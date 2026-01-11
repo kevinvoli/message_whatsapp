@@ -12,15 +12,15 @@ export class WhatsappMessageReactionService {
     return `This action returns all whatsappMessageReaction`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappMessageReaction`;
   }
 
-  update(id: number, updateWhatsappMessageReactionDto: UpdateWhatsappMessageReactionDto) {
+  update(id: string, updateWhatsappMessageReactionDto: UpdateWhatsappMessageReactionDto) {
     return `This action updates a #${id} whatsappMessageReaction`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappMessageReaction`;
   }
 }

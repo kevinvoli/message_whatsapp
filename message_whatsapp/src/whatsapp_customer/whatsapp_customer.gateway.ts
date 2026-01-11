@@ -19,17 +19,17 @@ export class WhatsappCustomerGateway {
   }
 
   @SubscribeMessage('findOneWhatsappCustomer')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappCustomerService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappCustomer')
   update(@MessageBody() updateWhatsappCustomerDto: UpdateWhatsappCustomerDto) {
-    return this.whatsappCustomerService.update(updateWhatsappCustomerDto.id, updateWhatsappCustomerDto);
+    // return this.whatsappCustomerService.update(updateWhatsappCustomerDto.id, updateWhatsappCustomerDto);
   }
 
   @SubscribeMessage('removeWhatsappCustomer')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappCustomerService.remove(id);
   }
 }

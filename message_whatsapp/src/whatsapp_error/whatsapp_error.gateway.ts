@@ -19,17 +19,17 @@ export class WhatsappErrorGateway {
   }
 
   @SubscribeMessage('findOneWhatsappError')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappErrorService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappError')
   update(@MessageBody() updateWhatsappErrorDto: UpdateWhatsappErrorDto) {
-    return this.whatsappErrorService.update(updateWhatsappErrorDto.id, updateWhatsappErrorDto);
+    // return this.whatsappErrorService.update(updateWhatsappErrorDto.id, updateWhatsappErrorDto);
   }
 
   @SubscribeMessage('removeWhatsappError')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappErrorService.remove(id);
   }
 }

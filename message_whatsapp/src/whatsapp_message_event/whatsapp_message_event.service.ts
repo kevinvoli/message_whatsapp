@@ -12,15 +12,15 @@ export class WhatsappMessageEventService {
     return `This action returns all whatsappMessageEvent`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappMessageEvent`;
   }
 
-  update(id: number, updateWhatsappMessageEventDto: UpdateWhatsappMessageEventDto) {
+  update(id: string, updateWhatsappMessageEventDto: UpdateWhatsappMessageEventDto) {
     return `This action updates a #${id} whatsappMessageEvent`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappMessageEvent`;
   }
 }

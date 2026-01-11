@@ -20,7 +20,7 @@ export class WhatsappConversationService {
   }
 
   findByChatId(chatId: string) {
-    return this.repo.findOne({ where: { chatId } });
+    // return this.repo.findOne();
   }
 
 
@@ -38,10 +38,10 @@ export class WhatsappConversationService {
   if (!conversation) {
     return;
   }
-    return this.repo.update(conversation, updateWhatsappConversationDto);
+    // return this.repo.update(conversation, updateWhatsappConversationDto);
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappConversation`;
   }
 }

@@ -12,15 +12,15 @@ export class WhatsappErrorService {
     return `This action returns all whatsappError`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappError`;
   }
 
-  update(id: number, updateWhatsappErrorDto: UpdateWhatsappErrorDto) {
+  update(id: string, updateWhatsappErrorDto: UpdateWhatsappErrorDto) {
     return `This action updates a #${id} whatsappError`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappError`;
   }
 }

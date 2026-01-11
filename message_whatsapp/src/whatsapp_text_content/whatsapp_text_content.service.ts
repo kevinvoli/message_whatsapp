@@ -12,15 +12,15 @@ export class WhatsappTextContentService {
     return `This action returns all whatsappTextContent`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappTextContent`;
   }
 
-  update(id: number, updateWhatsappTextContentDto: UpdateWhatsappTextContentDto) {
+  update(id: string, updateWhatsappTextContentDto: UpdateWhatsappTextContentDto) {
     return `This action updates a #${id} whatsappTextContent`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappTextContent`;
   }
 }

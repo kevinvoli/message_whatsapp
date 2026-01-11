@@ -19,17 +19,17 @@ export class WhatsappAgentGateway {
   }
 
   @SubscribeMessage('findOneWhatsappAgent')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappAgentService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappAgent')
   update(@MessageBody() updateWhatsappAgentDto: UpdateWhatsappAgentDto) {
-    return this.whatsappAgentService.update(updateWhatsappAgentDto.id, updateWhatsappAgentDto);
+    // return this.whatsappAgentService.update(updateWhatsappAgentDto.id, updateWhatsappAgentDto);
   }
 
   @SubscribeMessage('removeWhatsappAgent')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappAgentService.remove(id);
   }
 }

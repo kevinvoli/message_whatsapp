@@ -19,17 +19,17 @@ export class WhatsappMediaContentGateway {
   }
 
   @SubscribeMessage('findOneWhatsappMediaContent')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappMediaContentService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappMediaContent')
   update(@MessageBody() updateWhatsappMediaContentDto: UpdateWhatsappMediaContentDto) {
-    return this.whatsappMediaContentService.update(updateWhatsappMediaContentDto.id, updateWhatsappMediaContentDto);
+    // return this.whatsappMediaContentService.update(updateWhatsappMediaContentDto.id, updateWhatsappMediaContentDto);
   }
 
   @SubscribeMessage('removeWhatsappMediaContent')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappMediaContentService.remove(id);
   }
 }

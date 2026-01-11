@@ -19,17 +19,17 @@ export class WhatsappStatusesGateway {
   }
 
   @SubscribeMessage('findOneWhatsappStatus')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappStatusesService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappStatus')
   update(@MessageBody() updateWhatsappStatusDto: UpdateWhatsappStatusDto) {
-    return this.whatsappStatusesService.update(updateWhatsappStatusDto.id, updateWhatsappStatusDto);
+    // return this.whatsappStatusesService.update(updateWhatsappStatusDto.id, updateWhatsappStatusDto);
   }
 
   @SubscribeMessage('removeWhatsappStatus')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappStatusesService.remove(id);
   }
 }

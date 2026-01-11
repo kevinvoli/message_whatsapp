@@ -1,43 +1,151 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
+import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
+import { WhatsappMessageContext } from 'src/whatsapp_message_context/entities/whatsapp_message_context.entity';
+import { WhatsappMessageEvent } from 'src/whatsapp_message_event/entities/whatsapp_message_event.entity';
+import { WhatsappMessageReaction } from 'src/whatsapp_message_reaction/entities/whatsapp_message_reaction.entity';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+
+export enum MessageDirection {
+  IN = 'IN',
+  OUT = 'OUT',
+}
+export enum WhatsappMessageStatus {
+  FAILED = 'failed',
+  PENDING = 'pending',
+  SENT = 'sent',
+  DELIVERED = 'delivered',
+  READ = 'read',
+  PLAYED = 'played',
+  DELETED = 'deleted',
+}
 
 @Entity()
+@Index('UQ_whatsapp_message_message_id', ['message_id'], { unique: true })
 export class WhatsappMessage {
-@PrimaryGeneratedColumn('uuid',{name: 'id', comment:'Primary key - Unique trajet identifier'})
+  @PrimaryGeneratedColumn('uuid', {
+    name: 'id',
+    comment: 'Primary key - Unique trajet identifier',
+  })
   id: string;
 
-  @Column({name:'external_id', type:'string', length:100, nullable:false, })
- external_id :string;
+    @Column({
+    name: 'message_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  message_id: string;
 
-@Column({name:'conversation_id', type:'string', length:100, nullable:false, })
-conversation_id :string
+  @Column({ name: 'external_id', type: 'varchar', length: 100, nullable: false })
+  external_id: string;
 
-@Column({name:'direction', type:'string', length:100, nullable:false, })
-direction: 'IN'| 'OUT'
+   @Column({
+    name: 'chat_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  chat_id: string;
 
-@Column({name:'from_me', type:'bool', length:100, nullable:false, })
-from_me :boolean
+  @ManyToOne(() => WhatsappChat, (data) => data.conversation)
+    @JoinColumn({
+      name: 'chat_id',
+      referencedColumnName: 'chat_id',
+    })
+    chat: WhatsappChat;
 
-@Column({name:'sender_phone.', type:'string', length:100, nullable:false, })
-sender_phone: string;
+  @Column({
+    name: 'conversation_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  conversation_id: string;
 
-@Column({name:'sender_name', type:'string', length:100, nullable:false, })
-sender_name:string;
 
-@Column({name:'timestamp', type:'timestamp', length:100, nullable:false, })
-timestamp:Date;
+  @ManyToOne(() => WhatsappConversation, (conversation) => conversation.message)
+  @JoinColumn({ name: 'conversation_id', referencedColumnName: 'conversation_id' })
+  conversation: WhatsappConversation;
 
-@Column({name:'status', type:'enum', length:100, nullable:false, })
-status :  'failed'| 'pending'| 'sent'| 'delivered' | 'read' | 'played'| 'deleted';
+  @OneToMany(() => WhatsappMessageContent, (messageContent) => messageContent.message)
+  messageCnntent: WhatsappMessageContent[];
 
-@Column({name:'source', type:'string', length:100, nullable:false, })
-source : string
+  @OneToMany(() => WhatsappMessageContext, (messageContext) => messageContext.message)
+  messagecontext: WhatsappMessageContext[];
 
-@CreateDateColumn({name:'createdAt', type:'timestamp', default: () => 'CURRENT_TIMESTAMP', comment:'Timestamp when the trajet was created'})
+
+  @OneToMany(() => WhatsappMessageEvent, (messageEvent) => messageEvent.message)
+  event: WhatsappMessageEvent[];
+
+   @OneToMany(() => WhatsappMessageReaction, (messageReaction) => messageReaction.message)
+  reaction: WhatsappMessageReaction[];
+
+  @Column({ name: 'direction', type: 'enum', enum: MessageDirection, nullable: false })
+  direction: MessageDirection;
+
+  @Column({ name: 'from_me', type: 'bool', nullable: false })
+  from_me: boolean;
+
+  @Column({
+    name: 'sender_phone',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  sender_phone: string;
+
+  @Column({ name: 'sender_name', type: 'varchar', length: 100, nullable: false })
+  sender_name: string;
+
+  @Column({
+    name: 'timestamp',
+    type: 'timestamp',
+    precision:0,
+    nullable: false,
+  })
+  timestamp: Date;
+
+  @Column({ name: 'status', type: 'enum',enum:WhatsappMessageStatus, nullable: false })
+  status:WhatsappMessageStatus;
+
+  @Column({ name: 'source', type: 'varchar', length: 100, nullable: false })
+  source: string;
+
+  @CreateDateColumn({
+    name: 'createdAt',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    comment: 'Timestamp when the trajet was created',
+  })
   createdAt: Date;
 
-@UpdateDateColumn({name:'updatedAt', type:'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP', comment:'Timestamp when the trajet was last updated'})
-updatedAt: Date;
+  @UpdateDateColumn({
+    name: 'updatedAt',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+    comment: 'Timestamp when the trajet was last updated',
+  })
+  updatedAt: Date;
 
-@DeleteDateColumn({name:'deletedAt', type:'timestamp', nullable:true, comment:'Timestamp when the trajet was deleted'})
-deletedAt: Date | null;
+  @DeleteDateColumn({
+    name: 'deletedAt',
+    type: 'timestamp',
+    nullable: true,
+    comment: 'Timestamp when the trajet was deleted',
+  })
+  deletedAt: Date | null;
 }

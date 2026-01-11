@@ -19,17 +19,17 @@ export class WhatsappChatLabelGateway {
   }
 
   @SubscribeMessage('findOneWhatsappChatLabel')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappChatLabelService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappChatLabel')
   update(@MessageBody() updateWhatsappChatLabelDto: UpdateWhatsappChatLabelDto) {
-    return this.whatsappChatLabelService.update(updateWhatsappChatLabelDto.id, updateWhatsappChatLabelDto);
+    // return this.whatsappChatLabelService.update(updateWhatsappChatLabelDto.id, updateWhatsappChatLabelDto);
   }
 
   @SubscribeMessage('removeWhatsappChatLabel')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappChatLabelService.remove(id);
   }
 }

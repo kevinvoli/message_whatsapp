@@ -19,17 +19,17 @@ export class WhatsappMessageReactionGateway {
   }
 
   @SubscribeMessage('findOneWhatsappMessageReaction')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappMessageReactionService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappMessageReaction')
   update(@MessageBody() updateWhatsappMessageReactionDto: UpdateWhatsappMessageReactionDto) {
-    return this.whatsappMessageReactionService.update(updateWhatsappMessageReactionDto.id, updateWhatsappMessageReactionDto);
+    // return this.whatsappMessageReactionService.update(updateWhatsappMessageReactionDto.id, updateWhatsappMessageReactionDto);
   }
 
   @SubscribeMessage('removeWhatsappMessageReaction')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappMessageReactionService.remove(id);
   }
 }

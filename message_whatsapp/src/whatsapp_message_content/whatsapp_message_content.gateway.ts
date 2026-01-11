@@ -19,17 +19,17 @@ export class WhatsappMessageContentGateway {
   }
 
   @SubscribeMessage('findOneWhatsappMessageContent')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappMessageContentService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappMessageContent')
   update(@MessageBody() updateWhatsappMessageContentDto: UpdateWhatsappMessageContentDto) {
-    return this.whatsappMessageContentService.update(updateWhatsappMessageContentDto.id, updateWhatsappMessageContentDto);
+    // return this.whatsappMessageContentService.update(updateWhatsappMessageContentDto.id, updateWhatsappMessageContentDto);
   }
 
   @SubscribeMessage('removeWhatsappMessageContent')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappMessageContentService.remove(id);
   }
 }

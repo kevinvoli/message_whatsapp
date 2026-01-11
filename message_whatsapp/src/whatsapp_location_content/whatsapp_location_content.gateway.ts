@@ -19,17 +19,17 @@ export class WhatsappLocationContentGateway {
   }
 
   @SubscribeMessage('findOneWhatsappLocationContent')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappLocationContentService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappLocationContent')
   update(@MessageBody() updateWhatsappLocationContentDto: UpdateWhatsappLocationContentDto) {
-    return this.whatsappLocationContentService.update(updateWhatsappLocationContentDto.id, updateWhatsappLocationContentDto);
+    // return this.whatsappLocationContentService.update(updateWhatsappLocationContentDto.id, updateWhatsappLocationContentDto);
   }
 
   @SubscribeMessage('removeWhatsappLocationContent')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappLocationContentService.remove(id);
   }
 }

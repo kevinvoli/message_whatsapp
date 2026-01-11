@@ -19,17 +19,17 @@ export class WhatsappInteractiveContentGateway {
   }
 
   @SubscribeMessage('findOneWhatsappInteractiveContent')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappInteractiveContentService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappInteractiveContent')
   update(@MessageBody() updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto) {
-    return this.whatsappInteractiveContentService.update(updateWhatsappInteractiveContentDto.id, updateWhatsappInteractiveContentDto);
+    // return this.whatsappInteractiveContentService.update(updateWhatsappInteractiveContentDto.id, updateWhatsappInteractiveContentDto);
   }
 
   @SubscribeMessage('removeWhatsappInteractiveContent')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappInteractiveContentService.remove(id);
   }
 }

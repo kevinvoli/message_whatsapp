@@ -12,15 +12,15 @@ export class WhatsappMessageContextService {
     return `This action returns all whatsappMessageContext`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappMessageContext`;
   }
 
-  update(id: number, updateWhatsappMessageContextDto: UpdateWhatsappMessageContextDto) {
+  update(id: string, updateWhatsappMessageContextDto: UpdateWhatsappMessageContextDto) {
     return `This action updates a #${id} whatsappMessageContext`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappMessageContext`;
   }
 }

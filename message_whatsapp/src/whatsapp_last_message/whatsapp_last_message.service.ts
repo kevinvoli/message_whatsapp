@@ -12,15 +12,15 @@ export class WhatsappLastMessageService {
     return `This action returns all whatsappLastMessage`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappLastMessage`;
   }
 
-  update(id: number, updateWhatsappLastMessageDto: UpdateWhatsappLastMessageDto) {
+  update(id: string, updateWhatsappLastMessageDto: UpdateWhatsappLastMessageDto) {
     return `This action updates a #${id} whatsappLastMessage`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappLastMessage`;
   }
 }

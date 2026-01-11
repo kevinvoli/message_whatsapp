@@ -12,15 +12,15 @@ export class WhatsappButtonService {
     return `This action returns all whatsappButton`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappButton`;
   }
 
-  update(id: number, updateWhatsappButtonDto: UpdateWhatsappButtonDto) {
+  update(id: string, updateWhatsappButtonDto: UpdateWhatsappButtonDto) {
     return `This action updates a #${id} whatsappButton`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappButton`;
   }
 }

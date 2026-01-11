@@ -19,17 +19,17 @@ export class WhatsappLastMessageGateway {
   }
 
   @SubscribeMessage('findOneWhatsappLastMessage')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappLastMessageService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappLastMessage')
   update(@MessageBody() updateWhatsappLastMessageDto: UpdateWhatsappLastMessageDto) {
-    return this.whatsappLastMessageService.update(updateWhatsappLastMessageDto.id, updateWhatsappLastMessageDto);
+    // return this.whatsappLastMessageService.update(updateWhatsappLastMessageDto.id, updateWhatsappLastMessageDto);
   }
 
   @SubscribeMessage('removeWhatsappLastMessage')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappLastMessageService.remove(id);
   }
 }

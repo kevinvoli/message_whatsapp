@@ -12,15 +12,15 @@ export class WhatsappChatLabelService {
     return `This action returns all whatsappChatLabel`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappChatLabel`;
   }
 
-  update(id: number, updateWhatsappChatLabelDto: UpdateWhatsappChatLabelDto) {
+  update(id: string, updateWhatsappChatLabelDto: UpdateWhatsappChatLabelDto) {
     return `This action updates a #${id} whatsappChatLabel`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappChatLabel`;
   }
 }

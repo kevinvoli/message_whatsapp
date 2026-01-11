@@ -19,17 +19,17 @@ export class WhatsappContactsGateway {
   }
 
   @SubscribeMessage('findOneWhatsappContact')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappContactsService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappContact')
   update(@MessageBody() updateWhatsappContactDto: UpdateWhatsappContactDto) {
-    return this.whatsappContactsService.update(updateWhatsappContactDto.id, updateWhatsappContactDto);
+    // return this.whatsappContactsService.update(updateWhatsappContactDto.id, updateWhatsappContactDto);
   }
 
   @SubscribeMessage('removeWhatsappContact')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappContactsService.remove(id);
   }
 }

@@ -12,15 +12,15 @@ export class WhatsappMediaService {
     return `This action returns all whatsappMedia`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappMedia`;
   }
 
-  update(id: number, updateWhatsappMediaDto: UpdateWhatsappMediaDto) {
+  update(id: string, updateWhatsappMediaDto: UpdateWhatsappMediaDto) {
     return `This action updates a #${id} whatsappMedia`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappMedia`;
   }
 }

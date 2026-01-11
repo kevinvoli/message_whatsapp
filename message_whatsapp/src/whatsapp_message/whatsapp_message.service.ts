@@ -4,12 +4,11 @@ import { WhatsappMessage } from './entities/whatsapp_message.entity';
 @Injectable()
 export class WhatsappMessageService {
   create(
-    
       createWhatsappMessageDto: Partial<WhatsappMessage>,
-      direction: 'IN',
-      type,
-      content,
-      timestamp,
+      // direction: 'IN',
+      // type,
+      // content,
+      // timestamp,
     ): string {
 
     return 'This action adds a new whatsappMessage';
@@ -20,15 +19,15 @@ export class WhatsappMessageService {
     return `This action returns all whatsappMessage`;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} whatsappMessage`;
+  findOne(id: string) {
+    
   }
 
-  update(id: number, updateWhatsappMessageDto: Partial<WhatsappMessage>) {
+   update(id: string, updateWhatsappMessageDto: Partial<WhatsappMessage>) {
     return `This action updates a #${id} whatsappMessage`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappMessage`;
   }
 }

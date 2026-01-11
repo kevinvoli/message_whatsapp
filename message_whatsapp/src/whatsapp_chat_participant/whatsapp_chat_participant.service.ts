@@ -12,15 +12,15 @@ export class WhatsappChatParticipantService {
     return `This action returns all whatsappChatParticipant`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappChatParticipant`;
   }
 
-  update(id: number, updateWhatsappChatParticipantDto: UpdateWhatsappChatParticipantDto) {
+  update(id: string, updateWhatsappChatParticipantDto: UpdateWhatsappChatParticipantDto) {
     return `This action updates a #${id} whatsappChatParticipant`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappChatParticipant`;
   }
 }

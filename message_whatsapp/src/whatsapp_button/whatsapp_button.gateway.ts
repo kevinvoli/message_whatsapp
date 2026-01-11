@@ -19,17 +19,17 @@ export class WhatsappButtonGateway {
   }
 
   @SubscribeMessage('findOneWhatsappButton')
-  findOne(@MessageBody() id: number) {
+  findOne(@MessageBody() id: string) {
     return this.whatsappButtonService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappButton')
   update(@MessageBody() updateWhatsappButtonDto: UpdateWhatsappButtonDto) {
-    return this.whatsappButtonService.update(updateWhatsappButtonDto.id, updateWhatsappButtonDto);
+    // return this.whatsappButtonService.update(updateWhatsappButtonDto.id, updateWhatsappButtonDto);
   }
 
   @SubscribeMessage('removeWhatsappButton')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappButtonService.remove(id);
   }
 }

@@ -12,15 +12,15 @@ export class WhatsappStatusesService {
     return `This action returns all whatsappStatuses`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappStatus`;
   }
 
-  update(id: number, updateWhatsappStatusDto: UpdateWhatsappStatusDto) {
+  update(id: string, updateWhatsappStatusDto: UpdateWhatsappStatusDto) {
     return `This action updates a #${id} whatsappStatus`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappStatus`;
   }
 }

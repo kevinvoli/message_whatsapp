@@ -1,7 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { EventEmitter } from 'events';
+
+
 
 async function bootstrap() {
+   EventEmitter.defaultMaxListeners = 0;
   const app = await NestFactory.create(AppModule);
 
   const corsOptions = {

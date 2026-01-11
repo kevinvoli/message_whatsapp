@@ -12,15 +12,15 @@ export class WhatsappInteractiveContentService {
     return `This action returns all whatsappInteractiveContent`;
   }
 
-  findOne(id: number) {
+  findOne(id: string) {
     return `This action returns a #${id} whatsappInteractiveContent`;
   }
 
-  update(id: number, updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto) {
+  update(id: string, updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto) {
     return `This action updates a #${id} whatsappInteractiveContent`;
   }
 
-  remove(id: number) {
+  remove(id: string) {
     return `This action removes a #${id} whatsappInteractiveContent`;
   }
 }

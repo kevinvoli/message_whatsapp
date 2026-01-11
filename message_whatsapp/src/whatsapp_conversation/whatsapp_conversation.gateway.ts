@@ -19,17 +19,17 @@ export class WhatsappConversationGateway {
   }
 
   @SubscribeMessage('findOneWhatsappConversation')
-  findOne(@MessageBody() id: number) {
-    return this.whatsappConversationService.findOne(id);
+  findOne(@MessageBody() id: string) {
+    // return this.whatsappConversationService.findOne(id);
   }
 
   @SubscribeMessage('updateWhatsappConversation')
   update(@MessageBody() updateWhatsappConversationDto: UpdateWhatsappConversationDto) {
-    return this.whatsappConversationService.update(updateWhatsappConversationDto.id, updateWhatsappConversationDto);
+    // return this.whatsappConversationService.update(updateWhatsappConversationDto.id, updateWhatsappConversationDto);
   }
 
   @SubscribeMessage('removeWhatsappConversation')
-  remove(@MessageBody() id: number) {
+  remove(@MessageBody() id: string) {
     return this.whatsappConversationService.remove(id);
   }
 }
