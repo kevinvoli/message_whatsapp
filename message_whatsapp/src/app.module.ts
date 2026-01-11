@@ -27,6 +27,7 @@ import { WhapiModule } from './whapi/whapi.module';
 // import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
+import { WhatsappCommercialModule } from './whatsapp-commercial/whatsapp-commercial.module';
 import * as Joi from 'joi';
 
 @Module({
@@ -41,7 +42,7 @@ import * as Joi from 'joi';
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappChatParticipantModule, WhatsappChatEventModule, WhatsappMessageModule, WhatsappMessageContentModule, WhatsappTextContentModule, WhatsappMediaContentModule, WhatsappInteractiveContentModule, WhatsappMessageEventModule, WhatsappMessageReactionModule, WhatsappMessageContextModule, WhatsappConversationModule, WhatsappAgentModule, WhatsappCustomerModule, WhatsappContactsModule, WhatsappStatusesModule, WhatsappMediaModule, WhatsappLocationContentModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappChatParticipantModule, WhatsappChatEventModule, WhatsappMessageModule, WhatsappMessageContentModule, WhatsappTextContentModule, WhatsappMediaContentModule, WhatsappInteractiveContentModule, WhatsappMessageEventModule, WhatsappMessageReactionModule, WhatsappMessageContextModule, WhatsappConversationModule, WhatsappAgentModule, WhatsappCustomerModule, WhatsappContactsModule, WhatsappStatusesModule, WhatsappMediaModule, WhatsappLocationContentModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, WhatsappCommercialModule],
   controllers: [AppController],
   providers: [AppService],
 })
