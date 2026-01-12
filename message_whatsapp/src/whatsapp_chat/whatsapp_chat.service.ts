@@ -73,7 +73,7 @@ export class WhatsappChatService {
 
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chat_id: chatId } });
+      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel',], });
     }
     return this.chatRepository.find();
   }

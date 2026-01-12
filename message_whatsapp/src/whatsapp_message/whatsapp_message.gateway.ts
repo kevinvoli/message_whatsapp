@@ -1,15 +1,24 @@
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { UpdateWhatsappMessageDto } from './dto/update-whatsapp_message.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect, ConnectedSocket } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+  WebSocketServer,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 
-
 @WebSocketGateway({
   cors: { origin: '*' },
 })
-export class WhatsappMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class WhatsappMessageGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   constructor(
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
@@ -17,8 +26,8 @@ export class WhatsappMessageGateway implements OnGatewayConnection, OnGatewayDis
 
   @WebSocketServer()
   server: Server;
-  
-   handleConnection(client: Socket) {
+
+  handleConnection(client: Socket) {
     console.log('🟢 Client connecté:', client.id);
   }
 
@@ -26,27 +35,23 @@ export class WhatsappMessageGateway implements OnGatewayConnection, OnGatewayDis
     console.log('🔴 Client déconnecté:', client.id);
   }
 
-   // AGENT ONLINE
+  // AGENT ONLINE
   // =========================
-  @SubscribeMessage('join:commercial')
-async  handleAgentOnline(
+  @SubscribeMessage('get:conversation')
+  async handleAgentOnline(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { agentId: string }
+    @MessageBody() data: { agentId: string },
   ) {
     console.log('👨‍💻 Agent en ligne:', data);
-   const chat =await  this.chatService.findAll();
+    const chat = await this.chatService.findAll();
 
-   console.log("liste des chat ici", chat);
-   
-
+    console.log('liste des chat ici', chat);
 
     // MOCK conversations
-    client.emit('conversation:list', [
-      ...chat
-    ]);
+    client.emit('conversation:get', [...chat]);
   }
 
-   @SubscribeMessage('conversation:join')
+  @SubscribeMessage('conversation:join')
   handleJoin(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
@@ -55,6 +60,16 @@ async  handleAgentOnline(
 
     client.join(data.conversationId);
   }
+
+  //   @SubscribeMessage('get:conversation')
+  // handleGetConversation(
+  //   @ConnectedSocket() client: Socket,
+  //   @MessageBody() data: { conversationId: string },
+  // ) {
+  //   console.log('📥 Join conversation:', data.conversationId);
+
+  //   client.join(data.conversationId);
+  // }
 
   // =========================
   // SEND MESSAGE
@@ -78,7 +93,7 @@ async  handleAgentOnline(
     this.server.to(data.conversationId).emit('message:received', message);
   }
 
-   // AGENT OFFLINE
+  // AGENT OFFLINE
   // =========================
   @SubscribeMessage('agent:offline')
   handleAgentOffline(@ConnectedSocket() client: Socket) {

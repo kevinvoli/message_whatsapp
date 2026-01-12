@@ -6,7 +6,7 @@ import {
 } from './entities/whatsapp_message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
+import { WhapiMessage, WhapiText } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 
 @Injectable()
@@ -26,6 +26,9 @@ export class WhatsappMessageService {
         message.from_name,
         '04b6c42f-5df8-4d93-8fd1-e1eb2c420ef7',
       );
+      if (!chat) {
+        throw new Error('Chat not found or created');
+      }
 
       const chekMessage = await this.messageRepository.findOne({
         where: { message_id: message.id },
@@ -37,14 +40,13 @@ export class WhatsappMessageService {
         return chekMessage;
       }
 
-      if (!chat) {
-        throw new Error('Chat not found or created');
-      }
-      const data = {
+      
+      const data: Partial<WhatsappMessage> = {
         message_id: message.id,
         external_id: message.id,
         chat_id: message.chat_id,
         conversation_id: null,
+        commercial_id: chat.commercial_id,
         direction: message.from_me ? MessageDirection.OUT : MessageDirection.IN,
         from_me: message.from_me,
         sender_phone: message.from,
@@ -54,6 +56,7 @@ export class WhatsappMessageService {
         timestamp: new Date(message.timestamp * 1000),
         commercial: chat.commercial,
         source: message.source,
+        text: message.type === 'text' ? (message.text as WhapiText).body : null,
       };
 
       const messageEntity = this.messageRepository.create(data);

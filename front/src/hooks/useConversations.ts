@@ -3,10 +3,14 @@ import { Conversation, Message, WebSocketMessage } from '@/types/chat';
 import { useWebSocket } from './useWebSocket';
 import { useAuth } from './useAuth';
 
+interface MessagesLoadedMessage {
+  type: 'messages_loaded';
+  messages: Message[];
+}
+
 const API_BASE_URL = process.env.API_URL || 'http://localhost:3000/';
 
 export const useConversations = () => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,7 +23,11 @@ export const useConversations = () => {
     sendMessage: sendWebSocketMessage, 
     joinConversation, 
     leaveConversation,
+    loadConversation,
+    loadMessages: loadMessagesWS,
     lastMessage,
+    conversations,
+    setConversations,
     reconnect 
   } = useWebSocket(commercial);
   
@@ -35,23 +43,29 @@ export const useConversations = () => {
     messagesRef.current = messages;
   }, [messages]);
 
-  // Gestion des messages WebSocket entrants
+
   useEffect(() => {
     if (!lastMessage) return;
+
+    if ((lastMessage as unknown as MessagesLoadedMessage).type === 'messages_loaded' && (lastMessage as unknown as MessagesLoadedMessage).messages) {
+      setMessages((lastMessage as unknown as MessagesLoadedMessage).messages);
+      return;
+    }
 
     const { conversationId, message } = lastMessage;
     
     console.log('🔄 Traitement du message WebSocket:', lastMessage);
+    console.log('🔄  du message WebSocket:', conversations);
     
     // Mettre à jour les messages si c'est la conversation sélectionnée
-    if (selectedConversation?.id === conversationId) {
+    if (selectedConversation?.id === conversationId && message !== undefined) {
       setMessages(prev => [...prev, message]);
     }
     
     // Mettre à jour la conversation dans la liste
     setConversations(prev => 
       prev.map(conv => {
-        if (conv.id === conversationId) {
+        if (conv.id === conversationId && message !== undefined) {
           return {
             ...conv,
             lastMessage: message,
@@ -61,11 +75,11 @@ export const useConversations = () => {
         return conv;
       })
     );
-  }, [lastMessage, selectedConversation]);
+  }, [lastMessage, selectedConversation, conversations, setConversations]);
 
-  const getAuthToken = (): string | null => {
+  const getAuthToken = useCallback((): string | null => {
     return token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
-  };
+  }, [token]);
 
   // READ: Récupérer toutes les conversations
   const loadConversations = useCallback(async (commercialId?: string) => {
@@ -82,25 +96,9 @@ export const useConversations = () => {
     }
 
     try {
-      const url = commercialId 
-        ? `${API_BASE_URL}conversations/commercial/${commercialId}`
-        : `${API_BASE_URL}conversations`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      loadConversation(commercialId || commercial?.id || '')
 
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const data: Conversation[] = await response.json();
-      setConversations(data);
-      return data;
+     
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des conversations';
       setError(errorMessage);
@@ -109,7 +107,7 @@ export const useConversations = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAuthToken, commercial?.id, loadConversation]);
 
   // READ: Charger les messages d'une conversation
   const loadMessages = useCallback(async (conversationId: string) => {
@@ -124,7 +122,7 @@ export const useConversations = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/22507711898@s.whatsapp.net`, {
+      const response = await fetch(`${API_BASE_URL}/chat/${conversationId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -147,7 +145,7 @@ export const useConversations = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAuthToken]);
 
   // CREATE: Envoyer un message (WebSocket + backup HTTP)
   const sendMessage = useCallback(async (
@@ -204,7 +202,7 @@ export const useConversations = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/22507711898@s.whatsapp.net`, {
+      const response = await fetch(`${API_BASE_URL}/chat/${conversationId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -226,13 +224,14 @@ export const useConversations = () => {
         )
       );
       
-      // Mettre à jour la conversation
-      const updatedConv = await getConversation(conversationId, );
-      if (updatedConv) {
-        setConversations(prev => 
-          prev.map(conv => conv.id === conversationId ? updatedConv : conv)
-        );
-      }
+      // Mettre à jour la conversation (simplifié)
+      setConversations(prev => 
+        prev.map(conv => 
+          conv.id === conversationId 
+            ? { ...conv, lastMessage: serverMessage } 
+            : conv
+        )
+      );
       
       return serverMessage;
     } catch (err) {
@@ -251,7 +250,7 @@ export const useConversations = () => {
       console.error('Erreur sendMessage:', err);
       return null;
     }
-  }, [isConnected, sendWebSocketMessage]);
+  }, [isConnected, sendWebSocketMessage, getAuthToken, setConversations]);
 
   // Sélectionner une conversation avec gestion WebSocket
   const selectConversation = useCallback(async (conv: Conversation) => {
@@ -269,16 +268,18 @@ export const useConversations = () => {
     );
     
     // Mettre à jour sur le serveur
-    await leaveConversation(conv.id, { unreadCount: 0 });
+    await leaveConversation(conv.id);
     
     // Charger les messages
-    await loadMessages(conv.id);
+    if (isConnected) {
+      loadMessagesWS(conv.id);
+    }
     
     // Rejoindre la conversation via WebSocket
     if (isConnected) {
       joinConversation(conv.id);
     }
-  }, [selectedConversation, leaveConversation, isConnected, joinConversation, loadMessages]);
+  }, [selectedConversation, leaveConversation, isConnected, joinConversation, loadMessagesWS, setConversations]);
 
  
   useEffect(() => {
@@ -291,7 +292,7 @@ export const useConversations = () => {
         leaveConversation(selectedConversation.id);
       }
     };
-  }, [selectedConversation, isConnected, joinConversation, leaveConversation]);
+  }, [selectedConversation, isConnected, joinConversation, leaveConversation,setConversations]);
 
   // Effet pour surveiller la connexion WebSocket
   useEffect(() => {
@@ -300,6 +301,20 @@ export const useConversations = () => {
       // Vous pourriez implémenter une logique de reconnexion ici
     }
   }, [isConnected, commercial]);
+
+  // Charger les conversations au chargement de la page via WebSocket
+  useEffect(() => {
+    if (isConnected && commercial) {
+      loadConversation(commercial.id);
+    }
+  }, [isConnected, commercial, loadConversation]);
+
+  // Sélectionner automatiquement la première conversation si aucune n'est sélectionnée
+  useEffect(() => {
+    if (conversations.length > 0 && !selectedConversation) {
+      selectConversation(conversations[0]);
+    }
+  }, [conversations, selectedConversation, selectConversation]);
 
   return {
     // State
@@ -323,10 +338,6 @@ export const useConversations = () => {
     
     // Conversations CRUD
     loadConversations,
-    getConversation: useCallback(async (id: string) => { /* ... */ }, []),
-    createConversation: useCallback(async (data) => { /* ... */ }, []),
-    updateConversation: useCallback(async (id, data) => { /* ... */ }, []),
-    deleteConversation: useCallback(async (id) => { /* ... */ }, []),
     
     // Messages
     loadMessages,

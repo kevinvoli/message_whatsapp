@@ -10,9 +10,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useConversations } from '@/hooks/useConversations';
 import { useRouter } from 'next/navigation';
+import { Conversation } from '../../types/chat';
 
 const WhatsAppPage = () => {
   const { commercial, initialized, logout } = useAuth();
+  // const { conversations } = useWebSocket();
+
+
+  
   const router = useRouter();
   const [isSending, setIsSending] = useState(false);
 

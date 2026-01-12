@@ -18,7 +18,6 @@ import {
 } from 'typeorm';
 import { WhatsappCommercial } from 'src/users/entities/user.entity';
 
-
 export enum MessageDirection {
   IN = 'IN',
   OUT = 'OUT',
@@ -42,7 +41,7 @@ export class WhatsappMessage {
   })
   id: string;
 
-    @Column({
+  @Column({
     name: 'message_id',
     type: 'varchar',
     length: 100,
@@ -50,10 +49,15 @@ export class WhatsappMessage {
   })
   message_id: string;
 
-  @Column({ name: 'external_id', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'external_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   external_id: string;
 
-   @Column({
+  @Column({
     name: 'chat_id',
     type: 'varchar',
     length: 100,
@@ -61,12 +65,12 @@ export class WhatsappMessage {
   })
   chat_id: string;
 
-  @ManyToOne(() => WhatsappChat, (data) => data.conversation)
-    @JoinColumn({
-      name: 'chat_id',
-      referencedColumnName: 'chat_id',
-    })
-    chat: WhatsappChat;
+  @ManyToOne(() => WhatsappChat, (data) => data.messages)
+  @JoinColumn({
+    name: 'chat_id',
+    referencedColumnName: 'chat_id',
+  })
+  chat: WhatsappChat;
 
   @Column({
     name: 'conversation_id',
@@ -76,42 +80,63 @@ export class WhatsappMessage {
   })
   conversation_id: string | null;
 
-    @Column({
+  @Column({
     name: 'commercial_id',
     type: 'varchar',
     length: 100,
     nullable: true,
   })
-  commercial_id: string ;
+  commercial_id: string | null;
 
-   @ManyToOne(() => WhatsappCommercial, (data) => data.messages)
-    @JoinColumn({
-      name: 'commercial_id',
-      referencedColumnName: 'id',
-    })
-    commercial: WhatsappCommercial;
+  @Column({
+    name: 'text',
+    type: 'varchar',
+    length: 200,
+    nullable: true,
+  })
+  text: string | null;
 
+  @ManyToOne(() => WhatsappCommercial, (data) => data.messages)
+  @JoinColumn({
+    name: 'commercial_id',
+    referencedColumnName: 'id',
+  })
+  commercial: WhatsappCommercial;
 
   @ManyToOne(() => WhatsappConversation, (conversation) => conversation.message)
-  @JoinColumn({ name: 'conversation_id', referencedColumnName: 'conversation_id' })
+  @JoinColumn({
+    name: 'conversation_id',
+    referencedColumnName: 'conversation_id',
+  })
   conversation: WhatsappConversation;
 
-  @OneToMany(() => WhatsappMessageContent, (messageContent) => messageContent.message)
+  @OneToMany(
+    () => WhatsappMessageContent,
+    (messageContent) => messageContent.message,
+  )
   messageCnntent: WhatsappMessageContent[];
 
-  @OneToMany(() => WhatsappMessageContext, (messageContext) => messageContext.message)
+  @OneToMany(
+    () => WhatsappMessageContext,
+    (messageContext) => messageContext.message,
+  )
   messagecontext: WhatsappMessageContext[];
-
 
   @OneToMany(() => WhatsappMessageEvent, (messageEvent) => messageEvent.message)
   event: WhatsappMessageEvent[];
 
-   @OneToMany(() => WhatsappMessageReaction, (messageReaction) => messageReaction.message)
+  @OneToMany(
+    () => WhatsappMessageReaction,
+    (messageReaction) => messageReaction.message,
+  )
   reaction: WhatsappMessageReaction[];
 
-  
-
-  @Column({ name: 'direction', type: 'enum', enum: MessageDirection, nullable: false })
+  @Column({
+    name: 'direction',
+    type: 'enum',
+    enum: MessageDirection,
+    nullable: false,
+  })
   direction: MessageDirection;
 
   @Column({ name: 'from_me', type: 'bool', nullable: false })
@@ -125,19 +150,29 @@ export class WhatsappMessage {
   })
   sender_phone: string;
 
-  @Column({ name: 'sender_name', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'sender_name',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   sender_name: string;
 
   @Column({
     name: 'timestamp',
     type: 'timestamp',
-    precision:0,
+    precision: 0,
     nullable: false,
   })
   timestamp: Date;
 
-  @Column({ name: 'status', type: 'enum',enum:WhatsappMessageStatus, nullable: false })
-  status:WhatsappMessageStatus;
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: WhatsappMessageStatus,
+    nullable: false,
+  })
+  status: WhatsappMessageStatus;
 
   @Column({ name: 'source', type: 'varchar', length: 100, nullable: false })
   source: string;

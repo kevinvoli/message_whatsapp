@@ -2,6 +2,7 @@ import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { WhatsappChatEvent } from 'src/whatsapp_chat_event/entities/whatsapp_chat_event.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Column,
   CreateDateColumn,
@@ -24,10 +25,10 @@ export class WhatsappChat {
   })
   id: string;
 
-  @Column({ name: 'commercial_id', type: 'varchar', length: 100, nullable: false })
-  commercial_id: string;
+  @Column({ name: 'commercial_id', type: 'varchar', length: 100, nullable: true })
+  commercial_id: string | null;
 
-  @ManyToOne(() => WhatsappCommercial, (data) => data.id)
+  @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
     @JoinColumn({
       name: 'commercial_id',
       referencedColumnName: 'id',
@@ -111,6 +112,9 @@ export class WhatsappChat {
 
      @OneToMany(() => WhatsappChatEvent, (data) => data.chat)
     chatEvent: WhatsappChatEvent[];
+
+    @OneToMany(()=> WhatsappMessage, (message) => message.chat)
+    messages: WhatsappMessage[];
 
   @CreateDateColumn({
     name: 'createdAt',
