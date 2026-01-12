@@ -4,7 +4,9 @@ import { UpdateWhatsappButtonDto } from './dto/update-whatsapp_button.dto';
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappButtonGateway {
   constructor(private readonly whatsappButtonService: WhatsappButtonService) {}
 

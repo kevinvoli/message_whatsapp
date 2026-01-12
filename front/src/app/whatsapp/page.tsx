@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -9,11 +9,20 @@ import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/hooks/useAuth';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useConversations } from '@/hooks/useConversations';
-import { LoginFormData } from '@/types/chat';
-import LoginForm from '@/components/auth/loginForm';
+import { useRouter } from 'next/navigation';
 
 const WhatsAppPage = () => {
-  const { commercial, login, logout } = useAuth();
+  const { commercial,initialized, logout } = useAuth();
+  const router = useRouter();
+
+  // 🔐 protection route
+  useEffect(() => {
+     if (!initialized) return;
+    if (!commercial) {
+      router.replace('/login');
+    }
+  }, [initialized, commercial, router]);
+
   const { isConnected, sendMessage } = useWebSocket(commercial);
   const {
     conversations,
@@ -27,45 +36,40 @@ const WhatsAppPage = () => {
     setMessages
   } = useConversations();
 
-  const handleLogin = async (formData: LoginFormData) => {
-    try {
-      const commercial = await login(formData.email, formData.password);
+  useEffect(() => {
+    if (commercial) {
       loadConversations(commercial.id);
-    } catch (error) {
-      console.error('Login failed:', error);
     }
-  };
+  }, [commercial]);
 
   const handleSendMessage = useCallback((text: string) => {
     if (!selectedConversation || !commercial) return;
 
-    const message = {
-      type: 'send_message' as const,
-      conversationId: selectedConversation.id,
-      clientPhone: selectedConversation.clientPhone,
-      text: text,
-      commercialId: commercial.id,
-      timestamp: new Date()
-    };
-
-    // Optimistic update
     const newMsg = {
       id: 'msg_temp_' + Date.now(),
-      text: text,
+      text,
       timestamp: new Date(),
       from: 'commercial' as const,
       status: 'sending' as const
     };
-    
-    setMessages(prev => [...prev, newMsg]);
-    
-    // Envoyer via WebSocket
-    sendMessage(message);
-  }, [selectedConversation, commercial, sendMessage, setMessages]);
 
-  if (!commercial) {
-    return <LoginForm onLogin={handleLogin} />;
-  }
+    setMessages(prev => [...prev, newMsg]);
+
+    sendMessage({
+      type: 'send_message',
+      conversationId: selectedConversation.id,
+      clientPhone: selectedConversation.clientPhone,
+      text,
+      commercialId: commercial.id,
+      timestamp: new Date()
+    });
+  }, [selectedConversation, commercial, sendMessage,
+  setMessages,]);
+
+  if (!commercial) return null;
+  if (!initialized) {
+  return null; // ou un loader
+} // évite flicker
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -88,15 +92,15 @@ const WhatsAppPage = () => {
             <ChatInput
               onSendMessage={handleSendMessage}
               isConnected={isConnected}
-              disabled={!selectedConversation}
             />
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-400">
             <div className="text-center">
               <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
-              <p className="text-xl font-semibold">Sélectionnez une conversation</p>
-              <p className="text-sm mt-2">Choisissez une conversation dans la liste pour commencer</p>
+              <p className="text-xl font-semibold">
+                Sélectionnez une conversation
+              </p>
             </div>
           </div>
         )}

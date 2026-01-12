@@ -27,8 +27,9 @@ import { WhapiModule } from './whapi/whapi.module';
 // import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
-import { WhatsappCommercialModule } from './whatsapp-commercial/whatsapp-commercial.module';
+
 import * as Joi from 'joi';
+import { WhatsappCommercialModule } from './users/users.module';
 
 @Module({
   imports: [

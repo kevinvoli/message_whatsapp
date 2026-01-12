@@ -4,7 +4,9 @@ import { UpdateWhatsappChatLabelDto } from './dto/update-whatsapp_chat_label.dto
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappChatLabelGateway {
   constructor(private readonly whatsappChatLabelService: WhatsappChatLabelService) {}
 

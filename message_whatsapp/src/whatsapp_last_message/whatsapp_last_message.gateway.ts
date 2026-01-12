@@ -4,7 +4,9 @@ import { UpdateWhatsappLastMessageDto } from './dto/update-whatsapp_last_message
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappLastMessageGateway {
   constructor(private readonly whatsappLastMessageService: WhatsappLastMessageService) {}
 

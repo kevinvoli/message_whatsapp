@@ -2,18 +2,27 @@ import React, { useState } from 'react';
 import { Phone } from 'lucide-react';
 import { LoginFormData } from '@/types/chat';
 
+
 interface LoginFormProps {
-  onLogin: (formData: LoginFormData) => void;
+  onLogin: (formData: LoginFormData) => Promise<void>;
   isLoading?: boolean;
+  error?: string | null;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading = false }) => {
-  const [formData, setFormData] = useState<LoginFormData>({ email: '', password: '' });
+const LoginForm: React.FC<LoginFormProps> = ({
+  onLogin,
+  isLoading = false,
+  error,
+}) => {
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    name: '',
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onLogin(formData);
-  };
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  await onLogin(formData);
+};
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-green-100">
@@ -22,35 +31,53 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, isLoading = false }) => 
           <div className="inline-block p-3 bg-green-100 rounded-full mb-4">
             <Phone className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">WhatsApp Commercial</h1>
-          <p className="text-gray-600">Connectez-vous pour gérer vos conversations</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            WhatsApp Commercial
+          </h1>
+          <p className="text-gray-600">
+            Connectez-vous pour gérer vos conversations
+          </p>
         </div>
-        
+
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email
+            </label>
             <input
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-600"
               placeholder="votre@email.com"
               required
             />
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              name
+            </label>
             <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              type="name"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-600"
               placeholder="••••••••"
               required
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={isLoading}

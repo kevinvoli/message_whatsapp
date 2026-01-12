@@ -2,7 +2,6 @@ export interface Commercial {
   id: string;
   name: string;
   email: string;
-  token: string;
 }
 
 export interface Message {
@@ -38,5 +37,5 @@ export interface WebSocketMessage {
 
 export interface LoginFormData {
   email: string;
-  password: string;
+  name: string;
 }

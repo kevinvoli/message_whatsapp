@@ -4,7 +4,9 @@ import { UpdateWhatsappLocationContentDto } from './dto/update-whatsapp_location
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappLocationContentGateway {
   constructor(private readonly whatsappLocationContentService: WhatsappLocationContentService) {}
 

@@ -4,7 +4,9 @@ import { UpdateWhatsappMessageEventDto } from './dto/update-whatsapp_message_eve
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappMessageEventGateway {
   constructor(private readonly whatsappMessageEventService: WhatsappMessageEventService) {}
 

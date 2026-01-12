@@ -4,7 +4,9 @@ import { UpdateWhatsappErrorDto } from './dto/update-whatsapp_error.dto';
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappErrorGateway {
   constructor(private readonly whatsappErrorService: WhatsappErrorService) {}
 

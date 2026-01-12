@@ -4,7 +4,9 @@ import { UpdateWhatsappChatDto } from './dto/update-whatsapp_chat.dto';
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappChatGateway {
   constructor(private readonly whatsappChatService: WhatsappChatService) {}
 

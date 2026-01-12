@@ -4,7 +4,9 @@ import { UpdateWhatsappInteractiveContentDto } from './dto/update-whatsapp_inter
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappInteractiveContentGateway {
   constructor(private readonly whatsappInteractiveContentService: WhatsappInteractiveContentService) {}
 

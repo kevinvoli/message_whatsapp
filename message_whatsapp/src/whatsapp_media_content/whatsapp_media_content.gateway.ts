@@ -4,7 +4,9 @@ import { UpdateWhatsappMediaContentDto } from './dto/update-whatsapp_media_conte
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: { origin: '*' },
+})
 export class WhatsappMediaContentGateway {
   constructor(private readonly whatsappMediaContentService: WhatsappMediaContentService) {}
 
