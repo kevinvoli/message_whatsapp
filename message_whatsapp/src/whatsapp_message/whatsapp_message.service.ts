@@ -1,29 +1,79 @@
 import { Injectable } from '@nestjs/common';
-import { WhatsappMessage } from './entities/whatsapp_message.entity';
+import {
+  MessageDirection,
+  WhatsappMessage,
+  WhatsappMessageStatus,
+} from './entities/whatsapp_message.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
+import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 
 @Injectable()
 export class WhatsappMessageService {
-  create(
-      createWhatsappMessageDto: Partial<WhatsappMessage>,
-      // direction: 'IN',
-      // type,
-      // content,
-      // timestamp,
-    ): string {
+  constructor(
+    @InjectRepository(WhatsappMessage)
+    private readonly messageRepository: Repository<WhatsappMessage>,
+    private readonly chatService: WhatsappChatService,
+  ) {}
 
-    return 'This action adds a new whatsappMessage';
+  async create(message: WhapiMessage) {
+    try {
+      console.log('message reçue du dispache', message);
+      const chat = await this.chatService.findOrCreateChat(
+        message.chat_id,
+        message.from,
+        message.from_name,
+        '04b6c42f-5df8-4d93-8fd1-e1eb2c420ef7',
+      );
+
+      const chekMessage = await this.messageRepository.findOne({
+        where: { message_id: message.id },
+      });
+
+      // assuming commercial with id "1"
+      if (chekMessage) {
+        console.log('Message already exists with id:', chekMessage.id);
+        return chekMessage;
+      }
+
+      if (!chat) {
+        throw new Error('Chat not found or created');
+      }
+      const data = {
+        message_id: message.id,
+        external_id: message.id,
+        chat_id: message.chat_id,
+        conversation_id: null,
+        direction: message.from_me ? MessageDirection.OUT : MessageDirection.IN,
+        from_me: message.from_me,
+        sender_phone: message.from,
+        sender_name: message.from_name,
+        status: WhatsappMessageStatus.DELIVERED,
+        chat: chat,
+        timestamp: new Date(message.timestamp * 1000),
+        commercial: chat.commercial,
+        source: message.source,
+      };
+
+      const messageEntity = this.messageRepository.create(data);
+
+      return this.messageRepository.save(messageEntity);
+    } catch (error) {
+      console.error('Error creating message:', error);
+      throw new Error(`Failed to create message: ${error}`);
+    }
   }
 
   findAll() {
-    
     return `This action returns all whatsappMessage`;
   }
 
   findOne(id: string) {
-    
+    return `This action returns a #${id} whatsappMessage`;
   }
 
-   update(id: string, updateWhatsappMessageDto: Partial<WhatsappMessage>) {
+  update(id: string, updateWhatsappMessageDto: Partial<WhatsappMessage>) {
     return `This action updates a #${id} whatsappMessage`;
   }
 

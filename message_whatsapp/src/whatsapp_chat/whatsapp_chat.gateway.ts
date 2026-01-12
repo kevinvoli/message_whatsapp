@@ -1,5 +1,4 @@
 import { WhatsappChatService } from './whatsapp_chat.service';
-import { CreateWhatsappChatDto } from './dto/create-whatsapp_chat.dto';
 import { UpdateWhatsappChatDto } from './dto/update-whatsapp_chat.dto';
 import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
 
@@ -10,14 +9,14 @@ import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websock
 export class WhatsappChatGateway {
   constructor(private readonly whatsappChatService: WhatsappChatService) {}
 
-  @SubscribeMessage('createWhatsappChat')
-  create(@MessageBody() createWhatsappChatDto: CreateWhatsappChatDto) {
-    return this.whatsappChatService.create(createWhatsappChatDto);
-  }
+  // @SubscribeMessage('createWhatsappChat')
+  // create(@MessageBody() createWhatsappChatDto: CreateWhatsappChatDto) {
+  //   return this.whatsappChatService.create(createWhatsappChatDto);
+  // }
 
   @SubscribeMessage('findAllWhatsappChat')
-  findAll() {
-    return this.whatsappChatService.findAll();
+  findAll(@MessageBody() chatId: string) {
+    return this.whatsappChatService.findAll(chatId);
   }
 
   @SubscribeMessage('findOneWhatsappChat')

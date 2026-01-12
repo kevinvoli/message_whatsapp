@@ -1,7 +1,7 @@
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { WhapiService } from './whapi.service';
 
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 
 
 @Controller('webhooks/whapi')
@@ -14,13 +14,6 @@ export class WhapiController {
      this.whapiService.handleIncomingMessage(payload);
     return { status: 'ok' };
   }
-
-  @Get()
-   handleWebhookGet(@Body() payload: WhapiWebhookPayload) {
-    console.log("dans mon get whapi", payload);
-    
-     this.whapiService.handleIncomingMessage(payload);
-    return { status: 'ok' };
-  }
+ 
 
 }

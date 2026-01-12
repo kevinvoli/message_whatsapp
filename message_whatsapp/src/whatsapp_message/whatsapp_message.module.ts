@@ -9,11 +9,15 @@ import { WhatsappMessageContext } from 'src/whatsapp_message_context/entities/wh
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
+import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
+import { UsersService } from 'src/users/users.service';
+import { WhatsappCommercial } from 'src/users/entities/user.entity';
 
 @Module({
    imports: [TypeOrmModule.forFeature([
-          WhatsappMessage, WhatsappChat, WhatsappConversation, WhatsappMessageContent, WhatsappMessageContext, WhatsappMessageEvent, WhatsappMessageReaction
-        ])],
-  providers: [WhatsappMessageGateway, WhatsappMessageService],
+          WhatsappMessage, WhatsappChat, WhatsappConversation, WhatsappMessageContent, WhatsappMessageContext, WhatsappMessageEvent, WhatsappMessageReaction, WhatsappCommercial
+        ]), WhatsappChatModule],
+  providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,UsersService],
 })
 export class WhatsappMessageModule {}

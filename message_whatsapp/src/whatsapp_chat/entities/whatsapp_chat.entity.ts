@@ -1,3 +1,4 @@
+import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { WhatsappChatEvent } from 'src/whatsapp_chat_event/entities/whatsapp_chat_event.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
@@ -7,6 +8,8 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -20,6 +23,17 @@ export class WhatsappChat {
     comment: 'Primary key - Unique trajet identifier',
   })
   id: string;
+
+  @Column({ name: 'commercial_id', type: 'varchar', length: 100, nullable: false })
+  commercial_id: string;
+
+  @ManyToOne(() => WhatsappCommercial, (data) => data.id)
+    @JoinColumn({
+      name: 'commercial_id',
+      referencedColumnName: 'id',
+    })
+    commercial: WhatsappCommercial;
+
 
   @Column({ name: 'chat_id', type: 'varchar', length: 100, nullable: false, unique: true })
   chat_id: string; // chat_id WHAPI

@@ -1,4 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn,CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { Entity, Column, PrimaryGeneratedColumn,CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 // import * as bcrypt from 'bcrypt';
 
 
@@ -16,8 +18,7 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', nullable: false })
   name: string ;
 
-  // @Column()
-  // password: string;
+
 
   @Column({ type: 'varchar', nullable: true })
   passwordResetToken?: string | null;
@@ -25,16 +26,16 @@ export class WhatsappCommercial {
   @Column({ type: 'timestamp', nullable: true })
   passwordResetExpires?: Date | null;
 
+  @OneToMany(() => WhatsappChat, (chat) => chat.commercial)
+  chats: WhatsappChat[];
+
+  @OneToMany(() => WhatsappMessage, (message) => message.commercial)
+  messages: WhatsappMessage[];
+
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 
   @UpdateDateColumn({ type: 'timestamp' })
   updated_at: Date;
-
-  // @BeforeInsert()
-  // async hashPassword() {
-  //   if (this.password) {
-  //     this.password = await bcrypt.hash(this.password, 10);
-  //   }
-  // }
+ 
 }

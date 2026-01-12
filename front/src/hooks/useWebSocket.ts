@@ -1,13 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Commercial, WebSocketMessage, Message, Conversation } from '@/types/chat';
-
-interface WebSocketMessageData {
-  conversationId: string;
-  message: Message;
-}
+import { Commercial, WebSocketMessage } from '@/types/chat';
 
 interface WebSocketError {
   error: string;
@@ -16,19 +11,20 @@ interface WebSocketError {
 export const useWebSocket = (commercial: Commercial | null) => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<WebSocketMessageData | null>(null);
+  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const connect = useCallback(() => {
-    if (!commercial) return;
+    if (!commercial) return null;
 
-    console.log('🔄 Tentative de connexion WebSocket...');
+
+    console.log('🔄 Tentative de connexions WebSocket...');
     
     const socket = io('http://localhost:3000', {
       transports: ['websocket', 'polling'],
       auth: {
         commercialId: commercial.id,
-        token: localStorage.getItem('token'),
+        token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
       },
       reconnection: true,
       reconnectionAttempts: 5,
@@ -36,12 +32,12 @@ export const useWebSocket = (commercial: Commercial | null) => {
     });
 
     socket.on('connect', () => {
-      console.log('🟢 Connecté au socket avec ID:', socket.id);
+      console.log('🟢 Connecté au socket');
       setIsConnected(true);
       setError(null);
       
       // Joindre la room du commercial
-      socket.emit('join:commercial', { commercialId: commercial.id });
+      socket.emit('join:commercial', { commercialId: '22507711898@s.whatsapp.net' });
     });
 
     socket.on('disconnect', (reason) => {
@@ -64,18 +60,19 @@ export const useWebSocket = (commercial: Commercial | null) => {
       setError(data.error);
     });
 
-    socket.on('message:received', (data: WebSocketMessageData) => {
+    socket.on('message:received', (data: WebSocketMessage) => {
       console.log('📩 Message reçu en temps réel:', data);
       setLastMessage(data);
     });
 
-    socket.on('message:sent', (data: WebSocketMessageData) => {
-      console.log('✅ Message envoyé confirmé:', data);
+     socket.on('conversation:list', (data: WebSocketMessage) => {
+      console.log('📩 Message reçu en temps réel:', data);
       setLastMessage(data);
     });
 
-    socket.on('conversation:updated', (data: Conversation) => {
-      console.log('🔄 Conversation mise à jour:', data);
+    socket.on('message:sent', (data: WebSocketMessage) => {
+      console.log('✅ Message envoyé confirmé:', data);
+      setLastMessage(data);
     });
 
     socket.on('typing:start', (data: { conversationId: string; userId: string }) => {
@@ -103,7 +100,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
     };
   }, [connect]);
 
-  const sendMessage = useCallback((messageData: WebSocketMessageData) => {
+  const sendMessage = useCallback((messageData: WebSocketMessage) => {
     if (socketRef.current && isConnected) {
       console.log('📤 Envoi du message via WebSocket:', messageData);
       socketRef.current.emit('agent:message', messageData);
@@ -159,18 +156,30 @@ export const useWebSocket = (commercial: Commercial | null) => {
     }
   }, []);
 
-  return {
+  // Utiliser useMemo pour éviter de recréer l'objet à chaque render
+  const webSocketApi = useMemo(() => ({
     isConnected,
     lastMessage,
     error,
-    socket: socketRef.current,
     sendMessage,
     joinConversation,
     leaveConversation,
     startTyping,
     stopTyping,
     reconnect,
-  };
+  }), [
+    isConnected,
+    lastMessage,
+    error,
+    sendMessage,
+    joinConversation,
+    leaveConversation,
+    startTyping,
+    stopTyping,
+    reconnect,
+  ]);
+
+  return webSocketApi;
 };
 
 

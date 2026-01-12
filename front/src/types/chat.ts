@@ -8,8 +8,8 @@ export interface Message {
   id: string;
   text: string;
   timestamp: Date;
-  from: 'client' | 'commercial';
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  from: 'commercial' | 'client';
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error'; // Ajoutez 'error'
 }
 
 export interface Conversation {
@@ -20,6 +20,8 @@ export interface Conversation {
   unreadCount: number;
   status: 'active' | 'inactive' | 'archived';
 }
+
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
 
 export interface WebSocketMessage {
   type: 'auth' | 'new_conversation' | 'new_message' | 'message_status' | 'conversation_reassigned' | 'send_message';

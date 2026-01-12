@@ -1,15 +1,19 @@
 import { WhatsappMessageService } from './whatsapp_message.service';
-import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { UpdateWhatsappMessageDto } from './dto/update-whatsapp_message.dto';
 import { WebSocketGateway, SubscribeMessage, MessageBody, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect, ConnectedSocket } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
+import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  constructor(private readonly whatsappMessageService: WhatsappMessageService) {}
+  constructor(
+    private readonly whatsappMessageService: WhatsappMessageService,
+    private readonly chatService: WhatsappChatService,
+  ) {}
 
   @WebSocketServer()
   server: Server;
@@ -22,22 +26,23 @@ export class WhatsappMessageGateway implements OnGatewayConnection, OnGatewayDis
     console.log('🔴 Client déconnecté:', client.id);
   }
 
-
-
    // AGENT ONLINE
   // =========================
-  @SubscribeMessage('agent:online')
-  handleAgentOnline(@ConnectedSocket() client: Socket) {
-    console.log('👨‍💻 Agent en ligne:', client.id);
+  @SubscribeMessage('join:commercial')
+async  handleAgentOnline(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { agentId: string }
+  ) {
+    console.log('👨‍💻 Agent en ligne:', data);
+   const chat =await  this.chatService.findAll();
+
+   console.log("liste des chat ici", chat);
+   
+
 
     // MOCK conversations
     client.emit('conversation:list', [
-      {
-        id: 'conv-1',
-        clientNumber: '+2250700000000',
-        clientName: 'Client Test',
-        unreadCount: 1,
-      },
+      ...chat
     ]);
   }
 
@@ -81,7 +86,7 @@ export class WhatsappMessageGateway implements OnGatewayConnection, OnGatewayDis
   }
 
   @SubscribeMessage('createWhatsappMessage')
-  create(@MessageBody() createWhatsappMessageDto: CreateWhatsappMessageDto) {
+  create(@MessageBody() createWhatsappMessageDto: WhapiMessage) {
     return this.whatsappMessageService.create(createWhatsappMessageDto);
   }
 

@@ -1,86 +1,125 @@
 // whapi.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { WhapiMessage, WhapiWebhookPayload } from './interface/whapi-webhook.interface';
-
+import {
+  WhapiMessage,
+  WhapiWebhookPayload,
+} from './interface/whapi-webhook.interface';
+import { WhapiServiceDispacher } from './whatsapp_dispacher.service';
 
 @Injectable()
 export class WhapiService {
   private readonly logger = new Logger(WhapiService.name);
 
-   handleIncomingMessage(payload: WhapiWebhookPayload) {
+  constructor(
+    private readonly whatsappDispacherService: WhapiServiceDispacher,
+  ) {}
+
+  async handleIncomingMessage(payload: WhapiWebhookPayload) {
     if (!payload) return;
 
     // --- Messages ---
     if (payload.messages?.length) {
-      for (const message of payload.messages) {
-        if (message.from_me) continue;
+      console.log(
+        'verification du message ===================================== ',
+        payload,
+      );
 
+      if (payload.messages?.[0]) {
+        const message = payload.messages[0];
         const chatId = message.chat_id;
-        const timestamp = message.timestamp;
-        const content =  this.extractMessageContent(message);
-
-        this.logger.log(`[Message] Chat: ${chatId}, Timestamp: ${timestamp}, Content: ${content}`);
+        await this.whatsappDispacherService.sendMessage(chatId, message);
       }
     }
 
+    //      {
+    //   id: 'rCOhxfGiSPy0aKy6rTlrmQ-hcy0Sh4AICk',
+    //   from_me: false,
+    //   type: 'text',
+    //   chat_id: '22507711898@s.whatsapp.net',
+    //   timestamp: 1768222473,
+    //   source: 'mobile',
+    //   text: { body: 'Salut' },
+    //   from: '22507711898',
+    //   from_name: 'Mr. Voli Bi'
+    // }
     // --- Statuses ---
     if (payload.statuses?.length) {
       for (const status of payload.statuses) {
-        this.logger.log(`[Status] Message: ${status.id}, Recipient: ${status.recipient_id}, Status: ${status.status}`);
+        this.logger.log(
+          `[Status] Message: ${status.id}, Recipient: ${status.recipient_id}, Status: ${status.status}`,
+        );
       }
     }
 
     // --- Polls ---
     if (payload.polls?.length) {
       for (const poll of payload.polls) {
-        this.logger.log(`[Poll] Title: ${poll.title}, Options: ${poll.options.join(', ')}`);
+        this.logger.log(
+          `[Poll] Title: ${poll.title}, Options: ${poll.options.join(', ')}`,
+        );
       }
     }
 
     // --- Interactive (list, buttons, product) ---
     if (payload.interactives?.length) {
       for (const interactive of payload.interactives) {
-        this.logger.log(`[Interactive] Type: ${interactive.type}, Body: ${interactive.body?.text}`);
+        this.logger.log(
+          `[Interactive] Type: ${interactive.type}, Body: ${interactive.body?.text}`,
+        );
       }
     }
 
     // --- HSM (Highly Structured Messages) ---
     if (payload.hsms?.length) {
       for (const hsm of payload.hsms) {
-        this.logger.log(`[HSM] Header: ${hsm.header?.text?.body}, Body: ${hsm.body}, Footer: ${hsm.footer}`);
+        this.logger.log(
+          `[HSM] Header: ${hsm.header?.text?.body}, Body: ${hsm.body}, Footer: ${hsm.footer}`,
+        );
       }
     }
 
     // --- Catalogs ---
     if (payload.catalogs?.length) {
       for (const catalog of payload.catalogs) {
-        this.logger.log(`[Catalog] Title: ${catalog.title}, ID: ${catalog.catalog_id}`);
+        this.logger.log(
+          `[Catalog] Title: ${catalog.title}, ID: ${catalog.catalog_id}`,
+        );
       }
     }
 
     // --- Orders ---
     if (payload.orders?.length) {
       for (const order of payload.orders) {
-        this.logger.log(`[Order] Title: ${order.title}, Status: ${order.status}, Total: ${order.total_price}`);
+        this.logger.log(
+          `[Order] Title: ${order.title}, Status: ${order.status}, Total: ${order.total_price}`,
+        );
       }
     }
 
     // --- Invites (group, newsletter, admin) ---
     if (payload.invites?.length) {
       for (const invite of payload.invites) {
-        this.logger.log(`[Invite] Type: ${invite.title}, Body: ${invite.body}, Link: ${invite.link}`);
+        this.logger.log(
+          `[Invite] Type: ${invite.title}, Body: ${invite.body}, Link: ${invite.link}`,
+        );
       }
     }
   }
 
   private extractMessageContent(message: WhapiMessage): string {
     switch (message.type) {
-      case 'text': return message.text?.body ?? '';
-      case 'image': return message.image?.caption ?? '[image]';
-      case 'audio': return '[audio]';
-      case 'video': return message.video?.caption ?? '[video]';
-      case 'document': return message.document?.filename ?? '[document]';
-      default: return '[unsupported]';
+      case 'text':
+        return message.text?.body ?? '';
+      case 'image':
+        return message.image?.caption ?? '[image]';
+      case 'audio':
+        return '[audio]';
+      case 'video':
+        return message.video?.caption ?? '[video]';
+      case 'document':
+        return message.document?.filename ?? '[document]';
+      default:
+        return '[unsupported]';
     }
   }
 }

@@ -4,9 +4,8 @@ import { Repository, In } from 'typeorm';
 // import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { WhatsappCommercial as User } from './entities/user.entity';
+import { WhatsappCommercial  } from './entities/user.entity';
 import { LoginUserDto } from './dto/login-user.dto';
-import { access } from 'fs';
 
 export interface SafeUser {
   id: string;
@@ -17,8 +16,8 @@ export interface SafeUser {
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly userRepository: Repository<WhatsappCommercial>,
  
   ) {}
 
@@ -87,6 +86,19 @@ export class UsersService {
     };
   }
 
+  async findOneById(id: string): Promise<SafeUser> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    };
+  }
+
   async update(id: string, updateUserDto: UpdateUserDto): Promise<SafeUser> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
@@ -123,7 +135,7 @@ export class UsersService {
   }
 
   // This method is for internal use by AuthService and should return the full user object
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<WhatsappCommercial | null> {
     return this.userRepository.findOne({
       where: { email },
       relations: ['roles', 'roles.permissions'],
@@ -131,15 +143,14 @@ export class UsersService {
   }
 
   // This method is for internal use by AuthService
-  async findById(id: string): Promise<User | null> {
+  async findById(id: string): Promise<WhatsappCommercial | null> {
     return this.userRepository.findOne({
       where: { id },
-      relations: ['roles', 'roles.permissions'],
     });
   }
 
   // Find multiple users by their IDs
-  async findByIds(ids: number[]): Promise<User[]> {
+  async findByIds(ids: number[]): Promise<WhatsappCommercial[]> {
     return this.userRepository.findBy({ id: In(ids) });
   }
 
@@ -152,7 +163,7 @@ export class UsersService {
     });
   }
 
-  async findByPasswordResetToken(token: string): Promise<User | null> {
+  async findByPasswordResetToken(token: string): Promise<WhatsappCommercial | null> {
  
     return this.userRepository.findOne({ where: { passwordResetToken: token } });
   }

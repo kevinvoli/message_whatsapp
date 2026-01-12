@@ -30,7 +30,6 @@ export class UsersController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     console.log("get on user", id);
-    
     return this.usersService.findOne(id);
   }
 
