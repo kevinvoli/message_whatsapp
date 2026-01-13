@@ -21,12 +21,15 @@ export const useWebSocket = (commercial: Commercial | null) => {
 
     console.log("🔄 Tentative de connexions WebSocket...", commercial);
 
+  if (!commercial) return null;
+
+    console.log("🔄 Tentative de connexion WebSocket...", commercial);
+
     const socket = io("http://localhost:3000", {
       transports: ["websocket", "polling"],
       auth: {
         commercialId: commercial.id,
-        token:
-          typeof window !== "undefined" ? localStorage.getItem("token") : null,
+        token: typeof window !== "undefined" ? localStorage.getItem("token") : null,
       },
       reconnection: true,
       reconnectionAttempts: 5,
@@ -38,9 +41,9 @@ export const useWebSocket = (commercial: Commercial | null) => {
       setIsConnected(true);
       setError(null);
 
-      // Joindre la room du commercial
+      // CORRECTION: Envoyer l'événement correct avec le bon nom de champ
       socket.emit("get:conversation", {
-        commercialId: "22507711898@s.whatsapp.net",
+        agentId: commercial.id, // Changé de commercialId à agentId
       });
     });
 
@@ -96,13 +99,26 @@ export const useWebSocket = (commercial: Commercial | null) => {
       console.log("⏹️ L'utilisateur a arrêté d'écrire:", data);
     });
 
-    socket.on("conversation:get", (data: any) => {
-      console.log("🚪 Rejoint la conversation:==========================================================================================================================", data);
-
-      if (data.conversations) {
-        setConversations(data.conversations as Conversation[]);
-      console.log("🚪 Rejoint la list conversation:==========================================================================================================================", data);
-
+     socket.on("conversation:get", (data: any) => {
+      console.log("🚪 Liste des conversations reçue:", data);
+      
+      // Transformer les données du backend en format frontend
+      if (data && Array.isArray(data)) {
+        const transformedConversations = data.map((chat: any) => ({
+          id: chat.id,
+          chat_id: chat.chat_id,
+          clientName: chat.name,
+          clientPhone: chat.chat_id.split('@')[0], // Extraction du numéro du chat_id
+          lastMessage: {
+            text: chat.messages?.[chat.messages.length - 1]?.text || "Aucun message",
+            timestamp: new Date(chat.updatedAt),
+            author: 'client'
+          },
+          unreadCount: parseInt(chat.unread_count) || 0,
+          commercial_id: chat.commercial_id,
+          name: chat.name
+        }));
+        setConversations(transformedConversations);
       }
     });
 

@@ -9,10 +9,7 @@ import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websock
 export class WhatsappChatGateway {
   constructor(private readonly whatsappChatService: WhatsappChatService) {}
 
-  // @SubscribeMessage('createWhatsappChat')
-  // create(@MessageBody() createWhatsappChatDto: CreateWhatsappChatDto) {
-  //   return this.whatsappChatService.create(createWhatsappChatDto);
-  // }
+
 
   @SubscribeMessage('findAllWhatsappChat')
   findAll(@MessageBody() chatId: string) {

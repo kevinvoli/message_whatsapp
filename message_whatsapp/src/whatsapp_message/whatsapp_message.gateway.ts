@@ -37,18 +37,33 @@ export class WhatsappMessageGateway
 
   // AGENT ONLINE
   // =========================
-  @SubscribeMessage('get:conversation')
+   @SubscribeMessage('get:conversation')
   async handleAgentOnline(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { agentId: string },
   ) {
     console.log('👨‍💻 Agent en ligne:', data);
-    const chat = await this.chatService.findAll();
-
-    console.log('liste des chat ici', chat);
-
-    // MOCK conversations
-    client.emit('conversation:get', [...chat]);
+    
+    try {
+      // Récupérer les chats avec leurs messages
+      const chats = await this.chatService.findAll();
+      
+      // Récupérer les messages pour chaque chat
+      const chatsWithMessages = await Promise.all(
+        chats.map(async (chat) => {
+          const messages = await this.whatsappMessageService.findByChatId(chat.chat_id);
+          return {
+            ...chat,
+            messages: messages
+          };
+        })
+      );
+      
+      client.emit('conversation:get', chatsWithMessages);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des conversations:', error);
+      client.emit('error', { error: 'Failed to fetch conversations' });
+    }
   }
 
   @SubscribeMessage('conversation:join')

@@ -17,6 +17,14 @@ export class WhatsappMessageService {
     private readonly chatService: WhatsappChatService,
   ) {}
 
+  async findByChatId(chatId: string): Promise<WhatsappMessage[]> {
+    return this.messageRepository.find({
+      where: { chat_id: chatId },
+      order: { timestamp: 'DESC' },
+      take: 10 // Limiter aux 10 derniers messages
+    });
+  }
+
   async create(message: WhapiMessage) {
     try {
       console.log('message reçue du dispache', message);

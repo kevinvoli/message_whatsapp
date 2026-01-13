@@ -12,13 +12,21 @@ export interface Message {
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error'; // Ajoutez 'error'
 }
 
+// types/chat.ts
 export interface Conversation {
   id: string;
+  chat_id: string; // Ajouté pour correspondre au backend
   clientName: string;
   clientPhone: string;
-  lastMessage: Message;
+  lastMessage: {
+    text: string;
+    timestamp: Date;
+    author: 'agent' | 'client';
+  };
   unreadCount: number;
-  status: 'active' | 'inactive' | 'archived';
+  commercial_id?: string; // Pour la correspondance
+  name: string; // Ajouté pour correspondre à WhatsappChat
+  // Autres champs si nécessaire
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
