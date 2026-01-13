@@ -53,6 +53,7 @@ export interface WebSocketMessage {
 
 export interface LoginFormData {
   email: string;
-  name: string;
+  password?: string;
+  name?: string;
 }
 
