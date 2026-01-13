@@ -4,35 +4,39 @@ export interface Commercial {
   email: string;
 }
 
-// types/chat.ts
+export type MessageStatus = 'SENT' | 'DELIVERED' | 'READ' | 'sending' | 'error';
+
 export interface Message {
   id: string;
-  text: string;
-  timestamp: Date;
-  from: 'commercial' | 'client'; // ou 'agent' | 'user'
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
+  conversationId: string;
+  content: string;
+  type: 'TEXT' | 'IMAGE' | 'DOCUMENT';
+  sender: 'COMMERCIAL' | 'CLIENT';
+  status: MessageStatus;
+  sentAt: Date;
+  // Make sure all expected properties are here
+  text?: string;
+  timestamp?: Date;
+  from?: 'commercial' | 'client';
   direction?: 'IN' | 'OUT';
   sender_phone?: string;
-  from_me: boolean;
+  from_me?: boolean;
   sender_name?: string;
 }
 
-// types/chat.ts
 export interface Conversation {
   id: string;
-  chat_id: string; // Ajouté pour correspondre au backend
   clientName: string;
   clientPhone: string;
-  lastMessage: {
-    text: string;
-    timestamp: Date;
-    author: 'agent' | 'client';
-  };
-  messages: Message[];
+  lastMessage?: Message;
   unreadCount: number;
-  commercial_id?: string; // Pour la correspondance
-  name: string; // Ajouté pour correspondre à WhatsappChat
-  // Autres champs si nécessaire
+  status: 'ALL' | 'ACTIVE' | 'PENDING' | 'CLOSED';
+  // existing properties
+  chat_id: string;
+  messages: Message[];
+  commercial_id?: string;
+  name: string;
+  clientProfilePic?: string; // Added from another step
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
@@ -53,6 +57,7 @@ export interface WebSocketMessage {
 
 export interface LoginFormData {
   email: string;
-  name: string;
+  password?: string;
+  name?: string;
 }
 

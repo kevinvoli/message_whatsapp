@@ -1,268 +1,140 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Conversation, Message } from '@/types/chat';
 import { useWebSocket } from './useWebSocket';
 import { useAuth } from './useAuth';
 
 export const useConversations = () => {
+  const { commercial } = useAuth();
+
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
-  const { commercial } = useAuth();
-  const { 
-    isConnected, 
-    sendMessage: sendWebSocketMessage, 
-    joinConversation, 
-    leaveConversation,
-    loadConversation,
-    loadMessages: loadMessagesWS,
-    conversations,
-    setConversations,
-    messages,
-    setMessages,
-    setSelectedConversation: setSelectedConvWS,
-    reconnect,
-    selectedConversationId
-  } = useWebSocket(commercial);
-  
-  // Référence pour suivre le dernier chargement
-  const lastLoadRef = useRef<string | null>(null);
-  const joiningRef = useRef<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'CLOSED'>('ALL');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
-  // Effet pour charger les conversations au démarrage
-  useEffect(() => {
-    if (isConnected && commercial && conversations.length === 0) {
-      loadConversations(commercial.id);
+  const handleConversationList = useCallback((convs: Conversation[]) => {
+    setConversations(convs);
+    setIsLoading(false);
+  }, []);
+
+  const handleNewMessage = useCallback((message: Message) => {
+    if (message.conversationId === selectedConversation?.id) {
+      setMessages(prev => [...prev, message]);
     }
-  }, [isConnected, commercial, conversations.length]);
-
-  // Effet pour gérer le changement de conversation
-  useEffect(() => {
-    const handleConversationSwitch = async () => {
-      if (!selectedConversation || !isConnected) return;
-      
-      const conversationId = selectedConversation.chat_id;
-      
-      // Éviter les doublons de chargement
-      if (lastLoadRef.current === conversationId || joiningRef.current) {
-        return;
-      }
-      
-      console.log(`🔄 Changement vers conversation: ${conversationId}`);
-      
-      joiningRef.current = true;
-      lastLoadRef.current = conversationId;
-      setIsLoadingMessages(true);
-      
-      try {
-        // 1. Mettre à jour l'état WebSocket
-        setSelectedConvWS(conversationId);
-        
-        // 2. Vider les messages précédents
-        setMessages([]);
-        
-        // 3. Joindre la conversation
-        const joined = joinConversation(conversationId);
-        if (!joined) {
-          throw new Error('Impossible de rejoindre la conversation');
-        }
-        
-        // 4. Attendre un court instant pour la synchronisation WebSocket
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 5. Charger les messages
-        loadMessagesWS(conversationId);
-        
-        // 6. Mettre à jour le compteur non lus
-        setConversations(prev => 
-          prev.map(c => 
-            c.chat_id === conversationId 
-              ? { ...c, unreadCount: 0 } 
-              : c
-          )
-        );
-        
-      } catch (err) {
-        console.error('Erreur lors du changement de conversation:', err);
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      } finally {
-        joiningRef.current = false;
-        setTimeout(() => setIsLoadingMessages(false), 300);
-      }
-    };
-    
-    handleConversationSwitch();
-  }, [selectedConversation, isConnected, joinConversation, loadMessagesWS, setConversations, setMessages, setSelectedConvWS]);
-
-  // Nettoyage quand on quitte
-  useEffect(() => {
-    return () => {
-      if (selectedConversation && isConnected) {
-        leaveConversation(selectedConversation.chat_id);
-      }
-    };
-  }, [selectedConversation, isConnected, leaveConversation]);
-
-  // Charger les conversations
-  const loadConversations = useCallback(async (commercialId?: string) => {
-    setLoading(true);
-    setError(null);
-    
-    const targetCommercialId = commercialId || commercial?.id;
-    
-    if (!targetCommercialId) {
-      setError('Commercial ID manquant');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      if (isConnected) {
-        loadConversation(targetCommercialId);
-      } else {
-        throw new Error('WebSocket non connecté');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des conversations';
-      setError(errorMessage);
-      console.error('Erreur loadConversations:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [commercial?.id, isConnected, loadConversation]);
-
-  // Charger les messages d'une conversation
-  const loadMessages = useCallback(async (conversationId: string) => {
-    if (!isConnected) {
-      setError('WebSocket non connecté');
-      return;
-    }
-    
-    setIsLoadingMessages(true);
-    
-    try {
-      loadMessagesWS(conversationId);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des messages';
-      setError(errorMessage);
-      console.error('Erreur loadMessages:', err);
-    } finally {
-      setTimeout(() => setIsLoadingMessages(false), 300);
-    }
-  }, [isConnected, loadMessagesWS]);
-
-  // Sélectionner une conversation
-  const selectConversation = useCallback((conversation: Conversation) => {
-    // Réinitialiser le dernier chargement si c'est une nouvelle conversation
-    if (selectedConversation?.chat_id !== conversation.chat_id) {
-      lastLoadRef.current = null;
-    }
-    
-    // Mettre à jour l'état
-    setSelectedConversation(conversation);
-    setError(null);
+    setConversations(prev => prev.map(c =>
+      c.id === message.conversationId
+        ? {
+            ...c,
+            lastMessage: message,
+            unreadCount: c.id === selectedConversation?.id ? 0 : (c.unreadCount || 0) + 1,
+          }
+        : c
+    ));
   }, [selectedConversation]);
 
-  // Envoyer un message
-  const sendMessage = useCallback(async (
-    conversationId: string, 
-    messageData: Partial<Message>
-  ): Promise<Message | null> => {
-    setError(null);
-    
-    if (!commercial || !isConnected) {
-      setError('Non connecté ou non authentifié');
-      return null;
-    }
+  const handleNewConversation = useCallback((conversation: Conversation) => {
+    setConversations(prev => [conversation, ...prev]);
+  }, []);
 
-    // Préparer le message complet
-    const fullMessage: Message = {
-      id: `temp_${Date.now()}`,
-      text: messageData.text || '',
-      timestamp: new Date(),
-      from: 'commercial',
+  const ws = useWebSocket({
+    commercial,
+    onConversationList: handleConversationList,
+    onNewMessage: handleNewMessage,
+    onNewConversation: handleNewConversation,
+    onMessageStatusUpdate: () => {},
+    onConversationAssigned: () => {},
+    onTypingStart: () => {},
+    onTypingStop: () => {},
+  });
+
+  useEffect(() => {
+    if (ws.isConnected && commercial) {
+      ws.requestConversations({ commercialId: commercial.id });
+    }
+  }, [ws.isConnected, commercial, ws]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setIsLoadingMessages(true);
+      setMessages([]);
+      ws.requestMessages({ conversationId: selectedConversation.id });
+      setTimeout(() => setIsLoadingMessages(false), 500);
+
+      if (selectedConversation.unreadCount > 0) {
+        ws.markAsRead({ conversationId: selectedConversation.id, messageIds: [] });
+      }
+    }
+  }, [selectedConversation, ws]);
+
+  const selectConversation = useCallback((conversation: Conversation) => {
+    setSelectedConversation(conversation);
+  }, []);
+
+  const sendMessage = useCallback((content: string) => {
+    if (!selectedConversation || !commercial) return;
+    
+    const optimisticMessage: Message = {
+      id: `temp-${Date.now()}`,
+      conversationId: selectedConversation.id,
+      content,
+      type: 'TEXT',
+      sender: 'COMMERCIAL',
       status: 'sending',
-      direction: 'OUT',
-      sender_name: commercial.name || 'Agent',
-      ...messageData,
+      sentAt: new Date(),
     };
-
-    // Optimistic UI update
-    setMessages(prev => [...prev, fullMessage]);
     
-    // Envoyer via WebSocket
-    const webSocketMessage = {
-      conversationId,
-      content: fullMessage.text,
-      author: commercial.id,
-      chat_id: conversationId
-    };
-
-    const success = sendWebSocketMessage(webSocketMessage);
+    setMessages(prev => [...prev, optimisticMessage]);
     
-    if (!success) {
-      setError('Échec de l\'envoi via WebSocket');
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === fullMessage.id 
-            ? { ...msg, status: 'error' } 
-            : msg
-        )
-      );
-      return null;
-    }
+    ws.sendMessage({
+      conversationId: selectedConversation.id,
+      content,
+      type: 'TEXT',
+    });
+  }, [selectedConversation, commercial, ws]);
 
-    // Mettre à jour la conversation
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.chat_id === conversationId 
-          ? {
-              ...conv,
-              lastMessage: {
-                text: fullMessage.text,
-                timestamp: fullMessage.timestamp,
-                author: 'agent'
-              }
-            } 
-          : conv
-      )
-    );
-    
-    return fullMessage;
-  }, [commercial, isConnected, sendWebSocketMessage, setMessages, setConversations]);
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => (prev === 'DESC' ? 'ASC' : 'DESC'));
+  }, []);
+
+  const filteredAndSortedConversations = useMemo(() => {
+    return conversations
+      .filter(c => {
+        if (filterStatus !== 'ALL' && c.status !== filterStatus) return false;
+        const term = searchTerm.toLowerCase();
+        return (
+          c.clientName?.toLowerCase().includes(term) ||
+          c.clientPhone?.includes(term)
+        );
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.lastMessage?.sentAt || 0).getTime();
+        const dateB = new Date(b.lastMessage?.sentAt || 0).getTime();
+        return sortOrder === 'DESC' ? dateB - dateA : dateA - dateB;
+      });
+  }, [conversations, filterStatus, searchTerm, sortOrder]);
 
   return {
-    // State
-    conversations,
+    conversations: filteredAndSortedConversations,
     selectedConversation,
     messages,
-    searchTerm,
-    filteredConversations: conversations.filter((conv: Conversation) =>
-      conv.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conv.clientPhone?.includes(searchTerm) ||
-      conv.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    loading,
+    isLoading,
     isLoadingMessages,
-    error,
-    isWebSocketConnected: isConnected,
-    
-    // Setters
+    isWebSocketConnected: ws.isConnected,
+    error: ws.error,
+    searchTerm,
+    filterStatus,
+    sortOrder,
     setSearchTerm,
-    setMessages,
-    setConversations,
-    setSelectedConversation,
-    
-    // Actions
-    loadConversations,
-    loadMessages,
-    sendMessage,
+    setFilterStatus,
+    toggleSortOrder,
     selectConversation,
-    reconnectWebSocket: reconnect,
-    clearError: useCallback(() => setError(null), []),
+    sendMessage,
+    reconnectWebSocket: ws.reconnect,
   };
 };

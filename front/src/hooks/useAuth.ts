@@ -34,23 +34,21 @@ export const useAuth = () => {
   setInitialized(true);
 }, []);
 
-  const login = async (email: string, name: string): Promise<Commercial> => {
+  const login = async (email: string, password: string): Promise<Commercial> => {
     setLoading(true);
 
-
     try {
-      const res = await fetch(`${API_BASE_URL}users/login`, {
+      const res = await fetch(`${API_BASE_URL}auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-      name: name
-    }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
-        throw new Error('Identifiants invalides');
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Identifiants invalides');
       }
 
       const data: LoginResponse = await res.json();
