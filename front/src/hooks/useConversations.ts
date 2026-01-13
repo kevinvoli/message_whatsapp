@@ -15,7 +15,7 @@ export const useConversations = () => {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'CLOSED'>('ALL');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
   const handleConversationList = useCallback((convs: Conversation[]) => {
@@ -85,7 +85,7 @@ export const useConversations = () => {
       content,
       type: 'TEXT',
       sender: 'COMMERCIAL',
-      status: 'SENT',
+      status: 'sending',
       sentAt: new Date(),
     };
     
