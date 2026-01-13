@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateWhatsappChatDto } from './dto/create-whatsapp_chat.dto';
-import { UpdateWhatsappChatDto } from './dto/update-whatsapp_chat.dto';
+
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
@@ -16,9 +15,14 @@ export class WhatsappChatService {
     
   ) {}
 
-  // create(createWhatsappChatDto: CreateWhatsappChatDto) {
-  //   return 'This action adds a new whatsappChat';
-  // }
+// Dans WhatsappChatService
+async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+  return this.chatRepository.find({
+    where: { commercial_id: commercialId },
+    order: { updatedAt: 'DESC' },
+    relations: ['commercial','messages','conversation','chatEvent','chatLabel'],
+  });
+}
 
   async findOrCreateChat(
     chatId: string,
@@ -67,7 +71,7 @@ export class WhatsappChatService {
       return this.chatRepository.save(creatChat);
     } catch (error) {
       console.error('Error finding or creating chat:', error);
-      throw new Error(`Failed to find or create chat: ${error}`);
+      throw new Error(`Failed to find or create chat: ${String(error)}`);
     }
   }
 
@@ -78,12 +82,18 @@ export class WhatsappChatService {
     return this.chatRepository.find();
   }
 
-  findOne(id: string) {
-    return `This action returns a #${id} whatsappChat`;
+  async findByChatId(chatId: string): Promise<WhatsappChat | null> {
+    return this.chatRepository.findOne({
+      where: { chat_id: chatId },
+      relations: ['commercial'],
+    });
   }
 
-  update(id: string, updateWhatsappChatDto: UpdateWhatsappChatDto) {
-    return `This action updates a #${id} whatsappChat`;
+  async findOne(id: string): Promise<WhatsappChat | null> {
+    return this.chatRepository.findOne({
+      where: { id },
+      relations: ['commercial', 'conversation', 'chatEvent', 'chatLabel'],
+    });
   }
 
   remove(id: string) {

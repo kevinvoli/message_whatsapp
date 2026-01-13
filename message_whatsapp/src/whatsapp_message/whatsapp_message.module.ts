@@ -13,11 +13,12 @@ import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { UsersService } from 'src/users/users.service';
 import { WhatsappCommercial } from 'src/users/entities/user.entity';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 
 @Module({
    imports: [TypeOrmModule.forFeature([
           WhatsappMessage, WhatsappChat, WhatsappConversation, WhatsappMessageContent, WhatsappMessageContext, WhatsappMessageEvent, WhatsappMessageReaction, WhatsappCommercial
         ]), WhatsappChatModule],
-  providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,UsersService],
+  providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,UsersService,CommunicationWhapiService],
 })
 export class WhatsappMessageModule {}

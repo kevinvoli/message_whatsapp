@@ -17,7 +17,7 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true }) 
+@Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -25,18 +25,28 @@ export class WhatsappChat {
   })
   id: string;
 
-  @Column({ name: 'commercial_id', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'commercial_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   commercial_id: string | null;
 
   @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
-    @JoinColumn({
-      name: 'commercial_id',
-      referencedColumnName: 'id',
-    })
-    commercial: WhatsappCommercial;
+  @JoinColumn({
+    name: 'commercial_id',
+    referencedColumnName: 'id',
+  })
+  commercial: WhatsappCommercial;
 
-
-  @Column({ name: 'chat_id', type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({
+    name: 'chat_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
   chat_id: string; // chat_id WHAPI
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
@@ -65,7 +75,12 @@ export class WhatsappChat {
   @Column({ name: 'mute_until', type: 'varchar', length: 100, nullable: false })
   mute_until: string;
 
-  @Column({ name: 'is_archived', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'is_archived',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   is_archived: string;
 
   @Column({
@@ -98,6 +113,9 @@ export class WhatsappChat {
   })
   last_activity_at: string; // timestamp
 
+    @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
+  contact_client: string;
+
   @Column({ name: 'created_at', type: 'varchar', length: 100, nullable: false })
   created_at: string;
 
@@ -105,16 +123,16 @@ export class WhatsappChat {
   updated_at: string;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
-    chatLabel: WhatsappChatLabel[];
+  chatLabel: WhatsappChatLabel[];
 
-     @OneToMany(() => WhatsappConversation, (data) => data.chat)
-    conversation: WhatsappConversation[];
+  @OneToMany(() => WhatsappConversation, (data) => data.chat)
+  conversation: WhatsappConversation[];
 
-     @OneToMany(() => WhatsappChatEvent, (data) => data.chat)
-    chatEvent: WhatsappChatEvent[];
+  @OneToMany(() => WhatsappChatEvent, (data) => data.chat)
+  chatEvent: WhatsappChatEvent[];
 
-    @OneToMany(()=> WhatsappMessage, (message) => message.chat)
-    messages: WhatsappMessage[];
+  @OneToMany(() => WhatsappMessage, (message) => message.chat)
+  messages: WhatsappMessage[];
 
   @CreateDateColumn({
     name: 'createdAt',

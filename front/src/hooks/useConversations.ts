@@ -1,23 +1,18 @@
+"use client";
+
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Conversation, Message, WebSocketMessage } from '@/types/chat';
+import { Conversation, Message } from '@/types/chat';
 import { useWebSocket } from './useWebSocket';
 import { useAuth } from './useAuth';
 
-interface MessagesLoadedMessage {
-  type: 'messages_loaded';
-  messages: Message[];
-}
-
-const API_BASE_URL = process.env.API_URL || 'http://localhost:3000/';
-
 export const useConversations = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
-  const { commercial, token } = useAuth();
+  const { commercial } = useAuth();
   const { 
     isConnected, 
     sendMessage: sendWebSocketMessage, 
@@ -25,296 +20,220 @@ export const useConversations = () => {
     leaveConversation,
     loadConversation,
     loadMessages: loadMessagesWS,
-    lastMessage,
     conversations,
     setConversations,
-    reconnect 
+    messages,
+    setMessages,
+    setSelectedConversation: setSelectedConvWS,
+    reconnect,
+    selectedConversationId
   } = useWebSocket(commercial);
   
-  // Référence pour éviter les cycles de re-render
-  const conversationsRef = useRef(conversations);
-  const messagesRef = useRef(messages);
-  // Mettre à jour les références
-  useEffect(() => {
-    conversationsRef.current = conversations;
-  }, [conversations]);
-  
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+  // Référence pour suivre le dernier chargement
+  const lastLoadRef = useRef<string | null>(null);
+  const joiningRef = useRef<boolean>(false);
 
-
+  // Effet pour charger les conversations au démarrage
   useEffect(() => {
-    if (!lastMessage) return;
-
-    if ((lastMessage as unknown as MessagesLoadedMessage).type === 'messages_loaded' && (lastMessage as unknown as MessagesLoadedMessage).messages) {
-      setMessages((lastMessage as unknown as MessagesLoadedMessage).messages);
-      return;
+    if (isConnected && commercial && conversations.length === 0) {
+      loadConversations(commercial.id);
     }
+  }, [isConnected, commercial, conversations.length]);
 
-    const { conversationId, message } = lastMessage;
-    
-    console.log('🔄 Traitement du message WebSocket:', lastMessage);
-    console.log('🔄  du message WebSocket:', conversations);
-    
-    // Mettre à jour les messages si c'est la conversation sélectionnée
-    if (selectedConversation?.id === conversationId && message !== undefined) {
-      setMessages(prev => [...prev, message]);
-    }
-    
-    // Mettre à jour la conversation dans la liste
-    setConversations(prev => 
-      prev.map(conv => {
-        if (conv.id === conversationId && message !== undefined) {
-          return {
-            ...conv,
-            lastMessage: message,
-            unreadCount: conv.id === selectedConversation?.id ? 0 : (conv.unreadCount || 0) + 1,
-          };
+  // Effet pour gérer le changement de conversation
+  useEffect(() => {
+    const handleConversationSwitch = async () => {
+      if (!selectedConversation || !isConnected) return;
+      
+      const conversationId = selectedConversation.chat_id;
+      
+      // Éviter les doublons de chargement
+      if (lastLoadRef.current === conversationId || joiningRef.current) {
+        return;
+      }
+      
+      console.log(`🔄 Changement vers conversation: ${conversationId}`);
+      
+      joiningRef.current = true;
+      lastLoadRef.current = conversationId;
+      setIsLoadingMessages(true);
+      
+      try {
+        // 1. Mettre à jour l'état WebSocket
+        setSelectedConvWS(conversationId);
+        
+        // 2. Vider les messages précédents
+        setMessages([]);
+        
+        // 3. Joindre la conversation
+        const joined = joinConversation(conversationId);
+        if (!joined) {
+          throw new Error('Impossible de rejoindre la conversation');
         }
-        return conv;
-      })
-    );
-  }, [lastMessage, selectedConversation, conversations, setConversations]);
-
-  const getAuthToken = useCallback((): string | null => {
-    return token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
-  }, [token]);
-
-  // READ: Récupérer toutes les conversations
-  const loadConversations = useCallback(async (commercialId?: string) => {
-    console.log("les conversation", conversationsRef.current);
+        
+        // 4. Attendre un court instant pour la synchronisation WebSocket
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // 5. Charger les messages
+        loadMessagesWS(conversationId);
+        
+        // 6. Mettre à jour le compteur non lus
+        setConversations(prev => 
+          prev.map(c => 
+            c.chat_id === conversationId 
+              ? { ...c, unreadCount: 0 } 
+              : c
+          )
+        );
+        
+      } catch (err) {
+        console.error('Erreur lors du changement de conversation:', err);
+        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      } finally {
+        joiningRef.current = false;
+        setTimeout(() => setIsLoadingMessages(false), 300);
+      }
+    };
     
+    handleConversationSwitch();
+  }, [selectedConversation, isConnected, joinConversation, loadMessagesWS, setConversations, setMessages, setSelectedConvWS]);
+
+  // Nettoyage quand on quitte
+  useEffect(() => {
+    return () => {
+      if (selectedConversation && isConnected) {
+        leaveConversation(selectedConversation.chat_id);
+      }
+    };
+  }, [selectedConversation, isConnected, leaveConversation]);
+
+  // Charger les conversations
+  const loadConversations = useCallback(async (commercialId?: string) => {
     setLoading(true);
     setError(null);
     
-    const authToken = getAuthToken();
-    if (!authToken) {
-      setError('Non authentifié');
+    const targetCommercialId = commercialId || commercial?.id;
+    
+    if (!targetCommercialId) {
+      setError('Commercial ID manquant');
       setLoading(false);
       return;
     }
 
     try {
-      loadConversation(commercialId || commercial?.id || '')
-
-     
+      if (isConnected) {
+        loadConversation(targetCommercialId);
+      } else {
+        throw new Error('WebSocket non connecté');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des conversations';
       setError(errorMessage);
       console.error('Erreur loadConversations:', err);
-      return [];
     } finally {
       setLoading(false);
     }
-  }, [getAuthToken, commercial?.id, loadConversation]);
+  }, [commercial?.id, isConnected, loadConversation]);
 
-  // READ: Charger les messages d'une conversation
+  // Charger les messages d'une conversation
   const loadMessages = useCallback(async (conversationId: string) => {
-    setLoading(true);
-    setError(null);
-    
-    const authToken = getAuthToken();
-    if (!authToken) {
-      setError('Non authentifié');
-      setLoading(false);
-      return [];
+    if (!isConnected) {
+      setError('WebSocket non connecté');
+      return;
     }
-
+    
+    setIsLoadingMessages(true);
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/${conversationId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const data: Message[] = await response.json();
-      setMessages(data);
-      return data;
+      loadMessagesWS(conversationId);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des messages';
       setError(errorMessage);
       console.error('Erreur loadMessages:', err);
-      return [];
     } finally {
-      setLoading(false);
+      setTimeout(() => setIsLoadingMessages(false), 300);
     }
-  }, [getAuthToken]);
+  }, [isConnected, loadMessagesWS]);
 
-  // CREATE: Envoyer un message (WebSocket + backup HTTP)
+  // Sélectionner une conversation
+  const selectConversation = useCallback((conversation: Conversation) => {
+    // Réinitialiser le dernier chargement si c'est une nouvelle conversation
+    if (selectedConversation?.chat_id !== conversation.chat_id) {
+      lastLoadRef.current = null;
+    }
+    
+    // Mettre à jour l'état
+    setSelectedConversation(conversation);
+    setError(null);
+  }, [selectedConversation]);
+
+  // Envoyer un message
   const sendMessage = useCallback(async (
     conversationId: string, 
     messageData: Partial<Message>
   ): Promise<Message | null> => {
     setError(null);
     
+    if (!commercial || !isConnected) {
+      setError('Non connecté ou non authentifié');
+      return null;
+    }
+
     // Préparer le message complet
     const fullMessage: Message = {
       id: `temp_${Date.now()}`,
       text: messageData.text || '',
       timestamp: new Date(),
-      from: messageData.from || 'commercial',
+      from: 'commercial',
       status: 'sending',
+      direction: 'OUT',
+      sender_name: commercial.name || 'Agent',
       ...messageData,
     };
 
     // Optimistic UI update
     setMessages(prev => [...prev, fullMessage]);
     
-    // Tenter d'envoyer via WebSocket
-    if (isConnected) {
-      const webSocketMessage: WebSocketMessage = {
-        conversationId,
-        message: fullMessage,
-        type: 'send_message',
-      };
+    // Envoyer via WebSocket
+    const webSocketMessage = {
+      conversationId,
+      content: fullMessage.text,
+      author: commercial.id,
+      chat_id: conversationId
+    };
 
-      const webSocketSuccess = sendWebSocketMessage(webSocketMessage);
-      
-      if (webSocketSuccess) {
-        // Mettre à jour le statut du message
-        setTimeout(() => {
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === fullMessage.id 
-                ? { ...msg, status: 'sent' as const } 
-                : msg
-            )
-          );
-        }, 100);
-        
-        return fullMessage;
-      }
-    }
-
-    // Fallback: Envoyer via HTTP
-    console.log('🔄 WebSocket non disponible, envoi via HTTP...');
-    const authToken = getAuthToken();
-    if (!authToken) {
-      setError('Non authentifié');
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/chat/${conversationId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messageData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const serverMessage: Message = await response.json();
-      
-      // Remplacer le message temporaire par celui du serveur
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === fullMessage.id ? { ...serverMessage, status: 'sent' as const } : msg
-        )
-      );
-      
-      // Mettre à jour la conversation (simplifié)
-      setConversations(prev => 
-        prev.map(conv => 
-          conv.id === conversationId 
-            ? { ...conv, lastMessage: serverMessage } 
-            : conv
-        )
-      );
-      
-      return serverMessage;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'envoi du message';
-      setError(errorMessage);
-      
-      // Marquer le message comme erreur
+    const success = sendWebSocketMessage(webSocketMessage);
+    
+    if (!success) {
+      setError('Échec de l\'envoi via WebSocket');
       setMessages(prev => 
         prev.map(msg => 
           msg.id === fullMessage.id 
-            ? { ...msg, status: 'error' as const } 
+            ? { ...msg, status: 'error' } 
             : msg
         )
       );
-      
-      console.error('Erreur sendMessage:', err);
       return null;
     }
-  }, [isConnected, sendWebSocketMessage, getAuthToken, setConversations]);
 
-  // Sélectionner une conversation avec gestion WebSocket
-  const selectConversation = useCallback(async (conv: Conversation) => {
-    // Quitter la conversation précédente si elle existe
-    if (selectedConversation) {
-      leaveConversation(selectedConversation.id);
-    }
-    
-    // Mettre à jour l'état local
-    setSelectedConversation(conv);
-    
-    // Réinitialiser le compteur non lus
+    // Mettre à jour la conversation
     setConversations(prev => 
-      prev.map(c => c.id === conv.id ? { ...c, unreadCount: 0 } : c)
+      prev.map(conv => 
+        conv.chat_id === conversationId 
+          ? {
+              ...conv,
+              lastMessage: {
+                text: fullMessage.text,
+                timestamp: fullMessage.timestamp,
+                author: 'agent'
+              }
+            } 
+          : conv
+      )
     );
     
-    // Mettre à jour sur le serveur
-    await leaveConversation(conv.id);
-    
-    // Charger les messages
-    if (isConnected) {
-      loadMessagesWS(conv.id);
-    }
-    
-    // Rejoindre la conversation via WebSocket
-    if (isConnected) {
-      joinConversation(conv.id);
-    }
-  }, [selectedConversation, leaveConversation, isConnected, joinConversation, loadMessagesWS, setConversations]);
-
- 
-  useEffect(() => {
-    if (selectedConversation && isConnected) {
-      joinConversation(selectedConversation.id);
-    }
-    
-    return () => {
-      if (selectedConversation) {
-        leaveConversation(selectedConversation.id);
-      }
-    };
-  }, [selectedConversation, isConnected, joinConversation, leaveConversation,setConversations]);
-
-  // Effet pour surveiller la connexion WebSocket
-  useEffect(() => {
-    if (!isConnected && commercial) {
-      console.log('⚠️ WebSocket déconnecté, tentative de reconnexion...');
-      // Vous pourriez implémenter une logique de reconnexion ici
-    }
-  }, [isConnected, commercial]);
-
-  // Charger les conversations au chargement de la page via WebSocket
-  useEffect(() => {
-    if (isConnected && commercial) {
-      loadConversation(commercial.id);
-    }
-  }, [isConnected, commercial, loadConversation]);
-
-  // Sélectionner automatiquement la première conversation si aucune n'est sélectionnée
-  useEffect(() => {
-    if (conversations.length > 0 && !selectedConversation) {
-      selectConversation(conversations[0]);
-    }
-  }, [conversations, selectedConversation, selectConversation]);
+    return fullMessage;
+  }, [commercial, isConnected, sendWebSocketMessage, setMessages, setConversations]);
 
   return {
     // State
@@ -322,11 +241,13 @@ export const useConversations = () => {
     selectedConversation,
     messages,
     searchTerm,
-    filteredConversations: conversations.filter(conv =>
+    filteredConversations: conversations.filter((conv: Conversation) =>
       conv.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conv.clientPhone?.includes(searchTerm)
+      conv.clientPhone?.includes(searchTerm) ||
+      conv.name?.toLowerCase().includes(searchTerm.toLowerCase())
     ),
     loading,
+    isLoadingMessages,
     error,
     isWebSocketConnected: isConnected,
     
@@ -336,18 +257,12 @@ export const useConversations = () => {
     setConversations,
     setSelectedConversation,
     
-    // Conversations CRUD
+    // Actions
     loadConversations,
-    
-    // Messages
     loadMessages,
     sendMessage,
-    
-    // WebSocket
-    reconnectWebSocket: reconnect,
-    
-    // Actions
     selectConversation,
+    reconnectWebSocket: reconnect,
     clearError: useCallback(() => setError(null), []),
   };
 };

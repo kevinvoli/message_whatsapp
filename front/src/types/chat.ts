@@ -4,12 +4,17 @@ export interface Commercial {
   email: string;
 }
 
+// types/chat.ts
 export interface Message {
   id: string;
   text: string;
   timestamp: Date;
-  from: 'commercial' | 'client';
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error'; // Ajoutez 'error'
+  from: 'commercial' | 'client'; // ou 'agent' | 'user'
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
+  direction?: 'IN' | 'OUT';
+  sender_phone?: string;
+  from_me: boolean;
+  sender_name?: string;
 }
 
 // types/chat.ts
@@ -23,6 +28,7 @@ export interface Conversation {
     timestamp: Date;
     author: 'agent' | 'client';
   };
+  messages: Message[];
   unreadCount: number;
   commercial_id?: string; // Pour la correspondance
   name: string; // Ajouté pour correspondre à WhatsappChat
@@ -49,3 +55,4 @@ export interface LoginFormData {
   email: string;
   name: string;
 }
+

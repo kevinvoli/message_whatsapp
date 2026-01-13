@@ -18,8 +18,6 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', nullable: false })
   name: string ;
 
-
-
   @Column({ type: 'varchar', nullable: true })
   passwordResetToken?: string | null;
 

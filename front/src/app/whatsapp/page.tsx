@@ -7,21 +7,28 @@ import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/hooks/useAuth';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useConversations } from '@/hooks/useConversations';
+import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
 import { useRouter } from 'next/navigation';
-import { Conversation } from '../../types/chat';
 
 const WhatsAppPage = () => {
   const { commercial, initialized, logout } = useAuth();
-  // const { conversations } = useWebSocket();
-
-
-  
   const router = useRouter();
-  const [isSending, setIsSending] = useState(false);
+  
+  // Utilisez le hook refactoré
+  const {
+    conversations,
+    selectedConversation,
+    messages,
+    isLoadingMessages,
+    isWebSocketConnected,
+    error,
+    selectConversation,
+    sendMessage,
+    loadConversations,
+    reconnectWebSocket
+  } = useConversations();
 
-  // 🔐 protection route
+  // Protection de route
   useEffect(() => {
     if (!initialized) return;
     if (!commercial) {
@@ -29,143 +36,54 @@ const WhatsAppPage = () => {
     }
   }, [initialized, commercial, router]);
 
-  const { 
-    isConnected, 
-    sendMessage: sendWebSocketMessage,
-    lastMessage,
-    joinConversation,
-    leaveConversation,
-    reconnect: reconnectWebSocket,
-    error: webSocketError
-  } = useWebSocket(commercial);
-  
-  const {
-    conversations,
-    selectedConversation,
-    messages,
-    searchTerm,
-    filteredConversations,
-    setSearchTerm,
-    loadConversations,
-    selectConversation,
-    setMessages,
-    sendMessage: sendHTTPMessage,
-    loadMessages,
-    updateConversation,
-    deleteConversation,
-    createConversation,
-    loading: conversationsLoading,
-    error: conversationsError,
-    clearError
-  } = useConversations();
-
+  // Recharger les conversations si la connexion se rétablit
   useEffect(() => {
-    if (commercial) {
+    if (isWebSocketConnected && commercial) {
       loadConversations(commercial.id);
     }
-  }, [commercial, loadConversations]);
+  }, [isWebSocketConnected, commercial, loadConversations]);
 
-  // Gérer les messages WebSocket
-  useEffect(() => {
-    if (lastMessage && selectedConversation?.id === lastMessage.conversationId) {
-      setMessages(prev => {
-        const exists = prev.some(m => m.id === lastMessage.message.id);
-        if (exists) {
-          return prev.map(m => 
-            m.id === lastMessage.message.id ? lastMessage.message : m
-          );
-        }
-        return [...prev, lastMessage.message];
+  // Gérer la sélection d'une conversation
+  const handleSelectConversation = useCallback((conversation: any) => {
+    console.log("🎯 Sélection de la conversation:", conversation.clientName);
+    selectConversation(conversation);
+  }, [selectConversation]);
+
+  // Envoyer un message
+  const handleSendMessage = useCallback(async (text: string) => {
+    if (!selectedConversation || !commercial) {
+      console.error('❌ Impossible d\'envoyer: conversation ou commercial manquant');
+      return;
+    }
+
+    try {
+      await sendMessage(selectedConversation.chat_id, {
+        text,
+        from: 'commercial'
       });
+    } catch (err) {
+      console.error('Erreur lors de l\'envoi:', err);
     }
-  }, [lastMessage, selectedConversation, setMessages]);
+  }, [selectedConversation, commercial, sendMessage]);
 
-  // Gestion WebSocket des conversations
-  useEffect(() => {
-    if (selectedConversation && isConnected) {
-      joinConversation(selectedConversation.id);
-    }
-    
-    return () => {
-      if (selectedConversation) {
-        leaveConversation(selectedConversation.id);
-      }
-    };
-  }, [selectedConversation, isConnected, joinConversation, leaveConversation]);
-
-  const handleSendMessage = useCallback((text: string) => {
-    if (!selectedConversation || !commercial) return;
-
-    const newMsg = {
-      id: 'msg_temp_' + Date.now(),
-      text,
-      timestamp: new Date(),
-      from: 'commercial' as const,
-      status: 'sending' as const
-    };
-
-    setMessages(prev => [...prev, newMsg]);
-
-    // Essayer WebSocket d'abord
-    if (isConnected) {
-      const success = sendWebSocketMessage({
-        conversationId: selectedConversation.id,
-        message: newMsg
-      });
-      
-      if (success) {
-        // Mettre à jour le statut après un délai
-        setTimeout(() => {
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === newMsg.id 
-                ? { ...msg, status: 'sent' }
-                : msg
-            )
-          );
-        }, 500);
-        return;
-      }
-    }
-
-    // Fallback HTTP
-    sendHTTPMessage(selectedConversation.id, {
-      text,
-      from: 'commercial',
-      timestamp: new Date()
-    }).then(result => {
-      if (result) {
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === newMsg.id 
-              ? { ...result, status: 'sent' }
-              : msg
-          )
-        );
-      }
-    }).catch(() => {
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === newMsg.id 
-            ? { ...msg, status: 'error' }
-            : msg
-        )
-      );
-    });
-  }, [selectedConversation, commercial, isConnected, sendWebSocketMessage, sendHTTPMessage, setMessages]);
-
-  if (!commercial || !initialized) return null;
+  if (!commercial || !initialized) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar
         commercial={commercial}
-        conversations={filteredConversations}
-        searchTerm={searchTerm}
+        conversations={conversations}
+        searchTerm=""
         selectedConversation={selectedConversation}
-        isConnected={isConnected}
-        onSearchChange={setSearchTerm}
-        onSelectConversation={selectConversation}
+        isConnected={isWebSocketConnected}
+        onSearchChange={() => {}}
+        onSelectConversation={handleSelectConversation}
         onLogout={logout}
       />
 
@@ -173,23 +91,48 @@ const WhatsAppPage = () => {
         {selectedConversation ? (
           <>
             <ChatHeader conversation={selectedConversation} />
-            <ChatMessages messages={messages} />
+            
+            {isLoadingMessages ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
+                  <p className="text-gray-500">Chargement des messages...</p>
+                </div>
+              </div>
+            ) : (
+              <ChatMessages messages={messages} />
+            )}
+            
             <ChatInput
               onSendMessage={handleSendMessage}
-              isConnected={isConnected}
-              disabled={isSending}
+              isConnected={isWebSocketConnected}
+              disabled={isLoadingMessages}
             />
+            
+            {/* Debug panel */}
+            {error && (
+              <div className="bg-red-50 border-t border-red-200 p-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-red-600 text-sm">{error}</span>
+                  <button
+                    onClick={reconnectWebSocket}
+                    className="text-sm text-green-600 hover:text-green-800"
+                  >
+                    Reconnecter
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-400">
             <div className="text-center">
               <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
               <p className="text-xl font-semibold">
-                Sélectionnez une conversation
+                {conversations.length === 0 
+                  ? 'Aucune conversation disponible' 
+                  : 'Sélectionnez une conversation'}
               </p>
-              {webSocketError && (
-                <p className="text-red-500 text-sm mt-2">{webSocketError}</p>
-              )}
             </div>
           </div>
         )}

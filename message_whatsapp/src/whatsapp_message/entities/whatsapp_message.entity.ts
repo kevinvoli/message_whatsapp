@@ -65,6 +65,16 @@ export class WhatsappMessage {
   })
   chat_id: string;
 
+  @Column({
+    name: 'type',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  type: string;
+
+  
+
   @ManyToOne(() => WhatsappChat, (data) => data.messages)
   @JoinColumn({
     name: 'chat_id',
@@ -148,7 +158,7 @@ export class WhatsappMessage {
     length: 100,
     nullable: false,
   })
-  sender_phone: string;
+  from: string;
 
   @Column({
     name: 'sender_name',
@@ -156,7 +166,7 @@ export class WhatsappMessage {
     length: 100,
     nullable: false,
   })
-  sender_name: string;
+  from_name: string;
 
   @Column({
     name: 'timestamp',
@@ -171,6 +181,7 @@ export class WhatsappMessage {
     type: 'enum',
     enum: WhatsappMessageStatus,
     nullable: false,
+    default: WhatsappMessageStatus.DELIVERED,
   })
   status: WhatsappMessageStatus;
 

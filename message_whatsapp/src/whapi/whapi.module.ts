@@ -11,6 +11,7 @@ import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 
 
 @Module({
@@ -18,6 +19,6 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
       TypeOrmModule.forFeature([WhatsappCommercial,WhatsappMessage, WhatsappChat]),
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhapiServiceDispacher,UsersService,WhatsappMessageService, WhatsappChatService],
+  providers: [WhapiService, WhapiServiceDispacher,UsersService,WhatsappMessageService, WhatsappChatService,CommunicationWhapiService],
 })
 export class WhapiModule {}

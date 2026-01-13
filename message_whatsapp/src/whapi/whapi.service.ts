@@ -5,6 +5,7 @@ import {
   WhapiWebhookPayload,
 } from './interface/whapi-webhook.interface';
 import { WhapiServiceDispacher } from './whatsapp_dispacher.service';
+import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 
 @Injectable()
 export class WhapiService {
@@ -12,99 +13,43 @@ export class WhapiService {
 
   constructor(
     private readonly whatsappDispacherService: WhapiServiceDispacher,
+    private readonly whatsappMessageService: WhatsappMessageService,
   ) {}
 
   async handleIncomingMessage(payload: WhapiWebhookPayload) {
     if (!payload) return;
-
-    // --- Messages ---
-    if (payload.messages?.length) {
-      console.log(
-        'verification du message ===================================== ',
-        payload,
-      );
-
-      if (payload.messages?.[0]) {
-        const message = payload.messages[0];
-        const chatId = message.chat_id;
-        await this.whatsappDispacherService.sendMessage(chatId, message);
-      }
+    if (payload.messages?.[0]) {
+      const message = payload.messages[0];
+      const chatId = message.chat_id;
+      await this.whatsappDispacherService.sendMessage(chatId, message);
     }
+  }
 
-    //      {
-    //   id: 'rCOhxfGiSPy0aKy6rTlrmQ-hcy0Sh4AICk',
-    //   from_me: false,
-    //   type: 'text',
-    //   chat_id: '22507711898@s.whatsapp.net',
-    //   timestamp: 1768222473,
-    //   source: 'mobile',
-    //   text: { body: 'Salut' },
-    //   from: '22507711898',
-    //   from_name: 'Mr. Voli Bi'
-    // }
-    // --- Statuses ---
-    if (payload.statuses?.length) {
+  async updateStatusMessage(payload: WhapiWebhookPayload) {
+    try {
+      if (!payload || !payload.statuses) return;
       for (const status of payload.statuses) {
+        await this.whatsappMessageService.updateByStatus(status);
+
         this.logger.log(
           `[Status] Message: ${status.id}, Recipient: ${status.recipient_id}, Status: ${status.status}`,
         );
       }
-    }
-
-    // --- Polls ---
-    if (payload.polls?.length) {
-      for (const poll of payload.polls) {
-        this.logger.log(
-          `[Poll] Title: ${poll.title}, Options: ${poll.options.join(', ')}`,
-        );
-      }
-    }
-
-    // --- Interactive (list, buttons, product) ---
-    if (payload.interactives?.length) {
-      for (const interactive of payload.interactives) {
-        this.logger.log(
-          `[Interactive] Type: ${interactive.type}, Body: ${interactive.body?.text}`,
-        );
-      }
-    }
-
-    // --- HSM (Highly Structured Messages) ---
-    if (payload.hsms?.length) {
-      for (const hsm of payload.hsms) {
-        this.logger.log(
-          `[HSM] Header: ${hsm.header?.text?.body}, Body: ${hsm.body}, Footer: ${hsm.footer}`,
-        );
-      }
-    }
-
-    // --- Catalogs ---
-    if (payload.catalogs?.length) {
-      for (const catalog of payload.catalogs) {
-        this.logger.log(
-          `[Catalog] Title: ${catalog.title}, ID: ${catalog.catalog_id}`,
-        );
-      }
-    }
-
-    // --- Orders ---
-    if (payload.orders?.length) {
-      for (const order of payload.orders) {
-        this.logger.log(
-          `[Order] Title: ${order.title}, Status: ${order.status}, Total: ${order.total_price}`,
-        );
-      }
-    }
-
-    // --- Invites (group, newsletter, admin) ---
-    if (payload.invites?.length) {
-      for (const invite of payload.invites) {
-        this.logger.log(
-          `[Invite] Type: ${invite.title}, Body: ${invite.body}, Link: ${invite.link}`,
-        );
-      }
+    } catch (error) {
+      this.logger.error(`Error updating message status: ${error}`);
     }
   }
+
+  //   {
+  //   id: 'rAF3nNMHa2sRk6WF4BgqbA-hWHCtSkAsFM',
+  //   code: 4,
+  //   status: 'read',
+  //   recipient_id: '214083332780115@lid',
+  //   timestamp: '1768305745'
+  // }
+
+
+
 
   private extractMessageContent(message: WhapiMessage): string {
     switch (message.type) {
