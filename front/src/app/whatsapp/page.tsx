@@ -7,14 +7,14 @@ import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/hooks/useAuth';
-import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
+import { useConversations } from '@/hooks/useConversations';
+import { Conversation } from '@/types/chat';
 import { useRouter } from 'next/navigation';
 
 const WhatsAppPage = () => {
   const { commercial, initialized, logout } = useAuth();
   const router = useRouter();
-  
-  // Utilisez le hook refactoré
+
   const {
     conversations,
     selectedConversation,
@@ -24,47 +24,33 @@ const WhatsAppPage = () => {
     error,
     selectConversation,
     sendMessage,
-    loadConversations,
-    reconnectWebSocket
+    reconnectWebSocket,
   } = useConversations();
 
-  // Protection de route
+  // Route protection
   useEffect(() => {
-    if (!initialized) return;
-    if (!commercial) {
+    if (initialized && !commercial) {
       router.replace('/login');
     }
   }, [initialized, commercial, router]);
 
-  // Recharger les conversations si la connexion se rétablit
-  useEffect(() => {
-    if (isWebSocketConnected && commercial) {
-      loadConversations(commercial.id);
-    }
-  }, [isWebSocketConnected, commercial, loadConversations]);
+  const handleSelectConversation = useCallback(
+    (conversation: Conversation) => {
+      selectConversation(conversation);
+    },
+    [selectConversation],
+  );
 
-  // Gérer la sélection d'une conversation
-  const handleSelectConversation = useCallback((conversation: any) => {
-    console.log("🎯 Sélection de la conversation:", conversation.clientName);
-    selectConversation(conversation);
-  }, [selectConversation]);
-
-  // Envoyer un message
-  const handleSendMessage = useCallback(async (text: string) => {
-    if (!selectedConversation || !commercial) {
-      console.error('❌ Impossible d\'envoyer: conversation ou commercial manquant');
-      return;
-    }
-
-    try {
-      await sendMessage(selectedConversation.chat_id, {
-        text,
-        from: 'commercial'
-      });
-    } catch (err) {
-      console.error('Erreur lors de l\'envoi:', err);
-    }
-  }, [selectedConversation, commercial, sendMessage]);
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      if (!selectedConversation || !commercial) {
+        console.error('Cannot send message: missing conversation or commercial.');
+        return;
+      }
+      sendMessage(text);
+    },
+    [selectedConversation, commercial, sendMessage],
+  );
 
   if (!commercial || !initialized) {
     return (

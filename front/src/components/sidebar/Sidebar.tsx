@@ -59,13 +59,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-200" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-green-200" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Rechercher une conversation..."
-            className="w-full pl-10 pr-4 py-2 bg-green-700 text-white placeholder-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
+            className="w-full rounded-lg bg-green-700 py-2 pl-10 pr-4 text-white placeholder-green-200 focus:outline-none focus:ring-2 focus:ring-green-400"
           />
         </div>
       </div>

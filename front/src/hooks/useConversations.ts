@@ -15,12 +15,17 @@ export const useConversations = () => {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'PENDING' | 'CLOSED'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | Conversation['status']>('ALL');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
   const handleConversationList = useCallback((convs: Conversation[]) => {
     setConversations(convs);
     setIsLoading(false);
+  }, []);
+
+  const handleMessageList = useCallback((incomingMessages: Message[]) => {
+    setMessages(incomingMessages);
+    setIsLoadingMessages(false);
   }, []);
 
   const handleNewMessage = useCallback((message: Message) => {
@@ -45,6 +50,7 @@ export const useConversations = () => {
   const ws = useWebSocket({
     commercial,
     onConversationList: handleConversationList,
+    onMessageList: handleMessageList,
     onNewMessage: handleNewMessage,
     onNewConversation: handleNewConversation,
     onMessageStatusUpdate: () => {},
@@ -64,7 +70,6 @@ export const useConversations = () => {
       setIsLoadingMessages(true);
       setMessages([]);
       ws.requestMessages({ conversationId: selectedConversation.id });
-      setTimeout(() => setIsLoadingMessages(false), 500);
 
       if (selectedConversation.unreadCount > 0) {
         ws.markAsRead({ conversationId: selectedConversation.id, messageIds: [] });
@@ -85,7 +90,7 @@ export const useConversations = () => {
       content,
       type: 'TEXT',
       sender: 'COMMERCIAL',
-      status: 'sending',
+      status: 'SENDING',
       sentAt: new Date(),
     };
     

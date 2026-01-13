@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
 import { Commercial, Conversation, Message } from "@/types/chat";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
 interface UseWebSocketOptions {
   commercial: Commercial | null;
   onConversationList: (conversations: Conversation[]) => void;
+  onMessageList: (messages: Message[]) => void;
   onNewMessage: (message: Message) => void;
   onMessageStatusUpdate: (update: { messageId: string, status: string }) => void;
   onNewConversation: (conversation: Conversation) => void;
@@ -20,6 +21,7 @@ interface UseWebSocketOptions {
 export const useWebSocket = ({
   commercial,
   onConversationList,
+  onMessageList,
   onNewMessage,
   onMessageStatusUpdate,
   onNewConversation,
@@ -55,6 +57,7 @@ export const useWebSocket = ({
     socket.on("connect_error", (err) => setError(err.message));
 
     socket.on("conversation:list", onConversationList);
+    socket.on("message:list", onMessageList);
     socket.on("message:receive", onNewMessage);
     socket.on("message:status:update", onMessageStatusUpdate);
     socket.on("conversation:new", onNewConversation);
@@ -76,24 +79,39 @@ export const useWebSocket = ({
     return () => disconnect();
   }, [commercial, connect, disconnect]);
 
-  const createAndEmit = <T,>(eventName: string) =>
-    useCallback((payload: T) => {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit(eventName, payload);
-        return true;
-      }
-      return false;
-    }, []);
+  const sendMessage = useCallback((payload: { conversationId: string; content: string; type: 'TEXT' | 'IMAGE' | 'DOCUMENT'; mediaUrl?: string }) => {
+    socketRef.current?.emit('message:send', payload);
+  }, []);
+
+  const requestConversations = useCallback((payload: { commercialId: string }) => {
+    socketRef.current?.emit('conversations:get', payload);
+  }, []);
+
+  const requestMessages = useCallback((payload: { conversationId: string }) => {
+    socketRef.current?.emit('messages:get', payload);
+  }, []);
+
+  const startTyping = useCallback((payload: { conversationId:string; commercialId: string }) => {
+    socketRef.current?.emit('typing:start', payload);
+  }, []);
+
+  const stopTyping = useCallback((payload: { conversationId: string; commercialId: string }) => {
+    socketRef.current?.emit('typing:stop', payload);
+  }, []);
+
+  const markAsRead = useCallback((payload: { conversationId: string; messageIds: string[] }) => {
+    socketRef.current?.emit('messages:read', payload);
+  }, []);
 
   return useMemo(() => ({
     isConnected,
     error,
     reconnect: connect,
-    sendMessage: createAndEmit<{ conversationId: string; content: string; type: 'TEXT' | 'IMAGE' | 'DOCUMENT'; mediaUrl?: string }>('message:send'),
-    requestConversations: createAndEmit<{ commercialId: string }>('conversations:get'),
-    requestMessages: createAndEmit<{ conversationId: string }>('messages:get'),
-    startTyping: createAndEmit<{ conversationId:string; commercialId: string }>('typing:start'),
-    stopTyping: createAndEmit<{ conversationId: string; commercialId: string }>('typing:stop'),
-    markAsRead: createAndEmit<{ conversationId: string; messageIds: string[] }>('messages:read'),
-  }), [isConnected, error, connect, createAndEmit]);
+    sendMessage,
+    requestConversations,
+    requestMessages,
+    startTyping,
+    stopTyping,
+    markAsRead,
+  }), [isConnected, error, connect, sendMessage, requestConversations, requestMessages, startTyping, stopTyping, markAsRead]);
 };
