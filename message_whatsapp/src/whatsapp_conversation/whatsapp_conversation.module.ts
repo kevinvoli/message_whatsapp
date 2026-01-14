@@ -13,5 +13,6 @@ import { WhatsappCustomer } from 'src/whatsapp_customer/entities/whatsapp_custom
           WhatsappConversation,WhatsappCustomer , WhatsappChat, WhatsappMessage, WhatsappAgent
         ])],
   providers: [WhatsappConversationGateway, WhatsappConversationService],
+  exports: [WhatsappConversationService],
 })
 export class WhatsappConversationModule {}
