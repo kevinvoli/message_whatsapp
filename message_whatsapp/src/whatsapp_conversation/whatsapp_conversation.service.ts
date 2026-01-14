@@ -20,6 +20,27 @@ export class WhatsappConversationService {
     return this.repo.find();
   }
 
+  findAllByUser(userId: string): Promise<WhatsappConversation[]> {
+    return this.repo.find({ where: { assigned_agent_id: userId } });
+  }
+
+  async updateStatus(id: string, status: 'open' | 'close'): Promise<WhatsappConversation> {
+    const conversation = await this.findById(id);
+    if (!conversation) {
+      throw new Error('Conversation not found');
+    }
+    conversation.status = status;
+    return this.repo.save(conversation);
+  }
+
+  async incrementUnreadCount(id: string): Promise<void> {
+    await this.repo.increment({ id }, 'unreadCount', 1);
+  }
+
+  async resetUnreadCount(id: string): Promise<void> {
+    await this.repo.update(id, { unreadCount: 0 });
+  }
+
   findByChatId(chatId: string): Promise<WhatsappConversation | null> {
     return this.repo.findOne({ where: { chat_id: chatId } });
   }

@@ -437,6 +437,15 @@ export class WhatsappMessageGateway
     });
   }
 
+  async handleMessageStatusUpdate(conversationId: string, messageId: string, status: string) {
+    const roomName = `conversation_${conversationId}`;
+    this.server.to(roomName).emit('message:status:update', {
+      conversationId,
+      messageId,
+      status,
+    });
+  }
+
   // =========================
   // MÉTHODES PRIVÉES UTILITAIRES
   // =========================

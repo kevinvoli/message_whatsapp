@@ -38,6 +38,17 @@ async createAgentMessage(data: {
     const chat = await this.chatService.findByChatId(data.chat_id);
     if (!chat) throw new Error('Chat not found');
 
+    const lastMessage = await this.findLastMessageByChatId(data.chat_id);
+    if (lastMessage && !lastMessage.from_me) {
+      const now = new Date();
+      const lastMessageDate = new Date(lastMessage.timestamp);
+      const diff = now.getTime() - lastMessageDate.getTime();
+      const diffHours = Math.ceil(diff / (1000 * 60 * 60));
+      if (diffHours > 24) {
+        throw new Error('Response timeout');
+      }
+    }
+
     // 1️⃣ Envoi réel vers WhatsApp
     const whapiResponse = await this.communicationWhapiService.sendToWhapi(
       chat.contact_client, 
@@ -100,12 +111,13 @@ async createAgentMessage(data: {
     return messages.length > 0 ? messages[0] : null;
   }
 
-  async findByChatId(chatId: string): Promise<WhatsappMessage[]> {
+  async findByChatId(chatId: string, limit = 100, offset = 0): Promise<WhatsappMessage[]> {
     return this.messageRepository.find({
       where: { chat_id: chatId },
       relations: ['chat', 'commercial'],
-      order: { timestamp: 'ASC' }, // ASC pour afficher du plus ancien au plus récent
-      take: 100,
+      order: { timestamp: 'ASC' },
+      take: limit,
+      skip: offset,
     });
   }
 
