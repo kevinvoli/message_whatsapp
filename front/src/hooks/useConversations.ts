@@ -12,7 +12,7 @@ export const useConversations = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
-  const { commercial } = useAuth();
+  const { commercial, token } = useAuth();
   const { 
     isConnected, 
     sendMessage: sendWebSocketMessage, 
@@ -27,7 +27,7 @@ export const useConversations = () => {
     setSelectedConversation: setSelectedConvWS,
     reconnect,
     selectedConversationId
-  } = useWebSocket(commercial);
+  } = useWebSocket(token);
   
   // Référence pour suivre le dernier chargement
   const lastLoadRef = useRef<string | null>(null);

@@ -4,12 +4,14 @@ import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = 'http://localhost:3001';
 
-import { Conversation } from '@/types/chat';
+import { Conversation, Message } from '@/types/chat';
 
 export const useWebSocket = (token: string | null) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -50,5 +52,38 @@ export const useWebSocket = (token: string | null) => {
     [socket],
   );
 
-  return { socket, isConnected, emit, conversations, setConversations };
+  return {
+    socket,
+    isConnected,
+    emit,
+    conversations,
+    setConversations,
+    messages,
+    setMessages,
+    selectedConversationId,
+    setSelectedConversation: setSelectedConversationId,
+    reconnect: () => {
+      if (socket) {
+        socket.disconnect();
+        socket.connect();
+      }
+    },
+    joinConversation: (conversationId: string) => {
+      emit('join:conversation', { conversationId });
+      return true;
+    },
+    leaveConversation: (conversationId: string) => {
+      emit('leave:conversation', { conversationId });
+    },
+    loadConversation: (commercialId: string) => {
+      emit('get:conversation', { agentId: commercialId });
+    },
+    loadMessages: (conversationId: string) => {
+      emit('get:messages', { conversationId });
+    },
+    sendMessage: (message: any) => {
+      emit('agent:message', message);
+      return true;
+    },
+  };
 };

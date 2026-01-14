@@ -28,7 +28,8 @@ export const useAuth = () => {
       setToken(access_token);
       localStorage.setItem('token', access_token);
       // Fetch user profile or decode token to get user info
-      // setUser(decodedUser);
+      const decodedUser = JSON.parse(atob(access_token.split('.')[1]));
+      setUser(decodedUser);
     } catch (err) {
       setError('Invalid email or password');
       console.error(err);
