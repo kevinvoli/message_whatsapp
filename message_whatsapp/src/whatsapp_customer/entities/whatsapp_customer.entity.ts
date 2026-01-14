@@ -23,7 +23,7 @@ export class WhatsappCustomer {
     name: 'customer_id',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
     unique: true,
   })
   customer_id: string;

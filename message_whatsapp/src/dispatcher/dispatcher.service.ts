@@ -6,6 +6,7 @@ import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappConversation } from '../whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappConversationService } from '../whatsapp_conversation/whatsapp_conversation.service';
 import { CreateWhatsappConversationDto } from '../whatsapp_conversation/dto/create-whatsapp_conversation.dto';
+import { WhatsappCustomerService } from 'src/whatsapp_customer/whatsapp_customer.service';
 
 @Injectable()
 export class DispatcherService {
@@ -14,6 +15,7 @@ export class DispatcherService {
     private readonly pendingMessageRepository: Repository<PendingMessage>,
     private readonly queueService: QueueService,
     private readonly conversationService: WhatsappConversationService,
+    private readonly customerService: WhatsappCustomerService
   ) {}
 
   async assignConversation(
@@ -24,13 +26,21 @@ export class DispatcherService {
     mediaUrl?: string,
   ): Promise<WhatsappConversation | null> {
     const nextAgent = await this.queueService.getNextInQueue();
+      console.log(" 1   nextMessage =============================", nextAgent,clientPhone, clientName, content, messageType, mediaUrl);
+
 
     if (!nextAgent) {
+
+      console.log("nextMessage =============================", nextAgent);
+      
       await this.addPendingMessage(clientPhone, clientName, content, messageType, mediaUrl || '');
+      
       return null;
     }
 
     let conversation = await this.conversationService.findByChatId(clientPhone);
+
+      console.log("conversation =============================", conversation);
 
     if (conversation) {
       if (conversation.assigned_agent_id !== nextAgent.id) {
@@ -39,7 +49,15 @@ export class DispatcherService {
         conversation = await this.conversationService.update(conversation.id, conversation);
       }
     } else {
-      // Create a new conversation
+   
+      const customer = await this.customerService.findOne(clientPhone);
+      let client;
+      if (!customer) {
+    client=  await  this.customerService.create({
+           phone: clientPhone,
+           name: clientName 
+        });
+      }
       const createDto: CreateWhatsappConversationDto = {
         chat_id: clientPhone,
         customer_id: clientName, // This should be improved later

@@ -24,6 +24,8 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { WhatsappCommercialModule as UsersModule } from 'src/users/users.module';
 import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
+import { WhatsappCustomerService } from 'src/whatsapp_customer/whatsapp_customer.service';
+import { WhatsappCustomer } from 'src/whatsapp_customer/entities/whatsapp_customer.entity';
 
 
 @Module({
@@ -35,6 +37,7 @@ import { CommunicationWhapiModule } from 'src/communication_whapi/communication_
       PendingMessage,
       QueuePosition,
       WhatsappConversation,
+      WhatsappCustomer
     ]),
     DispatcherModule,
     WhatsappConversationModule,
@@ -44,6 +47,6 @@ import { CommunicationWhapiModule } from 'src/communication_whapi/communication_
     CommunicationWhapiModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhapiServiceDispacher],
+  providers: [WhapiService, WhapiServiceDispacher, UsersService, WhatsappMessageService, WhatsappChatService, CommunicationWhapiService, DispatcherService, WhatsappConversationService,WhatsappCustomerService],
 })
 export class WhapiModule {}

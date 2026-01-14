@@ -41,8 +41,11 @@ export class WhatsappConversationService {
     await this.repo.update(id, { unreadCount: 0 });
   }
 
-  findByChatId(chatId: string): Promise<WhatsappConversation | null> {
-    return this.repo.findOne({ where: { chat_id: chatId } });
+  async findByChatId(chatId: string): Promise<WhatsappConversation | null> {
+
+    console.log("tcheck de chatsllllllllllllllllllllllllllll",chatId);
+    
+    return await this.repo.findOne({ where: { chat_id: chatId } });
   }
 
   findById(id: string): Promise<WhatsappConversation | null> {

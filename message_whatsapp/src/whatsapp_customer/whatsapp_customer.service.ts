@@ -1,26 +1,42 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateWhatsappCustomerDto } from './dto/create-whatsapp_customer.dto';
 import { UpdateWhatsappCustomerDto } from './dto/update-whatsapp_customer.dto';
+import { WhatsappCustomer } from './entities/whatsapp_customer.entity';
 
 @Injectable()
 export class WhatsappCustomerService {
-  create(createWhatsappCustomerDto: CreateWhatsappCustomerDto) {
-    return 'This action adds a new whatsappCustomer';
+  constructor(
+    @InjectRepository(WhatsappCustomer)
+    private readonly customerRepository: Repository<WhatsappCustomer>,
+  ) {}
+
+  async create(createWhatsappCustomerDto: CreateWhatsappCustomerDto): Promise<WhatsappCustomer> {
+    const customer = this.customerRepository.create(createWhatsappCustomerDto);
+    return this.customerRepository.save(customer);
   }
 
-  findAll() {
-    return `This action returns all whatsappCustomer`;
+  async findAll(): Promise<WhatsappCustomer[]> {
+    return this.customerRepository.find();
   }
 
-  findOne(id: string) {
-    return `This action returns a #${id} whatsappCustomer`;
+  async findOne(id: string): Promise<WhatsappCustomer> {
+    const customer = await this.customerRepository.findOne({ where: { id } });
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID ${id} not found`);
+    }
+    return customer;
   }
 
-  update(id: string, updateWhatsappCustomerDto: UpdateWhatsappCustomerDto) {
-    return `This action updates a #${id} whatsappCustomer`;
+  async update(id: string, updateWhatsappCustomerDto: UpdateWhatsappCustomerDto): Promise<WhatsappCustomer> {
+    const customer = await this.findOne(id);
+    Object.assign(customer, updateWhatsappCustomerDto);
+    return this.customerRepository.save(customer);
   }
 
-  remove(id: string) {
-    return `This action removes a #${id} whatsappCustomer`;
+  async remove(id: string): Promise<void> {
+    const customer = await this.findOne(id);
+    await this.customerRepository.remove(customer);
   }
 }
