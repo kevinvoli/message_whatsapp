@@ -11,18 +11,23 @@ export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
-        private readonly commercialService : WhatsappCommercialService,
-    
+    private readonly commercialService: WhatsappCommercialService,
   ) {}
 
-// Dans WhatsappChatService
-async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
-  return this.chatRepository.find({
-    where: { commercial_id: commercialId },
-    order: { updatedAt: 'DESC' },
-    relations: ['commercial','messages','conversation','chatEvent','chatLabel'],
-  });
-}
+  // Dans WhatsappChatService
+  async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+    return this.chatRepository.find({
+      where: { commercial_id: commercialId },
+      order: { updatedAt: 'DESC' },
+      relations: [
+        'commercial',
+        'messages',
+        'conversation',
+        'chatEvent',
+        'chatLabel',
+      ],
+    });
+  }
 
   async findOrCreateChat(
     chatId: string,
@@ -39,13 +44,13 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
         return chat;
       }
       const commercial = await this.commercialService.findOneById(commercialId);
-      console.log("le commercial trouve",commercial);
-      
+      console.log('le commercial trouve', commercial);
+
       if (!commercial) {
         throw new Error('Commercial not found');
       }
-      console.log("le chat doit etre ici");
-      
+      console.log('le chat doit etre ici');
+
       const creatChat = this.chatRepository.create({
         chat_id: chatId,
         name: fromName,
@@ -77,7 +82,10 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel',], });
+      return this.chatRepository.find({
+        where: { chat_id: chatId },
+        relations: ['commercial', 'conversation', 'chatEvent', 'chatLabel'],
+      });
     }
     return this.chatRepository.find();
   }

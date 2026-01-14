@@ -16,7 +16,10 @@ export class WhatsappMessageContextService {
     return `This action returns a #${id} whatsappMessageContext`;
   }
 
-  update(id: string, updateWhatsappMessageContextDto: UpdateWhatsappMessageContextDto) {
+  update(
+    id: string,
+    updateWhatsappMessageContextDto: UpdateWhatsappMessageContextDto,
+  ) {
     return `This action updates a #${id} whatsappMessageContext`;
   }
 

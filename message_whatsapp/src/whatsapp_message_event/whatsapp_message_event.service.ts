@@ -16,7 +16,10 @@ export class WhatsappMessageEventService {
     return `This action returns a #${id} whatsappMessageEvent`;
   }
 
-  update(id: string, updateWhatsappMessageEventDto: UpdateWhatsappMessageEventDto) {
+  update(
+    id: string,
+    updateWhatsappMessageEventDto: UpdateWhatsappMessageEventDto,
+  ) {
     return `This action updates a #${id} whatsappMessageEvent`;
   }
 

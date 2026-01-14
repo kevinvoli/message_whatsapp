@@ -1,18 +1,28 @@
 import { WhatsappMessageContentService } from './whatsapp_message_content.service';
 import { CreateWhatsappMessageContentDto } from './dto/create-whatsapp_message_content.dto';
 import { UpdateWhatsappMessageContentDto } from './dto/update-whatsapp_message_content.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappMessageContentGateway {
-  constructor(private readonly whatsappMessageContentService: WhatsappMessageContentService) {}
+  constructor(
+    private readonly whatsappMessageContentService: WhatsappMessageContentService,
+  ) {}
 
   @SubscribeMessage('createWhatsappMessageContent')
-  create(@MessageBody() createWhatsappMessageContentDto: CreateWhatsappMessageContentDto) {
-    return this.whatsappMessageContentService.create(createWhatsappMessageContentDto);
+  create(
+    @MessageBody()
+    createWhatsappMessageContentDto: CreateWhatsappMessageContentDto,
+  ) {
+    return this.whatsappMessageContentService.create(
+      createWhatsappMessageContentDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappMessageContent')
@@ -26,7 +36,10 @@ export class WhatsappMessageContentGateway {
   }
 
   @SubscribeMessage('updateWhatsappMessageContent')
-  update(@MessageBody() updateWhatsappMessageContentDto: UpdateWhatsappMessageContentDto) {
+  update(
+    @MessageBody()
+    updateWhatsappMessageContentDto: UpdateWhatsappMessageContentDto,
+  ) {
     // return this.whatsappMessageContentService.update(updateWhatsappMessageContentDto.id, updateWhatsappMessageContentDto);
   }
 

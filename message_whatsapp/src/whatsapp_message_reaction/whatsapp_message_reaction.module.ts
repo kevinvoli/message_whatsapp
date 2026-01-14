@@ -6,9 +6,9 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappMessageReaction } from './entities/whatsapp_message_reaction.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappMessage, WhatsappMessageReaction
-        ])],
+  imports: [
+    TypeOrmModule.forFeature([WhatsappMessage, WhatsappMessageReaction]),
+  ],
   providers: [WhatsappMessageReactionGateway, WhatsappMessageReactionService],
 })
 export class WhatsappMessageReactionModule {}

@@ -1,9 +1,6 @@
-import { IsEmail, IsOptional, } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateWhatsappCommercialDto } from './create-whatsapp_commercial.dto';
 
-export class UpdateWhatsappCommercialDto {
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-
-}
+export class UpdateWhatsappCommercialDto extends PartialType(
+  CreateWhatsappCommercialDto,
+) {}

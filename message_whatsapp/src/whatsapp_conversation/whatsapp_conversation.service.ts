@@ -8,10 +8,10 @@ import { WhatsappConversation } from './entities/whatsapp_conversation.entity';
 @Injectable()
 export class WhatsappConversationService {
   constructor(
-      @InjectRepository(WhatsappConversation)
+    @InjectRepository(WhatsappConversation)
     private readonly repo: Repository<WhatsappConversation>,
-  ){}
-   create(createWhatsappConversationDto: Partial<WhatsappConversation>) {
+  ) {}
+  create(createWhatsappConversationDto: Partial<WhatsappConversation>) {
     return this.repo.save(this.repo.create(createWhatsappConversationDto));
   }
 
@@ -23,21 +23,22 @@ export class WhatsappConversationService {
     // return this.repo.findOne();
   }
 
-
-
   findById(id: string) {
-  return this.repo.findOne({
-    where: { id },
-    relations: [],
-  });
-}
-
- async update(id: string, updateWhatsappConversationDto: Partial<WhatsappConversation>) {
-  const conversation= await this.repo.findOne({ where: { id } });
-
-  if (!conversation) {
-    return;
+    return this.repo.findOne({
+      where: { id },
+      relations: [],
+    });
   }
+
+  async update(
+    id: string,
+    updateWhatsappConversationDto: Partial<WhatsappConversation>,
+  ) {
+    const conversation = await this.repo.findOne({ where: { id } });
+
+    if (!conversation) {
+      return;
+    }
     // return this.repo.update(conversation, updateWhatsappConversationDto);
   }
 

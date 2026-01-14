@@ -5,9 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappLastMessage } from './entities/whatsapp_last_message.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappLastMessage
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappLastMessage])],
   providers: [WhatsappLastMessageGateway, WhatsappLastMessageService],
 })
 export class WhatsappLastMessageModule {}

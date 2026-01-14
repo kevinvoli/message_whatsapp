@@ -7,10 +7,15 @@ describe('WhatsappChatParticipantGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WhatsappChatParticipantGateway, WhatsappChatParticipantService],
+      providers: [
+        WhatsappChatParticipantGateway,
+        WhatsappChatParticipantService,
+      ],
     }).compile();
 
-    gateway = module.get<WhatsappChatParticipantGateway>(WhatsappChatParticipantGateway);
+    gateway = module.get<WhatsappChatParticipantGateway>(
+      WhatsappChatParticipantGateway,
+    );
   });
 
   it('should be defined', () => {

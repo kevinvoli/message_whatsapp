@@ -12,7 +12,9 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_media_content_media_content_id', ['media_content_id'], { unique: true })
+@Index('UQ_whatsapp_media_content_media_content_id', ['media_content_id'], {
+  unique: true,
+})
 export class WhatsappMediaContent {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -36,9 +38,15 @@ export class WhatsappMediaContent {
     nullable: false,
   })
   message_content_id: string;
-    @ManyToOne(() => WhatsappMessageContent, (messageContent) => messageContent.mediaContent)
-    @JoinColumn({ name: 'message_content_id', referencedColumnName: 'message_content_id' })
-    messageContent: WhatsappMessageContent;
+  @ManyToOne(
+    () => WhatsappMessageContent,
+    (messageContent) => messageContent.mediaContent,
+  )
+  @JoinColumn({
+    name: 'message_content_id',
+    referencedColumnName: 'message_content_id',
+  })
+  messageContent: WhatsappMessageContent;
 
   @Column({ name: 'media_type', type: 'varchar', length: 100, nullable: false })
   media_type: string;
@@ -50,7 +58,6 @@ export class WhatsappMediaContent {
     nullable: false,
   })
   whapi_media_id: string;
- 
 
   @Column({ name: 'url', type: 'varchar', length: 100, nullable: false })
   url: string;

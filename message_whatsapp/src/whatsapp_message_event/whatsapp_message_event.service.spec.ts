@@ -9,7 +9,9 @@ describe('WhatsappMessageEventService', () => {
       providers: [WhatsappMessageEventService],
     }).compile();
 
-    service = module.get<WhatsappMessageEventService>(WhatsappMessageEventService);
+    service = module.get<WhatsappMessageEventService>(
+      WhatsappMessageEventService,
+    );
   });
 
   it('should be defined', () => {

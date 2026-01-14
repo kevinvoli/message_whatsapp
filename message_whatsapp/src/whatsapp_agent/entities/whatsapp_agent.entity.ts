@@ -10,8 +10,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-
-
 @Entity()
 @Index('UQ_whatsapp_agent_agent_id', ['agent_id'], { unique: true })
 export class WhatsappAgent {
@@ -21,7 +19,13 @@ export class WhatsappAgent {
   })
   id: string;
 
-  @Column({ name: 'agent_id', type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({
+    name: 'agent_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
   agent_id: string;
 
   @Column({ name: 'phone', type: 'varchar', length: 100, nullable: false })
@@ -37,8 +41,6 @@ export class WhatsappAgent {
 
   @OneToMany(() => WhatsappConversation, (agent) => agent.agent)
   conversation: WhatsappConversation[];
-
-
 
   @CreateDateColumn({
     name: 'createdAt',

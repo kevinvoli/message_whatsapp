@@ -4,7 +4,9 @@ import { UpdateWhatsappInteractiveContentDto } from './dto/update-whatsapp_inter
 
 @Injectable()
 export class WhatsappInteractiveContentService {
-  create(createWhatsappInteractiveContentDto: CreateWhatsappInteractiveContentDto) {
+  create(
+    createWhatsappInteractiveContentDto: CreateWhatsappInteractiveContentDto,
+  ) {
     return 'This action adds a new whatsappInteractiveContent';
   }
 
@@ -16,7 +18,10 @@ export class WhatsappInteractiveContentService {
     return `This action returns a #${id} whatsappInteractiveContent`;
   }
 
-  update(id: string, updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto) {
+  update(
+    id: string,
+    updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto,
+  ) {
     return `This action updates a #${id} whatsappInteractiveContent`;
   }
 

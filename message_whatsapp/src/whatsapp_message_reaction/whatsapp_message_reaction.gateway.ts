@@ -1,18 +1,28 @@
 import { WhatsappMessageReactionService } from './whatsapp_message_reaction.service';
 import { CreateWhatsappMessageReactionDto } from './dto/create-whatsapp_message_reaction.dto';
 import { UpdateWhatsappMessageReactionDto } from './dto/update-whatsapp_message_reaction.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappMessageReactionGateway {
-  constructor(private readonly whatsappMessageReactionService: WhatsappMessageReactionService) {}
+  constructor(
+    private readonly whatsappMessageReactionService: WhatsappMessageReactionService,
+  ) {}
 
   @SubscribeMessage('createWhatsappMessageReaction')
-  create(@MessageBody() createWhatsappMessageReactionDto: CreateWhatsappMessageReactionDto) {
-    return this.whatsappMessageReactionService.create(createWhatsappMessageReactionDto);
+  create(
+    @MessageBody()
+    createWhatsappMessageReactionDto: CreateWhatsappMessageReactionDto,
+  ) {
+    return this.whatsappMessageReactionService.create(
+      createWhatsappMessageReactionDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappMessageReaction')
@@ -26,7 +36,10 @@ export class WhatsappMessageReactionGateway {
   }
 
   @SubscribeMessage('updateWhatsappMessageReaction')
-  update(@MessageBody() updateWhatsappMessageReactionDto: UpdateWhatsappMessageReactionDto) {
+  update(
+    @MessageBody()
+    updateWhatsappMessageReactionDto: UpdateWhatsappMessageReactionDto,
+  ) {
     // return this.whatsappMessageReactionService.update(updateWhatsappMessageReactionDto.id, updateWhatsappMessageReactionDto);
   }
 

@@ -4,19 +4,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhapiMessage } from './interface/whapi-webhook.interface';
-import { MessageDirection, WhatsappMessageStatus } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-
+import {
+  MessageDirection,
+  WhatsappMessageStatus,
+} from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Injectable()
 export class WhapiServiceDispacher {
   private readonly logger = new Logger(WhapiServiceDispacher.name);
 
   constructor(
-        private readonly commercialService: WhatsappCommercialService,
-         private readonly messageService: WhatsappMessageService,
+    private readonly commercialService: WhatsappCommercialService,
+    private readonly messageService: WhatsappMessageService,
   ) {}
-
-
 
   async sendMessage(to: string, message: WhapiMessage) {
     const messageData = {
@@ -42,6 +42,4 @@ export class WhapiServiceDispacher {
     // Logic to save message to database
     this.logger.log(`Saving message to ${to}: ${message}`);
   }
-
-
 }

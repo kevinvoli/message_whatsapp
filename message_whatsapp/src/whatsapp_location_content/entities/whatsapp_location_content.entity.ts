@@ -12,7 +12,11 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_location_content_location_content_id', ['location_content_id'], { unique: true })
+@Index(
+  'UQ_whatsapp_location_content_location_content_id',
+  ['location_content_id'],
+  { unique: true },
+)
 export class WhatsappLocationContent {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

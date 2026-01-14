@@ -113,7 +113,12 @@ export class WhatsappChat {
   })
   last_activity_at: string; // timestamp
 
-    @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'contact_client',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   contact_client: string;
 
   @Column({ name: 'created_at', type: 'varchar', length: 100, nullable: false })

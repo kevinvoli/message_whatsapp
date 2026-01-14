@@ -16,7 +16,10 @@ export class WhatsappLastMessageService {
     return `This action returns a #${id} whatsappLastMessage`;
   }
 
-  update(id: string, updateWhatsappLastMessageDto: UpdateWhatsappLastMessageDto) {
+  update(
+    id: string,
+    updateWhatsappLastMessageDto: UpdateWhatsappLastMessageDto,
+  ) {
     return `This action updates a #${id} whatsappLastMessage`;
   }
 

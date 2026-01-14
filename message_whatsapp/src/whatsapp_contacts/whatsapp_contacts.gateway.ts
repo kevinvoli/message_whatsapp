@@ -1,14 +1,19 @@
-
 import { WhatsappContactsService } from './whatsapp_contacts.service';
 import { CreateWhatsappContactDto } from './dto/create-whatsapp_contact.dto';
 import { UpdateWhatsappContactDto } from './dto/update-whatsapp_contact.dto';
-import { MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import {
+  MessageBody,
+  SubscribeMessage,
+  WebSocketGateway,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappContactsGateway {
-  constructor(private readonly whatsappContactsService: WhatsappContactsService) {}
+  constructor(
+    private readonly whatsappContactsService: WhatsappContactsService,
+  ) {}
 
   @SubscribeMessage('createWhatsappContact')
   create(@MessageBody() createWhatsappContactDto: CreateWhatsappContactDto) {

@@ -1,8 +1,11 @@
 import { WhatsappMediaService } from './whatsapp_media.service';
 import { CreateWhatsappMediaDto } from './dto/create-whatsapp_media.dto';
 import { UpdateWhatsappMediaDto } from './dto/update-whatsapp_media.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },

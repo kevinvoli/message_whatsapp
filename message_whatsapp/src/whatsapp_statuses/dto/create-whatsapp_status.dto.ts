@@ -1,19 +1,27 @@
-import { IsInt, IsOptional, IsString } from "class-validator";
+import { IsString, IsNotEmpty, IsInt, IsBoolean } from 'class-validator';
 
 export class CreateWhatsappStatusDto {
   @IsString()
-  @IsOptional()
-  id: string;
+  @IsNotEmpty()
+  status_id: string;
 
   @IsInt()
+  @IsNotEmpty()
   code: number;
 
   @IsString()
+  @IsNotEmpty()
   status: string;
 
   @IsString()
+  @IsNotEmpty()
   recipient_id: string;
 
-  @IsOptional()
-  timestamp: number | string;
+  @IsString()
+  @IsNotEmpty()
+  viewer_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  timestamp: string;
 }

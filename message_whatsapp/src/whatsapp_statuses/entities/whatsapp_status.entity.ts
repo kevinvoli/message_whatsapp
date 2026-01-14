@@ -17,7 +17,13 @@ export class WhatsappStatus {
   })
   id: string;
 
-  @Column({ name: 'status_id', type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({
+    name: 'status_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
   status_id: string;
 
   @Column({ name: 'code', type: 'varchar', length: 100, nullable: false })
@@ -39,7 +45,6 @@ export class WhatsappStatus {
 
   @Column({ name: 'timestamp', type: 'varchar', length: 100, nullable: false })
   timestamp: string;
-   
 
   @CreateDateColumn({
     name: 'createdAt',

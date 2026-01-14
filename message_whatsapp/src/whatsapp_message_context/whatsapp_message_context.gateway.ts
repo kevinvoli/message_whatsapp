@@ -1,18 +1,28 @@
 import { WhatsappMessageContextService } from './whatsapp_message_context.service';
 import { CreateWhatsappMessageContextDto } from './dto/create-whatsapp_message_context.dto';
 import { UpdateWhatsappMessageContextDto } from './dto/update-whatsapp_message_context.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappMessageContextGateway {
-  constructor(private readonly whatsappMessageContextService: WhatsappMessageContextService) {}
+  constructor(
+    private readonly whatsappMessageContextService: WhatsappMessageContextService,
+  ) {}
 
   @SubscribeMessage('createWhatsappMessageContext')
-  create(@MessageBody() createWhatsappMessageContextDto: CreateWhatsappMessageContextDto) {
-    return this.whatsappMessageContextService.create(createWhatsappMessageContextDto);
+  create(
+    @MessageBody()
+    createWhatsappMessageContextDto: CreateWhatsappMessageContextDto,
+  ) {
+    return this.whatsappMessageContextService.create(
+      createWhatsappMessageContextDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappMessageContext')
@@ -26,7 +36,10 @@ export class WhatsappMessageContextGateway {
   }
 
   @SubscribeMessage('updateWhatsappMessageContext')
-  update(@MessageBody() updateWhatsappMessageContextDto: UpdateWhatsappMessageContextDto) {
+  update(
+    @MessageBody()
+    updateWhatsappMessageContextDto: UpdateWhatsappMessageContextDto,
+  ) {
     // return this.whatsappMessageContextService.update(updateWhatsappMessageContextDto.id, updateWhatsappMessageContextDto);
   }
 

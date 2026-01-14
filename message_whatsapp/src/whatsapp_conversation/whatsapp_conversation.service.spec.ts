@@ -9,7 +9,9 @@ describe('WhatsappConversationService', () => {
       providers: [WhatsappConversationService],
     }).compile();
 
-    service = module.get<WhatsappConversationService>(WhatsappConversationService);
+    service = module.get<WhatsappConversationService>(
+      WhatsappConversationService,
+    );
   });
 
   it('should be defined', () => {

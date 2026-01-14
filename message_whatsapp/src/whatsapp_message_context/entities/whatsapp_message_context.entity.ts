@@ -12,7 +12,11 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_message_context_message_context_id', ['message_context_id'], { unique: true })
+@Index(
+  'UQ_whatsapp_message_context_message_context_id',
+  ['message_context_id'],
+  { unique: true },
+)
 export class WhatsappMessageContext {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -33,8 +37,8 @@ export class WhatsappMessageContext {
   message_id: string;
 
   @ManyToOne(() => WhatsappMessage, (message) => message.messagecontext)
-    @JoinColumn({ name: 'message_id', referencedColumnName: 'message_id' })
-    message: WhatsappMessage;
+  @JoinColumn({ name: 'message_id', referencedColumnName: 'message_id' })
+  message: WhatsappMessage;
 
   @Column({ name: 'forwarded', type: 'varchar', length: 100, nullable: false })
   forwarded: string;

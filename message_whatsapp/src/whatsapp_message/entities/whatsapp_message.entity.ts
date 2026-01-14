@@ -73,8 +73,6 @@ export class WhatsappMessage {
   })
   type: string;
 
-  
-
   @ManyToOne(() => WhatsappChat, (data) => data.messages)
   @JoinColumn({
     name: 'chat_id',

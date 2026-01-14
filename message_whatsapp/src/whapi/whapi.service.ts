@@ -48,9 +48,6 @@ export class WhapiService {
   //   timestamp: '1768305745'
   // }
 
-
-
-
   private extractMessageContent(message: WhapiMessage): string {
     switch (message.type) {
       case 'text':

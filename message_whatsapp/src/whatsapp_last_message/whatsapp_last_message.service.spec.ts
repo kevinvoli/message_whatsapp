@@ -9,7 +9,9 @@ describe('WhatsappLastMessageService', () => {
       providers: [WhatsappLastMessageService],
     }).compile();
 
-    service = module.get<WhatsappLastMessageService>(WhatsappLastMessageService);
+    service = module.get<WhatsappLastMessageService>(
+      WhatsappLastMessageService,
+    );
   });
 
   it('should be defined', () => {

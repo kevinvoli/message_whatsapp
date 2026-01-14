@@ -9,7 +9,9 @@ describe('WhatsappLocationContentService', () => {
       providers: [WhatsappLocationContentService],
     }).compile();
 
-    service = module.get<WhatsappLocationContentService>(WhatsappLocationContentService);
+    service = module.get<WhatsappLocationContentService>(
+      WhatsappLocationContentService,
+    );
   });
 
   it('should be defined', () => {

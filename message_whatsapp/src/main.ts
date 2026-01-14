@@ -1,12 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { EventEmitter } from 'events';
-
-
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-   EventEmitter.defaultMaxListeners = 0;
+  EventEmitter.defaultMaxListeners = 0;
   const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+    }),
+  );
 
   const corsOptions = {
     origin: '*',
@@ -18,17 +22,14 @@ async function bootstrap() {
       'Content-Type',
       'Authorization',
       'X-Requested-With',
-      'Accept'
+      'Accept',
     ],
-    exposedHeaders: [
-      'Authorization',
-      'X-Token-Count'
-    ]
-  }
-  app.enableCors(corsOptions)
+    exposedHeaders: ['Authorization', 'X-Token-Count'],
+  };
+  app.enableCors(corsOptions);
 
-//   volibigbamblekevin@gmail.com
-// 88kevinCool*
+  //   volibigbamblekevin@gmail.com
+  // 88kevinCool*
 
   await app.listen(process.env.PORT ?? 3000);
 }

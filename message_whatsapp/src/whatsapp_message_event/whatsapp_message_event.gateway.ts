@@ -1,18 +1,27 @@
 import { WhatsappMessageEventService } from './whatsapp_message_event.service';
 import { CreateWhatsappMessageEventDto } from './dto/create-whatsapp_message_event.dto';
 import { UpdateWhatsappMessageEventDto } from './dto/update-whatsapp_message_event.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappMessageEventGateway {
-  constructor(private readonly whatsappMessageEventService: WhatsappMessageEventService) {}
+  constructor(
+    private readonly whatsappMessageEventService: WhatsappMessageEventService,
+  ) {}
 
   @SubscribeMessage('createWhatsappMessageEvent')
-  create(@MessageBody() createWhatsappMessageEventDto: CreateWhatsappMessageEventDto) {
-    return this.whatsappMessageEventService.create(createWhatsappMessageEventDto);
+  create(
+    @MessageBody() createWhatsappMessageEventDto: CreateWhatsappMessageEventDto,
+  ) {
+    return this.whatsappMessageEventService.create(
+      createWhatsappMessageEventDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappMessageEvent')
@@ -26,7 +35,9 @@ export class WhatsappMessageEventGateway {
   }
 
   @SubscribeMessage('updateWhatsappMessageEvent')
-  update(@MessageBody() updateWhatsappMessageEventDto: UpdateWhatsappMessageEventDto) {
+  update(
+    @MessageBody() updateWhatsappMessageEventDto: UpdateWhatsappMessageEventDto,
+  ) {
     // return this.whatsappMessageEventService.update(updateWhatsappMessageEventDto.id, updateWhatsappMessageEventDto);
   }
 

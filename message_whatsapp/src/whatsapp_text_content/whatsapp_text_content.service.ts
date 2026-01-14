@@ -16,7 +16,10 @@ export class WhatsappTextContentService {
     return `This action returns a #${id} whatsappTextContent`;
   }
 
-  update(id: string, updateWhatsappTextContentDto: UpdateWhatsappTextContentDto) {
+  update(
+    id: string,
+    updateWhatsappTextContentDto: UpdateWhatsappTextContentDto,
+  ) {
     return `This action updates a #${id} whatsappTextContent`;
   }
 

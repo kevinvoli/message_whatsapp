@@ -6,9 +6,9 @@ import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/wh
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappMessageContent, WhatsappMessage
-        ])],
+  imports: [
+    TypeOrmModule.forFeature([WhatsappMessageContent, WhatsappMessage]),
+  ],
   providers: [WhatsappMessageContextGateway, WhatsappMessageContextService],
 })
 export class WhatsappMessageContextModule {}

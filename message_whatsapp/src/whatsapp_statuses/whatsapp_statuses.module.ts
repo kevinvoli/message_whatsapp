@@ -5,9 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappStatus } from './entities/whatsapp_status.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappStatus
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappStatus])],
   providers: [WhatsappStatusesGateway, WhatsappStatusesService],
 })
 export class WhatsappStatusesModule {}

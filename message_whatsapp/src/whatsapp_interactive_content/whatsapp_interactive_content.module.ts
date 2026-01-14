@@ -7,9 +7,16 @@ import { WhatsappButton } from 'src/whatsapp_button/entities/whatsapp_button.ent
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappInteractiveContent,WhatsappMessageContent, WhatsappButton
-        ])],
-  providers: [WhatsappInteractiveContentGateway, WhatsappInteractiveContentService],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappInteractiveContent,
+      WhatsappMessageContent,
+      WhatsappButton,
+    ]),
+  ],
+  providers: [
+    WhatsappInteractiveContentGateway,
+    WhatsappInteractiveContentService,
+  ],
 })
 export class WhatsappInteractiveContentModule {}

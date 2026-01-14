@@ -10,7 +10,9 @@ describe('WhatsappMessageContextGateway', () => {
       providers: [WhatsappMessageContextGateway, WhatsappMessageContextService],
     }).compile();
 
-    gateway = module.get<WhatsappMessageContextGateway>(WhatsappMessageContextGateway);
+    gateway = module.get<WhatsappMessageContextGateway>(
+      WhatsappMessageContextGateway,
+    );
   });
 
   it('should be defined', () => {

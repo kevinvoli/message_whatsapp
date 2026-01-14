@@ -5,9 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappMedia } from './entities/whatsapp_media.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappMedia
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappMedia])],
   providers: [WhatsappMediaGateway, WhatsappMediaService],
 })
 export class WhatsappMediaModule {}

@@ -3,12 +3,11 @@ import { WhatsappAgent } from './entities/whatsapp_agent.entity';
 
 @Injectable()
 export class WhatsappAgentService {
-    create(createWhatsappAgentDto: Partial<WhatsappAgent>) {
-
+  create(createWhatsappAgentDto: Partial<WhatsappAgent>) {
     return 'This action adds a new whatsappAgent';
   }
 
-   assignAgent() {
+  assignAgent() {
     return `This action returns all whatsappAgent`;
   }
 
@@ -16,13 +15,11 @@ export class WhatsappAgentService {
     return `This action returns all whatsappAgent`;
   }
 
-
   findOne(id: string) {
-
     return `This action returns a #${id} whatsappAgent`;
   }
 
-  update(id: string, updateWhatsappAgentDto:  Partial<WhatsappAgent>) {
+  update(id: string, updateWhatsappAgentDto: Partial<WhatsappAgent>) {
     return `This action updates a #${id} whatsappAgent`;
   }
 

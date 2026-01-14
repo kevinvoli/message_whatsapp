@@ -16,7 +16,10 @@ export class WhatsappChatParticipantService {
     return `This action returns a #${id} whatsappChatParticipant`;
   }
 
-  update(id: string, updateWhatsappChatParticipantDto: UpdateWhatsappChatParticipantDto) {
+  update(
+    id: string,
+    updateWhatsappChatParticipantDto: UpdateWhatsappChatParticipantDto,
+  ) {
     return `This action updates a #${id} whatsappChatParticipant`;
   }
 

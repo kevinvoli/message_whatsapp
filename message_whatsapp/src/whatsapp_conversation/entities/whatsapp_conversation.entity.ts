@@ -16,7 +16,9 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_conversation_conversation_id', ['conversation_id'], { unique: true })
+@Index('UQ_whatsapp_conversation_conversation_id', ['conversation_id'], {
+  unique: true,
+})
 export class WhatsappConversation {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -28,11 +30,16 @@ export class WhatsappConversation {
     type: 'varchar',
     length: 100,
     nullable: false,
-    unique: true
+    unique: true,
   })
   conversation_id: string;
 
-  @Column({ name: 'customer_id', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'customer_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   customer_id: string;
 
   @ManyToOne(() => WhatsappCustomer, (data) => data.conversation)

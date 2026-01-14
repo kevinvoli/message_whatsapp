@@ -5,9 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappChatParticipant } from './entities/whatsapp_chat_participant.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappChatParticipant
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappChatParticipant])],
   providers: [WhatsappChatParticipantGateway, WhatsappChatParticipantService],
 })
 export class WhatsappChatParticipantModule {}

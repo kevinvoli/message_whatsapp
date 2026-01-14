@@ -1,4 +1,3 @@
-
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -19,7 +18,9 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
     origin: '*',
   },
 })
-export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class WebsocketGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -28,7 +29,7 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     private jwtService: JwtService,
     private messageService: WhatsappMessageService,
     private chatService: WhatsappChatService,
-    ) {}
+  ) {}
 
   async handleConnection(client: Socket) {
     const token = client.handshake.auth.token;
@@ -55,7 +56,10 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('agent:message')
-  async handleAgentMessage(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
+  async handleAgentMessage(
+    @MessageBody() data: any,
+    @ConnectedSocket() client: Socket,
+  ) {
     const { content, conversationId } = data;
     const message = await this.messageService.create({
       chat_id: conversationId,
@@ -67,13 +71,19 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('get:conversation')
-  async handleGetConversations(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
+  async handleGetConversations(
+    @MessageBody() data: any,
+    @ConnectedSocket() client: Socket,
+  ) {
     const conversations = await this.chatService.findAll(client.data.user.id);
     client.emit('conversation:list', conversations);
   }
 
   @SubscribeMessage('get:messages')
-  async handleGetMessages(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
+  async handleGetMessages(
+    @MessageBody() data: any,
+    @ConnectedSocket() client: Socket,
+  ) {
     const { conversationId } = data;
     const messages = await this.messageService.findAll(conversationId);
     client.emit('messages:get', messages);

@@ -6,9 +6,9 @@ import { WhatsappLocationContent } from './entities/whatsapp_location_content.en
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappLocationContent, WhatsappMessageContent 
-        ])],
+  imports: [
+    TypeOrmModule.forFeature([WhatsappLocationContent, WhatsappMessageContent]),
+  ],
   providers: [WhatsappLocationContentGateway, WhatsappLocationContentService],
 })
 export class WhatsappLocationContentModule {}

@@ -12,7 +12,9 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_chat_event_chat_event_id', ['chat_event_id'], { unique: true })
+@Index('UQ_whatsapp_chat_event_chat_event_id', ['chat_event_id'], {
+  unique: true,
+})
 export class WhatsappChatEvent {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -33,11 +35,11 @@ export class WhatsappChatEvent {
   chat_id: string;
 
   @ManyToOne(() => WhatsappChat, (data) => data.chatEvent)
-      @JoinColumn({
-        name: 'chat_id',
-        referencedColumnName: 'chat_id',
-      })
-      chat: WhatsappChat;
+  @JoinColumn({
+    name: 'chat_id',
+    referencedColumnName: 'chat_id',
+  })
+  chat: WhatsappChat;
 
   @Column({ name: 'event_type', type: 'varchar', length: 100, nullable: false })
   event_type: string;
@@ -48,7 +50,12 @@ export class WhatsappChatEvent {
   @Column({ name: 'timestamp', type: 'varchar', length: 100, nullable: false })
   timestamp: string;
 
-  @Column({ name: 'raw_payload', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'raw_payload',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   raw_payload: string;
 
   @CreateDateColumn({

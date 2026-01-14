@@ -1,4 +1,13 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsDate,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateWhatsappCommercialDto {
   @IsEmail()
@@ -6,10 +15,32 @@ export class CreateWhatsappCommercialDto {
   email: string;
 
   @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
   password: string;
+
+  @IsEnum(['ADMIN', 'COMMERCIAL'])
+  @IsNotEmpty()
+  role: string;
+
+  @IsString()
+  @IsOptional()
+  passwordResetToken?: string | null;
+
+  @Type(() => Date)
+  @IsDate()
+  @IsOptional()
+  passwordResetExpires?: Date | null;
+
+  @IsBoolean()
+  @IsOptional()
+  isConnected: boolean;
+
+  @Type(() => Date)
+  @IsDate()
+  @IsOptional()
+  lastConnectionAt: Date;
 }

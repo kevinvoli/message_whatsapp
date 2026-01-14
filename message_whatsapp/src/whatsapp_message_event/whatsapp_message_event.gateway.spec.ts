@@ -10,7 +10,9 @@ describe('WhatsappMessageEventGateway', () => {
       providers: [WhatsappMessageEventGateway, WhatsappMessageEventService],
     }).compile();
 
-    gateway = module.get<WhatsappMessageEventGateway>(WhatsappMessageEventGateway);
+    gateway = module.get<WhatsappMessageEventGateway>(
+      WhatsappMessageEventGateway,
+    );
   });
 
   it('should be defined', () => {

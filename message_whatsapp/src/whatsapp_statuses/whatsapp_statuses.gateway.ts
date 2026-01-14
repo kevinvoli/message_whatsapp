@@ -1,14 +1,19 @@
 import { WhatsappStatusesService } from './whatsapp_statuses.service';
 import { CreateWhatsappStatusDto } from './dto/create-whatsapp_status.dto';
 import { UpdateWhatsappStatusDto } from './dto/update-whatsapp_status.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappStatusesGateway {
-  constructor(private readonly whatsappStatusesService: WhatsappStatusesService) {}
+  constructor(
+    private readonly whatsappStatusesService: WhatsappStatusesService,
+  ) {}
 
   @SubscribeMessage('createWhatsappStatus')
   create(@MessageBody() createWhatsappStatusDto: CreateWhatsappStatusDto) {
