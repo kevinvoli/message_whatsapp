@@ -24,12 +24,12 @@ import { WhatsappLocationContentModule } from './whatsapp_location_content/whats
 import { WhatsappButtonModule } from './whatsapp_button/whatsapp_button.module';
 import { WhatsappLastMessageModule } from './whatsapp_last_message/whatsapp_last_message.module';
 import { WhapiModule } from './whapi/whapi.module';
-// import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
 
 import * as Joi from 'joi';
-import { WhatsappCommercialModule } from './users/users.module';
+import { WhatsappCommercialModule } from './whatsapp_commercial/whatsapp_commercial.module';
 import { DispatcherModule } from './dispatcher/dispatcher.module';
 import { CommunicationWhapiModule } from './communication_whapi/communication_whapi.module';
 import { WebsocketModule } from './websocket/websocket.module';

@@ -2,8 +2,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { WhatsappCommercialService } from '../users/users.service';
-import { WhatsappCommercial } from '../users/entities/user.entity';
+import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
+import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 
 @Injectable()
 export class AuthService {

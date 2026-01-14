@@ -1,4 +1,4 @@
-import { WhatsappCommercial } from 'src/users/entities/user.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappChatEvent } from 'src/whatsapp_chat_event/entities/whatsapp_chat_event.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';

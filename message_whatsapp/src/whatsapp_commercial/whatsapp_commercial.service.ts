@@ -2,11 +2,11 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { WhatsappCommercial  } from './entities/user.entity';
+import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
+import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
+import { WhatsappCommercial } from './entities/user.entity';
 
-export interface SafeUser {
+export interface SafeWhatsappCommercial {
   id: string;
   email: string;
   name: string;
@@ -16,38 +16,38 @@ export interface SafeUser {
 export class WhatsappCommercialService {
   constructor(
     @InjectRepository(WhatsappCommercial)
-    private readonly userRepository: Repository<WhatsappCommercial>,
- 
+    private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
+
   ) {}
 
   async findOneByEmail(email: string): Promise<WhatsappCommercial | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.whatsappCommercialRepository.findOne({ where: { email } });
   }
 
   async setConnectionStatus(userId: string, isConnected: boolean) {
-    return this.userRepository.update(userId, {
+    return this.whatsappCommercialRepository.update(userId, {
       isConnected,
       lastConnectionAt: new Date(),
     });
   }
 
-  async create(createUserDto: CreateUserDto): Promise<SafeUser> {
-    const { email, name, password } = createUserDto;
+  async create(createWhatsappCommercialDto: CreateWhatsappCommercialDto): Promise<SafeWhatsappCommercial> {
+    const { email, name, password } = createWhatsappCommercialDto;
 
-    const existingUser = await this.userRepository.findOne({ where: { name } });
+    const existingUser = await this.whatsappCommercialRepository.findOne({ where: { name } });
     if (existingUser) {
       throw new ConflictException('Name already exists');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = this.userRepository.create({
+    const user = this.whatsappCommercialRepository.create({
       email,
       name,
       password: hashedPassword,
     });
 
-    const savedUser = await this.userRepository.save(user);
+    const savedUser = await this.whatsappCommercialRepository.save(user);
 
     return {
       id: savedUser.id,
@@ -56,8 +56,8 @@ export class WhatsappCommercialService {
     };
   }
 
-  async findAll(): Promise<SafeUser[]> {
-    const users = await this.userRepository.find();
+  async findAll(): Promise<SafeWhatsappCommercial[]> {
+    const users = await this.whatsappCommercialRepository.find();
     return users.map(user => ({
       id: user.id,
       email: user.email,
@@ -65,8 +65,8 @@ export class WhatsappCommercialService {
     }));
   }
 
-  async findOne(id: string): Promise<SafeUser> {
-    const user = await this.userRepository.findOne({ where: { id } });
+  async findOne(id: string): Promise<SafeWhatsappCommercial> {
+    const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
@@ -78,8 +78,8 @@ export class WhatsappCommercialService {
     };
   }
 
-  async findOneById(id: string): Promise<SafeUser> {
-    const user = await this.userRepository.findOne({ where: { id } });
+  async findOneById(id: string): Promise<SafeWhatsappCommercial> {
+    const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
@@ -91,24 +91,24 @@ export class WhatsappCommercialService {
     };
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<SafeUser> {
-    const user = await this.userRepository.findOne({ where: { id } });
+  async update(id: string, updateWhatsappCommercialDto: UpdateWhatsappCommercialDto): Promise<SafeWhatsappCommercial> {
+    const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
 
     // Update email if provided
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.userRepository.findOne({ where: { email: updateUserDto.email } });
+    if (updateWhatsappCommercialDto.email && updateWhatsappCommercialDto.email !== user.email) {
+      const existingUser = await this.whatsappCommercialRepository.findOne({ where: { email: updateWhatsappCommercialDto.email } });
       if (existingUser) {
         throw new ConflictException('Email already in use');
       }
-      user.email = updateUserDto.email;
+      user.email = updateWhatsappCommercialDto.email;
     }
 
     // This method will NOT update the role. That's handled by updateRole.
 
-    const savedUser = await this.userRepository.save(user);
+    const savedUser = await this.whatsappCommercialRepository.save(user);
 
     return {
       id: savedUser.id,
@@ -120,7 +120,7 @@ export class WhatsappCommercialService {
 
 
   async remove(id: string): Promise<void> {
-    const result = await this.userRepository.delete(id);
+    const result = await this.whatsappCommercialRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
@@ -128,7 +128,7 @@ export class WhatsappCommercialService {
 
   // This method is for internal use by AuthService and should return the full user object
   async findByEmail(email: string): Promise<WhatsappCommercial | null> {
-    return this.userRepository.findOne({
+    return this.whatsappCommercialRepository.findOne({
       where: { email },
       relations: ['roles', 'roles.permissions'],
     });
@@ -136,28 +136,28 @@ export class WhatsappCommercialService {
 
   // This method is for internal use by AuthService
   async findById(id: string): Promise<WhatsappCommercial | null> {
-    return this.userRepository.findOne({
+    return this.whatsappCommercialRepository.findOne({
       where: { id },
     });
   }
 
   // Find multiple users by their IDs
-  async findByIds(ids: number[]): Promise<WhatsappCommercial[]> {
-    return this.userRepository.findBy({ id: In(ids) });
+  async findByIds(ids: string[]): Promise<WhatsappCommercial[]> {
+    return this.whatsappCommercialRepository.findBy({ id: In(ids) });
   }
 
-  async setPasswordResetToken(userId: number, token: string, expires: Date) {
+  async setPasswordResetToken(userId: string, token: string, expires: Date) {
     // Storing the raw token is acceptable for a short-lived, single-use token.
     // Hashing it would prevent us from looking up the user by the token.
-    await this.userRepository.update(userId, {
+    await this.whatsappCommercialRepository.update(userId, {
       passwordResetToken: token,
       passwordResetExpires: expires,
     });
   }
 
   async findByPasswordResetToken(token: string): Promise<WhatsappCommercial | null> {
- 
-    return this.userRepository.findOne({ where: { passwordResetToken: token } });
+
+    return this.whatsappCommercialRepository.findOne({ where: { passwordResetToken: token } });
   }
 
   // async updatePassword(userId: number, newPassword: string): Promise<void> {

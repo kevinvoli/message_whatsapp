@@ -9,9 +9,10 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UsersService } from 'src/users/users.service';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
+import { MessageDirection, WhatsappMessageStatus } from './entities/whatsapp_message.entity';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -22,7 +23,7 @@ export class WhatsappMessageGateway
   constructor(
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
-    private readonly userService: UsersService,
+    private readonly userService: WhatsappCommercialService,
   ) {}
 
   @WebSocketServer()
@@ -353,8 +354,22 @@ export class WhatsappMessageGateway
     });
     
     try {
+      const transformedMessage = {
+        message_id: messageData.id,
+        external_id: messageData.id,
+        chat_id: messageData.chat_id,
+        type: messageData.type,
+        text: messageData.text ? messageData.text.body : null,
+        direction: messageData.from_me ? MessageDirection.OUT : MessageDirection.IN,
+        from_me: messageData.from_me,
+        from: messageData.from,
+        from_name: messageData.from_name,
+        timestamp: new Date(messageData.timestamp * 1000),
+        status: WhatsappMessageStatus.DELIVERED,
+        source: messageData.source,
+      };
       // Sauvegarder le message en base
-      const savedMessage = await this.whatsappMessageService.create(messageData);
+      const savedMessage = await this.whatsappMessageService.create(transformedMessage);
       
       console.log('💾 Message WhatsApp sauvegardé:', savedMessage.id);
       
