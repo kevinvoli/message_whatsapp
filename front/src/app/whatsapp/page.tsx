@@ -6,7 +6,7 @@ import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthProvider';
 import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
 import { useRouter } from 'next/navigation';
 
@@ -35,13 +35,6 @@ const WhatsAppPage = () => {
       router.replace('/login');
     }
   }, [initialized, commercial, router]);
-
-  // Recharger les conversations si la connexion se rétablit
-  useEffect(() => {
-    if (isWebSocketConnected && commercial) {
-      loadConversations(commercial.id);
-    }
-  }, [isWebSocketConnected, commercial, loadConversations]);
 
   // Gérer la sélection d'une conversation
   const handleSelectConversation = useCallback((conversation: any) => {

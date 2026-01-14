@@ -4,9 +4,12 @@ import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = 'http://localhost:3001';
 
+import { Conversation } from '@/types/chat';
+
 export const useWebSocket = (token: string | null) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
     if (token) {
@@ -26,6 +29,10 @@ export const useWebSocket = (token: string | null) => {
         console.log('WebSocket disconnected');
       });
 
+      newSocket.on('conversation:list', (data: Conversation[]) => {
+        setConversations(data);
+      });
+
       setSocket(newSocket);
 
       return () => {
@@ -43,5 +50,5 @@ export const useWebSocket = (token: string | null) => {
     [socket],
   );
 
-  return { socket, isConnected, emit };
+  return { socket, isConnected, emit, conversations, setConversations };
 };

@@ -38,7 +38,7 @@ export const useConversations = () => {
     if (isConnected && commercial && conversations.length === 0) {
       loadConversations(commercial.id);
     }
-  }, [isConnected, commercial, conversations.length]);
+  }, [isConnected, commercial, conversations]);
 
   // Effet pour gérer le changement de conversation
   useEffect(() => {
