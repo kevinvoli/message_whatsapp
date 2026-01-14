@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';

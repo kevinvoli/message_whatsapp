@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
 import { Commercial, Conversation, Message } from "@/types/chat";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 interface UseWebSocketOptions {
   commercial: Commercial | null;
@@ -66,7 +66,7 @@ export const useWebSocket = ({
     socket.on("typing:stop:broadcast", onTypingStop);
     socket.on("error", (err: { message: string }) => setError(err.message));
 
-  }, [commercial, onConversationList, onNewMessage, onMessageStatusUpdate, onNewConversation, onConversationAssigned, onTypingStart, onTypingStop]);
+  }, [commercial, onConversationList, onMessageList, onNewMessage, onMessageStatusUpdate, onNewConversation, onConversationAssigned, onTypingStart, onTypingStop]);
 
   const disconnect = useCallback(() => {
     socketRef.current?.disconnect();

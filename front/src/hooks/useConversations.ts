@@ -9,11 +9,15 @@ export const useConversations = () => {
   const { commercial } = useAuth();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesState, setMessagesState] = useState<{ list: Message[], isLoading: boolean }>({
+    list: [],
+    isLoading: false,
+  });
+  const { list: messages, isLoading: isLoadingMessages } = messagesState;
+
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | Conversation['status']>('ALL');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
@@ -24,13 +28,12 @@ export const useConversations = () => {
   }, []);
 
   const handleMessageList = useCallback((incomingMessages: Message[]) => {
-    setMessages(incomingMessages);
-    setIsLoadingMessages(false);
+    setMessagesState({ list: incomingMessages, isLoading: false });
   }, []);
 
   const handleNewMessage = useCallback((message: Message) => {
     if (message.conversationId === selectedConversation?.id) {
-      setMessages(prev => [...prev, message]);
+      setMessagesState(prev => ({ ...prev, list: [...prev.list, message] }));
     }
     setConversations(prev => prev.map(c =>
       c.id === message.conversationId
@@ -65,21 +68,15 @@ export const useConversations = () => {
     }
   }, [ws.isConnected, commercial, ws]);
 
-  useEffect(() => {
-    if (selectedConversation) {
-      setIsLoadingMessages(true);
-      setMessages([]);
-      ws.requestMessages({ conversationId: selectedConversation.id });
-
-      if (selectedConversation.unreadCount > 0) {
-        ws.markAsRead({ conversationId: selectedConversation.id, messageIds: [] });
-      }
-    }
-  }, [selectedConversation, ws]);
-
   const selectConversation = useCallback((conversation: Conversation) => {
     setSelectedConversation(conversation);
-  }, []);
+    setMessagesState({ list: [], isLoading: true });
+    ws.requestMessages({ conversationId: conversation.id });
+
+    if (conversation.unreadCount > 0) {
+      ws.markAsRead({ conversationId: conversation.id, messageIds: [] });
+    }
+  }, [ws]);
 
   const sendMessage = useCallback((content: string) => {
     if (!selectedConversation || !commercial) return;
@@ -94,7 +91,7 @@ export const useConversations = () => {
       sentAt: new Date(),
     };
     
-    setMessages(prev => [...prev, optimisticMessage]);
+    setMessagesState(prev => ({ ...prev, list: [...prev.list, optimisticMessage] }));
     
     ws.sendMessage({
       conversationId: selectedConversation.id,
