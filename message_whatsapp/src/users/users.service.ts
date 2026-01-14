@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-// import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { WhatsappCommercial  } from './entities/user.entity';
-import { LoginUserDto } from './dto/login-user.dto';
 
 export interface SafeUser {
   id: string;
@@ -14,45 +13,38 @@ export interface SafeUser {
 }
 
 @Injectable()
-export class UsersService {
+export class WhatsappCommercialService {
   constructor(
     @InjectRepository(WhatsappCommercial)
     private readonly userRepository: Repository<WhatsappCommercial>,
  
   ) {}
 
+  async findOneByEmail(email: string): Promise<WhatsappCommercial | null> {
+    return this.userRepository.findOne({ where: { email } });
+  }
 
-    async login(createUserDto: LoginUserDto) {
-     const { name } = createUserDto;
-
-    const existingUser = await this.userRepository.findOne({ where: { name } });
-    if (!existingUser) {
-      throw new ConflictException('echec de connexion');
-    }
-    const user ={
-      id: existingUser.id,
-      email: existingUser.email,
-      name: existingUser.name,
-    };
-
-    return {
-      user: user,
-      access_token: "token"
-    }
+  async setConnectionStatus(userId: string, isConnected: boolean) {
+    return this.userRepository.update(userId, {
+      isConnected,
+      lastConnectionAt: new Date(),
+    });
   }
 
   async create(createUserDto: CreateUserDto): Promise<SafeUser> {
-    const { email, name } = createUserDto;
+    const { email, name, password } = createUserDto;
 
     const existingUser = await this.userRepository.findOne({ where: { name } });
     if (existingUser) {
       throw new ConflictException('Name already exists');
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = this.userRepository.create({
       email,
       name,
-      // password: password,
+      password: hashedPassword,
     });
 
     const savedUser = await this.userRepository.save(user);

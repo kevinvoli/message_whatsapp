@@ -122,62 +122,16 @@ async createAgentMessage(data: {
     });
   }
 
-  async create(message: WhapiMessage) {
-    try {
-      console.log('message reçue du dispache', message);
-      const chat = await this.chatService.findOrCreateChat(
-        message.chat_id,
-        message.from,
-        message.from_name,
-        '04b6c42f-5df8-4d93-8fd1-e1eb2c420ef7',
-      );
-      if (!chat) {
-        throw new Error('Chat not found or created');
-      }
-
-      const chekMessage = await this.messageRepository.findOne({
-        where: { message_id: message.id },
-      });
-
-      // assuming commercial with id "1"
-      if (chekMessage) {
-        console.log('Message already exists with id:', chekMessage.id);
-        return chekMessage;
-      }
-
-      const data: Partial<WhatsappMessage> = {
-        message_id: message.id,
-        external_id: message.id,
-        chat_id: message.chat_id,
-        conversation_id: null,
-        commercial_id: chat.commercial_id,
-        direction: message.from_me ? MessageDirection.OUT : MessageDirection.IN,
-        from_me: message.from_me,
-        from: message.from,
-        from_name: message.from_name,
-        status: WhatsappMessageStatus.DELIVERED,
-        chat: chat,
-        timestamp: new Date(message.timestamp * 1000),
-        commercial: chat.commercial,
-        source: message.source,
-        text: message.type === 'text' ? (message.text as WhapiText).body : null,
-      };
-
-      const messageEntity = this.messageRepository.create(data);
-
-      return this.messageRepository.save(messageEntity);
-    } catch (error) {
-      console.error('Error creating message:', error);
-      throw new Error(`Failed to create message: ${error}`);
-    }
+  async create(message: Partial<WhatsappMessage>) {
+    const messageEntity = this.messageRepository.create(message);
+    return this.messageRepository.save(messageEntity);
   }
 
-
-
-
-
-  findAll() {
-    return `This action returns all whatsappMessage`;
+  findAll(chatId?: string) {
+    if (chatId) {
+      return this.messageRepository.find({ where: { chat_id: chatId }, relations: ['chat', 'commercial'], order: { timestamp: 'ASC' } });
+    }
+    return this.messageRepository.find();
   }
 
   findOne(id: string) {

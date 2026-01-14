@@ -30,6 +30,12 @@ export class WhatsappCommercial {
   @Column({ type: 'timestamp', nullable: true })
   passwordResetExpires?: Date | null;
 
+  @Column({ type: 'boolean', default: false })
+  isConnected: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastConnectionAt: Date;
+
   @OneToMany(() => WhatsappChat, (chat) => chat.commercial)
   chats: WhatsappChat[];
 

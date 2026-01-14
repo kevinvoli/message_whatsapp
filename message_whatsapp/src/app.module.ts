@@ -32,6 +32,7 @@ import * as Joi from 'joi';
 import { WhatsappCommercialModule } from './users/users.module';
 import { DispatcherModule } from './dispatcher/dispatcher.module';
 import { CommunicationWhapiModule } from './communication_whapi/communication_whapi.module';
+import { WebsocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { CommunicationWhapiModule } from './communication_whapi/communication_wh
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappChatParticipantModule, WhatsappChatEventModule, WhatsappMessageModule, WhatsappMessageContentModule, WhatsappTextContentModule, WhatsappMediaContentModule, WhatsappInteractiveContentModule, WhatsappMessageEventModule, WhatsappMessageReactionModule, WhatsappMessageContextModule, WhatsappConversationModule, WhatsappAgentModule, WhatsappCustomerModule, WhatsappContactsModule, WhatsappStatusesModule, WhatsappMediaModule, WhatsappLocationContentModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, WhatsappCommercialModule, DispatcherModule, CommunicationWhapiModule],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappChatParticipantModule, WhatsappChatEventModule, WhatsappMessageModule, WhatsappMessageContentModule, WhatsappTextContentModule, WhatsappMediaContentModule, WhatsappInteractiveContentModule, WhatsappMessageEventModule, WhatsappMessageReactionModule, WhatsappMessageContextModule, WhatsappConversationModule, WhatsappAgentModule, WhatsappCustomerModule, WhatsappContactsModule, WhatsappStatusesModule, WhatsappMediaModule, WhatsappLocationContentModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, AuthModule, WhatsappCommercialModule, DispatcherModule, CommunicationWhapiModule, WebsocketModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -1,90 +1,55 @@
+
 import { useState, useEffect } from 'react';
-import { Commercial } from '@/types/chat';
+import axios from 'axios';
+import { LoginFormData } from '@/types/chat';
 
-const API_BASE_URL = process.env.API_URL || 'http://localhost:3000/';
-
-interface LoginResponse {
-  user: Commercial;
-  access_token: string;
-}
+const API_URL = 'http://localhost:3001/auth';
 
 export const useAuth = () => {
-  const [commercial, setCommercial] = useState<Commercial | null>(null);
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [initialized, setInitialized] = useState(false); // 🔥 clé
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // 🔁 Restaurer la session au refresh
- useEffect(() => {
-  if (typeof window === 'undefined') return;
-
-  const storedUser = localStorage.getItem('commercial');
-  const storedToken = localStorage.getItem('token');
-
-  if (storedUser && storedToken) {
-    try {
-      setCommercial(JSON.parse(storedUser));
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
       setToken(storedToken);
-    } catch {
-      localStorage.removeItem('commercial');
-      localStorage.removeItem('token');
+      // You might want to fetch user profile here using the token
     }
-  }
+  }, []);
 
-  setInitialized(true);
-}, []);
-
-  const login = async (email: string, name: string): Promise<Commercial> => {
-    setLoading(true);
-
-
+  const login = async (formData: LoginFormData) => {
+    setIsLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}users/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-      name: name
-    }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Identifiants invalides');
-      }
-
-      const data: LoginResponse = await res.json();
-
-      console.log("repon de la request", data);
-      
-
-      setCommercial(data.user);
-      setToken(data.access_token);
-
-      // 💾 Persistance
-      localStorage.setItem('commercial', JSON.stringify(data.user));
-      localStorage.setItem('token', data.access_token);
-
-      return data.user;
+      const response = await axios.post(`${API_URL}/login`, formData);
+      const { access_token } = response.data;
+      setToken(access_token);
+      localStorage.setItem('token', access_token);
+      // Fetch user profile or decode token to get user info
+      // setUser(decodedUser);
+    } catch (err) {
+      setError('Invalid email or password');
+      console.error(err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const logout = () => {
-    setCommercial(null);
+    setUser(null);
     setToken(null);
-    localStorage.removeItem('commercial');
     localStorage.removeItem('token');
   };
 
   return {
-    commercial,
+    user,
     token,
-    loading,
-    initialized,
-    isAuthenticated: !!commercial,
+    isLoading,
+    error,
     login,
     logout,
+    isAuthenticated: !!token,
   };
 };
