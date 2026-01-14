@@ -486,4 +486,9 @@ export class WhatsappMessageGateway
   handlePing(@ConnectedSocket() client: Socket) {
     client.emit('pong', { timestamp: new Date().toISOString() });
   }
+
+  public isAgentConnected(agentId: string): boolean {
+    const connectedAgentIds = Array.from(this.connectedAgents.values());
+    return connectedAgentIds.includes(agentId);
+  }
 }

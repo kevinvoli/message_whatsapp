@@ -21,5 +21,6 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
           WhatsappMessage, WhatsappChat, WhatsappConversation, WhatsappMessageContent, WhatsappMessageContext, WhatsappMessageEvent, WhatsappMessageReaction, WhatsappCommercial
         ]), WhatsappChatModule, DispatcherModule],
   providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,UsersService,CommunicationWhapiService],
+  exports: [WhatsappMessageGateway],
 })
 export class WhatsappMessageModule {}

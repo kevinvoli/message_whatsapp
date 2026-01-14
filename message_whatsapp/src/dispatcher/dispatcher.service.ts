@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
@@ -6,6 +6,7 @@ import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappConversation } from '../whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappConversationService } from '../whatsapp_conversation/whatsapp_conversation.service';
 import { CreateWhatsappConversationDto } from '../whatsapp_conversation/dto/create-whatsapp_conversation.dto';
+import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
 
 @Injectable()
 export class DispatcherService {
@@ -14,6 +15,8 @@ export class DispatcherService {
     private readonly pendingMessageRepository: Repository<PendingMessage>,
     private readonly queueService: QueueService,
     private readonly conversationService: WhatsappConversationService,
+    @Inject(forwardRef(() => WhatsappMessageGateway))
+    private readonly messageGateway: WhatsappMessageGateway,
   ) {}
 
   async assignConversation(
@@ -23,6 +26,13 @@ export class DispatcherService {
     messageType: string,
     mediaUrl?: string,
   ): Promise<WhatsappConversation | null> {
+    let conversation = await this.conversationService.findByChatId(clientPhone);
+
+    // If conversation exists and its agent is connected, do nothing.
+    if (conversation && conversation.assigned_agent_id && this.messageGateway.isAgentConnected(conversation.assigned_agent_id)) {
+      return conversation;
+    }
+
     const nextAgent = await this.queueService.getNextInQueue();
 
     if (!nextAgent) {
@@ -30,11 +40,9 @@ export class DispatcherService {
       return null;
     }
 
-    let conversation = await this.conversationService.findByChatId(clientPhone);
-
     if (conversation) {
+      // Re-assign the conversation if the agent is different or disconnected
       if (conversation.assigned_agent_id !== nextAgent.id) {
-        // Re-assign the conversation
         conversation.assigned_agent_id = nextAgent.id;
         conversation = await this.conversationService.update(conversation.id, conversation);
       }
