@@ -16,7 +16,7 @@ export class QueueService {
    * Adds a commercial to the end of the queue.
    * If the user is already in the queue, they are not added again.
    */
-  async addToQueue(userId: string): Promise<QueuePosition> {
+  async addToQueue(userId: number): Promise<QueuePosition> {
     const existingPosition = await this.queueRepository.findOne({ where: { userId } });
     if (existingPosition) {
       return existingPosition;
@@ -40,7 +40,7 @@ export class QueueService {
   /**
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
-  async removeFromQueue(userId: string): Promise<void> {
+  async removeFromQueue(userId: number): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -75,52 +75,23 @@ export class QueueService {
    * Gets the next commercial in the queue (round-robin) and moves them to the end.
    */
   async getNextInQueue(): Promise<WhatsappCommercial | null> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    const nextInQueue = await this.queueRepository.findOne({
+      where: {},
+      order: { position: 'ASC' },
+      relations: ['user'],
+    });
 
-    try {
-        const nextInQueue = await queryRunner.manager.findOne(QueuePosition, {
-            where: {},
-            order: { position: 'ASC' },
-            relations: ['user'],
-        });
-
-        if (!nextInQueue) {
-            await queryRunner.commitTransaction();
-            return null;
-        }
-
-        const maxPositionResult = await queryRunner.manager
-            .createQueryBuilder(QueuePosition, 'qp')
-            .select('MAX(qp.position)', 'max_position')
-            .getRawOne();
-        const maxPosition = maxPositionResult.max_position || 0;
-
-        if (maxPosition > nextInQueue.position) {
-            await queryRunner.manager.update(QueuePosition, { id: nextInQueue.id }, { position: maxPosition });
-
-            await queryRunner.manager.createQueryBuilder()
-                .update(QueuePosition)
-                .set({ position: () => 'position - 1' })
-                .where('position > :removedPosition', { removedPosition: nextInQueue.position })
-                .andWhere('id != :id', { id: nextInQueue.id })
-                .execute();
-        }
-
-        await queryRunner.commitTransaction();
-
-        if (!nextInQueue.user) {
-            throw new NotFoundException(`User with ID ${nextInQueue.userId} not found for queue position.`);
-        }
-
-        return nextInQueue.user;
-    } catch (err) {
-        await queryRunner.rollbackTransaction();
-        throw err;
-    } finally {
-        await queryRunner.release();
+    if (!nextInQueue) {
+      return null;
     }
+
+    if (!nextInQueue.user) {
+      throw new NotFoundException(`User with ID ${nextInQueue.userId} not found for queue position.`);
+    }
+
+    await this.moveToEnd(nextInQueue.userId);
+
+    return nextInQueue.user;
   }
 
   /**
@@ -136,7 +107,7 @@ export class QueueService {
   /**
    * Moves a user to the end of the queue. Used for reconnections.
    */
-  async moveToEnd(userId: string): Promise<void> {
+  async moveToEnd(userId: number): Promise<void> {
     await this.removeFromQueue(userId);
     await this.addToQueue(userId);
   }

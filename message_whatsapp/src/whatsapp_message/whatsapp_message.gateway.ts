@@ -43,7 +43,7 @@ export class WhatsappMessageGateway
     if (commercialId) {
       this.connectedAgents.set(client.id, commercialId);
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
-      await this.queueService.addToQueue(commercialId);
+      await this.queueService.addToQueue(parseInt(commercialId, 10));
       await this.emitQueueUpdate();
       await this.dispatcherService.distributePendingMessages();
     }
@@ -55,7 +55,7 @@ export class WhatsappMessageGateway
     if (commercialId) {
       this.connectedAgents.delete(client.id);
       console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
-      await this.queueService.removeFromQueue(commercialId);
+      await this.queueService.removeFromQueue(parseInt(commercialId, 10));
       await this.emitQueueUpdate();
     }
   }
@@ -73,7 +73,7 @@ export class WhatsappMessageGateway
     // Vérifier le token (à implémenter selon votre système d'auth)
     // Pour l'instant, on accepte simplement l'ID
     this.connectedAgents.set(client.id, data.commercialId);
-    await this.queueService.addToQueue(data.commercialId);
+    await this.queueService.addToQueue(parseInt(data.commercialId, 10));
     await this.emitQueueUpdate();
     await this.dispatcherService.distributePendingMessages();
     

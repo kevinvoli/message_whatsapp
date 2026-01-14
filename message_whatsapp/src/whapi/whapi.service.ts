@@ -4,25 +4,36 @@ import {
   WhapiMessage,
   WhapiWebhookPayload,
 } from './interface/whapi-webhook.interface';
-import { WhapiServiceDispacher } from './whatsapp_dispacher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 
 @Injectable()
 export class WhapiService {
   private readonly logger = new Logger(WhapiService.name);
 
   constructor(
-    private readonly whatsappDispacherService: WhapiServiceDispacher,
+    private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
   ) {}
 
   async handleIncomingMessage(payload: WhapiWebhookPayload) {
-    if (!payload) return;
-    if (payload.messages?.[0]) {
-      const message = payload.messages[0];
-      const chatId = message.chat_id;
-      await this.whatsappDispacherService.sendMessage(chatId, message);
+    if (!payload || !payload.messages || payload.messages.length === 0) {
+      return;
     }
+
+    const message = payload.messages[0];
+    if (message.from_me) return; // Ignore messages sent by the business account itself
+
+    const content = this.extractMessageContent(message);
+    const mediaUrl = message.image?.id || message.video?.id || message.document?.id;
+
+    await this.dispatcherService.assignConversation(
+      message.chat_id,
+      message.from_name,
+      content,
+      message.type,
+      mediaUrl,
+    );
   }
 
   async updateStatusMessage(payload: WhapiWebhookPayload) {

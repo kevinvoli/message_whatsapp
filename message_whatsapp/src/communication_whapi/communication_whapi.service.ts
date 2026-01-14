@@ -60,4 +60,11 @@ export class CommunicationWhapiService {
   remove(id: number) {
     return `This action removes a #${id} communicationWhapi`;
   }
+
+  async sendMedia(to: string, mediaUrl: string): Promise<any> {
+    // This is a placeholder for the actual media sending logic.
+    // The implementation will depend on the Whapi.cloud API for sending media.
+    console.log(`Sending media to ${to} with URL ${mediaUrl}`);
+    return Promise.resolve({ id: 'fake-media-id', status: 'sent' });
+  }
 }

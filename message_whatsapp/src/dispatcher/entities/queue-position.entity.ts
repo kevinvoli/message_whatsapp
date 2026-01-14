@@ -6,8 +6,8 @@ export class QueuePosition {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'user_id', type: 'varchar' })
-  userId: string;
+  @Column({ name: 'user_id' })
+  userId: number;
 
   @Column()
   position: number;
