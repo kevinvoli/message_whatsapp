@@ -9,16 +9,25 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
-
+import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
+import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
+import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 
 @Module({
-   imports:[
-      TypeOrmModule.forFeature([WhatsappCommercial,WhatsappMessage, WhatsappChat]),
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappCommercial,
+      WhatsappMessage,
+      WhatsappChat,
+    ]),
+    WhatsappCommercialModule,
+    WhatsappMessageModule,
+    WhatsappChatModule,
+    CommunicationWhapiModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhapiServiceDispacher,WhatsappCommercialService,WhatsappMessageService, WhatsappChatService,CommunicationWhapiService],
+  providers: [WhapiService, WhapiServiceDispacher],
 })
 export class WhapiModule {}

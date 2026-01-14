@@ -20,5 +20,6 @@ import { CommunicationWhapiService } from 'src/communication_whapi/communication
           WhatsappMessage, WhatsappChat, WhatsappConversation, WhatsappMessageContent, WhatsappMessageContext, WhatsappMessageEvent, WhatsappMessageReaction, WhatsappCommercial
         ]), WhatsappChatModule],
   providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,WhatsappCommercialService,CommunicationWhapiService],
+  exports: [WhatsappMessageService],
 })
 export class WhatsappMessageModule {}
