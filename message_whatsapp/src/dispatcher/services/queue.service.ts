@@ -16,7 +16,7 @@ export class QueueService {
    * Adds a commercial to the end of the queue.
    * If the user is already in the queue, they are not added again.
    */
-  async addToQueue(userId: number): Promise<QueuePosition> {
+  async addToQueue(userId: string): Promise<QueuePosition> {
     const existingPosition = await this.queueRepository.findOne({ where: { userId } });
     if (existingPosition) {
       return existingPosition;
@@ -40,7 +40,7 @@ export class QueueService {
   /**
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
-  async removeFromQueue(userId: number): Promise<void> {
+  async removeFromQueue(userId: string): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -136,7 +136,7 @@ export class QueueService {
   /**
    * Moves a user to the end of the queue. Used for reconnections.
    */
-  async moveToEnd(userId: number): Promise<void> {
+  async moveToEnd(userId: string): Promise<void> {
     await this.removeFromQueue(userId);
     await this.addToQueue(userId);
   }
