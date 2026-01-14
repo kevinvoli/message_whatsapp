@@ -1,4 +1,3 @@
-import { WhatsappAgent } from 'src/whatsapp_agent/entities/whatsapp_agent.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCustomer } from 'src/whatsapp_customer/entities/whatsapp_customer.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -79,9 +78,6 @@ export class WhatsappConversation {
   @Column({ name: 'closed_at', type: 'varchar', length: 100, nullable: false })
   closed_at: Date;
 
-  @ManyToOne(() => WhatsappAgent, (agent) => agent.conversation)
-  @JoinColumn({ name: 'assigned_agent_id', referencedColumnName: 'agent_id' })
-  agent: WhatsappAgent;
 
   @CreateDateColumn({
     name: 'createdAt',

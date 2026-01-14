@@ -1,5 +1,4 @@
 import { WhatsappCommercial } from 'src/users/entities/user.entity';
-import { WhatsappChatEvent } from 'src/whatsapp_chat_event/entities/whatsapp_chat_event.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -127,9 +126,6 @@ export class WhatsappChat {
 
   @OneToMany(() => WhatsappConversation, (data) => data.chat)
   conversation: WhatsappConversation[];
-
-  @OneToMany(() => WhatsappChatEvent, (data) => data.chat)
-  chatEvent: WhatsappChatEvent[];
 
   @OneToMany(() => WhatsappMessage, (message) => message.chat)
   messages: WhatsappMessage[];

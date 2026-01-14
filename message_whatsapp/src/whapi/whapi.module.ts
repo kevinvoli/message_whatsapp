@@ -44,6 +44,9 @@ import { CommunicationWhapiModule } from 'src/communication_whapi/communication_
     CommunicationWhapiModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhapiServiceDispacher],
+  providers: [WhapiService, WhatsappMessageService,WhapiServiceDispacher,
+    WhatsappChatService,
+    CommunicationWhapiService
+  ],
 })
 export class WhapiModule {}

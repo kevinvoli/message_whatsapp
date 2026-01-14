@@ -1,9 +1,6 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
-import { WhatsappMessageContext } from 'src/whatsapp_message_context/entities/whatsapp_message_context.entity';
-import { WhatsappMessageEvent } from 'src/whatsapp_message_event/entities/whatsapp_message_event.entity';
-import { WhatsappMessageReaction } from 'src/whatsapp_message_reaction/entities/whatsapp_message_reaction.entity';
 import {
   Column,
   CreateDateColumn,
@@ -126,20 +123,9 @@ export class WhatsappMessage {
   )
   messageCnntent: WhatsappMessageContent[];
 
-  @OneToMany(
-    () => WhatsappMessageContext,
-    (messageContext) => messageContext.message,
-  )
-  messagecontext: WhatsappMessageContext[];
 
-  @OneToMany(() => WhatsappMessageEvent, (messageEvent) => messageEvent.message)
-  event: WhatsappMessageEvent[];
 
-  @OneToMany(
-    () => WhatsappMessageReaction,
-    (messageReaction) => messageReaction.message,
-  )
-  reaction: WhatsappMessageReaction[];
+
 
   @Column({
     name: 'direction',

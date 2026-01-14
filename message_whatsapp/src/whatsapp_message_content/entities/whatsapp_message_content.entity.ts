@@ -1,9 +1,5 @@
 import { WhatsappContact } from 'src/whatsapp_contacts/entities/whatsapp_contact.entity';
-import { WhatsappInteractiveContent } from 'src/whatsapp_interactive_content/entities/whatsapp_interactive_content.entity';
-import { WhatsappLocationContent } from 'src/whatsapp_location_content/entities/whatsapp_location_content.entity';
-import { WhatsappMediaContent } from 'src/whatsapp_media_content/entities/whatsapp_media_content.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-import { WhatsappTextContent } from 'src/whatsapp_text_content/entities/whatsapp_text_content.entity';
 import {
   Column,
   CreateDateColumn,
@@ -42,20 +38,9 @@ export class WhatsappMessageContent {
   @JoinColumn({ name: 'message_id', referencedColumnName: 'message_id' })
   message: WhatsappMessage;
 
-  @OneToMany(() => WhatsappTextContent, (message) => message.messageContent)
-  textContent: WhatsappTextContent[];
-
   @OneToMany(() => WhatsappContact, (message) => message.messageContent)
   contact: WhatsappContact[];
 
-  @OneToMany(() => WhatsappMediaContent, (message) => message.messageContent)
-  mediaContent: WhatsappMediaContent[];
-
-   @OneToMany(() => WhatsappLocationContent, (message) => message.messageContent)
-  locationContent: WhatsappLocationContent[];
-
-  @OneToMany(() => WhatsappInteractiveContent, (message) => message.messageContent)
-  interactiveContent: WhatsappInteractiveContent[];
 
   @Column({
     name: 'content_type',

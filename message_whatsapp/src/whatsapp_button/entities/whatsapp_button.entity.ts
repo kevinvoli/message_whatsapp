@@ -1,12 +1,9 @@
-import { WhatsappInteractiveContent } from 'src/whatsapp_interactive_content/entities/whatsapp_interactive_content.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
   Index,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -47,9 +44,6 @@ export class WhatsappButton {
   })
   phone_number: string;
 
-  @ManyToOne(()=>WhatsappInteractiveContent, (InteractiveContent)=> InteractiveContent.button )
-  @JoinColumn({name: 'interractive_content_id', referencedColumnName: 'interactive_content_id'})
-  interactiveContent: WhatsappInteractiveContent
 
 
   @CreateDateColumn({
