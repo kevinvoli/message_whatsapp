@@ -9,6 +9,8 @@ export class QueueService {
   constructor(
     @InjectRepository(QueuePosition)
     private readonly queueRepository: Repository<QueuePosition>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly userRepository: Repository<WhatsappCommercial>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -17,6 +19,11 @@ export class QueueService {
    * If the user is already in the queue, they are not added again.
    */
   async addToQueue(userId: number): Promise<QueuePosition> {
+    const user = await this.userRepository.findOne({ where: { id: userId.toString() } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found.`);
+    }
+
     const existingPosition = await this.queueRepository.findOne({ where: { userId } });
     if (existingPosition) {
       return existingPosition;
