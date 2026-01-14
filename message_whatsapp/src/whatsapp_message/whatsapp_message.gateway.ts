@@ -1,3 +1,5 @@
+import { DispatcherService } from '../dispatcher/dispatcher.service';
+import { QueueService } from '../dispatcher/services/queue.service';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import {
   WebSocketGateway,
@@ -23,6 +25,8 @@ export class WhatsappMessageGateway
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
     private readonly userService: UsersService,
+    private readonly queueService: QueueService,
+    private readonly dispatcherService: DispatcherService,
   ) {}
 
   @WebSocketServer()
@@ -31,7 +35,7 @@ export class WhatsappMessageGateway
   // Map pour suivre les agents connectés (socketId -> commercialId)
   private connectedAgents = new Map<string, string>();
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     console.log('🟢 Client connecté:', client.id);
 
     // Authentification via query params ou auth
@@ -39,12 +43,21 @@ export class WhatsappMessageGateway
     if (commercialId) {
       this.connectedAgents.set(client.id, commercialId);
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
+      await this.queueService.addToQueue(parseInt(commercialId, 10));
+      await this.emitQueueUpdate();
+      await this.dispatcherService.distributePendingMessages();
     }
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     console.log('🔴 Client déconnecté:', client.id);
-    this.connectedAgents.delete(client.id);
+    const commercialId = this.connectedAgents.get(client.id);
+    if (commercialId) {
+      this.connectedAgents.delete(client.id);
+      console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
+      await this.queueService.removeFromQueue(parseInt(commercialId, 10));
+      await this.emitQueueUpdate();
+    }
   }
 
   // =========================
@@ -60,6 +73,9 @@ export class WhatsappMessageGateway
     // Vérifier le token (à implémenter selon votre système d'auth)
     // Pour l'instant, on accepte simplement l'ID
     this.connectedAgents.set(client.id, data.commercialId);
+    await this.queueService.addToQueue(parseInt(data.commercialId, 10));
+    await this.emitQueueUpdate();
+    await this.dispatcherService.distributePendingMessages();
     
     client.emit('auth:success', { commercialId: data.commercialId });
   }
@@ -424,6 +440,11 @@ export class WhatsappMessageGateway
   // =========================
   // MÉTHODES PRIVÉES UTILITAIRES
   // =========================
+  private async emitQueueUpdate(): Promise<void> {
+    const queue = await this.queueService.getQueuePositions();
+    this.server.emit('queue:updated', queue);
+    console.log('📢 File d\'attente mise à jour et diffusée.');
+  }
   
   private async markMessagesAsRead(chatId: string, commercialId: string): Promise<void> {
     try {
