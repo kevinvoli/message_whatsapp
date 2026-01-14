@@ -66,6 +66,9 @@ export class WhatsappConversation {
   @Column({ name: 'status', type: 'varchar', length: 100, nullable: false })
   status: 'open' | 'close';
 
+  @Column({ name: 'unread_count', type: 'int', default: 0 })
+  unreadCount: number;
+
   @Column({
     name: 'started_at',
     type: 'timestamp',
