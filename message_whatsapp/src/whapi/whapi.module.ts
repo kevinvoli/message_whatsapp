@@ -13,9 +13,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
-import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
-import { WhatsappConversationModule } from 'src/whatsapp_conversation/whatsapp_conversation.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { WhatsappCommercialModule as UsersModule } from 'src/users/users.module';
@@ -30,10 +28,9 @@ import { CommunicationWhapiModule } from 'src/communication_whapi/communication_
       WhatsappChat,
       PendingMessage,
       QueuePosition,
-      WhatsappConversation,
+      
     ]),
     DispatcherModule,
-    WhatsappConversationModule,
     WhatsappMessageModule,
     WhatsappChatModule,
     UsersModule,

@@ -4,7 +4,6 @@ import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
-import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -15,7 +14,7 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 
 @Module({
    imports: [TypeOrmModule.forFeature([
-          WhatsappMessage, WhatsappChat, WhatsappConversation, WhatsappMessageContent,  WhatsappCommercial
+          WhatsappMessage, WhatsappChat,  WhatsappMessageContent,  WhatsappCommercial
         ]), WhatsappChatModule, DispatcherModule],
   providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,UsersService,CommunicationWhapiService],
   exports: [WhatsappMessageGateway],

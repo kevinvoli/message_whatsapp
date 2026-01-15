@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
 import { WhatsappCommercial } from '../../users/entities/user.entity';
+import { error } from 'console';
 
 @Injectable()
 export class QueueService {
@@ -18,13 +19,13 @@ export class QueueService {
    * Adds a commercial to the end of the queue.
    * If the user is already in the queue, they are not added again.
    */
-  async addToQueue(userId: number): Promise<QueuePosition> {
+  async addToQueue(userId: string){
     const user = await this.userRepository.findOne({ where: { id: userId.toString() } });
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found.`);
     }
 
-    const existingPosition = await this.queueRepository.findOne({ where: { userId } });
+    const existingPosition = await this.queueRepository.findOne({ where: {userId} });
     if (existingPosition) {
       return existingPosition;
     }
@@ -47,7 +48,7 @@ export class QueueService {
   /**
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
-  async removeFromQueue(userId: number): Promise<void> {
+  async removeFromQueue(userId: string): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -114,7 +115,7 @@ export class QueueService {
   /**
    * Moves a user to the end of the queue. Used for reconnections.
    */
-  async moveToEnd(userId: number): Promise<void> {
+  async moveToEnd(userId: string): Promise<void> {
     await this.removeFromQueue(userId);
     await this.addToQueue(userId);
   }

@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhapiMessage } from './interface/whapi-webhook.interface';
+import { CreateWhatsappMessageDto } from 'src/whatsapp_message/dto/create-whatsapp_message.dto';
 
 
 @Injectable()
@@ -17,7 +18,7 @@ export class WhapiServiceDispacher {
 
 
 
-  async sendMessage(to: string, message: WhapiMessage) {
+  async sendMessage(to: string, message: CreateWhatsappMessageDto) {
 
     await this.messageService.create(message);
     // Logic to send message via WhatsApp API

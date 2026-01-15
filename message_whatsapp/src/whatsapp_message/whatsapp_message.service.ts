@@ -6,12 +6,13 @@ import {
 } from './entities/whatsapp_message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  WhapiMessage,
-  WhapiText,
-} from 'src/whapi/interface/whapi-webhook.interface';
-import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
+
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { WhatsappCommercial } from 'src/users/entities/user.entity';
+import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
+import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -22,7 +23,12 @@ export class WhatsappMessageService {
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly chatService: WhatsappChatService,
-    private readonly communicationWhapiService: CommunicationWhapiService
+    private readonly communicationWhapiService: CommunicationWhapiService,
+   @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepository: Repository<WhatsappCommercial>,
+
+       @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
 
@@ -60,7 +66,6 @@ async createAgentMessage(data: {
       message_id: whapiResponse.id ?? `agent_${Date.now()}`,
       external_id: whapiResponse.id,
       chat_id: data.chat_id,
-      conversation_id: data.chat_id,
       commercial_id: data.commercial_id,
       direction: MessageDirection.OUT,
       from_me: true,
@@ -134,15 +139,26 @@ async createAgentMessage(data: {
     });
   }
 
-  async create(message: WhapiMessage) {
+  async create(message: CreateWhatsappMessageDto, commercialId?:string) {
+
     try {
       console.log('message reçue du dispache', message);
-      const chat = await this.chatService.findOrCreateChat(
-        message.chat_id,
-        message.from,
-        message.from_name,
-        '04b6c42f-5df8-4d93-8fd1-e1eb2c420ef7',
-      );
+// let chat;
+//       if (commercialId) {
+//   chat= await this.chatService.findOrCreateChat(
+//         message.chat_id,
+//         message.from,
+//         message.from_name,
+//         commercialId,
+//       );        
+//       }
+
+      const chat  = await this.chatRepository.find({
+        where:{
+          chat_id: message.chat_id
+        }
+      })
+
       if (!chat) {
         throw new Error('Chat not found or created');
       }
@@ -157,25 +173,32 @@ async createAgentMessage(data: {
         return chekMessage;
       }
 
-      const data: Partial<WhatsappMessage> = {
+
+
+      const  commercial= await this.commercialRepository.findOne({
+        where:{
+          id: commercialId
+        }
+      })
+
+      if (!commercial) {
+        return null;
+      }
+
+       const data: Partial<WhatsappMessage> = {
         message_id: message.id,
         external_id: message.id,
         chat_id: message.chat_id,
-        conversation_id: null,
-        commercial_id: chat.commercial_id,
         direction: message.from_me ? MessageDirection.OUT : MessageDirection.IN,
         from_me: message.from_me,
         from: message.from,
         from_name: message.from_name,
         status: WhatsappMessageStatus.DELIVERED,
-        chat: chat,
         timestamp: new Date(message.timestamp * 1000),
-        commercial: chat.commercial,
         source: message.source,
-        text: message.type === 'text' ? (message.text as WhapiText).body : null,
       };
-
-      const messageEntity = this.messageRepository.create(data);
+      
+      const messageEntity =  this.messageRepository.create(data);
 
       return this.messageRepository.save(messageEntity);
     } catch (error) {
@@ -188,8 +211,11 @@ async createAgentMessage(data: {
 
 
 
-  findAll() {
-    return `This action returns all whatsappMessage`;
+  async findAll(chatId: string) {
+      const messages = await this.messageRepository.find({
+        where: {chat_id:chatId}
+      })
+      return messages
   }
 
   findOne(id: string) {
@@ -221,6 +247,25 @@ async createAgentMessage(data: {
     }
   };
 
+  async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
+  return this.messageRepository.save(
+    this.messageRepository.create({
+      chat,
+      message_id: message.id,
+      external_id: message.id,
+      direction: MessageDirection.IN,
+      from_me: false,
+      from: message.from,
+      from_name: message.from_name,
+      text: message.text?.body ?? '',
+      type: message.type,
+      timestamp: message.timestamp,
+      status: WhatsappMessageStatus.SENT,
+      source: 'whapi',
+    }),
+  );
+}
+
    
 
 
@@ -232,24 +277,3 @@ async createAgentMessage(data: {
 }
 
 
-  // id: '29a7d7fc-8f3c-46cd-bfd1-dd1353cf8fb7',
-  // commercial_id: '04b6c42f-5df8-4d93-8fd1-e1eb2c420ef7',
-  // chat_id: '22584688680@s.whatsapp.net',
-  // name: 'Test Whats',
-  // type: 'private',
-  // chat_pic: '',
-  // chat_pic_full: '',
-  // is_pinned: 'false',
-  // is_muted: 'false',
-  // mute_until: '0',
-  // is_archived: 'false',
-  // unread_count: '0',
-  // unread_mention: 'false',
-  // read_only: 'false',
-  // not_spam: 'true',
-  // last_activity_at: '1768295972494',
-  // created_at: '1768295972494',
-  // updated_at: '1768295972494',
-  // createdAt: 2026-01-13T09:19:32.516Z,
-  // updatedAt: 2026-01-13T09:19:32.516Z,
-  // deletedAt: null

@@ -1,7 +1,6 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
-import {
+import { 
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -12,6 +11,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+   // Add this import
 } from 'typeorm';
 import { WhatsappCommercial } from 'src/users/entities/user.entity';
 
@@ -42,9 +42,9 @@ export class WhatsappMessage {
     name: 'message_id',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
   })
-  message_id: string;
+  message_id: string | null;
 
   @Column({
     name: 'external_id',
@@ -78,14 +78,7 @@ export class WhatsappMessage {
     referencedColumnName: 'chat_id',
   })
   chat: WhatsappChat;
-
-  @Column({
-    name: 'conversation_id',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
-  conversation_id: string | null;
+ 
 
   @Column({
     name: 'commercial_id',
@@ -103,19 +96,14 @@ export class WhatsappMessage {
   })
   text: string | null;
 
-  @ManyToOne(() => WhatsappCommercial, (data) => data.messages)
+@ManyToOne(() => WhatsappCommercial, (data) => data.messages)
   @JoinColumn({
     name: 'commercial_id',
     referencedColumnName: 'id',
   })
   commercial: WhatsappCommercial;
 
-  @ManyToOne(() => WhatsappConversation, (conversation) => conversation.message)
-  @JoinColumn({
-    name: 'conversation_id',
-    referencedColumnName: 'conversation_id',
-  })
-  conversation: WhatsappConversation;
+
 
   @OneToMany(
     () => WhatsappMessageContent,

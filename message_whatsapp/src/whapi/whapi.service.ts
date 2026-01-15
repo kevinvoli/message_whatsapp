@@ -1,11 +1,11 @@
-// whapi.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import {
   WhapiMessage,
   WhapiWebhookPayload,
 } from './interface/whapi-webhook.interface';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 
 @Injectable()
 export class WhapiService {
@@ -14,68 +14,86 @@ export class WhapiService {
   constructor(
     private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
+    @Inject(forwardRef(() => WhatsappMessageGateway))
+    private readonly messageGateway: WhatsappMessageGateway,
   ) {}
 
-  async handleIncomingMessage(payload: WhapiWebhookPayload) {
-    if (!payload || !payload.messages || payload.messages.length === 0) {
+  async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
+    if (!payload?.messages?.length) return;
+
+    const message = payload.messages[0];
+
+    // 🔒 ignorer les messages envoyés par ton propre compte
+    if (message.from_me) return;
+
+    const content = this.extractMessageContent(message);
+    const messageType = message.type;
+    const mediaUrl =
+      message.image?.id ||
+      message.video?.id ||
+      message.audio?.id ||
+      message.document?.id ||
+      null;
+
+    // 1️⃣ Dispatcher (assignation agent ou pending)
+    const conversation = await this.dispatcherService.assignConversation(
+      message.chat_id,
+      message.from_name ?? 'Client',
+      content,
+      messageType,
+      mediaUrl ?? undefined,
+    );
+
+    if (!conversation) {
+      this.logger.warn(
+        `⏳ Aucun agent disponible, message mis en attente (${message.chat_id})`,
+      );
       return;
     }
 
-    const message = payload.messages[0];
-    if (message.from_me) return; // Ignore messages sent by the business account itself
+    // 2️⃣ Sauvegarde en base
+    const savedMessage =
+      await this.whatsappMessageService.saveIncomingFromWhapi(
+        message,
+        conversation,
+      );
 
-    const content = this.extractMessageContent(message);
-    const mediaUrl = message.image?.id || message.video?.id || message.document?.id;
-
-    await this.dispatcherService.assignConversation(
-      message.chat_id,
-      message.from_name,
-      content,
-      message.type,
-      mediaUrl,
+    // 3️⃣ Temps réel (WebSocket)
+    this.messageGateway.emitIncomingMessage(
+      conversation.chat_id,
+      savedMessage,
     );
   }
 
-  async updateStatusMessage(payload: WhapiWebhookPayload) {
-    try {
-      if (!payload || !payload.statuses) return;
-      for (const status of payload.statuses) {
-        await this.whatsappMessageService.updateByStatus(status);
+  async updateStatusMessage(payload: WhapiWebhookPayload): Promise<void> {
+    if (!payload?.statuses?.length) return;
 
-        this.logger.log(
-          `[Status] Message: ${status.id}, Recipient: ${status.recipient_id}, Status: ${status.status}`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(`Error updating message status: ${error}`);
+    for (const status of payload.statuses) {
+      await this.whatsappMessageService.updateByStatus(status);
+
+      this.logger.log(
+        `📌 Status update | msg=${status.id} | ${status.status}`,
+      );
     }
   }
 
-  //   {
-  //   id: 'rAF3nNMHa2sRk6WF4BgqbA-hWHCtSkAsFM',
-  //   code: 4,
-  //   status: 'read',
-  //   recipient_id: '214083332780115@lid',
-  //   timestamp: '1768305745'
-  // }
-
-
-
-
+  // =========================
+  // UTIL
+  // =========================
   private extractMessageContent(message: WhapiMessage): string {
     switch (message.type) {
       case 'text':
         return message.text?.body ?? '';
       case 'image':
-        return message.image?.caption ?? '[image]';
-      case 'audio':
-        return '[audio]';
+        return message.image?.caption ?? '[Image]';
       case 'video':
-        return message.video?.caption ?? '[video]';
+        return message.video?.caption ?? '[Vidéo]';
+      case 'audio':
+        return '[Audio]';
       case 'document':
-        return message.document?.filename ?? '[document]';
+        return message.document?.filename ?? '[Document]';
       default:
-        return '[unsupported]';
+        return '[Message non supporté]';
     }
   }
 }

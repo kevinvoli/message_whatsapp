@@ -6,16 +6,22 @@ export class CreateWhatsappMessageDto {
   id: string;
 
   @IsString()
-  message_id: string
+  message_id?: string
 
   @IsString()
-  external_id: string
+  external_id?: string
+
+  conversation_id?: string
+commercial_id: string
+  direction: 'IN' | 'OUT'
 
   @IsBoolean()
-  from_me: boolean;
+  from_me?: boolean;
+
+
 
   @IsString()
-  type: string;
+  type?: string;
 
    @IsString()
   chat_id: string;
@@ -41,5 +47,11 @@ export class CreateWhatsappMessageDto {
 
    @IsString()
   text?: string;
+
+  
+  sender_phone: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
  
 }

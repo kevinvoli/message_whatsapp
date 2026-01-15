@@ -1,11 +1,9 @@
-import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
   Index,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -33,9 +31,6 @@ export class WhatsappCustomer {
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
-
-  @OneToMany(() => WhatsappConversation, (data) => data.customer)
-  conversation: WhatsappConversation[];
 
   @CreateDateColumn({
     name: 'createdAt',

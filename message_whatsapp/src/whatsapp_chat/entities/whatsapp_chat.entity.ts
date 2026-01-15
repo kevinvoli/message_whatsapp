@@ -1,6 +1,5 @@
 import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
-import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Column,
@@ -38,6 +37,7 @@ export class WhatsappChat {
     referencedColumnName: 'id',
   })
   commercial: WhatsappCommercial;
+  
 
   @Column({
     name: 'chat_id',
@@ -50,6 +50,9 @@ export class WhatsappChat {
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
+
+    @Column({ name: 'status', type: 'varchar', length: 100, nullable: false })
+  status: string;
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
@@ -124,8 +127,6 @@ export class WhatsappChat {
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 
-  @OneToMany(() => WhatsappConversation, (data) => data.chat)
-  conversation: WhatsappConversation[];
 
   @OneToMany(() => WhatsappMessage, (message) => message.chat)
   messages: WhatsappMessage[];

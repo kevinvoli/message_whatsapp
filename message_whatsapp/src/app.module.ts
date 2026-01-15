@@ -6,7 +6,6 @@ import { WhatsappChatModule } from './whatsapp_chat/whatsapp_chat.module';
 import { WhatsappChatLabelModule } from './whatsapp_chat_label/whatsapp_chat_label.module';
 import { WhatsappMessageModule } from './whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageContentModule } from './whatsapp_message_content/whatsapp_message_content.module';
-import { WhatsappConversationModule } from './whatsapp_conversation/whatsapp_conversation.module';
 import { WhatsappCustomerModule } from './whatsapp_customer/whatsapp_customer.module';
 import { WhatsappContactsModule } from './whatsapp_contacts/whatsapp_contacts.module';
 import { WhatsappMediaModule } from './whatsapp_media/whatsapp_media.module';
@@ -34,7 +33,7 @@ import { CommunicationWhapiModule } from './communication_whapi/communication_wh
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule, WhatsappConversationModule, WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, WhatsappCommercialModule, DispatcherModule, CommunicationWhapiModule],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, WhatsappCommercialModule, DispatcherModule, CommunicationWhapiModule],
   controllers: [AppController],
   providers: [AppService],
 })

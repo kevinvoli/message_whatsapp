@@ -3,18 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { PendingMessage } from './entities/pending-message.entity';
-import { WhatsappConversation } from '../whatsapp_conversation/entities/whatsapp_conversation.entity';
-import { WhatsappConversationService } from '../whatsapp_conversation/whatsapp_conversation.service';
-import { CreateWhatsappConversationDto } from '../whatsapp_conversation/dto/create-whatsapp_conversation.dto';
 import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 
 @Injectable()
 export class DispatcherService {
   constructor(
     @InjectRepository(PendingMessage)
     private readonly pendingMessageRepository: Repository<PendingMessage>,
+     @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
     private readonly queueService: QueueService,
-    private readonly conversationService: WhatsappConversationService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
   ) {}
@@ -25,11 +25,11 @@ export class DispatcherService {
     content: string,
     messageType: string,
     mediaUrl?: string,
-  ): Promise<WhatsappConversation | null> {
-    let conversation = await this.conversationService.findByChatId(clientPhone);
+  ): Promise<WhatsappChat| null> {
+    let conversation = await this.chatRepository.findOne({where:{chat_id:clientPhone}});
 
     // If conversation exists and its agent is connected, do nothing.
-    if (conversation && conversation.assigned_agent_id && this.messageGateway.isAgentConnected(conversation.assigned_agent_id)) {
+    if (conversation && conversation.commercial && this.messageGateway.isAgentConnected(conversation.commercial.id)) {
       return conversation;
     }
 
@@ -42,21 +42,39 @@ export class DispatcherService {
 
     if (conversation) {
       // Re-assign the conversation if the agent is different or disconnected
-      if (conversation.assigned_agent_id !== nextAgent.id) {
-        conversation.assigned_agent_id = nextAgent.id;
-        conversation = await this.conversationService.update(conversation.id, conversation);
+      if (conversation.commercial_id !== nextAgent.id) {
+       conversation.commercial_id = nextAgent.id;
+conversation = await this.chatRepository.save(conversation);
+
       }
     } else {
       // Create a new conversation
-      const createDto: CreateWhatsappConversationDto = {
+      const createDto: CreateWhatsappChatDto = {
         chat_id: clientPhone,
-        customer_id: clientName, // This should be improved later
-        assigned_agent_id: nextAgent.id,
-        conversation_id: clientPhone, // This should be improved later
+        name: clientName, // This should be improved later
+        commercial_id: nextAgent.id,
         status: 'open',
+        type: '',
+        chat_pic: '',
+        chat_pic_full: '',
+        is_pinned: '',
+        is_muted: '',
+        mute_until: '',
+        is_archived: '',
+        unread_count: '',
+        unread_mention: '',
+        read_only: '',
+        not_spam: '',
+        last_activity_at: '',
+        contact_client: '',
+        created_at: '',
+        updated_at: ''
       };
-      conversation = await this.conversationService.create(createDto);
+      conversation =  this.chatRepository.create(createDto);
+         await this.chatRepository.save(conversation)
     }
+
+
 
     return conversation;
   }

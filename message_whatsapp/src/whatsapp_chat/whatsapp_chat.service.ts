@@ -17,11 +17,16 @@ export class WhatsappChatService {
 
 // Dans WhatsappChatService
 async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
-  return this.chatRepository.find({
+
+  const  chats=
+   await this.chatRepository.find({
     where: { commercial_id: commercialId },
     order: { updatedAt: 'DESC' },
-    relations: ['commercial','messages','conversation','chatEvent','chatLabel'],
+    relations: ['commercial','messages'],
   });
+
+
+  return chats
 }
 
   async findOrCreateChat(

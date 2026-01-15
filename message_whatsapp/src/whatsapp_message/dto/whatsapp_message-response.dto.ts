@@ -8,7 +8,7 @@ export class WhatsappMessageResponseDto {
   direction: 'IN' | 'OUT';
   from_me: boolean;
   sender_phone: string;
-  sender_name: string;
+  from_name: string;
   timestamp: Date;
   status: string;
   source: string;

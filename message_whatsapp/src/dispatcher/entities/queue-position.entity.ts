@@ -3,11 +3,14 @@ import { WhatsappCommercial } from '../../users/entities/user.entity';
 
 @Entity('queue_positions')
 export class QueuePosition {
-  @PrimaryGeneratedColumn()
-  id: number;
+   @PrimaryGeneratedColumn('uuid', {
+    name: 'id',
+    comment: 'Primary key - Unique trajet identifier',
+  })
+  id: string;
 
   @Column({ name: 'user_id' })
-  userId: number;
+  userId: string;
 
   @Column()
   position: number;
