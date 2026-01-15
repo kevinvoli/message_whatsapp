@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { LoginFormData } from '@/types/chat';
 
-const API_URL = 'http://localhost:3001/auth';
+const API_URL = 'http://localhost:3000/auth';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);

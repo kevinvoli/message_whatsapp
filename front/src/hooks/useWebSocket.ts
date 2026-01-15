@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = 'http://localhost:3000';
 
 import { Conversation, Message } from '@/types/chat';
 

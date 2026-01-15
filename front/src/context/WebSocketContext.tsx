@@ -11,7 +11,7 @@ export const WebSocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (token) {
-      const newSocket = io('http://localhost:3001', {
+      const newSocket = io('http://localhost:3000', {
         auth: {
           token: `Bearer ${token}`
         }
