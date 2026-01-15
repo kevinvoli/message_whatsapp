@@ -44,13 +44,32 @@ export const useWebSocket = (token: string | null) => {
   }, [token]);
 
   const emit = useCallback(
-    (event: string, data: any) => {
+    <T>(event: string, data: T) => {
       if (socket) {
         socket.emit(event, data);
       }
     },
     [socket],
   );
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('message:received', (message: Message) => {
+        setMessages((prevMessages) => [...prevMessages, message]);
+      });
+
+      socket.on('messages:get', (messages: Message[]) => {
+        setMessages(messages);
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('message:received');
+        socket.off('messages:get');
+      }
+    };
+  }, [socket]);
 
   return {
     socket,
@@ -81,7 +100,7 @@ export const useWebSocket = (token: string | null) => {
     loadMessages: (conversationId: string) => {
       emit('get:messages', { conversationId });
     },
-    sendMessage: (message: any) => {
+    sendMessage: (message: { conversationId: string; content: string; author: string; chat_id: string }) => {
       emit('agent:message', message);
       return true;
     },

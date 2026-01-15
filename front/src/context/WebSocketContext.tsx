@@ -2,12 +2,19 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthProvider';
+import { Socket } from 'socket.io-client';
 
-const WebSocketContext = createContext(null);
+interface WebSocketContextProps {
+  socket: Socket | null;
+}
 
-export const WebSocketProvider = ({ children }) => {
+const WebSocketContext = createContext<WebSocketContextProps>({
+  socket: null,
+});
+
+export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAuth();
-  const [socket, setSocket] = useState(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -18,7 +25,9 @@ export const WebSocketProvider = ({ children }) => {
       });
       setSocket(newSocket);
 
-      return () => newSocket.close();
+      return () => {
+        newSocket.close();
+      };
     }
   }, [token]);
 

@@ -3,51 +3,9 @@
 > next dev
 
  ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
   ▲ Next.js 14.2.4
-  - Local:        http://localhost:3001
+  - Local:        http://localhost:3002
 
  ✓ Starting...
- ✓ Ready in 2.1s
- ○ Compiling /login ...
- ✓ Compiled /login in 4.2s (613 modules)
-Rendering RootLayout
-Rendering LoginPage
- GET /login 200 in 4814ms
- ✓ Compiled in 382ms (270 modules)
- ○ Compiling /_not-found ...
- ✓ Compiled /_not-found in 3.3s (819 modules)
-Rendering RootLayout
- ✓ Compiled in 5.8s (358 modules)
- ✓ Compiled in 613ms (358 modules)
- ✓ Compiled in 506ms (358 modules)
- ✓ Compiled in 603ms (358 modules)
- ✓ Compiled in 344ms (358 modules)
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/app/front/.next/cache/webpack/client-development/4.pack.gz_' -> '/app/front/.next/cache/webpack/client-development/4.pack.gz'
- ✓ Compiled in 3.2s (358 modules)
- ✓ Compiled in 826ms (358 modules)
- ✓ Compiled in 458ms (358 modules)
- ✓ Compiled in 306ms (358 modules)
-tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
- ⨯ src/app/layout.tsx
-`next/font` error:
-Unknown font `Geist`
+ ✓ Ready in 2.8s
