@@ -28,7 +28,7 @@ export class WhapiService {
     const mediaUrl = message.image?.id || message.video?.id || message.document?.id;
 
     await this.dispatcherService.assignConversation(
-      message.chat_id,
+      message.from,
       message.from_name,
       content,
       message.type,
@@ -50,17 +50,6 @@ export class WhapiService {
       this.logger.error(`Error updating message status: ${error}`);
     }
   }
-
-  //   {
-  //   id: 'rAF3nNMHa2sRk6WF4BgqbA-hWHCtSkAsFM',
-  //   code: 4,
-  //   status: 'read',
-  //   recipient_id: '214083332780115@lid',
-  //   timestamp: '1768305745'
-  // }
-
-
-
 
   private extractMessageContent(message: WhapiMessage): string {
     switch (message.type) {

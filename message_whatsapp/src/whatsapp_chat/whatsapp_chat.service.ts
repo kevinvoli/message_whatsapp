@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
 import { log } from 'console';
 import { UsersService } from 'src/users/users.service';
+import { PartialType } from '@nestjs/mapped-types';
 
 @Injectable()
 export class WhatsappChatService {
@@ -92,8 +93,22 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
   async findOne(id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { id },
-      relations: ['commercial', 'conversation', 'chatEvent', 'chatLabel'],
+      relations: ['commercial','customer', 'chatEvent', 'chatLabel'],
     });
+  }
+
+  async update(chatId: string, chats: Partial<WhatsappChat>){
+
+    try {
+          const categorie = await this.chatRepository.findOne({
+            where:{chat_id:chatId}
+          })
+          if(!categorie) throw new NotFoundException('categorie')
+          Object.assign(categorie, chats)
+          return await this.chatRepository.save(categorie)
+        } catch (error) {
+          throw new NotFoundException(error)
+        }
   }
 
   remove(id: string) {

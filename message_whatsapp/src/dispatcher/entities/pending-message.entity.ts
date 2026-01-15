@@ -2,8 +2,11 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeor
 
 @Entity('pending_messages')
 export class PendingMessage {
-  @PrimaryGeneratedColumn()
-  id: number;
+    @PrimaryGeneratedColumn('uuid', {
+    name: 'id',
+    comment: 'Primary key - Unique trajet identifier',
+  })
+  id: string;
 
   @Column({ name: 'client_phone' })
   clientPhone: string;

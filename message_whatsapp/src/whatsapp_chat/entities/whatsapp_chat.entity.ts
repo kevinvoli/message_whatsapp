@@ -2,6 +2,7 @@ import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { WhatsappChatEvent } from 'src/whatsapp_chat_event/entities/whatsapp_chat_event.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
+import { WhatsappCustomer } from 'src/whatsapp_customer/entities/whatsapp_customer.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Column,
@@ -41,6 +42,24 @@ export class WhatsappChat {
   commercial: WhatsappCommercial;
 
   @Column({
+    name: 'assigned_agent_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  assigned_agent_id: string;
+
+    @Column({ name: 'customer_id', type: 'varchar', length: 100, nullable: false })
+    customer_id: string;
+  
+    @ManyToOne(() => WhatsappCustomer, (data) => data.conversation)
+    @JoinColumn({
+      name: 'customer_id',
+      referencedColumnName: 'customer_id',
+    })
+    customer: WhatsappCustomer;
+
+  @Column({
     name: 'chat_id',
     type: 'varchar',
     length: 100,
@@ -51,6 +70,8 @@ export class WhatsappChat {
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
+
+
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
@@ -121,6 +142,9 @@ export class WhatsappChat {
 
   @Column({ name: 'updated_at', type: 'varchar', length: 100, nullable: false })
   updated_at: string;
+
+  @Column({ name: 'status', type: 'varchar', length: 100, nullable: false })
+  status: 'open' | 'close';
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
