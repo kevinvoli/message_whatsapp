@@ -51,7 +51,11 @@ export class WhatsappChat {
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
-    @Column({ name: 'status', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    type: 'enum',
+    enum: ['actif', 'en attente', 'fermé'],
+    default: 'en attente',
+  })
   status: string;
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
@@ -87,11 +91,10 @@ export class WhatsappChat {
 
   @Column({
     name: 'unread_count',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
+    type: 'int',
+    default: 0,
   })
-  unread_count: string;
+  unread_count: number;
 
   @Column({
     name: 'unread_mention',
@@ -109,11 +112,10 @@ export class WhatsappChat {
 
   @Column({
     name: 'last_activity_at',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
+    type: 'timestamp',
+    nullable: true,
   })
-  last_activity_at: string; // timestamp
+  last_activity_at: Date; // timestamp
 
     @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
   contact_client: string;

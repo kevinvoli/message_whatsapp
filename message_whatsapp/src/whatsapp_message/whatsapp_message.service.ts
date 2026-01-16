@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -29,6 +30,8 @@ export class WhatsappMessageService {
 
        @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    @Inject(forwardRef(() => WhatsappMessageGateway))
+    private readonly messageGateway: WhatsappMessageGateway,
   ) {}
 
 
@@ -246,6 +249,15 @@ async createAgentMessage(data: {
 
     const result= await this.messageRepository.save(messages); 
     console.log("====== status======", result);
+
+    // Notify clients via WebSocket
+    if (messages.message_id) {
+      this.messageGateway.handleMessageStatusUpdate(
+        messages.chat_id,
+        messages.message_id,
+        messages.status,
+      );
+    }
 
     } catch (error) {
       throw new Error(`Failed to update message status: ${String(error)}`);
