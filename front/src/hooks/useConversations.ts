@@ -6,7 +6,7 @@ import { io, Socket } from "socket.io-client";
 import { LogOut } from "lucide-react";
 import { Commercial, Conversation, Message } from "@/types/chat";
 
-export const useWebSocket = (commercial: Commercial | null) => {
+export const useConversations = (commercial: Commercial | null) => {
    const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
