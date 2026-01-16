@@ -33,6 +33,7 @@ export class DispatcherService {
     });
 
     // If conversation exists and its agent is connected, do nothing.
+    // If conversation exists and its agent is connected, do nothing.
     if (
       conversation &&
       conversation.commercial &&
@@ -56,15 +57,13 @@ export class DispatcherService {
 
     if (conversation) {
       // Re-assign the conversation if the agent is different or disconnected
-      if (conversation.commercial_id !== nextAgent.id) {
-        conversation.commercial_id = nextAgent.id;
-        conversation = await this.chatRepository.save(conversation);
-      }
+      conversation.commercial_id = nextAgent.id;
+      conversation = await this.chatRepository.save(conversation);
     } else {
       // Create a new conversation
       const createDto: CreateWhatsappChatDto = {
         chat_id: clientPhone,
-        name: clientName, // This should be improved later
+        name: clientName,
         commercial_id: nextAgent.id,
         status: 'open',
         type: '',
@@ -84,22 +83,11 @@ export class DispatcherService {
         updated_at: '',
       };
 
-      const existingChat = await this.chatRepository.findOne({
-        where: { chat_id: createDto.chat_id },
-      });
-      if (existingChat) {
-        // Mettez à jour le chat existant
-        await this.chatRepository.update(existingChat.id, createDto);
-        // Récupérez l'entité mise à jour
-        return await this.chatRepository.findOne({
-          where: { id: existingChat.id },
-        });
-      } else {
-        // Créez un nouveau chat
-        const newChat = this.chatRepository.create(createDto);
-        return await this.chatRepository.save(newChat);
-      }
+      const newChat = this.chatRepository.create(createDto);
+      conversation = await this.chatRepository.save(newChat);
     }
+
+    await this.queueService.moveToEnd(nextAgent.id);
 
     return conversation;
   }

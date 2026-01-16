@@ -93,10 +93,11 @@ export class QueueService {
     }
 
     if (!nextInQueue.user) {
-      throw new NotFoundException(`User with ID ${nextInQueue.userId} not found for queue position.`);
+      // It's possible the user was deleted, so we should clean up the queue.
+      await this.queueRepository.delete({ id: nextInQueue.id });
+      // And try to get the next one.
+      return this.getNextInQueue();
     }
-
-    await this.moveToEnd(nextInQueue.userId);
 
     return nextInQueue.user;
   }
