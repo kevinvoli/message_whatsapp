@@ -530,6 +530,13 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
         message: messageForFrontend,
       });
 
+      // Émettre une notification générique
+      this.server.to(roomName).emit('notification', {
+        title: `Nouveau message de ${savedMessage.from_name}`,
+        body: savedMessage.text,
+        conversationId: messageData.chat_id,
+      });
+
       console.log(`📢 Message WhatsApp diffusé dans: ${roomName}`);
 
       // Mettre à jour la conversation (dernier message)

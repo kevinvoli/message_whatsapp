@@ -1,4 +1,17 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsDateString,
+} from 'class-validator';
+
+export enum WhatsappChatStatus {
+  ACTIF = 'actif',
+  EN_ATTENTE = 'en attente',
+  FERME = 'fermé',
+}
 
 export class CreateWhatsappChatDto {
   @IsString()
@@ -13,75 +26,67 @@ export class CreateWhatsappChatDto {
   @IsNotEmpty()
   name: string;
 
+  @IsEnum(WhatsappChatStatus)
+  @IsOptional()
+  status?: WhatsappChatStatus;
+
   @IsString()
   @IsNotEmpty()
   type: string;
 
   @IsString()
-  @IsNotEmpty()
-  chat_pic: string;
+  @IsOptional()
+  chat_pic?: string;
 
   @IsString()
-  @IsNotEmpty()
-  chat_pic_full: string;
+  @IsOptional()
+  chat_pic_full?: string;
 
   @IsString()
-  @IsNotEmpty()
-  is_pinned: string;
+  @IsOptional()
+  is_pinned?: string;
 
   @IsString()
-  @IsNotEmpty()
-  is_muted: string;
+  @IsOptional()
+  is_muted?: string;
 
   @IsString()
-  @IsNotEmpty()
-  mute_until: string;
+  @IsOptional()
+  mute_until?: string;
 
   @IsString()
-  @IsNotEmpty()
-  is_archived: string;
+  @IsOptional()
+  is_archived?: string;
+
+  @IsNumber()
+  @IsOptional()
+  unread_count?: number;
 
   @IsString()
-  @IsNotEmpty()
-  unread_count: string;
+  @IsOptional()
+  unread_mention?: string;
 
   @IsString()
-  @IsNotEmpty()
-  unread_mention: string;
+  @IsOptional()
+  read_only?: string;
 
   @IsString()
-  @IsNotEmpty()
-  read_only: string;
+  @IsOptional()
+  not_spam?: string;
+
+  @IsDateString()
+  @IsOptional()
+  last_activity_at?: Date;
 
   @IsString()
-  @IsNotEmpty()
-  not_spam: string;
+  @IsOptional()
+  contact_client?: string;
 
   @IsString()
-  @IsNotEmpty()
-  last_activity_at: string;
+  @IsOptional()
+  created_at?: string;
 
   @IsString()
-  @IsNotEmpty()
-  contact_client: string;
-
-  @IsString()
-  @IsNotEmpty()
-  created_at: string;
-
-  @IsString()
-  @IsNotEmpty()
-  updated_at: string;
-
-   conversation_id?: string;
-
-  customer_id?: string;
-
-  assigned_agent_id?: string;
-
-  status?: 'open' | 'close';
- 
-  started_at?: Date;
-
-  closed_at?: Date;
+  @IsOptional()
+  updated_at?: string;
 }

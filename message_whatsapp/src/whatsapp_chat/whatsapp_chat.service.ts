@@ -61,14 +61,12 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
         is_muted: 'false',
         mute_until: '0',
         is_archived: 'false',
-        unread_count: '0',
+        unread_count: 0,
         unread_mention: 'false',
         read_only: 'false',
         not_spam: 'true',
         commercial: commercial,
-        last_activity_at: Date.now().toString(),
-        created_at: Date.now().toString(),
-        updated_at: Date.now().toString(),
+        last_activity_at: new Date(),
       });
 
       console.log('chat a cree===============================', creatChat);
