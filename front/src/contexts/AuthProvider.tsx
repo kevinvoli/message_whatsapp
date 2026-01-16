@@ -3,7 +3,7 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useConversations } from '@/hooks/useConversations';
 
 interface User {
   id: string;
@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const { 
    LogOut
-  } = useWebSocket(user);
+  } = useConversations(user);
 
 
 
