@@ -3,6 +3,7 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface User {
   id: string;
@@ -28,6 +29,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { 
+   LogOut
+  } = useWebSocket(user);
+
+
+
 
   useEffect(() => {
     // Vérifier si l'utilisateur est déjà connecté
@@ -79,8 +86,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('token');
+
+    const success  = logout(); 
+
+    if (!success) {
+      setError('Échec de lea Deconnexion');
+      // Marquer le message comme erreur
+      return null;
+    }
+       localStorage.removeItem('token');
     localStorage.removeItem('user');
+ 
   };
 
   return (

@@ -26,6 +26,8 @@ export class WhatsappCommercialController {
 
   @Patch(':id')
  async update(@Param('id') id: string, @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto) {
+  console.log("tentative de supression", updateWhatsappCommercialDto);
+  
     return await this.whatsappCommercialService.update(id, updateWhatsappCommercialDto);
   }
 

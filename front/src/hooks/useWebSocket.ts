@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
+import { LogOut } from 'lucide-react';
 import {
   Commercial,
   Conversation,
@@ -132,10 +133,37 @@ export const useWebSocket = (commercial: Commercial | null) => {
       }
     });
 
+    socket.on(`${conversationId}`, (data: { conversationId: string; message: any }) => {
+      console.log("📩 Message reçu en temps réel");
+      if (data.message && selectedConversationId === data.conversationId) {
+        const newMessage: Message = {
+          id: data.message.id,
+          text: data.message.text,
+          timestamp: new Date(data.message.timestamp || Date.now()),
+          from: data.message.from_me ? "commercial" : "client",
+          status: data.message.status || "sent",
+          direction: data.message.direction || "IN",
+          sender_phone: data.message.from,
+          sender_name: data.message.from_name,
+          from_me: data.message.from_me,
+        };
+        setMessages(prev => [...prev, newMessage]);
+      }
+    });
+
+
+
     socket.on("message:sent", (data: { conversationId: string; message: any }) => {
       console.log("✅ Message envoyé confirmé:", data);
     });
   }, [selectedConversationId, commercial]);
+
+    socket.on("message:sent", (data: { conversationId: string; message: any }) => {
+      console.log("✅ Message envoyé confirmé:", data);
+    });
+  }, [selectedConversationId, commercial]);
+
+  
 
   // Effet principal pour gérer la connexion
   useEffect(() => {
@@ -215,6 +243,17 @@ export const useWebSocket = (commercial: Commercial | null) => {
     return false;
   }, [isConnected]);
 
+
+    const LogOut = useCallback(() => {
+    if (socketRef.current && isConnected) {
+      console.log("📤 deconnection:");
+      socketRef.current.emit("agent:logout");
+      return true;
+    }
+    console.warn("⚠️ Socket non connecté");
+    return false;
+  }, [isConnected]);
+
   const joinConversation = useCallback((conversationId: string) => {
     if (socketRef.current && isConnected && commercial) {
       console.log(`🚪 Rejoindre conversation: ${conversationId}`);
@@ -268,7 +307,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
     setConversations,
     setMessages,
     setSelectedConversation,
-    
+    LogOut,
     // Actions
     sendMessage,
     joinConversation,
@@ -283,6 +322,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
     conversations,
     messages,
     selectedConversationId,
+    LogOut,
     setConversations,
     setMessages,
     setSelectedConversation,

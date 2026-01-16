@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -91,33 +91,84 @@ export class WhatsappCommercialService {
     };
   }
 
-  async update(id: string, updateWhatsappCommercialDto: UpdateWhatsappCommercialDto): Promise<SafeWhatsappCommercial> {
-    const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
-    if (!user) {
-      throw new NotFoundException(`User with ID "${id}" not found`);
-    }
-
-    // Update email if provided
-    if (updateWhatsappCommercialDto.email && updateWhatsappCommercialDto.email !== user.email) {
-      const existingUser = await this.whatsappCommercialRepository.findOne({ where: { email: updateWhatsappCommercialDto.email } });
-      if (existingUser) {
-        throw new ConflictException('Email already in use');
-      }
-      user.email = updateWhatsappCommercialDto.email;
-    }
-
-    // This method will NOT update the role. That's handled by updateRole.
-
-    const savedUser = await this.whatsappCommercialRepository.save(user);
-
-    return {
-      id: savedUser.id,
-      email: savedUser.email,
-      name: savedUser.name,
-    };
+async update(id: string, updateWhatsappCommercialDto: UpdateWhatsappCommercialDto): Promise<SafeWhatsappCommercial> {
+  const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
+  
+  if (!user) {
+    throw new NotFoundException(`User with ID "${id}" not found`);
   }
 
+  // Vérifier l'unicité de l'email si fourni et différent de l'actuel
+  if (updateWhatsappCommercialDto.email && updateWhatsappCommercialDto.email !== user.email) {
+    const existingUser = await this.whatsappCommercialRepository.findOne({ 
+      where: { email: updateWhatsappCommercialDto.email } 
+    });
+    
+    if (existingUser) {
+      throw new ConflictException('Email already in use');
+    }
+    user.email = updateWhatsappCommercialDto.email;
+  }
 
+  // Mettre à jour le nom si fourni
+  if (updateWhatsappCommercialDto.name !== undefined) {
+    user.name = updateWhatsappCommercialDto.name;
+  }
+
+  const updatedUser = await this.whatsappCommercialRepository.save(user);
+
+  return {
+    id: updatedUser.id,
+    email: updatedUser.email,
+    name: updatedUser.name,
+  };
+}
+
+async updateStatus(id:string, status:boolean) {
+  const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
+  if (!user) {
+    throw new NotFoundException(`User with ID "${id}" not found`);
+  }
+  console.log("nuew status User",status);
+  
+  // Vérifier que le rôle est valide
+  user.isConnected = status;
+
+  const updatedUser = await this.whatsappCommercialRepository.save(user);
+  return updatedUser
+}
+
+async updatePassword(id: string, newPassword: string): Promise<void> {
+  const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
+  if (!user) {
+    throw new NotFoundException(`User with ID "${id}" not found`);
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  user.password = hashedPassword;
+  await this.whatsappCommercialRepository.save(user);
+}
+
+async updateRole(id: string, role: string): Promise<SafeWhatsappCommercial> {
+  const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
+  if (!user) {
+    throw new NotFoundException(`User with ID "${id}" not found`);
+  }
+
+  // Vérifier que le rôle est valide
+  if (!['ADMIN', 'COMMERCIAL'].includes(role)) {
+    throw new BadRequestException('Invalid role');
+  }
+
+  user.role = role;
+  const updatedUser = await this.whatsappCommercialRepository.save(user);
+
+  return {
+    id: updatedUser.id,
+    email: updatedUser.email,
+    name: updatedUser.name,
+  };
+}
 
   async remove(id: string): Promise<void> {
     const result = await this.whatsappCommercialRepository.delete(id);
@@ -160,13 +211,5 @@ export class WhatsappCommercialService {
     return this.whatsappCommercialRepository.findOne({ where: { passwordResetToken: token } });
   }
 
-  // async updatePassword(userId: number, newPassword: string): Promise<void> {
-  //   const salt = await bcrypt.genSalt(10);
-  //   const hashedPassword = await bcrypt.hash(newPassword, salt);
-  //   await this.userRepository.update(userId, {
-  //     password: hashedPassword,
-  //     passwordResetToken: null,
-  //     passwordResetExpires: null,
-  //   });
-  // }
+
 }
