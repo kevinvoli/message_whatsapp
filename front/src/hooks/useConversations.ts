@@ -12,6 +12,7 @@ import {
 } from '@/types/chat';
 import { useWebSocket } from './useWebSocket';
 import { useAuth } from '@/contexts/AuthProvider';
+import { ConversationUpdatedPayload, NotificationPayload } from '@/types/events';
 
 export const useConversations = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -54,7 +55,7 @@ export const useConversations = () => {
   useEffect(() => {
     if (!on) return;
 
-    const cleanupConversationUpdated = on('conversation:updated', (data: { chat_id: string; lastMessage: any, unread_count: number }) => {
+    const cleanupConversationUpdated = on('conversation:updated', (data: ConversationUpdatedPayload) => {
       console.log('🔄 Conversation mise à jour (via on):', data);
       setConversations(prev =>
         prev.map(c =>
@@ -65,7 +66,7 @@ export const useConversations = () => {
       );
     });
 
-    const cleanupNotification = on('notification', (data: { title: string; body: string }) => {
+    const cleanupNotification = on('notification', (data: NotificationPayload) => {
       console.log('🔔 Notification reçue (via on):', data);
       // Ici, on pourrait intégrer un système de notifications
     });

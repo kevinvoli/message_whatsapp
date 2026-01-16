@@ -456,11 +456,7 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
       console.log(`📢 Message diffusé dans la room: ${roomName}`);
 
       // Mettre à jour la conversation (dernier message)
-      await this.updateConversationLastMessage(data.conversationId, {
-        text: data.content,
-        timestamp: new Date(),
-        author: 'agent',
-      });
+      await this.emitConversationUpdate(data.conversationId);
     } catch (error) {
       console.error("❌ Erreur lors de l'envoi du message:", error);
       client.emit('message:error', {
@@ -542,11 +538,7 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
       console.log(`📢 Message WhatsApp diffusé dans: ${roomName}`);
 
       // Mettre à jour la conversation (dernier message)
-      await this.updateConversationLastMessage(messageData.chat_id, {
-        text: savedMessage.text ?? '(Message sans texte)',
-        timestamp: savedMessage.timestamp,
-        author: 'client',
-      });
+      await this.emitConversationUpdate(messageData.chat_id);
     } catch (error) {
       console.error('❌ Erreur lors du traitement du message WhatsApp:', error);
     }
@@ -617,25 +609,23 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
     }
   }
 
-  private async updateConversationLastMessage(
-    chatId: string,
-    lastMessage: { text: string; timestamp: Date; author: string },
-  ): Promise<void> {
+  public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
       const chat = await this.chatService.findByChatId(chatId);
       if (chat) {
+        const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chatId);
         this.server.emit('conversation:updated', {
           chat_id: chat.chat_id,
           lastMessage: {
-            text: lastMessage.text,
-            timestamp: lastMessage.timestamp,
-            author: lastMessage.author,
+            text: lastMessage?.text || 'Aucun message',
+            timestamp: lastMessage?.timestamp || chat.updatedAt,
+            author: lastMessage?.from_me ? 'agent' : 'client',
           },
           unread_count: chat.unread_count,
         });
       }
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du dernier message:', error);
+      console.error('Erreur lors de l emission de la mise à jour du dernier message:', error);
     }
   }
 

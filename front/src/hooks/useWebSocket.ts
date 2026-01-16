@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
 import { LogOut } from "lucide-react";
 import { Commercial, Conversation, Message } from "@/types/chat";
+import { MessagePayload } from "@/types/events";
 
 export const useWebSocket = (commercial: Commercial | null) => {
    const socketRef = useRef<Socket | null>(null);
@@ -138,7 +139,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
 
       socket.on(
         "message:received",
-        (data: { conversationId: string; message: any }) => {
+        (data: MessagePayload) => {
           console.log(
             "📩 Message reçu en temps réel (message:received):",
             data
@@ -153,29 +154,17 @@ export const useWebSocket = (commercial: Commercial | null) => {
           ) {
             return;
           }
-          const newMessage: Message = {
-            id: data.message.id,
-            text: data.message.text,
-            timestamp: new Date(data.message.timestamp || Date.now()),
-            from: data.message.from_me ? "commercial" : "client",
-            status: data.message.status || "sent",
-            direction: data.message.direction || "IN",
-            sender_phone: data.message.from,
-            sender_name: data.message.from_name,
-            from_me: data.message.from_me,
-          };
-
-          setMessages((prev) => [...prev, newMessage]);
+          setMessages((prev) => [...prev, data.message]);
         }
       );
 
-      socket.on("reception",(data: { conversationId: string; messages: any }) => {
+      socket.on("reception",(data: MessagePayload) => {
          
            console.log(
             "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
             data
           );
-        if (!data.messages) return;
+        if (!data.message) return;
    console.log(
             "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
             data
@@ -191,24 +180,12 @@ export const useWebSocket = (commercial: Commercial | null) => {
             data
           );
 
-          const newMessage: Message = {
-            id: data.messages.id,
-            text: data.messages.text,
-            timestamp: new Date(data.messages.timestamp || Date.now()),
-            from: data.messages.from_me ? "commercial" : "client",
-            status: data.messages.status || "sent",
-            direction: data.messages.direction || "IN",
-            sender_phone: data.messages.from,
-            sender_name: data.messages.from_name,
-            from_me: data.messages.from_me,
-          };
-
           console.log(
             "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-            newMessage
+            data.message
           );
 
-          setMessages((prev) => [...prev, newMessage]);
+          setMessages((prev) => [...prev, data.message]);
         }
       );
 

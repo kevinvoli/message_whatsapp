@@ -91,6 +91,9 @@ export class WhapiService {
         conversation.commercial_id,
         savedMessage,
       );
+
+      // Émettre la mise à jour de la conversation
+      this.messageGateway.emitConversationUpdate(conversation.chat_id);
     } catch (error) {
       console.log(error);
 
