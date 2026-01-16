@@ -60,9 +60,9 @@ export class WhatsappMessageGateway
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
       await this.emitQueueUpdate();
-      console.log('nuew status socket', false);
+      console.log('nuew status socket', true);
 
-      await this.userService.updateStatus(commercialId, false);
+      await this.userService.updateStatus(commercialId, true);
       // await this.dispatcherService.distributePendingMessages();
     }
   }
