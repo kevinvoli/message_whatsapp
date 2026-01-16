@@ -1,5 +1,5 @@
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { WhatsappCommercial } from '../../users/entities/user.entity';
 
 @Entity('queue_positions')
 export class QueuePosition {

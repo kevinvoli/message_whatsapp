@@ -17,9 +17,9 @@ import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
 
 import * as Joi from 'joi';
-import { WhatsappCommercialModule } from './users/users.module';
 import { DispatcherModule } from './dispatcher/dispatcher.module';
 import { CommunicationWhapiModule } from './communication_whapi/communication_whapi.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -33,7 +33,7 @@ import { CommunicationWhapiModule } from './communication_whapi/communication_wh
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, WhatsappCommercialModule, DispatcherModule, CommunicationWhapiModule],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, ],
   controllers: [AppController],
   providers: [AppService],
 })

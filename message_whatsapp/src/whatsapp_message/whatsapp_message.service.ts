@@ -8,11 +8,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
-import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
 export class WhatsappMessageService {

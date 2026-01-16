@@ -11,17 +11,19 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UsersService } from 'src/users/users.service';
-import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MessageDirection, WhatsappMessage, WhatsappMessageStatus } from './entities/whatsapp_message.entity';
-import { WhatsappCommercial } from 'src/users/entities/user.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
-@WebSocketGateway({
-  cors: { origin: '*' },
+@WebSocketGateway(3001,{
+  cors:{
+    origin: '*',
+    credentials: true,
+  },
 })
 export class WhatsappMessageGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -29,7 +31,7 @@ export class WhatsappMessageGateway
   constructor(
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
-    private readonly userService: UsersService,
+    private readonly userService: WhatsappCommercialService,
     private readonly queueService: QueueService,
     private readonly dispatcherService: DispatcherService,
         @InjectRepository(WhatsappMessage)
@@ -528,18 +530,18 @@ console.log('chat trouver ',chat );
     console.log("📢 File d'attente mise à jour et diffusée.");
   }
 
-  private async markMessagesAsRead(
-    chatId: string,
-    commercialId: string,
-  ): Promise<void> {
-    try {
-      console.log(`📖 Marquer les messages comme lus pour ${chatId}`);
-      // À implémenter si nécessaire
-      // await this.whatsappMessageService.markAsRead(chatId, commercialId);
-    } catch (error) {
-      console.error('Erreur lors du marquage des messages comme lus:', error);
-    }
-  }
+  // private async markMessagesAsRead(
+  //   chatId: string,
+  //   commercialId: string,
+  // ): Promise<void> {
+  //   try {
+  //     console.log(`📖 Marquer les messages comme lus pour ${chatId}`);
+  //     // À implémenter si nécessaire
+  //     // await this.whatsappMessageService.markAsRead(chatId, commercialId);
+  //   } catch (error) {
+  //     console.error('Erreur lors du marquage des messages comme lus:', error);
+  //   }
+  // }
 
   private async updateConversationLastMessage(
     chatId: string,

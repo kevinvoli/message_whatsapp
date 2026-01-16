@@ -1,4 +1,5 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import { 
   Column,
@@ -13,7 +14,6 @@ import {
   UpdateDateColumn,
    // Add this import
 } from 'typeorm';
-import { WhatsappCommercial } from 'src/users/entities/user.entity';
 
 export enum MessageDirection {
   IN = 'IN',

@@ -1,10 +1,9 @@
 // whapi.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 
-import { UsersService } from 'src/users/users.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
-import { WhapiMessage } from './interface/whapi-webhook.interface';
 import { CreateWhatsappMessageDto } from 'src/whatsapp_message/dto/create-whatsapp_message.dto';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
 
 @Injectable()
@@ -12,7 +11,7 @@ export class WhapiServiceDispacher {
   private readonly logger = new Logger(WhapiServiceDispacher.name);
 
   constructor(
-        private readonly commercialService: UsersService,
+        private readonly commercialService: WhatsappCommercialService,
          private readonly messageService: WhatsappMessageService,
   ) {}
 

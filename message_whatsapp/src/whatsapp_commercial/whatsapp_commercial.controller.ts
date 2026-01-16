@@ -4,35 +4,33 @@ import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dt
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
 
 
-@Controller('whatsapp_commercial')
+@Controller('users')
 export class WhatsappCommercialController {
   constructor(private readonly whatsappCommercialService: WhatsappCommercialService) {}
 
   @Post()
-  create(@Body() createWhatsappCommercialDto: CreateWhatsappCommercialDto) {
-
-
-    return this.whatsappCommercialService.create(createWhatsappCommercialDto);
+  async create(@Body() createWhatsappCommercialDto: CreateWhatsappCommercialDto) {
+    return await this.whatsappCommercialService.create(createWhatsappCommercialDto);
   }
 
   @Get()
-  findAll() {
-    return this.whatsappCommercialService.findAll();
+  async findAll() {
+    return await this.whatsappCommercialService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     console.log("get on user", id);
-    return this.whatsappCommercialService.findOne(id);
+    return await this.whatsappCommercialService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto) {
-    return this.whatsappCommercialService.update(id, updateWhatsappCommercialDto);
+ async update(@Param('id') id: string, @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto) {
+    return await this.whatsappCommercialService.update(id, updateWhatsappCommercialDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.whatsappCommercialService.remove(id);
+  async remove(@Param('id') id: string) {
+    return await this.whatsappCommercialService.remove(id);
   }
 }

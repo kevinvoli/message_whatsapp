@@ -1,10 +1,11 @@
+// components/auth/loginForm.tsx
+'use client';
+
 import React, { useState } from 'react';
 import { Phone } from 'lucide-react';
-import { LoginFormData } from '@/types/chat';
-
 
 interface LoginFormProps {
-  onLogin: (formData: LoginFormData) => Promise<void>;
+  onLogin: (formData: { email: string; password: string }) => Promise<void>;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -14,15 +15,15 @@ const LoginForm: React.FC<LoginFormProps> = ({
   isLoading = false,
   error,
 }) => {
-  const [formData, setFormData] = useState<LoginFormData>({
+  const [formData, setFormData] = useState({
     email: '',
-    name: '',
+    password: '',
   });
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  await onLogin(formData);
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onLogin(formData);
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-green-100">
@@ -59,22 +60,24 @@ const LoginForm: React.FC<LoginFormProps> = ({
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-600"
               placeholder="votre@email.com"
               required
+              disabled={isLoading}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              name
+              Password
             </label>
             <input
-              type="name"
-              value={formData.name}
+              type="password"
+              value={formData.password}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData({ ...formData, password: e.target.value })
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-600"
               placeholder="••••••••"
               required
+              disabled={isLoading}
             />
           </div>
 

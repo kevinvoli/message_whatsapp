@@ -70,8 +70,20 @@ conversation = await this.chatRepository.save(conversation);
         created_at: '',
         updated_at: ''
       };
-      conversation =  this.chatRepository.create(createDto);
-         await this.chatRepository.save(conversation)
+
+       const existingChat = await this.chatRepository.findOne({
+    where: { chat_id: createDto.chat_id }
+  });
+  if (existingChat) {
+    // Mettez à jour le chat existant
+    await this.chatRepository.update(existingChat.id, createDto);
+    // Récupérez l'entité mise à jour
+    return await this.chatRepository.findOne({ where: { id: existingChat.id } });
+  } else {
+    // Créez un nouveau chat
+    const newChat = this.chatRepository.create(createDto);
+    return await this.chatRepository.save(newChat);
+  }
     }
 
 

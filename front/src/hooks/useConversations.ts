@@ -1,9 +1,17 @@
+// src/hooks/useConversations.ts
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Conversation, Message } from '@/types/chat';
+import { 
+  Conversation, 
+  Message, 
+  createMessage, 
+  transformToMessage,
+  createConversation,
+  isValidMessage
+} from '@/types/chat';
 import { useWebSocket } from './useWebSocket';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export const useConversations = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -12,7 +20,7 @@ export const useConversations = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
-  const { commercial } = useAuth();
+  const { user } = useAuth();
   const { 
     isConnected, 
     sendMessage: sendWebSocketMessage, 
@@ -27,7 +35,7 @@ export const useConversations = () => {
     setSelectedConversation: setSelectedConvWS,
     reconnect,
     selectedConversationId
-  } = useWebSocket(commercial);
+  } = useWebSocket(user);
   
   // Référence pour suivre le dernier chargement
   const lastLoadRef = useRef<string | null>(null);
@@ -35,10 +43,11 @@ export const useConversations = () => {
 
   // Effet pour charger les conversations au démarrage
   useEffect(() => {
-    if (isConnected && commercial && conversations.length === 0) {
-      loadConversations(commercial.id);
+    if (isConnected && user && conversations.length === 0) {
+      console.log("📋 Chargement initial des conversations");
+      loadConversation(user.id);
     }
-  }, [isConnected, commercial, conversations.length]);
+  }, [isConnected, user, conversations.length, loadConversation]);
 
   // Effet pour gérer le changement de conversation
   useEffect(() => {
@@ -81,7 +90,15 @@ export const useConversations = () => {
         setConversations(prev => 
           prev.map(c => 
             c.chat_id === conversationId 
-              ? { ...c, unreadCount: 0 } 
+              ? { 
+                  ...c, 
+                  unreadCount: 0,
+                  // Mettre à jour le timestamp de dernière activité
+                  lastMessage: {
+                    ...c.lastMessage,
+                    timestamp: new Date()
+                  }
+                } 
               : c
           )
         );
@@ -112,7 +129,7 @@ export const useConversations = () => {
     setLoading(true);
     setError(null);
     
-    const targetCommercialId = commercialId || commercial?.id;
+    const targetCommercialId = commercialId || user?.id;
     
     if (!targetCommercialId) {
       setError('Commercial ID manquant');
@@ -133,7 +150,7 @@ export const useConversations = () => {
     } finally {
       setLoading(false);
     }
-  }, [commercial?.id, isConnected, loadConversation]);
+  }, [user?.id, isConnected, loadConversation]);
 
   // Charger les messages d'une conversation
   const loadMessages = useCallback(async (conversationId: string) => {
@@ -165,7 +182,31 @@ export const useConversations = () => {
     // Mettre à jour l'état
     setSelectedConversation(conversation);
     setError(null);
+    
+    console.log(`🎯 Conversation sélectionnée: ${conversation.clientName} (${conversation.chat_id})`);
   }, [selectedConversation]);
+
+  // Ajouter un message à une conversation
+const addMessageToConversation = useCallback((conversationId: string, message: Message) => {
+  setConversations(prev => 
+    prev.map(conv => 
+      conv.chat_id === conversationId 
+        ? {
+            ...conv,
+            lastMessage: {
+              text: message.text,
+              timestamp: message.timestamp,
+              author: message.from === 'commercial' ? 'agent' : 'client'
+            },
+            unreadCount: selectedConversationId === conversationId 
+              ? conv.unreadCount 
+              : conv.unreadCount + 1,
+            messages: [...(conv.messages || []), message] // Assurer que conv.messages est un tableau
+          } 
+        : conv
+    )
+  );
+}, [selectedConversationId]);
 
   // Envoyer un message
   const sendMessage = useCallback(async (
@@ -174,38 +215,48 @@ export const useConversations = () => {
   ): Promise<Message | null> => {
     setError(null);
     
-    if (!commercial || !isConnected) {
+    if (!user || !isConnected) {
       setError('Non connecté ou non authentifié');
       return null;
     }
 
-    // Préparer le message complet
-    const fullMessage: Message = {
+    // Utiliser createMessage pour garantir un message valide
+    const fullMessage = createMessage({
       id: `temp_${Date.now()}`,
       text: messageData.text || '',
       timestamp: new Date(),
-      from: 'commercial',
+      from: messageData.sender_phone,
       status: 'sending',
       direction: 'OUT',
-      sender_name: commercial.name || 'Agent',
+      sender_name: user.name || 'Agent',
+      from_me: true, // Toujours true pour les messages de l'agent
+      sender_phone: user.email || '', // Optionnel: utiliser email comme sender_phone
       ...messageData,
-    };
+    });
+
+    // Vérifier que le message est valide
+    // if (!isValidMessage(fullMessage)) {
+    //   setError('Message invalide');
+    //   return null;
+    // }
+
+    console.log(`📤 Envoi message: "${fullMessage.text.substring(0, 50)}..."`);
 
     // Optimistic UI update
     setMessages(prev => [...prev, fullMessage]);
+    addMessageToConversation(conversationId, fullMessage);
     
     // Envoyer via WebSocket
-    const webSocketMessage = {
+    const success = sendWebSocketMessage({
       conversationId,
-      content: fullMessage.text,
-      author: commercial.id,
+      text: fullMessage.text,
+      author: user.id,
       chat_id: conversationId
-    };
-
-    const success = sendWebSocketMessage(webSocketMessage);
+    });
     
     if (!success) {
       setError('Échec de l\'envoi via WebSocket');
+      // Marquer le message comme erreur
       setMessages(prev => 
         prev.map(msg => 
           msg.id === fullMessage.id 
@@ -216,36 +267,63 @@ export const useConversations = () => {
       return null;
     }
 
-    // Mettre à jour la conversation
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.chat_id === conversationId 
-          ? {
-              ...conv,
-              lastMessage: {
-                text: fullMessage.text,
-                timestamp: fullMessage.timestamp,
-                author: 'agent'
-              }
-            } 
-          : conv
-      )
-    );
-    
     return fullMessage;
-  }, [commercial, isConnected, sendWebSocketMessage, setMessages, setConversations]);
+  }, [user, isConnected, sendWebSocketMessage, setMessages, addMessageToConversation]);
+
+  // Gérer les messages entrants
+  const handleIncomingMessage = useCallback((conversationId: string, rawMessage: any) => {
+    try {
+      const message = transformToMessage(rawMessage);
+      
+      if (!isValidMessage(message)) {
+        console.error('Message invalide reçu:', rawMessage);
+        return;
+      }
+
+      // Si c'est la conversation actuelle, ajouter aux messages
+      if (selectedConversationId === conversationId) {
+        setMessages(prev => {
+          // Éviter les doublons
+          const exists = prev.some(m => m.id === message.id);
+          if (!exists) {
+            return [...prev, message];
+          }
+          return prev;
+        });
+      }
+
+      // Mettre à jour la conversation
+      addMessageToConversation(conversationId, message);
+      
+      console.log(`📩 Message entrant dans ${conversationId}: "${message.text.substring(0, 50)}..."`);
+    } catch (err) {
+      console.error('Erreur lors du traitement du message entrant:', err);
+    }
+  }, [selectedConversationId, addMessageToConversation, setMessages]);
+
+  // Filtrer les conversations
+  const filteredConversations = conversations.filter((conv: Conversation) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      conv.clientName?.toLowerCase().includes(searchLower) ||
+      conv.clientPhone?.includes(searchTerm) ||
+      conv.name?.toLowerCase().includes(searchLower) ||
+      conv.lastMessage.text?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Trier les conversations par date du dernier message
+  const sortedConversations = [...filteredConversations].sort((a, b) => {
+    return new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime();
+  });
 
   return {
     // State
-    conversations,
+    conversations: sortedConversations,
     selectedConversation,
     messages,
     searchTerm,
-    filteredConversations: conversations.filter((conv: Conversation) =>
-      conv.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conv.clientPhone?.includes(searchTerm) ||
-      conv.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
+    filteredConversations: sortedConversations,
     loading,
     isLoadingMessages,
     error,
@@ -262,7 +340,13 @@ export const useConversations = () => {
     loadMessages,
     sendMessage,
     selectConversation,
+    handleIncomingMessage,
     reconnectWebSocket: reconnect,
     clearError: useCallback(() => setError(null), []),
+    
+    // Utilitaires
+    hasConversations: conversations.length > 0,
+    unreadCount: conversations.reduce((total, conv) => total + conv.unreadCount, 0),
+    selectedConversationMessages: messages,
   };
 };

@@ -6,12 +6,12 @@ import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthProvider';
 import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
 import { useRouter } from 'next/navigation';
 
 const WhatsAppPage = () => {
-  const { commercial, initialized, logout } = useAuth();
+  const { user, initialized, logout } = useAuth();
   const router = useRouter();
   
   // Utilisez le hook refactoré
@@ -31,17 +31,17 @@ const WhatsAppPage = () => {
   // Protection de route
   useEffect(() => {
     if (!initialized) return;
-    if (!commercial) {
+    if (!user) {
       router.replace('/login');
     }
-  }, [initialized, commercial, router]);
+  }, [initialized, user, router]);
 
   // Recharger les conversations si la connexion se rétablit
   useEffect(() => {
-    if (isWebSocketConnected && commercial) {
-      loadConversations(commercial.id);
+    if (isWebSocketConnected && user) {
+      loadConversations(user.id);
     }
-  }, [isWebSocketConnected, commercial, loadConversations]);
+  }, [isWebSocketConnected, user, loadConversations]);
 
   // Gérer la sélection d'une conversation
   const handleSelectConversation = useCallback((conversation: any) => {
@@ -51,7 +51,7 @@ const WhatsAppPage = () => {
 
   // Envoyer un message
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!selectedConversation || !commercial) {
+    if (!selectedConversation || !user) {
       console.error('❌ Impossible d\'envoyer: conversation ou commercial manquant');
       return;
     }
@@ -59,14 +59,14 @@ const WhatsAppPage = () => {
     try {
       await sendMessage(selectedConversation.chat_id, {
         text,
-        from: 'commercial'
+        from: selectedConversation.clientPhone
       });
     } catch (err) {
       console.error('Erreur lors de l\'envoi:', err);
     }
-  }, [selectedConversation, commercial, sendMessage]);
+  }, [selectedConversation, user, sendMessage]);
 
-  if (!commercial || !initialized) {
+  if (!user || !initialized) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
@@ -77,7 +77,7 @@ const WhatsAppPage = () => {
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar
-        commercial={commercial}
+        commercial={user}
         conversations={conversations}
         searchTerm=""
         selectedConversation={selectedConversation}

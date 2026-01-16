@@ -4,14 +4,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
 import { log } from 'console';
-import { UsersService } from 'src/users/users.service';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
 @Injectable()
 export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
-        private readonly commercialService : UsersService,
+        private readonly commercialService : WhatsappCommercialService,
     
   ) {}
 

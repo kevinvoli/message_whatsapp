@@ -7,16 +7,16 @@ import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/wh
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { UsersService } from 'src/users/users.service';
-import { WhatsappCommercial } from 'src/users/entities/user.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
 @Module({
    imports: [TypeOrmModule.forFeature([
           WhatsappMessage, WhatsappChat,  WhatsappMessageContent,  WhatsappCommercial
         ]), WhatsappChatModule, DispatcherModule],
-  providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,UsersService,CommunicationWhapiService],
+  providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,WhatsappCommercialService,CommunicationWhapiService],
   exports: [WhatsappMessageGateway],
 })
 export class WhatsappMessageModule {}

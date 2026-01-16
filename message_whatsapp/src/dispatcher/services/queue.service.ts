@@ -2,8 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
-import { WhatsappCommercial } from '../../users/entities/user.entity';
-import { error } from 'console';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
 export class QueueService {
