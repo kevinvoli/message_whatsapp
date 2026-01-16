@@ -16,6 +16,8 @@ export class CommunicationWhapiService {
        id: string,
   status: number,
   statusText: string}> {
+    console.log("cschuhd",to);
+    
     const response = await axios.post(
       this.WHAPI_URL,
       {

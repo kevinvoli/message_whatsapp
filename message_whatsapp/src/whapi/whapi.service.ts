@@ -1,4 +1,10 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  forwardRef,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   WhapiMessage,
   WhapiWebhookPayload,
@@ -6,6 +12,7 @@ import {
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { NotFoundError } from 'rxjs';
 
 @Injectable()
 export class WhapiService {
@@ -35,34 +42,60 @@ export class WhapiService {
       message.document?.id ||
       null;
 
-    // 1️⃣ Dispatcher (assignation agent ou pending)
-    const conversation = await this.dispatcherService.assignConversation(
-      message.chat_id,
-      message.from_name ?? 'Client',
-      content,
-      messageType,
-      mediaUrl ?? undefined,
-    );
-
-    if (!conversation) {
-      this.logger.warn(
-        `⏳ Aucun agent disponible, message mis en attente (${message.chat_id})`,
+    try {
+      //  1️⃣ Dispatcher (assignation agent ou pending)
+      const conversation = await this.dispatcherService.assignConversation(
+        message.chat_id,
+        message.from_name ?? 'Client',
+        content,
+        messageType,
+        mediaUrl ?? undefined,
       );
-      return;
-    }
 
-    // 2️⃣ Sauvegarde en base
-    const savedMessage =
-      await this.whatsappMessageService.saveIncomingFromWhapi(
-        message,
+      if (!conversation) {
+        this.logger.warn(
+          `⏳ Aucun agent disponible, message mis en attente (${message.chat_id})`,
+        );
+        return;
+      }
+
+      // 2️⃣ Sauvegarde en base
+      const savedMessage =
+        await this.whatsappMessageService.saveIncomingFromWhapi(
+          message,
+          conversation,
+        );
+
+      // if (conversation.commercial_id) {
+      //   return;
+      // }
+
+      console.log(
+        'vooooooooooooooooooooooooooooooooooooooooooooooooooooooo',
+        savedMessage,
+        'fffffffffffffffffff',
         conversation,
       );
 
-    // 3️⃣ Temps réel (WebSocket)
-    this.messageGateway.emitIncomingMessage(
-      conversation.chat_id,
-      savedMessage,
-    );
+      if (!conversation.chat_id || !conversation.commercial_id) {
+        console.warn(
+          "❌ Impossible d'émettre : chat_id ou commercial_id manquant",
+          conversation,
+        );
+        return;
+      }
+
+      // 3️⃣ Temps réel (WebSocket)
+      this.messageGateway.emitIncomingMessage(
+        conversation.chat_id,
+        conversation.commercial_id,
+        savedMessage,
+      );
+    } catch (error) {
+      console.log(error);
+
+      throw new NotFoundException(error);
+    }
   }
 
   async updateStatusMessage(payload: WhapiWebhookPayload): Promise<void> {
@@ -71,9 +104,7 @@ export class WhapiService {
     for (const status of payload.statuses) {
       await this.whatsappMessageService.updateByStatus(status);
 
-      this.logger.log(
-        `📌 Status update | msg=${status.id} | ${status.status}`,
-      );
+      this.logger.log(`📌 Status update | msg=${status.id} | ${status.status}`);
     }
   }
 
@@ -81,6 +112,8 @@ export class WhapiService {
   // UTIL
   // =========================
   private extractMessageContent(message: WhapiMessage): string {
+    console.log('vfvfhi vijifijij');
+
     switch (message.type) {
       case 'text':
         return message.text?.body ?? '';

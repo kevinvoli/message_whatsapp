@@ -43,7 +43,8 @@ async createAgentMessage(data: {
   try {
     const chat = await this.chatService.findByChatId(data.chat_id);
     if (!chat) throw new Error('Chat not found');
-
+    console.log("chat a envoie", chat);
+    
     const lastMessage = await this.findLastMessageByChatId(data.chat_id);
     if (lastMessage && !lastMessage.from_me) {
       const now = new Date();
@@ -56,8 +57,12 @@ async createAgentMessage(data: {
     }
 
     // 1️⃣ Envoi réel vers WhatsApp
+    console.log("message         =================================a envoie",lastMessage);
+    function extractPhoneNumber(chatId: string): string {
+  return chatId.split("@")[0];
+}
     const whapiResponse = await this.communicationWhapiService.sendToWhapi(
-      chat.contact_client, 
+      extractPhoneNumber(chat?.chat_id) ,
       data.text,
     );
 
@@ -248,7 +253,9 @@ async createAgentMessage(data: {
   };
 
   async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
-  return this.messageRepository.save(
+console.log("mes messageqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",message);
+
+  const messagesss= await this.messageRepository.save(
     this.messageRepository.create({
       chat,
       message_id: message.id,
@@ -264,6 +271,10 @@ async createAgentMessage(data: {
       source: 'whapi',
     }),
   );
+console.log("mes messageqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",messagesss);
+
+
+  return messagesss
 }
 
    

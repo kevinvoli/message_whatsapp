@@ -15,12 +15,16 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MessageDirection, WhatsappMessage, WhatsappMessageStatus } from './entities/whatsapp_message.entity';
+import {
+  MessageDirection,
+  WhatsappMessage,
+  WhatsappMessageStatus,
+} from './entities/whatsapp_message.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
-@WebSocketGateway(3001,{
-  cors:{
+@WebSocketGateway(3001, {
+  cors: {
     origin: '*',
     credentials: true,
   },
@@ -34,10 +38,10 @@ export class WhatsappMessageGateway
     private readonly userService: WhatsappCommercialService,
     private readonly queueService: QueueService,
     private readonly dispatcherService: DispatcherService,
-        @InjectRepository(WhatsappMessage)
-        private readonly messageRepository: Repository<WhatsappMessage>,
-           @InjectRepository(WhatsappCommercial)
-        private readonly commercialRepository: Repository<WhatsappCommercial>,
+    @InjectRepository(WhatsappMessage)
+    private readonly messageRepository: Repository<WhatsappMessage>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepository: Repository<WhatsappCommercial>,
   ) {}
 
   @WebSocketServer()
@@ -56,19 +60,26 @@ export class WhatsappMessageGateway
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
       await this.emitQueueUpdate();
-  console.log("nuew status socket",false);
+      console.log('nuew status socket', false);
 
       await this.userService.updateStatus(commercialId, false);
-      await this.dispatcherService.distributePendingMessages();
+      // await this.dispatcherService.distributePendingMessages();
     }
   }
 
-    public emitIncomingMessage(chatId: string, message: any) {
+public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
+  console.log('📤 retransmission message============================================================================================', chatId, message);
 
-      console.log("retransmition des message", message);
-      
-    this.server.emit(`chat:${chatId}`, message);
+  const targetSocketId = Array.from(this.connectedAgents.entries())
+    .find(([socketId, agentId]) => agentId === commercialId)?.[0];
+
+  if (targetSocketId) {
+    this.server.to(targetSocketId).emit('reception', {
+      conversationId: chatId,
+      messages: message,
+    });
   }
+}
 
   async handleDisconnect(client: Socket) {
     console.log('🔴 Client déconnecté:', client.id);
@@ -77,18 +88,34 @@ export class WhatsappMessageGateway
       this.connectedAgents.delete(client.id);
       console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
       await this.queueService.removeFromQueue(commercialId);
-  console.log("nuew status AGent",false);
+      console.log('nuew status AGent', false);
 
       await this.userService.updateStatus(commercialId, false);
       await this.emitQueueUpdate();
     }
   }
 
-   @SubscribeMessage('agent:logout')
- async handleAgentDisconnect(
-    @ConnectedSocket() client: Socket,
+  emitDebug(
+    server: Server,
+    target: string | null,
+    event: string,
+    payload: any,
   ) {
-     const commercialId = this.connectedAgents.get(client.id);
+    console.log('📤 SOCKET EMIT');
+    console.log('Target:', target ?? 'GLOBAL');
+    console.log('Event:', event);
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+
+    if (target) {
+      server.to(target).emit(event, payload);
+    } else {
+      server.emit(event, payload);
+    }
+  }
+
+  @SubscribeMessage('agent:logout')
+  async handleAgentDisconnect(@ConnectedSocket() client: Socket) {
+    const commercialId = this.connectedAgents.get(client.id);
     if (commercialId) {
       this.connectedAgents.delete(client.id);
       console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
@@ -113,7 +140,7 @@ export class WhatsappMessageGateway
     this.connectedAgents.set(client.id, data.commercialId);
     await this.queueService.addToQueue(data.commercialId);
     await this.emitQueueUpdate();
-    await this.dispatcherService.distributePendingMessages();
+    // await this.dispatcherService.distributePendingMessages();
 
     client.emit('auth:success', { commercialId: data.commercialId });
   }
@@ -126,7 +153,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string; commercialId: string },
   ) {
-    console.log('📥 Agent rejoint conversation:', data);
+    // console.log('📥 Agent rejoint conversation:', data);
 
     // Vérifier que l'agent est connecté
     const agentId = this.connectedAgents.get(client.id);
@@ -138,25 +165,38 @@ export class WhatsappMessageGateway
     // Quitter toutes les autres rooms de conversation
     const rooms = Array.from(client.rooms);
     rooms.forEach((room) => {
-      if (room !== client.id && room.startsWith('conversation_')) {
+      if (room !== client.id && room.startsWith('conversationId')) {
         client.leave(room);
       }
     });
 
-    // Rejoindre la room de la conversation
-    const roomName = `conversation_${data.conversationId}`;
-    client.join(roomName);
+    console.log('tous les salon', rooms);
 
-    console.log(`🚪 Agent ${agentId} a rejoint la room: ${roomName}`);
+    // Rejoindre la room de la conversation
+    // const roomName = `conversation_${data.conversationId}`;
+
+    console.log(
+      '================================================================================================================================================',
+    );
+
+    client.join(data.conversationId);
+    console.log(
+      '✅ join ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd room:',
+      data.conversationId,
+      client.id,
+    );
+
+    // console.log(`🚪 Agent ${agentId} a rejoint la room: ${data.conversationId}`);
 
     // Charger les messages existants
     const messages = await this.whatsappMessageService.findByChatId(
       data.conversationId,
     );
 
-    console.log(
-      `💬 ${messages.length} messages chargés pour ${data.conversationId}`,
-    );
+    console
+      .log
+      // `💬 ${messages.length} messages chargés pour ${data.conversationId}`,
+      ();
 
     // Envoyer les messages à l'agent
     client.emit('messages:get', {
@@ -195,9 +235,9 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
   ) {
-    const roomName = `conversation_${data.conversationId}`;
+    const roomName = `data.conversationId}`;
     client.leave(roomName);
-    console.log(`🚪 Agent a quitté la conversation: ${data.conversationId}`);
+    // console.log(`🚪 Agent a quitté la conversation: ${data.conversationId}`);
 
     client.emit('conversation:left', {
       conversationId: data.conversationId,
@@ -213,8 +253,8 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { agentId: string },
   ) {
-    console.log( "mes comversation :smiley:" );
-    
+    console.log('mes comversation :smiley:');
+
     console.log('👨‍💻 Agent demande ses conversations:', data.agentId);
 
     try {
@@ -225,27 +265,26 @@ export class WhatsappMessageGateway
         return;
       }
 
-      console.log("le connecte id", connectedAgentId);
-      
+      console.log('le connecte id', connectedAgentId);
+
       // Récupérer les chats de l'agent
       const chats = await this.chatService.findByCommercialId(data.agentId);
 
+      // console.log("le connecte id", chats);
 
-      console.log("le connecte id", chats);
-
-      console.log(
-        `📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`,
-      );
+      console
+        .log
+        // `📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`,
+        ();
 
       // Pour chaque chat, récupérer le dernier message
       const conversationsWithLastMessage = await Promise.all(
-
         chats.map(async (chat) => {
           const lastMessage =
             await this.whatsappMessageService.findLastMessageByChatId(
               chat.chat_id,
             );
-console.log('chat trouver ',chat );
+          // console.log('chat trouver ',chat );
 
           // Compter les messages non lus
           const unreadCount =
@@ -400,10 +439,16 @@ console.log('chat trouver ',chat );
       console.log("✅ Confirmation envoyée à l'expéditeur");
 
       // Diffuser le message à tous les clients dans la room
-      const roomName = `conversation_${data.conversationId}`;
+      const roomName = data.conversationId;
       this.server.to(roomName).emit('message:received', {
         conversationId: data.conversationId,
-        // message: messageForFrontend
+        message: messageForFrontend,
+      });
+
+      this.server.to(roomName).emit('reception', {
+        // Nous allons changer pour 'message:received'
+        conversationId: data.conversationId,
+        message: messageForFrontend,
       });
 
       console.log(`📢 Message diffusé dans la room: ${roomName}`);
@@ -434,22 +479,22 @@ console.log('chat trouver ',chat );
       text: messageData.text,
     });
 
-      const chat = await this.chatService.findByChatId(messageData.chat_id);
+    const chat = await this.chatService.findByChatId(messageData.chat_id);
     if (!chat) throw new Error('Chat not found');
-     const commercial = await this.commercialRepository.findOne({
-      where:{
-        id: messageData.commercial_id
-      }
-     });
+    const commercial = await this.commercialRepository.findOne({
+      where: {
+        id: messageData.commercial_id,
+      },
+    });
 
-     if (!commercial) {
-        return null;
-     }
+    if (!commercial) {
+      return null;
+    }
     if (!chat) throw new Error('Chat not found');
 
     try {
       // Sauvegarder le message en base
-      const savedMessage =  this.messageRepository.create({
+      const savedMessage = this.messageRepository.create({
         message_id: messageData.id ?? `agent_${Date.now()}`,
         external_id: messageData.id,
         chat: chat,
@@ -479,7 +524,7 @@ console.log('chat trouver ',chat );
       };
 
       // Diffuser le message à tous les agents dans la room de la conversation
-      const roomName = `conversation_${messageData.chat_id}`;
+      const roomName = messageData.chat_id;
       this.server.to(roomName).emit('message:received', {
         conversationId: messageData.chat_id,
         message: messageForFrontend,
@@ -509,7 +554,7 @@ console.log('chat trouver ',chat );
     console.log('✍️ Typing started:', data);
 
     // Diffuser à tous les autres dans la conversation
-    client.to(`conversation_${data.conversationId}`).emit('typing:start', {
+    client.to(data.conversationId).emit('typing:start', {
       conversationId: data.conversationId,
       userId: data.userId,
       userName: 'Agent',
@@ -523,7 +568,7 @@ console.log('chat trouver ',chat );
   ) {
     console.log('⏹️ Typing stopped:', data);
 
-    client.to(`conversation_${data.conversationId}`).emit('typing:stop', {
+    client.to(data.conversationId).emit('typing:stop', {
       conversationId: data.conversationId,
     });
   }
@@ -533,7 +578,7 @@ console.log('chat trouver ',chat );
     messageId: string,
     status: string,
   ) {
-    const roomName = `conversation_${conversationId}`;
+    const roomName = conversationId;
     this.server.to(roomName).emit('message:status:update', {
       conversationId,
       messageId,
@@ -550,18 +595,18 @@ console.log('chat trouver ',chat );
     console.log("📢 File d'attente mise à jour et diffusée.");
   }
 
-  // private async markMessagesAsRead(
-  //   chatId: string,
-  //   commercialId: string,
-  // ): Promise<void> {
-  //   try {
-  //     console.log(`📖 Marquer les messages comme lus pour ${chatId}`);
-  //     // À implémenter si nécessaire
-  //     // await this.whatsappMessageService.markAsRead(chatId, commercialId);
-  //   } catch (error) {
-  //     console.error('Erreur lors du marquage des messages comme lus:', error);
-  //   }
-  // }
+  private async markMessagesAsRead(
+    chatId: string,
+    commercialId: string,
+  ): Promise<void> {
+    try {
+      console.log(`📖 Marquer les messages comme lus pour ${chatId}`);
+      // À implémenter si nécessaire
+      // await this.whatsappMessageService.markAsRead(chatId, commercialId);
+    } catch (error) {
+      console.error('Erreur lors du marquage des messages comme lus:', error);
+    }
+  }
 
   private async updateConversationLastMessage(
     chatId: string,
@@ -589,5 +634,4 @@ console.log('chat trouver ',chat );
     const connectedAgentIds = Array.from(this.connectedAgents.values());
     return connectedAgentIds.includes(agentId);
   }
-  
 }
