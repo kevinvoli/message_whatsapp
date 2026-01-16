@@ -622,10 +622,18 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
     lastMessage: { text: string; timestamp: Date; author: string },
   ): Promise<void> {
     try {
-      this.server.emit('conversation:updated', {
-        chatId,
-        lastMessage,
-      });
+      const chat = await this.chatService.findByChatId(chatId);
+      if (chat) {
+        this.server.emit('conversation:updated', {
+          chat_id: chat.chat_id,
+          lastMessage: {
+            text: lastMessage.text,
+            timestamp: lastMessage.timestamp,
+            author: lastMessage.author,
+          },
+          unread_count: chat.unread_count,
+        });
+      }
     } catch (error) {
       console.error('Erreur lors de la mise à jour du dernier message:', error);
     }

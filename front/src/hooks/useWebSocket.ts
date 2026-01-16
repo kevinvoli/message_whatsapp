@@ -391,6 +391,18 @@ export const useWebSocket = (commercial: Commercial | null) => {
     }
   }, []);
 
+  const on = useCallback((event: string, handler: (...args: any[]) => void) => {
+    if (socketRef.current) {
+      socketRef.current.on(event, handler);
+    }
+    // Cleanup function to remove the listener
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off(event, handler);
+      }
+    };
+  }, []);
+
   // API exposée - Ajouter toutes les propriétés nécessaires
   const webSocketApi = useMemo(
     () => ({
@@ -432,6 +444,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       loadConversations,
       loadMessages,
       reconnect,
+      on,
     ]
   );
 

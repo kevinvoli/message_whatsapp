@@ -34,7 +34,8 @@ export const useConversations = () => {
     setMessages,
     setSelectedConversation: setSelectedConvWS,
     reconnect,
-    selectedConversationId
+    selectedConversationId,
+    on
   } = useWebSocket(user);
   
   // Référence pour suivre le dernier chargement
@@ -48,6 +49,32 @@ export const useConversations = () => {
       loadConversation(user.id);
     }
   }, [isConnected, user, conversations.length, loadConversation]);
+
+  // Effet pour s'abonner aux événements WebSocket globaux
+  useEffect(() => {
+    if (!on) return;
+
+    const cleanupConversationUpdated = on('conversation:updated', (data: { chat_id: string; lastMessage: any, unread_count: number }) => {
+      console.log('🔄 Conversation mise à jour (via on):', data);
+      setConversations(prev =>
+        prev.map(c =>
+          c.chat_id === data.chat_id
+            ? { ...c, lastMessage: data.lastMessage, unreadCount: data.unread_count }
+            : c
+        )
+      );
+    });
+
+    const cleanupNotification = on('notification', (data: { title: string; body: string }) => {
+      console.log('🔔 Notification reçue (via on):', data);
+      // Ici, on pourrait intégrer un système de notifications
+    });
+
+    return () => {
+      cleanupConversationUpdated();
+      cleanupNotification();
+    };
+  }, [on, setConversations]);
 
   // Effet pour gérer le changement de conversation
   useEffect(() => {
