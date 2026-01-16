@@ -1,352 +1,374 @@
-// src/hooks/useConversations.ts
+// src/hooks/useWebSocket.ts
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { 
-  Conversation, 
-  Message, 
-  createMessage, 
-  transformToMessage,
-  createConversation,
-  isValidMessage
-} from '@/types/chat';
-import { useWebSocket } from './useWebSocket';
-import { useAuth } from '@/contexts/AuthProvider';
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { io, Socket } from "socket.io-client";
+import { LogOut } from "lucide-react";
+import { Commercial, Conversation, Message } from "@/types/chat";
 
-export const useConversations = () => {
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
+export const useWebSocket = (commercial: Commercial | null) => {
+   const socketRef = useRef<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  
-  const { user } = useAuth();
-  const { 
-    isConnected, 
-    sendMessage: sendWebSocketMessage, 
-    joinConversation, 
-    leaveConversation,
-    loadConversation,
-    loadMessages: loadMessagesWS,
-    conversations,
-    setConversations,
-    messages,
-    setMessages,
-    setSelectedConversation: setSelectedConvWS,
-    reconnect,
-    selectedConversationId
-  } = useWebSocket(user);
-  
-  // Référence pour suivre le dernier chargement
-  const lastLoadRef = useRef<string | null>(null);
-  const joiningRef = useRef<boolean>(false);
 
-  // Effet pour charger les conversations au démarrage
+  // Ref pour la conversation sélectionnée
+  const selectedConversationRef = useRef<string | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+
+ useEffect(() => {
+    selectedConversationRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
   useEffect(() => {
-    if (isConnected && user && conversations.length === 0) {
-      console.log("📋 Chargement initial des conversations");
-      loadConversation(user.id);
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Créer et configurer la connexion socket
+  const createSocket = useCallback(() => {
+    if (!commercial) {
+      console.log("⚠️ Commercial non disponible pour WebSocket");
+      return null;
     }
-  }, [isConnected, user, conversations.length, loadConversation]);
 
-  // Effet pour gérer le changement de conversation
-  useEffect(() => {
-    const handleConversationSwitch = async () => {
-      if (!selectedConversation || !isConnected) return;
-      
-      const conversationId = selectedConversation.chat_id;
-      
-      // Éviter les doublons de chargement
-      if (lastLoadRef.current === conversationId || joiningRef.current) {
-        return;
-      }
-      
-      console.log(`🔄 Changement vers conversation: ${conversationId}`);
-      
-      joiningRef.current = true;
-      lastLoadRef.current = conversationId;
-      setIsLoadingMessages(true);
-      
-      try {
-        // 1. Mettre à jour l'état WebSocket
-        setSelectedConvWS(conversationId);
-        
-        // 2. Vider les messages précédents
-        setMessages([]);
-        
-        // 3. Joindre la conversation
-        const joined = joinConversation(conversationId);
-        if (!joined) {
-          throw new Error('Impossible de rejoindre la conversation');
+    // Récupérer le token
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("❌ Token manquant");
+      setError("Token d'authentification manquant");
+      return null;
+    }
+
+    // Créer la connexion socket
+    const socket = io("http://localhost:3001", {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 15000,
+      auth: {
+        commercialId: commercial.id,
+        token: token,
+      },
+    });
+
+    return socket;
+  }, [commercial]);
+
+  // Configurer les écouteurs d'événements
+  const setupSocketListeners = useCallback(
+    (socket: Socket) => {
+      socket.on("connect", () => {
+        console.log("🟢 Socket connecté:", socket.id);
+        setIsConnected(true);
+        setError(null);
+
+        // Authentification automatique
+        const token = localStorage.getItem("token");
+        console.log("nouvel request :punch:", token, commercial);
+
+        if (token && commercial) {
+          socket.emit("auth", {
+            commercialId: commercial.id,
+            token: token,
+          });
         }
-        
-        // 4. Attendre un court instant pour la synchronisation WebSocket
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 5. Charger les messages
-        loadMessagesWS(conversationId);
-        
-        // 6. Mettre à jour le compteur non lus
-        setConversations(prev => 
-          prev.map(c => 
-            c.chat_id === conversationId 
-              ? { 
-                  ...c, 
-                  unreadCount: 0,
-                  // Mettre à jour le timestamp de dernière activité
-                  lastMessage: {
-                    ...c.lastMessage,
-                    timestamp: new Date()
-                  }
-                } 
-              : c
-          )
-        );
-        
-      } catch (err) {
-        console.error('Erreur lors du changement de conversation:', err);
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      } finally {
-        joiningRef.current = false;
-        setTimeout(() => setIsLoadingMessages(false), 300);
-      }
-    };
-    
-    handleConversationSwitch();
-  }, [selectedConversation, isConnected, joinConversation, loadMessagesWS, setConversations, setMessages, setSelectedConvWS]);
+      });
 
-  // Nettoyage quand on quitte
-  useEffect(() => {
-    return () => {
-      if (selectedConversation && isConnected) {
-        leaveConversation(selectedConversation.chat_id);
-      }
-    };
-  }, [selectedConversation, isConnected, leaveConversation]);
+      socket.on("disconnect", (reason) => {
+        console.log("🔴 Socket déconnecté:", reason);
+        setIsConnected(false);
+      });
 
-  // Charger les conversations
-  const loadConversations = useCallback(async (commercialId?: string) => {
-    setLoading(true);
-    setError(null);
-    
-    const targetCommercialId = commercialId || user?.id;
-    
-    if (!targetCommercialId) {
-      setError('Commercial ID manquant');
-      setLoading(false);
-      return;
-    }
+      socket.on("connect_error", (err) => {
+        console.error("❌ Erreur connexion socket:", err.message);
+        setError(`Erreur: ${err.message}`);
+        setIsConnected(false);
+      });
 
-    try {
-      if (isConnected) {
-        loadConversation(targetCommercialId);
-      } else {
-        throw new Error('WebSocket non connecté');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des conversations';
-      setError(errorMessage);
-      console.error('Erreur loadConversations:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, isConnected, loadConversation]);
+      socket.on("auth:success", (data) => {
+        console.log("✅ Authentification réussie:", data);
+      });
 
-  // Charger les messages d'une conversation
-  const loadMessages = useCallback(async (conversationId: string) => {
-    if (!isConnected) {
-      setError('WebSocket non connecté');
-      return;
-    }
-    
-    setIsLoadingMessages(true);
-    
-    try {
-      loadMessagesWS(conversationId);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des messages';
-      setError(errorMessage);
-      console.error('Erreur loadMessages:', err);
-    } finally {
-      setTimeout(() => setIsLoadingMessages(false), 300);
-    }
-  }, [isConnected, loadMessagesWS]);
+      socket.on("error", (data: { error: string }) => {
+        console.error("❌ Erreur WebSocket:", data.error);
+        setError(data.error);
+      });
 
-  // Sélectionner une conversation
-  const selectConversation = useCallback((conversation: Conversation) => {
-    // Réinitialiser le dernier chargement si c'est une nouvelle conversation
-    if (selectedConversation?.chat_id !== conversation.chat_id) {
-      lastLoadRef.current = null;
-    }
-    
-    // Mettre à jour l'état
-    setSelectedConversation(conversation);
-    setError(null);
-    
-    console.log(`🎯 Conversation sélectionnée: ${conversation.clientName} (${conversation.chat_id})`);
-  }, [selectedConversation]);
+      console.log("🔌 Création socket pour:", selectedConversationId);
+      socket.onAny((event, ...args) => {
+        console.log("👀 SOCKET EVENT:", event, args);
+      });
 
-  // Ajouter un message à une conversation
-const addMessageToConversation = useCallback((conversationId: string, message: Message) => {
-  setConversations(prev => 
-    prev.map(conv => 
-      conv.chat_id === conversationId 
-        ? {
-            ...conv,
-            lastMessage: {
-              text: message.text,
-              timestamp: message.timestamp,
-              author: message.from === 'commercial' ? 'agent' : 'client'
-            },
-            unreadCount: selectedConversationId === conversationId 
-              ? conv.unreadCount 
-              : conv.unreadCount + 1,
-            messages: [...(conv.messages || []), message] // Assurer que conv.messages est un tableau
-          } 
-        : conv
-    )
-  );
-}, [selectedConversationId]);
-
-  // Envoyer un message
-  const sendMessage = useCallback(async (
-    conversationId: string, 
-    messageData: Partial<Message>
-  ): Promise<Message | null> => {
-    setError(null);
-    
-    if (!user || !isConnected) {
-      setError('Non connecté ou non authentifié');
-      return null;
-    }
-
-    // Utiliser createMessage pour garantir un message valide
-    const fullMessage = createMessage({
-      id: `temp_${Date.now()}`,
-      text: messageData.text || '',
-      timestamp: new Date(),
-      from: messageData.sender_phone,
-      status: 'sending',
-      direction: 'OUT',
-      sender_name: user.name || 'Agent',
-      from_me: true, // Toujours true pour les messages de l'agent
-      sender_phone: user.email || '', // Optionnel: utiliser email comme sender_phone
-      ...messageData,
-    });
-
-    // Vérifier que le message est valide
-    // if (!isValidMessage(fullMessage)) {
-    //   setError('Message invalide');
-    //   return null;
-    // }
-
-    console.log(`📤 Envoi message: "${fullMessage.text.substring(0, 50)}..."`);
-
-    // Optimistic UI update
-    setMessages(prev => [...prev, fullMessage]);
-    addMessageToConversation(conversationId, fullMessage);
-    
-    // Envoyer via WebSocket
-    const success = sendWebSocketMessage({
-      conversationId,
-      text: fullMessage.text,
-      author: user.id,
-      chat_id: conversationId
-    });
-    
-    if (!success) {
-      setError('Échec de l\'envoi via WebSocket');
-      // Marquer le message comme erreur
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === fullMessage.id 
-            ? { ...msg, status: 'error' } 
-            : msg
-        )
-      );
-      return null;
-    }
-
-    return fullMessage;
-  }, [user, isConnected, sendWebSocketMessage, setMessages, addMessageToConversation]);
-
-  // Gérer les messages entrants
-  const handleIncomingMessage = useCallback((conversationId: string, rawMessage: any) => {
-    try {
-      const message = transformToMessage(rawMessage);
-      
-      if (!isValidMessage(message)) {
-        console.error('Message invalide reçu:', rawMessage);
-        return;
-      }
-
-      // Si c'est la conversation actuelle, ajouter aux messages
-      if (selectedConversationId === conversationId) {
-        setMessages(prev => {
-          // Éviter les doublons
-          const exists = prev.some(m => m.id === message.id);
-          if (!exists) {
-            return [...prev, message];
+      socket.on(
+        "conversation:list",
+        (data: { conversations: Conversation[] }) => {
+          console.log("📋 Conversations reçues:", data.conversations?.length);
+          if (data.conversations) {
+            setConversations(data.conversations);
           }
-          return prev;
-        });
-      }
+        }
+      );
 
-      // Mettre à jour la conversation
-      addMessageToConversation(conversationId, message);
+      socket.on(
+        "messages:get",(data: { conversationId: string; messages: any[] }) => {
+          console.log("💬 Messages reçus:", data.messages?.length);
+          console.log("💬 Messages reçus:", data.messages);
+
+          if (data.messages) {
+            const transformedMessages: Message[] = data.messages.map(
+              (msg: any) => ({
+                id: msg.id,
+                text: msg.text || "",
+                timestamp: new Date(msg.timestamp || Date.now()),
+                from: msg.from_me ? "commercial" : "client",
+                status: msg.status || "sent",
+                direction: msg.direction || "IN",
+                sender_phone: msg.from,
+                sender_name: msg.from_name,
+                from_me: msg.from_me || false, // Toujours fournir une valeur
+              })
+            );
+            setMessages(transformedMessages);
+          }
+        }
+      );
+
+      socket.on(
+        "message:received",
+        (data: { conversationId: string; message: Message }) => {
+          console.log(
+            "📩 Message reçu en temps réel (message:received):",
+            data
+          );
+          if (data.message.from_me) {
+            return;
+          }
       
-      console.log(`📩 Message entrant dans ${conversationId}: "${message.text.substring(0, 50)}..."`);
-    } catch (err) {
-      console.error('Erreur lors du traitement du message entrant:', err);
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.chat_id === data.conversationId
+                ? {
+                    ...conv,
+                    lastMessage: {
+                      text: data.message.text,
+                      timestamp: data.message.timestamp,
+                      author: data.message.from,
+                    },
+                    unreadCount: (conv.unreadCount || 0) + 1,
+                  }
+                : conv
+            )
+          );
+      
+          if (selectedConversationId === data.conversationId) {
+            setMessages((prev) => [...prev, data.message]);
+          }
+        }
+      );
+
+
+      socket.on(
+        "message:sent",
+        (data: { conversationId: string; message: any }) => {
+          console.log("✅ Message envoyé confirmé:", data);
+        }
+      );
+    },
+    [selectedConversationId, commercial]
+  );
+
+
+  useEffect(() => {
+    if (!commercial) {
+      console.log("❌ Pas de commercial, arrêt WebSocket");
+      return;
     }
-  }, [selectedConversationId, addMessageToConversation, setMessages]);
 
-  // Filtrer les conversations
-  const filteredConversations = conversations.filter((conv: Conversation) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      conv.clientName?.toLowerCase().includes(searchLower) ||
-      conv.clientPhone?.includes(searchTerm) ||
-      conv.name?.toLowerCase().includes(searchLower) ||
-      conv.lastMessage.text?.toLowerCase().includes(searchLower)
-    );
-  });
+    console.log("🚀 Initialisation WebSocket...");
 
-  // Trier les conversations par date du dernier message
-  const sortedConversations = [...filteredConversations].sort((a, b) => {
-    return new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime();
-  });
+    const socket = createSocket();
+    if (!socket) {
+      console.error("❌ Impossible de créer le socket");
+      return;
+    }
 
-  return {
-    // State
-    conversations: sortedConversations,
-    selectedConversation,
-    messages,
-    searchTerm,
-    filteredConversations: sortedConversations,
-    loading,
-    isLoadingMessages,
-    error,
-    isWebSocketConnected: isConnected,
-    
-    // Setters
-    setSearchTerm,
-    setMessages,
-    setConversations,
-    setSelectedConversation,
-    
-    // Actions
-    loadConversations,
-    loadMessages,
-    sendMessage,
-    selectConversation,
-    handleIncomingMessage,
-    reconnectWebSocket: reconnect,
-    clearError: useCallback(() => setError(null), []),
-    
-    // Utilitaires
-    hasConversations: conversations.length > 0,
-    unreadCount: conversations.reduce((total, conv) => total + conv.unreadCount, 0),
-    selectedConversationMessages: messages,
-  };
+    setupSocketListeners(socket);
+    socketRef.current = socket;
+
+    // Nettoyage
+    return () => {
+      console.log("🧹 Nettoyage WebSocket");
+      if (socket) {
+        socket.disconnect();
+        socketRef.current = null;
+        setIsConnected(false);
+      }
+    };
+  }, [commercial, createSocket, setupSocketListeners]);
+
+  // Fonctions pour interagir avec le socket
+
+  // Ajout des fonctions manquantes
+  const leaveConversation = useCallback(
+    (conversationId: string) => {
+      if (socketRef.current && isConnected) {
+        console.log(`🚪 Quitter conversation: ${conversationId}`);
+        socketRef.current.emit("leave:conversation", { conversationId });
+        if (selectedConversationId === conversationId) {
+          setSelectedConversationId(null);
+          setMessages([]);
+        }
+        return true;
+      }
+      return false;
+    },
+    [isConnected, selectedConversationId]
+  );
+
+  const setSelectedConversation = useCallback(
+    (conversationId: string | null) => {
+      setSelectedConversationId(conversationId);
+    },
+    []
+  );
+
+  const loadConversation = useCallback(
+    (commercialId: string) => {
+      if (socketRef.current && isConnected) {
+        console.log(`📋 Charger conversations pour: ${commercialId}`);
+        socketRef.current.emit("get:conversation", { agentId: commercialId });
+        return true;
+      }
+      return false;
+    },
+    [isConnected]
+  );
+
+  const sendMessage = useCallback(
+    (messageData: {
+      text: string;
+      conversationId: string;
+      chat_id: string;
+      author: string;
+    }) => {
+      if (socketRef.current && isConnected) {
+        console.log("📤 Envoi message:", messageData);
+        socketRef.current.emit("agent:message", {
+          conversationId: messageData.conversationId,
+          content: messageData.text,
+          chat_id: messageData.chat_id,
+          author: messageData.author,
+        });
+        return true;
+      }
+      console.warn("⚠️ Socket non connecté");
+      return false;
+    },
+    [isConnected]
+  );
+
+  const LogOut = useCallback(() => {
+    if (socketRef.current && isConnected) {
+      console.log("📤 deconnection:");
+      socketRef.current.emit("agent:logout");
+      return true;
+    }
+    console.warn("⚠️ Socket non connecté");
+    return false;
+  }, [isConnected]);
+
+  const joinConversation = useCallback(
+    (conversationId: string) => {
+      if (socketRef.current && isConnected && commercial) {
+        console.log(`🚪 Rejoindre conversation: ${conversationId}`);
+        setSelectedConversationId(conversationId);
+        socketRef.current.emit("join:conversation", {
+          conversationId,
+          commercialId: commercial.id,
+        });
+        return true;
+      }
+      return false;
+    },
+    [isConnected, commercial]
+  );
+
+  const loadConversations = useCallback(() => {
+    if (socketRef.current && isConnected && commercial) {
+      console.log("📋 Chargement conversations");
+      socketRef.current.emit("get:conversation", {
+        agentId: commercial.id,
+      });
+      return true;
+    }
+    return false;
+  }, [isConnected, commercial]);
+
+  const loadMessages = useCallback(
+    (conversationId: string) => {
+      if (socketRef.current && isConnected) {
+        console.log(`💬 Chargement messages: ${conversationId}`);
+        socketRef.current.emit("get:messages", { conversationId });
+        return true;
+      }
+      return false;
+    },
+    [isConnected]
+  );
+
+  const reconnect = useCallback(() => {
+    console.log("🔄 Reconnexion...");
+    if (socketRef.current) {
+      socketRef.current.connect();
+    }
+  }, []);
+
+  // API exposée - Ajouter toutes les propriétés nécessaires
+  const webSocketApi = useMemo(
+    () => ({
+      // État
+      isConnected,
+      error,
+      conversations,
+      messages,
+      selectedConversationId,
+
+      // Setters
+      setConversations,
+      setMessages,
+      setSelectedConversation,
+      LogOut,
+      // Actions
+      sendMessage,
+      joinConversation,
+      leaveConversation,
+      loadConversation,
+      loadConversations,
+      loadMessages,
+      reconnect,
+    }),
+    [
+      isConnected,
+      error,
+      conversations,
+      messages,
+      selectedConversationId,
+      LogOut,
+      setConversations,
+      setMessages,
+      setSelectedConversation,
+      sendMessage,
+      joinConversation,
+      leaveConversation,
+      loadConversation,
+      loadConversations,
+      loadMessages,
+      reconnect,
+    ]
+  );
+
+  return webSocketApi;
 };

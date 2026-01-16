@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
+import { useConversations } from '@/hooks/useConversations';
 import { useRouter } from 'next/navigation';
 
 const WhatsAppPage = () => {
