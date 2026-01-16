@@ -1,3 +1,4 @@
+import { Inject, forwardRef } from '@nestjs/common';
 import { DispatcherService } from '../dispatcher/dispatcher.service';
 import { QueueService } from '../dispatcher/services/queue.service';
 import { WhatsappMessageService } from './whatsapp_message.service';
@@ -33,6 +34,7 @@ export class WhatsappMessageGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   constructor(
+    @Inject(forwardRef(() => WhatsappMessageService))
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
     private readonly userService: WhatsappCommercialService,
