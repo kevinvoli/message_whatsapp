@@ -182,7 +182,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
         id: message.id,
         text: message.text,
         timestamp: new Date(message.timestamp || Date.now()),
-        from: message.from_me ? "commercial" : "client",
+        from: message.from,
         status: message.status || "sent",
         direction: message.direction || "IN",
         sender_phone: message.from,

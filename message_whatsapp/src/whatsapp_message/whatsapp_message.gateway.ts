@@ -231,6 +231,9 @@ public async emitIncomingConversation(chat: any) {
       }
     });
 
+    console.log("conversation---------------------", data.conversationId);
+    
+
     client.join(data.conversationId);
 
     // console.log(`🚪 Agent ${agentId} a rejoint la room: ${data.conversationId}`);
