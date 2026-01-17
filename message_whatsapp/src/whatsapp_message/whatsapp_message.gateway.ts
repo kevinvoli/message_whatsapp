@@ -76,7 +76,7 @@ export class WhatsappMessageGateway
     const messageForFrontend = {
       id: message.id,
       text: message.text,
-      timestamp: message.timestamp,
+      timestamp: new Date(`${message.timestamp}`).getTime() ,
       direction: message.direction,
       from: message.from,
       from_name: message.from_name || 'Client',
@@ -133,6 +133,8 @@ public async emitIncomingConversation(chat: any) {
 
     // Émettre l'événement de mise à jour de conversation à l'agent spécifique
     this.server.to(targetSocketId).emit('conversation:updated', conversation);
+
+       this.server.emit('conversation:updated', conversation);
 
     
   } catch (error) {
@@ -212,7 +214,7 @@ public async emitIncomingConversation(chat: any) {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string; commercialId: string },
   ) {
-    // console.log('📥 Agent rejoint conversation:', data);
+
 
     // Vérifier que l'agent est connecté
     const agentId = this.connectedAgents.get(client.id);
@@ -249,7 +251,7 @@ public async emitIncomingConversation(chat: any) {
       messages: messages.map((msg) => ({
         id: msg.id,
         text: msg.text || '(Pas de texte)',
-        timestamp: msg.timestamp,
+        timestamp:new Date(msg.timestamp).getTime(),
         from: msg.from,
         direction: msg.direction,
         from_name: msg.from_name || (msg.from_me ? 'Agent' : 'Client'),
@@ -402,7 +404,7 @@ public async emitIncomingConversation(chat: any) {
         return {
           id: msg.id,
           text: msg.text || '(Message sans texte)',
-          timestamp: msg.timestamp,
+          timestamp: new Date(msg.timestamp).getTime(),
           direction: msg.direction,
           from: msg.from,
           from_name: msg.from_name || (msg.from_me ? 'Agent' : 'Client'),
@@ -466,7 +468,7 @@ public async emitIncomingConversation(chat: any) {
       const messageForFrontend = {
         id: savedMessage.id,
         text: savedMessage.text,
-        timestamp: savedMessage.timestamp,
+        timestamp: new Date(savedMessage.timestamp).getTime(),
         direction: 'OUT',
         from: savedMessage.from,
         from_name: savedMessage.from_name || 'Agent',
@@ -545,7 +547,7 @@ public async emitIncomingConversation(chat: any) {
         commercial: commercial,
         direction: MessageDirection.OUT as MessageDirection,
         from_me: true,
-        timestamp: messageData.timestamp,
+        timestamp:new Date(messageData.timestamp).getTime(),
         status: WhatsappMessageStatus.SENT as WhatsappMessageStatus,
         source: 'agent_web',
         text: messageData.text,
@@ -559,7 +561,7 @@ public async emitIncomingConversation(chat: any) {
       const messageForFrontend = {
         id: savedMessage.id,
         text: savedMessage.text,
-        timestamp: savedMessage.timestamp,
+        timestamp: new Date(savedMessage.timestamp).getTime(),
         direction: 'IN',
         from: savedMessage.from,
         from_name: savedMessage.from_name || 'Client',

@@ -123,27 +123,32 @@ export const useWebSocket = (commercial: Commercial | null) => {
         },
       );
 
-      socket.on("conversation:updated", (conversation: Conversation) => {
-        console.log(
-          "✅ Conversation update envoyé ddddddddddddddddddddddddddddddddddddddddddddddddddddconfirmé:",
-          conversation,
-        );
+  socket.on("conversation:updated", (conversation: Conversation) => {
+  console.log("✅ Conversation update reçu:", conversation);
 
-        if (conversation) {
-          setConversations((prev) => {
-            // ✅ Éviter les doublons
-            const exists = prev.some((m) => m.id === conversation.id);
-            if (exists) {
-              return prev.map((conv) =>
-                conv.chat_id === conversation.chat_id ? conversation : conv,
-              );
-            } else {
-              console.log("✅ Ajout nouveau message:", conversation.id);
-              return [...prev, conversation];
-            }
-          });
-        }
-      });
+  if (conversation) {
+    setConversations((prev) => {
+      // Vérifier si la conversation existe déjà
+      const index = prev.findIndex((conv) => conv.chat_id === conversation.chat_id);
+      let newConversations;
+      if (index !== -1) {
+        // Si elle existe, on la met à jour
+        console.log("🔄 Mise à jour de la conversation:", conversation.chat_id);
+        newConversations = [...prev];
+        newConversations[index] = conversation;
+      } else {
+        // Sinon, on l'ajoute
+        console.log("✅ Ajout d'une nouvelle conversation:", conversation.chat_id);
+        newConversations = [...prev, conversation];
+      }
+      // Trier par date du dernier message (plus récent en premier)
+      newConversations.sort((a, b) => 
+        new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+      );
+      return newConversations;
+    });
+  }
+});
 
       // ✅ Debug : Écouter TOUS les événements
 
