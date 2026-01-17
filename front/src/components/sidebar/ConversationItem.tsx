@@ -11,7 +11,6 @@ interface ConversationItemProps {
 const ConversationItem: React.FC<ConversationItemProps> = ({ 
   conversation, isSelected, onClick }) => {
 
-    console.log(":expressionless: mes conversation  ===========================================",conversation);
     
   const formatTime = (date: Date) => {
     const now = new Date();

@@ -32,7 +32,6 @@ export class CommunicationWhapiService {
       },
     )
 
-    console.log("===========================response", response);
     
     return response.data as {
       id: string,

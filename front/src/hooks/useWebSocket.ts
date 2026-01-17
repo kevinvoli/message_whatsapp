@@ -169,71 +169,51 @@ export const useWebSocket = (commercial: Commercial | null) => {
         }
       );
 
-      socket.on("reception",(data: { conversationId: string; messages: any }) => {
+    //   socket.on("reception",(data: { conversationId: string; messages: any }) => {
          
-           console.log(
-            "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-            data
-          );
-        if (!data.messages) return;
-   console.log(
-            "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-            data
-          );
-          // Vérifie avec la ref au lieu du state
-          if (
-            selectedConversationRef.current &&
-            data.conversationId !== selectedConversationRef.current
-          )
-            return;
-          console.log(
-            "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-            data
-          );
+    //        if (data.conversationId !== selectedConversationRef.current) return;
 
-          const newMessage: Message = {
-            id: data.messages.id,
-            text: data.messages.text,
-            timestamp: new Date(data.messages.timestamp || Date.now()),
-            from: data.messages.from_me ? "commercial" : "client",
-            status: data.messages.status || "sent",
-            direction: data.messages.direction || "IN",
-            sender_phone: data.messages.from,
-            sender_name: data.messages.from_name,
-            from_me: data.messages.from_me,
-          };
+    // // 2️⃣ Transformer le message
+    // const newMessage: Message = {
+    //   id: data.messages.id,
+    //   text: data.messages.text,
+    //   timestamp: new Date(data.messages.timestamp),
+    //   from: data.messages.from_me ? "commercial" : "client",
+    //   status: data.messages.status,
+    //   direction: data.messages.direction,
+    //   sender_phone: data.messages.from,
+    //   sender_name: data.messages.from_name,
+    //   from_me: data.messages.from_me,
+    // };
 
-          console.log(
-            "affichage des message yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-            newMessage
-          );
+    // // 3️⃣ Mise à jour SAFE (pas de closure bug)
+    // setMessages(prev => [...prev, newMessage]);
 
-          setMessages((prev) => [...prev, newMessage]);
-        }
-      );
+    //     }
+    //   );
 
       // socket.to(selectedConversationId).on()
 
-      socket.on(
-        `${selectedConversationId}`,
-        (data: { conversationId: string; message: any }) => {
-          console.log("📩 Message reçu en temps réel");
-          if (data.message && selectedConversationId === data.conversationId) {
-            const newMessage: Message = {
-              id: data.message.id,
-              text: data.message.text,
-              timestamp: new Date(data.message.timestamp || Date.now()),
-              from: data.message.from_me ? "commercial" : "client",
-              status: data.message.status || "sent",
-              direction: data.message.direction || "IN",
-              sender_phone: data.message.from,
-              sender_name: data.message.from_name,
-              from_me: data.message.from_me,
-            };
-            setMessages((prev) => [...prev, newMessage]);
-          }
-        }
-      );
+      // socket.on(
+      //   `${selectedConversationId}`,
+      //   (data: { conversationId: string; message: any }) => {
+      //     console.log("📩 Message reçu en temps réel");
+      //     if (data.message && selectedConversationId === data.conversationId) {
+      //       const newMessage: Message = {
+      //         id: data.message.id,
+      //         text: data.message.text,
+      //         timestamp: new Date(data.message.timestamp || Date.now()),
+      //         from: data.message.from_me ? "commercial" : "client",
+      //         status: data.message.status || "sent",
+      //         direction: data.message.direction || "IN",
+      //         sender_phone: data.message.from,
+      //         sender_name: data.message.from_name,
+      //         from_me: data.message.from_me,
+      //       };
+      //       setMessages((prev) => [...prev, newMessage]);
+      //     }
+      //   }
+      // );
 
       socket.on(
         "message:sent",

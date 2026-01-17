@@ -67,16 +67,26 @@ export class WhatsappMessageGateway
     }
   }
 
-public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
-  console.log('📤 retransmission message============================================================================================', chatId, message);
+public async emitIncomingMessage(chatId: string, commercialId: string, message: any) {
+   const chats = await this.chatService.findByCommercialId(commercialId);
 
+         const messageForFrontend = {
+        id: message.id,
+        text: message.text,
+        timestamp: message.timestamp,
+        direction: message.direction,
+        from: message.from,
+        from_name: message.from_name || 'Client',
+        status: message.status,
+        from_me: false,
+      }
   const targetSocketId = Array.from(this.connectedAgents.entries())
     .find(([socketId, agentId]) => agentId === commercialId)?.[0];
 
   if (targetSocketId) {
-    this.server.to(targetSocketId).emit('reception', {
+    this.server.to(targetSocketId).emit('message:received', {
       conversationId: chatId,
-      messages: message,
+      messages: messageForFrontend,
     });
   }
 }
@@ -170,21 +180,7 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
       }
     });
 
-    console.log('tous les salon', rooms);
-
-    // Rejoindre la room de la conversation
-    // const roomName = `conversation_${data.conversationId}`;
-
-    console.log(
-      '================================================================================================================================================',
-    );
-
     client.join(data.conversationId);
-    console.log(
-      '✅ join ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd room:',
-      data.conversationId,
-      client.id,
-    );
 
     // console.log(`🚪 Agent ${agentId} a rejoint la room: ${data.conversationId}`);
 
@@ -266,14 +262,12 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
       }
 
       console.log('le connecte id', connectedAgentId);
-
       // Récupérer les chats de l'agent
       const chats = await this.chatService.findByCommercialId(data.agentId);
 
       // console.log("le connecte id", chats);
 
-      console
-        .log
+      console.log
         // `📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`,
         ();
 
@@ -450,6 +444,7 @@ public emitIncomingMessage(chatId: string, commercialId: string, message: any) {
         conversationId: data.conversationId,
         message: messageForFrontend,
       });
+
 
       console.log(`📢 Message diffusé dans la room: ${roomName}`);
 
