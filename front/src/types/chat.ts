@@ -227,16 +227,16 @@ export const transformToWebSocketMessage = (rawData: any): WebSocketMessage => {
  * Valide si un objet est un Message valide
  */
 export const isValidMessage = (data: any): data is Message => {
-  console.log("les message transmie", data);
+  console.log("les message transmieaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", data);
   
   return (
     typeof data === 'object' &&
     data !== null &&
-    data.direction==='string'&&
+    typeof  data.direction==='string'&&
     typeof data.id === 'string' &&
     typeof data.text === 'string' &&
-    data.timestamp instanceof Date &&
-    data.from === 'string' &&
+     data.timestamp instanceof Date &&
+    typeof  data.from === 'string' &&
     typeof data.from_me === 'boolean'
   );
 };​

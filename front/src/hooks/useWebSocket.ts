@@ -3,28 +3,15 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { io, Socket } from "socket.io-client";
-import { LogOut } from "lucide-react";
 import { Commercial, Conversation, Message } from "@/types/chat";
 
 export const useWebSocket = (commercial: Commercial | null) => {
-   const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Ref pour la conversation sélectionnée
-  const selectedConversationRef = useRef<string | null>(null);
-  const messagesRef = useRef<Message[]>([]);
-
- useEffect(() => {
-    selectedConversationRef.current = selectedConversationId;
-  }, [selectedConversationId]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   // Créer et configurer la connexion socket
   const createSocket = useCallback(() => {
@@ -33,7 +20,6 @@ export const useWebSocket = (commercial: Commercial | null) => {
       return null;
     }
 
-    // Récupérer le token
     const token = localStorage.getItem("token");
     if (!token) {
       console.error("❌ Token manquant");
@@ -41,9 +27,8 @@ export const useWebSocket = (commercial: Commercial | null) => {
       return null;
     }
 
-    // Créer la connexion socket
     const socket = io("http://localhost:3001", {
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
@@ -65,9 +50,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
         setIsConnected(true);
         setError(null);
 
-        // Authentification automatique
         const token = localStorage.getItem("token");
-        console.log("nouvel request :punch:", token, commercial);
 
         if (token && commercial) {
           socket.emit("auth", {
@@ -97,134 +80,120 @@ export const useWebSocket = (commercial: Commercial | null) => {
         setError(data.error);
       });
 
-      console.log("🔌 Création socket pour:", selectedConversationId);
-      socket.onAny((event, ...args) => {
-        console.log("👀 SOCKET EVENT:", event, args);
+      socket.on("conversation:list", (data: { conversations: Conversation[] }) => {
+        console.log("📋 Conversations reçues:", data.conversations?.length);
+        if (data.conversations) {
+          setConversations(data.conversations);
+        }
       });
 
-      socket.on(
-        "conversation:list",
-        (data: { conversations: Conversation[] }) => {
-          console.log("📋 Conversations reçues:", data.conversations?.length);
-          if (data.conversations) {
-            setConversations(data.conversations);
-          }
+      socket.on("messages:get", (data: { conversationId: string; messages: any[] }) => {
+        console.log("💬 Messages reçus:", data.messages?.length);
+
+        if (data.messages) {
+          const transformedMessages: Message[] = data.messages.map((msg: any) => ({
+            id: msg.id,
+            text: msg.text || "",
+            timestamp: new Date(msg.timestamp || Date.now()),
+            from: msg.from_me ? "commercial" : "client",
+            status: msg.status || "sent",
+            direction: msg.direction || "IN",
+            sender_phone: msg.from,
+            sender_name: msg.from_name,
+            from_me: msg.from_me || false,
+          }));
+          setMessages(transformedMessages);
         }
-      );
+      });
 
-      socket.on(
-        "messages:get",(data: { conversationId: string; messages: any[] }) => {
-          console.log("💬 Messages reçus:", data.messages?.length);
-          console.log("💬 Messages reçus:", data.messages);
+      socket.on("message:sent", (data: { conversationId: string; message: any }) => {
+        console.log("✅ Message envoyé confirmé:", data);
+      });
 
-          if (data.messages) {
-            const transformedMessages: Message[] = data.messages.map(
-              (msg: any) => ({
-                id: msg.id,
-                text: msg.text || "",
-                timestamp: new Date(msg.timestamp || Date.now()),
-                from: msg.from_me ? "commercial" : "client",
-                status: msg.status || "sent",
-                direction: msg.direction || "IN",
-                sender_phone: msg.from,
-                sender_name: msg.from_name,
-                from_me: msg.from_me || false, // Toujours fournir une valeur
-              })
-            );
-            setMessages(transformedMessages);
-          }
+       socket.on("message:received", (data: { conversationId: string; message: any }) => {
+        console.log("✅ Message envoyé ddddddddddddddddddddddddddddddddddddddddddddddddddddconfirmé:", data);
+        const message= data.message
+         const newMessage: Message = {
+        id: message.id,
+        text: message.text,
+        timestamp: new Date(message.timestamp || Date.now()),
+        from: message.from_me ? "commercial" : "client",
+        status: message.status || "sent",
+        direction: message.direction || "IN",
+        sender_phone: message.from,
+        sender_name: message.from_name,
+        from_me: message.from_me,
+      };
+
+      setMessages((prev) => {
+        // ✅ Éviter les doublons
+        const exists = prev.some((m) => m.id === newMessage.id);
+        if (exists) {
+          console.log("⚠️ Message déjà présent:", newMessage.id);
+          return prev;
         }
-      );
+        console.log("✅ Ajout nouveau message:", newMessage.id);
+        return [...prev, newMessage];
+      });
 
-      socket.on(
-        "message:received",
-        (data: { conversationId: string; message: any }) => {
-          console.log(
-            "📩 Message reçu en temps réel (message:received):",
-            data
-          );
-          if (data.message.from_me) {
-            return;
-          }
-          // Vérifier que c'est la conversation sélectionnée
-          if (
-            selectedConversationId &&
-            data.conversationId !== selectedConversationId
-          ) {
-            return;
-          }
-          const newMessage: Message = {
-            id: data.message.id,
-            text: data.message.text,
-            timestamp: new Date(data.message.timestamp || Date.now()),
-            from: data.message.from_me ? "commercial" : "client",
-            status: data.message.status || "sent",
-            direction: data.message.direction || "IN",
-            sender_phone: data.message.from,
-            sender_name: data.message.from_name,
-            from_me: data.message.from_me,
-          };
+ 
+      });
 
-          setMessages((prev) => [...prev, newMessage]);
-        }
-      );
-
-    //   socket.on("reception",(data: { conversationId: string; messages: any }) => {
-         
-    //        if (data.conversationId !== selectedConversationRef.current) return;
-
-    // // 2️⃣ Transformer le message
-    // const newMessage: Message = {
-    //   id: data.messages.id,
-    //   text: data.messages.text,
-    //   timestamp: new Date(data.messages.timestamp),
-    //   from: data.messages.from_me ? "commercial" : "client",
-    //   status: data.messages.status,
-    //   direction: data.messages.direction,
-    //   sender_phone: data.messages.from,
-    //   sender_name: data.messages.from_name,
-    //   from_me: data.messages.from_me,
-    // };
-
-    // // 3️⃣ Mise à jour SAFE (pas de closure bug)
-    // setMessages(prev => [...prev, newMessage]);
-
-    //     }
-    //   );
-
-      // socket.to(selectedConversationId).on()
-
-      // socket.on(
-      //   `${selectedConversationId}`,
-      //   (data: { conversationId: string; message: any }) => {
-      //     console.log("📩 Message reçu en temps réel");
-      //     if (data.message && selectedConversationId === data.conversationId) {
-      //       const newMessage: Message = {
-      //         id: data.message.id,
-      //         text: data.message.text,
-      //         timestamp: new Date(data.message.timestamp || Date.now()),
-      //         from: data.message.from_me ? "commercial" : "client",
-      //         status: data.message.status || "sent",
-      //         direction: data.message.direction || "IN",
-      //         sender_phone: data.message.from,
-      //         sender_name: data.message.from_name,
-      //         from_me: data.message.from_me,
-      //       };
-      //       setMessages((prev) => [...prev, newMessage]);
-      //     }
-      //   }
-      // );
-
-      socket.on(
-        "message:sent",
-        (data: { conversationId: string; message: any }) => {
-          console.log("✅ Message envoyé confirmé:", data);
-        }
-      );
+      // ✅ Debug : Écouter TOUS les événements
+      socket.onAny((event, ...args) => {
+        console.log(`🔔 Event reçu: ${event}`, args);
+      });
     },
-    [selectedConversationId, commercial]
+    [commercial]
   );
 
+  // ✅ EFFET SÉPARÉ pour écouter les messages en temps réel de la conversation active
+  useEffect(() => {
+    if (!selectedConversationId || !socketRef.current || !socketRef.current.connected) {
+      return;
+    }
+
+    const eventName = `chat:${selectedConversationId}`;
+
+    const handleIncomingMessage = (message: any) => {
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`📩 MESSAGE EN TEMPS RÉEL`);
+      console.log('Event:', eventName);
+      console.log('Message:', message);
+      console.log('═══════════════════════════════════════════════════════');
+
+      const newMessage: Message = {
+        id: message.id,
+        text: message.text,
+        timestamp: new Date(message.timestamp || Date.now()),
+        from: message.from_me ? "commercial" : "client",
+        status: message.status || "sent",
+        direction: message.direction || "IN",
+        sender_phone: message.from,
+        sender_name: message.from_name,
+        from_me: message.from_me,
+      };
+
+      setMessages((prev) => {
+        // ✅ Éviter les doublons
+        const exists = prev.some((m) => m.id === newMessage.id);
+        if (exists) {
+          console.log("⚠️ Message déjà présent:", newMessage.id);
+          return prev;
+        }
+        console.log("✅ Ajout nouveau message:", newMessage.id);
+        return [...prev, newMessage];
+      });
+    };
+
+    console.log("👂 Écoute des messages sur:", eventName);
+    socketRef.current.on(eventName, handleIncomingMessage);
+
+    return () => {
+      console.log("🧹 Arrêt écoute de", eventName);
+      socketRef.current?.off(eventName, handleIncomingMessage);
+    };
+  }, [selectedConversationId]);
 
   useEffect(() => {
     if (!commercial) {
@@ -243,7 +212,6 @@ export const useWebSocket = (commercial: Commercial | null) => {
     setupSocketListeners(socket);
     socketRef.current = socket;
 
-    // Nettoyage
     return () => {
       console.log("🧹 Nettoyage WebSocket");
       if (socket) {
@@ -254,9 +222,6 @@ export const useWebSocket = (commercial: Commercial | null) => {
     };
   }, [commercial, createSocket, setupSocketListeners]);
 
-  // Fonctions pour interagir avec le socket
-
-  // Ajout des fonctions manquantes
   const leaveConversation = useCallback(
     (conversationId: string) => {
       if (socketRef.current && isConnected) {
@@ -273,12 +238,9 @@ export const useWebSocket = (commercial: Commercial | null) => {
     [isConnected, selectedConversationId]
   );
 
-  const setSelectedConversation = useCallback(
-    (conversationId: string | null) => {
-      setSelectedConversationId(conversationId);
-    },
-    []
-  );
+  const setSelectedConversation = useCallback((conversationId: string | null) => {
+    setSelectedConversationId(conversationId);
+  }, []);
 
   const loadConversation = useCallback(
     (commercialId: string) => {
@@ -317,7 +279,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
 
   const LogOut = useCallback(() => {
     if (socketRef.current && isConnected) {
-      console.log("📤 deconnection:");
+      console.log("📤 Déconnexion");
       socketRef.current.emit("agent:logout");
       return true;
     }
@@ -371,22 +333,17 @@ export const useWebSocket = (commercial: Commercial | null) => {
     }
   }, []);
 
-  // API exposée - Ajouter toutes les propriétés nécessaires
   const webSocketApi = useMemo(
     () => ({
-      // État
       isConnected,
       error,
       conversations,
       messages,
       selectedConversationId,
-
-      // Setters
       setConversations,
       setMessages,
       setSelectedConversation,
       LogOut,
-      // Actions
       sendMessage,
       joinConversation,
       leaveConversation,
@@ -395,24 +352,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       loadMessages,
       reconnect,
     }),
-    [
-      isConnected,
-      error,
-      conversations,
-      messages,
-      selectedConversationId,
-      LogOut,
-      setConversations,
-      setMessages,
-      setSelectedConversation,
-      sendMessage,
-      joinConversation,
-      leaveConversation,
-      loadConversation,
-      loadConversations,
-      loadMessages,
-      reconnect,
-    ]
+    [isConnected, error, conversations, messages, selectedConversationId, setSelectedConversation, LogOut, sendMessage, joinConversation, leaveConversation, loadConversation, loadConversations, loadMessages, reconnect]
   );
 
   return webSocketApi;

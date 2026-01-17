@@ -7,7 +7,6 @@ import {
   Message, 
   createMessage, 
   transformToMessage,
-  createConversation,
   isValidMessage
 } from '@/types/chat';
 import { useWebSocket } from './useWebSocket';
@@ -72,7 +71,7 @@ export const useConversations = () => {
         setSelectedConvWS(conversationId);
         
         // 2. Vider les messages précédents
-        setMessages([]);
+        // setMessages([]);
         
         // 3. Joindre la conversation
         const joined = joinConversation(conversationId);
@@ -93,7 +92,6 @@ export const useConversations = () => {
               ? { 
                   ...c, 
                   unreadCount: 0,
-                  // Mettre à jour le timestamp de dernière activité
                   lastMessage: {
                     ...c.lastMessage,
                     timestamp: new Date()
@@ -187,26 +185,25 @@ export const useConversations = () => {
   }, [selectedConversation]);
 
   // Ajouter un message à une conversation
-const addMessageToConversation = useCallback((conversationId: string, message: Message) => {
-  setConversations(prev => 
-    prev.map(conv => 
-      conv.chat_id === conversationId 
-        ? {
-            ...conv,
-            lastMessage: {
-              text: message.text,
-              timestamp: message.timestamp,
-              author: message.from === 'commercial' ? 'agent' : 'client'
-            },
-            unreadCount: selectedConversationId === conversationId 
-              ? conv.unreadCount 
-              : conv.unreadCount + 1,
-            messages: [...(conv.messages || []), message] // Assurer que conv.messages est un tableau
-          } 
-        : conv
-    )
-  );
-}, [selectedConversationId]);
+  const addMessageToConversation = useCallback((conversationId: string, message: Message) => {
+    setConversations(prev => 
+      prev.map(conv => {
+        if (conv.chat_id !== conversationId) return conv;
+        
+        return {
+          ...conv,
+          lastMessage: {
+            text: message.text,
+            timestamp: message.timestamp,
+            author: message.from_me ? 'agent' : 'client'
+          },
+          unreadCount: selectedConversationId === conversationId 
+            ? 0
+            : conv.unreadCount + 1,
+        };
+      })
+    );
+  }, [selectedConversationId]);
 
   // Envoyer un message
   const sendMessage = useCallback(async (
@@ -220,55 +217,37 @@ const addMessageToConversation = useCallback((conversationId: string, message: M
       return null;
     }
 
-    // Utiliser createMessage pour garantir un message valide
-    const fullMessage = createMessage({
-      id: `temp_${Date.now()}`,
-      text: messageData.text || '',
-      timestamp: new Date(),
-      from: messageData.sender_phone,
-      status: 'sending',
-      direction: 'OUT',
-      sender_name: user.name || 'Agent',
-      from_me: true, // Toujours true pour les messages de l'agent
-      sender_phone: user.email || '', // Optionnel: utiliser email comme sender_phone
-      ...messageData,
-    });
-
-    // Vérifier que le message est valide
-    // if (!isValidMessage(fullMessage)) {
-    //   setError('Message invalide');
-    //   return null;
-    // }
-
-    console.log(`📤 Envoi message: "${fullMessage.text.substring(0, 50)}..."`);
-
-    // Optimistic UI update
-    setMessages(prev => [...prev, fullMessage]);
-    addMessageToConversation(conversationId, fullMessage);
+    console.log(`📤 Envoi message: "${messageData.text?.substring(0, 50)}..."`);
     
     // Envoyer via WebSocket
     const success = sendWebSocketMessage({
       conversationId,
-      text: fullMessage.text,
+      text: messageData.text || '',
       author: user.id,
       chat_id: conversationId
     });
     
     if (!success) {
       setError('Échec de l\'envoi via WebSocket');
-      // Marquer le message comme erreur
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === fullMessage.id 
-            ? { ...msg, status: 'error' } 
-            : msg
-        )
-      );
       return null;
     }
 
-    return fullMessage;
-  }, [user, isConnected, sendWebSocketMessage, setMessages, addMessageToConversation]);
+    // Créer un message temporaire pour le retour
+    const tempMessage = createMessage({
+      id: `temp_${Date.now()}`,
+      text: messageData.text || '',
+      timestamp: new Date(),
+      from: 'commercial',
+      status: 'sending',
+      direction: 'OUT',
+      sender_name: user.name || 'Agent',
+      from_me: true,
+      sender_phone: user.email || '',
+      ...messageData,
+    });
+
+    return tempMessage;
+  }, [user, isConnected, sendWebSocketMessage]);
 
   // Gérer les messages entrants
   const handleIncomingMessage = useCallback((conversationId: string, rawMessage: any) => {

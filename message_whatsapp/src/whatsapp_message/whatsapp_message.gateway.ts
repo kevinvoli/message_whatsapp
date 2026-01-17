@@ -67,26 +67,29 @@ export class WhatsappMessageGateway
     }
   }
 
-public async emitIncomingMessage(chatId: string, commercialId: string, message: any) {
-   const chats = await this.chatService.findByCommercialId(commercialId);
+public  emitIncomingMessage(
+  chatId: string, // ⚠️ DOIT être chat.chat_id
+  commercialId: string,
+  message: any
+) {
+  const messageForFrontend = {
+    id: message.id,
+    text: message.text,
+    timestamp: message.timestamp,
+    direction: message.direction,
+    from: message.from,
+    from_name: message.from_name || 'Client',
+    status: message.status,
+    from_me: false,
+  };
 
-         const messageForFrontend = {
-        id: message.id,
-        text: message.text,
-        timestamp: message.timestamp,
-        direction: message.direction,
-        from: message.from,
-        from_name: message.from_name || 'Client',
-        status: message.status,
-        from_me: false,
-      }
   const targetSocketId = Array.from(this.connectedAgents.entries())
-    .find(([socketId, agentId]) => agentId === commercialId)?.[0];
+    .find(([_, agentId]) => agentId === commercialId)?.[0];
 
   if (targetSocketId) {
     this.server.to(targetSocketId).emit('message:received', {
-      conversationId: chatId,
-      messages: messageForFrontend,
+      conversationId: message.chat_id, // ✅ PAS chat.id
+      message: messageForFrontend,
     });
   }
 }
