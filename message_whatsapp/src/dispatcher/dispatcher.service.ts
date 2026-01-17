@@ -30,6 +30,7 @@ export class DispatcherService {
   ): Promise<WhatsappChat | null> {
     let conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
+      relations: ['commercial', 'messages']
     });
 
     // If conversation exists and its agent is connected, do nothing.

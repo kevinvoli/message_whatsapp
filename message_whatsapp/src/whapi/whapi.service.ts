@@ -13,6 +13,9 @@ import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.se
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { NotFoundError } from 'rxjs';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
 export class WhapiService {
@@ -23,6 +26,8 @@ export class WhapiService {
     private readonly whatsappMessageService: WhatsappMessageService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
+          @InjectRepository(WhatsappChat)
+        private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
   async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
@@ -59,6 +64,9 @@ export class WhapiService {
         return;
       }
 
+      console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk_______________________________rrrrrrrrrrrrrrrrrrrrr",conversation);
+      
+
       // 2️⃣ Sauvegarde en base
       const savedMessage =
         await this.whatsappMessageService.saveIncomingFromWhapi(
@@ -66,16 +74,6 @@ export class WhapiService {
           conversation,
         );
 
-      // if (conversation.commercial_id) {
-      //   return;
-      // }
-
-      console.log(
-        'vooooooooooooooooooooooooooooooooooooooooooooooooooooooo',
-        savedMessage,
-        'fffffffffffffffffff',
-        conversation,
-      );
 
       if (!conversation.chat_id || !conversation.commercial_id) {
         console.warn(
@@ -85,12 +83,20 @@ export class WhapiService {
         return;
       }
 
+
       // 3️⃣ Temps réel (WebSocket)
       this.messageGateway.emitIncomingMessage(
         conversation.chat_id,
         conversation.commercial_id,
         savedMessage,
       );
+
+      this.messageGateway.emitIncomingConversation(
+        conversation
+      )
+
+
+
     } catch (error) {
       console.log(error);
 

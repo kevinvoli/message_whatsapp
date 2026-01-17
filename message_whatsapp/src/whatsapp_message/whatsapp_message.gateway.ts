@@ -22,6 +22,7 @@ import {
 } from './entities/whatsapp_message.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -67,30 +68,75 @@ export class WhatsappMessageGateway
     }
   }
 
-public  emitIncomingMessage(
-  chatId: string, // ⚠️ DOIT être chat.chat_id
-  commercialId: string,
-  message: any
-) {
-  const messageForFrontend = {
-    id: message.id,
-    text: message.text,
-    timestamp: message.timestamp,
-    direction: message.direction,
-    from: message.from,
-    from_name: message.from_name || 'Client',
-    status: message.status,
-    from_me: false,
-  };
+  public emitIncomingMessage(
+    chatId: string, // ⚠️ DOIT être chat.chat_id
+    commercialId: string,
+    message: any,
+  ) {
+    const messageForFrontend = {
+      id: message.id,
+      text: message.text,
+      timestamp: message.timestamp,
+      direction: message.direction,
+      from: message.from,
+      from_name: message.from_name || 'Client',
+      status: message.status,
+      from_me: false,
+    };
 
-  const targetSocketId = Array.from(this.connectedAgents.entries())
-    .find(([_, agentId]) => agentId === commercialId)?.[0];
+    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, agentId]) => agentId === commercialId,
+    )?.[0];
 
-  if (targetSocketId) {
-    this.server.to(targetSocketId).emit('message:received', {
-      conversationId: message.chat_id, // ✅ PAS chat.id
-      message: messageForFrontend,
-    });
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('message:received', {
+        conversationId: message.chat_id, // ✅ PAS chat.id
+        message: messageForFrontend,
+      });
+    }
+  }
+
+public async emitIncomingConversation(chat: any) {
+  try {
+    // Trouver le socket de l'agent assigné à cette conversation
+    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, agentId]) => agentId === chat.commercial?.id,
+    )?.[0];
+
+    if (!targetSocketId) {
+   
+      return;
+    }
+
+    // Récupérer le dernier message
+    const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+
+    // Compter les messages non lus
+    const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+
+    // Construire l'objet conversation
+    const conversation = {
+      id: chat.id,
+      chat_id: chat.chat_id,
+      clientName: chat.name,
+      clientPhone: chat.chat_id?.split('@')[0] || '',
+      lastMessage: {
+        text: lastMessage?.text || 'Aucun message',
+        timestamp: lastMessage?.timestamp || chat.updatedAt,
+        author: lastMessage?.from_me ? 'agent' : 'client',
+      },
+      unreadCount: unreadCount,
+      commercial_id: chat.commercial_id,
+      name: chat.name,
+      updatedAt: chat.updatedAt,
+    };
+
+    // Émettre l'événement de mise à jour de conversation à l'agent spécifique
+    this.server.to(targetSocketId).emit('conversation:updated', conversation);
+
+    
+  } catch (error) {
+    console.error('Erreur lors de l\'émission de la conversation:', error);
   }
 }
 
@@ -270,7 +316,8 @@ public  emitIncomingMessage(
 
       // console.log("le connecte id", chats);
 
-      console.log
+      console
+        .log
         // `📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`,
         ();
 
@@ -447,7 +494,6 @@ public  emitIncomingMessage(
         conversationId: data.conversationId,
         message: messageForFrontend,
       });
-
 
       console.log(`📢 Message diffusé dans la room: ${roomName}`);
 

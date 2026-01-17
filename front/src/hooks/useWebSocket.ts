@@ -10,7 +10,9 @@ export const useWebSocket = (commercial: Commercial | null) => {
   const [isConnected, setIsConnected] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   // Créer et configurer la connexion socket
@@ -80,87 +82,96 @@ export const useWebSocket = (commercial: Commercial | null) => {
         setError(data.error);
       });
 
-      socket.on("conversation:list", (data: { conversations: Conversation[] }) => {
-        console.log("📋 Conversations reçues:", data.conversations?.length);
-        if (data.conversations) {
-          setConversations(data.conversations);
+      socket.on(
+        "conversation:list",
+        (data: { conversations: Conversation[] }) => {
+          console.log("📋 Conversations reçues:", data.conversations?.length);
+          if (data.conversations) {
+            setConversations(data.conversations);
+          }
+        },
+      );
+
+      socket.on(
+        "messages:get",
+        (data: { conversationId: string; messages: any[] }) => {
+          console.log("💬 Messages reçus:", data.messages?.length);
+
+          if (data.messages) {
+            const transformedMessages: Message[] = data.messages.map(
+              (msg: any) => ({
+                id: msg.id,
+                text: msg.text || "",
+                timestamp: new Date(msg.timestamp || Date.now()),
+                from: msg.from_me ? "commercial" : "client",
+                status: msg.status || "sent",
+                direction: msg.direction || "IN",
+                sender_phone: msg.from,
+                sender_name: msg.from_name,
+                from_me: msg.from_me || false,
+              }),
+            );
+            setMessages(transformedMessages);
+          }
+        },
+      );
+
+      socket.on(
+        "message:sent",
+        (data: { conversationId: string; message: any }) => {
+          console.log("✅ Message envoyé confirmé:", data);
+        },
+      );
+
+      socket.on("conversation:updated", (conversation: Conversation) => {
+        console.log(
+          "✅ Conversation update envoyé ddddddddddddddddddddddddddddddddddddddddddddddddddddconfirmé:",
+          conversation,
+        );
+
+        if (conversation) {
+          setConversations((prev) => {
+            // ✅ Éviter les doublons
+            const exists = prev.some((m) => m.id === conversation.id);
+            if (exists) {
+              return prev.map((conv) =>
+                conv.chat_id === conversation.chat_id ? conversation : conv,
+              );
+            } else {
+              console.log("✅ Ajout nouveau message:", conversation.id);
+              return [...prev, conversation];
+            }
+          });
         }
       });
-
-      socket.on("messages:get", (data: { conversationId: string; messages: any[] }) => {
-        console.log("💬 Messages reçus:", data.messages?.length);
-
-        if (data.messages) {
-          const transformedMessages: Message[] = data.messages.map((msg: any) => ({
-            id: msg.id,
-            text: msg.text || "",
-            timestamp: new Date(msg.timestamp || Date.now()),
-            from: msg.from_me ? "commercial" : "client",
-            status: msg.status || "sent",
-            direction: msg.direction || "IN",
-            sender_phone: msg.from,
-            sender_name: msg.from_name,
-            from_me: msg.from_me || false,
-          }));
-          setMessages(transformedMessages);
-        }
-      });
-
-      socket.on("message:sent", (data: { conversationId: string; message: any }) => {
-        console.log("✅ Message envoyé confirmé:", data);
-      });
-
-      //  socket.on("message:received", (data: { conversationId: string; message: any }) => {
-      //   console.log("✅ Message envoyé ddddddddddddddddddddddddddddddddddddddddddddddddddddconfirmé:", data);
-      //   const message= data.message
-      //    const newMessage: Message = {
-      //   id: message.id,
-      //   text: message.text,
-      //   timestamp: new Date(message.timestamp || Date.now()),
-      //   from: message.from_me ? "commercial" : "client",
-      //   status: message.status || "sent",
-      //   direction: message.direction || "IN",
-      //   sender_phone: message.from,
-      //   sender_name: message.from_name,
-      //   from_me: message.from_me,
-      // };
-
-      // setMessages((prev) => {
-      //   // ✅ Éviter les doublons
-      //   const exists = prev.some((m) => m.id === newMessage.id);
-      //   if (exists) {
-      //     console.log("⚠️ Message déjà présent:", newMessage.id);
-      //     return prev;
-      //   }
-      //   console.log("✅ Ajout nouveau message:", newMessage.id);
-      //   return [...prev, newMessage];
-      // });
-
- 
-      // });
 
       // ✅ Debug : Écouter TOUS les événements
+
       socket.onAny((event, ...args) => {
         console.log(`🔔 Event reçu: ${event}`, args);
       });
     },
-    [commercial]
+    [commercial],
   );
 
   // ✅ EFFET SÉPARÉ pour écouter les messages en temps réel de la conversation active
   useEffect(() => {
-    if (!selectedConversationId || !socketRef.current || !socketRef.current.connected) {
+    if (
+      !selectedConversationId ||
+      !socketRef.current ||
+      !socketRef.current.connected
+    ) {
       return;
     }
 
     const eventName = `message:received`;
 
     const handleIncomingMessage = (message: any) => {
-      console.log('═══════════════════════════════════════════════════════');
+      console.log("═══════════════════════════════════════════════════════");
       console.log(`📩 MESSAGE EN TEMPS RÉEL`);
-      console.log('Event:', eventName);
-      console.log('Message:', message);
-      console.log('═══════════════════════════════════════════════════════');
+      console.log("Event:", eventName);
+      console.log("Message:", message);
+      console.log("═══════════════════════════════════════════════════════");
 
       const newMessage: Message = {
         id: message.id,
@@ -235,12 +246,15 @@ export const useWebSocket = (commercial: Commercial | null) => {
       }
       return false;
     },
-    [isConnected, selectedConversationId]
+    [isConnected, selectedConversationId],
   );
 
-  const setSelectedConversation = useCallback((conversationId: string | null) => {
-    setSelectedConversationId(conversationId);
-  }, []);
+  const setSelectedConversation = useCallback(
+    (conversationId: string | null) => {
+      setSelectedConversationId(conversationId);
+    },
+    [],
+  );
 
   const loadConversation = useCallback(
     (commercialId: string) => {
@@ -251,7 +265,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       }
       return false;
     },
-    [isConnected]
+    [isConnected],
   );
 
   const sendMessage = useCallback(
@@ -274,7 +288,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       console.warn("⚠️ Socket non connecté");
       return false;
     },
-    [isConnected]
+    [isConnected],
   );
 
   const LogOut = useCallback(() => {
@@ -300,7 +314,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       }
       return false;
     },
-    [isConnected, commercial]
+    [isConnected, commercial],
   );
 
   const loadConversations = useCallback(() => {
@@ -323,7 +337,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       }
       return false;
     },
-    [isConnected]
+    [isConnected],
   );
 
   const reconnect = useCallback(() => {
@@ -352,7 +366,22 @@ export const useWebSocket = (commercial: Commercial | null) => {
       loadMessages,
       reconnect,
     }),
-    [isConnected, error, conversations, messages, selectedConversationId, setSelectedConversation, LogOut, sendMessage, joinConversation, leaveConversation, loadConversation, loadConversations, loadMessages, reconnect]
+    [
+      isConnected,
+      error,
+      conversations,
+      messages,
+      selectedConversationId,
+      setSelectedConversation,
+      LogOut,
+      sendMessage,
+      joinConversation,
+      leaveConversation,
+      loadConversation,
+      loadConversations,
+      loadMessages,
+      reconnect,
+    ],
   );
 
   return webSocketApi;
