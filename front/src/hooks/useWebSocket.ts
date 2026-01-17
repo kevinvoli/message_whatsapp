@@ -110,34 +110,34 @@ export const useWebSocket = (commercial: Commercial | null) => {
         console.log("✅ Message envoyé confirmé:", data);
       });
 
-       socket.on("message:received", (data: { conversationId: string; message: any }) => {
-        console.log("✅ Message envoyé ddddddddddddddddddddddddddddddddddddddddddddddddddddconfirmé:", data);
-        const message= data.message
-         const newMessage: Message = {
-        id: message.id,
-        text: message.text,
-        timestamp: new Date(message.timestamp || Date.now()),
-        from: message.from_me ? "commercial" : "client",
-        status: message.status || "sent",
-        direction: message.direction || "IN",
-        sender_phone: message.from,
-        sender_name: message.from_name,
-        from_me: message.from_me,
-      };
+      //  socket.on("message:received", (data: { conversationId: string; message: any }) => {
+      //   console.log("✅ Message envoyé ddddddddddddddddddddddddddddddddddddddddddddddddddddconfirmé:", data);
+      //   const message= data.message
+      //    const newMessage: Message = {
+      //   id: message.id,
+      //   text: message.text,
+      //   timestamp: new Date(message.timestamp || Date.now()),
+      //   from: message.from_me ? "commercial" : "client",
+      //   status: message.status || "sent",
+      //   direction: message.direction || "IN",
+      //   sender_phone: message.from,
+      //   sender_name: message.from_name,
+      //   from_me: message.from_me,
+      // };
 
-      setMessages((prev) => {
-        // ✅ Éviter les doublons
-        const exists = prev.some((m) => m.id === newMessage.id);
-        if (exists) {
-          console.log("⚠️ Message déjà présent:", newMessage.id);
-          return prev;
-        }
-        console.log("✅ Ajout nouveau message:", newMessage.id);
-        return [...prev, newMessage];
-      });
+      // setMessages((prev) => {
+      //   // ✅ Éviter les doublons
+      //   const exists = prev.some((m) => m.id === newMessage.id);
+      //   if (exists) {
+      //     console.log("⚠️ Message déjà présent:", newMessage.id);
+      //     return prev;
+      //   }
+      //   console.log("✅ Ajout nouveau message:", newMessage.id);
+      //   return [...prev, newMessage];
+      // });
 
  
-      });
+      // });
 
       // ✅ Debug : Écouter TOUS les événements
       socket.onAny((event, ...args) => {
@@ -153,7 +153,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       return;
     }
 
-    const eventName = `chat:${selectedConversationId}`;
+    const eventName = `message:received`;
 
     const handleIncomingMessage = (message: any) => {
       console.log('═══════════════════════════════════════════════════════');
