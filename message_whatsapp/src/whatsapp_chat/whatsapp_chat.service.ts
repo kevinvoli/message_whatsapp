@@ -66,8 +66,8 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
         commercial: commercial,
         contact_client: from,
         last_activity_at: new Date(),
-        created_at: new Date(),
-        updated_at: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
       return this.chatRepository.save(newChat);
