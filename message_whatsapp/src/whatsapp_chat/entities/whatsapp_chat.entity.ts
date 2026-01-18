@@ -125,12 +125,6 @@ export class WhatsappChat {
   @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
   contact_client: string;
 
-  @Column({ name: 'created_at', type: 'timestamp' })
-  created_at: Date;
-
-  @Column({ name: 'updated_at', type: 'timestamp' })
-  updated_at: Date;
-
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

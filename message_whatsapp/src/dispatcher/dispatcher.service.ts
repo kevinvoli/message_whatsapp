@@ -75,8 +75,8 @@ export class DispatcherService {
         unread_count: 1, // Assign a number
         last_activity_at: new Date(),
         contact_client: clientPhone,
-        created_at: new Date(),
-        updated_at: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       const newChat = this.chatRepository.create(createDto);
