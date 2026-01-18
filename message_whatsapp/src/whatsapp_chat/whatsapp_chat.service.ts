@@ -36,44 +36,41 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     commercialId: string,
   ): Promise<WhatsappChat> {
     try {
-      const chat = await this.chatRepository.findOne({
+      const existingChat = await this.chatRepository.findOne({
         where: { chat_id: chatId },
       });
-      if (chat) {
-        log('chat trouvé ou créé:', chat);
-        return chat;
+
+      if (existingChat) {
+        return existingChat;
       }
+
       const commercial = await this.commercialService.findOneById(commercialId);
-      console.log("le commercial trouve",commercial);
-      
       if (!commercial) {
         throw new Error('Commercial not found');
       }
-      console.log("le chat doit etre ici");
-      
-      const creatChat = this.chatRepository.create({
+
+      const newChat = this.chatRepository.create({
         chat_id: chatId,
         name: fromName,
-        type: 'private', // assuming private chat
+        type: 'private',
         chat_pic: '',
         chat_pic_full: '',
-        is_pinned: 'false',
-        is_muted: 'false',
-        mute_until: '0',
-        is_archived: 'false',
-        unread_count: '0',
-        unread_mention: 'false',
-        read_only: 'false',
-        not_spam: 'true',
+        is_pinned: false,
+        is_muted: false,
+        mute_until: null,
+        is_archived: false,
+        unread_count: 0,
+        unread_mention: false,
+        read_only: false,
+        not_spam: true,
         commercial: commercial,
-        last_activity_at: Date.now().toString(),
-        created_at: Date.now().toString(),
-        updated_at: Date.now().toString(),
+        contact_client: from,
+        last_activity_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
       });
 
-      console.log('chat a cree===============================', creatChat);
-
-      return this.chatRepository.save(creatChat);
+      return this.chatRepository.save(newChat);
     } catch (error) {
       console.error('Error finding or creating chat:', error);
       throw new Error(`Failed to find or create chat: ${String(error)}`);
