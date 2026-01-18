@@ -4,6 +4,7 @@
 import { useEffect } from 'react';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useChatStore } from '@/store/chatStore';
+import { useAuth } from '@/contexts/AuthProvider';
 import { Conversation, Message } from '@/types/chat';
 
 /**
