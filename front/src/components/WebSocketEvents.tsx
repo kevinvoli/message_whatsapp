@@ -3,9 +3,9 @@
 
 import { useEffect } from 'react';
 import { useSocket } from '@/contexts/SocketProvider';
-import { useChatStore } from '@/store/chatStore';
+import { useChatStore } from '@/stores/useChatStore'; // CORRIGÉ : Import du store unifié
 import { useAuth } from '@/contexts/AuthProvider';
-import { Conversation, Message, transformToConversation, transformToMessage } from '@/types/chat';
+import { transformToConversation, transformToMessage } from '@/types/chat';
 
 /**
  * @file WebSocketEvents.tsx
@@ -15,20 +15,19 @@ import { Conversation, Message, transformToConversation, transformToMessage } fr
  */
 const WebSocketEvents = () => {
   const { socket } = useSocket();
+  const { user } = useAuth();
+  // Actions du store pour mettre à jour l'état
   const {
-    setSocket,
     setConversations,
     setMessages,
-    addMessage,
     updateConversation,
-    loadConversations,
+    setError,
   } = useChatStore();
-  const { user } = useAuth();
 
   useEffect(() => {
     if (socket && user) {
-      setSocket(socket);
-      loadConversations();
+      // Demande la liste initiale des conversations au chargement
+      socket.emit('conversations:get');
 
       // --- Définition des handlers ---
       const handleConversationsList = (rawConversations: any[]) => {
@@ -37,8 +36,14 @@ const WebSocketEvents = () => {
       };
 
       const handleMessagesList = (data: { chatId: string, messages: any[] }) => {
-        const messages = data.messages.map(transformToMessage);
-        setMessages(data.chatId, messages);
+        // Récupère l'état le plus récent du store pour éviter les "stale closures"
+        const { selectedConversation } = useChatStore.getState();
+
+        // Met à jour les messages uniquement si la liste reçue correspond à la conversation ouverte
+        if (selectedConversation?.chatId === data.chatId) {
+          const messages = data.messages.map(transformToMessage);
+          setMessages(messages);
+        }
       };
 
       const handleConversationUpdated = (rawConversation: any) => {
@@ -47,7 +52,9 @@ const WebSocketEvents = () => {
       };
 
       const handleError = (error: { message: string, details?: string }) => {
-        console.error('Socket error received:', error.message, error.details || '');
+        const errorMessage = `Socket error: ${error.message}${error.details ? ` (${error.details})` : ''}`;
+        console.error(errorMessage);
+        setError(errorMessage);
       };
 
       // --- Enregistrement des listeners ---
@@ -62,10 +69,9 @@ const WebSocketEvents = () => {
         socket.off('messages:list', handleMessagesList);
         socket.off('conversation:updated', handleConversationUpdated);
         socket.off('error', handleError);
-        setSocket(null);
       };
     }
-  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation]);
+  }, [socket, user, setConversations, setMessages, updateConversation, setError]);
 
   return null; // Ce composant ne rend rien
 };

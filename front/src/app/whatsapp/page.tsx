@@ -1,72 +1,81 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
 import { useRouter } from 'next/navigation';
+import { useChatStore } from '@/stores/useChatStore';
+import { useSocket } from '@/contexts/SocketProvider';
 
+/**
+ * Page principale de l'interface de messagerie.
+ * Ce composant orchestre l'affichage de la barre latérale, de l'en-tête,
+ * de la liste des messages et du champ de saisie.
+ * Il récupère son état depuis le `useChatStore` et interagit avec le WebSocket
+ * via le hook `useSocket`.
+ */
 const WhatsAppPage = () => {
   const { user, initialized, logout } = useAuth();
   const router = useRouter();
+  const { socket, isConnected } = useSocket();
 
-  // Utilisez le hook refactoré
+  // Récupération de l'état depuis le store Zustand
   const {
     conversations,
     selectedConversation,
     messages,
-    isLoadingMessages,
-    isWebSocketConnected,
+    isLoading,
     error,
     selectConversation,
-    sendMessage,
-    loadConversations,
-    reconnectWebSocket
-  } = useConversations();
+  } = useChatStore((state) => ({
+    conversations: state.conversations,
+    selectedConversation: state.selectedConversation,
+    messages: state.messages,
+    isLoading: state.isLoading,
+    error: state.error,
+    selectConversation: state.selectConversation,
+  }));
 
-  // Protection de route
+  // Protection de la route : redirige vers /login si l'utilisateur n'est pas authentifié
   useEffect(() => {
-    if (!initialized) return;
-    if (!user) {
+    if (initialized && !user) {
       router.replace('/login');
     }
   }, [initialized, user, router]);
 
-  // Recharger les conversations si la connexion se rétablit
-  useEffect(() => {
-    if (isWebSocketConnected && user) {
-      loadConversations(user.id);
-    }
-  }, [isWebSocketConnected, user, loadConversations]);
-
-  // Gérer la sélection d'une conversation
+  // Gérer la sélection d'une conversation dans la barre latérale
   const handleSelectConversation = useCallback((conversation: any) => {
     console.log("🎯 Sélection de la conversation:", conversation.clientName);
     selectConversation(conversation);
-  }, [selectConversation]);
+    if (socket && conversation) {
+      // Demander les messages pour la conversation sélectionnée
+      socket.emit('conversation:join', { chatId: conversation.chatId });
+    }
+  }, [selectConversation, socket]);
 
-  // Envoyer un message
+  // Gérer l'envoi d'un message via le champ de saisie
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!selectedConversation || !user) {
-      console.error('❌ Impossible d\'envoyer: conversation ou commercial manquant');
+    if (!selectedConversation || !user || !socket) {
+      console.error("❌ Impossible d'envoyer: informations manquantes", {
+        selectedConversation, user, socket
+      });
       return;
     }
 
-    try {
-      await sendMessage(selectedConversation.chat_id, {
-        text,
-        from: selectedConversation.clientPhone
-      });
-    } catch (err) {
-      console.error('Erreur lors de l\'envoi:', err);
-    }
-  }, [selectedConversation, user, sendMessage]);
+    // Émission de l'événement WebSocket pour envoyer le message
+    socket.emit('message:send', {
+      chatId: selectedConversation.chatId,
+      text,
+      from: selectedConversation.clientPhone, // Ce champ pourrait être géré côté backend
+      commercialId: user.id,
+    });
+  }, [selectedConversation, user, socket]);
 
-  if (!user || !initialized) {
+  if (!initialized || !user) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
@@ -81,7 +90,7 @@ const WhatsAppPage = () => {
         conversations={conversations}
         searchTerm=""
         selectedConversation={selectedConversation}
-        isConnected={isWebSocketConnected}
+        isConnected={isConnected}
         onSearchChange={() => {}}
         onSelectConversation={handleSelectConversation}
         onLogout={logout}
@@ -92,7 +101,7 @@ const WhatsAppPage = () => {
           <>
             <ChatHeader conversation={selectedConversation} />
 
-            {isLoadingMessages ? (
+            {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
@@ -105,22 +114,14 @@ const WhatsAppPage = () => {
             
             <ChatInput
               onSendMessage={handleSendMessage}
-              isConnected={isWebSocketConnected}
-              disabled={isLoadingMessages}
+              isConnected={isConnected}
+              disabled={isLoading}
             />
 
-            {/* Debug panel */}
+            {/* Affiche une erreur globale si elle existe */}
             {error && (
               <div className="bg-red-50 border-t border-red-200 p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-red-600 text-sm">{error}</span>
-                  <button
-                    onClick={reconnectWebSocket}
-                    className="text-sm text-green-600 hover:text-green-800"
-                  >
-                    Reconnecter
-                  </button>
-                </div>
+                <span className="text-red-600 text-sm">{error}</span>
               </div>
             )}
           </>
