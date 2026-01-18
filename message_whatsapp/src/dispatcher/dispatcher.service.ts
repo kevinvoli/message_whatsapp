@@ -53,8 +53,8 @@ export class DispatcherService {
     {
   conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
-      if (conversation.status === 'fermé') {
-        conversation.status = 'actif';
+      if (conversation.status === WhatsappChatStatus.FERME) {
+        conversation.status = WhatsappChatStatus.ACTIF;
       }
       return this.chatRepository.save(conversation);
     }
