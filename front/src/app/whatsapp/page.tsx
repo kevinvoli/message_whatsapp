@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -17,54 +17,33 @@ const WhatsAppPage = () => {
   // Utilisez le hook refactoré
   const {
     conversations,
-    selectedConversation,
     messages,
-    isLoadingMessages,
-    isWebSocketConnected,
+    selectedConversationId,
+    isLoading,
     error,
+    isConnected,
     selectConversation,
     sendMessage,
-    loadConversations,
-    reconnectWebSocket
   } = useConversations();
 
   // Protection de route
   useEffect(() => {
-    if (!initialized) return;
-    if (!user) {
-      router.replace('/login');
+    if (initialized && !user) {
+      router.replace("/login");
     }
   }, [initialized, user, router]);
 
-  // Recharger les conversations si la connexion se rétablit
-  useEffect(() => {
-    if (isWebSocketConnected && user) {
-      loadConversations(user.id);
-    }
-  }, [isWebSocketConnected, user, loadConversations]);
-
-  // Gérer la sélection d'une conversation
-  const handleSelectConversation = useCallback((conversation: any) => {
-    console.log("🎯 Sélection de la conversation:", conversation.clientName);
-    selectConversation(conversation);
-  }, [selectConversation]);
+  const selectedConversation = conversations.find(
+    (c) => c.chat_id === selectedConversationId
+  );
 
   // Envoyer un message
-  const handleSendMessage = useCallback(async (text: string) => {
-    if (!selectedConversation || !user) {
-      console.error('❌ Impossible d\'envoyer: conversation ou commercial manquant');
-      return;
-    }
-
-    try {
-      await sendMessage(selectedConversation.chat_id, {
-        text,
-        from: selectedConversation.clientPhone
-      });
-    } catch (err) {
-      console.error('Erreur lors de l\'envoi:', err);
-    }
-  }, [selectedConversation, user, sendMessage]);
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      sendMessage(text);
+    },
+    [sendMessage]
+  );
 
   if (!user || !initialized) {
     return (
@@ -80,10 +59,10 @@ const WhatsAppPage = () => {
         commercial={user}
         conversations={conversations}
         searchTerm=""
-        selectedConversation={selectedConversation}
-        isConnected={isWebSocketConnected}
+        selectedConversationId={selectedConversationId}
+        isConnected={isConnected}
         onSearchChange={() => {}}
-        onSelectConversation={handleSelectConversation}
+        onSelectConversation={selectConversation}
         onLogout={logout}
       />
 
@@ -91,35 +70,29 @@ const WhatsAppPage = () => {
         {selectedConversation ? (
           <>
             <ChatHeader conversation={selectedConversation} />
-            
-            {isLoadingMessages ? (
+
+            {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                  <p className="text-gray-500">Chargement des messages...</p>
+                  <p className="text-gray-500">Chargement...</p>
                 </div>
               </div>
             ) : (
               <ChatMessages messages={messages} />
             )}
-            
+
             <ChatInput
               onSendMessage={handleSendMessage}
-              isConnected={isWebSocketConnected}
-              disabled={isLoadingMessages}
+              isConnected={isConnected}
+              disabled={isLoading}
             />
-            
+
             {/* Debug panel */}
             {error && (
               <div className="bg-red-50 border-t border-red-200 p-3">
                 <div className="flex justify-between items-center">
                   <span className="text-red-600 text-sm">{error}</span>
-                  <button
-                    onClick={reconnectWebSocket}
-                    className="text-sm text-green-600 hover:text-green-800"
-                  >
-                    Reconnecter
-                  </button>
                 </div>
               </div>
             )}

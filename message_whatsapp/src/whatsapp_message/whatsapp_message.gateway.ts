@@ -13,8 +13,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import {
   MessageDirection,
   WhatsappMessage,
