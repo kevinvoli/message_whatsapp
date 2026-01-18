@@ -1,87 +1,99 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { WhatsappChatStatus } from '../entities/whatsapp_chat.entity';
 
 export class CreateWhatsappChatDto {
   @IsString()
   @IsOptional()
-  commercial_id: string | null;
+  commercial_id?: string | null;
 
   @IsString()
-  @IsNotEmpty()
-  chat_id: string;
+  @IsOptional()
+  chat_id?: string;
 
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  @IsOptional()
+  name?: string;
 
   @IsString()
-  @IsNotEmpty()
-  type: string;
+  @IsOptional()
+  type?: string;
 
   @IsString()
-  @IsNotEmpty()
-  chat_pic: string;
+  @IsOptional()
+  chat_pic?: string;
 
   @IsString()
-  @IsNotEmpty()
-  chat_pic_full: string;
+  @IsOptional()
+  chat_pic_full?: string;
 
   @IsString()
-  @IsNotEmpty()
-  is_pinned: string;
+  @IsOptional()
+  is_pinned?: string;
 
   @IsString()
-  @IsNotEmpty()
-  is_muted: string;
+  @IsOptional()
+  is_muted?: string;
 
   @IsString()
-  @IsNotEmpty()
-  mute_until: string;
+  @IsOptional()
+  mute_until?: string;
 
   @IsString()
-  @IsNotEmpty()
-  is_archived: string;
+  @IsOptional()
+  is_archived?: string;
 
   @IsString()
-  @IsNotEmpty()
-  unread_count: string;
+  @IsOptional()
+  unread_count?: string;
 
   @IsString()
-  @IsNotEmpty()
-  unread_mention: string;
+  @IsOptional()
+  unread_mention?: string;
 
   @IsString()
-  @IsNotEmpty()
-  read_only: string;
+  @IsOptional()
+  read_only?: string;
 
   @IsString()
-  @IsNotEmpty()
-  not_spam: string;
+  @IsOptional()
+  not_spam?: string;
 
   @IsString()
-  @IsNotEmpty()
-  last_activity_at: string;
+  @IsOptional()
+  last_activity_at?: string;
 
   @IsString()
-  @IsNotEmpty()
-  contact_client: string;
+  @IsOptional()
+  contact_client?: string;
 
   @IsString()
-  @IsNotEmpty()
-  created_at: string;
+  @IsOptional()
+  created_at?: string;
 
   @IsString()
-  @IsNotEmpty()
-  updated_at: string;
+  @IsOptional()
+  updated_at?: string;
 
-   conversation_id?: string;
+  @IsString()
+  @IsOptional()
+  conversation_id?: string;
 
+  @IsString()
+  @IsOptional()
   customer_id?: string;
 
+  @IsString()
+  @IsOptional()
   assigned_agent_id?: string;
 
-  status?: 'open' | 'close';
+  @IsEnum(WhatsappChatStatus)
+  @IsOptional()
+  status?: WhatsappChatStatus;
  
-  started_at?: Date;
+  @IsString()
+  @IsOptional()
+  started_at?: string;
 
+  @IsOptional()
   closed_at?: Date;
 }

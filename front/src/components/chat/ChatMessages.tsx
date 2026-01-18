@@ -24,11 +24,16 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
 
   const formatTime = (date: Date) => {
     try {
-      return new Date(date).toLocaleTimeString('fr-FR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+      // Vérifie si la date est valide avant de la formater
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        return '--:--';
+      }
+      return d.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
       });
-    } catch (error) {
+    } catch {
       return '--:--';
     }
   };
@@ -70,13 +75,17 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
         // Validation des données
         const messageText = msg.text || "(Message sans texte)";
         const messageFrom = msg.from === 'commercial' ? 'commercial' : 'client';
-        const messageTimestamp = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp || Date.now());
-        const messageId = msg.id || `msg_${index}_${Date.now()}`;
+        // Utilise une date valide ou null. La fonction formatTime gérera le cas null.
+        const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
+        // Crée un ID stable pour la clé en cas d'absence d'ID de message
+        const messageId = msg.id || `msg-fallback-${index}`;
 
         return (
           <div
             key={messageId}
-            className={`flex ${messageFrom === 'commercial' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${
+              messageFrom === 'commercial' ? 'justify-end' : 'justify-start'
+            }`}
           >
             <div
               className={`max-w-xl px-4 py-2 rounded-2xl ${

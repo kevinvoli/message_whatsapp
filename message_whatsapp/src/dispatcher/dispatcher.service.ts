@@ -4,10 +4,9 @@ import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
-// import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 
 @Injectable()
 export class DispatcherService {
@@ -51,10 +50,10 @@ export class DispatcherService {
       this.messageGateway.isAgentConnected(conversation.commercial.id)
     )
     {
-  conversation.unread_count += 1;
+      conversation.unread_count = (parseInt(conversation.unread_count, 10) + 1).toString();
       conversation.last_activity_at = new Date();
-      if (conversation.status === 'fermé') {
-        conversation.status = 'actif';
+      if (conversation.status === WhatsappChatStatus.FERME) {
+        conversation.status = WhatsappChatStatus.ACTIF;
       }
       return this.chatRepository.save(conversation);
     }
@@ -81,7 +80,7 @@ export class DispatcherService {
       // Re-assign the conversation if the agent is different or disconnected
      conversation.commercial_id = nextAgent.id;
       conversation.status = WhatsappChatStatus.EN_ATTENTE;
-      conversation.unread_count = 1;
+      conversation.unread_count = "1";
       conversation.last_activity_at = new Date();
       return this.chatRepository.save(conversation);
     } else {
@@ -92,8 +91,8 @@ export class DispatcherService {
         commercial_id: nextAgent.id,
         status: WhatsappChatStatus.EN_ATTENTE,
         type: 'private', // Assuming 'private' as a default type
-        unread_count: 1,
-        last_activity_at: new Date(),
+        unread_count: "1",
+        last_activity_at: new Date().toISOString(),
       };
 
 

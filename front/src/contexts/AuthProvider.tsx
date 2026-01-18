@@ -3,7 +3,7 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useChatStore } from '@/store/chatStore';
 
 interface User {
   id: string;
@@ -29,12 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { 
-   LogOut
-  } = useWebSocket(user);
-
-
-
+  const { reset } = useChatStore();
 
   useEffect(() => {
     // Vérifier si l'utilisateur est déjà connecté
@@ -74,29 +69,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('token', authToken);
       localStorage.setItem('user', JSON.stringify(userData));
       
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Login failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error) {
+        let errorMessage = 'Login failed due to an unexpected error';
+        if (axios.isAxiosError(error)) {
+          // Si c'est une erreur Axios, on peut accéder à `error.response`
+          errorMessage = error.response?.data?.message || 'Login failed';
+        } else if (error instanceof Error) {
+          // Si c'est une erreur standard
+          errorMessage = error.message;
+        }
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
-
-    const success  = logout(); 
-
-    if (!success) {
-      setError('Échec de lea Deconnexion');
-      // Marquer le message comme erreur
-      return null;
-    }
-       localStorage.removeItem('token');
+    reset(); // Vide le store Zustand
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
- 
   };
 
   return (

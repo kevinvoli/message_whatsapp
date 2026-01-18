@@ -1,20 +1,26 @@
-// utils/messageUtils.ts
+// lib/utils.ts
 import { Message } from '@/types/chat';
 
-export const createMessage = (data: any): Message => ({
-  id: data.id || `msg_${Date.now()}`,
-  text: data.text || "",
+// Définit le type pour les données brutes d'un message reçues (par ex. d'une API)
+interface RawMessageData {
+  id?: string | number;
+  text?: string;
+  timestamp?: string | number | Date;
+  from_me?: boolean;
+  status?: string;
+  direction?: 'IN' | 'OUT';
+  from: string; // Le numéro de téléphone de l'expéditeur
+  from_name?: string;
+}
+
+export const createMessage = (data: RawMessageData): Message => ({
+  id: String(data.id || `msg_${new Date().getTime()}`),
+  text: data.text || '',
   timestamp: new Date(data.timestamp || Date.now()),
-  from: data.from_me ? "commercial" : "client",
-  status: data.status || "sent",
-  direction: data.direction || "IN",
+  from: data.from_me ? 'commercial' : 'client',
+  status: data.status || 'sent',
+  direction: data.direction || 'IN',
   sender_phone: data.from,
-  sender_name: data.from_name || (data.from_me ? "Agent" : "Client"),
-  from_me: !!data.from_me, // Convertir en boolean
+  sender_name: data.from_name || (data.from_me ? 'Agent' : 'Client'),
+  from_me: !!data.from_me,
 });
-
-// Puis dans useWebSocket.ts
-import { createMessage } from '@/utils/messageUtils';
-
-// Utilisation
-const transformedMessages: Message[] = data.messages.map(createMessage);
