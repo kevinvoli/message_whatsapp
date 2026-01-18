@@ -1,7 +1,7 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
-import { 
+import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -12,7 +12,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-   // Add this import
+  // Add this import
 } from 'typeorm';
 
 export enum MessageDirection {
@@ -70,15 +70,12 @@ export class WhatsappMessage {
   })
   type: string;
 
-  
-
   @ManyToOne(() => WhatsappChat, (data) => data.messages)
   @JoinColumn({
     name: 'chat_id',
     referencedColumnName: 'chat_id',
   })
   chat: WhatsappChat;
- 
 
   @Column({
     name: 'commercial_id',
@@ -96,24 +93,18 @@ export class WhatsappMessage {
   })
   text: string | null;
 
-@ManyToOne(() => WhatsappCommercial, (data) => data.messages)
+  @ManyToOne(() => WhatsappCommercial, (data) => data.messages)
   @JoinColumn({
     name: 'commercial_id',
     referencedColumnName: 'id',
   })
   commercial: WhatsappCommercial;
 
-
-
   @OneToMany(
     () => WhatsappMessageContent,
     (messageContent) => messageContent.message,
   )
   messageCnntent: WhatsappMessageContent[];
-
-
-
-
 
   @Column({
     name: 'direction',

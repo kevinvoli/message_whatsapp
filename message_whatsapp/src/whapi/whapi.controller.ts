@@ -9,19 +9,19 @@ export class WhapiController {
   constructor(private readonly whapiService: WhapiService) {}
    @Post()
    handleWebhook(@Body() payload: WhapiWebhookPayload) {
-    console.log("mon payload whapi", payload);
+    // console.log("mon payload whapi", payload);
 
     const eventType = payload.event.type;
   switch (eventType) {
     case 'messages':
       // Traiter les messages
-      console.log('Événement messages:', payload.messages);
+      // console.log('Événement messages:', payload.messages);
      this.whapiService.handleIncomingMessage(payload);
 
       break;
     case 'statuses':
       // Traiter les statuts
-      console.log('Événement statuses:', payload.statuses);
+      // console.log('Événement statuses:', payload.statuses);
 
       this.whapiService.updateStatusMessage(payload);
 

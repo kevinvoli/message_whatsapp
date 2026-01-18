@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
 import { WhatsappCommercial } from './entities/user.entity';
+import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 
 export interface SafeWhatsappCommercial {
   id: string;
@@ -17,6 +18,9 @@ export class WhatsappCommercialService {
   constructor(
     @InjectRepository(WhatsappCommercial)
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
+     @InjectRepository(QueuePosition)
+    private readonly queuePositionRepository: Repository<QueuePosition>,
+
 
   ) {}
 
@@ -78,6 +82,14 @@ export class WhatsappCommercialService {
     };
   }
 
+  async findStatus(id: string): Promise<boolean> {
+    const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+    return user.isConnected
+  }
+
   async findOneById(id: string): Promise<SafeWhatsappCommercial> {
     const user = await this.whatsappCommercialRepository.findOne({ where: { id } });
     if (!user) {
@@ -135,6 +147,14 @@ async updateStatus(id:string, status:boolean) {
   user.isConnected = status;
 
   const updatedUser = await this.whatsappCommercialRepository.save(user);
+  
+  if (user.isConnected===false) {
+
+    await this.queuePositionRepository.delete({
+      user
+    })
+  }
+
   return updatedUser
 }
 

@@ -11,10 +11,11 @@ import { CommunicationWhapiService } from 'src/communication_whapi/communication
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 
 @Module({
    imports: [TypeOrmModule.forFeature([
-          WhatsappMessage, WhatsappChat,  WhatsappMessageContent,  WhatsappCommercial
+          WhatsappMessage, WhatsappChat,  WhatsappMessageContent,  WhatsappCommercial,QueuePosition
         ]), WhatsappChatModule, DispatcherModule],
   providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,WhatsappCommercialService,CommunicationWhapiService],
   exports: [WhatsappMessageGateway],

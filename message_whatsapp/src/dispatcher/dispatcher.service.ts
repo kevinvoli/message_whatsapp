@@ -6,6 +6,7 @@ import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
+import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
 // import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 
 @Injectable()
@@ -19,6 +20,8 @@ export class DispatcherService {
     private readonly queueService: QueueService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
+
+    private readonly WhatsappCommercialService: WhatsappCommercialService,
   ) {}
 
   async assignConversation(
@@ -33,14 +36,30 @@ export class DispatcherService {
       relations: ['commercial', 'messages']
     });
 
+    console.log("new message arrive", clientName);
+    
     // If conversation exists and its agent is connected, do nothing.
-    if (
+  const  isConnected :boolean    =(conversation)? await this.WhatsappCommercialService.findStatus(conversation.commercial.id): false
+
+  console.log("log des connecté",isConnected);
+  
+    
+     if (
       conversation &&
       conversation.commercial &&
+      isConnected &&
       this.messageGateway.isAgentConnected(conversation.commercial.id)
-    ) {
-      return conversation;
+    )
+    {
+  conversation.unread_count += 1;
+      conversation.last_activity_at = new Date();
+      if (conversation.status === 'fermé') {
+        conversation.status = 'actif';
+      }
+      return this.chatRepository.save(conversation);
     }
+
+
 
     const nextAgent = await this.queueService.getNextInQueue();
 
@@ -54,52 +73,48 @@ export class DispatcherService {
       );
       return null;
     }
+    console.log("New Proprio", nextAgent);
 
+    
+    
     if (conversation) {
       // Re-assign the conversation if the agent is different or disconnected
-      if (conversation.commercial_id !== nextAgent.id) {
-        conversation.commercial_id = nextAgent.id;
-        conversation = await this.chatRepository.save(conversation);
-      }
+     conversation.commercial_id = nextAgent.id;
+      conversation.status = WhatsappChatStatus.EN_ATTENTE;
+      conversation.unread_count = 1;
+      conversation.last_activity_at = new Date();
+      return this.chatRepository.save(conversation);
     } else {
       // Create a new conversation
       const createDto: CreateWhatsappChatDto = {
-        chat_id: clientPhone,
-        name: clientName, // This should be improved later
+         chat_id: clientPhone,
+        name: clientName,
         commercial_id: nextAgent.id,
-        status: 'open',
-        type: '',
-        chat_pic: '',
-        chat_pic_full: '',
-        is_pinned: '',
-        is_muted: '',
-        mute_until: '',
-        is_archived: '',
-        unread_count: '',
-        unread_mention: '',
-        read_only: '',
-        not_spam: '',
-        last_activity_at: '',
-        contact_client: '',
-        created_at: '',
-        updated_at: '',
+        status: WhatsappChatStatus.EN_ATTENTE,
+        type: 'private', // Assuming 'private' as a default type
+        unread_count: 1,
+        last_activity_at: new Date(),
       };
 
-      const existingChat = await this.chatRepository.findOne({
-        where: { chat_id: createDto.chat_id },
-      });
-      if (existingChat) {
-        // Mettez à jour le chat existant
-        await this.chatRepository.update(existingChat.id, createDto);
-        // Récupérez l'entité mise à jour
-        return await this.chatRepository.findOne({
-          where: { id: existingChat.id },
-        });
-      } else {
-        // Créez un nouveau chat
-        const newChat = this.chatRepository.create(createDto);
-        return await this.chatRepository.save(newChat);
-      }
+
+       const newChat = this.chatRepository.create(createDto);
+      return this.chatRepository.save(newChat);
+
+      // const existingChat = await this.chatRepository.findOne({
+      //   where: { chat_id: createDto.chat_id },
+      // });
+      // if (existingChat) {
+      //   // Mettez à jour le chat existant
+      //   await this.chatRepository.update(existingChat.id, createDto);
+      //   // Récupérez l'entité mise à jour
+      //   return await this.chatRepository.findOne({
+      //     where: { id: existingChat.id },
+      //   });
+      // } else {
+      //   // Créez un nouveau chat
+      //   const newChat = this.chatRepository.create(createDto);
+      //   return await this.chatRepository.save(newChat);
+      // }
     }
 
     return conversation;

@@ -80,7 +80,7 @@ async createAgentMessage(data: {
       text: data.text,
       chat: chat,
       commercial: chat.commercial,
-      from: chat.contact_client,
+      from:  extractPhoneNumber(chat?.chat_id),
       from_name: chat.name,
     });
 
@@ -253,7 +253,6 @@ async createAgentMessage(data: {
   };
 
   async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
-console.log("mes messageqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",message);
 
   const messagesss= await this.messageRepository.save(
     this.messageRepository.create({
@@ -271,17 +270,8 @@ console.log("mes messageqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",message);
       source: 'whapi',
     }),
   );
-console.log("mes messageqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",messagesss);
-
-
   return messagesss
 }
-
-   
-
-
-  
-
   remove(id: string) {
     return `This action removes a #${id} whatsappMessage`;
   }

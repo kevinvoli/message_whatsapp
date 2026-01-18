@@ -64,7 +64,7 @@ export class WhapiService {
         return;
       }
 
-      console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk_______________________________rrrrrrrrrrrrrrrrrrrrr",conversation);
+  
       
 
       // 2️⃣ Sauvegarde en base
@@ -94,9 +94,6 @@ export class WhapiService {
       this.messageGateway.emitIncomingConversation(
         conversation
       )
-
-
-
     } catch (error) {
       console.log(error);
 

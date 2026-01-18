@@ -22,7 +22,6 @@ import {
 } from './entities/whatsapp_message.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -61,9 +60,9 @@ export class WhatsappMessageGateway
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
       await this.emitQueueUpdate();
-      console.log('nuew status socket', false);
+      console.log('nuew status socket', true);
 
-      await this.userService.updateStatus(commercialId, false);
+      await this.userService.updateStatus(commercialId, true);
       // await this.dispatcherService.distributePendingMessages();
     }
   }
@@ -132,11 +131,8 @@ public async emitIncomingConversation(chat: any) {
     };
 
     // Émettre l'événement de mise à jour de conversation à l'agent spécifique
-    this.server.to(targetSocketId).emit('conversation:updated', conversation);
-
-       this.server.emit('conversation:updated', conversation);
-
-    
+    this.server.to(targetSocketId).emit('conversation:updated', conversation)
+      //  this.server.emit('conversation:updated', conversation);    
   } catch (error) {
     console.error('Erreur lors de l\'émission de la conversation:', error);
   }
@@ -231,7 +227,6 @@ public async emitIncomingConversation(chat: any) {
       }
     });
 
-    console.log("conversation---------------------", data.conversationId);
     
 
     client.join(data.conversationId);
@@ -445,13 +440,23 @@ public async emitIncomingConversation(chat: any) {
       chat_id: string;
     },
   ) {
-    console.log('💬 Message agent reçu:', data);
+    console.log('💬 Message agent reçu:_______________________________________________', );
+
 
     try {
       // Vérifier que l'agent est connecté
       const agentId = this.connectedAgents.get(client.id);
+
+       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, agentId]) => agentId === agentId,
+    )?.[0];
+
+    if (!targetSocketId) {
+   
+      return;
+    }
       if (!agentId) {
-        client.emit('error', { error: 'Agent non authentifié' });
+        client.to(targetSocketId).emit('error', { error: 'Agent non authentifié' });
         return;
       }
 
@@ -465,7 +470,7 @@ public async emitIncomingConversation(chat: any) {
         },
       );
 
-      // console.log('💾 Message sauvegardé en base:', savedMessage.id);
+      console.log('💾 Message sauvegardé en base:',data );
 
       // Préparer l'objet message pour le frontend
       const messageForFrontend = {
@@ -474,15 +479,15 @@ public async emitIncomingConversation(chat: any) {
         timestamp: new Date(savedMessage.timestamp).getTime(),
         direction: 'OUT',
         from: savedMessage.from,
-        from_name: savedMessage.from_name || 'Agent',
+        from_name: savedMessage.from_name || (savedMessage.from_me ? 'Agent' : 'Client'),
         status: savedMessage.status,
-        from_me: true,
+        from_me: savedMessage.from_me,
       };
 
       // Envoyer la confirmation à l'expéditeur
-      client.emit('message:sent', {
+      client.to(targetSocketId).emit('message:sent', {
         conversationId: data.conversationId,
-        message: messageForFrontend,
+        messages: messageForFrontend,
       });
 
       console.log("✅ Confirmation envoyée à l'expéditeur");
@@ -680,6 +685,7 @@ public async emitIncomingConversation(chat: any) {
   }
 
   public isAgentConnected(agentId: string): boolean {
+
     const connectedAgentIds = Array.from(this.connectedAgents.values());
     return connectedAgentIds.includes(agentId);
   }

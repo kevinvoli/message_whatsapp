@@ -15,9 +15,7 @@ export class CommunicationWhapiService {
     async sendToWhapi(to: string, text: string): Promise<{
        id: string,
   status: number,
-  statusText: string}> {
-    console.log("cschuhd",to);
-    
+  statusText: string}> {  
     const response = await axios.post(
       this.WHAPI_URL,
       {

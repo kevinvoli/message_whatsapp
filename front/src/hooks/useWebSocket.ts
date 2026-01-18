@@ -133,7 +133,7 @@ export const useWebSocket = (commercial: Commercial | null) => {
       let newConversations;
       if (index !== -1) {
         // Si elle existe, on la met à jour
-        console.log("🔄 Mise à jour de la conversation:", conversation.chat_id);
+        console.log("🔄 Mise à jour de la conversation:", conversation);
         newConversations = [...prev];
         newConversations[index] = conversation;
       } else {
@@ -171,24 +171,31 @@ export const useWebSocket = (commercial: Commercial | null) => {
 
     const eventName = `message:received`;
 
-    const handleIncomingMessage = (message: any) => {
+    const handleIncomingMessage = (data:{
+        conversationId: string, // ✅ PAS chat.id
+        message: any,
+      }) => {
+        const msg=data.message;
       console.log("═══════════════════════════════════════════════════════");
       console.log(`📩 MESSAGE EN TEMPS RÉEL`);
       console.log("Event:", eventName);
-      console.log("Message:", message);
+      console.log("Message:", msg);
       console.log("═══════════════════════════════════════════════════════");
 
       const newMessage: Message = {
-        id: message.id,
-        text: message.text,
-        timestamp: new Date(message.timestamp || Date.now()),
-        from: message.from,
-        status: message.status || "sent",
-        direction: message.direction || "IN",
-        sender_phone: message.from,
-        sender_name: message.from_name,
-        from_me: message.from_me,
+        id: msg.id,
+        text: msg.text,
+        timestamp: new Date(msg.timestamp || Date.now()),
+        from: msg.from,
+        status: msg.status || "sent",
+        direction: msg.direction || "IN",
+        sender_phone: msg.from,
+        sender_name: msg.from_name,
+        from_me: msg.from_me,
       };
+       
+
+
 
       setMessages((prev) => {
         // ✅ Éviter les doublons

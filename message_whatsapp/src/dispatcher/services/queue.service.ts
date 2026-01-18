@@ -87,33 +87,34 @@ export class QueueService {
       order: { position: 'ASC' },
       relations: ['user'],
     });
+    
+    // console.log("qui ce trouver a la queue",nextInQueue);
+    
 
     if (!nextInQueue) {
       return null;
     }
-
     if (!nextInQueue.user) {
       throw new NotFoundException(`User with ID ${nextInQueue.userId} not found for queue position.`);
     }
-
     await this.moveToEnd(nextInQueue.userId);
-
     return nextInQueue.user;
+    
   }
 
-  /**
-   * Gets the current state of the queue.
-   */
-  async getQueuePositions(): Promise<QueuePosition[]> {
-    return this.queueRepository.find({
+    
+ 
+    async getQueuePositions(): Promise<QueuePosition[]> {
+    return await this.queueRepository.find({
       order: { position: 'ASC' },
       relations: ['user'],
     });
   }
 
-  /**
-   * Moves a user to the end of the queue. Used for reconnections.
-   */
+//  suprime et ajouter a la queue
+
+
+
   async moveToEnd(userId: string): Promise<void> {
     await this.removeFromQueue(userId);
     await this.addToQueue(userId);
