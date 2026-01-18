@@ -418,8 +418,32 @@ public async emitIncomingConversation(chat: any) {
   }
 
   public isAgentConnected(agentId: string): boolean {
-
     const connectedAgentIds = Array.from(this.connectedAgents.values());
     return connectedAgentIds.includes(agentId);
+  }
+
+  public async emitConversationUpdate(chatId: string): Promise<void> {
+    try {
+      const chat = await this.chatService.findByChatId(chatId);
+      if (!chat || !chat.commercial_id) return;
+
+      const targetSocketId = Array.from(this.connectedAgents.entries())
+        .find(([_, agentId]) => agentId === chat.commercial_id)?.[0];
+
+      if (targetSocketId) {
+        const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+        const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+
+        const conversationPayload = {
+          ...chat,
+          last_message: lastMessage,
+          unread_count: unreadCount,
+        };
+
+        this.server.to(targetSocketId).emit('conversation:updated', conversationPayload);
+      }
+    } catch (error) {
+      console.error(`Failed to emit conversation update for chat ${chatId}:`, error);
+    }
   }
 }
