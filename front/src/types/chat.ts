@@ -138,9 +138,9 @@ export const transformToConversation = (rawData: RawConversationData): Conversat
   return {
     id: rawData.id,
     chatId: rawData.chat_id,
-    clientName: rawData.client_name || rawData.clientName || 'Client Inconnu',
+    clientName: rawData.name || rawData.client_name || rawData.clientName || 'Client Inconnu',
     clientPhone: rawData.client_phone || rawData.clientPhone || rawData.chat_id?.split('@')[0] || '',
-    lastMessage: rawData.last_message ? transformToMessage(rawData.last_message) : null,
+    lastMessage: rawData.last_message ? transformToMessage(rawData.last_message) : (rawData as any).lastMessage ? (rawData as any).lastMessage : null,
     messages,
     unreadCount: rawData.unread_count ?? rawData.unreadCount ?? 0,
     commercialId: rawData.commercial_id,
