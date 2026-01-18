@@ -111,47 +111,6 @@ interface RawCommercialData {
 // ==============================================
 
 /**
- * Transforme des données brutes en un objet Message valide.
- */
-export const transformToMessage = (rawData: RawMessageData): Message => {
-  return {
-    id: rawData.id,
-    text: rawData.text || rawData.content || '',
-    timestamp: new Date(rawData.timestamp || rawData.createdAt || Date.now()),
-    from: rawData.from_me ? 'commercial' : 'client',
-    status: (rawData.status as MessageStatus) || 'sent',
-    direction: rawData.direction || (rawData.from_me ? 'OUT' : 'IN'),
-    sender_phone: rawData.from || '',
-    sender_name: rawData.from_name || (rawData.from_me ? 'Agent' : 'Client'),
-    from_me: !!rawData.from_me,
-  };
-};
-
-/**
- * Transforme des données brutes en un objet Conversation valide.
- */
-export const transformToConversation = (rawData: RawConversationData): Conversation => {
-  const messages: Message[] = Array.isArray(rawData.messages)
-    ? rawData.messages.map(transformToMessage)
-    : [];
-
-  return {
-    id: rawData.id,
-    chatId: rawData.chat_id,
-    clientName: rawData.name || rawData.client_name || rawData.clientName || 'Client Inconnu',
-    clientPhone: rawData.client_phone || rawData.clientPhone || rawData.chat_id?.split('@')[0] || '',
-    lastMessage: rawData.last_message ? transformToMessage(rawData.last_message) : (rawData as any).lastMessage ? (rawData as any).lastMessage : null,
-    messages,
-    unreadCount: rawData.unread_count ?? rawData.unreadCount ?? 0,
-    commercialId: rawData.commercial_id,
-    name: rawData.name || rawData.clientName || 'Conversation',
-    status: rawData.status || 'en attente',
-    createdAt: new Date(rawData.created_at),
-    updatedAt: new Date(rawData.updated_at),
-  };
-};
-
-/**
  * Transforme des données brutes en un objet Commercial valide.
  */
 export const transformToCommercial = (rawData: RawCommercialData): Commercial => {

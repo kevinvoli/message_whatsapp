@@ -20,7 +20,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   const  chats=
    await this.chatRepository.find({
-    where: { commercial_id: commercialId },
+    where: { commercialId: commercialId },
     order: { updatedAt: 'DESC' },
     relations: ['commercial','messages',],
   });
@@ -37,7 +37,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
   ): Promise<WhatsappChat> {
     try {
       const existingChat = await this.chatRepository.findOne({
-        where: { chat_id: chatId },
+        where: { chatId: chatId },
       });
 
       if (existingChat) {
@@ -50,22 +50,22 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
       }
 
       const newChat = this.chatRepository.create({
-        chat_id: chatId,
+        chatId: chatId,
         name: fromName,
         type: 'private',
-        chat_pic: '',
-        chat_pic_full: '',
-        is_pinned: false,
-        is_muted: false,
-        mute_until: null,
-        is_archived: false,
-        unread_count: 0,
-        unread_mention: false,
-        read_only: false,
-        not_spam: true,
+        chatPic: '',
+        chatPicFull: '',
+        isPinned: false,
+        isMuted: false,
+        muteUntil: null,
+        isArchived: false,
+        unreadCount: 0,
+        unreadMention: false,
+        readOnly: false,
+        notSpam: true,
         commercial: commercial,
-        contact_client: from,
-        last_activity_at: new Date(),
+        contactClient: from,
+        lastActivityAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -79,14 +79,14 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel','messages',], });
+      return this.chatRepository.find({ where: { chatId: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel','messages',], });
     }
     return this.chatRepository.find();
   }
 
   async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
-      where: { chat_id: chatId },
+      where: { chatId: chatId },
       relations: ['commercial','messages'],
     });
   }

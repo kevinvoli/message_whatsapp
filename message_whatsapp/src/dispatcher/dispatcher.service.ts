@@ -31,7 +31,7 @@ export class DispatcherService {
     mediaUrl?: string,
   ): Promise<WhatsappChat | null> {
     const conversation = await this.chatRepository.findOne({
-      where: { chat_id: clientPhone },
+      where: { chatId: clientPhone },
       relations: ['commercial', 'messages'],
     });
 
@@ -41,8 +41,8 @@ export class DispatcherService {
 
     // If conversation exists and its agent is connected, update it.
     if (conversation && isConnected) {
-      conversation.unread_count += 1; // Correctly increment the number
-      conversation.last_activity_at = new Date();
+      conversation.unreadCount += 1; // Correctly increment the number
+      conversation.lastActivityAt = new Date();
       if (conversation.status === WhatsappChatStatus.FERME) {
         conversation.status = WhatsappChatStatus.ACTIF;
       }
@@ -59,22 +59,22 @@ export class DispatcherService {
 
     if (conversation) {
       // Re-assign the existing conversation to the new agent.
-      conversation.commercial_id = nextAgent.id;
+      conversation.commercialId = nextAgent.id;
       conversation.status = WhatsappChatStatus.EN_ATTENTE;
-      conversation.unread_count = 1; // Assign a number
-      conversation.last_activity_at = new Date();
+      conversation.unreadCount = 1; // Assign a number
+      conversation.lastActivityAt = new Date();
       return this.chatRepository.save(conversation);
     } else {
       // Create a new conversation for the new agent.
       const createDto: Partial<WhatsappChat> = {
-        chat_id: clientPhone,
+        chatId: clientPhone,
         name: clientName,
-        commercial_id: nextAgent.id,
+        commercialId: nextAgent.id,
         status: WhatsappChatStatus.EN_ATTENTE,
         type: 'private',
-        unread_count: 1, // Assign a number
-        last_activity_at: new Date(),
-        contact_client: clientPhone,
+        unreadCount: 1, // Assign a number
+        lastActivityAt: new Date(),
+        contactClient: clientPhone,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

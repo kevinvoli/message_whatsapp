@@ -4,10 +4,10 @@ import { WhatsappChatStatus } from '../entities/whatsapp_chat.entity';
 export class CreateWhatsappChatDto {
   @IsString()
   @IsOptional()
-  commercial_id?: string | null;
+  commercialId?: string | null;
 
   @IsString()
-  chat_id: string;
+  chatId: string;
 
   @IsString()
   name: string;
@@ -17,56 +17,56 @@ export class CreateWhatsappChatDto {
 
   @IsString()
   @IsOptional()
-  chat_pic?: string;
+  chatPic?: string;
 
   @IsString()
   @IsOptional()
-  chat_pic_full?: string;
+  chatPicFull?: string;
 
   @IsBoolean()
   @IsOptional()
-  is_pinned?: boolean;
+  isPinned?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  is_muted?: boolean;
+  isMuted?: boolean;
 
   @IsDateString()
   @IsOptional()
-  mute_until?: Date | null;
+  muteUntil?: Date | null;
 
   @IsBoolean()
   @IsOptional()
-  is_archived?: boolean;
+  isArchived?: boolean;
 
   @IsNumber()
   @IsOptional()
-  unread_count?: number;
+  unreadCount?: number;
 
   @IsBoolean()
   @IsOptional()
-  unread_mention?: boolean;
+  unreadMention?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  read_only?: boolean;
+  readOnly?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  not_spam?: boolean;
+  notSpam?: boolean;
 
   @IsDateString()
   @IsOptional()
-  last_activity_at?: Date;
+  lastActivityAt?: Date;
 
   @IsString()
-  contact_client: string;
+  contactClient: string;
 
   @IsDateString()
-  created_at: Date;
+  createdAt: Date;
 
   @IsDateString()
-  updated_at: Date;
+  updatedAt: Date;
 
   @IsEnum(WhatsappChatStatus)
   @IsOptional()

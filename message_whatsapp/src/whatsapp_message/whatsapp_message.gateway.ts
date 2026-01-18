@@ -184,12 +184,12 @@ public async emitIncomingConversation(chat: any) {
       const chats = await this.chatService.findByCommercialId(commercialId);
       const conversations = await Promise.all(
         chats.map(async (chat) => {
-          const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
-          const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+          const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chatId);
+          const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chatId);
           return {
             ...chat,
-            last_message: lastMessage,
-            unread_count: unreadCount,
+            lastMessage: lastMessage,
+            unreadCount: unreadCount,
           };
         }),
       );
@@ -244,8 +244,6 @@ public async emitIncomingConversation(chat: any) {
         timestamp: new Date(),
       });
 
-      // The dispatcher or another service should handle broadcasting this new message.
-      // For now, we can emit an update to the sender.
       const chat = await this.chatService.findByChatId(payload.chatId);
       if (chat) {
         this.emitConversationUpdate(chat.id);
@@ -425,19 +423,19 @@ public async emitIncomingConversation(chat: any) {
   public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
       const chat = await this.chatService.findByChatId(chatId);
-      if (!chat || !chat.commercial_id) return;
+      if (!chat || !chat.commercialId) return;
 
       const targetSocketId = Array.from(this.connectedAgents.entries())
-        .find(([_, agentId]) => agentId === chat.commercial_id)?.[0];
+        .find(([_, agentId]) => agentId === chat.commercialId)?.[0];
 
       if (targetSocketId) {
-        const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
-        const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+        const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chatId);
+        const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chatId);
 
         const conversationPayload = {
           ...chat,
-          last_message: lastMessage,
-          unread_count: unreadCount,
+          lastMessage: lastMessage,
+          unreadCount: unreadCount,
         };
 
         this.server.to(targetSocketId).emit('conversation:updated', conversationPayload);

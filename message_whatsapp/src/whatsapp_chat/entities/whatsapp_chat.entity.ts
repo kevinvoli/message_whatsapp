@@ -35,7 +35,7 @@ export class WhatsappChat {
     length: 100,
     nullable: true,
   })
-  commercial_id: string | null;
+  commercialId: string | null;
 
   @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
   @JoinColumn({
@@ -52,7 +52,7 @@ export class WhatsappChat {
     nullable: false,
     unique: true,
   })
-  chat_id: string; // chat_id WHAPI
+  chatId: string; // chat_id WHAPI
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
@@ -68,7 +68,7 @@ export class WhatsappChat {
   type: string; // private | group | newsletter
 
   @Column({ name: 'chat_pic', type: 'varchar', length: 100, nullable: false })
-  chat_pic: string;
+  chatPic: string;
 
   @Column({
     name: 'chat_pic_full',
@@ -76,23 +76,23 @@ export class WhatsappChat {
     length: 100,
     nullable: false,
   })
-  chat_pic_full: string;
+  chatPicFull: string;
 
   @Column({ name: 'is_pinned', type: 'boolean', default: false })
-  is_pinned: boolean;
+  isPinned: boolean;
 
   @Column({ name: 'is_muted', type: 'boolean', default: false })
-  is_muted: boolean;
+  isMuted: boolean;
 
   @Column({ name: 'mute_until', type: 'timestamp', nullable: true })
-  mute_until: Date | null;
+  muteUntil: Date | null;
 
   @Column({
     name: 'is_archived',
     type: 'boolean',
     default: false,
   })
-  is_archived: boolean;
+  isArchived: boolean;
 
   @Column({
     name: 'unread_count',
@@ -100,30 +100,30 @@ export class WhatsappChat {
     default: 0,
     comment: 'Number of unread messages in the chat',
   })
-  unread_count: number;
+  unreadCount: number;
 
   @Column({
     name: 'unread_mention',
     type: 'boolean',
     default: false,
   })
-  unread_mention: boolean;
+  unreadMention: boolean;
 
   @Column({ name: 'read_only', type: 'boolean', default: false })
-  read_only: boolean;
+  readOnly: boolean;
 
   @Column({ name: 'not_spam', type: 'boolean', default: true })
-  not_spam: boolean;
+  notSpam: boolean;
 
   @Column({
     name: 'last_activity_at',
     type: 'timestamp',
     nullable: true,
   })
-  last_activity_at: Date; // timestamp
+  lastActivityAt: Date; // timestamp
 
   @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
-  contact_client: string;
+  contactClient: string;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
