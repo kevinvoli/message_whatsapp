@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
 // import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';

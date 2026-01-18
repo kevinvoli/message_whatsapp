@@ -72,60 +72,57 @@ export class WhatsappChat {
   })
   chat_pic_full: string;
 
-  @Column({ name: 'is_pinned', type: 'varchar', length: 100, nullable: false })
-  is_pinned: string;
+  @Column({ name: 'is_pinned', type: 'boolean', default: false })
+  is_pinned: boolean;
 
-  @Column({ name: 'is_muted', type: 'varchar', length: 100, nullable: false })
-  is_muted: string;
+  @Column({ name: 'is_muted', type: 'boolean', default: false })
+  is_muted: boolean;
 
-  @Column({ name: 'mute_until', type: 'varchar', length: 100, nullable: false })
-  mute_until: string;
+  @Column({ name: 'mute_until', type: 'timestamp', nullable: true })
+  mute_until: Date | null;
 
   @Column({
     name: 'is_archived',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
+    type: 'boolean',
+    default: false,
   })
-  is_archived: string;
+  is_archived: boolean;
 
   @Column({
     name: 'unread_count',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
+    type: 'int',
+    default: 0,
   })
-  unread_count: string;
+  unread_count: number;
 
   @Column({
     name: 'unread_mention',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
+    type: 'boolean',
+    default: false,
   })
-  unread_mention: string;
+  unread_mention: boolean;
 
-  @Column({ name: 'read_only', type: 'varchar', length: 100, nullable: false })
-  read_only: string;
+  @Column({ name: 'read_only', type: 'boolean', default: false })
+  read_only: boolean;
 
-  @Column({ name: 'not_spam', type: 'varchar', length: 100, nullable: false })
-  not_spam: string;
+  @Column({ name: 'not_spam', type: 'boolean', default: true })
+  not_spam: boolean;
 
    @Column({
     name: 'last_activity_at',
     type: 'timestamp',
     nullable: true,
   })
-  last_activity_at: Date; // timestamp
+  last_activity_at: Date;
 
     @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
   contact_client: string;
 
-  @Column({ name: 'created_at', type: 'varchar', length: 100, nullable: false })
-  created_at: string;
+  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  created_at: Date;
 
-  @Column({ name: 'updated_at', type: 'varchar', length: 100, nullable: false })
-  updated_at: string;
+  @Column({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  updated_at: Date;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
