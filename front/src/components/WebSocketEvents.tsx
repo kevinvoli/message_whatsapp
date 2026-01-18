@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useAuth } from '@/contexts/AuthProvider';
-import { Conversation, Message } from '@/types/chat';
+import { Conversation, Message, transformToConversation, transformToMessage } from '@/types/chat';
 
 /**
  * @file WebSocketEvents.tsx
@@ -36,23 +36,27 @@ const WebSocketEvents = () => {
       loadConversations();
 
       // --- Définition des handlers ---
-      const handleConversationsList = (conversations: Conversation[]) => {
-        console.log('Received conversations list:', conversations);
+      const handleConversationsList = (rawConversations: any[]) => {
+        console.log('Received raw conversations list:', rawConversations);
+        const conversations = rawConversations.map(transformToConversation);
         setConversations(conversations);
       };
 
-      const handleMessagesList = (data: { chatId: string, messages: Message[] }) => {
-        console.log(`Received messages for chat ${data.chatId}:`, data.messages);
-        setMessages(data.chatId, data.messages);
+      const handleMessagesList = (data: { chatId: string, messages: any[] }) => {
+        console.log(`Received raw messages for chat ${data.chatId}:`, data.messages);
+        const messages = data.messages.map(transformToMessage);
+        setMessages(data.chatId, messages);
       };
 
-      const handleNewMessage = (message: Message) => {
-        console.log('Received new message:', message);
+      const handleNewMessage = (rawMessage: any) => {
+        console.log('Received raw new message:', rawMessage);
+        const message = transformToMessage(rawMessage);
         addMessage(message);
       };
 
-      const handleConversationUpdated = (conversation: Conversation) => {
-        console.log('Conversation updated:', conversation);
+      const handleConversationUpdated = (rawConversation: any) => {
+        console.log('Received raw conversation update:', rawConversation);
+        const conversation = transformToConversation(rawConversation);
         updateConversation(conversation);
       };
 

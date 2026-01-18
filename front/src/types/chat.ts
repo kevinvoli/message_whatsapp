@@ -30,17 +30,17 @@ export interface Message {
 
 export interface Conversation {
   id: string;
-  chat_id: string;
-  client_name: string; // Convention: snake_case pour correspondre au backend
-  client_phone: string;
-  last_message: Message | null;
+  chatId: string;
+  clientName: string;
+  clientPhone: string;
+  lastMessage: Message | null;
   messages: Message[];
-  unread_count: number;
-  commercial_id?: string | null;
+  unreadCount: number;
+  commercialId?: string | null;
   name: string;
   status: 'actif' | 'en attente' | 'fermé';
-  created_at: Date;
-  updated_at: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
@@ -137,17 +137,17 @@ export const transformToConversation = (rawData: RawConversationData): Conversat
 
   return {
     id: rawData.id,
-    chat_id: rawData.chat_id,
-    client_name: rawData.client_name || rawData.clientName || 'Client Inconnu',
-    client_phone: rawData.client_phone || rawData.clientPhone || rawData.chat_id?.split('@')[0] || '',
-    last_message: rawData.last_message ? transformToMessage(rawData.last_message) : null,
+    chatId: rawData.chat_id,
+    clientName: rawData.client_name || rawData.clientName || 'Client Inconnu',
+    clientPhone: rawData.client_phone || rawData.clientPhone || rawData.chat_id?.split('@')[0] || '',
+    lastMessage: rawData.last_message ? transformToMessage(rawData.last_message) : null,
     messages,
-    unread_count: rawData.unread_count ?? rawData.unreadCount ?? 0,
-    commercial_id: rawData.commercial_id,
+    unreadCount: rawData.unread_count ?? rawData.unreadCount ?? 0,
+    commercialId: rawData.commercial_id,
     name: rawData.name || rawData.clientName || 'Conversation',
     status: rawData.status || 'en attente',
-    created_at: new Date(rawData.created_at),
-    updated_at: new Date(rawData.updated_at),
+    createdAt: new Date(rawData.created_at),
+    updatedAt: new Date(rawData.updated_at),
   };
 };
 
