@@ -4,9 +4,10 @@ import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
+// import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 
 @Injectable()
 export class DispatcherService {
@@ -30,58 +31,93 @@ export class DispatcherService {
     messageType: string,
     mediaUrl?: string,
   ): Promise<WhatsappChat | null> {
-    const conversation = await this.chatRepository.findOne({
-      where: { chatId: clientPhone },
-      relations: ['commercial', 'messages'],
+    let conversation = await this.chatRepository.findOne({
+      where: { chat_id: clientPhone },
+      relations: ['commercial', 'messages']
     });
 
-    const isConnected = conversation?.commercial?.id
-      ? this.messageGateway.isAgentConnected(conversation.commercial.id)
-      : false;
+    console.log("new message arrive", clientName);
 
-    // If conversation exists and its agent is connected, update it.
-    if (conversation && isConnected) {
-      conversation.unreadCount += 1; // Correctly increment the number
-      conversation.lastActivityAt = new Date();
-      if (conversation.status === WhatsappChatStatus.FERME) {
-        conversation.status = WhatsappChatStatus.ACTIF;
+    // If conversation exists and its agent is connected, do nothing.
+  const  isConnected :boolean    =(conversation)? await this.WhatsappCommercialService.findStatus(conversation.commercial.id): false
+
+  console.log("log des connecté",isConnected);
+
+
+     if (
+      conversation &&
+      conversation.commercial &&
+      isConnected &&
+      this.messageGateway.isAgentConnected(conversation.commercial.id)
+    )
+    {
+  conversation.unread_count += 1;
+      conversation.last_activity_at = new Date();
+      if (conversation.status === 'fermé') {
+        conversation.status = 'actif';
       }
       return this.chatRepository.save(conversation);
     }
 
-    // Find the next available agent.
+
+
     const nextAgent = await this.queueService.getNextInQueue();
+
     if (!nextAgent) {
-      // If no agent is available, queue the message.
-      await this.addPendingMessage(clientPhone, clientName, content, messageType, mediaUrl || '');
+      await this.addPendingMessage(
+        clientPhone,
+        clientName,
+        content,
+        messageType,
+        mediaUrl || '',
+      );
       return null;
     }
+    console.log("New Proprio", nextAgent);
+
+
 
     if (conversation) {
-      // Re-assign the existing conversation to the new agent.
-      conversation.commercialId = nextAgent.id;
+      // Re-assign the conversation if the agent is different or disconnected
+     conversation.commercial_id = nextAgent.id;
       conversation.status = WhatsappChatStatus.EN_ATTENTE;
-      conversation.unreadCount = 1; // Assign a number
-      conversation.lastActivityAt = new Date();
+      conversation.unread_count = 1;
+      conversation.last_activity_at = new Date();
       return this.chatRepository.save(conversation);
     } else {
-      // Create a new conversation for the new agent.
-      const createDto: Partial<WhatsappChat> = {
-        chatId: clientPhone,
+      // Create a new conversation
+      const createDto: CreateWhatsappChatDto = {
+         chat_id: clientPhone,
         name: clientName,
-        commercialId: nextAgent.id,
+        commercial_id: nextAgent.id,
         status: WhatsappChatStatus.EN_ATTENTE,
-        type: 'private',
-        unreadCount: 1, // Assign a number
-        lastActivityAt: new Date(),
-        contactClient: clientPhone,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        type: 'private', // Assuming 'private' as a default type
+        unread_count: 1,
+        last_activity_at: new Date(),
       };
 
-      const newChat = this.chatRepository.create(createDto);
+
+       const newChat = this.chatRepository.create(createDto);
       return this.chatRepository.save(newChat);
+
+      // const existingChat = await this.chatRepository.findOne({
+      //   where: { chat_id: createDto.chat_id },
+      // });
+      // if (existingChat) {
+      //   // Mettez à jour le chat existant
+      //   await this.chatRepository.update(existingChat.id, createDto);
+      //   // Récupérez l'entité mise à jour
+      //   return await this.chatRepository.findOne({
+      //     where: { id: existingChat.id },
+      //   });
+      // } else {
+      //   // Créez un nouveau chat
+      //   const newChat = this.chatRepository.create(createDto);
+      //   return await this.chatRepository.save(newChat);
+      // }
     }
+
+    return conversation;
   }
 
   async addPendingMessage(

@@ -20,7 +20,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   const  chats=
    await this.chatRepository.find({
-    where: { commercialId: commercialId },
+    where: { commercial_id: commercialId },
     order: { updatedAt: 'DESC' },
     relations: ['commercial','messages',],
   });
@@ -36,41 +36,44 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     commercialId: string,
   ): Promise<WhatsappChat> {
     try {
-      const existingChat = await this.chatRepository.findOne({
-        where: { chatId: chatId },
+      const chat = await this.chatRepository.findOne({
+        where: { chat_id: chatId },
       });
-
-      if (existingChat) {
-        return existingChat;
+      if (chat) {
+        log('chat trouvé ou créé:', chat);
+        return chat;
       }
-
       const commercial = await this.commercialService.findOneById(commercialId);
+      console.log("le commercial trouve",commercial);
+
       if (!commercial) {
         throw new Error('Commercial not found');
       }
+      console.log("le chat doit etre ici");
 
-      const newChat = this.chatRepository.create({
-        chatId: chatId,
+      const creatChat = this.chatRepository.create({
+        chat_id: chatId,
         name: fromName,
-        type: 'private',
-        chatPic: '',
-        chatPicFull: '',
-        isPinned: false,
-        isMuted: false,
-        muteUntil: null,
-        isArchived: false,
-        unreadCount: 0,
-        unreadMention: false,
-        readOnly: false,
-        notSpam: true,
+        type: 'private', // assuming private chat
+        chat_pic: '',
+        chat_pic_full: '',
+        is_pinned: 'false',
+        is_muted: 'false',
+        mute_until: '0',
+        is_archived: 'false',
+        unread_count: '0',
+        unread_mention: 'false',
+        read_only: 'false',
+        not_spam: 'true',
         commercial: commercial,
-        contactClient: from,
-        lastActivityAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        last_activity_at: Date.now().toString(),
+        created_at: Date.now().toString(),
+        updated_at: Date.now().toString(),
       });
 
-      return this.chatRepository.save(newChat);
+      console.log('chat a cree===============================', creatChat);
+
+      return this.chatRepository.save(creatChat);
     } catch (error) {
       console.error('Error finding or creating chat:', error);
       throw new Error(`Failed to find or create chat: ${String(error)}`);
@@ -79,14 +82,14 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chatId: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel','messages',], });
+      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel','messages',], });
     }
     return this.chatRepository.find();
   }
 
   async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
-      where: { chatId: chatId },
+      where: { chat_id: chatId },
       relations: ['commercial','messages'],
     });
   }

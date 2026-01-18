@@ -14,12 +14,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export enum WhatsappChatStatus {
-  ACTIF = 'actif',
-  EN_ATTENTE = 'en attente',
-  FERME = 'fermé',
-}
-
 @Entity()
 @Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
 export class WhatsappChat {
@@ -35,7 +29,7 @@ export class WhatsappChat {
     length: 100,
     nullable: true,
   })
-  commercialId: string | null;
+  commercial_id: string | null;
 
   @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
   @JoinColumn({
@@ -52,23 +46,23 @@ export class WhatsappChat {
     nullable: false,
     unique: true,
   })
-  chatId: string; // chat_id WHAPI
+  chat_id: string; // chat_id WHAPI
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
    @Column({
     type: 'enum',
-    enum: WhatsappChatStatus,
-    default: WhatsappChatStatus.EN_ATTENTE,
+    enum: ['actif', 'en attente', 'fermé'],
+    default: 'en attente',
   })
-  status: WhatsappChatStatus;
+  status: string;
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
 
   @Column({ name: 'chat_pic', type: 'varchar', length: 100, nullable: false })
-  chatPic: string;
+  chat_pic: string;
 
   @Column({
     name: 'chat_pic_full',
@@ -76,54 +70,62 @@ export class WhatsappChat {
     length: 100,
     nullable: false,
   })
-  chatPicFull: string;
+  chat_pic_full: string;
 
-  @Column({ name: 'is_pinned', type: 'boolean', default: false })
-  isPinned: boolean;
+  @Column({ name: 'is_pinned', type: 'varchar', length: 100, nullable: false })
+  is_pinned: string;
 
-  @Column({ name: 'is_muted', type: 'boolean', default: false })
-  isMuted: boolean;
+  @Column({ name: 'is_muted', type: 'varchar', length: 100, nullable: false })
+  is_muted: string;
 
-  @Column({ name: 'mute_until', type: 'timestamp', nullable: true })
-  muteUntil: Date | null;
+  @Column({ name: 'mute_until', type: 'varchar', length: 100, nullable: false })
+  mute_until: string;
 
   @Column({
     name: 'is_archived',
-    type: 'boolean',
-    default: false,
+    type: 'varchar',
+    length: 100,
+    nullable: false,
   })
-  isArchived: boolean;
+  is_archived: string;
 
   @Column({
     name: 'unread_count',
-    type: 'int',
-    default: 0,
-    comment: 'Number of unread messages in the chat',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
   })
-  unreadCount: number;
+  unread_count: string;
 
   @Column({
     name: 'unread_mention',
-    type: 'boolean',
-    default: false,
+    type: 'varchar',
+    length: 100,
+    nullable: false,
   })
-  unreadMention: boolean;
+  unread_mention: string;
 
-  @Column({ name: 'read_only', type: 'boolean', default: false })
-  readOnly: boolean;
+  @Column({ name: 'read_only', type: 'varchar', length: 100, nullable: false })
+  read_only: string;
 
-  @Column({ name: 'not_spam', type: 'boolean', default: true })
-  notSpam: boolean;
+  @Column({ name: 'not_spam', type: 'varchar', length: 100, nullable: false })
+  not_spam: string;
 
-  @Column({
+   @Column({
     name: 'last_activity_at',
     type: 'timestamp',
     nullable: true,
   })
-  lastActivityAt: Date; // timestamp
+  last_activity_at: Date; // timestamp
 
-  @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
-  contactClient: string;
+    @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
+  contact_client: string;
+
+  @Column({ name: 'created_at', type: 'varchar', length: 100, nullable: false })
+  created_at: string;
+
+  @Column({ name: 'updated_at', type: 'varchar', length: 100, nullable: false })
+  updated_at: string;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];

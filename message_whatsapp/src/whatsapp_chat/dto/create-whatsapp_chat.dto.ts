@@ -1,74 +1,87 @@
-import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsDateString } from 'class-validator';
-import { WhatsappChatStatus } from '../entities/whatsapp_chat.entity';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CreateWhatsappChatDto {
   @IsString()
   @IsOptional()
-  commercialId?: string | null;
+  commercial_id: string | null;
 
   @IsString()
-  chatId: string;
+  @IsNotEmpty()
+  chat_id: string;
 
   @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsString()
+  @IsNotEmpty()
   type: string;
 
   @IsString()
-  @IsOptional()
-  chatPic?: string;
+  @IsNotEmpty()
+  chat_pic: string;
 
   @IsString()
-  @IsOptional()
-  chatPicFull?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  isPinned?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  isMuted?: boolean;
-
-  @IsDateString()
-  @IsOptional()
-  muteUntil?: Date | null;
-
-  @IsBoolean()
-  @IsOptional()
-  isArchived?: boolean;
-
-  @IsNumber()
-  @IsOptional()
-  unreadCount?: number;
-
-  @IsBoolean()
-  @IsOptional()
-  unreadMention?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  readOnly?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  notSpam?: boolean;
-
-  @IsDateString()
-  @IsOptional()
-  lastActivityAt?: Date;
+  @IsNotEmpty()
+  chat_pic_full: string;
 
   @IsString()
-  contactClient: string;
+  @IsNotEmpty()
+  is_pinned: string;
 
-  @IsDateString()
-  createdAt: Date;
+  @IsString()
+  @IsNotEmpty()
+  is_muted: string;
 
-  @IsDateString()
-  updatedAt: Date;
+  @IsString()
+  @IsNotEmpty()
+  mute_until: string;
 
-  @IsEnum(WhatsappChatStatus)
-  @IsOptional()
-  status?: WhatsappChatStatus;
+  @IsString()
+  @IsNotEmpty()
+  is_archived: string;
+
+  @IsString()
+  @IsNotEmpty()
+  unread_count: string;
+
+  @IsString()
+  @IsNotEmpty()
+  unread_mention: string;
+
+  @IsString()
+  @IsNotEmpty()
+  read_only: string;
+
+  @IsString()
+  @IsNotEmpty()
+  not_spam: string;
+
+  @IsString()
+  @IsNotEmpty()
+  last_activity_at: string;
+
+  @IsString()
+  @IsNotEmpty()
+  contact_client: string;
+
+  @IsString()
+  @IsNotEmpty()
+  created_at: string;
+
+  @IsString()
+  @IsNotEmpty()
+  updated_at: string;
+
+   conversation_id?: string;
+
+  customer_id?: string;
+
+  assigned_agent_id?: string;
+
+  status?: 'open' | 'close';
+
+  started_at?: Date;
+
+  closed_at?: Date;
 }
