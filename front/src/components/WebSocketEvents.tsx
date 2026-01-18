@@ -21,13 +21,18 @@ const WebSocketEvents = () => {
     setMessages,
     addMessage,
     updateConversation,
-    addConversation
+    addConversation,
+    loadConversations,
   } = useChatStore();
+  const { user } = useAuth();
 
   useEffect(() => {
-    if (socket) {
+    if (socket && user) {
       // Injecte le socket dans le store pour un accès global
       setSocket(socket);
+
+      // Charge les conversations initiales une fois la connexion établie
+      loadConversations();
 
       // --- Définition des handlers ---
       const handleConversationsList = (conversations: Conversation[]) => {
@@ -71,7 +76,7 @@ const WebSocketEvents = () => {
         setSocket(null);
       };
     }
-  }, [socket, setSocket, setConversations, setMessages, addMessage, updateConversation]);
+  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation]);
 
   return null; // Ce composant ne rend rien
 };

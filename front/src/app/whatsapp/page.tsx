@@ -34,13 +34,6 @@ const WhatsAppPage = () => {
     }
   }, [initialized, user, router]);
 
-  // Charger les conversations initiales
-  useEffect(() => {
-    if (user) {
-      loadConversations(user.id);
-    }
-  }, [user, loadConversations]);
-
     // Gérer la sélection d'une conversation
     const handleSelectConversation = useCallback((conversation: Conversation) => {
         console.log("🎯 Sélection de la conversation:", conversation.client_name);

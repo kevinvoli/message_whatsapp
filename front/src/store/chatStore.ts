@@ -79,14 +79,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   updateConversation: (updatedConversation: Conversation) => {
-    set((state) => ({
-      conversations: state.conversations.map((c) =>
-        c.id === updatedConversation.id ? updatedConversation : c
-      ),
-      selectedConversation: state.selectedConversation?.id === updatedConversation.id
-        ? updatedConversation
-        : state.selectedConversation,
-    }));
+    set((state) => {
+      const newState: Partial<ChatState> = {
+        // Met à jour la conversation dans la liste
+        conversations: state.conversations.map((c) =>
+          c.id === updatedConversation.id ? updatedConversation : c
+        ),
+      };
+
+      // Si la conversation mise à jour est celle sélectionnée
+      if (state.selectedConversation?.id === updatedConversation.id) {
+        newState.selectedConversation = updatedConversation;
+
+        // Ajoute le nouveau message à la liste des messages, s'il existe et n'est pas déjà présent
+        if (updatedConversation.last_message && !state.messages.find(m => m.id === updatedConversation.last_message.id)) {
+          newState.messages = [...state.messages, updatedConversation.last_message];
+        }
+      }
+
+      return newState;
+    });
   },
 
   addConversation: (newConversation: Conversation) => {
