@@ -14,6 +14,12 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+export enum WhatsappChatStatus {
+  ACTIF = 'actif',
+  EN_ATTENTE = 'en attente',
+  FERME = 'fermé',
+}
+
 @Entity()
 @Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
 export class WhatsappChat {
@@ -53,10 +59,10 @@ export class WhatsappChat {
 
    @Column({
     type: 'enum',
-    enum: ['actif', 'en attente', 'fermé'],
-    default: 'en attente',
+    enum: WhatsappChatStatus,
+    default: WhatsappChatStatus.EN_ATTENTE,
   })
-  status: string;
+  status: WhatsappChatStatus;
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
@@ -118,12 +124,6 @@ export class WhatsappChat {
     @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
   contact_client: string;
 
-  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  created_at: Date;
-
-  @Column({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
-  updated_at: Date;
-
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 
@@ -132,19 +132,14 @@ export class WhatsappChat {
   messages: WhatsappMessage[];
 
   @CreateDateColumn({
-    name: 'createdAt',
+    name: 'created_at',
     type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    comment: 'Timestamp when the trajet was created',
   })
   createdAt: Date;
 
   @UpdateDateColumn({
-    name: 'updatedAt',
+    name: 'updated_at',
     type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-    comment: 'Timestamp when the trajet was last updated',
   })
   updatedAt: Date;
 

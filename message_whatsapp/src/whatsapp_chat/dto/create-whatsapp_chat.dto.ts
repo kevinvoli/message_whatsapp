@@ -62,14 +62,6 @@ export class CreateWhatsappChatDto {
   @IsString()
   contact_client: string;
 
-  @IsDate()
-  @IsOptional()
-  created_at?: Date;
-
-  @IsDate()
-  @IsOptional()
-  updated_at?: Date;
-
   @IsEnum(WhatsappChatStatus)
   @IsOptional()
   status?: WhatsappChatStatus;

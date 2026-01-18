@@ -87,17 +87,18 @@ export class DispatcherService {
     } else {
       // Create a new conversation
       const createDto: CreateWhatsappChatDto = {
-         chat_id: clientPhone,
+        chat_id: clientPhone,
         name: clientName,
         commercial_id: nextAgent.id,
         status: WhatsappChatStatus.EN_ATTENTE,
-        type: 'private', // Assuming 'private' as a default type
+        type: 'private',
         unread_count: 1,
         last_activity_at: new Date(),
+        contact_client: clientPhone, // Ajout du champ manquant
+        // Les autres champs auront leurs valeurs par défaut définies dans l'entité
       };
 
-
-       const newChat = this.chatRepository.create(createDto);
+      const newChat = this.chatRepository.create(createDto);
       return this.chatRepository.save(newChat);
 
       // const existingChat = await this.chatRepository.findOne({
