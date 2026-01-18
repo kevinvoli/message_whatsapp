@@ -70,8 +70,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
         // Validation des données
         const messageText = msg.text || "(Message sans texte)";
         const messageFrom = msg.from === 'commercial' ? 'commercial' : 'client';
-        const messageTimestamp = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp || Date.now());
-        const messageId = msg.id || `msg_${index}_${Date.now()}`;
+        const messageTimestamp = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp || 0);
+        const messageId = msg.id || `msg_${index}`;
 
         return (
           <div

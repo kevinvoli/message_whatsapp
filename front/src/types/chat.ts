@@ -226,56 +226,45 @@ export const transformToWebSocketMessage = (rawData: any): WebSocketMessage => {
 /**
  * Valide si un objet est un Message valide
  */
-export const isValidMessage = (data: any): data is Message => {
-  console.log("les message transmieaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", data);
-  
+export const isValidMessage = (data: unknown): data is Message => {
+  const msg = data as Message;
   return (
-    typeof data === 'object' &&
-    data !== null &&
-    typeof  data.direction==='string'&&
-    typeof data.id === 'string' &&
-    typeof data.text === 'string' &&
-     data.timestamp instanceof Date &&
-    typeof  data.from === 'string' &&
-    typeof data.from_me === 'boolean'
+    typeof msg === 'object' &&
+    msg !== null &&
+    typeof msg.id === 'string' &&
+    typeof msg.text === 'string' &&
+    msg.timestamp instanceof Date &&
+    typeof msg.from === 'string' &&
+    typeof msg.from_me === 'boolean'
   );
-};​
-
-from_me: true​
-id: "temp_1768498859084"
-
-sender_name: "bilo"​
-sender_phone: "test@tes.co"
-
-status: "sending"​
-text: "merci grand"
-
-
+};
 
 /**
  * Valide si un objet est une Conversation valide
  */
-export const isValidConversation = (data: any): data is Conversation => {
+export const isValidConversation = (data: unknown): data is Conversation => {
+  const conv = data as Conversation;
   return (
-    typeof data === 'object' &&
-    data !== null &&
-    typeof data.id === 'string' &&
-    typeof data.chat_id === 'string' &&
-    typeof data.clientName === 'string' &&
-    Array.isArray(data.messages)
+    typeof conv === 'object' &&
+    conv !== null &&
+    typeof conv.id === 'string' &&
+    typeof conv.chat_id === 'string' &&
+    typeof conv.clientName === 'string' &&
+    Array.isArray(conv.messages)
   );
 };
 
 /**
  * Valide si un objet est un Commercial valide
  */
-export const isValidCommercial = (data: any): data is Commercial => {
+export const isValidCommercial = (data: unknown): data is Commercial => {
+  const comm = data as Commercial;
   return (
-    typeof data === 'object' &&
-    data !== null &&
-    typeof data.id === 'string' &&
-    typeof data.name === 'string' &&
-    typeof data.email === 'string'
+    typeof comm === 'object' &&
+    comm !== null &&
+    typeof comm.id === 'string' &&
+    typeof comm.name === 'string' &&
+    typeof comm.email === 'string'
   );
 };
 
