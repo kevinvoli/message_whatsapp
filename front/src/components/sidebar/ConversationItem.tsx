@@ -38,19 +38,19 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-gray-800 truncate">{conversation.clientName}</h3>
+            <h3 className="font-semibold text-gray-800 truncate">{conversation.client_name}</h3>
             <span className="text-xs text-gray-500">
-              {formatTime(conversation.lastMessage.timestamp)}
+              {conversation.last_message ? formatTime(conversation.last_message.timestamp) : formatTime(new Date())}
             </span>
           </div>
-          <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
+          <p className="text-sm text-gray-600 truncate">{conversation.client_phone}</p>
           <p className="text-sm text-gray-500 truncate mt-1">
-            {conversation.lastMessage.text}
+            {conversation.last_message ? conversation.last_message.text : 'Aucun message pour le moment'}
           </p>
         </div>
-        {conversation.unreadCount > 0 && (
+        {conversation.unread_count > 0 && (
           <div className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-            {conversation.unreadCount}
+            {conversation.unread_count}
           </div>
         )}
       </div>
