@@ -15,42 +15,63 @@ import { Conversation, Message } from '@/types/chat';
  */
 const WebSocketEvents = () => {
   const { socket } = useSocket();
-  const { addMessage, updateConversation, addConversation } = useChatStore();
+  const {
+    setSocket,
+    setConversations,
+    setMessages,
+    addMessage,
+    updateConversation,
+    addConversation
+  } = useChatStore();
 
   useEffect(() => {
-    if (!socket) return;
+    if (socket) {
+      // Injecte le socket dans le store pour un accès global
+      setSocket(socket);
 
-    // Listener pour les nouveaux messages
-    const handleNewMessage = (message: Message) => {
-      console.log('Received new message:', message);
-      addMessage(message);
-    };
-
-    // Listener pour la mise à jour d'une conversation (ex: changement de statut, nouveau message)
-    const handleConversationUpdated = (conversation: Conversation) => {
-      console.log('Conversation updated:', conversation);
-      updateConversation(conversation);
-    };
-
-    // Listener pour une nouvelle conversation assignée
-    const handleNewConversation = (conversation: Conversation) => {
-        console.log('New conversation assigned:', conversation);
-        addConversation(conversation); // Ajoute la nouvelle conversation au store
+      // --- Définition des handlers ---
+      const handleConversationsList = (conversations: Conversation[]) => {
+        console.log('Received conversations list:', conversations);
+        setConversations(conversations);
       };
 
+      const handleMessagesList = (data: { chatId: string, messages: Message[] }) => {
+        console.log(`Received messages for chat ${data.chatId}:`, data.messages);
+        setMessages(data.chatId, data.messages);
+      };
 
-    socket.on('message:new', handleNewMessage);
-    socket.on('conversation:updated', handleConversationUpdated);
-    socket.on('conversation:new', handleNewConversation);
+      const handleNewMessage = (message: Message) => {
+        console.log('Received new message:', message);
+        addMessage(message);
+      };
 
+      const handleConversationUpdated = (conversation: Conversation) => {
+        console.log('Conversation updated:', conversation);
+        updateConversation(conversation);
+      };
 
-    // Nettoyage des listeners lors du démontage du composant
-    return () => {
-      socket.off('message:new', handleNewMessage);
-      socket.off('conversation:updated', handleConversationUpdated);
-      socket.off('conversation:new', handleNewConversation);
-    };
-  }, [socket, addMessage, updateConversation, addConversation]);
+      const handleError = (error: { message: string, details?: string }) => {
+        console.error('Socket error received:', error.message, error.details || '');
+      };
+
+      // --- Enregistrement des listeners ---
+      socket.on('conversations:list', handleConversationsList);
+      socket.on('messages:list', handleMessagesList);
+      socket.on('message:new', handleNewMessage);
+      socket.on('conversation:updated', handleConversationUpdated);
+      socket.on('error', handleError);
+
+      // --- Nettoyage ---
+      return () => {
+        socket.off('conversations:list', handleConversationsList);
+        socket.off('messages:list', handleMessagesList);
+        socket.off('message:new', handleNewMessage);
+        socket.off('conversation:updated', handleConversationUpdated);
+        socket.off('error', handleError);
+        setSocket(null);
+      };
+    }
+  }, [socket, setSocket, setConversations, setMessages, addMessage, updateConversation]);
 
   return null; // Ce composant ne rend rien
 };

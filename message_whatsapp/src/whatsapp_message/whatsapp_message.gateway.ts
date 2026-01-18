@@ -170,356 +170,89 @@ public async emitIncomingConversation(chat: any) {
     }
   }
 
-  @SubscribeMessage('agent:logout')
-  async handleAgentDisconnect(@ConnectedSocket() client: Socket) {
+  // =========================
+  // EVENT: conversations:get
+  // =========================
+  @SubscribeMessage('conversations:get')
+  async handleGetConversations(@ConnectedSocket() client: Socket) {
     const commercialId = this.connectedAgents.get(client.id);
-    if (commercialId) {
-      this.connectedAgents.delete(client.id);
-      console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
-      await this.queueService.removeFromQueue(commercialId);
-      await this.userService.updateStatus(commercialId, false);
-      await this.emitQueueUpdate();
+    if (!commercialId) {
+      return client.emit('error', { message: 'Not authenticated' });
     }
-  }
-
-  // =========================
-  // AUTHENTIFICATION
-  // =========================
-  @SubscribeMessage('auth')
-  async handleAuth(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { commercialId: string; token: string },
-  ) {
-    console.log('🔐 Authentification:', data.commercialId);
-
-    // Vérifier le token (à implémenter selon votre système d'auth)
-    // Pour l'instant, on accepte simplement l'ID
-    this.connectedAgents.set(client.id, data.commercialId);
-    await this.queueService.addToQueue(data.commercialId);
-    await this.emitQueueUpdate();
-    // await this.dispatcherService.distributePendingMessages();
-
-    client.emit('auth:success', { commercialId: data.commercialId });
-  }
-
-  // =========================
-  // REJOINDRE UNE CONVERSATION
-  // =========================
-  @SubscribeMessage('join:conversation')
-  async handleJoinConversation(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; commercialId: string },
-  ) {
-
-
-    // Vérifier que l'agent est connecté
-    const agentId = this.connectedAgents.get(client.id);
-    if (!agentId) {
-      client.emit('error', { error: 'Agent non authentifié' });
-      return;
-    }
-
-    // Quitter toutes les autres rooms de conversation
-    const rooms = Array.from(client.rooms);
-    rooms.forEach((room) => {
-      if (room !== client.id && room.startsWith('conversationId')) {
-        client.leave(room);
-      }
-    });
-
-    
-
-    client.join(data.conversationId);
-
-    // console.log(`🚪 Agent ${agentId} a rejoint la room: ${data.conversationId}`);
-
-    // Charger les messages existants
-    const messages = await this.whatsappMessageService.findByChatId(
-      data.conversationId,
-    );
-
-    console
-      .log
-      // `💬 ${messages.length} messages chargés pour ${data.conversationId}`,
-      ();
-
-    // Envoyer les messages à l'agent
-    client.emit('messages:get', {
-      conversationId: data.conversationId,
-      messages: messages.map((msg) => ({
-        id: msg.id,
-        text: msg.text || '(Pas de texte)',
-        timestamp:new Date(msg.timestamp).getTime(),
-        from: msg.from,
-        direction: msg.direction,
-        from_name: msg.from_name || (msg.from_me ? 'Agent' : 'Client'),
-        status: msg.status,
-        from_me: msg.from_me,
-      })),
-    });
-
-    client.emit('conversation:joined', {
-      conversationId: data.conversationId,
-      success: true,
-      messageCount: messages.length,
-    });
-
-    // Marquer les messages non lus comme lus
-    await this.whatsappMessageService.updateByStatus({
-      id: data.conversationId,
-      status: 'read',
-      recipient_id: data.commercialId,
-    });
-  }
-
-  // =========================
-  // QUITTER UNE CONVERSATION
-  // =========================
-  @SubscribeMessage('leave:conversation')
-  handleLeaveConversation(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
-  ) {
-    const roomName = `data.conversationId}`;
-    client.leave(roomName);
-    // console.log(`🚪 Agent a quitté la conversation: ${data.conversationId}`);
-
-    client.emit('conversation:left', {
-      conversationId: data.conversationId,
-      success: true,
-    });
-  }
-
-  // =========================
-  // LISTER LES CONVERSATIONS
-  // =========================
-  @SubscribeMessage('get:conversation')
-  async handleGetConversations(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { agentId: string },
-  ) {
-    console.log('mes comversation :smiley:');
-
-    console.log('👨‍💻 Agent demande ses conversations:', data.agentId);
 
     try {
-      // Vérifier que l'agent est connecté
-      const connectedAgentId = this.connectedAgents.get(client.id);
-      if (!connectedAgentId) {
-        client.emit('error', { error: 'Agent non authentifié' });
-        return;
-      }
-
-      console.log('le connecte id', connectedAgentId);
-      // Récupérer les chats de l'agent
-      const chats = await this.chatService.findByCommercialId(data.agentId);
-
-      // console.log("le connecte id", chats);
-
-      console
-        .log
-        // `📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`,
-        ();
-
-      // Pour chaque chat, récupérer le dernier message
-      const conversationsWithLastMessage = await Promise.all(
+      const chats = await this.chatService.findByCommercialId(commercialId);
+      const conversations = await Promise.all(
         chats.map(async (chat) => {
-          const lastMessage =
-            await this.whatsappMessageService.findLastMessageByChatId(
-              chat.chat_id,
-            );
-          // console.log('chat trouver ',chat );
-
-          // Compter les messages non lus
-          const unreadCount =
-            await this.whatsappMessageService.countUnreadMessages(
-              chat.chat_id,
-              // data.agentId
-            );
-
+          const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+          const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
           return {
-            id: chat.id,
-            chat_id: chat.chat_id,
-            clientName: chat.name,
-            clientPhone: chat.chat_id?.split('@')[0] || '',
-            lastMessage: {
-              text: lastMessage?.text || 'Aucun message',
-              timestamp: lastMessage?.timestamp || chat.updatedAt,
-              author: lastMessage?.from_me ? 'agent' : 'client',
-            },
-            unreadCount: unreadCount,
-            commercial_id: chat.commercial_id,
-            name: chat.name,
-            updatedAt: chat.updatedAt,
+            ...chat,
+            last_message: lastMessage,
+            unread_count: unreadCount,
           };
         }),
       );
 
-      // Trier par date du dernier message (plus récent en premier)
-      conversationsWithLastMessage.sort(
-        (a, b) =>
-          new Date(b.lastMessage.timestamp).getTime() -
-          new Date(a.lastMessage.timestamp).getTime(),
-      );
+      conversations.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
-      // Envoyer les conversations à l'agent
-      client.emit('conversation:list', {
-        conversations: conversationsWithLastMessage,
-      });
+      client.emit('conversations:list', conversations);
     } catch (error) {
-      console.error(
-        '❌ Erreur lors de la récupération des conversations:',
-        error,
-      );
-      client.emit('conversation:error', {
-        error: 'Failed to fetch conversations',
-        details: error?.message,
-      });
+      client.emit('error', { message: 'Failed to get conversations', details: error.message });
     }
   }
 
   // =========================
-  // CHARGER LES MESSAGES
+  // EVENT: messages:get
   // =========================
-  @SubscribeMessage('get:messages')
+  @SubscribeMessage('messages:get')
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody() payload: { chatId: string },
   ) {
-    console.log('📩 Demande de messages pour:', data.conversationId);
+    const commercialId = this.connectedAgents.get(client.id);
+    if (!commercialId) {
+      return client.emit('error', { message: 'Not authenticated' });
+    }
 
     try {
-      const messages = await this.whatsappMessageService.findByChatId(
-        data.conversationId,
-      );
-
-      console.log(
-        `💬 ${messages.length} messages trouvés pour ${data.conversationId}`,
-      );
-
-      // Formater les messages pour le frontend
-      const formattedMessages = messages.map((msg) => {
-        return {
-          id: msg.id,
-          text: msg.text || '(Message sans texte)',
-          timestamp: new Date(msg.timestamp).getTime(),
-          direction: msg.direction,
-          from: msg.from,
-          from_name: msg.from_name || (msg.from_me ? 'Agent' : 'Client'),
-          status: msg.status,
-          from_me: msg.from_me,
-          type: msg.type,
-        };
-      });
-
-      client.emit('messages:get', {
-        conversationId: data.conversationId,
-        messages: formattedMessages,
-      });
+      const messages = await this.whatsappMessageService.findByChatId(payload.chatId);
+      client.emit('messages:list', { chatId: payload.chatId, messages });
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des messages:', error);
-      client.emit('messages:error', {
-        conversationId: data.conversationId,
-        error: 'Failed to load messages',
-        details: error.message,
-      });
+      client.emit('error', { message: 'Failed to get messages', details: error.message });
     }
   }
 
   // =========================
-  // ENVOYER UN MESSAGE (de l'agent)
+  // EVENT: message:send
   // =========================
-  @SubscribeMessage('agent:message')
-  async handleAgentMessage(
+  @SubscribeMessage('message:send')
+  async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody()
-    data: {
-      conversationId: string;
-      content: string;
-      author: string;
-      chat_id: string;
-    },
+    @MessageBody() payload: { chatId: string; text: string },
   ) {
-    console.log('💬 Message agent reçu:_______________________________________________', );
-
+    const commercialId = this.connectedAgents.get(client.id);
+    if (!commercialId) {
+      return client.emit('error', { message: 'Not authenticated' });
+    }
 
     try {
-      // Vérifier que l'agent est connecté
-      const agentId = this.connectedAgents.get(client.id);
+      const message = await this.whatsappMessageService.createAgentMessage({
+        chat_id: payload.chatId,
+        text: payload.text,
+        commercial_id: commercialId,
+        timestamp: new Date(),
+      });
 
-       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-      ([_, agentId]) => agentId === agentId,
-    )?.[0];
-
-    if (!targetSocketId) {
-   
-      return;
-    }
-      if (!agentId) {
-        client.to(targetSocketId).emit('error', { error: 'Agent non authentifié' });
-        return;
+      // The dispatcher or another service should handle broadcasting this new message.
+      // For now, we can emit an update to the sender.
+      const chat = await this.chatService.findByChatId(payload.chatId);
+      if (chat) {
+        this.emitConversationUpdate(chat.id);
       }
 
-      // Créer et sauvegarder le message en base
-      const savedMessage = await this.whatsappMessageService.createAgentMessage(
-        {
-          chat_id: data.chat_id,
-          text: data.content,
-          commercial_id: data.author,
-          timestamp: new Date(),
-        },
-      );
-
-      console.log('💾 Message sauvegardé en base:',data );
-
-      // Préparer l'objet message pour le frontend
-      const messageForFrontend = {
-        id: savedMessage.id,
-        text: savedMessage.text,
-        timestamp: new Date(savedMessage.timestamp).getTime(),
-        direction: 'OUT',
-        from: savedMessage.from,
-        from_name: savedMessage.from_name || (savedMessage.from_me ? 'Agent' : 'Client'),
-        status: savedMessage.status,
-        from_me: savedMessage.from_me,
-      };
-
-      // Envoyer la confirmation à l'expéditeur
-      client.to(targetSocketId).emit('message:sent', {
-        conversationId: data.conversationId,
-        messages: messageForFrontend,
-      });
-
-      console.log("✅ Confirmation envoyée à l'expéditeur");
-
-      // Diffuser le message à tous les clients dans la room
-      const roomName = data.conversationId;
-      this.server.to(roomName).emit('message:received', {
-        conversationId: data.conversationId,
-        message: messageForFrontend,
-      });
-
-      this.server.to(roomName).emit('reception', {
-        // Nous allons changer pour 'message:received'
-        conversationId: data.conversationId,
-        message: messageForFrontend,
-      });
-
-      console.log(`📢 Message diffusé dans la room: ${roomName}`);
-
-      // Mettre à jour la conversation (dernier message)
-      await this.updateConversationLastMessage(data.conversationId, {
-        text: data.content,
-        timestamp: new Date(),
-        author: 'agent',
-      });
     } catch (error) {
-      console.error("❌ Erreur lors de l'envoi du message:", error);
-      client.emit('message:error', {
-        error: 'Failed to send message',
-        conversationId: data.conversationId,
-        details: error.message,
-      });
+      client.emit('error', { message: 'Failed to send message', details: error.message });
     }
   }
 
