@@ -131,6 +131,8 @@ export const transformToMessage = (rawData: RawMessageData): Message => {
  * Transforme des données brutes en un objet Conversation valide.
  */
 export const transformToConversation = (rawData: RawConversationData): Conversation => {
+  
+  
   const messages: Message[] = Array.isArray(rawData.messages)
     ? rawData.messages.map(transformToMessage)
     : [];
@@ -138,7 +140,7 @@ export const transformToConversation = (rawData: RawConversationData): Conversat
   return {
     id: rawData.id,
     chatId: rawData.chat_id,
-    clientName: rawData.client_name || rawData.clientName || 'Client Inconnu',
+    clientName: rawData.client_name || rawData.clientName || rawData.name || 'Client Inconnu',
     clientPhone: rawData.client_phone || rawData.clientPhone || rawData.chat_id?.split('@')[0] || '',
     lastMessage: rawData.last_message ? transformToMessage(rawData.last_message) : null,
     messages,
@@ -185,6 +187,8 @@ export const isValidMessage = (data: unknown): data is Message => {
  * Valide si un objet est une Conversation valide.
  */
 export const isValidConversation = (data: unknown): data is Conversation => {
+  console.log("validation convetsation:ttttttttttttttttttttttttttttttttttt",data);
+  
     if (typeof data !== 'object' || data === null) return false;
     const conv = data as Conversation;
     return (

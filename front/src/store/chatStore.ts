@@ -49,6 +49,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   selectConversation: (chatId: string) => {
     const conversation = get().conversations.find(c => c.chat_id === chatId);
+
     if (conversation) {
       set({ selectedConversation: conversation, messages: [], isLoading: true });
       get().socket?.emit('messages:get', { chatId });
@@ -63,6 +64,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setConversations: (conversations) => {
+    console.log("setconverqationrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",conversations);
+    
     set({ conversations, isLoading: false });
   },
 

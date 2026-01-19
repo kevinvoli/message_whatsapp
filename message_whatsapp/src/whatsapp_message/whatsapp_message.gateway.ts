@@ -70,8 +70,11 @@ export class WhatsappMessageGateway
   public emitIncomingMessage(
     chatId: string, // ⚠️ DOIT être chat.chat_id
     commercialId: string,
-    message: any,
+    message: CreateWhatsappMessageDto,
   ) {
+
+    console.log("new message recue",message);
+    
     const messageForFrontend = {
       id: message.id,
       text: message.text,
@@ -119,7 +122,7 @@ public async emitIncomingConversation(chat: any) {
       chat_id: chat.chat_id,
       clientName: chat.name,
       clientPhone: chat.chat_id?.split('@')[0] || '',
-      lastMessage: {
+      last_message: {
         text: lastMessage?.text || 'Aucun message',
         timestamp: lastMessage?.timestamp || chat.updatedAt,
         author: lastMessage?.from_me ? 'agent' : 'client',

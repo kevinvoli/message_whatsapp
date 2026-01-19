@@ -24,6 +24,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectConversation,
   onLogout
 }) => {
+
+  console.log("sidebar grosssssssssssssssssssssssssssssssss",conversations);
+  
   return (
     <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
       <div className="bg-green-600 text-white p-4">
