@@ -17,6 +17,6 @@ async function bootstrap() {
   });
 
   // Start the application on the port defined in the .env file
-  await app.listen(process.env.SERVER_PORT ?? 3001);
+  await app.listen(process.env.SERVER_PORT ?? 3002);
 }
 bootstrap();

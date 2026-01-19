@@ -24,7 +24,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
-@WebSocketGateway(3001, {
+@WebSocketGateway(3002, {
   cors: {
     origin: '*',
     credentials: true,
