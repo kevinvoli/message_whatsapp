@@ -16,6 +16,8 @@ import { NotFoundError } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappMessageResponseDto } from '../whatsapp_message/dto/whatsapp_message-response.dto';
+import { CreateWhatsappMessageDto } from 'src/whatsapp_message/dto/create-whatsapp_message.dto';
 
 @Injectable()
 export class WhapiService {
@@ -33,7 +35,7 @@ export class WhapiService {
   async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
     if (!payload?.messages?.length) return;
 
-    const message = payload.messages[0];
+    const message : CreateWhatsappMessageDto = payload.messages[0];
 
     // 🔒 ignorer les messages envoyés par ton propre compte
     if (message.from_me) return;
