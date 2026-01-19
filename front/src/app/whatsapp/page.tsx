@@ -7,14 +7,16 @@ import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useChatStore } from '@/store/chatStore';
-import { useSocket } from '@/contexts/SocketProvider';
 import { useRouter } from 'next/navigation';
-import { Conversation } from '@/types/chat';
+import { useChatStore } from '@/stores/useChatStore';
+// import { useSocket } from '@/contexts/SocketProvider'; // Note: SocketProvider is missing
 
 const WhatsAppPage = () => {
   const { user, initialized, logout } = useAuth();
   const router = useRouter();
+  // const { socket, isConnected } = useSocket(); // Temporarily disabled
+  const isConnected = false; // Mock value
+
   const {
     conversations,
     selectedConversation,
@@ -22,32 +24,37 @@ const WhatsAppPage = () => {
     isLoading,
     error,
     selectConversation,
-    sendMessage,
-    loadConversations,
   } = useChatStore();
-  const { isConnected: isWebSocketConnected } = useSocket();
 
-  // Protection de route
   useEffect(() => {
     if (initialized && !user) {
       router.replace('/login');
     }
   }, [initialized, user, router]);
 
-    // Gérer la sélection d'une conversation
-    const handleSelectConversation = useCallback((conversation: Conversation) => {
-        console.log("🎯 Sélection de la conversation:", conversation.client_name);
-        selectConversation(conversation.chat_id);
-      }, [selectConversation]);
+  const handleSelectConversation = useCallback((conversation: any) => {
+    selectConversation(conversation);
+    // if (socket && conversation) {
+    //   socket.emit('conversation:join', { chatId: conversation.chatId });
+    // }
+  }, [selectConversation /*, socket*/]);
 
-  // Envoyer un message
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!selectedConversation) {
-      console.error('❌ Impossible d\'envoyer: aucune conversation sélectionnée');
+    if (!selectedConversation || !user /*|| !socket*/) {
+      console.error("Cannot send message: missing info (socket disabled)", {
+        selectedConversation, user,
+      });
       return;
     }
-    sendMessage(text);
-  }, [selectedConversation, sendMessage]);
+
+    console.log(`(Simulated) Sending message: ${text}`);
+    // socket.emit('message:send', {
+    //   chatId: selectedConversation.chatId,
+    //   text,
+    //   from: selectedConversation.clientPhone,
+    //   commercialId: user.id,
+    // });
+  }, [selectedConversation, user /*, socket*/]);
 
   if (!initialized || !user) {
     return (
@@ -64,7 +71,7 @@ const WhatsAppPage = () => {
         conversations={conversations}
         searchTerm=""
         selectedConversation={selectedConversation}
-        isConnected={isWebSocketConnected}
+        isConnected={isConnected}
         onSearchChange={() => {}}
         onSelectConversation={handleSelectConversation}
         onLogout={logout}
@@ -79,7 +86,7 @@ const WhatsAppPage = () => {
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                  <p className="text-gray-500">Chargement...</p>
+                  <p className="text-gray-500">Loading messages...</p>
                 </div>
               </div>
             ) : (
@@ -88,14 +95,13 @@ const WhatsAppPage = () => {
             
             <ChatInput
               onSendMessage={handleSendMessage}
-              isConnected={isWebSocketConnected}
+              isConnected={isConnected}
               disabled={isLoading}
             />
 
-            {/* Affiche une erreur s'il y en a une */}
             {error && (
-              <div className="bg-red-100 border-t border-red-200 p-2 text-center">
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="bg-red-50 border-t border-red-200 p-3">
+                <span className="text-red-600 text-sm">{error}</span>
               </div>
             )}
           </>
@@ -105,8 +111,8 @@ const WhatsAppPage = () => {
               <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
               <p className="text-xl font-semibold">
                 {conversations.length === 0 
-                  ? 'Aucune conversation disponible' 
-                  : 'Sélectionnez une conversation'}
+                  ? 'No conversations available'
+                  : 'Select a conversation'}
               </p>
             </div>
           </div>

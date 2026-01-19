@@ -8,14 +8,30 @@ async function bootstrap() {
    EventEmitter.defaultMaxListeners = 0;
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS for the frontend application
-  app.enableCors({
-    origin: 'http://localhost:3000', // The origin of the frontend app
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  const corsOptions = {
+    origin: '*',
+    methods: ['GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS'],
     credentials: true,
-  });
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept'
+    ],
+    exposedHeaders: [
+      'Authorization',
+      'X-Token-Count'
+    ]
+  }
 
-  // Start the application on the port defined in the .env file
-  await app.listen(process.env.SERVER_PORT ?? 3001);
+
+  app.enableCors(corsOptions)
+
+//   volibigbamblekevin@gmail.com
+// 88kevinCool*
+
+  await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

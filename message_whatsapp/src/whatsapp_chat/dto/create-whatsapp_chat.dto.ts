@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsDate } from 'class-validator';
 import { WhatsappChatStatus } from '../entities/whatsapp_chat.entity';
 
 export class CreateWhatsappChatDto {
@@ -31,7 +31,7 @@ export class CreateWhatsappChatDto {
   @IsOptional()
   is_muted?: boolean;
 
-  @IsDateString()
+  @IsDate()
   @IsOptional()
   mute_until?: Date | null;
 
@@ -55,18 +55,12 @@ export class CreateWhatsappChatDto {
   @IsOptional()
   not_spam?: boolean;
 
-  @IsDateString()
+  @IsDate()
   @IsOptional()
   last_activity_at?: Date;
 
   @IsString()
   contact_client: string;
-
-  @IsDateString()
-  created_at: Date;
-
-  @IsDateString()
-  updated_at: Date;
 
   @IsEnum(WhatsappChatStatus)
   @IsOptional()

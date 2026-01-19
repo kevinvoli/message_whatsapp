@@ -36,14 +36,13 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     commercialId: string,
   ): Promise<WhatsappChat> {
     try {
-      const existingChat = await this.chatRepository.findOne({
+      const chat = await this.chatRepository.findOne({
         where: { chat_id: chatId },
       });
-
-      if (existingChat) {
-        return existingChat;
+      if (chat) {
+        log('chat trouvé ou créé:', chat);
+        return chat;
       }
-
       const commercial = await this.commercialService.findOneById(commercialId);
       if (!commercial) {
         throw new Error('Commercial not found');
@@ -53,21 +52,8 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
         chat_id: chatId,
         name: fromName,
         type: 'private',
-        chat_pic: '',
-        chat_pic_full: '',
-        is_pinned: false,
-        is_muted: false,
-        mute_until: null,
-        is_archived: false,
-        unread_count: 0,
-        unread_mention: false,
-        read_only: false,
-        not_spam: true,
-        commercial: commercial,
+        commercial_id: commercialId,
         contact_client: from,
-        last_activity_at: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
 
       return this.chatRepository.save(newChat);

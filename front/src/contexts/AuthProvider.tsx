@@ -1,9 +1,9 @@
-// contexts/AuthContext.tsx
+// contexts/AuthProvider.tsx
 'use client';
 
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import axios from 'axios';
-import { useChatStore } from '@/store/chatStore';
+// import { useSocket } from './SocketProvider'; // Note: SocketProvider is missing but this is the correct future import
 
 interface User {
   id: string;
@@ -29,10 +29,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { reset } = useChatStore();
+  // const { socket } = useSocket(); // Temporarily disabled until SocketProvider is restored
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà connecté
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     
@@ -40,13 +39,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         setUser(JSON.parse(storedUser));
         setToken(storedToken);
-      } catch (error) {
-        console.error('Error parsing stored user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+      } catch (e) {
+        console.error('Failed to parse user data from localStorage', e);
+        localStorage.clear();
       }
     }
-    
     setInitialized(true);
   }, []);
 
@@ -55,43 +52,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      // Appel à votre API de login
-      const response = await axios.post('http://localhost:3000/auth/login', {
+      // CORRECTED: Backend runs on port 3002
+      const response = await axios.post('http://localhost:3002/auth/login', {
         email,
         password,
       });
-      console.log("mon user est connecté ici:", response);
       
-      const { token: authToken, user: userData } = response.data;
+      const { access_token: authToken, user: userData } = response.data;
       
       setUser(userData);
       setToken(authToken);
       localStorage.setItem('token', authToken);
       localStorage.setItem('user', JSON.stringify(userData));
       
-    } catch (error) {
-        let errorMessage = 'Login failed due to an unexpected error';
-        if (axios.isAxiosError(error)) {
-          // Si c'est une erreur Axios, on peut accéder à `error.response`
-          errorMessage = error.response?.data?.message || 'Login failed';
-        } else if (error instanceof Error) {
-          // Si c'est une erreur standard
-          errorMessage = error.message;
-        }
-        setError(errorMessage);
-        throw new Error(errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Login failed';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    // if (socket) {
+    //   socket.disconnect();
+    // }
     setUser(null);
     setToken(null);
-    reset(); // Vide le store Zustand
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-  };
+  }, [/* socket */]);
 
   return (
     <AuthContext.Provider value={{ 

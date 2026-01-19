@@ -98,7 +98,6 @@ export class WhatsappChat {
     name: 'unread_count',
     type: 'int',
     default: 0,
-    comment: 'Number of unread messages in the chat',
   })
   unread_count: number;
 
@@ -115,14 +114,14 @@ export class WhatsappChat {
   @Column({ name: 'not_spam', type: 'boolean', default: true })
   not_spam: boolean;
 
-  @Column({
+   @Column({
     name: 'last_activity_at',
     type: 'timestamp',
     nullable: true,
   })
-  last_activity_at: Date; // timestamp
+  last_activity_at: Date;
 
-  @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
+    @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
   contact_client: string;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
@@ -133,19 +132,14 @@ export class WhatsappChat {
   messages: WhatsappMessage[];
 
   @CreateDateColumn({
-    name: 'createdAt',
+    name: 'created_at',
     type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    comment: 'Timestamp when the trajet was created',
   })
   createdAt: Date;
 
   @UpdateDateColumn({
-    name: 'updatedAt',
+    name: 'updated_at',
     type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-    comment: 'Timestamp when the trajet was last updated',
   })
   updatedAt: Date;
 

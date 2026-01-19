@@ -1,13 +1,7 @@
 // types/chat.ts
 
-/**
- * @fileoverview Ce fichier définit les types et interfaces principaux utilisés
- * dans l'application de chat, ainsi que des fonctions utilitaires pour
- * créer, transformer et valider ces objets.
- */
-
 // ==============================================
-// INTERFACES PRINCIPALES
+// INTERFACES FRONTEND (camelCase)
 // ==============================================
 
 export interface Commercial {
@@ -23,9 +17,7 @@ export interface Message {
   from: 'commercial' | 'client';
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
   direction?: 'IN' | 'OUT';
-  sender_phone?: string;
   from_me: boolean;
-  sender_name?: string;
 }
 
 export interface Conversation {
@@ -37,102 +29,54 @@ export interface Conversation {
   messages: Message[];
   unreadCount: number;
   commercialId?: string | null;
-  name: string;
   status: 'actif' | 'en attente' | 'fermé';
-  createdAt: Date;
   updatedAt: Date;
 }
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
-
-export interface WebSocketMessage {
-  type: 'auth' | 'new_conversation' | 'new_message' | 'message_status' | 'conversation_reassigned' | 'send_message';
-  commercialId?: string;
-  token?: string;
-  conversationId?: string;
-  conversation?: Conversation;
-  message?: Message;
-  messageId?: string;
-  status?: string;
-  clientPhone?: string;
-  text?: string;
-  timestamp?: Date;
-}
-
-export interface LoginFormData {
-  email: string;
-  password: string;
-}
-
 // ==============================================
-// INTERFACES POUR LES DONNÉES BRUTES (API)
+// INTERFACES POUR DONNÉES BRUTES (snake_case)
 // ==============================================
 
 interface RawMessageData {
-    id: string;
-    text?: string | null;
-    timestamp: string | number | Date;
-    from_me: boolean;
-    status: string;
-    direction: 'IN' | 'OUT';
-    from: string;
-    from_name?: string;
-    content?: string;
-    createdAt?: string | number | Date;
+  id: string;
+  text?: string | null;
+  timestamp: string | number | Date;
+  from_me: boolean;
+  status: string;
+  direction: 'IN' | 'OUT';
 }
 
 interface RawConversationData {
-    id: string;
-    chat_id: string;
-    clientName?: string; // Gardé pour la compatibilité
-    client_name?: string;
-    name?: string;
-    clientPhone?: string;
-    client_phone?: string;
-    messages?: RawMessageData[];
-    last_message?: RawMessageData | null;
-    unreadCount?: number; // Gardé pour la compatibilité
-    unread_count?: number;
-    commercial_id?: string | null;
-    status: 'actif' | 'en attente' | 'fermé';
-    created_at: string | number | Date;
-    updated_at: string | number | Date;
-}
-
-interface RawCommercialData {
-    id: string;
-    name?: string;
-    username?: string;
-    email: string;
+  id: string;
+  chat_id: string;
+  name?: string; // Le nom du client peut être ici
+  client_name?: string; // Ou ici
+  client_phone?: string;
+  last_message?: RawMessageData; // Notez le snake_case
+  lastMessage?: RawMessageData; // Ou parfois camelCase
+  messages?: RawMessageData[];
+  unread_count?: number;
+  unreadCount?: number;
+  commercial_id?: string | null;
+  status: 'actif' | 'en attente' | 'fermé';
+  updatedAt: string | number | Date;
 }
 
 // ==============================================
-// FONCTIONS DE TRANSFORMATION
+// FONCTIONS DE TRANSFORMATION ROBUSTES
 // ==============================================
 
-/**
- * Transforme des données brutes en un objet Message valide.
- */
-export const transformToMessage = (rawData: RawMessageData): Message => {
-  return {
-    id: rawData.id,
-    text: rawData.text || rawData.content || '',
-    timestamp: new Date(rawData.timestamp || rawData.createdAt || Date.now()),
-    from: rawData.from_me ? 'commercial' : 'client',
-    status: (rawData.status as MessageStatus) || 'sent',
-    direction: rawData.direction || (rawData.from_me ? 'OUT' : 'IN'),
-    sender_phone: rawData.from || '',
-    sender_name: rawData.from_name || (rawData.from_me ? 'Agent' : 'Client'),
-    from_me: !!rawData.from_me,
-  };
-};
+export const transformToMessage = (rawData: RawMessageData): Message => ({
+  id: rawData.id,
+  text: rawData.text || '',
+  timestamp: new Date(rawData.timestamp),
+  from: rawData.from_me ? 'commercial' : 'client',
+  status: rawData.status as Message['status'],
+  direction: rawData.direction,
+  from_me: rawData.from_me,
+});
 
-/**
- * Transforme des données brutes en un objet Conversation valide.
- */
 export const transformToConversation = (rawData: RawConversationData): Conversation => {
-  
-  
   const messages: Message[] = Array.isArray(rawData.messages)
     ? rawData.messages.map(transformToMessage)
     : [];
@@ -140,7 +84,7 @@ export const transformToConversation = (rawData: RawConversationData): Conversat
   return {
     id: rawData.id,
     chatId: rawData.chat_id,
-    clientName: rawData.client_name || rawData.clientName || rawData.name || 'Client Inconnu',
+    clientName: rawData.client_name || rawData.clientName || 'Client Inconnu',
     clientPhone: rawData.client_phone || rawData.clientPhone || rawData.chat_id?.split('@')[0] || '',
     lastMessage: rawData.last_message ? transformToMessage(rawData.last_message) : null,
     messages,
@@ -187,8 +131,6 @@ export const isValidMessage = (data: unknown): data is Message => {
  * Valide si un objet est une Conversation valide.
  */
 export const isValidConversation = (data: unknown): data is Conversation => {
-  console.log("validation convetsation:ttttttttttttttttttttttttttttttttttt",data);
-  
     if (typeof data !== 'object' || data === null) return false;
     const conv = data as Conversation;
     return (
