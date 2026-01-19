@@ -457,6 +457,42 @@ export class WhatsappMessageGateway
     return connectedAgentIds.includes(agentId);
   }
 
+  // --- Méthodes d'émission pour le Dispatcher ---
+
+  public emitNewConversationToAgent(agentId: string, conversation: any) {
+    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, id]) => id === agentId
+    )?.[0];
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('conversation:new', conversation);
+    }
+  }
+
+  public emitConversationUpdateToAgent(agentId: string, conversation: any) {
+    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, id]) => id === agentId
+    )?.[0];
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('conversation:updated', conversation);
+    }
+  }
+
+  public emitConversationRemovedToAgent(agentId: string, conversationId: string) {
+    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, id]) => id === agentId
+    )?.[0];
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('conversation:removed', conversationId);
+    }
+  }
+
+  public emitQueueUpdateToAll(queue: any) {
+    this.server.emit('queue:updated', queue);
+  }
+
   public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
 

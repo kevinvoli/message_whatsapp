@@ -58,9 +58,7 @@ export class DispatcherOrchestrator {
             }
             const savedUpdatedChat = await this.chatRepository.save(updatedChat);
             await this.whatsappMessageService.saveIncomingFromWhapi(message, savedUpdatedChat);
-            this.messageGateway.server
-              .to(`commercial:${decision.agentId}`)
-              .emit('conversation:updated', savedUpdatedChat);
+            this.messageGateway.emitConversationUpdateToAgent(decision.agentId, savedUpdatedChat);
         }
         return true;
 
@@ -75,12 +73,8 @@ export class DispatcherOrchestrator {
           reAssignedChat.last_activity_at = new Date();
           savedAssignedChat = await this.chatRepository.save(reAssignedChat);
 
-          this.messageGateway.server
-            .to(`commercial:${oldAgentId}`)
-            .emit('conversation:removed', savedAssignedChat.id); // Or a more specific event
-          this.messageGateway.server
-            .to(`commercial:${decision.agentId}`)
-            .emit('conversation:new', savedAssignedChat);
+          this.messageGateway.emitConversationRemovedToAgent(oldAgentId, savedAssignedChat.id);
+          this.messageGateway.emitNewConversationToAgent(decision.agentId, savedAssignedChat);
           await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
 
         } else {
@@ -95,9 +89,7 @@ export class DispatcherOrchestrator {
           });
           savedAssignedChat = await this.chatRepository.save(newChat);
           await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
-          this.messageGateway.server
-            .to(`commercial:${decision.agentId}`)
-            .emit('conversation:new', savedAssignedChat);
+          this.messageGateway.emitNewConversationToAgent(decision.agentId, savedAssignedChat);
         }
 
         await this.queueService.moveToEnd(decision.agentId);
@@ -111,10 +103,9 @@ export class DispatcherOrchestrator {
           message.type,
           message.image?.id || message.video?.id || message.audio?.id || message.document?.id || '',
         );
-        // Emitting to a general 'admins' room
-        this.messageGateway.server
-          .to('admins')
-          .emit('pending:messages:count', await this.pendingMessageService.getPendingMessages().then(p => p.length));
+        // L'orchestrateur ne gère pas les rooms, donc nous émettons un événement général
+        // que la gateway pourra interpréter si nécessaire (par exemple, pour notifier les admins).
+        // Pour l'instant, nous nous concentrons sur les événements essentiels.
         return false;
     }
   }
@@ -152,7 +143,8 @@ export class DispatcherOrchestrator {
     async handleUserConnected(userId: string): Promise<void> {
         await this.queueService.addToQueue(userId);
         await this.distributePendingMessages();
-        this.messageGateway.server.emit('queue:updated', await this.queueService.getQueuePositions());
+        const queue = await this.queueService.getQueuePositions();
+        this.messageGateway.emitQueueUpdateToAll(queue);
     }
 
     /**
@@ -160,6 +152,7 @@ export class DispatcherOrchestrator {
      */
     async handleUserDisconnected(userId: string): Promise<void> {
         await this.queueService.removeFromQueue(userId);
-        this.messageGateway.server.emit('queue:updated', await this.queueService.getQueuePositions());
+        const queue = await this.queueService.getQueuePositions();
+        this.messageGateway.emitQueueUpdateToAll(queue);
     }
 }
