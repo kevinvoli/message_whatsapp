@@ -1,26 +1,26 @@
-[2J[3J[H[[90m10:21:44 PM[0m] Starting compilation in watch mode...
+[2J[3J[H[[90m11:32:18 PM[0m] Starting compilation in watch mode...
 
-[[90m10:21:48 PM[0m] Found 0 errors. Watching for file changes.
+[[90m11:32:27 PM[0m] Found 0 errors. Watching for file changes.
 
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDatabaseModule dependencies initialized[39m[38;5;3m +28ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappErrorModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappChatLabelModule dependencies initialized[39m[38;5;3m +1ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappMessageContentModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappCustomerModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappContactsModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappMediaModule dependencies initialized[39m[38;5;3m +1ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappButtonModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappLastMessageModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +1ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCommunicationWhapiModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +68ms[39m
-[31m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (1)...[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDatabaseModule dependencies initialized[39m[38;5;3m +37ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappErrorModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappChatLabelModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappMessageContentModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappCustomerModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappContactsModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappMediaModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappButtonModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWhatsappLastMessageModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCommunicationWhapiModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +104ms[39m
+[31m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [31m  ERROR[39m [38;5;3m[TypeOrmModule] [39m[31mUnable to connect to the database. Retrying (1)...[39m
 Error: connect ECONNREFUSED 127.0.0.1:3306
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
     --------------------
@@ -34,7 +34,7 @@ Error: connect ECONNREFUSED 127.0.0.1:3306
     at MysqlDriver.connect (/app/message_whatsapp/node_modules/typeorm/driver/src/driver/mysql/MysqlDriver.ts:388:36)
     at DataSource.initialize (/app/message_whatsapp/node_modules/typeorm/data-source/src/data-source/DataSource.ts:254:27)
     at /app/message_whatsapp/node_modules/@nestjs/typeorm/dist/typeorm-core.module.js:189:30
-[31m[Nest] 81904  - [39m01/18/2026, 10:21:50 PM [31m  ERROR[39m [38;5;3m[ExceptionHandler] [39mError: connect ECONNREFUSED 127.0.0.1:3306
+[31m[Nest] 90008  - [39m01/18/2026, 11:32:32 PM [31m  ERROR[39m [38;5;3m[ExceptionHandler] [39mError: connect ECONNREFUSED 127.0.0.1:3306
 [90m    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)[39m
     --------------------
     at Protocol._enqueue [90m(/app/message_whatsapp/[39mnode_modules/[4mmysql[24m/lib/protocol/Protocol.js:144:48[90m)[39m

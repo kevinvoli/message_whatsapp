@@ -1,24 +1,16 @@
-// contexts/AuthProvider.tsx
+// contexts/AuthContext.tsx
 'use client';
 
-import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-import { useSocket } from './SocketProvider'; // Correction de l'import
+import { useWebSocket } from '@/hooks/useWebSocket';
 
-/**
- * @interface User
- * Définit la structure de l'objet utilisateur.
- */
 interface User {
   id: string;
   email: string;
   name: string;
 }
 
-/**
- * @interface AuthContextType
- * Définit le contrat du contexte d'authentification.
- */
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -31,22 +23,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * @provider AuthProvider
- * Fournit l'état d'authentification et les fonctions associées à l'ensemble de l'application.
- * Gère le cycle de vie de la session utilisateur, y compris la connexion, la déconnexion
- * et la persistance de l'état dans le localStorage.
- */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { socket } = useSocket(); // Utilisation du hook SocketProvider
+  const {
+   LogOut
+  } = useWebSocket(user);
 
-  // Initialisation au chargement : restaure la session depuis le localStorage
+
+
+
   useEffect(() => {
+    // Vérifier si l'utilisateur est déjà connecté
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     
@@ -54,11 +45,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         setUser(JSON.parse(storedUser));
         setToken(storedToken);
-      } catch (e) {
-        console.error('Failed to parse user data from localStorage', e);
-        localStorage.clear(); // Nettoyage en cas de données corrompues
+      } catch (error) {
+        console.error('Error parsing stored user data:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
     }
+
     setInitialized(true);
   }, []);
 
@@ -67,13 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      // Correction de l'URL de l'API : le backend tourne sur le port 3002
-      const response = await axios.post('http://localhost:3002/auth/login', {
+      // Appel à votre API de login
+      const response = await axios.post('http://localhost:3000/auth/login', {
         email,
         password,
       });
+      console.log("mon user est connecté ici:", response);
       
-      const { access_token: authToken, user: userData } = response.data;
+      const { token: authToken, user: userData } = response.data;
       
       setUser(userData);
       setToken(authToken);
@@ -89,15 +83,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = useCallback(() => {
-    if (socket) {
-      socket.disconnect(); // Déconnexion propre du WebSocket
-    }
+  const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('token');
+
+    const success  = logout();
+
+    if (!success) {
+      setError('Échec de lea Deconnexion');
+      // Marquer le message comme erreur
+      return null;
+    }
+       localStorage.removeItem('token');
     localStorage.removeItem('user');
-  }, [socket]);
+
+  };
 
   return (
     <AuthContext.Provider value={{ 

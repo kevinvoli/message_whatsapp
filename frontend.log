@@ -10,36 +10,7 @@
 - Network:       http://192.168.0.2:3000
 
 ✓ Starting...
-✓ Ready in 745ms
-⨯ ./front/src/contexts/AuthProvider.tsx:6:1
-Module not found: Can't resolve './SocketProvider'
-[0m [90m 4 |[39m [36mimport[39m [33mReact[39m[33m,[39m { createContext[33m,[39m useState[33m,[39m useContext[33m,[39m useEffect[33m,[39m [33mReactNode[39m[33m,[39m useCallback } [36mfrom[39m [32m'react'[39m[33m;[39m
- [90m 5 |[39m [36mimport[39m axios [36mfrom[39m [32m'axios'[39m[33m;[39m
-[31m[1m>[22m[39m[90m 6 |[39m [36mimport[39m { useSocket } [36mfrom[39m [32m'./SocketProvider'[39m[33m;[39m [90m// Correction de l'import[39m
- [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
- [90m 7 |[39m
- [90m 8 |[39m [90m/**[39m
- [90m 9 |[39m [90m * @interface User[39m[0m
-
-
-
-Import traces:
-  Server Component:
-    ./front/src/contexts/AuthProvider.tsx
-    ./front/src/app/layout.tsx
-
-  Client Component Browser:
-    ./front/src/contexts/AuthProvider.tsx [Client Component Browser]
-    ./front/src/app/login/page.tsx [Client Component Browser]
-    ./front/src/app/login/page.tsx [Server Component]
-
-  Client Component SSR:
-    ./front/src/contexts/AuthProvider.tsx [Client Component SSR]
-    ./front/src/app/login/page.tsx [Client Component SSR]
-    ./front/src/app/login/page.tsx [Server Component]
-
-https://nextjs.org/docs/messages/module-not-found
-
-
- GET /login 500 in 522ms (compile: 338ms, render: 184ms)
+✓ Ready in 2.5s
+ GET /login 200 in 3.5s (compile: 2.9s, render: 580ms)
+ GET /login 200 in 82ms (compile: 9ms, render: 73ms)
 [?25h
