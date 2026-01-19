@@ -9,6 +9,7 @@ import { QueuePosition } from './entities/queue-position.entity';
 import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { DispatcherScheduler } from './services/scheduler/dispatcher.scheduler';
 
 @Module({
   imports: [
