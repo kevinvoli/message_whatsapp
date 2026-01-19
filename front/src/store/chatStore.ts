@@ -74,9 +74,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addMessage: (message: Message) => {
-    set((state) => ({
-      messages: [...state.messages, message],
-    }));
+    set((state) => {
+      const newState: Partial<ChatState> = {};
+
+      // Met à jour la conversation dans la liste pour refléter le nouveau dernier message et incrémenter le compteur de non-lus
+      newState.conversations = state.conversations.map(c => {
+        if (c.chat_id === message.chatId) {
+          return {
+            ...c,
+            lastMessage: message,
+            unreadCount: (c.unreadCount || 0) + 1,
+          };
+        }
+        return c;
+      });
+
+      // Si la conversation du message est celle qui est sélectionnée, ajoute le message à la liste visible
+      if (state.selectedConversation?.chat_id === message.chatId) {
+        newState.messages = [...state.messages, message];
+      }
+
+      return newState;
+    });
   },
 
   updateConversation: (updatedConversation: Conversation) => {

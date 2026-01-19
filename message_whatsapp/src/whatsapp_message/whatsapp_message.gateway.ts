@@ -493,6 +493,16 @@ export class WhatsappMessageGateway
     this.server.emit('queue:updated', queue);
   }
 
+  public emitNewMessage(agentId: string, conversationId: string, message: any) {
+    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      ([_, id]) => id === agentId
+    )?.[0];
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('message:received', { conversationId, message });
+    }
+  }
+
   public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
 

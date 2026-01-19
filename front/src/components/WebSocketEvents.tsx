@@ -49,9 +49,9 @@ const WebSocketEvents = () => {
         setMessages(data.chatId, messages);
       };
 
-      const handleNewMessage = (rawMessage: any) => {
-        console.log('Received raw new message:ccccccccccccccccccccccccccccccccccccccccccccccccccccccc', rawMessage);
-        const message = transformToMessage(rawMessage);
+      const handleNewMessage = (data: { conversationId: string, message: any }) => {
+        console.log('Received raw new message for conversation:', data.conversationId, data.message);
+        const message = transformToMessage(data.message);
         addMessage(message);
       };
 
@@ -79,7 +79,7 @@ const WebSocketEvents = () => {
       // --- Enregistrement des listeners ---
       socket.on('conversations:list', handleConversationsList);
       socket.on('messages:list', handleMessagesList);
-      socket.on('message:new', handleNewMessage);
+      socket.on('message:received', handleNewMessage);
       socket.on('conversation:updated', handleConversationUpdated);
       socket.on('conversation:new', handleNewConversation);
       socket.on('conversation:removed', handleConversationRemoved);
@@ -88,7 +88,7 @@ const WebSocketEvents = () => {
       return () => {
         socket.off('conversations:list', handleConversationsList);
         socket.off('messages:list', handleMessagesList);
-        socket.off('message:new', handleNewMessage);
+        socket.off('message:received', handleNewMessage);
         socket.off('conversation:updated', handleConversationUpdated);
         socket.off('conversation:new', handleNewConversation);
         socket.off('conversation:removed', handleConversationRemoved);

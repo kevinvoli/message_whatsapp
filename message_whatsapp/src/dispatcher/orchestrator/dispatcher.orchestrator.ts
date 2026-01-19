@@ -57,8 +57,9 @@ export class DispatcherOrchestrator {
                 updatedChat.status = WhatsappChatStatus.ACTIF;
             }
             const savedUpdatedChat = await this.chatRepository.save(updatedChat);
-            await this.whatsappMessageService.saveIncomingFromWhapi(message, savedUpdatedChat);
+            const savedMessage = await this.whatsappMessageService.saveIncomingFromWhapi(message, savedUpdatedChat);
             this.messageGateway.emitConversationUpdateToAgent(decision.agentId, savedUpdatedChat);
+            this.messageGateway.emitNewMessage(decision.agentId, savedUpdatedChat.chat_id, savedMessage);
         }
         return true;
 
@@ -76,8 +77,9 @@ export class DispatcherOrchestrator {
           if (oldAgentId) {
             this.messageGateway.emitConversationRemovedToAgent(oldAgentId, savedAssignedChat.id);
           }
+          const savedMessage = await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
           this.messageGateway.emitNewConversationToAgent(decision.agentId, savedAssignedChat);
-          await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
+          this.messageGateway.emitNewMessage(decision.agentId, savedAssignedChat.chat_id, savedMessage);
 
         } else {
           const newChat = this.chatRepository.create({
@@ -90,8 +92,9 @@ export class DispatcherOrchestrator {
             last_activity_at: new Date(),
           });
           savedAssignedChat = await this.chatRepository.save(newChat);
-          await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
+          const savedMessage = await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
           this.messageGateway.emitNewConversationToAgent(decision.agentId, savedAssignedChat);
+          this.messageGateway.emitNewMessage(decision.agentId, savedAssignedChat.chat_id, savedMessage);
         }
 
         await this.queueService.moveToEnd(decision.agentId);
