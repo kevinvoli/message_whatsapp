@@ -79,6 +79,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   updateConversation: (updatedConversation: Conversation) => {
+    // console.log("update des conversation", updatedConversation);
+    
     set((state) => {
       const newState: Partial<ChatState> = {
         // Met à jour la conversation dans la liste
@@ -92,10 +94,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         newState.selectedConversation = updatedConversation;
 
         // Ajoute le nouveau message à la liste des messages, s'il existe et n'est pas déjà présent
-        if (updatedConversation.last_message && !state.messages.find(m => m.id === updatedConversation.last_message.id)) {
-          newState.messages = [...state.messages, updatedConversation.last_message];
+        if (updatedConversation.lastMessage && !state.messages.find(m => m.id === updatedConversation?.lastMessage.id)) {
+          newState.messages = [...state.messages, updatedConversation.lastMessage];
         }
       }
+console.log("fffffffffffffffffffffffffffffffffffffffff",newState);
 
       return newState;
     });

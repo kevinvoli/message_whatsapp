@@ -76,7 +76,7 @@ export class WhatsappMessageGateway
     const messageForFrontend = {
       id: message.id,
       text: message.text,
-      timestamp: new Date(`${message.timestamp}`).getTime() ,
+      timestamp: new Date(`${message.timestamp}`).getTime(),
       direction: message.direction,
       from: message.from,
       from_name: message.from_name || 'Client',
@@ -88,60 +88,54 @@ export class WhatsappMessageGateway
       ([_, agentId]) => agentId === commercialId,
     )?.[0];
 
-    if (targetSocketId) {
-      this.server.to(targetSocketId).emit('message:received', {
-        conversationId: message.chat_id, // ✅ PAS chat.id
-        message: messageForFrontend,
-      });
-    }
+    // if (targetSocketId) {
+    //   this.server.to(targetSocketId).emit('message:receid', {
+    //     conversationId: message.chat_id, // ✅ PAS chat.id
+    //     message: messageForFrontend,
+    //   });
+    // }
   }
 
-public async emitIncomingConversation(chat: WhatsappChat) {
-  try {
-    // Trouver le socket de l'agent assigné à cette conversation
-    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-      ([_, agentId]) => agentId === chat.commercial?.id,
-    )?.[0];
-
-    if (!targetSocketId) {
-   
-      return;
-    }
-
+  public async emitIncomingConversation(chat: WhatsappChat) {
+    // console.log("xssssssssssssssssssssssssssssssssssssssss",chat);
     
-    // Récupérer le dernier message
-    const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+    try {
+      // Trouver le socket de l'agent assigné à cette conversation
+      const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+        ([_, agentId]) => agentId === chat.commercial?.id,
+      )?.[0];
 
-    console.log("commit conversation!!!!!!!!!!!!!!!!!!",lastMessage );
+      if (!targetSocketId) {
+        return;
+      }
 
+      // Récupérer le dernier message
+      const lastMessage =
+        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
 
-    // Compter les messages non lus
-    const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+      // console.log("commit conversation!!!!!!!!!!!!!!!!!!",lastMessage );
 
-    // Construire l'objet conversation
-    const conversation = {
-      id: chat.id,
-      chat_id: chat.chat_id,
-      clientName: chat.name,
-      clientPhone: chat.chat_id?.split('@')[0] || '',
-      lastMessage: {
-        text: lastMessage?.text || 'Aucun message',
-        timestamp: lastMessage?.timestamp || chat.updatedAt,
-        author: lastMessage?.from_me ? 'agent' : 'client',
-      },
-      unreadCount: unreadCount,
-      commercial_id: chat.commercial_id,
-      name: chat.name,
-      updatedAt: chat.updatedAt,
-    };
+      // Compter les messages non lus
+      const unreadCount = await this.whatsappMessageService.countUnreadMessages(
+        chat.chat_id,
+      );
 
-    // Émettre l'événement de mise à jour de conversation à l'agent spécifique
-    this.server.to(targetSocketId).emit('conversation:updated', conversation)
-      //  this.server.emit('conversation:updated', conversation);    
-  } catch (error) {
-    console.error('Erreur lors de l\'émission de la conversation:', error);
+      // Construire l'objet conversation
+      const conversation = {
+        ...chat,
+        // clientPhone: chat.chat_id?.split('@')[0] || '',
+        last_message: lastMessage,
+        unreadCount: unreadCount,
+      };
+
+      console.log("cdidvveeeeeeeeeeeeeeeeeeeeeeeee",targetSocketId);
+      
+      // Émettre l'événement de mise à jour de conversation à l'agent spécifique
+      this.server.to(targetSocketId).emit('conversation:updated', conversation);
+    } catch (error) {
+      console.error("Erreur lors de l'émission de la conversation:", error);
+    }
   }
-}
 
   async handleDisconnect(client: Socket) {
     console.log('🔴 Client déconnecté:', client.id);
@@ -189,10 +183,14 @@ public async emitIncomingConversation(chat: WhatsappChat) {
       const chats = await this.chatService.findByCommercialId(commercialId);
       const conversations = await Promise.all(
         chats.map(async (chat) => {
-          const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
-          const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
-          console.log("chargement conversation:::::",lastMessage,unreadCount, chat);
-          
+          const lastMessage =
+            await this.whatsappMessageService.findLastMessageByChatId(
+              chat.chat_id,
+            );
+          const unreadCount =
+            await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+          // console.log('chargement conversation:::::', lastMessage);
+
           return {
             ...chat,
             last_message: lastMessage,
@@ -201,11 +199,16 @@ public async emitIncomingConversation(chat: WhatsappChat) {
         }),
       );
 
-      conversations.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      conversations.sort(
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+      );
 
       client.emit('conversations:list', conversations);
     } catch (error) {
-      client.emit('error', { message: 'Failed to get conversations', details: error.message });
+      client.emit('error', {
+        message: 'Failed to get conversations',
+        details: error.message,
+      });
     }
   }
 
@@ -223,10 +226,15 @@ public async emitIncomingConversation(chat: WhatsappChat) {
     }
 
     try {
-      const messages = await this.whatsappMessageService.findByChatId(payload.chatId);
+      const messages = await this.whatsappMessageService.findByChatId(
+        payload.chatId,
+      );
       client.emit('messages:list', { chatId: payload.chatId, messages });
     } catch (error) {
-      client.emit('error', { message: 'Failed to get messages', details: error.message });
+      client.emit('error', {
+        message: 'Failed to get messages',
+        details: error.message,
+      });
     }
   }
 
@@ -251,15 +259,46 @@ public async emitIncomingConversation(chat: WhatsappChat) {
         timestamp: new Date(),
       });
 
+      const chat = await this.chatService.findByChatId(message.chat_id)
+
+      if (!chat) {
+        return
+      }
+       const lastMessage =
+        await this.whatsappMessageService.findLastMessageByChatId(message.chat_id);
+
+
+      // Compter les messages non lus
+      const unreadCount = await this.whatsappMessageService.countUnreadMessages(
+        chat.chat_id,
+      );
+
+      // Construire l'objet conversation
+      const conversation = {
+        ...chat,
+        last_message: lastMessage,
+        unreadCount: unreadCount,
+      };
+
+      const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+        ([_, agentId]) => agentId === chat.commercial.id,
+      )?.[0];
+      if (!targetSocketId) {
+        return
+      }
+      
+      this.server.to(targetSocketId).emit('conversation:updated',conversation);
+
       // The dispatcher or another service should handle broadcasting this new message.
       // For now, we can emit an update to the sender.
-      const chat = await this.chatService.findByChatId(payload.chatId);
       if (chat) {
         this.emitConversationUpdate(chat.id);
       }
-
     } catch (error) {
-      client.emit('error', { message: 'Failed to send message', details: error.message });
+      client.emit('error', {
+        message: 'Failed to send message',
+        details: error.message,
+      });
     }
   }
 
@@ -295,7 +334,7 @@ public async emitIncomingConversation(chat: WhatsappChat) {
         commercial: commercial,
         direction: MessageDirection.OUT as MessageDirection,
         from_me: true,
-        timestamp:new Date(messageData.timestamp).getTime(),
+        timestamp: new Date(messageData.timestamp).getTime(),
         status: WhatsappMessageStatus.SENT as WhatsappMessageStatus,
         source: 'agent_web',
         text: messageData.text,
@@ -416,6 +455,8 @@ public async emitIncomingConversation(chat: WhatsappChat) {
     }
   }
 
+  // T9Bu4TnK6QPbZLbUAAAB
+
   // =========================
   // PING/PONG (keep-alive)
   // =========================
@@ -431,26 +472,39 @@ public async emitIncomingConversation(chat: WhatsappChat) {
 
   public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
+
+      
       const chat = await this.chatService.findByChatId(chatId);
       if (!chat || !chat.commercial_id) return;
 
-      const targetSocketId = Array.from(this.connectedAgents.entries())
-        .find(([_, agentId]) => agentId === chat.commercial_id)?.[0];
+      const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+        ([_, agentId]) => agentId === chat.commercial_id,
+      )?.[0];
 
       if (targetSocketId) {
-        const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
-        const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+        const lastMessage =
+          await this.whatsappMessageService.findLastMessageByChatId(
+            chat.chat_id,
+          );
+        const unreadCount =
+          await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
 
         const conversationPayload = {
           ...chat,
           last_message: lastMessage,
           unread_count: unreadCount,
         };
+      console.log("chat est icciccccccccccccccccccccccccc",targetSocketId);
 
-        this.server.to(targetSocketId).emit('conversation:updated', conversationPayload);
+        this.server
+          .to(targetSocketId)
+          .emit('conversation:updated', conversationPayload);
       }
     } catch (error) {
-      console.error(`Failed to emit conversation update for chat ${chatId}:`, error);
+      console.error(
+        `Failed to emit conversation update for chat ${chatId}:`,
+        error,
+      );
     }
   }
 }

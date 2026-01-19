@@ -143,7 +143,7 @@ export const transformToConversation = (
   const messages: Message[] = Array.isArray(rawData.messages)
     ? rawData.messages.map(transformToMessage)
     : [];
-  console.log("dernier message", rawData);
+  // console.log("dernier message", rawData);
 
   const message = {
     id: rawData.id,

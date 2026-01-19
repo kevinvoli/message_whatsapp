@@ -49,7 +49,7 @@ const WebSocketEvents = () => {
       };
 
       const handleNewMessage = (rawMessage: any) => {
-        console.log('Received raw new message:', rawMessage);
+        console.log('Received raw new message:ccccccccccccccccccccccccccccccccccccccccccccccccccccccc', rawMessage);
         const message = transformToMessage(rawMessage);
         addMessage(message);
       };
@@ -70,7 +70,6 @@ const WebSocketEvents = () => {
       socket.on('message:new', handleNewMessage);
       socket.on('conversation:updated', handleConversationUpdated);
       socket.on('error', handleError);
-
       // --- Nettoyage ---
       return () => {
         socket.off('conversations:list', handleConversationsList);

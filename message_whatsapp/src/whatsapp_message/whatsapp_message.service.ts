@@ -24,104 +24,103 @@ export class WhatsappMessageService {
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly chatService: WhatsappChatService,
     private readonly communicationWhapiService: CommunicationWhapiService,
-   @InjectRepository(WhatsappCommercial)
+    @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
 
-       @InjectRepository(WhatsappChat)
+    @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
-
-async createAgentMessage(data: {
-  chat_id: string;
-  text: string;
-  commercial_id: string;
-  timestamp: Date;
-}): Promise<WhatsappMessage> {
-
-
-  try {
-    const chat = await this.chatService.findByChatId(data.chat_id);
-    if (!chat) throw new Error('Chat not found');
-    console.log("chat a envoie", chat);
+  async createAgentMessage(data: {
+    chat_id: string;
+    text: string;
+    commercial_id: string;
+    timestamp: Date;
+  }): Promise<WhatsappMessage> {
+    console.log("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",data);
     
-    const lastMessage = await this.findLastMessageByChatId(data.chat_id);
-    if (lastMessage && !lastMessage.from_me) {
-      const now = new Date();
-      const lastMessageDate = new Date(lastMessage.timestamp);
-      const diff = now.getTime() - lastMessageDate.getTime();
-      const diffHours = Math.ceil(diff / (1000 * 60 * 60));
-      if (diffHours > 24) {
-        throw new Error('Response timeout');
+    try {
+      const chat = await this.chatService.findByChatId(data.chat_id);
+      if (!chat) throw new Error('Chat not found');
+      // console.log('chat a envoie', chat);
+
+      const lastMessage = await this.findLastMessageByChatId(data.chat_id);
+      if (lastMessage && !lastMessage.from_me) {
+        const now = new Date();
+        const lastMessageDate = new Date(lastMessage.timestamp);
+        const diff = now.getTime() - lastMessageDate.getTime();
+        const diffHours = Math.ceil(diff / (1000 * 60 * 60));
+        if (diffHours > 24) {
+          throw new Error('Response timeout');
+        }
       }
+
+      // 1️⃣ Envoi réel vers WhatsApp
+      function extractPhoneNumber(chatId: string): string {
+        return chatId.split('@')[0];
+      }
+      const whapiResponse = await this.communicationWhapiService.sendToWhapi(
+        extractPhoneNumber(chat?.chat_id),
+        data.text,
+      );
+
+      // 2️⃣ Création message DB
+      const messageEntity = this.messageRepository.create({
+        message_id: whapiResponse.id ?? `agent_${Date.now()}`,
+        external_id: whapiResponse.id,
+        chat_id: data.chat_id,
+        commercial_id: data.commercial_id,
+        direction: MessageDirection.OUT,
+        from_me: true,
+        timestamp: data.timestamp,
+        status: WhatsappMessageStatus.SENT,
+        source: 'agent_web',
+        text: data.text,
+        chat: chat,
+        commercial: chat.commercial,
+        from: extractPhoneNumber(chat?.chat_id),
+        from_name: chat.name,
+      });
+
+      const mes= await this.messageRepository.save(messageEntity);
+
+      return mes
+    } catch (error) {
+      console.error('WHAPI SEND FAILED:', error);
+
+      // 🧠 fallback : message en échec mais sauvegardé
+      const failedMessage = this.messageRepository.create({
+        message_id: `failed_${Date.now()}`,
+        chat_id: data.chat_id,
+        commercial_id: data.commercial_id,
+        direction: MessageDirection.OUT,
+        from_me: true,
+        timestamp: data.timestamp,
+        status: WhatsappMessageStatus.FAILED,
+        source: 'agent_web',
+        text: data.text,
+      });
+
+      await this.messageRepository.save(failedMessage);
+      throw error;
     }
-
-    // 1️⃣ Envoi réel vers WhatsApp
-    console.log("message         =================================a envoie",lastMessage);
-    function extractPhoneNumber(chatId: string): string {
-  return chatId.split("@")[0];
-}
-    const whapiResponse = await this.communicationWhapiService.sendToWhapi(
-      extractPhoneNumber(chat?.chat_id) ,
-      data.text,
-    );
-
-    // 2️⃣ Création message DB
-    const messageEntity = this.messageRepository.create({
-      message_id: whapiResponse.id ?? `agent_${Date.now()}`,
-      external_id: whapiResponse.id,
-      chat_id: data.chat_id,
-      commercial_id: data.commercial_id,
-      direction: MessageDirection.OUT,
-      from_me: true,
-      timestamp: data.timestamp,
-      status: WhatsappMessageStatus.SENT,
-      source: 'agent_web',
-      text: data.text,
-      chat: chat,
-      commercial: chat.commercial,
-      from:  extractPhoneNumber(chat?.chat_id),
-      from_name: chat.name,
-    });
-
-    return await this.messageRepository.save(messageEntity);
-
-  } catch (error) {
-    console.error('WHAPI SEND FAILED:', error);
-
-    // 🧠 fallback : message en échec mais sauvegardé
-    const failedMessage = this.messageRepository.create({
-      message_id: `failed_${Date.now()}`,
-      chat_id: data.chat_id,
-      commercial_id: data.commercial_id,
-      direction: MessageDirection.OUT,
-      from_me: true,
-      timestamp: data.timestamp,
-      status: WhatsappMessageStatus.FAILED,
-      source: 'agent_web',
-      text: data.text,
-    });
-
-    await this.messageRepository.save(failedMessage);
-    throw error;
   }
-}
-
 
   async findLastMessageByChatId(
     chatId: string,
   ): Promise<WhatsappMessage | null> {
-    const messages = await this.messageRepository.find({
+    return this.messageRepository.findOne({
       where: { chat_id: chatId },
       order: { timestamp: 'DESC' },
       relations: ['chat', 'commercial'],
-      take: 1,
     });
-
-    return messages.length > 0 ? messages[0] : null;
   }
 
-  async findByChatId(chatId: string, limit = 100, offset = 0): Promise<WhatsappMessage[]> {
+  async findByChatId(
+    chatId: string,
+    limit = 100,
+    offset = 0,
+  ): Promise<WhatsappMessage[]> {
     return this.messageRepository.find({
       where: { chat_id: chatId },
       relations: ['chat', 'commercial'],
@@ -131,38 +130,37 @@ async createAgentMessage(data: {
     });
   }
 
- async countUnreadMessages(chatId: string): Promise<number> {
-  return this.messageRepository.count({
-    where: {
-      chat_id: chatId,
-      from_me: false,
-      status: In([
-        WhatsappMessageStatus.SENT,
-        WhatsappMessageStatus.DELIVERED,
-      ]),
-    },
-  });
-}
+  async countUnreadMessages(chatId: string): Promise<number> {
+    return this.messageRepository.count({
+      where: {
+        chat_id: chatId,
+        from_me: false,
+        status: In([
+          WhatsappMessageStatus.SENT,
+          WhatsappMessageStatus.DELIVERED,
+        ]),
+      },
+    });
+  }
 
-  async create(message: CreateWhatsappMessageDto, commercialId?:string) {
-
+  async create(message: CreateWhatsappMessageDto, commercialId?: string) {
     try {
       console.log('message reçue du dispache', message);
-// let chat;
-//       if (commercialId) {
-//   chat= await this.chatService.findOrCreateChat(
-//         message.chat_id,
-//         message.from,
-//         message.from_name,
-//         commercialId,
-//       );        
-//       }
+      // let chat;
+      //       if (commercialId) {
+      //   chat= await this.chatService.findOrCreateChat(
+      //         message.chat_id,
+      //         message.from,
+      //         message.from_name,
+      //         commercialId,
+      //       );
+      //       }
 
-      const chat  = await this.chatRepository.find({
-        where:{
-          chat_id: message.chat_id
-        }
-      })
+      const chat = await this.chatRepository.find({
+        where: {
+          chat_id: message.chat_id,
+        },
+      });
 
       if (!chat) {
         throw new Error('Chat not found or created');
@@ -178,19 +176,17 @@ async createAgentMessage(data: {
         return chekMessage;
       }
 
-
-
-      const  commercial= await this.commercialRepository.findOne({
-        where:{
-          id: commercialId
-        }
-      })
+      const commercial = await this.commercialRepository.findOne({
+        where: {
+          id: commercialId,
+        },
+      });
 
       if (!commercial) {
         return null;
       }
 
-       const data: Partial<WhatsappMessage> = {
+      const data: Partial<WhatsappMessage> = {
         message_id: message.id,
         external_id: message.id,
         chat_id: message.chat_id,
@@ -202,8 +198,8 @@ async createAgentMessage(data: {
         timestamp: new Date(message.timestamp * 1000),
         source: message.source,
       };
-      
-      const messageEntity =  this.messageRepository.create(data);
+
+      const messageEntity = this.messageRepository.create(data);
 
       return this.messageRepository.save(messageEntity);
     } catch (error) {
@@ -212,69 +208,65 @@ async createAgentMessage(data: {
     }
   }
 
-
-
-
-
   async findAll(chatId: string) {
-      const messages = await this.messageRepository.find({
-        where: {chat_id:chatId}
-      })
-      return messages
+    const messages = await this.messageRepository.find({
+      where: { chat_id: chatId },
+    });
+    return messages;
   }
 
   findOne(id: string) {
     return `This action returns a #${id} whatsappMessage`;
   }
 
-  async updateByStatus(status: { id: string; recipient_id: string; status: string }) {
-
+  async updateByStatus(status: {
+    id: string;
+    recipient_id: string;
+    status: string;
+  }) {
     try {
-      
-       const messages= await this.messageRepository.findOne({
-      where: { external_id: status.id, chat_id: status.recipient_id },
-    });
+      const messages = await this.messageRepository.findOne({
+        where: { external_id: status.id, chat_id: status.recipient_id },
+      });
 
-    if (!messages) {
-      console.log('Message not found for status update:', status.id);
-      return null;
-    }
-      console.log("les info du status", messages);
-    messages.status = status.status as WhatsappMessageStatus;
+      if (!messages) {
+        console.log('Message not found for status update:', status.id);
+        return null;
+      }
+      console.log('les info du status', messages);
+      messages.status = status.status as WhatsappMessageStatus;
 
-    console.log("les info du status======", messages);
+      console.log('les info du status======', messages);
 
-    const result= await this.messageRepository.save(messages); 
-    console.log("====== status======", result);
-
+      const result = await this.messageRepository.save(messages);
+      console.log('====== status======', result);
     } catch (error) {
       throw new Error(`Failed to update message status: ${String(error)}`);
     }
-  };
+  }
 
   async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
+    const messagesss = await this.messageRepository.save(
+      this.messageRepository.create({
+        chat,
+        message_id: message.id,
+        external_id: message.id,
+        direction: MessageDirection.IN,
+        from_me: false,
+        from: message.from,
+        from_name: message.from_name,
+        text: message.text?.body ?? '',
+        type: message.type,
+        timestamp: new Date(message.timestamp * 1000),
+        status: WhatsappMessageStatus.SENT,
+        source: 'whapi',
+      }),
+    );
 
-  const messagesss= await this.messageRepository.save(
-    this.messageRepository.create({
-      chat,
-      message_id: message.id,
-      external_id: message.id,
-      direction: MessageDirection.IN,
-      from_me: false,
-      from: message.from,
-      from_name: message.from_name,
-      text: message.text?.body ?? '',
-      type: message.type,
-      timestamp: message.timestamp,
-      status: WhatsappMessageStatus.SENT,
-      source: 'whapi',
-    }),
-  );
-  return messagesss
-}
+    return messagesss;
+  }
+
   remove(id: string) {
     return `This action removes a #${id} whatsappMessage`;
   }
 }
-
-
