@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { QueuePosition } from '../entities/queue-position.entity';
+import { QueuePosition } from '../../entities/queue-position.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
@@ -53,7 +53,10 @@ export class QueueService {
     await queryRunner.startTransaction();
 
     try {
-      const positionToRemove = await queryRunner.manager.findOne(QueuePosition, { where: { userId } });
+      const positionToRemove = await queryRunner.manager.findOne(QueuePosition, {
+        where: { userId },
+        select: ['id', 'userId', 'position', 'addedAt', 'updatedAt'],
+      });
 
       if (!positionToRemove) {
         await queryRunner.commitTransaction();

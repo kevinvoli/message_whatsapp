@@ -1,5 +1,5 @@
-import { DispatcherService } from '../dispatcher/dispatcher.service';
-import { QueueService } from '../dispatcher/services/queue.service';
+import { DispatcherOrchestrator } from '../dispatcher/orchestrator/dispatcher.orchestrator';
+import { QueueService } from '../dispatcher/services/queue/queue.service';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import {
   WebSocketGateway,
@@ -37,8 +37,7 @@ export class WhatsappMessageGateway
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
     private readonly userService: WhatsappCommercialService,
-    private readonly queueService: QueueService,
-    private readonly dispatcherService: DispatcherService,
+    private readonly dispatcherOrchestrator: DispatcherOrchestrator,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
     @InjectRepository(WhatsappCommercial)
@@ -59,12 +58,8 @@ export class WhatsappMessageGateway
     if (commercialId) {
       this.connectedAgents.set(client.id, commercialId);
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
-      await this.queueService.addToQueue(commercialId);
-      await this.emitQueueUpdate();
-      console.log('nuew status socket', true);
-
       await this.userService.updateStatus(commercialId, true);
-      // await this.dispatcherService.distributePendingMessages();
+      await this.dispatcherOrchestrator.handleUserConnected(commercialId);
     }
   }
 
@@ -143,11 +138,8 @@ export class WhatsappMessageGateway
     if (commercialId) {
       this.connectedAgents.delete(client.id);
       console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
-      await this.queueService.removeFromQueue(commercialId);
-      console.log('nuew status AGent', false);
-
       await this.userService.updateStatus(commercialId, false);
-      await this.emitQueueUpdate();
+      await this.dispatcherOrchestrator.handleUserDisconnected(commercialId);
     }
   }
 
@@ -422,11 +414,6 @@ export class WhatsappMessageGateway
   // =========================
   // MÉTHODES PRIVÉES UTILITAIRES
   // =========================
-  private async emitQueueUpdate(): Promise<void> {
-    const queue = await this.queueService.getQueuePositions();
-    this.server.emit('queue:updated', queue);
-    console.log("📢 File d'attente mise à jour et diffusée.");
-  }
 
   private async markMessagesAsRead(
     chatId: string,

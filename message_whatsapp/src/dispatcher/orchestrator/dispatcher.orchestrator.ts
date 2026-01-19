@@ -6,6 +6,8 @@ import { QueueService } from '../services/queue/queue.service';
 import { PendingMessageService } from '../services/pending/pending-message.service';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 
 @Injectable()
 export class DispatcherOrchestrator {
@@ -15,6 +17,7 @@ export class DispatcherOrchestrator {
     private readonly assignmentService: AssignmentService,
     private readonly queueService: QueueService,
     private readonly pendingMessageService: PendingMessageService,
+    private readonly whatsappMessageService: WhatsappMessageService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
   ) {}
@@ -25,14 +28,10 @@ export class DispatcherOrchestrator {
    * @returns {Promise<boolean>} - True if the message was assigned, false if it was pended.
    */
   async handleIncomingMessage(
-    clientPhone: string,
-    clientName: string,
-    content: string,
-    messageType: string,
-    mediaUrl?: string,
+    message: WhapiMessage,
   ): Promise<boolean> {
     const conversation = await this.chatRepository.findOne({
-      where: { chat_id: clientPhone },
+      where: { chat_id: message.chat_id },
       relations: ['commercial'],
     });
 
@@ -50,16 +49,19 @@ export class DispatcherOrchestrator {
 
     switch (decision.type) {
       case 'KEEP_CURRENT_AGENT':
-        const updatedChat = { ...conversation };
-        updatedChat.unread_count = (conversation.unread_count || 0) + 1;
-        updatedChat.last_activity_at = new Date();
-        if (updatedChat.status === WhatsappChatStatus.FERME) {
-            updatedChat.status = WhatsappChatStatus.ACTIF;
+        if (conversation) {
+            const updatedChat = { ...conversation };
+            updatedChat.unread_count = (conversation.unread_count || 0) + 1;
+            updatedChat.last_activity_at = new Date();
+            if (updatedChat.status === WhatsappChatStatus.FERME) {
+                updatedChat.status = WhatsappChatStatus.ACTIF;
+            }
+            const savedUpdatedChat = await this.chatRepository.save(updatedChat);
+            await this.whatsappMessageService.saveIncomingFromWhapi(message, savedUpdatedChat);
+            this.messageGateway.server
+              .to(`commercial:${decision.agentId}`)
+              .emit('conversation:updated', savedUpdatedChat);
         }
-        const savedUpdatedChat = await this.chatRepository.save(updatedChat);
-        this.messageGateway.server
-          .to(`commercial:${decision.agentId}`)
-          .emit('conversation:updated', savedUpdatedChat);
         return true;
 
       case 'ASSIGN_NEW_AGENT':
@@ -79,11 +81,12 @@ export class DispatcherOrchestrator {
           this.messageGateway.server
             .to(`commercial:${decision.agentId}`)
             .emit('conversation:new', savedAssignedChat);
+          await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
 
         } else {
           const newChat = this.chatRepository.create({
-            chat_id: clientPhone,
-            name: clientName,
+            chat_id: message.chat_id,
+            name: message.from_name ?? 'Client',
             commercial_id: decision.agentId,
             status: WhatsappChatStatus.EN_ATTENTE,
             type: 'private',
@@ -91,6 +94,7 @@ export class DispatcherOrchestrator {
             last_activity_at: new Date(),
           });
           savedAssignedChat = await this.chatRepository.save(newChat);
+          await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
           this.messageGateway.server
             .to(`commercial:${decision.agentId}`)
             .emit('conversation:new', savedAssignedChat);
@@ -101,11 +105,11 @@ export class DispatcherOrchestrator {
 
       case 'PENDING':
         await this.pendingMessageService.addPendingMessage(
-          clientPhone,
-          clientName,
-          content,
-          messageType,
-          mediaUrl || '',
+          message.chat_id,
+          message.from_name ?? 'Client',
+          message.text?.body ?? '',
+          message.type,
+          message.image?.id || message.video?.id || message.audio?.id || message.document?.id || '',
         );
         // Emitting to a general 'admins' room
         this.messageGateway.server
@@ -120,16 +124,21 @@ export class DispatcherOrchestrator {
    */
   async distributePendingMessages(): Promise<void> {
     const pendingMessages = await this.pendingMessageService.getPendingMessages();
-    for (const message of pendingMessages) {
-        const wasAssigned = await this.handleIncomingMessage(
-            message.clientPhone,
-            message.clientName,
-            message.content,
-            message.type,
-            message.mediaUrl,
-        );
+    for (const p_message of pendingMessages) {
+        const whapiMessage: WhapiMessage = {
+            id: `pending_${p_message.id}`,
+            chat_id: p_message.clientPhone,
+            from_name: p_message.clientName,
+            from_me: false,
+            type: p_message.type,
+            text: { body: p_message.content },
+            source: 'pending',
+            timestamp: new Date(p_message.receivedAt).getTime(),
+        };
+
+        const wasAssigned = await this.handleIncomingMessage(whapiMessage);
         if (wasAssigned) {
-            await this.pendingMessageService.removePendingMessage(message.id);
+            await this.pendingMessageService.removePendingMessage(p_message.id);
         }
     }
   }
