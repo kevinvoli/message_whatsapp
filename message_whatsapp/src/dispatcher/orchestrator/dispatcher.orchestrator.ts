@@ -7,7 +7,7 @@ import { PendingMessageService } from '../services/pending/pending-message.servi
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
-import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
+import { WhapiMessage, WhapiMessageType } from 'src/whapi/interface/whapi-webhook.interface';
 
 @Injectable()
 export class DispatcherOrchestrator {
@@ -134,6 +134,9 @@ export class DispatcherOrchestrator {
             text: { body: p_message.content },
             source: 'pending',
             timestamp: new Date(p_message.receivedAt).getTime(),
+            device_id: 0,
+            chat_name: p_message.clientName,
+            from: p_message.clientPhone,
         };
 
         const wasAssigned = await this.handleIncomingMessage(whapiMessage);
