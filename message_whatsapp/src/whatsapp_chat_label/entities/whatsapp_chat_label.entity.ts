@@ -43,9 +43,9 @@ export class WhatsappChatLabel {
     name: 'label_external_id',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
   })
-  label_external_id: string;
+  label_external_id?: string;
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
