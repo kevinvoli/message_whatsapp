@@ -12,7 +12,9 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_message_event_message_event_id', ['message_event_id'], { unique: true })  
+@Index('UQ_whatsapp_message_event_message_event_id', ['message_event_id'], {
+  unique: true,
+})
 export class WhatsappMessageEvent {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -42,7 +44,7 @@ export class WhatsappMessageEvent {
   @Column({ name: 'created_at', type: 'varchar', length: 100, nullable: false })
   created_at: string;
 
-  @Column({ name: 'raw_payload', type: 'json',  nullable: false })
+  @Column({ name: 'raw_payload', type: 'json', nullable: false })
   raw_payload: string;
 
   @CreateDateColumn({

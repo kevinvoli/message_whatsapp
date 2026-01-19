@@ -11,7 +11,9 @@ describe('CommunicationWhapiController', () => {
       providers: [CommunicationWhapiService],
     }).compile();
 
-    controller = module.get<CommunicationWhapiController>(CommunicationWhapiController);
+    controller = module.get<CommunicationWhapiController>(
+      CommunicationWhapiController,
+    );
   });
 
   it('should be defined', () => {

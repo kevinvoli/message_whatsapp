@@ -16,7 +16,10 @@ export class WhatsappMediaContentService {
     return `This action returns a #${id} whatsappMediaContent`;
   }
 
-  update(id: string, updateWhatsappMediaContentDto: UpdateWhatsappMediaContentDto) {
+  update(
+    id: string,
+    updateWhatsappMediaContentDto: UpdateWhatsappMediaContentDto,
+  ) {
     return `This action updates a #${id} whatsappMediaContent`;
   }
 

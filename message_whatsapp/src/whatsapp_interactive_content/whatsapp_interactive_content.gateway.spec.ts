@@ -7,10 +7,15 @@ describe('WhatsappInteractiveContentGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WhatsappInteractiveContentGateway, WhatsappInteractiveContentService],
+      providers: [
+        WhatsappInteractiveContentGateway,
+        WhatsappInteractiveContentService,
+      ],
     }).compile();
 
-    gateway = module.get<WhatsappInteractiveContentGateway>(WhatsappInteractiveContentGateway);
+    gateway = module.get<WhatsappInteractiveContentGateway>(
+      WhatsappInteractiveContentGateway,
+    );
   });
 
   it('should be defined', () => {

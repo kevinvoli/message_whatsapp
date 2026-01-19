@@ -1,15 +1,16 @@
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { UpdateWhatsappChatDto } from './dto/update-whatsapp_chat.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappChatGateway {
   constructor(private readonly whatsappChatService: WhatsappChatService) {}
-
-
 
   @SubscribeMessage('findAllWhatsappChat')
   findAll(@MessageBody() chatId: string) {

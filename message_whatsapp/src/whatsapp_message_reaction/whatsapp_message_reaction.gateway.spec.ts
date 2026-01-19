@@ -7,10 +7,15 @@ describe('WhatsappMessageReactionGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WhatsappMessageReactionGateway, WhatsappMessageReactionService],
+      providers: [
+        WhatsappMessageReactionGateway,
+        WhatsappMessageReactionService,
+      ],
     }).compile();
 
-    gateway = module.get<WhatsappMessageReactionGateway>(WhatsappMessageReactionGateway);
+    gateway = module.get<WhatsappMessageReactionGateway>(
+      WhatsappMessageReactionGateway,
+    );
   });
 
   it('should be defined', () => {

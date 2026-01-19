@@ -18,7 +18,11 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_message_content_message_content_id', ['message_content_id'], { unique: true })
+@Index(
+  'UQ_whatsapp_message_content_message_content_id',
+  ['message_content_id'],
+  { unique: true },
+)
 export class WhatsappMessageContent {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -51,10 +55,13 @@ export class WhatsappMessageContent {
   @OneToMany(() => WhatsappMediaContent, (message) => message.messageContent)
   mediaContent: WhatsappMediaContent[];
 
-   @OneToMany(() => WhatsappLocationContent, (message) => message.messageContent)
+  @OneToMany(() => WhatsappLocationContent, (message) => message.messageContent)
   locationContent: WhatsappLocationContent[];
 
-  @OneToMany(() => WhatsappInteractiveContent, (message) => message.messageContent)
+  @OneToMany(
+    () => WhatsappInteractiveContent,
+    (message) => message.messageContent,
+  )
   interactiveContent: WhatsappInteractiveContent[];
 
   @Column({

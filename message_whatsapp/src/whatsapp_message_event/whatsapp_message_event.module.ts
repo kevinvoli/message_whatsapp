@@ -6,9 +6,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappMessageEvent } from './entities/whatsapp_message_event.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappMessage, WhatsappMessageEvent
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappMessage, WhatsappMessageEvent])],
   providers: [WhatsappMessageEventGateway, WhatsappMessageEventService],
 })
 export class WhatsappMessageEventModule {}

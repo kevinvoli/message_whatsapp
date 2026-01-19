@@ -6,9 +6,7 @@ import { WhatsappCustomer } from './entities/whatsapp_customer.entity';
 import { WhatsappConversation } from 'src/whatsapp_conversation/entities/whatsapp_conversation.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappCustomer, WhatsappConversation
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappCustomer, WhatsappConversation])],
   providers: [WhatsappCustomerGateway, WhatsappCustomerService],
 })
 export class WhatsappCustomerModule {}

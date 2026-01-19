@@ -7,10 +7,15 @@ describe('WhatsappLocationContentGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WhatsappLocationContentGateway, WhatsappLocationContentService],
+      providers: [
+        WhatsappLocationContentGateway,
+        WhatsappLocationContentService,
+      ],
     }).compile();
 
-    gateway = module.get<WhatsappLocationContentGateway>(WhatsappLocationContentGateway);
+    gateway = module.get<WhatsappLocationContentGateway>(
+      WhatsappLocationContentGateway,
+    );
   });
 
   it('should be defined', () => {

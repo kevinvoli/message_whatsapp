@@ -1,18 +1,28 @@
 import { WhatsappLocationContentService } from './whatsapp_location_content.service';
 import { CreateWhatsappLocationContentDto } from './dto/create-whatsapp_location_content.dto';
 import { UpdateWhatsappLocationContentDto } from './dto/update-whatsapp_location_content.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappLocationContentGateway {
-  constructor(private readonly whatsappLocationContentService: WhatsappLocationContentService) {}
+  constructor(
+    private readonly whatsappLocationContentService: WhatsappLocationContentService,
+  ) {}
 
   @SubscribeMessage('createWhatsappLocationContent')
-  create(@MessageBody() createWhatsappLocationContentDto: CreateWhatsappLocationContentDto) {
-    return this.whatsappLocationContentService.create(createWhatsappLocationContentDto);
+  create(
+    @MessageBody()
+    createWhatsappLocationContentDto: CreateWhatsappLocationContentDto,
+  ) {
+    return this.whatsappLocationContentService.create(
+      createWhatsappLocationContentDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappLocationContent')
@@ -26,7 +36,10 @@ export class WhatsappLocationContentGateway {
   }
 
   @SubscribeMessage('updateWhatsappLocationContent')
-  update(@MessageBody() updateWhatsappLocationContentDto: UpdateWhatsappLocationContentDto) {
+  update(
+    @MessageBody()
+    updateWhatsappLocationContentDto: UpdateWhatsappLocationContentDto,
+  ) {
     // return this.whatsappLocationContentService.update(updateWhatsappLocationContentDto.id, updateWhatsappLocationContentDto);
   }
 

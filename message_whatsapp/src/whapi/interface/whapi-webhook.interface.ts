@@ -15,19 +15,41 @@ export type WhapiEventType =
   | 'catalogs'
   | 'invites';
 
-export type WhapiMessageType = 'text' | 'image' | 'audio' | 'video' | 'document';
+export type WhapiMessageType =
+  | 'text'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'document';
 
 // --- Media types ---
 
-export interface WhapiText { body: string; }
+export interface WhapiText {
+  body: string;
+}
 
-export interface WhapiImage { id: string; mime_type: string; caption?: string; }
+export interface WhapiImage {
+  id: string;
+  mime_type: string;
+  caption?: string;
+}
 
-export interface WhapiAudio { id: string; mime_type: string; }
+export interface WhapiAudio {
+  id: string;
+  mime_type: string;
+}
 
-export interface WhapiVideo { id: string; mime_type: string; caption?: string; }
+export interface WhapiVideo {
+  id: string;
+  mime_type: string;
+  caption?: string;
+}
 
-export interface WhapiDocument { id: string; filename: string; mime_type: string; }
+export interface WhapiDocument {
+  id: string;
+  filename: string;
+  mime_type: string;
+}
 
 // --- Messages ---
 
@@ -106,7 +128,14 @@ export interface WhapiLocation {
 // --- HSM (template) ---
 
 export interface WhapiHSM {
-  header?: { type: string; text?: { body: string }; image?: any; video?: any; document?: any; location?: any };
+  header?: {
+    type: string;
+    text?: { body: string };
+    image?: any;
+    video?: any;
+    document?: any;
+    location?: any;
+  };
   body?: string;
   footer?: string;
   buttons?: any[];
@@ -137,7 +166,10 @@ export interface WhapiOrder {
   preview?: string;
 }
 
-export interface WhapiProduct { catalog_id: string; product_id: string; }
+export interface WhapiProduct {
+  catalog_id: string;
+  product_id: string;
+}
 
 export interface WhapiCatalog {
   id: string;

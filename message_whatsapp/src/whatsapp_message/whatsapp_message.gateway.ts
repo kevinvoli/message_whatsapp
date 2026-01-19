@@ -12,7 +12,10 @@ import { Server, Socket } from 'socket.io';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { MessageDirection, WhatsappMessageStatus } from './entities/whatsapp_message.entity';
+import {
+  MessageDirection,
+  WhatsappMessageStatus,
+} from './entities/whatsapp_message.entity';
 import { AuthDto } from './dto/auth.dto';
 import { JoinConversationDto } from './dto/join-conversation.dto';
 import { LeaveConversationDto } from './dto/leave-conversation.dto';
@@ -58,16 +61,13 @@ export class WhatsappMessageGateway
   // AUTHENTIFICATION
   // =========================
   @SubscribeMessage('auth')
-  handleAuth(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: AuthDto,
-  ) {
+  handleAuth(@ConnectedSocket() client: Socket, @MessageBody() data: AuthDto) {
     console.log('🔐 Authentification:', data.commercialId);
-    
+
     // Vérifier le token (à implémenter selon votre système d'auth)
     // Pour l'instant, on accepte simplement l'ID
     this.connectedAgents.set(client.id, data.commercialId);
-    
+
     client.emit('auth:success', { commercialId: data.commercialId });
   }
 
@@ -80,54 +80,58 @@ export class WhatsappMessageGateway
     @MessageBody() data: JoinConversationDto,
   ) {
     console.log('📥 Agent rejoint conversation:', data);
-    
+
     // Vérifier que l'agent est connecté
     const agentId = this.connectedAgents.get(client.id);
     if (!agentId) {
       client.emit('error', { error: 'Agent non authentifié' });
       return;
     }
-    
+
     // Quitter toutes les autres rooms de conversation
     const rooms = Array.from(client.rooms);
-    rooms.forEach(room => {
+    rooms.forEach((room) => {
       if (room !== client.id && room.startsWith('conversation_')) {
         client.leave(room);
       }
     });
-    
+
     // Rejoindre la room de la conversation
     const roomName = `conversation_${data.conversationId}`;
     client.join(roomName);
-    
+
     console.log(`🚪 Agent ${agentId} a rejoint la room: ${roomName}`);
-    
+
     // Charger les messages existants
-    const messages = await this.whatsappMessageService.findByChatId(data.conversationId);
-    
-    console.log(`💬 ${messages.length} messages chargés pour ${data.conversationId}`);
-    
+    const messages = await this.whatsappMessageService.findByChatId(
+      data.conversationId,
+    );
+
+    console.log(
+      `💬 ${messages.length} messages chargés pour ${data.conversationId}`,
+    );
+
     // Envoyer les messages à l'agent
     client.emit('messages:get', {
       conversationId: data.conversationId,
-      messages: messages.map(msg => ({
+      messages: messages.map((msg) => ({
         id: msg.id,
         text: msg.text || '(Pas de texte)',
         timestamp: msg.timestamp,
-        from: msg.from ,
+        from: msg.from,
         direction: msg.direction,
         from_name: msg.from_name || (msg.from_me ? 'Agent' : 'Client'),
         status: msg.status,
-        from_me: msg.from_me
-      }))
+        from_me: msg.from_me,
+      })),
     });
-    
-    client.emit('conversation:joined', { 
+
+    client.emit('conversation:joined', {
       conversationId: data.conversationId,
       success: true,
-      messageCount: messages.length
+      messageCount: messages.length,
     });
-    
+
     // Marquer les messages non lus comme lus
     await this.whatsappMessageService.updateByStatus({
       id: data.conversationId,
@@ -147,10 +151,10 @@ export class WhatsappMessageGateway
     const roomName = `conversation_${data.conversationId}`;
     client.leave(roomName);
     console.log(`🚪 Agent a quitté la conversation: ${data.conversationId}`);
-    
-    client.emit('conversation:left', { 
+
+    client.emit('conversation:left', {
       conversationId: data.conversationId,
-      success: true 
+      success: true,
     });
   }
 
@@ -163,7 +167,7 @@ export class WhatsappMessageGateway
     @MessageBody() data: GetConversationDto,
   ) {
     console.log('👨‍💻 Agent demande ses conversations:', data.agentId);
-    
+
     try {
       // Vérifier que l'agent est connecté
       const connectedAgentId = this.connectedAgents.get(client.id);
@@ -171,23 +175,29 @@ export class WhatsappMessageGateway
         client.emit('error', { error: 'Agent non authentifié' });
         return;
       }
-      
+
       // Récupérer les chats de l'agent
       const chats = await this.chatService.findByCommercialId(data.agentId);
-      
-      console.log(`📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`);
-      
+
+      console.log(
+        `📋 ${chats.length} chats trouvés pour l'agent ${data.agentId}`,
+      );
+
       // Pour chaque chat, récupérer le dernier message
       const conversationsWithLastMessage = await Promise.all(
         chats.map(async (chat) => {
-          const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
-          
+          const lastMessage =
+            await this.whatsappMessageService.findLastMessageByChatId(
+              chat.chat_id,
+            );
+
           // Compter les messages non lus
-          const unreadCount = await this.whatsappMessageService.countUnreadMessages(
-            chat.chat_id, 
-            // data.agentId
-          );
-          
+          const unreadCount =
+            await this.whatsappMessageService.countUnreadMessages(
+              chat.chat_id,
+              // data.agentId
+            );
+
           return {
             id: chat.id,
             chat_id: chat.chat_id,
@@ -196,31 +206,35 @@ export class WhatsappMessageGateway
             lastMessage: {
               text: lastMessage?.text || 'Aucun message',
               timestamp: lastMessage?.timestamp || chat.updatedAt,
-              author: lastMessage?.from_me ? 'agent' : 'client'
+              author: lastMessage?.from_me ? 'agent' : 'client',
             },
             unreadCount: unreadCount,
             commercial_id: chat.commercial_id,
             name: chat.name,
-            updatedAt: chat.updatedAt
+            updatedAt: chat.updatedAt,
           };
-        })
+        }),
       );
-      
+
       // Trier par date du dernier message (plus récent en premier)
-      conversationsWithLastMessage.sort((a, b) => 
-        new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+      conversationsWithLastMessage.sort(
+        (a, b) =>
+          new Date(b.lastMessage.timestamp).getTime() -
+          new Date(a.lastMessage.timestamp).getTime(),
       );
-      
+
       // Envoyer les conversations à l'agent
       client.emit('conversation:list', {
-        conversations: conversationsWithLastMessage
+        conversations: conversationsWithLastMessage,
       });
-      
     } catch (error) {
-      console.error('❌ Erreur lors de la récupération des conversations:', error);
-      client.emit('conversation:error', { 
+      console.error(
+        '❌ Erreur lors de la récupération des conversations:',
+        error,
+      );
+      client.emit('conversation:error', {
         error: 'Failed to fetch conversations',
-        details: error?.message
+        details: error?.message,
       });
     }
   }
@@ -234,14 +248,18 @@ export class WhatsappMessageGateway
     @MessageBody() data: GetMessagesDto,
   ) {
     console.log('📩 Demande de messages pour:', data.conversationId);
-    
+
     try {
-      const messages = await this.whatsappMessageService.findByChatId(data.conversationId);
-      
-      console.log(`💬 ${messages.length} messages trouvés pour ${data.conversationId}`);
-      
+      const messages = await this.whatsappMessageService.findByChatId(
+        data.conversationId,
+      );
+
+      console.log(
+        `💬 ${messages.length} messages trouvés pour ${data.conversationId}`,
+      );
+
       // Formater les messages pour le frontend
-      const formattedMessages = messages.map(msg => {
+      const formattedMessages = messages.map((msg) => {
         return {
           id: msg.id,
           text: msg.text || '(Message sans texte)',
@@ -251,21 +269,20 @@ export class WhatsappMessageGateway
           from_name: msg.from_name || (msg.from_me ? 'Agent' : 'Client'),
           status: msg.status,
           from_me: msg.from_me,
-          type: msg.type
+          type: msg.type,
         };
       });
-      
+
       client.emit('messages:get', {
         conversationId: data.conversationId,
-        messages: formattedMessages
+        messages: formattedMessages,
       });
-      
     } catch (error) {
       console.error('❌ Erreur lors du chargement des messages:', error);
-      client.emit('messages:error', { 
+      client.emit('messages:error', {
         conversationId: data.conversationId,
         error: 'Failed to load messages',
-        details: error.message 
+        details: error.message,
       });
     }
   }
@@ -279,7 +296,7 @@ export class WhatsappMessageGateway
     @MessageBody() data: AgentMessageDto,
   ) {
     console.log('💬 Message agent reçu:', data);
-    
+
     try {
       // Vérifier que l'agent est connecté
       const agentId = this.connectedAgents.get(client.id);
@@ -287,17 +304,19 @@ export class WhatsappMessageGateway
         client.emit('error', { error: 'Agent non authentifié' });
         return;
       }
-      
+
       // Créer et sauvegarder le message en base
-      const savedMessage = await this.whatsappMessageService.createAgentMessage({
-        chat_id: data.chat_id,
-        text: data.content,
-        commercial_id: data.author,
-        timestamp: new Date()
-      });
-      
+      const savedMessage = await this.whatsappMessageService.createAgentMessage(
+        {
+          chat_id: data.chat_id,
+          text: data.content,
+          commercial_id: data.author,
+          timestamp: new Date(),
+        },
+      );
+
       // console.log('💾 Message sauvegardé en base:', savedMessage.id);
-      
+
       // Préparer l'objet message pour le frontend
       const messageForFrontend = {
         id: savedMessage.id,
@@ -307,39 +326,38 @@ export class WhatsappMessageGateway
         from: savedMessage.from,
         from_name: savedMessage.from_name || 'Agent',
         status: savedMessage.status,
-        from_me: true
+        from_me: true,
       };
-      
+
       // Envoyer la confirmation à l'expéditeur
       client.emit('message:sent', {
         conversationId: data.conversationId,
-        message: messageForFrontend
+        message: messageForFrontend,
       });
-      
-      console.log('✅ Confirmation envoyée à l\'expéditeur');
-      
+
+      console.log("✅ Confirmation envoyée à l'expéditeur");
+
       // Diffuser le message à tous les clients dans la room
       const roomName = `conversation_${data.conversationId}`;
       this.server.to(roomName).emit('message:received', {
         conversationId: data.conversationId,
         // message: messageForFrontend
       });
-      
+
       console.log(`📢 Message diffusé dans la room: ${roomName}`);
-      
+
       // Mettre à jour la conversation (dernier message)
       await this.updateConversationLastMessage(data.conversationId, {
         text: data.content,
         timestamp: new Date(),
-        author: 'agent'
+        author: 'agent',
       });
-      
     } catch (error) {
-      console.error('❌ Erreur lors de l\'envoi du message:', error);
-      client.emit('message:error', { 
+      console.error("❌ Erreur lors de l'envoi du message:", error);
+      client.emit('message:error', {
         error: 'Failed to send message',
         conversationId: data.conversationId,
-        details: error.message 
+        details: error.message,
       });
     }
   }
@@ -351,9 +369,9 @@ export class WhatsappMessageGateway
     console.log('📩 Message WhatsApp entrant:', {
       chat_id: messageData.chat_id,
       from: messageData.from,
-      text: messageData.text
+      text: messageData.text,
     });
-    
+
     try {
       const transformedMessage = {
         message_id: messageData.id,
@@ -361,7 +379,9 @@ export class WhatsappMessageGateway
         chat_id: messageData.chat_id,
         type: messageData.type,
         text: messageData.text ? messageData.text.body : null,
-        direction: messageData.from_me ? MessageDirection.OUT : MessageDirection.IN,
+        direction: messageData.from_me
+          ? MessageDirection.OUT
+          : MessageDirection.IN,
         from_me: messageData.from_me,
         from: messageData.from,
         from_name: messageData.from_name,
@@ -370,10 +390,11 @@ export class WhatsappMessageGateway
         source: messageData.source,
       };
       // Sauvegarder le message en base
-      const savedMessage = await this.whatsappMessageService.create(transformedMessage);
-      
+      const savedMessage =
+        await this.whatsappMessageService.create(transformedMessage);
+
       console.log('💾 Message WhatsApp sauvegardé:', savedMessage.id);
-      
+
       // Préparer l'objet message pour le frontend
       const messageForFrontend = {
         id: savedMessage.id,
@@ -383,25 +404,24 @@ export class WhatsappMessageGateway
         from: savedMessage.from,
         from_name: savedMessage.from_name || 'Client',
         status: savedMessage.status,
-        from_me: false
+        from_me: false,
       };
-      
+
       // Diffuser le message à tous les agents dans la room de la conversation
       const roomName = `conversation_${messageData.chat_id}`;
       this.server.to(roomName).emit('message:received', {
         conversationId: messageData.chat_id,
-        message: messageForFrontend
+        message: messageForFrontend,
       });
-      
+
       console.log(`📢 Message WhatsApp diffusé dans: ${roomName}`);
-      
+
       // Mettre à jour la conversation (dernier message)
       await this.updateConversationLastMessage(messageData.chat_id, {
         text: savedMessage.text ?? '(Message sans texte)',
         timestamp: savedMessage.timestamp,
-        author: 'client'
+        author: 'client',
       });
-      
     } catch (error) {
       console.error('❌ Erreur lors du traitement du message WhatsApp:', error);
     }
@@ -416,12 +436,12 @@ export class WhatsappMessageGateway
     @MessageBody() data: { conversationId: string; userId: string },
   ) {
     console.log('✍️ Typing started:', data);
-    
+
     // Diffuser à tous les autres dans la conversation
     client.to(`conversation_${data.conversationId}`).emit('typing:start', {
       conversationId: data.conversationId,
       userId: data.userId,
-      userName: 'Agent'
+      userName: 'Agent',
     });
   }
 
@@ -431,16 +451,16 @@ export class WhatsappMessageGateway
     @MessageBody() data: { conversationId: string },
   ) {
     console.log('⏹️ Typing stopped:', data);
-    
+
     client.to(`conversation_${data.conversationId}`).emit('typing:stop', {
-      conversationId: data.conversationId
+      conversationId: data.conversationId,
     });
   }
 
   // =========================
   // MÉTHODES PRIVÉES UTILITAIRES
   // =========================
-  
+
   private markMessagesAsRead(chatId: string, commercialId: string): void {
     try {
       console.log(`📖 Marquer les messages comme lus pour ${chatId}`);
@@ -450,15 +470,15 @@ export class WhatsappMessageGateway
       console.error('Erreur lors du marquage des messages comme lus:', error);
     }
   }
-  
+
   private updateConversationLastMessage(
-    chatId: string, 
-    lastMessage: { text: string; timestamp: Date; author: string }
+    chatId: string,
+    lastMessage: { text: string; timestamp: Date; author: string },
   ): void {
     try {
       this.server.emit('conversation:updated', {
         chatId,
-        lastMessage
+        lastMessage,
       });
     } catch (error) {
       console.error('Erreur lors de la mise à jour du dernier message:', error);

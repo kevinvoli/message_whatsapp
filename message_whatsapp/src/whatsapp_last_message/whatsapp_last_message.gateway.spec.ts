@@ -10,7 +10,9 @@ describe('WhatsappLastMessageGateway', () => {
       providers: [WhatsappLastMessageGateway, WhatsappLastMessageService],
     }).compile();
 
-    gateway = module.get<WhatsappLastMessageGateway>(WhatsappLastMessageGateway);
+    gateway = module.get<WhatsappLastMessageGateway>(
+      WhatsappLastMessageGateway,
+    );
   });
 
   it('should be defined', () => {

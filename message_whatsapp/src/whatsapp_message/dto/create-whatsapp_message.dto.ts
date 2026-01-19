@@ -1,45 +1,72 @@
-import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsBoolean,
+  IsDate,
+  IsOptional,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  MessageDirection,
+  WhatsappMessageStatus,
+} from '../entities/whatsapp_message.entity';
 
 export class CreateWhatsappMessageDto {
+  @IsString()
+  @IsNotEmpty()
+  message_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  external_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  chat_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  type: string;
+
+  @IsString()
   @IsOptional()
-  @IsString()
-  id: string;
+  conversation_id: string | null;
 
   @IsString()
-  message_id: string
+  @IsOptional()
+  commercial_id: string | null;
 
   @IsString()
-  external_id: string
+  @IsOptional()
+  text: string | null;
+
+  @IsEnum(MessageDirection)
+  @IsNotEmpty()
+  direction: MessageDirection;
 
   @IsBoolean()
+  @IsNotEmpty()
   from_me: boolean;
 
   @IsString()
-  type: string;
-
-   @IsString()
-  chat_id: string;
-
-  @IsNumber()
-  timestamp: number;
-
-   @IsString()
-  source: string;
-
-  @IsOptional()
-  @IsNumber()
-  device_id: number;
-
-   @IsString()
-  chat_name: string;
-
-   @IsString()
+  @IsNotEmpty()
   from: string;
 
-   @IsString()
+  @IsString()
+  @IsNotEmpty()
   from_name: string;
 
-   @IsString()
-  text?: string;
- 
+  @Type(() => Date)
+  @IsDate()
+  @IsNotEmpty()
+  timestamp: Date;
+
+  @IsEnum(WhatsappMessageStatus)
+  @IsNotEmpty()
+  status: WhatsappMessageStatus;
+
+  @IsString()
+  @IsNotEmpty()
+  source: string;
 }

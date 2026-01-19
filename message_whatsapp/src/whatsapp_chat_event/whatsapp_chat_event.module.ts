@@ -6,9 +6,7 @@ import { WhatsappChatEvent } from './entities/whatsapp_chat_event.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
-    WhatsappChatEvent,WhatsappChat
-      ])],
+  imports: [TypeOrmModule.forFeature([WhatsappChatEvent, WhatsappChat])],
   providers: [WhatsappChatEventGateway, WhatsappChatEventService],
 })
 export class WhatsappChatEventModule {}

@@ -20,14 +20,21 @@ export class WhatsappButton {
   })
   id: string;
 
-  @Column({ name: 'button_id', type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({
+    name: 'button_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
   button_id: string;
   @Column({
-    name: 'interactive_content_id', type: 'varchar', length: 100, nullable: false,
+    name: 'interactive_content_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
   })
   interactive_content_id: string;
-
-
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string;
@@ -47,10 +54,15 @@ export class WhatsappButton {
   })
   phone_number: string;
 
-  @ManyToOne(()=>WhatsappInteractiveContent, (InteractiveContent)=> InteractiveContent.button )
-  @JoinColumn({name: 'interractive_content_id', referencedColumnName: 'interactive_content_id'})
-  interactiveContent: WhatsappInteractiveContent
-
+  @ManyToOne(
+    () => WhatsappInteractiveContent,
+    (InteractiveContent) => InteractiveContent.button,
+  )
+  @JoinColumn({
+    name: 'interractive_content_id',
+    referencedColumnName: 'interactive_content_id',
+  })
+  interactiveContent: WhatsappInteractiveContent;
 
   @CreateDateColumn({
     name: 'createdAt',

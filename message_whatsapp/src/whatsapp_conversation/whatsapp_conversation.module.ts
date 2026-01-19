@@ -9,9 +9,15 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCustomer } from 'src/whatsapp_customer/entities/whatsapp_customer.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappConversation,WhatsappCustomer , WhatsappChat, WhatsappMessage, WhatsappAgent
-        ])],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappConversation,
+      WhatsappCustomer,
+      WhatsappChat,
+      WhatsappMessage,
+      WhatsappAgent,
+    ]),
+  ],
   providers: [WhatsappConversationGateway, WhatsappConversationService],
 })
 export class WhatsappConversationModule {}

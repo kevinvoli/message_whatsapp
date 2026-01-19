@@ -9,7 +9,9 @@ describe('WhatsappMessageContentService', () => {
       providers: [WhatsappMessageContentService],
     }).compile();
 
-    service = module.get<WhatsappMessageContentService>(WhatsappMessageContentService);
+    service = module.get<WhatsappMessageContentService>(
+      WhatsappMessageContentService,
+    );
   });
 
   it('should be defined', () => {

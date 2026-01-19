@@ -16,7 +16,10 @@ export class WhatsappLocationContentService {
     return `This action returns a #${id} whatsappLocationContent`;
   }
 
-  update(id: string, updateWhatsappLocationContentDto: UpdateWhatsappLocationContentDto) {
+  update(
+    id: string,
+    updateWhatsappLocationContentDto: UpdateWhatsappLocationContentDto,
+  ) {
     return `This action updates a #${id} whatsappLocationContent`;
   }
 

@@ -1,7 +1,6 @@
-import { Controller, Get, Param, Delete,  } from '@nestjs/common';
+import { Controller, Get, Param, Delete } from '@nestjs/common';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-
 
 @Controller('chat')
 export class ChatController {
@@ -11,16 +10,16 @@ export class ChatController {
   ) {}
 
   @Get(':id')
-   findAll(@Param('id') chatId: string) {
-console.log("tantaltive de selection de message" ,chatId);
+  findAll(@Param('id') chatId: string) {
+    console.log('tantaltive de selection de message', chatId);
 
-    return  this.chatService.findAll(chatId);
+    return this.chatService.findAll(chatId);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    console.log("get on user", id);
-    
+    console.log('get on user', id);
+
     return this.messageService.findOne(id);
   }
 

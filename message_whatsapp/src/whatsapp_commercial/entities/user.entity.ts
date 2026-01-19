@@ -1,8 +1,14 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-import { Entity, Column, PrimaryGeneratedColumn,CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
 // import * as bcrypt from 'bcrypt';
-
 
 @Entity()
 export class WhatsappCommercial {
@@ -12,16 +18,20 @@ export class WhatsappCommercial {
   })
   id: string;
 
-  @Column({ type: 'varchar', name: 'email', unique: true, nullable:true })
+  @Column({ type: 'varchar', name: 'email', unique: true, nullable: true })
   email: string;
 
   @Column({ type: 'varchar', nullable: false })
-  name: string ;
+  name: string;
 
   @Column({ type: 'varchar', nullable: false, select: false })
   password: string;
 
-  @Column({ type: 'enum', enum: ['ADMIN', 'COMMERCIAL'], default: 'COMMERCIAL' })
+  @Column({
+    type: 'enum',
+    enum: ['ADMIN', 'COMMERCIAL'],
+    default: 'COMMERCIAL',
+  })
   role: string;
 
   @Column({ type: 'varchar', nullable: true })
@@ -47,5 +57,4 @@ export class WhatsappCommercial {
 
   @UpdateDateColumn({ type: 'timestamp' })
   updated_at: Date;
- 
 }

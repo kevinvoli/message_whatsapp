@@ -10,7 +10,9 @@ describe('WhatsappMediaContentGateway', () => {
       providers: [WhatsappMediaContentGateway, WhatsappMediaContentService],
     }).compile();
 
-    gateway = module.get<WhatsappMediaContentGateway>(WhatsappMediaContentGateway);
+    gateway = module.get<WhatsappMediaContentGateway>(
+      WhatsappMediaContentGateway,
+    );
   });
 
   it('should be defined', () => {

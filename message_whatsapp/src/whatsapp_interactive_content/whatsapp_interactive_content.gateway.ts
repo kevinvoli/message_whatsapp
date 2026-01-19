@@ -1,18 +1,28 @@
 import { WhatsappInteractiveContentService } from './whatsapp_interactive_content.service';
 import { CreateWhatsappInteractiveContentDto } from './dto/create-whatsapp_interactive_content.dto';
 import { UpdateWhatsappInteractiveContentDto } from './dto/update-whatsapp_interactive_content.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappInteractiveContentGateway {
-  constructor(private readonly whatsappInteractiveContentService: WhatsappInteractiveContentService) {}
+  constructor(
+    private readonly whatsappInteractiveContentService: WhatsappInteractiveContentService,
+  ) {}
 
   @SubscribeMessage('createWhatsappInteractiveContent')
-  create(@MessageBody() createWhatsappInteractiveContentDto: CreateWhatsappInteractiveContentDto) {
-    return this.whatsappInteractiveContentService.create(createWhatsappInteractiveContentDto);
+  create(
+    @MessageBody()
+    createWhatsappInteractiveContentDto: CreateWhatsappInteractiveContentDto,
+  ) {
+    return this.whatsappInteractiveContentService.create(
+      createWhatsappInteractiveContentDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappInteractiveContent')
@@ -26,7 +36,10 @@ export class WhatsappInteractiveContentGateway {
   }
 
   @SubscribeMessage('updateWhatsappInteractiveContent')
-  update(@MessageBody() updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto) {
+  update(
+    @MessageBody()
+    updateWhatsappInteractiveContentDto: UpdateWhatsappInteractiveContentDto,
+  ) {
     // return this.whatsappInteractiveContentService.update(updateWhatsappInteractiveContentDto.id, updateWhatsappInteractiveContentDto);
   }
 

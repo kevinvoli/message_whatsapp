@@ -1,17 +1,24 @@
 import { WhatsappTextContentService } from './whatsapp_text_content.service';
 import { CreateWhatsappTextContentDto } from './dto/create-whatsapp_text_content.dto';
 import { UpdateWhatsappTextContentDto } from './dto/update-whatsapp_text_content.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappTextContentGateway {
-  constructor(private readonly whatsappTextContentService: WhatsappTextContentService) {}
+  constructor(
+    private readonly whatsappTextContentService: WhatsappTextContentService,
+  ) {}
 
   @SubscribeMessage('createWhatsappTextContent')
-  create(@MessageBody() createWhatsappTextContentDto: CreateWhatsappTextContentDto) {
+  create(
+    @MessageBody() createWhatsappTextContentDto: CreateWhatsappTextContentDto,
+  ) {
     return this.whatsappTextContentService.create(createWhatsappTextContentDto);
   }
 
@@ -26,7 +33,9 @@ export class WhatsappTextContentGateway {
   }
 
   @SubscribeMessage('updateWhatsappTextContent')
-  update(@MessageBody() updateWhatsappTextContentDto: UpdateWhatsappTextContentDto) {
+  update(
+    @MessageBody() updateWhatsappTextContentDto: UpdateWhatsappTextContentDto,
+  ) {
     // return this.whatsappTextContentService.update(updateWhatsappTextContentDto.id, updateWhatsappTextContentDto);
   }
 

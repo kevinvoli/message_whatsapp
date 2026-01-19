@@ -1,18 +1,27 @@
 import { WhatsappMediaContentService } from './whatsapp_media_content.service';
 import { CreateWhatsappMediaContentDto } from './dto/create-whatsapp_media_content.dto';
 import { UpdateWhatsappMediaContentDto } from './dto/update-whatsapp_media_content.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },
 })
 export class WhatsappMediaContentGateway {
-  constructor(private readonly whatsappMediaContentService: WhatsappMediaContentService) {}
+  constructor(
+    private readonly whatsappMediaContentService: WhatsappMediaContentService,
+  ) {}
 
   @SubscribeMessage('createWhatsappMediaContent')
-  create(@MessageBody() createWhatsappMediaContentDto: CreateWhatsappMediaContentDto) {
-    return this.whatsappMediaContentService.create(createWhatsappMediaContentDto);
+  create(
+    @MessageBody() createWhatsappMediaContentDto: CreateWhatsappMediaContentDto,
+  ) {
+    return this.whatsappMediaContentService.create(
+      createWhatsappMediaContentDto,
+    );
   }
 
   @SubscribeMessage('findAllWhatsappMediaContent')
@@ -26,7 +35,9 @@ export class WhatsappMediaContentGateway {
   }
 
   @SubscribeMessage('updateWhatsappMediaContent')
-  update(@MessageBody() updateWhatsappMediaContentDto: UpdateWhatsappMediaContentDto) {
+  update(
+    @MessageBody() updateWhatsappMediaContentDto: UpdateWhatsappMediaContentDto,
+  ) {
     // return this.whatsappMediaContentService.update(updateWhatsappMediaContentDto.id, updateWhatsappMediaContentDto);
   }
 
