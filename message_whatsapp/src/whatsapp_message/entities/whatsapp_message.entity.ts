@@ -67,6 +67,7 @@ export class WhatsappMessage {
     type: 'varchar',
     length: 100,
     nullable: false,
+    default: 'text'
   })
   type: string;
 
