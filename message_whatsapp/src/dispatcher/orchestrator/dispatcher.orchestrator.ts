@@ -130,7 +130,7 @@ export class DispatcherOrchestrator {
             chat_id: p_message.clientPhone,
             from_name: p_message.clientName,
             from_me: false,
-            type: p_message.type,
+            type: p_message.type as WhapiMessageType,
             text: { body: p_message.content },
             source: 'pending',
             timestamp: new Date(p_message.receivedAt).getTime(),
