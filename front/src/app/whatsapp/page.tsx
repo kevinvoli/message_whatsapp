@@ -1,72 +1,62 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useConversations } from '@/hooks/useConversations'; // Utilisez le hook refactoré
 import { useRouter } from 'next/navigation';
+import { useChatStore } from '@/stores/useChatStore';
+// import { useSocket } from '@/contexts/SocketProvider'; // Note: SocketProvider is missing
 
 const WhatsAppPage = () => {
   const { user, initialized, logout } = useAuth();
   const router = useRouter();
+  // const { socket, isConnected } = useSocket(); // Temporarily disabled
+  const isConnected = false; // Mock value
 
-  // Utilisez le hook refactoré
   const {
     conversations,
     selectedConversation,
     messages,
-    isLoadingMessages,
-    isWebSocketConnected,
+    isLoading,
     error,
     selectConversation,
-    sendMessage,
-    loadConversations,
-    reconnectWebSocket
-  } = useConversations();
+  } = useChatStore();
 
-  // Protection de route
   useEffect(() => {
-    if (!initialized) return;
-    if (!user) {
+    if (initialized && !user) {
       router.replace('/login');
     }
   }, [initialized, user, router]);
 
-  // Recharger les conversations si la connexion se rétablit
-  useEffect(() => {
-    if (isWebSocketConnected && user) {
-      loadConversations(user.id);
-    }
-  }, [isWebSocketConnected, user, loadConversations]);
-
-  // Gérer la sélection d'une conversation
   const handleSelectConversation = useCallback((conversation: any) => {
-    console.log("🎯 Sélection de la conversation:", conversation.clientName);
     selectConversation(conversation);
-  }, [selectConversation]);
+    // if (socket && conversation) {
+    //   socket.emit('conversation:join', { chatId: conversation.chatId });
+    // }
+  }, [selectConversation /*, socket*/]);
 
-  // Envoyer un message
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!selectedConversation || !user) {
-      console.error('❌ Impossible d\'envoyer: conversation ou commercial manquant');
+    if (!selectedConversation || !user /*|| !socket*/) {
+      console.error("Cannot send message: missing info (socket disabled)", {
+        selectedConversation, user,
+      });
       return;
     }
 
-    try {
-      await sendMessage(selectedConversation.chat_id, {
-        text,
-        from: selectedConversation.clientPhone
-      });
-    } catch (err) {
-      console.error('Erreur lors de l\'envoi:', err);
-    }
-  }, [selectedConversation, user, sendMessage]);
+    console.log(`(Simulated) Sending message: ${text}`);
+    // socket.emit('message:send', {
+    //   chatId: selectedConversation.chatId,
+    //   text,
+    //   from: selectedConversation.clientPhone,
+    //   commercialId: user.id,
+    // });
+  }, [selectedConversation, user /*, socket*/]);
 
-  if (!user || !initialized) {
+  if (!initialized || !user) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
@@ -81,7 +71,7 @@ const WhatsAppPage = () => {
         conversations={conversations}
         searchTerm=""
         selectedConversation={selectedConversation}
-        isConnected={isWebSocketConnected}
+        isConnected={isConnected}
         onSearchChange={() => {}}
         onSelectConversation={handleSelectConversation}
         onLogout={logout}
@@ -92,11 +82,11 @@ const WhatsAppPage = () => {
           <>
             <ChatHeader conversation={selectedConversation} />
 
-            {isLoadingMessages ? (
+            {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                  <p className="text-gray-500">Chargement des messages...</p>
+                  <p className="text-gray-500">Loading messages...</p>
                 </div>
               </div>
             ) : (
@@ -105,22 +95,13 @@ const WhatsAppPage = () => {
             
             <ChatInput
               onSendMessage={handleSendMessage}
-              isConnected={isWebSocketConnected}
-              disabled={isLoadingMessages}
+              isConnected={isConnected}
+              disabled={isLoading}
             />
 
-            {/* Debug panel */}
             {error && (
               <div className="bg-red-50 border-t border-red-200 p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-red-600 text-sm">{error}</span>
-                  <button
-                    onClick={reconnectWebSocket}
-                    className="text-sm text-green-600 hover:text-green-800"
-                  >
-                    Reconnecter
-                  </button>
-                </div>
+                <span className="text-red-600 text-sm">{error}</span>
               </div>
             )}
           </>
@@ -130,8 +111,8 @@ const WhatsAppPage = () => {
               <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
               <p className="text-xl font-semibold">
                 {conversations.length === 0 
-                  ? 'Aucune conversation disponible' 
-                  : 'Sélectionnez une conversation'}
+                  ? 'No conversations available'
+                  : 'Select a conversation'}
               </p>
             </div>
           </div>
