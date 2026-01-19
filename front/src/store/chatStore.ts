@@ -23,6 +23,7 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
+  removeConversation: (conversationId: string) => void;
 
   reset: () => void;
 }
@@ -107,6 +108,14 @@ console.log("fffffffffffffffffffffffffffffffffffffffff",newState);
   addConversation: (newConversation: Conversation) => {
     set((state) => ({
       conversations: [newConversation, ...state.conversations.filter(c => c.id !== newConversation.id)],
+    }));
+  },
+
+  removeConversation: (conversationId: string) => {
+    set((state) => ({
+      conversations: state.conversations.filter(c => c.id !== conversationId),
+      // Si la conversation supprimée était sélectionnée, on la déselectionne
+      selectedConversation: state.selectedConversation?.id === conversationId ? null : state.selectedConversation,
     }));
   },
 

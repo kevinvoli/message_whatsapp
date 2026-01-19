@@ -23,6 +23,7 @@ const WebSocketEvents = () => {
     addMessage,
     updateConversation,
     addConversation,
+    removeConversation,
     loadConversations,
   } = useChatStore();
   const { user } = useAuth();
@@ -60,6 +61,17 @@ const WebSocketEvents = () => {
         updateConversation(conversation);
       };
 
+      const handleNewConversation = (rawConversation: any) => {
+        console.log('Received new conversation:', rawConversation);
+        const conversation = transformToConversation(rawConversation);
+        addConversation(conversation);
+      };
+
+      const handleConversationRemoved = (conversationId: string) => {
+        console.log('Received conversation removal:', conversationId);
+        removeConversation(conversationId);
+      };
+
       const handleError = (error: { message: string, details?: string }) => {
         console.error('Socket error received:', error.message, error.details || '');
       };
@@ -69,6 +81,8 @@ const WebSocketEvents = () => {
       socket.on('messages:list', handleMessagesList);
       socket.on('message:new', handleNewMessage);
       socket.on('conversation:updated', handleConversationUpdated);
+      socket.on('conversation:new', handleNewConversation);
+      socket.on('conversation:removed', handleConversationRemoved);
       socket.on('error', handleError);
       // --- Nettoyage ---
       return () => {
@@ -76,6 +90,8 @@ const WebSocketEvents = () => {
         socket.off('messages:list', handleMessagesList);
         socket.off('message:new', handleNewMessage);
         socket.off('conversation:updated', handleConversationUpdated);
+        socket.off('conversation:new', handleNewConversation);
+        socket.off('conversation:removed', handleConversationRemoved);
         socket.off('error', handleError);
         setSocket(null);
       };
