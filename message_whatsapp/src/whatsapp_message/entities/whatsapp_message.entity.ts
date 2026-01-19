@@ -16,7 +16,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { WhatsappCommercial } from 'src/users/entities/user.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 export enum MessageDirection {
   IN = 'IN',

@@ -16,7 +16,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
-    name: '',
+    password: '',
   });
 
  const handleSubmit = async (e: React.FormEvent) => {
@@ -64,13 +64,13 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              name
+              Password
             </label>
             <input
-              type="name"
-              value={formData.name}
+              type="password"
+              value={formData.password}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData({ ...formData, password: e.target.value })
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-600"
               placeholder="••••••••"

@@ -9,9 +9,16 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UsersService } from 'src/users/users.service';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
+import { MessageDirection, WhatsappMessageStatus } from './entities/whatsapp_message.entity';
+import { AuthDto } from './dto/auth.dto';
+import { JoinConversationDto } from './dto/join-conversation.dto';
+import { LeaveConversationDto } from './dto/leave-conversation.dto';
+import { GetConversationDto } from './dto/get-conversation.dto';
+import { GetMessagesDto } from './dto/get-messages.dto';
+import { AgentMessageDto } from './dto/agent-message.dto';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -22,7 +29,7 @@ export class WhatsappMessageGateway
   constructor(
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly chatService: WhatsappChatService,
-    private readonly userService: UsersService,
+    private readonly userService: WhatsappCommercialService,
   ) {}
 
   @WebSocketServer()
@@ -51,9 +58,9 @@ export class WhatsappMessageGateway
   // AUTHENTIFICATION
   // =========================
   @SubscribeMessage('auth')
-  async handleAuth(
+  handleAuth(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { commercialId: string; token: string },
+    @MessageBody() data: AuthDto,
   ) {
     console.log('🔐 Authentification:', data.commercialId);
     
@@ -70,7 +77,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('join:conversation')
   async handleJoinConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; commercialId: string },
+    @MessageBody() data: JoinConversationDto,
   ) {
     console.log('📥 Agent rejoint conversation:', data);
     
@@ -135,7 +142,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('leave:conversation')
   handleLeaveConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody() data: LeaveConversationDto,
   ) {
     const roomName = `conversation_${data.conversationId}`;
     client.leave(roomName);
@@ -153,7 +160,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('get:conversation')
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { agentId: string },
+    @MessageBody() data: GetConversationDto,
   ) {
     console.log('👨‍💻 Agent demande ses conversations:', data.agentId);
     
@@ -224,7 +231,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('get:messages')
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody() data: GetMessagesDto,
   ) {
     console.log('📩 Demande de messages pour:', data.conversationId);
     
@@ -269,12 +276,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('agent:message')
   async handleAgentMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: {
-      conversationId: string;
-      content: string;
-      author: string;
-      chat_id: string;
-    },
+    @MessageBody() data: AgentMessageDto,
   ) {
     console.log('💬 Message agent reçu:', data);
     
@@ -353,8 +355,22 @@ export class WhatsappMessageGateway
     });
     
     try {
+      const transformedMessage = {
+        message_id: messageData.id,
+        external_id: messageData.id,
+        chat_id: messageData.chat_id,
+        type: messageData.type,
+        text: messageData.text ? messageData.text.body : null,
+        direction: messageData.from_me ? MessageDirection.OUT : MessageDirection.IN,
+        from_me: messageData.from_me,
+        from: messageData.from,
+        from_name: messageData.from_name,
+        timestamp: new Date(messageData.timestamp * 1000),
+        status: WhatsappMessageStatus.DELIVERED,
+        source: messageData.source,
+      };
       // Sauvegarder le message en base
-      const savedMessage = await this.whatsappMessageService.create(messageData);
+      const savedMessage = await this.whatsappMessageService.create(transformedMessage);
       
       console.log('💾 Message WhatsApp sauvegardé:', savedMessage.id);
       
@@ -425,20 +441,20 @@ export class WhatsappMessageGateway
   // MÉTHODES PRIVÉES UTILITAIRES
   // =========================
   
-  private async markMessagesAsRead(chatId: string, commercialId: string): Promise<void> {
+  private markMessagesAsRead(chatId: string, commercialId: string): void {
     try {
       console.log(`📖 Marquer les messages comme lus pour ${chatId}`);
       // À implémenter si nécessaire
-      // await this.whatsappMessageService.markAsRead(chatId, commercialId);
+      // this.whatsappMessageService.markAsRead(chatId, commercialId);
     } catch (error) {
       console.error('Erreur lors du marquage des messages comme lus:', error);
     }
   }
   
-  private async updateConversationLastMessage(
+  private updateConversationLastMessage(
     chatId: string, 
     lastMessage: { text: string; timestamp: Date; author: string }
-  ): Promise<void> {
+  ): void {
     try {
       this.server.emit('conversation:updated', {
         chatId,

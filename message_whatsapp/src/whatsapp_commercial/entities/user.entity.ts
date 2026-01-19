@@ -18,11 +18,23 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', nullable: false })
   name: string ;
 
+  @Column({ type: 'varchar', nullable: false, select: false })
+  password: string;
+
+  @Column({ type: 'enum', enum: ['ADMIN', 'COMMERCIAL'], default: 'COMMERCIAL' })
+  role: string;
+
   @Column({ type: 'varchar', nullable: true })
   passwordResetToken?: string | null;
 
   @Column({ type: 'timestamp', nullable: true })
   passwordResetExpires?: Date | null;
+
+  @Column({ type: 'boolean', default: false })
+  isConnected: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastConnectionAt: Date;
 
   @OneToMany(() => WhatsappChat, (chat) => chat.commercial)
   chats: WhatsappChat[];

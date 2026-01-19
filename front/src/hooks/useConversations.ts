@@ -12,7 +12,7 @@ export const useConversations = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
-  const { commercial } = useAuth();
+  const { user: commercial, token } = useAuth();
   const { 
     isConnected, 
     sendMessage: sendWebSocketMessage, 
@@ -26,8 +26,7 @@ export const useConversations = () => {
     setMessages,
     setSelectedConversation: setSelectedConvWS,
     reconnect,
-    selectedConversationId
-  } = useWebSocket(commercial);
+  } = useWebSocket(token);
   
   // Référence pour suivre le dernier chargement
   const lastLoadRef = useRef<string | null>(null);
@@ -38,7 +37,7 @@ export const useConversations = () => {
     if (isConnected && commercial && conversations.length === 0) {
       loadConversations(commercial.id);
     }
-  }, [isConnected, commercial, conversations.length]);
+  }, [isConnected, commercial, conversations, loadConversations]);
 
   // Effet pour gérer le changement de conversation
   useEffect(() => {
@@ -188,6 +187,7 @@ export const useConversations = () => {
       status: 'sending',
       direction: 'OUT',
       sender_name: commercial.name || 'Agent',
+      from_me: true,
       ...messageData,
     };
 
