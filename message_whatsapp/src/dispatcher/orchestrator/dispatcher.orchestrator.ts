@@ -101,6 +101,18 @@ export class DispatcherOrchestrator {
         return true;
 
       case 'PENDING':
+        // Scénario 1: S'assure qu'une conversation existe même si aucun agent n'est disponible
+        if (!conversation) {
+          const newChat = this.chatRepository.create({
+            chat_id: message.chat_id,
+            name: message.from_name ?? 'Client',
+            commercial_id: null,
+            status: WhatsappChatStatus.EN_ATTENTE,
+            type: 'private',
+          });
+          await this.chatRepository.save(newChat);
+        }
+
         await this.pendingMessageService.addPendingMessage(
           message.chat_id,
           message.from_name ?? 'Client',
@@ -108,9 +120,6 @@ export class DispatcherOrchestrator {
           message.type,
           message.image?.id || message.video?.id || message.audio?.id || message.document?.id || '',
         );
-        // L'orchestrateur ne gère pas les rooms, donc nous émettons un événement général
-        // que la gateway pourra interpréter si nécessaire (par exemple, pour notifier les admins).
-        // Pour l'instant, nous nous concentrons sur les événements essentiels.
         return false;
     }
   }
@@ -157,6 +166,13 @@ export class DispatcherOrchestrator {
      */
     async handleUserDisconnected(userId: string): Promise<void> {
         await this.queueService.removeFromQueue(userId);
+
+        // Scénario 5: Met à jour les conversations de l'agent déconnecté
+        await this.chatRepository.update(
+            { commercial_id: userId, status: WhatsappChatStatus.ACTIF },
+            { status: WhatsappChatStatus.EN_ATTENTE }
+        );
+
         const queue = await this.queueService.getQueuePositions();
         this.messageGateway.emitQueueUpdateToAll(queue);
     }

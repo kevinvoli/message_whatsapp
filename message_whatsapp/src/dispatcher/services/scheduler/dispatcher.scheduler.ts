@@ -1,17 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { LessThan, Repository } from 'typeorm';
 
 @Injectable()
 export class DispatcherScheduler {
-  constructor() {}
+    private readonly logger = new Logger(DispatcherScheduler.name);
+
+    constructor(
+        @InjectRepository(WhatsappChat)
+        private readonly chatRepository: Repository<WhatsappChat>,
+    ) {}
 
   /**
    * Periodically checks for conversations that have exceeded the response timeout.
    */
   @Cron('*/30 * * * *') // Runs every 30 minutes
   async checkResponseTimeout() {
-    // TODO: Implement logic to lock conversations after 24h of inactivity.
-    console.log('Checking for timed out conversations...');
+    this.logger.log('Running job to close inactive conversations...');
+    const timeout = new Date();
+    timeout.setHours(timeout.getHours() - 24);
+
+    const result = await this.chatRepository.update(
+        {
+            last_activity_at: LessThan(timeout),
+            status: WhatsappChatStatus.ACTIF
+        },
+        { status: WhatsappChatStatus.FERME }
+    );
+
+    if (result.affected && result.affected > 0) {
+        this.logger.log(`Closed ${result.affected} inactive conversations.`);
+    }
   }
 
   /**

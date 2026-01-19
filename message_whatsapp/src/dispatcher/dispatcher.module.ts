@@ -26,6 +26,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
     AssignmentService,
     PendingMessageService,
     QueueService,
+    DispatcherScheduler,
   ],
   exports: [DispatcherOrchestrator, QueueService],
 })
