@@ -50,9 +50,9 @@ export class WhatsappMessage {
     name: 'external_id',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
   })
-  external_id: string;
+  external_id?: string;
 
   @Column({
     name: 'chat_id',
