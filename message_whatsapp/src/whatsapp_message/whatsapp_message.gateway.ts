@@ -227,7 +227,7 @@ public async emitIncomingConversation(chat: any) {
       }
     });
 
-    
+
 
     client.join(data.conversationId);
 
@@ -452,7 +452,7 @@ public async emitIncomingConversation(chat: any) {
     )?.[0];
 
     if (!targetSocketId) {
-   
+
       return;
     }
       if (!agentId) {

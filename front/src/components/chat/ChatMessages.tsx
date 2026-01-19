@@ -24,9 +24,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
 
   const formatTime = (date: Date) => {
     try {
-      return new Date(date).toLocaleTimeString('fr-FR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+      return new Date(date).toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
       });
     } catch (error) {
       return '--:--';
