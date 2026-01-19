@@ -18,6 +18,6 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
           WhatsappMessage, WhatsappChat,  WhatsappMessageContent,  WhatsappCommercial,QueuePosition
         ]), WhatsappChatModule, DispatcherModule],
   providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,WhatsappCommercialService,CommunicationWhapiService],
-  exports: [WhatsappMessageGateway],
+  exports: [WhatsappMessageGateway, WhatsappMessageService],
 })
 export class WhatsappMessageModule {}
