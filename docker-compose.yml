@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  backend:
+    image: ghcr.io/TON_USER/TON_REPO/back:latest
+    container_name: back
+    restart: always
+    env_file: .env
+    ports:
+      - "3001:3000"
+      - "3002:3000"
+      
+
+  frontend:
+    image: ghcr.io/TON_USER/TON_REPO/front:latest
+    container_name: front
+    restart: always
+    ports:
+      - "3003:3000"
