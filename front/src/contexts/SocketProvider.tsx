@@ -27,7 +27,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user?.id) {
-      const newSocket = io('http://localhost:3002', {
+      const newSocket = io('http://localhost:3001', {
         transports: ['websocket'],
         auth: {
           commercialId: user.id,
