@@ -10,8 +10,6 @@ interface ConversationItemProps {
 
 const ConversationItem: React.FC<ConversationItemProps> = ({ 
   conversation, isSelected, onClick }) => {
-
-    
   const formatTime = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - new Date(date).getTime();
@@ -40,12 +38,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-gray-800 truncate">{conversation.clientName}</h3>
             <span className="text-xs text-gray-500">
-              {formatTime(conversation.lastMessage.timestamp)}
+              {conversation.lastMessage ? formatTime(conversation.lastMessage.timestamp) : formatTime(new Date())}
             </span>
           </div>
           <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
           <p className="text-sm text-gray-500 truncate mt-1">
-            {conversation.lastMessage.text}
+            {conversation.lastMessage ? conversation.lastMessage.text : 'Aucun message pour le moment'}
           </p>
         </div>
         {conversation.unreadCount > 0 && (

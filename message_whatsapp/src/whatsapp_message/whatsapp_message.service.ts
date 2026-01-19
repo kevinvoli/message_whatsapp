@@ -252,7 +252,7 @@ async createAgentMessage(data: {
     }
   };
 
-  async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
+  async saveIncomingFromWhapi(message: CreateWhatsappMessageDto, chat: WhatsappChat) {
 
   const messagesss= await this.messageRepository.save(
     this.messageRepository.create({
@@ -263,7 +263,7 @@ async createAgentMessage(data: {
       from_me: false,
       from: message.from,
       from_name: message.from_name,
-      text: message.text?.body ?? '',
+      text: message.text ?? '',
       type: message.type,
       timestamp: message.timestamp,
       status: WhatsappMessageStatus.SENT,

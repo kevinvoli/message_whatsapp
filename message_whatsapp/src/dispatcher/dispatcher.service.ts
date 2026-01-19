@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { PendingMessage } from './entities/pending-message.entity';
 import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
 // import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
@@ -37,13 +37,13 @@ export class DispatcherService {
     });
 
     console.log("new message arrive", clientName);
-    
+
     // If conversation exists and its agent is connected, do nothing.
   const  isConnected :boolean    =(conversation)? await this.WhatsappCommercialService.findStatus(conversation.commercial.id): false
 
   console.log("log des connecté",isConnected);
-  
-    
+
+
      if (
       conversation &&
       conversation.commercial &&
@@ -53,8 +53,8 @@ export class DispatcherService {
     {
   conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
-      if (conversation.status === 'fermé') {
-        conversation.status = 'actif';
+      if (conversation.status === WhatsappChatStatus.FERME) {
+        conversation.status = WhatsappChatStatus.ACTIF;
       }
       return this.chatRepository.save(conversation);
     }
@@ -75,8 +75,8 @@ export class DispatcherService {
     }
     console.log("New Proprio", nextAgent);
 
-    
-    
+
+
     if (conversation) {
       // Re-assign the conversation if the agent is different or disconnected
      conversation.commercial_id = nextAgent.id;
@@ -87,17 +87,18 @@ export class DispatcherService {
     } else {
       // Create a new conversation
       const createDto: CreateWhatsappChatDto = {
-         chat_id: clientPhone,
+        chat_id: clientPhone,
         name: clientName,
         commercial_id: nextAgent.id,
         status: WhatsappChatStatus.EN_ATTENTE,
-        type: 'private', // Assuming 'private' as a default type
+        type: 'private',
         unread_count: 1,
         last_activity_at: new Date(),
+        contact_client: clientPhone, // Ajout du champ manquant
+        // Les autres champs auront leurs valeurs par défaut définies dans l'entité
       };
 
-
-       const newChat = this.chatRepository.create(createDto);
+      const newChat = this.chatRepository.create(createDto);
       return this.chatRepository.save(newChat);
 
       // const existingChat = await this.chatRepository.findOne({

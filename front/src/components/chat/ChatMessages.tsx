@@ -9,7 +9,7 @@ interface ChatMessagesProps {
 const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  console.log("📨 Messages reçus dans ChatMessages:", messages);
+  console.log("📨 Messages reçus dans ChatMessagesfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff:", messages);
   console.log("📊 Nombre de messages:", messages.length);
   console.log("📋 Détail de chaque message:", 
     messages.map((msg, index) => ({
@@ -24,9 +24,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
 
   const formatTime = (date: Date) => {
     try {
-      return new Date(date).toLocaleTimeString('fr-FR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+      return new Date(date).toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
       });
     } catch (error) {
       return '--:--';
