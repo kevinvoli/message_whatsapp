@@ -67,7 +67,7 @@ export class WhatsappChat {
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
 
-  @Column({ name: 'chat_pic', type: 'varchar', length: 100, nullable: false })
+  @Column({ name: 'chat_pic', type: 'varchar', length: 100, nullable: false ,default: 'default.png'})
   chat_pic: string;
 
   @Column({
@@ -75,6 +75,7 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
+    default: 'default.png'
   })
   chat_pic_full: string;
 
