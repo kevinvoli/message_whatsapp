@@ -22,6 +22,7 @@ import {
 } from './entities/whatsapp_message.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -95,7 +96,7 @@ export class WhatsappMessageGateway
     }
   }
 
-public async emitIncomingConversation(chat: any) {
+public async emitIncomingConversation(chat: WhatsappChat) {
   try {
     // Trouver le socket de l'agent assigné à cette conversation
     const targetSocketId = Array.from(this.connectedAgents.entries()).find(
@@ -107,8 +108,12 @@ public async emitIncomingConversation(chat: any) {
       return;
     }
 
+    
     // Récupérer le dernier message
     const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+
+    console.log("commit conversation!!!!!!!!!!!!!!!!!!",lastMessage );
+
 
     // Compter les messages non lus
     const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
@@ -186,6 +191,8 @@ public async emitIncomingConversation(chat: any) {
         chats.map(async (chat) => {
           const lastMessage = await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
           const unreadCount = await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
+          console.log("chargement conversation:::::",lastMessage,unreadCount, chat);
+          
           return {
             ...chat,
             last_message: lastMessage,

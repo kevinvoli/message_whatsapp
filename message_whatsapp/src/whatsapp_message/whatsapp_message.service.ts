@@ -5,7 +5,7 @@ import {
   WhatsappMessageStatus,
 } from './entities/whatsapp_message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -131,18 +131,18 @@ async createAgentMessage(data: {
     });
   }
 
-  async countUnreadMessages(
-    chatId: string,
-  ): Promise<number> {
-    // Implémentez la logique pour compter les messages non lus
-    return this.messageRepository.count({
-      where: {
-        chat_id: chatId,
-        from_me: false,
-        status: WhatsappMessageStatus.DELIVERED,
-      },
-    });
-  }
+ async countUnreadMessages(chatId: string): Promise<number> {
+  return this.messageRepository.count({
+    where: {
+      chat_id: chatId,
+      from_me: false,
+      status: In([
+        WhatsappMessageStatus.SENT,
+        WhatsappMessageStatus.DELIVERED,
+      ]),
+    },
+  });
+}
 
   async create(message: CreateWhatsappMessageDto, commercialId?:string) {
 
