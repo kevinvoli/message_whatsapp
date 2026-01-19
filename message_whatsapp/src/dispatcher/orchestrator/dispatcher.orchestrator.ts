@@ -73,7 +73,9 @@ export class DispatcherOrchestrator {
           reAssignedChat.last_activity_at = new Date();
           savedAssignedChat = await this.chatRepository.save(reAssignedChat);
 
-          this.messageGateway.emitConversationRemovedToAgent(oldAgentId, savedAssignedChat.id);
+          if (oldAgentId) {
+            this.messageGateway.emitConversationRemovedToAgent(oldAgentId, savedAssignedChat.id);
+          }
           this.messageGateway.emitNewConversationToAgent(decision.agentId, savedAssignedChat);
           await this.whatsappMessageService.saveIncomingFromWhapi(message, savedAssignedChat);
 
