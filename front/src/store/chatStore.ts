@@ -1,7 +1,7 @@
 // src/store/chatStore.ts
-import { create } from 'zustand';
-import { Socket } from 'socket.io-client';
-import { Conversation, Message } from '@/types/chat';
+import { create } from "zustand";
+import { Socket } from "socket.io-client";
+import { Conversation, Message } from "@/types/chat";
 
 interface ChatState {
   socket: Socket | null;
@@ -44,21 +44,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadConversations: () => {
     const { socket } = get();
     set({ isLoading: true });
-    socket?.emit('conversations:get');
+    socket?.emit("conversations:get");
   },
 
   selectConversation: (chatId: string) => {
-    const conversation = get().conversations.find(c => c.chat_id === chatId);
+    const conversation = get().conversations.find((c) => c.chat_id === chatId);
     if (conversation) {
-      set({ selectedConversation: conversation, messages: [], isLoading: true });
-      get().socket?.emit('messages:get', { chatId });
+      set({
+        selectedConversation: conversation,
+        messages: [],
+        isLoading: true,
+      });
+      get().socket?.emit("messages:get", { chatId });
     }
   },
 
   sendMessage: (text: string) => {
     const { socket, selectedConversation } = get();
     if (socket && selectedConversation) {
-      socket.emit('message:send', { chatId: selectedConversation.chat_id, text });
+      socket.emit("message:send", {
+        chatId: selectedConversation.chat_id,
+        text,
+      });
     }
   },
 
@@ -78,35 +85,100 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  updateConversation: (updatedConversation: Conversation) => {
-    // console.log("update des conversation", updatedConversation);
-    
-    set((state) => {
-      const newState: Partial<ChatState> = {
-        // Met à jour la conversation dans la liste
-        conversations: state.conversations.map((c) =>
-          c.id === updatedConversation.id ? updatedConversation : c
-        ),
-      };
+updateConversation: (updatedConversation: Conversation) => {
+  set((state) => {
+    // Vérifie si la conversation existe déjà
+    const conversationExists = state.conversations.some(
+      (c) => c.id === updatedConversation.id
+    );
 
-      // Si la conversation mise à jour est celle sélectionnée
-      if (state.selectedConversation?.id === updatedConversation.id) {
-        newState.selectedConversation = updatedConversation;
+    // Gestion des conversations
+    let newConversations: Conversation[];
+    if (conversationExists) {
+      // Mise à jour d'une conversation existante
+      newConversations = state.conversations.map((c) =>
+        c.id === updatedConversation.id ? updatedConversation : c
+      );
+    } else {
+      // Ajout d'une nouvelle conversation
+      newConversations = [updatedConversation, ...state.conversations];
+    }
 
-        // Ajoute le nouveau message à la liste des messages, s'il existe et n'est pas déjà présent
-        if (updatedConversation.lastMessage && !state.messages.find(m => m.id === updatedConversation?.lastMessage.id)) {
-          newState.messages = [...state.messages, updatedConversation.lastMessage];
-        }
+    const newState: Partial<ChatState> = {
+      conversations: newConversations,
+    };
+
+    // Si la conversation est sélectionnée OU si c'est la seule/la nouvelle
+    if (
+      state.selectedConversation?.id === updatedConversation.id ||
+      // Optionnel: sélectionner automatiquement la nouvelle conversation
+      (!state.selectedConversation && !conversationExists)
+    ) {
+      newState.selectedConversation = updatedConversation;
+
+      // Ajoute le nouveau message s'il existe
+      if (
+        updatedConversation.lastMessage &&
+        !state.messages.find((m) => m.id === updatedConversation.lastMessage.id)
+      ) {
+        newState.messages = [...state.messages, updatedConversation.lastMessage];
       }
-console.log("fffffffffffffffffffffffffffffffffffffffff",newState);
+      
+      // Optionnel: réinitialiser les messages pour la nouvelle conversation
+      if (!conversationExists) {
+        newState.messages = updatedConversation.lastMessage 
+          ? [updatedConversation.lastMessage] 
+          : [];
+      }
+    }
 
-      return newState;
-    });
-  },
+    console.log("Mise à jour des conversations", newState);
+    return newState;
+  });
+},
+
+  // updateConversation: (updatedConversation: Conversation) => {
+  //   console.log("update des conversation", updatedConversation);
+
+  //   set((state) => {
+  //     const newState: Partial<ChatState> = {
+  //       // Met à jour la conversation dans la liste
+  //       conversations: state.conversations.map((c) =>
+  //         c.id === updatedConversation.id ? updatedConversation : c,
+  //       ),
+  //     };
+
+     
+
+  //     // Si la conversation mise à jour est celle sélectionnée
+  //     if (state.selectedConversation?.id === updatedConversation.id) {
+  //       newState.selectedConversation = updatedConversation;
+
+  //       // Ajoute le nouveau message à la liste des messages, s'il existe et n'est pas déjà présent
+  //       if (
+  //         updatedConversation.lastMessage &&
+  //         !state.messages.find(
+  //           (m) => m.id === updatedConversation?.lastMessage.id,
+  //         )
+  //       ) {
+  //         newState.messages = [
+  //           ...state.messages,
+  //           updatedConversation.lastMessage,
+  //         ];
+  //       }
+  //     }
+  //     console.log("fffffffffffffffffffffffffffffffffffffffff", newState);
+
+  //     return newState;
+  //   });
+  // },
 
   addConversation: (newConversation: Conversation) => {
     set((state) => ({
-      conversations: [newConversation, ...state.conversations.filter(c => c.id !== newConversation.id)],
+      conversations: [
+        newConversation,
+        ...state.conversations.filter((c) => c.id !== newConversation.id),
+      ],
     }));
   },
 
