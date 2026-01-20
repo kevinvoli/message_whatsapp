@@ -1,28 +1,33 @@
-import { Injectable, forwardRef, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { QueueService } from './services/queue.service';
-import { PendingMessage } from './entities/pending-message.entity';
-import { WhatsappMessageGateway } from '../whatsapp_message/whatsapp_message.gateway';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { CreateWhatsappChatDto } from 'src/whatsapp_chat/dto/create-whatsapp_chat.dto';
-import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
+import { forwardRef, Inject, Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { WhatsappChat, WhatsappChatStatus } from "src/whatsapp_chat/entities/whatsapp_chat.entity";
+import { Repository } from "typeorm";
+import { QueueService } from "./services/queue.service";
+import { PendingMessageService } from "./services/pending-message.service";
+import { WhatsappMessageGateway } from "src/whatsapp_message/whatsapp_message.gateway";
+import { WhatsappCommercialService } from "src/whatsapp_commercial/whatsapp_commercial.service";
 
 @Injectable()
 export class DispatcherService {
- 
   constructor(
-    @InjectRepository(PendingMessage)
-    private readonly pendingMessageRepository: Repository<PendingMessage>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+
     private readonly queueService: QueueService,
+
+    private readonly pendingMessageService: PendingMessageService,
+
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
 
-    private readonly WhatsappCommercialService: WhatsappCommercialService,
+    private readonly whatsappCommercialService: WhatsappCommercialService,
   ) {}
 
+  /**
+   * 🎯 Décide si un message peut être assigné à un agent
+   * ❌ N’émet PAS de socket
+   * ❌ Ne sauvegarde PAS le message WhatsApp
+   */
   async assignConversation(
     clientPhone: string,
     clientName: string,
@@ -30,90 +35,94 @@ export class DispatcherService {
     messageType: string,
     mediaUrl?: string,
   ): Promise<WhatsappChat | null> {
+
     const conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
-      relations: ['commercial', 'messages'],
+      relations: ['commercial'],
     });
 
-    const isConnected = conversation?.commercial?.id
-      ? this.messageGateway.isAgentConnected(conversation.commercial.id)
+    const agentId = conversation?.commercial?.id;
+    const isAgentConnected = agentId
+      ? this.messageGateway.isAgentConnected(agentId)
       : false;
 
-    // If conversation exists and its agent is connected, update it.
-    if (conversation && isConnected) {
-      conversation.unread_count += 1; // Correctly increment the number
+    /**
+     * ✅ Cas 1 : conversation existante + agent connecté
+     */
+    if (conversation && isAgentConnected) {
+      conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
+
       if (conversation.status === WhatsappChatStatus.FERME) {
         conversation.status = WhatsappChatStatus.ACTIF;
       }
+
       return this.chatRepository.save(conversation);
     }
 
-    // Find the next available agent.
+    /**
+     * 🔍 Chercher un agent disponible
+     */
     const nextAgent = await this.queueService.getNextInQueue();
+
+    /**
+     * ❌ Aucun agent → message en attente (via PendingMessageService)
+     */
     if (!nextAgent) {
-      // If no agent is available, queue the message.
-      await this.addPendingMessage(clientPhone, clientName, content, messageType, mediaUrl || '');
+      await this.pendingMessageService.createIncomingMessage({
+        conversationId: clientPhone,
+        content,
+        type: messageType as any,
+        mediaUrl,
+      });
+
       return null;
     }
 
-    if (conversation) {
-      // Re-assign the existing conversation to the new agent.
-      conversation.commercial_id = nextAgent.id;
-      conversation.status = WhatsappChatStatus.EN_ATTENTE;
-      conversation.unread_count = 1; // Assign a number
-      conversation.last_activity_at = new Date();
-      return this.chatRepository.save(conversation);
-    } else {
-      // Create a new conversation for the new agent.
-      const createDto: Partial<WhatsappChat> = {
+    /**
+     * 🔁 Réassignation ou création de conversation
+     */
+    const chat =
+      conversation ??
+      this.chatRepository.create({
         chat_id: clientPhone,
         name: clientName,
-        commercial_id: nextAgent.id,
-        status: WhatsappChatStatus.EN_ATTENTE,
         type: 'private',
-        unread_count: 1, // Assign a number
-        last_activity_at: new Date(),
         contact_client: clientPhone,
         createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      });
 
-      const newChat = this.chatRepository.create(createDto);
-      return this.chatRepository.save(newChat);
-    }
+    chat.commercial_id = nextAgent.id;
+    chat.status = WhatsappChatStatus.EN_ATTENTE;
+    chat.unread_count = 1;
+    chat.last_activity_at = new Date();
+
+    return this.chatRepository.save(chat);
   }
 
-  async addPendingMessage(
-    clientPhone: string,
-    clientName: string,
-    content: string,
-    type: string,
-    mediaUrl: string,
-  ): Promise<PendingMessage> {
-    const pendingMessage = this.pendingMessageRepository.create({
-      clientPhone,
-      clientName,
-      content,
-      type,
-      mediaUrl,
-    });
-    return this.pendingMessageRepository.save(pendingMessage);
-  }
-
+  /**
+   * 🔁 Redistribution des messages en attente
+   * ⚠️ À appeler quand un agent devient disponible
+   */
   async distributePendingMessages(): Promise<void> {
-    const pendingMessages = await this.pendingMessageRepository.find();
-    for (const message of pendingMessages) {
+    while (true) {
+      const pending =
+        await this.pendingMessageService.lockNextPendingMessage();
+
+      if (!pending) break;
+
       const conversation = await this.assignConversation(
-        message.clientPhone,
-        message.clientName,
-        message.content,
-        message.type,
-        message.mediaUrl,
+        pending.conversationId,
+        'Client',
+        pending.content,
+        pending.type,
+        pending.mediaUrl,
       );
+
       if (conversation) {
-        await this.pendingMessageRepository.remove(message);
+        await this.pendingMessageService.markAsDispatched(pending.id);
       }
     }
   }
 }
+
