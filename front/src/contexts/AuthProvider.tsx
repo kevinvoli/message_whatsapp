@@ -21,6 +21,11 @@ interface AuthContextType {
   error: string | null;
 }
 
+const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/auth/login`;
+
+console.log(apiUrl);
+
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -56,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // Appel à votre API de login
-      const response = await axios.post('http://148.230.112.175:3002/auth/login', {
+      const response = await axios.post(apiUrl, {
         email,
         password,
       });

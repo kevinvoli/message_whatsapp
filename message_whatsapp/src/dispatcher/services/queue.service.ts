@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
@@ -6,6 +6,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 
 @Injectable()
 export class QueueService {
+      private readonly logger = new Logger(QueueService.name);
   constructor(
     @InjectRepository(QueuePosition)
     private readonly queueRepository: Repository<QueuePosition>,
@@ -87,7 +88,9 @@ export class QueueService {
       order: { position: 'ASC' },
       relations: ['user'],
     });
-    
+     this.logger.warn(
+          `⏳ Resherche  d'agent disponible, message mis en attente (${nextInQueue?.id})`,
+        );
     // console.log("qui ce trouver a la queue",nextInQueue);
     
 
@@ -95,8 +98,12 @@ export class QueueService {
       return null;
     }
     if (!nextInQueue.user) {
+      
       throw new NotFoundException(`User with ID ${nextInQueue.userId} not found for queue position.`);
     }
+    this.logger.warn(
+          `⏳   agent disponible, a l'id: (${nextInQueue?.user.id})`,
+        );
     await this.moveToEnd(nextInQueue.userId);
     return nextInQueue.user;
     

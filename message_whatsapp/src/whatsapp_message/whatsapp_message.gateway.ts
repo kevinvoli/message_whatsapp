@@ -60,12 +60,13 @@ export class WhatsappMessageGateway
       this.connectedAgents.set(client.id, commercialId);
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
+      await this.dispatcherService.distributePendingMessages(commercialId)
       
       await this.emitQueueUpdate();
       console.log('nuew status socket', true);
 
       await this.userService.updateStatus(commercialId, true);
-      // await this.dispatcherService.distributePendingMessages();
+   
     }
   }
 

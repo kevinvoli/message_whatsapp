@@ -1,9 +1,12 @@
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   Index,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
 
 export enum PendingMessageType {
@@ -25,32 +28,28 @@ export enum MessageSource {
   SYSTEM = 'SYSTEM',
 }
 
+
 @Entity('pending_messages')
 @Index(['conversationId', 'status'])
 export class PendingMessage {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // 🔗 Conversation concernée
   @Column({ name: 'conversation_id' })
   conversationId: string;
 
-  // 🧠 Contenu
   @Column('text')
   content: string;
 
-  // 📦 Type de message
   @Column({
     type: 'enum',
     enum: PendingMessageType,
   })
   type: PendingMessageType;
 
-  // 🖼️ Média éventuel
   @Column({ name: 'media_url', nullable: true })
   mediaUrl?: string;
 
-  // 📌 Statut dans la file
   @Column({
     type: 'enum',
     enum: PendingMessageStatus,
@@ -58,7 +57,6 @@ export class PendingMessage {
   })
   status: PendingMessageStatus;
 
-  // 📥 Source du message
   @Column({
     type: 'enum',
     enum: MessageSource,
@@ -66,7 +64,14 @@ export class PendingMessage {
   })
   source: MessageSource;
 
-  // ⏱️ Date de réception
   @CreateDateColumn({ name: 'received_at' })
   receivedAt: Date;
+
+  @Column({ name: 'message_id', type: 'char', length: 36, nullable: true })
+messageId: string;
+
+  // 🔗 Relation One-to-One vers le message réel
+  @OneToOne(() => WhatsappMessage, { nullable: false, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'message_id' })
+  message?: WhatsappMessage;
 }

@@ -6,6 +6,7 @@ import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dt
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
 import { WhatsappCommercial } from './entities/user.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
+import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 
 export interface SafeWhatsappCommercial {
   id: string;
@@ -16,11 +17,14 @@ export interface SafeWhatsappCommercial {
 @Injectable()
 export class WhatsappCommercialService {
   constructor(
+    
     @InjectRepository(WhatsappCommercial)
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
      @InjectRepository(QueuePosition)
     private readonly queuePositionRepository: Repository<QueuePosition>,
 
+
+  
 
   ) {}
 
@@ -141,7 +145,6 @@ async updateStatus(id:string, status:boolean) {
   if (!user) {
     throw new NotFoundException(`User with ID "${id}" not found`);
   }
-  console.log("nuew status User",status);
   
   // Vérifier que le rôle est valide
   user.isConnected = status;
@@ -149,10 +152,16 @@ async updateStatus(id:string, status:boolean) {
   const updatedUser = await this.whatsappCommercialRepository.save(user);
   
   if (user.isConnected===false) {
+    console.log(`🔌 Commercial ${user.name} (${user.id}) isConnected = ${status}`);
+
 
     await this.queuePositionRepository.delete({
       user
     })
+  }
+
+  if (user.isConnected===true) {
+    console.log(`🔌 Commercial ${user.name} (${user.id}) isConnected = ${status}`);
   }
 
   return updatedUser

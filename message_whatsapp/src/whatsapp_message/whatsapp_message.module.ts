@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -14,10 +14,24 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappMessage, WhatsappChat,  WhatsappMessageContent,  WhatsappCommercial,QueuePosition
-        ]), WhatsappChatModule, DispatcherModule],
-  providers: [WhatsappMessageGateway, WhatsappMessageService,WhatsappChatService,WhatsappCommercialService,CommunicationWhapiService],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappMessage,
+      WhatsappChat,
+      WhatsappMessageContent,
+      WhatsappCommercial,
+      QueuePosition,
+    ]),
+    WhatsappChatModule,
+    forwardRef(() => DispatcherModule)
+  ],
+  providers: [
+    WhatsappChatService,
+    WhatsappMessageGateway,
+    WhatsappMessageService,
+    WhatsappCommercialService,
+    CommunicationWhapiService,
+  ],
   exports: [WhatsappMessageGateway],
 })
 export class WhatsappMessageModule {}

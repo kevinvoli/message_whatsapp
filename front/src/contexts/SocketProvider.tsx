@@ -20,6 +20,8 @@ export const useSocket = () => {
   return useContext(SocketContext);
 };
 
+const socketUrl = `${process.env.NEXT_PUBLIC_SOCKET_URL}`;
+
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth() as { user: Commercial | null };
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -27,7 +29,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user?.id) {
-      const newSocket = io('http://148.230.112.175:3001', {
+      const newSocket = io(socketUrl, {
         transports: ['websocket'],
         auth: {
           commercialId: user.id,
