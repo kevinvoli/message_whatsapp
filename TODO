@@ -1,0 +1,64 @@
+
+Todo:
+📐 Règles Métier du Dispatcher
+  ☐  Règle 1 : Attribution des conversations
+
+    ☐ R1.1 : Une conversation est attribuée à un commercial connecté selon un système de rotation (round-robin)
+    ☐ R1.2 : Seuls les commerciaux dans la file d'attente peuvent recevoir des conversations
+    ☐ R1.3 : Après avoir attribué une conversation à chaque commercial, le dispatcher revient au premier commercial de la liste
+  ☐ Règle 2 : Gestion de la déconnexion
+
+    ☐ R2.1 : Si un commercial se déconnecte pendant une conversation active, il est immédiatement retiré de la file d'attente
+    ☐ R2.2 : Si le client envoie un message pendant que son commercial est déconnecté, la conversation est réattribuée à un autre commercial
+    ☐ R2.3 : Tant que le client n'envoie pas de message, la conversation reste attribuée au commercial déconnecté
+    ☐ R2.4 : À la reconnexion, le commercial est placé en dernière position de la file d'attente
+
+  ☐ Règle 3 : File d'attente des messages
+
+    ☐ R3.1 : Si tous les commerciaux sont déconnectés et que des clients envoient des messages, ces messages tous de meme assigne au commerciaux mai cette fois sens prendre en compte la fils d'attente des commerciaux elle doi distribue de façon equitable
+    ☐ R3.2 : commercial connecté
+      ☐ R3.2.1 lorsque un commercial ce connecte il voi directement les conversation qui luis ont ete attribué il peux donc commence a repndre 
+      ☐ R3.2.2 si le commercial ne reponde pas au conversation qui lui on ete attribué une une sous routine est declanché a partie du moment ou elle est connecte elle a pour role de verifie a chaque 5 min si ce commercial a repondu au conversation une premiere fois si non elle reinjecte la conversation dans le processus de dispatch 
+    ☐ R3.3 : si un commercial ne ce connecte pas jusqu"a partie d'une certaine heure de la journé les conversation qui lui on ete distribue en sont absence sont reinjecte dans le processus de dispatch des conversation 
+
+  ☐ Règle 4 : Délai de réponse (24h)
+
+    ☐ R4.1 : Si un commercial ne répond pas dans les 24h après attribution, il perd l'accès en écriture à la conversation
+    ☐ R4.2 : Ce délai de 24h doit être paramétrable par l'administrateur
+    ☐ R4.3 : Le commercial peut toujours lire la conversation mais ne peut plus y répondre
+
+  ☐ Règle 5 : Communication WebSocket obligatoire
+
+    ☐ R5.1 : Toutes les communications front-back doivent passer par WebSocket
+    ☐ R5.2 : Exception : l'authentification initiale du commercial peut utiliser HTTP/REST
+
+🎯 Fonctionnalités de Base WhatsApp à Implémenter
+    ☐ F1 : Messagerie instantanée
+
+    Envoi/réception de messages texte en temps réel
+    Affichage de l'état du message (envoyé, délivré, lu)
+    Notification sonore/visuelle à réception
+
+    ☐ F2 : Gestion des médias
+
+    Envoi/réception d'images
+    Envoi/réception de documents (PDF, etc.)
+    Prévisualisation des médias
+
+    ☐ F3 : Indicateurs de conversation
+
+    Indicateur "en train d'écrire..."
+    Affichage du dernier message reçu
+    Compteur de messages non lus
+
+    ☐ F4 : Informations client
+
+    Nom/numéro du contact
+    Photo de profil
+    Historique complet de la conversation
+
+    ☐ F5 : Recherche et filtres
+
+    Recherche de conversations par nom/numéro
+    Filtrage par statut (actif, en attente, fermé)
+    Tri par date du dernier message

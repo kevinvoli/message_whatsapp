@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WhatsappChat } from './entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
 import { log } from 'console';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
@@ -11,23 +11,19 @@ export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
-        private readonly commercialService : WhatsappCommercialService,
-    
+    private readonly commercialService: WhatsappCommercialService,
   ) {}
 
-// Dans WhatsappChatService
-async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+  // Dans WhatsappChatService
+  async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+    const chats = await this.chatRepository.find({
+      where: { commercial_id: commercialId },
+      order: { updatedAt: 'DESC' },
+      relations: ['commercial', 'messages'],
+    });
 
-  const  chats=
-   await this.chatRepository.find({
-    where: { commercial_id: commercialId },
-    order: { updatedAt: 'DESC' },
-    relations: ['commercial','messages',],
-  });
-
-
-  return chats
-}
+    return chats;
+  }
 
   async findOrCreateChat(
     chatId: string,
@@ -79,7 +75,16 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel','messages',], });
+      return this.chatRepository.find({
+        where: { chat_id: chatId },
+        relations: [
+          'commercial',
+          'conversation',
+          'chatEvent',
+          'chatLabel',
+          'messages',
+        ],
+      });
     }
     return this.chatRepository.find();
   }
@@ -87,14 +92,38 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
   async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { chat_id: chatId },
-      relations: ['commercial','messages'],
+      relations: ['commercial', 'messages'],
     });
   }
 
   async findOne(id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { id },
-      relations: ['commercial', 'conversation', 'chatEvent', 'chatLabel','messages'],
+      relations: [
+        'commercial',
+        'conversation',
+        'chatEvent',
+        'chatLabel',
+        'messages',
+      ],
+    });
+  }
+
+  async findPendingConversation(message:{
+    message_id: string;
+    from_me: boolean;
+    type: string;
+    chat_id: string;
+    timestamp: number;
+    source: string;
+    text: { body: string };
+    from: string;
+    from_name: string;
+  }): Promise<WhatsappChat[]> {
+    return await this.chatRepository.find({
+      where: {status: WhatsappChatStatus.EN_ATTENTE},
+      order: {deletedAt:'ASC'},
+      relations: ['message']
     });
   }
 

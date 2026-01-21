@@ -5,176 +5,125 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { Repository } from 'typeorm';
-import { QueueService } from './services/queue.service';
-import { PendingMessageService } from './services/pending-message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
-import {
-  PendingMessage,
-  PendingMessageStatus,
-} from './entities/pending-message.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
+
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
 
-    private readonly queueService: QueueService,
-
-    @InjectRepository(PendingMessage)
-    private readonly pendinMessageRepository: Repository<PendingMessage>,
-
-    private readonly pendingMessageService: PendingMessageService,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepository: Repository<WhatsappCommercial>,
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
-
-    private readonly whatsappCommercialService: WhatsappCommercialService,
   ) {}
 
   /**
-   * 🎯 Décide si un message peut être assigné à un agent
-   * ❌ N’émet PAS de socket
-   * ❌ Ne sauvegarde PAS le message WhatsApp
+   * 🎯 Récupère ou crée une conversation
+   * 🎯 Assigne un commercial si possible
+   * ❌ Ne sauvegarde PAS le message
+   * ❌ N’émet PAS de socket message
    */
+  async assignConversation(data: {
+    chat_id: string;
+    from: string;
+    from_name: string;
+    type: string;
+  }): Promise<WhatsappChat> {
+    // 1️⃣ récupérer ou créer la conversation
+    let conversation = await this.chatRepository.findOne({
+      where: { chat_id: data.chat_id },
+      relations: ['commercial'],
+    });
 
+    if (!conversation) {
+      conversation = this.chatRepository.create({
+        chat_id: data.chat_id,
+        name: data.from_name,
+        contact_client: data.from,
+        type: data.type,
+        status: WhatsappChatStatus.EN_ATTENTE,
+        unread_count: 0,
+        last_activity_at: new Date(),
+      });
 
+      conversation = await this.chatRepository.save(conversation);
+    }
 
+    // 2️⃣ conversation déjà assignée → simple update
+    if (conversation.commercial_id) {
+      conversation.unread_count += 1;
+      conversation.last_activity_at = new Date();
+      return this.chatRepository.save(conversation);
+    }
 
-async assignConversation(
-  clientPhone: string,
-  clientName: string,
-  content: string,
-  messageType: string,
-  mediaUrl?: string,
-): Promise<WhatsappChat | null> {
-  // 🔎 Chercher la conversation existante
-  let conversation = await this.chatRepository.findOne({
-    where: { chat_id: clientPhone },
-    relations: ['commercial'],
-  });
+    // 3️⃣ tenter une assignation
+    const agent = await this.findAvailableCommercial();
 
-  // Déterminer si l'agent actuel est connecté
-  const currentAgentId = conversation?.commercial?.id;
-  const isAgentConnected = currentAgentId
-    ? this.messageGateway.isAgentConnected(currentAgentId)
-    : false;
+    if (!agent) {
+      conversation.unread_count += 1;
+      conversation.last_activity_at = new Date();
+      return this.chatRepository.save(conversation);
+    }
 
-  /**
-   * Cas 1️⃣ : conversation existante + agent connecté
-   * → juste mettre à jour l’activité et le compteur de messages non lus
-   */
-  if (conversation && isAgentConnected) {
+    // 4️⃣ assignation
+    conversation.commercial = agent;
+    conversation.commercial_id = agent.id;
+    conversation.status = WhatsappChatStatus.ACTIF;
     conversation.unread_count += 1;
     conversation.last_activity_at = new Date();
-    if (conversation.status === WhatsappChatStatus.FERME) {
-      conversation.status = WhatsappChatStatus.ACTIF;
-    }
+    conversation.assigned_at = new Date();
 
     this.logger.log(
-      `📩 Conversation existante (${conversation.chat_id}) mise à jour pour l'agent (${conversation.commercial.email})`,
+      `📌 Conversation ${conversation.chat_id} assignée à ${agent.email}`,
     );
-    return this.chatRepository.save(conversation);
-  }
-
-  /**
-   * Cas 2️⃣ : chercher le prochain agent disponible
-   */
-  const nextAgent = await this.queueService.getNextInQueue();
-
-  // Aucun agent disponible → message en attente
-  if (!nextAgent) {
-    this.logger.warn(`⏳ Aucun agent disponible, message en attente pour ${clientPhone}`);
-    await this.pendingMessageService.createIncomingMessage({
-      conversationId: clientPhone,
-      content,
-      type: messageType as any,
-      mediaUrl,
-    });
-    return null;
-  }
-
-  /**
-   * Cas 3️⃣ : conversation existante mais agent absent ou réassignation
-   */
-  if (conversation) {
-    this.logger.log(
-      `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${conversation.commercial?.email || 'aucun'}) à (${nextAgent.email})`,
-    );
-    conversation.commercial = nextAgent;
-    conversation.commercial_id = nextAgent.id;
-    conversation.status = WhatsappChatStatus.EN_ATTENTE;
-    conversation.unread_count = 1;
-    conversation.last_activity_at = new Date();
 
     return this.chatRepository.save(conversation);
   }
 
   /**
-   * Cas 4️⃣ : nouvelle conversation
+   * 🔍 Trouve un commercial disponible selon la charge réelle
    */
-  this.logger.log(`🆕 Création nouvelle conversation pour ${clientPhone} avec agent (${nextAgent.email})`);
-
-  const newChat = this.chatRepository.create({
-    chat_id: clientPhone,
-    name: clientName,
-    type: 'private',
-    contact_client: clientPhone,
-    commercial: nextAgent,
-    commercial_id: nextAgent.id,
-    status: WhatsappChatStatus.EN_ATTENTE,
-    unread_count: 1,
-    last_activity_at: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return this.chatRepository.save(newChat);
-}
-
-
-
-
-
-
+  async findAvailableCommercial(): Promise<WhatsappCommercial | null> {
+    return this.commercialRepository
+      .createQueryBuilder('c')
+      .leftJoin('c.chats', 'chat', 'chat.status IN (:...statuses)', {
+        statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+      })
+      .where('c.isConnected = true')
+      .groupBy('c.id')
+      .having('COUNT(chat.id) < c.max_limit_chat')
+      .orderBy('c.lastConnectionAt', 'ASC')
+      .getOne();
+  }
 
   /**
-   * 🔁 Redistribution des messages en attente
-   * ⚠️ À appeler quand un agent devient disponible
+   * 🔄 Utilisée par le worker de redistribution
    */
-  async distributePendingMessages(forAgentId?: string): Promise<void> {
-    // Récupérer tous les messages en attente (avec leur message réel)
-    const pendingMessages = await this.pendinMessageRepository.find({
-      where: forAgentId ? { status: PendingMessageStatus.WAITING } : undefined,
-      order: { receivedAt: 'ASC' },
-      relations: ['message'], // On charge le message réel
-    });
+  async tryAssignConversation(conversation: WhatsappChat): Promise<boolean> {
+    if (conversation.commercial_id) return true;
 
-    for (const pending of pendingMessages) {
-      const realMessage = pending.message;
+    const agent = await this.findAvailableCommercial();
+    if (!agent) return false;
 
-      // 🔒 Vérifier que le message réel existe toujours
-      if (!realMessage) {
-        // Message réel supprimé, on supprime le pending
-        await this.pendinMessageRepository.remove(pending);
-        continue;
-      }
+    conversation.commercial = agent;
+    conversation.commercial_id = agent.id;
+    conversation.status = WhatsappChatStatus.ACTIF;
+    conversation.assigned_at = new Date();
 
-      // 🔹 Assigner la conversation via le dispatcher
-      const conversation = await this.assignConversation(
-        realMessage.chat_id, // Phone du client depuis le message réel
-        realMessage.from_name ?? 'Client', // Nom du client
-        realMessage.text ?? pending.content, // Contenu du message réel, fallback si absent
-        pending.type, // Type du pending message
-        pending.mediaUrl, // Media du pending
-      );
+    await this.chatRepository.save(conversation);
 
-      if (conversation) {
-        // ✅ Une fois distribué, on supprime le pending
-        await this.pendinMessageRepository.remove(pending);
-      }
-    }
+    this.logger.log(
+      `✅ Conversation ${conversation.chat_id} redispatchée vers ${agent.email}`,
+    );
+
+    this.messageGateway.emitIncomingConversation(conversation);
+
+    return true;
   }
 }

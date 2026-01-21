@@ -37,13 +37,15 @@ export class WhatsappChat {
   })
   commercial_id: string | null;
 
+  @Column({ type: 'timestamp', nullable: true })
+  assigned_at: Date | null;
+
   @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
   @JoinColumn({
     name: 'commercial_id',
     referencedColumnName: 'id',
   })
   commercial: WhatsappCommercial;
-  
 
   @Column({
     name: 'chat_id',
@@ -57,7 +59,7 @@ export class WhatsappChat {
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
-   @Column({
+  @Column({
     type: 'enum',
     enum: WhatsappChatStatus,
     default: WhatsappChatStatus.EN_ATTENTE,
@@ -67,7 +69,13 @@ export class WhatsappChat {
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
 
-  @Column({ name: 'chat_pic', type: 'varchar', length: 100, nullable: false ,default: 'default.png'})
+  @Column({
+    name: 'chat_pic',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    default: 'default.png',
+  })
   chat_pic: string;
 
   @Column({
@@ -75,7 +83,7 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
-    default: 'default.png'
+    default: 'default.png',
   })
   chat_pic_full: string;
 
@@ -94,6 +102,14 @@ export class WhatsappChat {
     default: false,
   })
   is_archived: boolean;
+
+  @Column({
+    name: 'lastMessageAt',
+    type: 'timestamp',
+    nullable: false,
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  lastMessageAt: Date;
 
   @Column({
     name: 'unread_count',
@@ -123,12 +139,16 @@ export class WhatsappChat {
   })
   last_activity_at: Date; // timestamp
 
-  @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'contact_client',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   contact_client: string;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
-
 
   @OneToMany(() => WhatsappMessage, (message) => message.chat)
   messages: WhatsappMessage[];
