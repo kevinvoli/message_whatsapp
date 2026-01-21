@@ -87,8 +87,9 @@ export class WhatsappMessage {
   commercial_id: string | null;
 
   @Column({
-    name: 'longtext',
+    name: 'text',
     type: 'varchar',
+    length: 200,
     nullable: true,
   })
   text: string | null;
