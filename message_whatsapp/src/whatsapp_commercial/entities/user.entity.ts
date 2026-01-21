@@ -1,5 +1,5 @@
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { WhatsappChat } from '../../whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappMessage } from '../../whatsapp_message/entities/whatsapp_message.entity';
 import { Entity, Column, PrimaryGeneratedColumn,CreateDateColumn, UpdateDateColumn, OneToMany, DeleteDateColumn } from 'typeorm';
 // import * as bcrypt from 'bcrypt';
 
