@@ -61,12 +61,27 @@ export class WhatsappMessageGateway
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
       await this.dispatcherService.distributePendingMessages(commercialId)
-      
+       await this.userService.updateStatus(commercialId, true);
       await this.emitQueueUpdate();
       console.log('nuew status socket', true);
-
-      await this.userService.updateStatus(commercialId, true);
+      await this.queueService.removeALlRankOnfline(commercialId)
+     
    
+    }
+  }
+
+   async handleDisconnect(client: Socket) {
+    console.log('🔴 Client déconnecté:', client.id);
+    const commercialId = this.connectedAgents.get(client.id);
+    if (commercialId) {
+      this.connectedAgents.delete(client.id);
+      console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
+      await this.queueService.removeFromQueue(commercialId);
+      console.log('nuew status AGent', false);
+
+      await this.userService.updateStatus(commercialId, false);
+       await this.queueService.tcheckALlRankAndAdd(commercialId)
+      await this.emitQueueUpdate();
     }
   }
 
@@ -139,19 +154,7 @@ export class WhatsappMessageGateway
     }
   }
 
-  async handleDisconnect(client: Socket) {
-    console.log('🔴 Client déconnecté:', client.id);
-    const commercialId = this.connectedAgents.get(client.id);
-    if (commercialId) {
-      this.connectedAgents.delete(client.id);
-      console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
-      await this.queueService.removeFromQueue(commercialId);
-      console.log('nuew status AGent', false);
-
-      await this.userService.updateStatus(commercialId, false);
-      await this.emitQueueUpdate();
-    }
-  }
+ 
 
   emitDebug(
     server: Server,

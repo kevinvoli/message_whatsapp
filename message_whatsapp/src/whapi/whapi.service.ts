@@ -12,7 +12,6 @@ import {
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { NotFoundError } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -63,9 +62,6 @@ export class WhapiService {
         );
         return;
       }
-
-  
-      
 
       // 2️⃣ Sauvegarde en base
       const savedMessage =

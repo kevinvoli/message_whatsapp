@@ -53,9 +53,11 @@ async assignConversation(
   // 🔎 Chercher la conversation existante
   let conversation = await this.chatRepository.findOne({
     where: { chat_id: clientPhone },
-    relations: ['commercial'],
+    relations: ['commercial','messages'],
   });
 
+  console.log(conversation);
+  
   // Déterminer si l'agent actuel est connecté
   const currentAgentId = conversation?.commercial?.id;
   const isAgentConnected = currentAgentId
@@ -87,12 +89,12 @@ async assignConversation(
   // Aucun agent disponible → message en attente
   if (!nextAgent) {
     this.logger.warn(`⏳ Aucun agent disponible, message en attente pour ${clientPhone}`);
-    await this.pendingMessageService.createIncomingMessage({
-      conversationId: clientPhone,
-      content,
-      type: messageType as any,
-      mediaUrl,
-    });
+    // await this.pendingMessageService.createIncomingMessage({
+    //   conversationId: clientPhone,
+    //   content,
+    //   type: messageType as any,
+    //   mediaUrl,
+    // });
     return null;
   }
 
@@ -108,7 +110,6 @@ async assignConversation(
     conversation.status = WhatsappChatStatus.EN_ATTENTE;
     conversation.unread_count = 1;
     conversation.last_activity_at = new Date();
-
     return this.chatRepository.save(conversation);
   }
 
@@ -131,19 +132,13 @@ async assignConversation(
     updatedAt: new Date(),
   });
 
+  console.log("mes message",newChat);
+  
+
   return this.chatRepository.save(newChat);
 }
 
-
-
-
-
-
-
-  /**
-   * 🔁 Redistribution des messages en attente
-   * ⚠️ À appeler quand un agent devient disponible
-   */
+ 
   async distributePendingMessages(forAgentId?: string): Promise<void> {
     // Récupérer tous les messages en attente (avec leur message réel)
     const pendingMessages = await this.pendinMessageRepository.find({
