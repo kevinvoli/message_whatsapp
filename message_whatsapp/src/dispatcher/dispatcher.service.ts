@@ -6,7 +6,6 @@ import {
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
-import { PendingMessageService } from './services/pending-message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import {
@@ -25,8 +24,7 @@ export class DispatcherService {
 
     @InjectRepository(PendingMessage)
     private readonly pendinMessageRepository: Repository<PendingMessage>,
-
-    private readonly pendingMessageService: PendingMessageService,
+ 
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
@@ -138,7 +136,6 @@ async assignConversation(
   return this.chatRepository.save(newChat);
 }
 
- 
   async distributePendingMessages(forAgentId?: string): Promise<void> {
     // Récupérer tous les messages en attente (avec leur message réel)
     const pendingMessages = await this.pendinMessageRepository.find({

@@ -12,7 +12,6 @@ import { CommunicationWhapiService } from 'src/communication_whapi/communication
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
-import { PendingMessageService } from './services/pending-message.service';
 
 @Module({
   imports: [
@@ -20,7 +19,7 @@ import { PendingMessageService } from './services/pending-message.service';
     forwardRef(() => WhatsappMessageModule),
   ],
   controllers: [],
-  providers: [DispatcherService ,QueueService,WhatsappMessageService,WhatsappChatService,CommunicationWhapiService,WhatsappCommercialService,PendingMessageService],
+  providers: [DispatcherService ,QueueService,WhatsappMessageService,WhatsappChatService,CommunicationWhapiService,WhatsappCommercialService],
   exports: [DispatcherService, QueueService,],
 })
 export class DispatcherModule {}

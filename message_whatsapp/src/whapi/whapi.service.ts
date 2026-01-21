@@ -31,8 +31,11 @@ export class WhapiService {
 
   async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
     if (!payload?.messages?.length) return;
-
+    
     const message = payload.messages[0];
+
+    console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
+
 
     // 🔒 ignorer les messages envoyés par ton propre compte
     if (message.from_me) return;
