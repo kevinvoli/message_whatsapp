@@ -88,14 +88,24 @@ Développer une plateforme de gestion et de distribution automatique des convers
 - **R3.2** : L'administrateur peut paramétrer une heure de distribution automatique des messages en attente
 - **R3.3** : L'administrateur peut forcer la distribution immédiate, indépendamment de l'heure programmée
 
-### Règle 4 : Délai de réponse (24h)
-- **R4.1** : Si un commercial ne répond pas dans les 24h après attribution, il perd l'accès en écriture à la conversation
-- **R4.2** : Ce délai de 24h doit être paramétrable par l'administrateur
-- **R4.3** : Le commercial peut toujours lire la conversation mais ne peut plus y répondre
+### Règle 4 — Inactivité commerciale (anti-sleep)
+- **R4.1** : Dès qu’un commercial reçoit une conversation : un timer de réponse initiale démarre (ex: 5 min)
+- ***R4.2** : Si aucune première réponse dans le délai : la conversation est réinjectée le commercial perd la priorité
+- **R4.3** : Une réponse valide = message envoyé au client
+
+### Règle 5 — Délai légal WhatsApp (24h)
+- **R5.1** : Après 24h sans réponse commerciale : écriture bloquée
+- **R5.2** : Lecture toujours autorisée
+- **R5.3** : Le délai est paramétrable
+
 
 ### Règle 5 : Communication WebSocket obligatoire
 - **R5.1** : Toutes les communications front-back doivent passer par WebSocket
 - **R5.2** : Exception : l'authentification initiale du commercial peut utiliser HTTP/REST
+
+### Règle 6 — WebSocket
+- **R6.1** : Tout le flux temps réel passe par WebSocket
+- **R6.2** : HTTP uniquement pour login / refresh token
 
 ---
 

@@ -13,14 +13,32 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { PendingMessageService } from './services/pending-message.service';
+import { ConversationRedispatchCron } from './workers/conversation-redispatch.cron';
+import { ConversationRedispatchWorker } from './services/ConversationRedispatchWorker.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PendingMessage, QueuePosition, WhatsappMessage, WhatsappChat, WhatsappCommercial,]),
+    TypeOrmModule.forFeature([
+      PendingMessage,
+      QueuePosition,
+      WhatsappMessage,
+      WhatsappChat,
+      WhatsappCommercial,
+    ]),
     forwardRef(() => WhatsappMessageModule),
   ],
   controllers: [],
-  providers: [DispatcherService ,QueueService,WhatsappMessageService,WhatsappChatService,CommunicationWhapiService,WhatsappCommercialService,PendingMessageService],
-  exports: [DispatcherService, QueueService,],
+  providers: [
+    DispatcherService,
+    QueueService,
+    WhatsappMessageService,
+    WhatsappChatService,
+    CommunicationWhapiService,
+    WhatsappCommercialService,
+    PendingMessageService,
+      ConversationRedispatchWorker,
+    ConversationRedispatchCron,
+  ],
+  exports: [DispatcherService, QueueService],
 })
 export class DispatcherModule {}
