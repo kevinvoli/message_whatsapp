@@ -1,4 +1,4 @@
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat } from '../../whatsapp_chat/entities/whatsapp_chat.entity';
 import {
   Column,
   CreateDateColumn,
