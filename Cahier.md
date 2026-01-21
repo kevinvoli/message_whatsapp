@@ -72,21 +72,27 @@ Développer une plateforme de gestion et de distribution automatique des convers
 
 ## 📐 Règles Métier du Dispatcher
 
-### Règle 1 : Attribution des conversations
-- **R1.1** : Une conversation est attribuée à un commercial connecté selon un système de rotation (round-robin)
-- **R1.2** : Seuls les commerciaux dans la file d'attente peuvent recevoir des conversations
-- **R1.3** : Après avoir attribué une conversation à chaque commercial, le dispatcher revient au premier commercial de la liste
+### Règle 1 — Attribution des conversations (ONLINE)
+- **R1.1** : Toute nouvelle conversation client est attribuée à un commercial ONLINE via un round-robin strict.
+- **R1.2** : Seuls les commerciaux ONLINE et éligibles sont dans la file.
+- **R1.3** : Une conversation reste liée au commercial tant que : le commercial est ONLINE le client continue de répondre
 
-### Règle 2 : Gestion de la déconnexion
-- **R2.1** : Si un commercial se déconnecte pendant une conversation active, il est immédiatement retiré de la file d'attente
-- **R2.2** : Si le client envoie un message pendant que son commercial est déconnecté, la conversation est réattribuée à un autre commercial
-- **R2.3** : Tant que le client n'envoie pas de message, la conversation reste attribuée au commercial déconnecté
-- **R2.4** : À la reconnexion, le commercial est placé en dernière position de la file d'attente
+### Règle 2 — Déconnexion
+- **R2.1** : À la déconnexion :
+        le commercial sort immédiatement de la file ONLINE
+- **R2.2** : Si un client envoie un message après la déconnexion :
+        la conversation est réinjectée dans le dispatcher
+- **R2.3** : Sans nouveau message client :
+        la conversation reste gelée
+- **R2.4** : À la reconnexion :
+        le commercial revient en fin de file
 
-### Règle 3 : File d'attente des messages
-- **R3.1** : Si tous les commerciaux sont déconnectés et que des clients envoient des messages, ces messages sont stockés dans une file d'attente
-- **R3.2** : L'administrateur peut paramétrer une heure de distribution automatique des messages en attente
-- **R3.3** : L'administrateur peut forcer la distribution immédiate, indépendamment de l'heure programmée
+### Règle 3 — Mode OFFLINE (aucun commercial connecté)
+- **R3.1** : Si aucun commercial ONLINE :
+        - les conversations sont stockées dans une file OFFLINE
+        - aucune attribution définitive
+- **R3.2** : À la première reconnexion :
+        - la file OFFLINE est dispatchée équitablement (round-robin initial)
 
 ### Règle 4 — Inactivité commerciale (anti-sleep)
 - **R4.1** : Dès qu’un commercial reçoit une conversation : un timer de réponse initiale démarre (ex: 5 min)
@@ -107,7 +113,42 @@ Développer une plateforme de gestion et de distribution automatique des convers
 - **R6.1** : Tout le flux temps réel passe par WebSocket
 - **R6.2** : HTTP uniquement pour login / refresh token
 
+
 ---
+
+## Décomposition en sous-tâches élémentaires (PRÊT POUR IA / DEV)
+        ### 🧩 MODULE 1 — Gestion des commerciaux
+        - Connexion / déconnexion
+        - Gestion état ONLINE / OFFLINE
+        - File d’attente circulaire
+
+        ### 🧩 MODULE 2 — Dispatcher de conversations
+        - Round-robin ONLINE
+        - File OFFLINE
+        - Réinjection sécurisée
+        - Verrou anti-double attribution
+        ### 🧩 MODULE 3 — Timers & jobs
+  
+        - Timer 5 min première réponse
+        - Cron 24h WhatsApp
+        - Job de nettoyage OFFLINE
+        ### 🧩 MODULE 4 — Droits & permissions
+        - Lecture seule après 24h
+        - Blocage écriture
+        - Règles reconnection
+        
+        ### 🧩 MODULE 5 — WebSocket Events
+        - commercial:online
+        - commercial:offline
+        - conversation:assigned
+        - conversation:reassigned
+        - conversation:readonly
+        
+        ### 🧩 MODULE 6 — Frontend
+        - Indicateurs live
+        - Statuts conversations
+        - Notifications
+        - Filtres & recherche
 
 ## 🎯 Fonctionnalités de Base WhatsApp à Implémenter
 
