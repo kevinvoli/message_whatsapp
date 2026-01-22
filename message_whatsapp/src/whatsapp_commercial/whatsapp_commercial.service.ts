@@ -12,6 +12,7 @@ import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dt
 import { WhatsappCommercial } from './entities/user.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { QueueService } from 'src/dispatcher/services/queue.service';
+import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 
 export interface SafeWhatsappCommercial {
   id: string;
@@ -26,7 +27,6 @@ export class WhatsappCommercialService {
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
     @InjectRepository(QueuePosition)
     private readonly queuePositionRepository: Repository<QueuePosition>,
-
     private readonly queueService: QueueService,
   ) {}
 

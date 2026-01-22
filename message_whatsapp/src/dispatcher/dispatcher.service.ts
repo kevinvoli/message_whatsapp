@@ -4,7 +4,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
@@ -79,28 +79,26 @@ export class DispatcherService {
       return this.chatRepository.save(conversation);
     }
 
-    /**
-     * Cas 2️⃣ : chercher le prochain agent disponible
-     */
-     console.log('______==__________il ne doit pas entre ici___________________');
+ 
     const nextAgent = await this.queueService.getNextInQueue();
- console.log('______==__________il ne doit pas entre ici___________________');
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
-      this.logger.warn(
-        `⏳ Aucun agent disponible, message en attente pour `,
+      this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);
+      console.log(
+        '________________il ne doit pas entre ici___________________',
       );
-      console.log('________________il ne doit pas entre ici___________________');
-      
+
       return null;
     }
 
-    console.log('______==__________il ne doit pas entre ici___________________');
+    console.log(
+      '______==__________il ne doit pas entre ici___________________',
+    );
     /**
      * Cas 3️⃣ : conversation existante mais agent absent ou réassignation
      */
-    console.log("conversation :",conversation);
-    
+    console.log('conversation :', conversation);
+
     if (conversation) {
       this.logger.log(
         `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${conversation.commercial?.email || 'aucun'}) à (${nextAgent.email})`,
@@ -208,5 +206,26 @@ export class DispatcherService {
     });
 
     this.messageGateway.emitConversationReassigned(chat.chat_id);
+  }
+
+  async jobRunnertcheque(commercialId: string) {
+    console.log('mes verification sont ici', commercialId);
+
+    const now = new Date();
+
+    const chats = await this.chatRepository.find({
+      where: {
+        commercial_id: commercialId,
+        status: WhatsappChatStatus.EN_ATTENTE,
+        last_commercial_message_at: IsNull(),
+        first_response_deadline_at: LessThan(now),
+      },
+    });
+    console.log('lencement du tcheque des reponse', chats, now);
+
+    for (const chat of chats) {
+      await this.reinjectConversation(chat);
+      this.messageGateway.emitConversationReassigned(chat.chat_id);
+    }
   }
 }

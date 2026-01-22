@@ -23,6 +23,7 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
+  removeConversation: (conversationId: string) => void;
 
   reset: () => void;
 }
@@ -182,6 +183,13 @@ updateConversation: (updatedConversation: Conversation) => {
         ...state.conversations.filter((c) => c.id !== newConversation.id),
       ],
     }));
+  },
+
+  
+  removeConversation: (conversationId: string) => {
+     set((state) => ({
+    conversations: state.conversations.filter((c) => c.id !== conversationId),
+  }));
   },
 
   reset: () => set(initialState),

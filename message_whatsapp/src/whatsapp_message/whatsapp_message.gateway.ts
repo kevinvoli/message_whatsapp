@@ -23,6 +23,7 @@ import {
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -43,6 +44,8 @@ export class WhatsappMessageGateway
     private readonly messageRepository: Repository<WhatsappMessage>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
+    private readonly jobRunnner : FirstResponseTimeoutJob,
+
   ) {}
 
   @WebSocketServer()
@@ -63,7 +66,8 @@ export class WhatsappMessageGateway
       await this.dispatcherService.distributePendingMessages(commercialId);
       await this.userService.updateStatus(commercialId, true);
       await this.emitQueueUpdate();
-      console.log('nuew status socket', true);
+      console.log('nuew effff status socket', true);
+      this.jobRunnner.startAgentSlaMonitor(commercialId)
       await this.queueService.removeALlRankOnfline(commercialId);
     }
   }
@@ -78,6 +82,7 @@ export class WhatsappMessageGateway
       console.log('nuew status AGent', false);
       await this.userService.updateStatus(commercialId, false);
       await this.queueService.tcheckALlRankAndAdd(commercialId);
+      this.jobRunnner.stopAgentSlaMonitor(commercialId)
       await this.emitQueueUpdate();
     }
   }

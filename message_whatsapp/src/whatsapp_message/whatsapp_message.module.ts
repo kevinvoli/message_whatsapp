@@ -12,6 +12,7 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
+import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
     WhatsappMessageService,
     WhatsappCommercialService,
     CommunicationWhapiService,
+    FirstResponseTimeoutJob
   ],
   exports: [WhatsappMessageGateway],
 })

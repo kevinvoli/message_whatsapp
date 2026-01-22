@@ -22,6 +22,7 @@ const WebSocketEvents = () => {
     setMessages,
     addMessage,
     updateConversation,
+    removeConversation,
     addConversation,
     loadConversations,
   } = useChatStore();
@@ -60,6 +61,12 @@ const WebSocketEvents = () => {
         updateConversation(conversation);
       };
 
+      const handleConversationRemove = (conversationId: string) => {
+        console.log('Received raw conversation assigned:', conversationId);
+        // const conversation = transformToConversation(rawConversation);
+        removeConversation(conversationId);
+      };
+
       const handleError = (error: { message: string, details?: string }) => {
         console.error('Socket error received:', error.message, error.details || '');
       };
@@ -69,6 +76,7 @@ const WebSocketEvents = () => {
       socket.on('messages:list', handleMessagesList);
       socket.on('message:new', handleNewMessage);
       socket.on('conversation:updated', handleConversationUpdated);
+       socket.on('conversation:reassigned', handleConversationRemove);
       socket.on('error', handleError);
       // --- Nettoyage ---
       return () => {

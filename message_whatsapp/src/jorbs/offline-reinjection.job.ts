@@ -17,10 +17,11 @@ export class FirstResponseTimeoutJob {
   ) {}
 
 
-@Cron('5 9 * * *')
+@Cron('36 15 * * *')
 async offlineReinject() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
+console.log("===================chaque matin===============");
 
   const chats = await this.chatRepo.find({
     where: {
