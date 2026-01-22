@@ -17,7 +17,8 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { RealtimeModule } from 'src/realtime/realtime.module';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
 
 
 @Module({
@@ -33,11 +34,10 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
     WhatsappMessageModule,
     WhatsappChatModule,
     CommunicationWhapiModule,
+    RealtimeModule, // Ajout pour RealtimeService
+    WhatsappCommercialModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhatsappMessageService,WhapiServiceDispacher,
-    WhatsappChatService,WhatsappCommercialService,
-    CommunicationWhapiService
-  ],
+  providers: [WhapiService, WhapiServiceDispacher],
 })
 export class WhapiModule {}

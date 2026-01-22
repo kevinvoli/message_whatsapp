@@ -1,19 +1,24 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RealtimeService } from './realtime.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
-import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
+import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
+import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
 
 @Module({
   imports: [
-    DispatcherModule,
+    forwardRef(() => DispatcherModule),
     TypeOrmModule.forFeature([WhatsappMessage, WhatsappCommercial]),
+    WhatsappMessageModule,
+    WhatsappChatModule,
+    WhatsappCommercialModule,
+    CommunicationWhapiModule,
   ],
-  providers: [ RealtimeService,WhatsappMessageGateway,WhatsappMessageService,WhatsappChatService,WhatsappCommercialService],
+  providers: [RealtimeService],
+  exports: [RealtimeService],
 })
 export class RealtimeModule {}

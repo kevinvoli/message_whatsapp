@@ -7,11 +7,11 @@ import { QueuePosition } from './entities/queue-position.entity';
 import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
+import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
 import { PendingMessageService } from './services/pending-message.service';
 import { ConversationRedispatchCron } from './workers/conversation-redispatch.cron';
 import { ConversationRedispatchWorker } from './services/ConversationRedispatchWorker.service';
@@ -26,17 +26,16 @@ import { ConversationRedispatchWorker } from './services/ConversationRedispatchW
       WhatsappCommercial,
     ]),
     forwardRef(() => WhatsappMessageModule),
+    WhatsappChatModule,
+    CommunicationWhapiModule,
+    WhatsappCommercialModule,
   ],
   controllers: [],
   providers: [
     DispatcherService,
     QueueService,
-    WhatsappMessageService,
-    WhatsappChatService,
-    CommunicationWhapiService,
-    WhatsappCommercialService,
     PendingMessageService,
-      ConversationRedispatchWorker,
+    ConversationRedispatchWorker,
     ConversationRedispatchCron,
   ],
   exports: [DispatcherService, QueueService],
