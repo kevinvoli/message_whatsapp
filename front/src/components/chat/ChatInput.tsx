@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
+import { useChatStore } from '@/store/chatStore';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -7,17 +8,58 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ 
-  onSendMessage, 
-  isConnected, 
-  disabled = false 
+const ChatInput: React.FC<ChatInputProps> = ({
+  onSendMessage,
+  isConnected,
+  disabled = false,
 }) => {
   const [message, setMessage] = useState('');
+  const { socket, selectedConversation } = useChatStore();
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Nettoie le timeout lorsque le composant est démonté
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const emitTypingEvent = (event: 'typing:start' | 'typing:stop') => {
+    if (socket && selectedConversation) {
+      socket.emit(event, { conversationId: selectedConversation.chat_id });
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+
+    // Si un timeout est déjà en cours, on ne fait rien (on a déjà émis 'typing:start')
+    if (!typingTimeoutRef.current) {
+      emitTypingEvent('typing:start');
+    } else {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Crée un nouveau timeout pour émettre 'typing:stop' après 2 secondes d'inactivité
+    typingTimeoutRef.current = setTimeout(() => {
+      emitTypingEvent('typing:stop');
+      typingTimeoutRef.current = null; // Réinitialise la référence
+    }, 2000);
+  };
 
   const handleSubmit = () => {
     if (message.trim() && !disabled && isConnected) {
       onSendMessage(message.trim());
       setMessage('');
+
+      // Arrête l'événement de frappe après l'envoi
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      emitTypingEvent('typing:stop');
     }
   };
 
@@ -33,7 +75,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       <div className="flex items-end gap-2">
         <textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="Tapez votre message..."
           className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-gray-500"
