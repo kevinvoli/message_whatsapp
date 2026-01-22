@@ -62,7 +62,6 @@ export class QueueService {
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
   async removeFromQueue(userId: string): Promise<void> {
-     console.log('______==__________il ne doit pas entre ici__________________=');
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -93,7 +92,6 @@ export class QueueService {
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {
-       console.log('______==__________il ne doit pas entre ici___________________+');
       await queryRunner.release();
     }
   }
@@ -125,7 +123,6 @@ export class QueueService {
         `⏳   agent disponible, a l'id: (${nextInQueue?.user.id})`,
       );
       await this.moveToEnd(nextInQueue.userId);
-       console.log('______==__________il ne doit pas entre ici___________________',nextInQueue);
       return nextInQueue.user;
     });
   }
@@ -140,45 +137,43 @@ export class QueueService {
   //  suprime et ajouter a la queue
 
   async moveToEnd(userId: string): Promise<void> {
-     console.log('______==__________il ne doit pas entre ici___________________',userId);
     await this.removeFromQueue(userId);
     await this.addToQueue(userId);
-     console.log('______==__________il ne doit pas entre ici_________==__________');
   }
 
   async tcheckALlRankAndAdd(id: string) {
     console.log('queue fantome', id);
 
-    const rank = await this.queueRepository.find();
-    const agent = await this.userRepository.find();
-
-    if (rank) {
+    const rank = await this.queueRepository.find({relations:['user']});
+    const agent = await this. userRepository.find();
+    
+    if (!rank) {
       if (!agent) return null;
-      // console.log('reng des nocture:', agent);
+      console.log('reng des nocture===========:', agent);
 
       for (const agen of agent) {
-        console.log('reng des nocture:', agen);
+        console.log('reng des nocture________________:', agen);
 
         await this.addToQueue(agen.id);
       }
     }
     const rankss = await this.queueRepository.find();
-    console.log('reng des nocture:', rankss);
+    console.log('reng des nocture+++++++++++++++:', rankss);
 
     if (rank) return null;
     return;
   }
 
-  async removeALlRankOnfline(id: string) {
+    async removeALlRankOnfline(id: string) {
     console.log('queue fantome', id);
 
     const rank = await this.queueRepository.find();
-    const agent = await this.userRepository.find({
-      where: {
-        isConnected: false,
-      },
+    const agent = await this. userRepository.find({
+      where:{
+        isConnected:false
+      }
     });
-
+    
     if (rank) {
       if (!agent) return null;
       console.log('reng des nocture:', agent);
