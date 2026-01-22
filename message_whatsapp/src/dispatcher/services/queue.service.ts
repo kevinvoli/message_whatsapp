@@ -27,12 +27,10 @@ export class QueueService {
   async addToQueue(userId: string): Promise<QueuePosition | null> {
   
 
-     console.log('______==__________il ne doit pas entre ici___________________++',userId);
 
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
- console.log('______==__________il ne doit pas entre ici______________=+');
       if (!user) {
         return null; // ⬅️ plus de throw
       }
@@ -173,16 +171,13 @@ export class QueueService {
     
     if (rank) {
       if (!agent) return null;
-      console.log('reng des nocture:', agent);
 
       for (const agen of agent) {
-        console.log('reng des nocture:', agen);
 
         await this.removeFromQueue(agen.id);
       }
     }
     const rankss = await this.queueRepository.find();
-    console.log('reng des nocture:', rankss);
 
     if (rank) return null;
     return;

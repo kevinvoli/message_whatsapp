@@ -76,7 +76,6 @@ export class WhatsappMessageGateway
       console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
       await this.queueService.removeFromQueue(commercialId);
       console.log('nuew status AGent', false);
-
       await this.userService.updateStatus(commercialId, false);
       await this.queueService.tcheckALlRankAndAdd(commercialId);
       await this.emitQueueUpdate();
@@ -258,6 +257,8 @@ export class WhatsappMessageGateway
     }
 
     try {
+      console.log("le chat id est ici:",payload);
+      
       const message = await this.whatsappMessageService.createAgentMessage({
         chat_id: payload.chatId,
         text: payload.text,

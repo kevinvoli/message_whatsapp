@@ -48,7 +48,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectConversation: (chatId: string) => {
-    const conversation = get().conversations.find((c) => c.chat_id === chatId);
+    const conversation = get().conversations.find((c) => c.chatId === chatId);
     if (conversation) {
       set({
         selectedConversation: conversation,
@@ -62,8 +62,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: (text: string) => {
     const { socket, selectedConversation } = get();
     if (socket && selectedConversation) {
+      console.log("pres pour l'envoie du message_______________________________",selectedConversation);
+      
       socket.emit("message:send", {
-        chatId: selectedConversation.chat_id,
+        chatId: selectedConversation.chatId,
         text,
       });
     }
@@ -74,7 +76,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setMessages: (chatId: string, messages) => {
-    if (get().selectedConversation?.chat_id === chatId) {
+    if (get().selectedConversation?.chatId === chatId) {
       set({ messages, isLoading: false });
     }
   },
@@ -119,7 +121,7 @@ updateConversation: (updatedConversation: Conversation) => {
       // Ajoute le nouveau message s'il existe
       if (
         updatedConversation.lastMessage &&
-        !state.messages.find((m) => m.id === updatedConversation.lastMessage.id)
+        !state.messages.find((m) => m.id === updatedConversation.lastMessage?.id)
       ) {
         newState.messages = [...state.messages, updatedConversation.lastMessage];
       }

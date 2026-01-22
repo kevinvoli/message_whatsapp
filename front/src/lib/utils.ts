@@ -1,5 +1,6 @@
 // lib/utils.ts
 import { Message } from '@/types/chat';
+import { StartupSnapshot } from 'node:v8';
 
 // Définit le type pour les données brutes d'un message reçues (par ex. d'une API)
 interface RawMessageData {
@@ -7,7 +8,7 @@ interface RawMessageData {
   text?: string;
   timestamp?: string | number | Date;
   from_me?: boolean;
-  status?: string;
+  status?:  "sending" | "sent" | "delivered" | "read" | "error";
   direction?: 'IN' | 'OUT';
   from: string; // Le numéro de téléphone de l'expéditeur
   from_name?: string;
@@ -18,7 +19,7 @@ export const createMessage = (data: RawMessageData): Message => ({
   text: data.text || '',
   timestamp: new Date(data.timestamp || Date.now()),
   from: data.from_me ? 'commercial' : 'client',
-  status: data.status || 'sent',
+  status: data.status  || 'sent',
   direction: data.direction || 'IN',
   sender_phone: data.from,
   sender_name: data.from_name || (data.from_me ? 'Agent' : 'Client'),
