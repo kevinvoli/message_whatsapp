@@ -144,10 +144,12 @@ export class QueueService {
   async tcheckALlRankAndAdd(id: string) {
     console.log('queue fantome', id);
 
-    const rank = await this.queueRepository.find({relations:['user']});
+    const rank = await this.queueRepository.find();
     const agent = await this. userRepository.find();
+      console.log('reng des nocture===========:', agent);
+      console.log('reng des nocture===========:', rank);
     
-    if (!rank) {
+    if (rank.length<=0) {
       if (!agent) return null;
       console.log('reng des nocture===========:', agent);
 
