@@ -146,21 +146,16 @@ export class QueueService {
 
     const rank = await this.queueRepository.find();
     const agent = await this. userRepository.find();
-      console.log('reng des nocture===========:', agent);
-      console.log('reng des nocture===========:', rank);
     
     if (rank.length<=0) {
       if (!agent) return null;
-      console.log('reng des nocture===========:', agent);
 
       for (const agen of agent) {
-        console.log('reng des nocture________________:', agen);
 
         await this.addToQueue(agen.id);
       }
     }
     const rankss = await this.queueRepository.find();
-    console.log('reng des nocture+++++++++++++++:', rankss);
 
     if (rank) return null;
     return;

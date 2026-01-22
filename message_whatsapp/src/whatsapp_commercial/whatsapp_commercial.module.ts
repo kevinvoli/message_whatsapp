@@ -9,7 +9,7 @@ import { QueueService } from 'src/dispatcher/services/queue.service';
 @Module({
   imports: [TypeOrmModule.forFeature([WhatsappCommercial,QueuePosition])],
   controllers: [WhatsappCommercialController],
-  providers: [WhatsappCommercialService,QueueService],
+  providers: [WhatsappCommercialService,QueueService,],
   exports: [WhatsappCommercialService],
 })
 export class WhatsappCommercialModule {}

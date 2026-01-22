@@ -38,7 +38,8 @@ export class FirstResponseTimeoutJob {
             first_response_deadline_at: LessThan(now),
           },
         });
-
+        console.log("lencement du tcheque des reponse",now);
+        
         for (const chat of chats) {
           await this.dispatcher.reinjectConversation(chat);
           this.gateway.emitConversationReassigned(chat.chat_id);

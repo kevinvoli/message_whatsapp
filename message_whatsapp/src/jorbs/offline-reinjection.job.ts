@@ -30,6 +30,8 @@ async offlineReinject() {
     relations: ['commercial'],
   });
 
+  console.log("tcher de chaque journe a 9h",startOfDay);
+  
   for (const chat of chats) {
     const commercial = chat.commercial;
     if (!commercial) continue;

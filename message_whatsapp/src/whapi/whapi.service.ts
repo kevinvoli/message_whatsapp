@@ -34,9 +34,15 @@ export class WhapiService {
     
     const message = payload.messages[0];
 
-    // console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
 
+    console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
 
+     function extractPhoneNumber(chatId: string): string {
+        return chatId.split('@')[0];
+      }
+      const bani= extractPhoneNumber(message.chat_id)
+
+      if (bani.length >= 14) return
     // 🔒 ignorer les messages envoyés par ton propre compte
     if (message.from_me) return;
 
@@ -48,6 +54,7 @@ export class WhapiService {
       message.audio?.id ||
       message.document?.id ||
       null;
+
 
     try {
       //  1️⃣ Dispatcher (assignation agent ou pending)

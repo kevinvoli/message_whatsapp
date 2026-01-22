@@ -180,6 +180,7 @@ export class WhatsappCommercialService {
     }
 
     if (user.isConnected === true) {
+      
       console.log(
         `🔌 Commercial ${user.name} (${user.id}) isConnected = ${status}`,
       );
