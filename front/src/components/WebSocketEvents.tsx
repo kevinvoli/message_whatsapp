@@ -24,6 +24,9 @@ const WebSocketEvents = () => {
     updateConversation,
     addConversation,
     loadConversations,
+    updateMessageStatus,
+    setTyping,
+    clearTyping,
   } = useChatStore();
   const { user } = useAuth();
 
@@ -64,11 +67,33 @@ const WebSocketEvents = () => {
         console.error('Socket error received:', error.message, error.details || '');
       };
 
+      const handleMessageStatusUpdate = (data: {
+        conversationId: string;
+        messageId: string;
+        status: string;
+      }) => {
+        console.log(`Received status update for message ${data.messageId}: ${data.status}`);
+        updateMessageStatus(data.conversationId, data.messageId, data.status);
+      };
+
+      const handleTypingStart = (data: { conversationId: string }) => {
+        console.log(`Typing started in chat ${data.conversationId}`);
+        setTyping(data.conversationId);
+      };
+
+      const handleTypingStop = (data: { conversationId: string }) => {
+        console.log(`Typing stopped in chat ${data.conversationId}`);
+        clearTyping(data.conversationId);
+      };
+
       // --- Enregistrement des listeners ---
       socket.on('conversations:list', handleConversationsList);
       socket.on('messages:list', handleMessagesList);
       socket.on('message:new', handleNewMessage);
       socket.on('conversation:updated', handleConversationUpdated);
+      socket.on('message:status:update', handleMessageStatusUpdate);
+      socket.on('typing:start', handleTypingStart);
+      socket.on('typing:stop', handleTypingStop);
       socket.on('error', handleError);
       // --- Nettoyage ---
       return () => {
@@ -76,11 +101,14 @@ const WebSocketEvents = () => {
         socket.off('messages:list', handleMessagesList);
         socket.off('message:new', handleNewMessage);
         socket.off('conversation:updated', handleConversationUpdated);
+        socket.off('message:status:update', handleMessageStatusUpdate);
+        socket.off('typing:start', handleTypingStart);
+        socket.off('typing:stop', handleTypingStop);
         socket.off('error', handleError);
         setSocket(null);
       };
     }
-  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation]);
+  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, updateMessageStatus, setTyping, clearTyping]);
 
   return null; // Ce composant ne rend rien
 };

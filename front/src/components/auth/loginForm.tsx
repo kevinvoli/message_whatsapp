@@ -48,10 +48,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               Email
             </label>
             <input
+              id="email"
+              name="email"
               type="email"
               value={formData.email}
               onChange={(e) =>
@@ -65,10 +67,12 @@ const LoginForm: React.FC<LoginFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
             <input
+              id="password"
+              name="password"
               type="password"
               value={formData.password}
               onChange={(e) =>

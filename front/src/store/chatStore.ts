@@ -10,6 +10,7 @@ interface ChatState {
   selectedConversation: Conversation | null;
   isLoading: boolean;
   error: string | null;
+  typingStatus: { [chatId: string]: boolean };
 
   // Actions
   setSocket: (socket: Socket | null) => void;
@@ -23,6 +24,13 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
+  updateMessageStatus: (
+    chatId: string,
+    messageId: string,
+    status: string,
+  ) => void;
+  setTyping: (chatId: string) => void;
+  clearTyping: (chatId: string) => void;
 
   reset: () => void;
 }
@@ -34,6 +42,7 @@ const initialState = {
   selectedConversation: null,
   isLoading: false,
   error: null,
+  typingStatus: {},
 };
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -180,6 +189,34 @@ updateConversation: (updatedConversation: Conversation) => {
         ...state.conversations.filter((c) => c.id !== newConversation.id),
       ],
     }));
+  },
+
+  updateMessageStatus: (chatId, messageId, status) => {
+    set((state) => {
+      // Met à jour le message dans la liste des messages de la conversation active
+      if (state.selectedConversation?.chat_id === chatId) {
+        return {
+          messages: state.messages.map((m) =>
+            m.id === messageId ? { ...m, status } : m,
+          ),
+        };
+      }
+      return {};
+    });
+  },
+
+  setTyping: (chatId) => {
+    set((state) => ({
+      typingStatus: { ...state.typingStatus, [chatId]: true },
+    }));
+  },
+
+  clearTyping: (chatId) => {
+    set((state) => {
+      const newTypingStatus = { ...state.typingStatus };
+      delete newTypingStatus[chatId];
+      return { typingStatus: newTypingStatus };
+    });
   },
 
   reset: () => set(initialState),

@@ -51,7 +51,7 @@ export class WhapiService {
     const event = payload?.event_datas?.[0];
     if (!event) return;
 
-    if (event.event === 'composing') {
+    if (event.event === 'composing' && event.chat_id) {
       const chatId = event.chat_id;
       // La documentation n'étant pas disponible, nous supposons que la payload
       // contient une propriété `composing` qui est un booléen.
@@ -68,7 +68,7 @@ export class WhapiService {
       const updatedMessage =
         await this.whatsappMessageService.updateByStatus(status);
 
-      if (updatedMessage) {
+      if (updatedMessage && updatedMessage.external_id) {
         this.realtimeEmitter.emitMessageStatusUpdate(
           updatedMessage.chat_id,
           updatedMessage.external_id,
