@@ -223,23 +223,23 @@ export class WhatsappMessageService {
     id: string;
     recipient_id: string;
     status: string;
-  }) {
+  }): Promise<WhatsappMessage | null> {
     try {
-      const messages = await this.messageRepository.findOne({
+      const message = await this.messageRepository.findOne({
         where: { external_id: status.id, chat_id: status.recipient_id },
       });
 
-      if (!messages) {
+      if (!message) {
         console.log('Message not found for status update:', status.id);
         return null;
       }
-      console.log('les info du status', messages);
-      messages.status = status.status as WhatsappMessageStatus;
 
-      console.log('les info du status======', messages);
-
-      const result = await this.messageRepository.save(messages);
-      console.log('====== status======', result);
+      message.status = status.status as WhatsappMessageStatus;
+      const updatedMessage = await this.messageRepository.save(message);
+      console.log(
+        `[DB] Status updated for message ${updatedMessage.external_id} to ${updatedMessage.status}`,
+      );
+      return updatedMessage;
     } catch (error) {
       throw new Error(`Failed to update message status: ${String(error)}`);
     }

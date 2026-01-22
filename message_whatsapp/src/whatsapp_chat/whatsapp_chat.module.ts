@@ -7,11 +7,19 @@ import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_cha
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
-    WhatsappChat,WhatsappChatLabel,   WhatsappCommercial, QueuePosition
-      ])],
-  providers: [WhatsappChatGateway, WhatsappChatService, WhatsappCommercialService],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappChat,
+      WhatsappChatLabel,
+      WhatsappCommercial,
+      QueuePosition,
+    ]),
+    WhatsappCommercialModule,
+  ],
+  providers: [WhatsappChatService],
+  exports: [WhatsappChatService],
 })
 export class WhatsappChatModule {}

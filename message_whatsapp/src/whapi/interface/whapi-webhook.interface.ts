@@ -179,6 +179,10 @@ export interface WhapiEventData {
   join_link?: string;
   start?: number;
   responses?: any[];
+  // Ajout pour la gestion des événements de frappe
+  event?: string;
+  chat_id?: string;
+  composing?: boolean;
 }
 
 // --- Webhook Payload ---

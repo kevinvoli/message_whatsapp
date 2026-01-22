@@ -47,12 +47,39 @@ export class WhapiService {
     }
   }
 
+  async handleEvent(payload: WhapiWebhookPayload): Promise<void> {
+    const event = payload?.event_datas?.[0];
+    if (!event) return;
+
+    if (event.event === 'composing' && event.chat_id) {
+      const chatId = event.chat_id;
+      // La documentation n'étant pas disponible, nous supposons que la payload
+      // contient une propriété `composing` qui est un booléen.
+      const state = event.composing ? 'start' : 'stop';
+      this.realtimeEmitter.emitTypingEvent(chatId, state);
+      this.logger.log(`✍️ Typing event [${state}] detected for chat ${chatId}`);
+    }
+  }
+
   async updateStatusMessage(payload: WhapiWebhookPayload): Promise<void> {
     if (!payload?.statuses?.length) return;
 
     for (const status of payload.statuses) {
-      await this.whatsappMessageService.updateByStatus(status);
-      this.logger.log(`📌 Status update | ${status.id} → ${status.status}`);
+      const updatedMessage =
+        await this.whatsappMessageService.updateByStatus(status);
+
+      if (updatedMessage && updatedMessage.external_id) {
+        this.realtimeEmitter.emitMessageStatusUpdate(
+          updatedMessage.chat_id,
+          updatedMessage.external_id,
+          updatedMessage.status,
+        );
+        this.logger.log(
+          `📌 Status update emitted | ${updatedMessage.external_id} → ${updatedMessage.status}`,
+        );
+      } else {
+        this.logger.warn(`Message not found for status update: ${status.id}`);
+      }
     }
   }
 

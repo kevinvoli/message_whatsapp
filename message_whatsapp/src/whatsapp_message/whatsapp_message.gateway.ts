@@ -408,17 +408,71 @@ export class WhatsappMessageGateway
     });
   }
 
+  async handleTypingStartFromWebhook(chatId: string) {
+    try {
+      const socketId = await this._getAgentSocketId(chatId);
+      if (socketId) {
+        this.server
+          .to(socketId)
+          .emit('typing:start', { conversationId: chatId });
+      }
+    } catch (error) {
+      console.error(`Erreur lors de l'émission du typing:start :`, error);
+    }
+  }
+
+  async handleTypingStopFromWebhook(chatId: string) {
+    try {
+      const socketId = await this._getAgentSocketId(chatId);
+      if (socketId) {
+        this.server.to(socketId).emit('typing:stop', { conversationId: chatId });
+      }
+    } catch (error) {
+      console.error(`Erreur lors de l'émission du typing:stop :`, error);
+    }
+  }
+
   async handleMessageStatusUpdate(
     conversationId: string,
     messageId: string,
     status: string,
   ) {
-    const roomName = conversationId;
-    this.server.to(roomName).emit('message:status:update', {
-      conversationId,
-      messageId,
-      status,
-    });
+    try {
+      const socketId = await this._getAgentSocketId(conversationId);
+      if (socketId) {
+        this.server.to(socketId).emit('message:status:update', {
+          conversationId,
+          messageId,
+          status,
+        });
+        console.log(
+          `[Socket] Statut du message ${messageId} mis à jour à "${status}" pour la conversation ${conversationId}`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        `[Socket] Erreur lors de l'émission de la mise à jour du statut du message pour la conversation ${conversationId}:`,
+        error,
+      );
+    }
+  }
+
+  private async _getAgentSocketId(
+    chatId: string,
+  ): Promise<string | undefined> {
+    const chat = await this.chatService.findByChatId(chatId);
+    if (!chat || !chat.commercial_id) {
+      console.warn(
+        `[Socket] Impossible de trouver le chat ou l'agent pour le chatId ${chatId}.`,
+      );
+      return undefined;
+    }
+
+    const socketEntry = Array.from(this.connectedAgents.entries()).find(
+      ([_, agentId]) => agentId === chat.commercial_id,
+    );
+
+    return socketEntry ? socketEntry[0] : undefined;
   }
 
   // =========================

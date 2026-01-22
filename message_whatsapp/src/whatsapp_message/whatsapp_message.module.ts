@@ -6,11 +6,10 @@ import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
-import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 
 @Module({
@@ -23,15 +22,11 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
       QueuePosition,
     ]),
     WhatsappChatModule,
-    forwardRef(() => DispatcherModule)
+    forwardRef(() => DispatcherModule),
+    CommunicationWhapiModule,
+    WhatsappCommercialModule,
   ],
-  providers: [
-    WhatsappChatService,
-    WhatsappMessageGateway,
-    WhatsappMessageService,
-    WhatsappCommercialService,
-    CommunicationWhapiService,
-  ],
-  exports: [WhatsappMessageGateway],
+  providers: [WhatsappMessageService, WhatsappMessageGateway],
+  exports: [WhatsappMessageService, WhatsappMessageGateway],
 })
 export class WhatsappMessageModule {}
