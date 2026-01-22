@@ -28,7 +28,7 @@ export class WhapiController {
       break;
     case 'events':
       // Traiter les événements (calls, joins, etc.)
-      console.log('Événement events:', payload.event_datas);
+      this.whapiService.handleEvent(payload);
       break;
     case 'polls':
       // Traiter les sondages

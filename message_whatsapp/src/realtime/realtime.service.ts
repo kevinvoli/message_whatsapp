@@ -20,4 +20,24 @@ export class RealtimeService {
 
     this.gateway.emitIncomingConversation(conversation);
   }
+
+  emitMessageStatusUpdate(
+    conversationId: string,
+    messageId: string,
+    status: string,
+  ) {
+    this.gateway.handleMessageStatusUpdate(conversationId, messageId, status);
+  }
+
+  emitTypingEvent(chatId: string, state: 'start' | 'stop') {
+    // Le gateway a déjà des méthodes pour 'typing:start' et 'typing:stop'.
+    // Nous avons besoin d'une méthode unifiée ou d'appeler la bonne.
+    // Pour l'instant, nous lions cela à une nouvelle méthode dans le gateway
+    // qui acheminera l'événement vers le bon agent.
+    if (state === 'start') {
+      this.gateway.handleTypingStartFromWebhook(chatId);
+    } else {
+      this.gateway.handleTypingStopFromWebhook(chatId);
+    }
+  }
 }
