@@ -60,17 +60,15 @@ export class WhatsappMessageGateway
       this.connectedAgents.set(client.id, commercialId);
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
-      await this.dispatcherService.distributePendingMessages(commercialId)
-       await this.userService.updateStatus(commercialId, true);
+      await this.dispatcherService.distributePendingMessages(commercialId);
+      await this.userService.updateStatus(commercialId, true);
       await this.emitQueueUpdate();
       console.log('nuew status socket', true);
-      await this.queueService.removeALlRankOnfline(commercialId)
-     
-   
+      await this.queueService.removeALlRankOnfline(commercialId);
     }
   }
 
-   async handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     console.log('🔴 Client déconnecté:', client.id);
     const commercialId = this.connectedAgents.get(client.id);
     if (commercialId) {
@@ -80,9 +78,21 @@ export class WhatsappMessageGateway
       console.log('nuew status AGent', false);
 
       await this.userService.updateStatus(commercialId, false);
-       await this.queueService.tcheckALlRankAndAdd(commercialId)
+      await this.queueService.tcheckALlRankAndAdd(commercialId);
       await this.emitQueueUpdate();
     }
+  }
+
+  emitConversationReassigned(chatId: string) {
+    this.server.emit('conversation:reassigned', {
+      chatId,
+    });
+  }
+
+  emitConversationReadonly(chatId: string) {
+    this.server.emit('conversation:readonly', {
+      chatId,
+    });
   }
 
   public emitIncomingMessage(
@@ -104,18 +114,11 @@ export class WhatsappMessageGateway
     const targetSocketId = Array.from(this.connectedAgents.entries()).find(
       ([_, agentId]) => agentId === commercialId,
     )?.[0];
-
-    // if (targetSocketId) {
-    //   this.server.to(targetSocketId).emit('message:receid', {
-    //     conversationId: message.chat_id, // ✅ PAS chat.id
-    //     message: messageForFrontend,
-    //   });
-    // }
   }
 
   public async emitIncomingConversation(chat: WhatsappChat) {
     // console.log("xssssssssssssssssssssssssssssssssssssssss",chat);
-    
+
     try {
       // Trouver le socket de l'agent assigné à cette conversation
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
@@ -145,16 +148,14 @@ export class WhatsappMessageGateway
         unreadCount: unreadCount,
       };
 
-      console.log("cdidvveeeeeeeeeeeeeeeeeeeeeeeee",targetSocketId);
-      
+      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', targetSocketId);
+
       // Émettre l'événement de mise à jour de conversation à l'agent spécifique
       this.server.to(targetSocketId).emit('conversation:updated', conversation);
     } catch (error) {
       console.error("Erreur lors de l'émission de la conversation:", error);
     }
   }
-
- 
 
   emitDebug(
     server: Server,
@@ -264,14 +265,15 @@ export class WhatsappMessageGateway
         timestamp: new Date(),
       });
 
-      const chat = await this.chatService.findByChatId(message.chat_id)
+      const chat = await this.chatService.findByChatId(message.chat_id);
 
       if (!chat) {
-        return
+        return;
       }
-       const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(message.chat_id);
-
+      const lastMessage =
+        await this.whatsappMessageService.findLastMessageByChatId(
+          message.chat_id,
+        );
 
       // Compter les messages non lus
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
@@ -285,14 +287,15 @@ export class WhatsappMessageGateway
         unreadCount: unreadCount,
       };
 
+      const commercialIds = chat.commercial?.id;
+      if (!commercialIds) return;
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agentId]) => agentId === chat.commercial.id,
-      )?.[0];
+        ([_, agentId]) => agentId === commercialIds,)?.[0];
       if (!targetSocketId) {
-        return
+        return;
       }
-      
-      this.server.to(targetSocketId).emit('conversation:updated',conversation);
+
+      this.server.to(targetSocketId).emit('conversation:updated', conversation);
 
       // The dispatcher or another service should handle broadcasting this new message.
       // For now, we can emit an update to the sender.
@@ -477,8 +480,6 @@ export class WhatsappMessageGateway
 
   public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
-
-      
       const chat = await this.chatService.findByChatId(chatId);
       if (!chat || !chat.commercial_id) return;
 
@@ -499,7 +500,7 @@ export class WhatsappMessageGateway
           last_message: lastMessage,
           unread_count: unreadCount,
         };
-      console.log("chat est icciccccccccccccccccccccccccc",targetSocketId);
+        console.log('chat est icciccccccccccccccccccccccccc', targetSocketId);
 
         this.server
           .to(targetSocketId)

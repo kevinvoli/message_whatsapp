@@ -77,14 +77,14 @@ export class WhatsappMessageService {
         source: 'agent_web',
         text: data.text,
         chat: chat,
-        commercial: chat.commercial,
+        commercial: chat.commercial ?? undefined,
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
       });
 
       const mes= await this.messageRepository.save(messageEntity);
 
-      return mes
+      return mes 
     } catch (error) {
       console.error('WHAPI SEND FAILED:', error);
 

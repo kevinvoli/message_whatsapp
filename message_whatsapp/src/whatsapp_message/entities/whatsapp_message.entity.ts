@@ -93,12 +93,12 @@ export class WhatsappMessage {
   })
   text: string | null;
 
-  @ManyToOne(() => WhatsappCommercial, (data) => data.messages)
+  @ManyToOne(() => WhatsappCommercial, (data) => data.messages,{nullable:true,onDelete:'SET NULL'})
   @JoinColumn({
     name: 'commercial_id',
     referencedColumnName: 'id',
   })
-  commercial: WhatsappCommercial;
+  commercial?: WhatsappCommercial | null;
 
   @OneToMany(
     () => WhatsappMessageContent,

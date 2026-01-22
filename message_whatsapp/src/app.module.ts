@@ -20,9 +20,13 @@ import * as Joi from 'joi';
 import { DispatcherModule } from './dispatcher/dispatcher.module';
 import { CommunicationWhapiModule } from './communication_whapi/communication_whapi.module';
 import { AuthModule } from './auth/auth.module';
+import { JorbsModule } from './jorbs/jorbs.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TasksService } from './jorbs/tasks.service';
 
 @Module({
   imports: [
+     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         MYSQL_HOST:Joi.string().required(),
@@ -33,8 +37,8 @@ import { AuthModule } from './auth/auth.module';
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, ],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule, ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService,TasksService],
 })
 export class AppModule {}

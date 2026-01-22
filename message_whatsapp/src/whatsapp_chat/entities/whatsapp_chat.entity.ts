@@ -35,15 +35,35 @@ export class WhatsappChat {
     length: 100,
     nullable: true,
   })
-  commercial_id: string | null;
+  commercial_id?: string | null;
+// pour les regle du dispatch
+  @Column({ type: 'timestamp', nullable: true })
+  assigned_at: Date | null;
+
+  @Column({
+    type: 'enum',
+    enum: ['ONLINE', 'OFFLINE'],
+    nullable: true,
+  })
+  assigned_mode: 'ONLINE' | 'OFFLINE' | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  first_response_deadline_at: Date | null; // R4
+
+  @Column({ type: 'timestamp', nullable: true })
+  last_client_message_at: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  last_commercial_message_at: Date | null;
+
+  // 
 
   @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
   @JoinColumn({
     name: 'commercial_id',
     referencedColumnName: 'id',
   })
-  commercial: WhatsappCommercial;
-  
+  commercial?: WhatsappCommercial | null;
 
   @Column({
     name: 'chat_id',
@@ -57,7 +77,7 @@ export class WhatsappChat {
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
-   @Column({
+  @Column({
     type: 'enum',
     enum: WhatsappChatStatus,
     default: WhatsappChatStatus.EN_ATTENTE,
@@ -67,7 +87,13 @@ export class WhatsappChat {
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
 
-  @Column({ name: 'chat_pic', type: 'varchar', length: 100, nullable: false ,default: 'default.png'})
+  @Column({
+    name: 'chat_pic',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    default: 'default.png',
+  })
   chat_pic: string;
 
   @Column({
@@ -75,7 +101,7 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
-    default: 'default.png'
+    default: 'default.png',
   })
   chat_pic_full: string;
 
@@ -123,12 +149,16 @@ export class WhatsappChat {
   })
   last_activity_at: Date; // timestamp
 
-  @Column({ name: 'contact_client', type: 'varchar', length: 100, nullable: false })
+  @Column({
+    name: 'contact_client',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
   contact_client: string;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
-
 
   @OneToMany(() => WhatsappMessage, (message) => message.chat)
   messages: WhatsappMessage[];

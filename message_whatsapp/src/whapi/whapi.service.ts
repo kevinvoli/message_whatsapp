@@ -34,7 +34,7 @@ export class WhapiService {
     
     const message = payload.messages[0];
 
-    console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
+    // console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
 
 
     // 🔒 ignorer les messages envoyés par ton propre compte
