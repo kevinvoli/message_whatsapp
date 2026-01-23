@@ -94,7 +94,11 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
                   : 'bg-white text-gray-800 border border-gray-200'
               }`}
             >
-              <p className="whitespace-pre-wrap break-words">{messageText}</p>
+              {msg.type === 'audio' && msg.mediaUrl ? (
+                <audio controls src={msg.mediaUrl} />
+              ) : (
+                <p className="whitespace-pre-wrap break-words">{messageText}</p>
+              )}
               <div className={`flex items-center gap-1 mt-1 text-xs ${
                 messageFrom === 'commercial' ? 'text-green-100' : 'text-gray-500'
               }`}>

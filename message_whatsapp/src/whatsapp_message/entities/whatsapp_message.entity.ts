@@ -93,6 +93,9 @@ export class WhatsappMessage {
   })
   text: string | null;
 
+  @Column({ name: 'mediaUrl', type: 'varchar', nullable: true })
+  mediaUrl: string;
+
   @ManyToOne(() => WhatsappCommercial, (data) => data.messages,{nullable:true,onDelete:'SET NULL'})
   @JoinColumn({
     name: 'commercial_id',

@@ -1,6 +1,17 @@
 version: "3.8"
 
 services:
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: always
+    env_file:
+      - ./message_whatsapp/.env.db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
   backend:
     image: ghcr.io/TON_USER/TON_REPO/back:latest
     container_name: back
@@ -9,7 +20,8 @@ services:
     ports:
       - "3001:3000"
       - "3002:3000"
-      
+    depends_on:
+      - db
 
   frontend:
     image: ghcr.io/TON_USER/TON_REPO/front:latest
@@ -17,3 +29,6 @@ services:
     restart: always
     ports:
       - "3003:3000"
+
+volumes:
+  mysql_data:

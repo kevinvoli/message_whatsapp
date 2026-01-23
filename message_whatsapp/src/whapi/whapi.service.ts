@@ -15,6 +15,7 @@ import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.ga
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 
 @Injectable()
 export class WhapiService {
@@ -25,8 +26,9 @@ export class WhapiService {
     private readonly whatsappMessageService: WhatsappMessageService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
-          @InjectRepository(WhatsappChat)
-        private readonly chatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
+    private readonly communicationWhapiService: CommunicationWhapiService,
   ) {}
 
   async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
@@ -50,12 +52,14 @@ export class WhapiService {
 
     const content = this.extractMessageContent(message);
     const messageType = message.type;
-    const mediaUrl =
+    const mediaId =
       message.image?.id ||
       message.video?.id ||
       message.audio?.id ||
       message.document?.id ||
       null;
+
+    const mediaUrl = mediaId ? this.communicationWhapiService.getMediaUrl(mediaId) : undefined;
 
 
     try {
@@ -65,7 +69,7 @@ export class WhapiService {
         message.from_name ?? 'Client',
         content,
         messageType,
-        mediaUrl ?? undefined,
+        mediaUrl,
       );
 
       if (!conversation) {
@@ -80,6 +84,7 @@ export class WhapiService {
         await this.whatsappMessageService.saveIncomingFromWhapi(
           message,
           conversation,
+          mediaUrl,
         );
 
 
