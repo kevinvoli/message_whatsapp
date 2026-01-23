@@ -30,7 +30,7 @@ export class FirstResponseTimeoutJob {
       void (async () => {
      await this.dispatcher.jobRunnertcheque(agentId)
       })();
-    }, 60_0); // chaque minute
+    }, 60_000); // chaque minute
 
     this.agentIntervals.set(agentId, interval);
   }

@@ -110,7 +110,7 @@ export class DispatcherService {
       conversation.assigned_at = new Date();
       conversation.assigned_mode = 'ONLINE';
       conversation.first_response_deadline_at = new Date(
-        Date.now() + 1 * 1000,
+        Date.now() + 5*60 * 1000,
       );
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -141,7 +141,7 @@ export class DispatcherService {
       assigned_at: new Date(),
       assigned_mode: 'ONLINE',
       first_response_deadline_at:  new Date(
-        Date.now() + 1 * 1000,
+        Date.now() + 5*60 * 1000,
       ),
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -215,7 +215,7 @@ export class DispatcherService {
       assigned_mode: nextAgent.isConnected ? 'ONLINE' : 'OFFLINE',
       assigned_at: new Date(),
       first_response_deadline_at:  new Date(
-        Date.now() + 1 * 1000,
+        Date.now() + 5*60 * 1000,
       )
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
