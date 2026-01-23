@@ -44,8 +44,7 @@ export class WhatsappMessageGateway
     private readonly messageRepository: Repository<WhatsappMessage>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
-    private readonly jobRunnner : FirstResponseTimeoutJob,
-
+    private readonly jobRunnner: FirstResponseTimeoutJob,
   ) {}
 
   @WebSocketServer()
@@ -67,7 +66,7 @@ export class WhatsappMessageGateway
       await this.userService.updateStatus(commercialId, true);
       await this.emitQueueUpdate();
       console.log('nuew effff status socket', true);
-      this.jobRunnner.startAgentSlaMonitor(commercialId)
+      this.jobRunnner.startAgentSlaMonitor(commercialId);
       await this.queueService.removeALlRankOnfline(commercialId);
     }
   }
@@ -82,15 +81,39 @@ export class WhatsappMessageGateway
       console.log('nuew status AGent', false);
       await this.userService.updateStatus(commercialId, false);
       await this.queueService.tcheckALlRankAndAdd(commercialId);
-      this.jobRunnner.stopAgentSlaMonitor(commercialId)
+      this.jobRunnner.stopAgentSlaMonitor(commercialId);
       await this.emitQueueUpdate();
     }
   }
 
-  emitConversationReassigned(chatId: string) {
-    this.server.emit('conversation:reassigned', {
-      chatId,
-    });
+  public emitConversationReassigned(
+    chat: WhatsappChat,
+    oldCommercialId: string ,
+    newCommercialId: string,
+  ) {
+
+
+    // 🔴 1. Ancien commercial → suppression
+    if (oldCommercialId) {
+      const oldSocketId = this.getSocketIdByCommercial(oldCommercialId);
+      if (oldSocketId) {
+    console.log('emition des event ------------------ ', oldCommercialId);
+
+        this.server.to(oldSocketId).emit('conversation:removed', {
+          chatId: chat.chat_id,
+        });
+      }
+    }
+
+    // 🟢 2. Nouveau commercial → ajout
+    const newSocketId = this.getSocketIdByCommercial(newCommercialId);
+    if (newSocketId) {
+    console.log('emition des event ------------------ ', newCommercialId);
+
+      this.server.to(newSocketId).emit('conversation:assigned', {
+        conversation: chat,
+      });
+    }
   }
 
   emitConversationReadonly(chatId: string) {
@@ -239,7 +262,6 @@ export class WhatsappMessageGateway
       const messages = await this.whatsappMessageService.findByChatId(
         payload.chatId,
       );
-      
 
       client.emit('messages:list', { chatId: payload.chatId, messages });
     } catch (error) {
@@ -249,7 +271,7 @@ export class WhatsappMessageGateway
       });
     }
   }
-// unreadCount
+  // unreadCount
   // =========================
   // EVENT: message:send
   // =========================
@@ -264,8 +286,8 @@ export class WhatsappMessageGateway
     }
 
     try {
-      console.log("le chat id est ici:",payload);
-      
+      console.log('le chat id est ici:', payload);
+
       const message = await this.whatsappMessageService.createAgentMessage({
         chat_id: payload.chatId,
         text: payload.text,
@@ -298,7 +320,8 @@ export class WhatsappMessageGateway
       const commercialIds = chat.commercial?.id;
       if (!commercialIds) return;
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agentId]) => agentId === commercialIds,)?.[0];
+        ([_, agentId]) => agentId === commercialIds,
+      )?.[0];
       if (!targetSocketId) {
         return;
       }
@@ -439,7 +462,9 @@ export class WhatsappMessageGateway
     try {
       const socketId = await this._getAgentSocketId(chatId);
       if (socketId) {
-        this.server.to(socketId).emit('typing:stop', { conversationId: chatId });
+        this.server
+          .to(socketId)
+          .emit('typing:stop', { conversationId: chatId });
       }
     } catch (error) {
       console.error(`Erreur lors de l'émission du typing:stop :`, error);
@@ -471,9 +496,7 @@ export class WhatsappMessageGateway
     }
   }
 
-   private async _getAgentSocketId(
-    chatId: string,
-  ): Promise<string | undefined> {
+  private async _getAgentSocketId(chatId: string): Promise<string | undefined> {
     const chat = await this.chatService.findByChatId(chatId);
     if (!chat || !chat.commercial_id) {
       console.warn(
@@ -488,7 +511,6 @@ export class WhatsappMessageGateway
 
     return socketEntry ? socketEntry[0] : undefined;
   }
-
 
   // =========================
   // MÉTHODES PRIVÉES UTILITAIRES
@@ -575,5 +597,11 @@ export class WhatsappMessageGateway
         error,
       );
     }
+  }
+
+  private getSocketIdByCommercial(commercialId: string): string | undefined {
+    return Array.from(this.connectedAgents.entries()).find(
+      ([_, agentId]) => agentId === commercialId,
+    )?.[0];
   }
 }

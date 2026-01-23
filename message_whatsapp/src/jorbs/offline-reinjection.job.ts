@@ -17,7 +17,7 @@ export class FirstResponseTimeoutJob {
   ) {}
 
 
-@Cron('36 15 * * *')
+@Cron('0 9 * * *')
 async offlineReinject() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -43,7 +43,7 @@ console.log("===================chaque matin===============");
 
     if (neverConnectedToday) {
       await this.dispatcher.reinjectConversation(chat);
-      this.gateway.emitConversationReassigned(chat.chat_id);
+      // this.gateway.emitConversationReassigned(chat.chat_id);
     }
   }
 }

@@ -21,7 +21,6 @@ export class FirstResponseTimeoutJob {
   startAgentSlaMonitor(agentId: string) {
 
     if (this.agentIntervals.has(agentId)) return;
-      console.log("mon runner est dans la place:___________________________________________________________________________________",agentId);
 
     // ⚠️ PAS async ici
     const interval = setInterval(() => {
@@ -31,7 +30,7 @@ export class FirstResponseTimeoutJob {
       void (async () => {
      await this.dispatcher.jobRunnertcheque(agentId)
       })();
-    }, 60_00); // chaque minute
+    }, 60_0); // chaque minute
 
     this.agentIntervals.set(agentId, interval);
   }

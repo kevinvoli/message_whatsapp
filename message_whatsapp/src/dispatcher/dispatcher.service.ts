@@ -79,7 +79,6 @@ export class DispatcherService {
       return this.chatRepository.save(conversation);
     }
 
- 
     const nextAgent = await this.queueService.getNextInQueue();
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
@@ -111,8 +110,12 @@ export class DispatcherService {
       conversation.assigned_at = new Date();
       conversation.assigned_mode = 'ONLINE';
       conversation.first_response_deadline_at = new Date(
-        Date.now() + 5 * 60 * 1000,
+        Date.now() + 1 * 1000,
       );
+      // new Date(
+      //   Date.now() + 0.10 * 60 * 1000,
+      // );
+      conversation.last_client_message_at = new Date();
       return this.chatRepository.save(conversation);
     }
 
@@ -137,7 +140,12 @@ export class DispatcherService {
       updatedAt: new Date(),
       assigned_at: new Date(),
       assigned_mode: 'ONLINE',
-      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+      first_response_deadline_at:  new Date(
+        Date.now() + 1 * 1000,
+      ),
+      // new Date(
+      //   Date.now() + 0.10 * 60 * 1000,
+      // );
       last_client_message_at: new Date(),
     });
 
@@ -194,6 +202,10 @@ export class DispatcherService {
   }
 
   async dispatchExistingConversation(chat: WhatsappChat) {
+    const oldCommercialId = chat.commercial_id;
+    if (!oldCommercialId) {
+      return;
+    }
     const nextAgent = await this.queueService.getNextInQueue();
     if (!nextAgent) return;
 
@@ -202,14 +214,32 @@ export class DispatcherService {
       commercial_id: nextAgent.id,
       assigned_mode: nextAgent.isConnected ? 'ONLINE' : 'OFFLINE',
       assigned_at: new Date(),
-      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+      first_response_deadline_at:  new Date(
+        Date.now() + 1 * 1000,
+      )
+      // new Date(
+      //   Date.now() + 0.10 * 60 * 1000,
+      // );
     });
 
-    this.messageGateway.emitConversationReassigned(chat.chat_id);
+    const updatedChat = await this.chatRepository.findOne({
+      where: { chat_id: chat.chat_id },
+      relations: ['commercial', 'messages'],
+    });
+
+    if (!updatedChat) {
+      return;
+    }
+    // 🔥 EVENT CENTRAL
+    this.messageGateway.emitConversationReassigned(
+      updatedChat,
+      oldCommercialId,
+      nextAgent.id,
+    );
   }
 
   async jobRunnertcheque(commercialId: string) {
-    console.log('mes verification sont ici', commercialId);
+    // console.log('mes verification sont ici', commercialId);
 
     const now = new Date();
 
@@ -225,7 +255,6 @@ export class DispatcherService {
 
     for (const chat of chats) {
       await this.reinjectConversation(chat);
-      this.messageGateway.emitConversationReassigned(chat.chat_id);
     }
   }
 }

@@ -24,7 +24,7 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
-  removeConversation: (conversationId: string) => void;
+  removeConversationByChatId: (conversationId: string) => void;
 
   reset: () => void;
 }
@@ -78,6 +78,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // 🔔 Charge les messages + déclenche le READ côté backend
   get().socket?.emit("messages:get", { chatId });
   get().socket?.emit("messages:read", { chatId });
+},
+
+removeConversationByChatId: (chatId: string) => {
+  set((state) => ({
+    conversations: state.conversations.filter(c => c.chatId !== chatId),
+    selectedConversation:
+      state.selectedConversation?.chatId === chatId
+        ? null
+        : state.selectedConversation,
+    messages:
+      state.selectedConversation?.chatId === chatId
+        ? []
+        : state.messages,
+  }));
 },
 
 

@@ -22,9 +22,10 @@ const WebSocketEvents = () => {
     setMessages,
     addMessage,
     updateConversation,
-    removeConversation,
+    removeConversationByChatId,
     addConversation,
     loadConversations,
+    
     // updateMessageStatus,
     // setTyping,
     // clearTyping,
@@ -40,6 +41,18 @@ const WebSocketEvents = () => {
       loadConversations();
 
       // --- Définition des handlers ---
+
+      const handleConversationAssigned = (data: { conversation: any }) => {
+        console.log("================================bien recu==============================",data);
+        
+        const conversation = transformToConversation(data.conversation);
+        addConversation(conversation);
+      };
+
+      const handleConversationRemoved = (data: { chatId: string }) => {
+        removeConversationByChatId(data.chatId);
+      };
+
       const handleConversationsList = (rawConversations: any[]) => {
         console.log('Received raw conversations list:', rawConversations);
         const conversations = rawConversations.map(transformToConversation);
@@ -102,8 +115,9 @@ const WebSocketEvents = () => {
       socket.on('message:status:update', handleMessageStatusUpdate);
       socket.on('typing:start', handleTypingStart);
       socket.on('typing:stop', handleTypingStop);
-      socket.on('conversation:reassigned', handleConversationRemove);
       socket.on('error', handleError);
+      socket.on('conversation:assigned', handleConversationAssigned);
+socket.on('conversation:removed', handleConversationRemoved);
       // --- Nettoyage ---
       return () => {
         socket.off('conversations:list', handleConversationsList);
@@ -114,7 +128,7 @@ const WebSocketEvents = () => {
         setSocket(null);
       };
     }
-  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation]);
+  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, addConversation, removeConversationByChatId]);
 
   return null; // Ce composant ne rend rien
 };
