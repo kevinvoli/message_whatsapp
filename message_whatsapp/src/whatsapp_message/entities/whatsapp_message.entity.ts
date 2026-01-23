@@ -1,3 +1,4 @@
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
@@ -77,6 +78,13 @@ export class WhatsappMessage {
     referencedColumnName: 'chat_id',
   })
   chat: WhatsappChat;
+
+    @ManyToOne(() => WhapiChannel, (data) => data.messages)
+  @JoinColumn({
+    name: 'channel_id',
+    referencedColumnName: 'channel_id',
+  })
+  channel: WhapiChannel;
 
   @Column({
     name: 'commercial_id',

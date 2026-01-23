@@ -62,7 +62,6 @@ export class WhatsappMessageGateway
       this.connectedAgents.set(client.id, commercialId);
       console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
       await this.queueService.addToQueue(commercialId);
-      await this.dispatcherService.distributePendingMessages(commercialId);
       await this.userService.updateStatus(commercialId, true);
       await this.emitQueueUpdate();
       console.log('nuew effff status socket', true);
@@ -130,30 +129,10 @@ export class WhatsappMessageGateway
       chatId,
     });
   }
-
-  public emitIncomingMessage(
-    chatId: string, // ⚠️ DOIT être chat.chat_id
-    commercialId: string,
-    message: any,
-  ) {
-    const messageForFrontend = {
-      id: message.id,
-      text: message.text,
-      timestamp: new Date(`${message.timestamp}`).getTime(),
-      direction: message.direction,
-      from: message.from,
-      from_name: message.from_name || 'Client',
-      status: message.status,
-      from_me: false,
-    };
-
-    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-      ([_, agentId]) => agentId === commercialId,
-    )?.[0];
-  }
+ 
 
   public async emitIncomingConversation(chat: WhatsappChat) {
-    // console.log("xssssssssssssssssssssssssssssssssssssssss",chat);
+  
 
     try {
       // Trouver le socket de l'agent assigné à cette conversation
@@ -169,8 +148,6 @@ export class WhatsappMessageGateway
       const lastMessage =
         await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
 
-      // console.log("commit conversation!!!!!!!!!!!!!!!!!!",lastMessage );
-
       // Compter les messages non lus
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
         chat.chat_id,
@@ -179,14 +156,12 @@ export class WhatsappMessageGateway
       // Construire l'objet conversation
       const conversation = {
         ...chat,
-        // clientPhone: chat.chat_id?.split('@')[0] || '',
         last_message: lastMessage,
         unreadCount: unreadCount,
       };
 
-      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', conversation);
-
-      // Émettre l'événement de mise à jour de conversation à l'agent spécifique
+      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee');
+     
       this.server.to(targetSocketId).emit('conversation:updated', conversation);
     } catch (error) {
       console.error("Erreur lors de l'émission de la conversation:", error);

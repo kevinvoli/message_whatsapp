@@ -13,6 +13,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
       WhatsappMessageContent,
       WhatsappCommercial,
       QueuePosition,
+      WhapiChannel,
     ]),
     WhatsappChatModule,
     forwardRef(() => DispatcherModule)

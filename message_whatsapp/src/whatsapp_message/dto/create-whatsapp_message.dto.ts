@@ -6,52 +6,51 @@ export class CreateWhatsappMessageDto {
   id: string;
 
   @IsString()
-  message_id?: string
+  message_id?: string;
 
   @IsString()
-  external_id?: string
+  external_id?: string;
 
-  conversation_id?: string
-commercial_id: string
-  direction: 'IN' | 'OUT'
+  conversation_id?: string;
+  commercial_id: string;
+  direction: 'IN' | 'OUT';
 
   @IsBoolean()
   from_me?: boolean;
 
-
+  @IsString()
+  channel_id: string;p
 
   @IsString()
   type?: string;
 
-   @IsString()
+  @IsString()
   chat_id: string;
 
   @IsNumber()
   timestamp: number;
 
-   @IsString()
+  @IsString()
   source: string;
 
   @IsOptional()
   @IsNumber()
   device_id: number;
 
-   @IsString()
+  @IsString()
   chat_name: string;
 
-   @IsString()
+  @IsString()
   from: string;
 
-   @IsString()
+  @IsString()
   from_name: string;
 
-   @IsString()
+  @IsString()
   text?: string;
 
-  
   sender_phone: string;
   status: string;
   createdAt: Date;
   updatedAt: Date;
- 
 }

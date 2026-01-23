@@ -23,6 +23,7 @@ import { AuthModule } from './auth/auth.module';
 import { JorbsModule } from './jorbs/jorbs.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksService } from './jorbs/tasks.service';
+import { ChannelModule } from './channel/channel.module';
 
 @Module({
   imports: [
@@ -37,7 +38,7 @@ import { TasksService } from './jorbs/tasks.service';
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule, ],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule, ChannelModule, ],
   controllers: [AppController],
   providers: [AppService,TasksService],
 })

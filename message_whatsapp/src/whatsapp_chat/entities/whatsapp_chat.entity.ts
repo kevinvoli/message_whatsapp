@@ -77,6 +77,9 @@ export class WhatsappChat {
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
+  @Column({ name: 'channel_id', type: 'varchar', length: 100, nullable: false })
+  channel_id: string;
+
   @Column({
     type: 'enum',
     enum: WhatsappChatStatus,

@@ -25,12 +25,10 @@ export class FirstResponseTimeoutJob {
     // ⚠️ PAS async ici
     const interval = setInterval(() => {
       // ✅ encapsulation propre de l’async
-      console.log("runner est dans la place:___________________________________________________________________________________",agentId);
-      
       void (async () => {
      await this.dispatcher.jobRunnertcheque(agentId)
       })();
-    }, 60_000); // chaque minute
+    }, 600_000); // chaque minute
 
     this.agentIntervals.set(agentId, interval);
   }

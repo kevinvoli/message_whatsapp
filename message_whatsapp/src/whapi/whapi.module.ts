@@ -18,6 +18,7 @@ import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 
 @Module({
@@ -28,6 +29,7 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
       WhatsappChat,
       PendingMessage,
       QueuePosition,
+      WhapiChannel
     ]),
     DispatcherModule,
     WhatsappMessageModule,

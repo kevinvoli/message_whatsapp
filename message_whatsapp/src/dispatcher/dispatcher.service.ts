@@ -39,6 +39,7 @@ export class DispatcherService {
 
   async assignConversation(
     clientPhone: string,
+    channel_id:string,
     clientName: string,
     content: string,
     messageType: string,
@@ -73,6 +74,7 @@ export class DispatcherService {
           `📩 Conversation ${conversation.chat_id} sans commercial (réinjection ou offline)`,
         );
       }
+      conversation.channel_id= channel_id
       this.logger.log(
         `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.commercial?.email ?? 'NON ASSIGNE'}`,
       );
@@ -83,16 +85,9 @@ export class DispatcherService {
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
       this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);
-      console.log(
-        '________________il ne doit pas entre ici___________________',
-      );
-
       return null;
     }
 
-    console.log(
-      '______==__________il ne doit pas entre ici___________________',
-    );
     /**
      * Cas 3️⃣ : conversation existante mais agent absent ou réassignation
      */
@@ -109,9 +104,11 @@ export class DispatcherService {
       conversation.last_activity_at = new Date();
       conversation.assigned_at = new Date();
       conversation.assigned_mode = 'ONLINE';
+      conversation.channel_id= channel_id;
       conversation.first_response_deadline_at = new Date(
         Date.now() + 5 * 60 * 1000,
       );
+      
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
       // );
@@ -140,13 +137,9 @@ export class DispatcherService {
       updatedAt: new Date(),
       assigned_at: new Date(),
       assigned_mode: 'ONLINE',
-      first_response_deadline_at:  new Date(
-        Date.now() + 5 * 60 * 1000,
-      ),
-      // new Date(
-      //   Date.now() + 0.10 * 60 * 1000,
-      // );
+      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
       last_client_message_at: new Date(),
+      channel_id: channel_id,
     });
 
     console.log('mes message', newChat);
@@ -154,39 +147,39 @@ export class DispatcherService {
     return this.chatRepository.save(newChat);
   }
 
-  async distributePendingMessages(forAgentId?: string): Promise<void> {
-    // Récupérer tous les messages en attente (avec leur message réel)
-    const pendingMessages = await this.pendinMessageRepository.find({
-      where: forAgentId ? { status: PendingMessageStatus.WAITING } : undefined,
-      order: { receivedAt: 'ASC' },
-      relations: ['message'], // On charge le message réel
-    });
+  // async distributePendingMessages(forAgentId?: string): Promise<void> {
+  //   // Récupérer tous les messages en attente (avec leur message réel)
+  //   const pendingMessages = await this.pendinMessageRepository.find({
+  //     where: forAgentId ? { status: PendingMessageStatus.WAITING } : undefined,
+  //     order: { receivedAt: 'ASC' },
+  //     relations: ['message'], // On charge le message réel
+  //   });
 
-    for (const pending of pendingMessages) {
-      const realMessage = pending.message;
+  //   for (const pending of pendingMessages) {
+  //     const realMessage = pending.message;
 
-      // 🔒 Vérifier que le message réel existe toujours
-      if (!realMessage) {
-        // Message réel supprimé, on supprime le pending
-        await this.pendinMessageRepository.remove(pending);
-        continue;
-      }
+  //     // 🔒 Vérifier que le message réel existe toujours
+  //     if (!realMessage) {
+  //       // Message réel supprimé, on supprime le pending
+  //       await this.pendinMessageRepository.remove(pending);
+  //       continue;
+  //     }
 
-      // 🔹 Assigner la conversation via le dispatcher
-      const conversation = await this.assignConversation(
-        realMessage.chat_id, // Phone du client depuis le message réel
-        realMessage.from_name ?? 'Client', // Nom du client
-        realMessage.text ?? pending.content, // Contenu du message réel, fallback si absent
-        pending.type, // Type du pending message
-        pending.mediaUrl, // Media du pending
-      );
+  //     // 🔹 Assigner la conversation via le dispatcher
+  //     const conversation = await this.assignConversation(
+  //       realMessage.chat_id, // Phone du client depuis le message réel
+  //       realMessage.from_name ?? 'Client', // Nom du client
+  //       realMessage.text ?? pending.content, // Contenu du message réel, fallback si absent
+  //       pending.type, // Type du pending message
+  //       pending.mediaUrl, // Media du pending
+  //     );
 
-      if (conversation) {
-        // ✅ Une fois distribué, on supprime le pending
-        await this.pendinMessageRepository.remove(pending);
-      }
-    }
-  }
+  //     if (conversation) {
+  //       // ✅ Une fois distribué, on supprime le pending
+  //       await this.pendinMessageRepository.remove(pending);
+  //     }
+  //   }
+  // }
 
   async reinjectConversation(chat: WhatsappChat) {
     await this.chatRepository.update(chat.id, {
@@ -209,7 +202,7 @@ export class DispatcherService {
     const nextAgent = await this.queueService.getNextInQueue();
     if (!nextAgent) return;
 
-     if (oldCommercialId===nextAgent.id) {
+    if (oldCommercialId === nextAgent.id) {
       return;
     }
 
@@ -218,12 +211,7 @@ export class DispatcherService {
       commercial_id: nextAgent.id,
       assigned_mode: nextAgent.isConnected ? 'ONLINE' : 'OFFLINE',
       assigned_at: new Date(),
-      first_response_deadline_at:  new Date(
-        Date.now() + 5 * 60 * 1000,
-      )
-      // new Date(
-      //   Date.now() + 0.10 * 60 * 1000,
-      // );
+      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
     });
 
     const updatedChat = await this.chatRepository.findOne({

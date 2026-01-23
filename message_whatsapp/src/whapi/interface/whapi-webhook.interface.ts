@@ -42,6 +42,7 @@ export interface WhapiMessage {
   chat_name: string;
   from: string;
   from_name: string;
+  channel_id:string;
   text?: WhapiText;
   image?: WhapiImage;
   audio?: WhapiAudio;

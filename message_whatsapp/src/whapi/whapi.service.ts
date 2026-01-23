@@ -25,26 +25,29 @@ export class WhapiService {
     private readonly whatsappMessageService: WhatsappMessageService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
-          @InjectRepository(WhatsappChat)
-        private readonly chatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
   async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
     if (!payload?.messages?.length) return;
-    
+
     const message = payload.messages[0];
+    message.channel_id = payload.channel_id
 
+    console.log(
+      'chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',
+      payload.channel_id
+    );
 
-    console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
+    function extractPhoneNumber(chatId: string): string {
+      console.log('conversation bani:', toString());
 
-     function extractPhoneNumber(chatId: string): string {
-      console.log("conversation bani:", toString());
-      
-        return chatId.split('@')[0];
-      }
-      const bani= extractPhoneNumber(message.chat_id)
+      return chatId.split('@')[0];
+    }
+    const bani = extractPhoneNumber(message.chat_id);
 
-      if (bani.length >= 14) return
+    if (bani.length >= 14) return;
     // 🔒 ignorer les messages envoyés par ton propre compte
     if (message.from_me) return;
 
@@ -57,14 +60,15 @@ export class WhapiService {
       message.document?.id ||
       null;
 
-
     try {
       //  1️⃣ Dispatcher (assignation agent ou pending)
       const conversation = await this.dispatcherService.assignConversation(
         message.chat_id,
+        message.channel_id,
         message.from_name ?? 'Client',
         content,
         messageType,
+        
         mediaUrl ?? undefined,
       );
 
@@ -82,7 +86,6 @@ export class WhapiService {
           conversation,
         );
 
-
       if (!conversation.chat_id || !conversation.commercial_id) {
         console.warn(
           "❌ Impossible d'émettre : chat_id ou commercial_id manquant",
@@ -91,17 +94,14 @@ export class WhapiService {
         return;
       }
 
-
       // 3️⃣ Temps réel (WebSocket)
-      this.messageGateway.emitIncomingMessage(
-        conversation.chat_id,
-        conversation.commercial_id,
-        savedMessage,
-      );
+      // this.messageGateway.emitIncomingMessage(
+      //   conversation.chat_id,
+      //   conversation.commercial_id,
+      //   savedMessage,
+      // );
 
-      this.messageGateway.emitIncomingConversation(
-        conversation
-      )
+      this.messageGateway.emitIncomingConversation(conversation);
     } catch (error) {
       console.log(error);
 

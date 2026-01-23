@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@nestjs/mapped-types": "*",
     "axios": "^1.13.2"
   }
 }
