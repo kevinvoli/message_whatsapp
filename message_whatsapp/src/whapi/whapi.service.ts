@@ -38,6 +38,8 @@ export class WhapiService {
     console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
 
      function extractPhoneNumber(chatId: string): string {
+      console.log("conversation bani:", toString());
+      
         return chatId.split('@')[0];
       }
       const bani= extractPhoneNumber(message.chat_id)

@@ -77,9 +77,58 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     }
   }
 
+    /* =======================
+   * 👁️ CHAT OUVERT (READ ALL)
+   * ======================= */
+  async markChatAsRead(chatId: string): Promise<void> {
+    await this.chatRepository.update(
+      { chat_id: chatId },
+      {
+        unread_count: 0,
+        last_activity_at: new Date(),
+      },
+    );
+  }
+
+  /* =======================
+   * ➕ MESSAGE ENTRANT
+   * ======================= */
+  async incrementUnreadCount(chatId: string): Promise<void> {
+    await this.chatRepository.increment(
+      { chat_id: chatId },
+      'unread_count',
+      1,
+    );
+
+    await this.chatRepository.update(
+      { chat_id: chatId },
+      { last_activity_at: new Date() },
+    );
+  }
+
+   /* =======================
+   * 🔄 RECALCUL (SÉCURITÉ)
+   * ======================= */
+  async recomputeUnreadCount(chatId: string): Promise<void> {
+    await this.chatRepository.query(
+      `
+      UPDATE whatsapp_chat c
+      SET unread_count = (
+        SELECT COUNT(*)
+        FROM whatsapp_message m
+        WHERE m.chat_id = c.chat_id
+          AND m.direction = 'IN'
+          AND m.status != 'READ'
+      )
+      WHERE c.chat_id = $1
+    `,
+      [chatId],
+    );
+  }
+
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial', 'conversation', 'chatEvent','chatLabel','messages',], });
+      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial','messages',], });
     }
     return this.chatRepository.find();
   }
@@ -91,12 +140,15 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     });
   }
 
+
+
   async findOne(id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { id },
-      relations: ['commercial', 'conversation', 'chatEvent', 'chatLabel','messages'],
+      relations: ['commercial','messages'],
     });
   }
+
 
   remove(id: string) {
     return `This action removes a #${id} whatsappChat`;

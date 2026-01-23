@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -109,6 +109,16 @@ export class WhatsappMessageService {
   async findLastMessageByChatId(
     chatId: string,
   ): Promise<WhatsappMessage | null> {
+    try {
+       return this.messageRepository.findOne({
+      where: { chat_id: chatId },
+      order: { timestamp: 'DESC' },
+      relations: ['chat', 'commercial'],
+    });
+    } catch (error) {
+      throw new NotFoundException(new Error(error) )
+      
+    }
     return this.messageRepository.findOne({
       where: { chat_id: chatId },
       order: { timestamp: 'DESC' },
@@ -116,22 +126,42 @@ export class WhatsappMessageService {
     });
   }
 
-  async findByChatId(
-    chatId: string,
-    limit = 100,
-    offset = 0,
-  ): Promise<WhatsappMessage[]> {
-    return this.messageRepository.find({
+ async findByChatId(
+  chatId: string,
+  limit = 100,
+  offset = 0,
+): Promise<WhatsappMessage[]> {
+  try {
+    // 1️⃣ Marquer les messages reçus comme lus
+    await this.messageRepository
+      .createQueryBuilder()
+      .update(WhatsappMessage)
+      .set({ status: WhatsappMessageStatus.READ })
+      .where('chat_id = :chatId', { chatId })
+      .andWhere('direction = :direction', { direction: MessageDirection.IN })
+      .andWhere('status != :status', {
+        status: WhatsappMessageStatus.READ,
+      })
+      .execute();
+
+    // 2️⃣ Récupérer les messages
+    return await this.messageRepository.find({
       where: { chat_id: chatId },
       relations: ['chat', 'commercial'],
       order: { timestamp: 'ASC' },
       take: limit,
       skip: offset,
     });
+    
+  } catch (error) {
+    throw new NotFoundException(error.message ?? error);
   }
+}
+
 
   async countUnreadMessages(chatId: string): Promise<number> {
-    return this.messageRepository.count({
+    try {
+        const count= await this.messageRepository.count({
       where: {
         chat_id: chatId,
         from_me: false,
@@ -141,6 +171,13 @@ export class WhatsappMessageService {
         ]),
       },
     });
+    console.log("c=============compteur message =================",count);
+    
+    return count;
+    } catch (error) {
+      throw new NotFoundException(new Error(error) )
+    }
+  
   }
 
   async create(message: CreateWhatsappMessageDto, commercialId?: string) {
