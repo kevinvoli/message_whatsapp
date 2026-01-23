@@ -86,11 +86,20 @@ export class WhatsappMessageGateway
     }
   }
 
-  public emitConversationReassigned(
+ async   emitConversationReassigned(
     chat: WhatsappChat,
     oldCommercialId: string ,
     newCommercialId: string,
   ) {
+
+   
+
+    const lastMessage =await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+
+    const conversation = {
+        ...chat,
+        last_message: lastMessage,
+      };
 
 
     // 🔴 1. Ancien commercial → suppression
@@ -111,7 +120,7 @@ export class WhatsappMessageGateway
     console.log('emition des event ------------------ ', newCommercialId);
 
       this.server.to(newSocketId).emit('conversation:assigned', {
-        conversation: chat,
+        conversation: conversation,
       });
     }
   }

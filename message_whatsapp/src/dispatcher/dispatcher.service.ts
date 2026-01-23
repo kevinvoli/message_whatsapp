@@ -110,7 +110,7 @@ export class DispatcherService {
       conversation.assigned_at = new Date();
       conversation.assigned_mode = 'ONLINE';
       conversation.first_response_deadline_at = new Date(
-        Date.now() + 5*60 * 1000,
+        Date.now() + 5 * 60 * 1000,
       );
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -141,7 +141,7 @@ export class DispatcherService {
       assigned_at: new Date(),
       assigned_mode: 'ONLINE',
       first_response_deadline_at:  new Date(
-        Date.now() + 5*60 * 1000,
+        Date.now() + 5 * 60 * 1000,
       ),
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -209,13 +209,17 @@ export class DispatcherService {
     const nextAgent = await this.queueService.getNextInQueue();
     if (!nextAgent) return;
 
+     if (oldCommercialId===nextAgent.id) {
+      return;
+    }
+
     await this.chatRepository.update(chat.id, {
       commercial: nextAgent,
       commercial_id: nextAgent.id,
       assigned_mode: nextAgent.isConnected ? 'ONLINE' : 'OFFLINE',
       assigned_at: new Date(),
       first_response_deadline_at:  new Date(
-        Date.now() + 5*60 * 1000,
+        Date.now() + 5 * 60 * 1000,
       )
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -231,7 +235,7 @@ export class DispatcherService {
       return;
     }
     // 🔥 EVENT CENTRAL
-    this.messageGateway.emitConversationReassigned(
+    void this.messageGateway.emitConversationReassigned(
       updatedChat,
       oldCommercialId,
       nextAgent.id,
