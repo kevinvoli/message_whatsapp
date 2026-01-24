@@ -65,7 +65,9 @@ export class ChannelService {
     return newSave;
   }
 
-  async findAll() {}
+  async findAll() {
+    return this.channelRepository.find();
+  }
 
   async findOne(id: string) {
     const channel = await this.channelRepository.findOne({

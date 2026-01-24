@@ -43,30 +43,10 @@ export class WhatsappMessageService {
     timestamp: Date;
   }): Promise<WhatsappMessage> {
     try {
-      const lastMessage = await this.findLastMessageByChatId(data.chat_id);
-
-      const lastMessageClient = await this.findLastMessageByClientId(
-        data.chat_id,
-      );
-
-      if (!lastMessageClient) {
-        throw new Error('aucun message envoie pas le client');
-      }
-
-      console.log(
-        '===============les dernier message============',
-        lastMessageClient,
-      );
-      const chat = await this.chatService.findByChatIdAndUpdate(
-        data.chat_id,
-        lastMessageClient?.channel?.channel_id,
-      );
-
+      const chat = await this.chatService.findByChatId(data.chat_id);
       if (!chat) throw new Error('Chat not found');
-      console.log(
-        '===============les dernier message============',
-        lastMessageClient.channel.channel_id,
-      );
+
+      const lastMessage = await this.findLastMessageByChatId(data.chat_id);
 
       if (lastMessage && !lastMessage.from_me) {
         const now = new Date();
@@ -86,12 +66,6 @@ export class WhatsappMessageService {
       //   extractPhoneNumber(chat?.chat_id),
       //   data.text,
       // );
-
-      console.log('le channele aven envoir', {
-        to: extractPhoneNumber(chat?.chat_id),
-        text: data.text,
-        channelId: lastMessageClient.channel.channel_id,
-      });
 
       const whapiResponse =
         await this.communicationWhapiService.sendToWhapiChannel({
@@ -116,7 +90,7 @@ export class WhatsappMessageService {
         commercial: chat.commercial ?? undefined,
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
-        channel: lastMessageClient.channel,
+        channel: chat.channel,
       });
 
       const mes = await this.messageRepository.save(messageEntity);

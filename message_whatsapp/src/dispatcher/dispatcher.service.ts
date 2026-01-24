@@ -46,7 +46,7 @@ export class DispatcherService {
   ): Promise<WhatsappChat | null> {
     // 🔎 Chercher la conversation existante
     let conversation = await this.chatRepository.findOne({
-      where: { chat_id: clientPhone },
+      where: { chat_id: clientPhone, channel_id: channel_id },
       relations: ['commercial', 'messages'],
     });
     

@@ -1,3 +1,4 @@
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -21,7 +22,9 @@ export enum WhatsappChatStatus {
 }
 
 @Entity()
-@Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
+@Index('UQ_whatsapp_chat_channel_id_chat_id', ['channel_id', 'chat_id'], {
+  unique: true,
+})
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -70,9 +73,12 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
-    unique: true,
   })
   chat_id: string; // chat_id WHAPI
+
+  @ManyToOne(() => WhapiChannel, (channel) => channel.messages)
+  @JoinColumn({ name: 'channel_id' })
+  channel: WhapiChannel;
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;

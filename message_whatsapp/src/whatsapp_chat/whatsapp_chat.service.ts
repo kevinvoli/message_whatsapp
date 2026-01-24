@@ -130,24 +130,8 @@ export class WhatsappChatService {
   async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { chat_id: chatId },
-      relations: ['commercial', 'messages'],
+      relations: ['commercial', 'messages', 'channel'],
     });
-  }
-
-  async findByChatIdAndUpdate(chatId: string, chanelId:string): Promise<WhatsappChat | null> {
-    const chat = await this.chatRepository.findOne({
-      where: { chat_id: chatId },
-      relations: ['commercial', 'messages'],
-    });
-
-    if (!chat) {
-      return null;
-    }
-    chat.last_commercial_message_at = new Date();
-    chat.unread_count = 0;
-    chat.channel_id = chanelId
-
-    return await this.chatRepository.save(chat);
   }
 
   async findOne(id: string): Promise<WhatsappChat | null> {
