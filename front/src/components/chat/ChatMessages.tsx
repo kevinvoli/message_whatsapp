@@ -12,6 +12,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
   console.log("📨 Messages reçus dans ChatMessages:", messages);
   console.log("📊 Nombre de messages:", messages.length);
   console.log("📋 Détail de chaque message:", 
+    
     messages.map((msg, index) => ({
       index,
       id: msg.id,
@@ -21,6 +22,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
       status: msg.status
     }))
   );
+  
 
   const formatTime = (date: Date) => {
     try {

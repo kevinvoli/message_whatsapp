@@ -47,7 +47,7 @@ const WhatsAppPage = () => {
       console.error('❌ Impossible d\'envoyer: aucune conversation sélectionnée');
       return;
     }
-    console.log("conversation selectionne",selectedConversation);
+    // console.log("conversation selectionne",selectedConversation);
     
     sendMessage(text);
   }, [selectedConversation, sendMessage]);

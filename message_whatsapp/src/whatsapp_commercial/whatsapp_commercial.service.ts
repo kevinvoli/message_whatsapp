@@ -177,6 +177,9 @@ export class WhatsappCommercialService {
       console.log(
         `🔌 Commercial ${user.name} (${user.id}) isConnected = ${status}`,
       );
+      console.log(
+        `ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt`,
+      );
     }
 
     if (user.isConnected === true) {

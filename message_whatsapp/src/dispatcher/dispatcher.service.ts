@@ -10,7 +10,6 @@ import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.ga
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import {
   PendingMessage,
-  PendingMessageStatus,
 } from './entities/pending-message.entity';
 
 @Injectable()
@@ -50,6 +49,7 @@ export class DispatcherService {
       where: { chat_id: clientPhone },
       relations: ['commercial', 'messages'],
     });
+    
 
     // console.log(conversation);
 
@@ -61,8 +61,11 @@ export class DispatcherService {
 
     /**
      * Cas 1️⃣ : conversation existante + agent connecté
-     * → juste mettre à jour l’activité et le compteur de messages non lus
+     * → juste mettre à jour l’activité et le compteur de messages non lus-
      */
+
+    console.log("mon compterhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+    
     if (conversation && isAgentConnected) {
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
@@ -100,7 +103,7 @@ export class DispatcherService {
       conversation.commercial = nextAgent;
       conversation.commercial_id = nextAgent.id;
       conversation.status = WhatsappChatStatus.EN_ATTENTE;
-      conversation.unread_count = 1;
+      conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
       conversation.assigned_at = new Date();
       conversation.assigned_mode = 'ONLINE';
@@ -108,6 +111,8 @@ export class DispatcherService {
       conversation.first_response_deadline_at = new Date(
         Date.now() + 5 * 60 * 1000,
       );
+
+      
       
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -202,9 +207,7 @@ export class DispatcherService {
     const nextAgent = await this.queueService.getNextInQueue();
     if (!nextAgent) return;
 
-    if (oldCommercialId === nextAgent.id) {
-      return;
-    }
+   
 
     await this.chatRepository.update(chat.id, {
       commercial: nextAgent,
@@ -218,8 +221,13 @@ export class DispatcherService {
       where: { chat_id: chat.chat_id },
       relations: ['commercial', 'messages'],
     });
-
+    
     if (!updatedChat) {
+      return;
+    }
+
+     if (oldCommercialId === nextAgent.id) {
+      
       return;
     }
     // 🔥 EVENT CENTRAL
@@ -234,6 +242,7 @@ export class DispatcherService {
     // console.log('mes verification sont ici', commercialId);
 
     const now = new Date();
+    console.log('lencement du tcheque des reponse', now);
 
     const chats = await this.chatRepository.find({
       where: {
@@ -243,7 +252,6 @@ export class DispatcherService {
         first_response_deadline_at: LessThan(now),
       },
     });
-    console.log('lencement du tcheque des reponse', chats, now);
 
     for (const chat of chats) {
       await this.reinjectConversation(chat);

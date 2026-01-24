@@ -51,57 +51,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectConversation: (chatId: string) => {
-  set((state) => {
-    const conversation = state.conversations.find(
-      (c) => c.chatId === chatId
-    );
+    set((state) => {
+      const conversation = state.conversations.find((c) => c.chatId === chatId);
 
-    if (!conversation) return state;
+      if (!conversation) return state;
 
-    const updatedConversation = {
-      ...conversation,
-      unreadCount: 0,
-    };
+      const updatedConversation = {
+        ...conversation,
+        unreadCount: 0,
+      };
 
-    return {
-      selectedConversation: updatedConversation,
+      return {
+        selectedConversation: updatedConversation,
 
-      conversations: state.conversations.map((c) =>
-        c.chatId === chatId ? updatedConversation : c
-      ),
+        conversations: state.conversations.map((c) =>
+          c.chatId === chatId ? updatedConversation : c,
+        ),
 
-      messages: [],
-      isLoading: true,
-    };
-  });
+        messages: [],
+        isLoading: true,
+      };
+    });
 
-  // 🔔 Charge les messages + déclenche le READ côté backend
-  get().socket?.emit("messages:get", { chatId });
-  get().socket?.emit("messages:read", { chatId });
-},
+    // 🔔 Charge les messages + déclenche le READ côté backend
+    get().socket?.emit("messages:get", { chatId });
+    get().socket?.emit("messages:read", { chatId });
+  },
 
-removeConversationByChatId: (chatId: string) => {
-  set((state) => ({
-    conversations: state.conversations.filter(c => c.chatId !== chatId),
-    selectedConversation:
-      state.selectedConversation?.chatId === chatId
-        ? null
-        : state.selectedConversation,
-    messages:
-      state.selectedConversation?.chatId === chatId
-        ? []
-        : state.messages,
-  }));
-},
-
+  removeConversationByChatId: (chatId: string) => {
+    set((state) => ({
+      conversations: state.conversations.filter((c) => c.chatId !== chatId),
+      selectedConversation:
+        state.selectedConversation?.chatId === chatId
+          ? null
+          : state.selectedConversation,
+      messages:
+        state.selectedConversation?.chatId === chatId ? [] : state.messages,
+    }));
+  },
 
   sendMessage: (text: string) => {
     const { socket, selectedConversation } = get();
     if (socket && selectedConversation) {
-      console.log(
-        "pres pour l'envoie du message_______________________________",
-        selectedConversation,
-      );
+      // console.log(
+      //   "pres pour l'envoie du message_______________________________",
+      //   selectedConversation,
+      // );
 
       socket.emit("message:send", {
         chatId: selectedConversation.chatId,
@@ -126,58 +121,63 @@ removeConversationByChatId: (chatId: string) => {
     }));
   },
 
- updateConversation: (updatedConversation: Conversation) => {
-  set((state) => {
-    const isSelected =
-      state.selectedConversation?.id === updatedConversation.id;
+  updateConversation: (updatedConversation: Conversation) => {
+    set((state) => {
+      const isSelected =
+        state.selectedConversation?.chatId === updatedConversation.chatId;
+      const isOutgoing = updatedConversation.lastMessage?.from_me === true;
+      console.log("est ce que c'est faux", updatedConversation);
 
-    const conversationExists = state.conversations.some(
-      (c) => c.id === updatedConversation.id
-    );
+      const conversationExists = state.conversations.some(
+        (c) => c.chatId === updatedConversation.chatId,
+      );
 
-    // 🔥 Mise à jour du compteur unread
-    const conversationWithUnread: Conversation = {
-      ...updatedConversation,
-      unreadCount: isSelected
-        ? 0
-        : conversationExists
-        ? (state.conversations.find(c => c.id === updatedConversation.id)
-            ?.unreadCount ?? 0) + 1
-        : updatedConversation.unreadCount ?? 1,
-    };
+      // 🔥 Mise à jour du compteur unread
+      const conversationWithUnread: Conversation = {
+        ...updatedConversation,
+        unreadCount:
+          isSelected || isOutgoing
+            ? 0
+            : conversationExists
+              ? (state.conversations.find(
+                  (c) => c.chatId === updatedConversation.chatId,
+                )?.unreadCount ?? 0) + 1
+              : (updatedConversation.unreadCount ?? 1),
+      };
 
-    // 🔁 Liste des conversations
-    const newConversations = conversationExists
-      ? state.conversations.map((c) =>
-          c.id === updatedConversation.id ? conversationWithUnread : c
-        )
-      : [conversationWithUnread, ...state.conversations];
+      // 🔁 Liste des conversations
+      const newConversations = conversationExists
+        ? state.conversations.map((c) =>
+            c.chatId === updatedConversation.chatId
+              ? conversationWithUnread
+              : c,
+          )
+        : [conversationWithUnread, ...state.conversations];
 
-    const newState: Partial<ChatState> = {
-      conversations: newConversations,
-    };
+      const newState: Partial<ChatState> = {
+        conversations: newConversations,
+      };
 
-    // 🟢 Conversation active
-    if (isSelected) {
-      newState.selectedConversation = conversationWithUnread;
+      // 🟢 Conversation active
+      if (isSelected) {
+  newState.selectedConversation = conversationWithUnread;
 
-      if (
-        updatedConversation.lastMessage &&
-        !state.messages.find(
-          (m) => m.id === updatedConversation.lastMessage?.id
-        )
-      ) {
-        newState.messages = [
-          ...state.messages,
-          updatedConversation.lastMessage,
-        ];
-      }
-    }
+  if (
+    updatedConversation.lastMessage &&
+    !state.messages.find(
+      (m) => m.id === updatedConversation.lastMessage?.id
+    )
+  ) {
+    newState.messages = [
+      ...state.messages,
+      updatedConversation.lastMessage,
+    ];
+  }
+}
 
-    return newState;
-  });
-},
-
+      return newState;
+    });
+  },
 
   // updateConversation: (updatedConversation: Conversation) => {
   //   console.log("update des conversation", updatedConversation);

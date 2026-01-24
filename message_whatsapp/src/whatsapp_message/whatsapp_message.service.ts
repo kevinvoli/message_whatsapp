@@ -42,17 +42,32 @@ export class WhatsappMessageService {
     commercial_id: string;
     timestamp: Date;
   }): Promise<WhatsappMessage> {
-    console.log(
-      'qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq',
-      data,
-    );
-
     try {
-      const chat = await this.chatService.findByChatId(data.chat_id);
-      if (!chat) throw new Error('Chat not found');
-      // console.log('chat a envoie', chat);
-
       const lastMessage = await this.findLastMessageByChatId(data.chat_id);
+
+      const lastMessageClient = await this.findLastMessageByClientId(
+        data.chat_id,
+      );
+
+      if (!lastMessageClient) {
+        throw new Error('aucun message envoie pas le client');
+      }
+
+      console.log(
+        '===============les dernier message============',
+        lastMessageClient,
+      );
+      const chat = await this.chatService.findByChatIdAndUpdate(
+        data.chat_id,
+        lastMessageClient?.channel?.channel_id,
+      );
+
+      if (!chat) throw new Error('Chat not found');
+      console.log(
+        '===============les dernier message============',
+        lastMessageClient.channel.channel_id,
+      );
+
       if (lastMessage && !lastMessage.from_me) {
         const now = new Date();
         const lastMessageDate = new Date(lastMessage.timestamp);
@@ -72,18 +87,19 @@ export class WhatsappMessageService {
       //   data.text,
       // );
 
-      console.log("le channele aven envoir",{
+      console.log('le channele aven envoir', {
         to: extractPhoneNumber(chat?.chat_id),
         text: data.text,
-        channelId:chat.channel_id});
-      
-      const whapiResponse = await this.communicationWhapiService.sendToWhapiChannel({
-        to: extractPhoneNumber(chat?.chat_id),
-        text: data.text,
-        channelId:chat.channel_id}
-      );
+        channelId: lastMessageClient.channel.channel_id,
+      });
 
-      
+      const whapiResponse =
+        await this.communicationWhapiService.sendToWhapiChannel({
+          to: extractPhoneNumber(chat?.chat_id),
+          text: data.text,
+          channelId: chat.channel_id,
+        });
+
       // 2️⃣ Création message DB
       const messageEntity = this.messageRepository.create({
         message_id: whapiResponse.id ?? `agent_${Date.now()}`,
@@ -100,14 +116,16 @@ export class WhatsappMessageService {
         commercial: chat.commercial ?? undefined,
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
+        channel: lastMessageClient.channel,
       });
 
       const mes = await this.messageRepository.save(messageEntity);
-
+      console.log("apres save ooooooooooooooooooooooo");
+      
       return mes;
     } catch (error) {
       console.error('WHAPI SEND FAILED:', error);
-
+      
       // 🧠 fallback : message en échec mais sauvegardé
       const failedMessage = this.messageRepository.create({
         message_id: `failed_${Date.now()}`,
@@ -131,18 +149,26 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage | null> {
     try {
       return this.messageRepository.findOne({
-        where: { chat_id: chatId },
+        where: { chat_id: chatId, from_me: false },
         order: { timestamp: 'DESC' },
         relations: ['chat', 'commercial'],
       });
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
-    return this.messageRepository.findOne({
-      where: { chat_id: chatId },
-      order: { timestamp: 'DESC' },
-      relations: ['chat', 'commercial'],
-    });
+  }
+  async findLastMessageByClientId(
+    chatId: string,
+  ): Promise<WhatsappMessage | null> {
+    try {
+      return await this.messageRepository.findOne({
+        where: { chat_id: chatId, from_me: false },
+        order: { timestamp: 'DESC' },
+        relations: { channel: true },
+      });
+    } catch (error) {
+      throw new NotFoundException(new Error(error));
+    }
   }
 
   async findByChatId(
@@ -220,13 +246,13 @@ export class WhatsappMessageService {
         return chekMessage;
       }
 
-       const channel = await this.channalRepository.findOne({
-      where: {
-        channel_id: message.channel_id,
-      },
-    });
+      const channel = await this.channalRepository.findOne({
+        where: {
+          channel_id: message.channel_id,
+        },
+      });
 
-    if (!channel) return;
+      if (!channel) return;
 
       const commercial = await this.commercialRepository.findOne({
         where: {
@@ -249,7 +275,7 @@ export class WhatsappMessageService {
         status: WhatsappMessageStatus.DELIVERED,
         timestamp: new Date(message.timestamp * 1000),
         source: message.source,
-        channel:channel
+        channel: channel,
       };
 
       const messageEntity = this.messageRepository.create(data);
@@ -268,8 +294,17 @@ export class WhatsappMessageService {
     return messages;
   }
 
-  findOne(id: string) {
-    return `This action returns a #${id} whatsappMessage`;
+  async findOne(id: string) {
+    const message = await this.messageRepository.findOne({
+      where: {
+        message_id: id,
+      },
+    });
+
+    if (!message) {
+      return;
+    }
+    return message;
   }
 
   async updateByStatus(status: {
@@ -307,16 +342,14 @@ export class WhatsappMessageService {
 
     if (!channel) return;
 
-     const existing = await this.messageRepository.findOne({
-    where: { message_id: message.id },
-  });
+    const existing = await this.messageRepository.findOne({
+      where: { message_id: message.id },
+    });
 
-  if (existing) {
-    // 🔁 replay Whapi → on ignore
-    return existing;
-  }
-
-
+    if (existing) {
+      // 🔁 replay Whapi → on ignore
+      return existing;
+    }
 
     const messagesss = await this.messageRepository.save(
       this.messageRepository.create({

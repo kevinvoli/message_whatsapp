@@ -44,6 +44,7 @@ export class WhatsappMessage {
     type: 'varchar',
     length: 100,
     nullable: true,
+    unique:true
   })
   message_id: string | null;
 

@@ -35,13 +35,16 @@ export class WhapiService {
     const message = payload.messages[0];
     message.channel_id = payload.channel_id
 
-    console.log(
-      'chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',
-      payload.channel_id
-    );
+  
+    const existingMessage= await this.whatsappMessageService.findOne(message.id)
+    // console.log("============il existe deja================");
+    if (existingMessage) {
+      return  ;
+    }
+    
 
     function extractPhoneNumber(chatId: string): string {
-      console.log('conversation bani:', toString());
+      // console.log('conversation bani:', toString());
 
       return chatId.split('@')[0];
     }

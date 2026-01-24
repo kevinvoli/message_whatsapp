@@ -9,7 +9,7 @@ export class WhapiController {
   constructor(private readonly whapiService: WhapiService) {}
    @Post()
    handleWebhook(@Body() payload: WhapiWebhookPayload) {
-    console.log("mon payload whapi", payload);
+    // console.log("mon payload whapi", payload);
 
     const eventType = payload.event.type;
   switch (eventType) {

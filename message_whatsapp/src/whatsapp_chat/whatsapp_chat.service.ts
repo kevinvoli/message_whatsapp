@@ -10,23 +10,19 @@ export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
-        private readonly commercialService : WhatsappCommercialService,
-    
+    private readonly commercialService: WhatsappCommercialService,
   ) {}
 
-// Dans WhatsappChatService
-async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+  // Dans WhatsappChatService
+  async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+    const chats = await this.chatRepository.find({
+      where: { commercial_id: commercialId },
+      order: { updatedAt: 'DESC' },
+      relations: ['commercial', 'messages'],
+    });
 
-  const  chats=
-   await this.chatRepository.find({
-    where: { commercial_id: commercialId },
-    order: { updatedAt: 'DESC' },
-    relations: ['commercial','messages',],
-  });
-
-
-  return chats
-}
+    return chats;
+  }
 
   async findOrCreateChat(
     chatId: string,
@@ -76,7 +72,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     }
   }
 
-    /* =======================
+  /* =======================
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chatId: string): Promise<void> {
@@ -93,11 +89,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
    * ➕ MESSAGE ENTRANT
    * ======================= */
   async incrementUnreadCount(chatId: string): Promise<void> {
-    await this.chatRepository.increment(
-      { chat_id: chatId },
-      'unread_count',
-      1,
-    );
+    await this.chatRepository.increment({ chat_id: chatId }, 'unread_count', 1);
 
     await this.chatRepository.update(
       { chat_id: chatId },
@@ -105,7 +97,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     );
   }
 
-   /* =======================
+  /* =======================
    * 🔄 RECALCUL (SÉCURITÉ)
    * ======================= */
   async recomputeUnreadCount(chatId: string): Promise<void> {
@@ -127,7 +119,10 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
 
   async findAll(chatId?: string) {
     if (chatId) {
-      return this.chatRepository.find({ where: { chat_id: chatId }, relations: ['commercial','messages',], });
+      return this.chatRepository.find({
+        where: { chat_id: chatId },
+        relations: ['commercial', 'messages'],
+      });
     }
     return this.chatRepository.find();
   }
@@ -135,19 +130,32 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
   async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { chat_id: chatId },
-      relations: ['commercial','messages'],
+      relations: ['commercial', 'messages'],
     });
   }
 
+  async findByChatIdAndUpdate(chatId: string, chanelId:string): Promise<WhatsappChat | null> {
+    const chat = await this.chatRepository.findOne({
+      where: { chat_id: chatId },
+      relations: ['commercial', 'messages'],
+    });
 
+    if (!chat) {
+      return null;
+    }
+    chat.last_commercial_message_at = new Date();
+    chat.unread_count = 0;
+    chat.channel_id = chanelId
+
+    return await this.chatRepository.save(chat);
+  }
 
   async findOne(id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { id },
-      relations: ['commercial','messages'],
+      relations: ['commercial', 'messages'],
     });
   }
-
 
   remove(id: string) {
     return `This action removes a #${id} whatsappChat`;

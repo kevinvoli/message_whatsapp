@@ -25,7 +25,7 @@ const WebSocketEvents = () => {
     removeConversationByChatId,
     addConversation,
     loadConversations,
-    
+
     // updateMessageStatus,
     // setTyping,
     // clearTyping,
@@ -43,8 +43,8 @@ const WebSocketEvents = () => {
       // --- Définition des handlers ---
 
       const handleConversationAssigned = (data: { conversation: any }) => {
-        console.log("================================bien recu==============================",data);
-        
+        console.log("================================bien recu==============================", data);
+
         const conversation = transformToConversation(data.conversation);
         addConversation(conversation);
       };
@@ -77,34 +77,34 @@ const WebSocketEvents = () => {
         updateConversation(conversation);
       };
 
-      const handleConversationRemove = (conversationId: string) => {
-        console.log('Received raw conversation assigned:', conversationId);
-        // const conversation = transformToConversation(rawConversation);
-        removeConversation(conversationId);
-      };
+      // const handleConversationRemove = (conversationId: string) => {
+      //   console.log('Received raw conversation assigned:', conversationId);
+      //   // const conversation = transformToConversation(rawConversation);
+      //   removeConversation(conversationId);
+      // };
 
       const handleError = (error: { message: string, details?: string }) => {
         console.error('Socket error received:', error.message, error.details || '');
       };
 
-      const handleMessageStatusUpdate = (data: {
-        conversationId: string;
-        messageId: string;
-        status: string;
-      }) => {
-        console.log(`Received status update for message ${data.messageId}: ${data.status}`);
-        updateMessageStatus(data.conversationId, data.messageId, data.status);
-      };
+      // const handleMessageStatusUpdate = (data: {
+      //   conversationId: string;
+      //   messageId: string;
+      //   status: string;
+      // }) => {
+      //   console.log(`Received status update for message ${data.messageId}: ${data.status}`);
+      //   updateMessageStatus(data.conversationId, data.messageId, data.status);
+      // };
 
-      const handleTypingStart = (data: { conversationId: string }) => {
-        console.log(`Typing started in chat ${data.conversationId}`);
-        setTyping(data.conversationId);
-      };
+      // const handleTypingStart = (data: { conversationId: string }) => {
+      //   console.log(`Typing started in chat ${data.conversationId}`);
+      //   setTyping(data.conversationId);
+      // };
 
-      const handleTypingStop = (data: { conversationId: string }) => {
-        console.log(`Typing stopped in chat ${data.conversationId}`);
-        clearTyping(data.conversationId);
-      };
+      // const handleTypingStop = (data: { conversationId: string }) => {
+      //   console.log(`Typing stopped in chat ${data.conversationId}`);
+      //   clearTyping(data.conversationId);
+      // };
 
 
       // --- Enregistrement des listeners ---
@@ -112,12 +112,12 @@ const WebSocketEvents = () => {
       socket.on('messages:list', handleMessagesList);
       socket.on('message:new', handleNewMessage);
       socket.on('conversation:updated', handleConversationUpdated);
-      socket.on('message:status:update', handleMessageStatusUpdate);
-      socket.on('typing:start', handleTypingStart);
-      socket.on('typing:stop', handleTypingStop);
+      // socket.on('message:status:update', handleMessageStatusUpdate);
+      // socket.on('typing:start', handleTypingStart);
+      // socket.on('typing:stop', handleTypingStop);
       socket.on('error', handleError);
       socket.on('conversation:assigned', handleConversationAssigned);
-socket.on('conversation:removed', handleConversationRemoved);
+      socket.on('conversation:removed', handleConversationRemoved);
       // --- Nettoyage ---
       return () => {
         socket.off('conversations:list', handleConversationsList);
@@ -125,6 +125,9 @@ socket.on('conversation:removed', handleConversationRemoved);
         socket.off('message:new', handleNewMessage);
         socket.off('conversation:updated', handleConversationUpdated);
         socket.off('error', handleError);
+        socket.onAny((event, data) => {
+          console.log('SOCKET EVENT:', event, data);
+        });
         setSocket(null);
       };
     }

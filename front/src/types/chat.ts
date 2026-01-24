@@ -140,10 +140,11 @@ export const transformToMessage = (rawData: RawMessageData): Message => {
 export const transformToConversation = (
   rawData: RawConversationData,
 ): Conversation => {
+  console.log("dernier message", rawData);
+  
   const messages: Message[] = Array.isArray(rawData.messages)
     ? rawData.messages.map(transformToMessage)
     : [];
-  // console.log("dernier message", rawData);
 
   const message = {
     id: rawData.id,
@@ -172,6 +173,7 @@ export const transformToConversation = (
     createdAt: new Date(rawData.created_at),
     updatedAt: new Date(rawData.updated_at),
   };
+console.log("ddddd");
 
   return message
 };
