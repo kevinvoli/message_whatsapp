@@ -3,19 +3,21 @@ import { CreateCommunicationWhapiDto } from './dto/create-communication_whapi.dt
 import { UpdateCommunicationWhapiDto } from './dto/update-communication_whapi.dto';
 import axios from 'axios';
 
-
 @Injectable()
 export class CommunicationWhapiService {
-
-    private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
+  private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
   private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN;
 
-  constructor() {}  
+  constructor() {}
 
-    async sendToWhapi(to: string, text: string): Promise<{
-       id: string,
-  status: number,
-  statusText: string}> {  
+  async sendToWhapi(
+    to: string,
+    text: string,
+  ): Promise<{
+    id: string;
+    status: number;
+    statusText: string;
+  }> {
     const response = await axios.post(
       this.WHAPI_URL,
       {
@@ -28,17 +30,14 @@ export class CommunicationWhapiService {
           'Content-Type': 'application/json',
         },
       },
-    )
+    );
 
-    
     return response.data as {
-      id: string,
-  status: number,
-  statusText: string};
-    
-  } 
-
-  
+      id: string;
+      status: number;
+      statusText: string;
+    };
+  }
 
   create(createCommunicationWhapiDto: CreateCommunicationWhapiDto) {
     return 'This action adds a new communicationWhapi';

@@ -18,9 +18,6 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', nullable: false })
   name: string ;
 
-  @Column({ name: 'max_limit_chat', type:'number', nullable: false,default: 10 })
-  max_limit_chat: number ;
-
   @Column({ type: 'varchar', nullable: false, select: false })
   password: string;
 

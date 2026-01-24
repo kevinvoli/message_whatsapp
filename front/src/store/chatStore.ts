@@ -72,7 +72,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { socket, selectedConversation } = get();
     if (socket && selectedConversation) {
       socket.emit("message:send", {
-        chatId: selectedConversation.chat_id,
+        chatId: selectedConversation.chatId,
+        channel_id:selectedConversation,
         text,
       });
     }

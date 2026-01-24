@@ -37,8 +37,6 @@ export class WhatsappMessageService {
     commercial_id: string;
     timestamp: Date;
   }): Promise<WhatsappMessage> {
-    console.log("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",data);
-    
     try {
       const chat = await this.chatService.findByChatId(data.chat_id);
       if (!chat) throw new Error('Chat not found');
@@ -82,9 +80,10 @@ export class WhatsappMessageService {
         from_name: chat.name,
       });
 
-      const mes= await this.messageRepository.save(messageEntity);
+      const mes = await this.messageRepository.save(messageEntity);
+      console.log('le message tuk', mes);
 
-      return mes
+      return mes;
     } catch (error) {
       console.error('WHAPI SEND FAILED:', error);
 

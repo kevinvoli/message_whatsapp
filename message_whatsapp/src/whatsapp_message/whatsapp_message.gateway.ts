@@ -252,6 +252,8 @@ export class WhatsappMessageGateway
     if (!commercialId) {
       return client.emit('error', { message: 'Not authenticated' });
     }
+ 
+    
 
     try {
       const message = await this.whatsappMessageService.createAgentMessage({

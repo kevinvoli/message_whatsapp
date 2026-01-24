@@ -97,7 +97,7 @@ export class DispatcherService {
       })
       .where('c.isConnected = true')
       .groupBy('c.id')
-      .having('COUNT(chat.id) < c.max_limit_chat')
+      // .having('COUNT(chat.id) < c.max_limit_chat')
       .orderBy('c.lastConnectionAt', 'ASC')
       .getOne();
   }

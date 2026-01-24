@@ -41,6 +41,7 @@ export interface Conversation {
   status: "actif" | "en attente" | "fermé";
   createdAt: Date;
   updatedAt: Date;
+  channel_id:string
 }
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "error";
