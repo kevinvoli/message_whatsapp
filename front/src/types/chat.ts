@@ -31,6 +31,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   chatId: string;
+  channelId: string;
   clientName: string;
   clientPhone: string;
   lastMessage: Message | null;

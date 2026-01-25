@@ -36,17 +36,23 @@ export class WhatsappMessageService {
     private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
-  async createAgentMessage(data: {
+  async sendMessageFromAgent(data: {
     chat_id: string;
+    channel_id: string;
     text: string;
     commercial_id: string;
     timestamp: Date;
   }): Promise<WhatsappMessage> {
     try {
-      const chat = await this.chatService.findByChatId(data.chat_id);
+      const chat = await this.chatService.findByChatId(data.chat_id, data.channel_id);
       if (!chat) throw new Error('Chat not found');
 
-      const lastMessage = await this.findLastMessageByChatId(data.chat_id);
+      // Réintégration de la logique de mise à jour du chat
+      chat.last_commercial_message_at = new Date();
+      chat.unread_count = 0;
+      await this.chatRepository.save(chat);
+
+      const lastMessage = await this.findLastMessageByChatId(data.chat_id, data.channel_id);
 
       if (lastMessage && !lastMessage.from_me) {
         const now = new Date();
@@ -120,12 +126,13 @@ export class WhatsappMessageService {
 
   async findLastMessageByChatId(
     chatId: string,
+    channelId: string,
   ): Promise<WhatsappMessage | null> {
     try {
       return this.messageRepository.findOne({
-        where: { chat_id: chatId, from_me: false },
+        where: { chat_id: chatId, channel: { id: channelId }, from_me: false },
         order: { timestamp: 'DESC' },
-        relations: ['chat', 'commercial'],
+        relations: ['chat', 'commercial', 'channel'],
       });
     } catch (error) {
       throw new NotFoundException(new Error(error));

@@ -29,6 +29,7 @@ import { ChannelModule } from './channel/channel.module';
   imports: [
      ScheduleModule.forRoot(),
     ConfigModule.forRoot({
+      isGlobal: true,
       validationSchema: Joi.object({
         MYSQL_HOST:Joi.string().required(),
         MYSQL_PORT:Joi.number().required(),

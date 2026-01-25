@@ -262,7 +262,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('message:send')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: string; text: string },
+    @MessageBody() payload: { chatId: string; channelId: string; text: string },
   ) {
     const commercialId = this.connectedAgents.get(client.id);
     if (!commercialId) {
@@ -272,14 +272,15 @@ export class WhatsappMessageGateway
     try {
       console.log('le chat id est ici:', payload);
 
-      const message = await this.whatsappMessageService.createAgentMessage({
+      const message = await this.whatsappMessageService.sendMessageFromAgent({
         chat_id: payload.chatId,
+        channel_id: payload.channelId,
         text: payload.text,
         commercial_id: commercialId,
         timestamp: new Date(),
       });
 
-      const chat = await this.chatService.findByChatId(message.chat_id);
+      const chat = await this.chatService.findByChatId(message.chat_id, message.channel.id);
 
       if (!chat) {
         return;

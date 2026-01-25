@@ -93,13 +93,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: (text: string) => {
     const { socket, selectedConversation } = get();
     if (socket && selectedConversation) {
-      // console.log(
-      //   "pres pour l'envoie du message_______________________________",
-      //   selectedConversation,
-      // );
-
       socket.emit("message:send", {
         chatId: selectedConversation.chatId,
+        channelId: selectedConversation.channelId,
         text,
       });
     }
