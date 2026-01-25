@@ -56,17 +56,26 @@ export class WhatsappMessageGateway
   async handleConnection(client: Socket) {
     console.log('🟢 Client connecté:', client.id);
 
-    // Authentification via query params ou auth
     const commercialId = client.handshake.auth?.commercialId as string;
     if (commercialId) {
-      this.connectedAgents.set(client.id, commercialId);
-      console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
-      await this.queueService.addToQueue(commercialId);
-      await this.userService.updateStatus(commercialId, true);
-      await this.emitQueueUpdate();
-      console.log('nuew effff status socket', true);
-      this.jobRunnner.startAgentSlaMonitor(commercialId);
-      await this.queueService.removeALlRankOnfline(commercialId);
+      try {
+        // Vérifier si l'utilisateur existe avant de continuer
+        await this.userService.findOneById(commercialId);
+
+        this.connectedAgents.set(client.id, commercialId);
+        console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
+
+        await this.queueService.addToQueue(commercialId);
+        await this.userService.updateStatus(commercialId, true);
+        await this.emitQueueUpdate();
+
+        this.jobRunnner.startAgentSlaMonitor(commercialId);
+        await this.queueService.removeALlRankOnfline(commercialId);
+      } catch (error) {
+        console.error(`[Auth] Tentative de connexion échouée pour un utilisateur inconnu: ${commercialId}`);
+        client.emit('error', { message: 'Authentication failed: User not found.' });
+        client.disconnect();
+      }
     }
   }
 

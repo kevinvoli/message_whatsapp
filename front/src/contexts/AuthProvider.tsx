@@ -37,23 +37,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { reset } = useChatStore();
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà connecté
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (storedToken && storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-        setToken(storedToken);
-      } catch (error) {
-        console.error('Error parsing stored user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const verifyAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        try {
+          // Utiliser l'URL de l'API définie dans les variables d'environnement
+          const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+            headers: { 'Authorization': `Bearer ${storedToken}` }
+          });
+          setUser(response.data);
+          setToken(storedToken);
+        } catch (error) {
+          if (axios.isAxiosError(error) && error.response?.status === 404) {
+            // L'utilisateur n'existe plus, on le déconnecte
+            logout();
+          } else {
+            console.error('Error verifying auth token:', error);
+            logout(); // Déconnecter en cas d'autre erreur pour plus de sécurité
+          }
+        }
       }
-    }
-    
-    setInitialized(true);
-  }, []);
+      setInitialized(true);
+    };
+
+    verifyAuth();
+  }, [logout]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -90,13 +98,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setToken(null);
     reset(); // Vide le store Zustand
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-  };
+  }, [reset]);
 
   return (
     <AuthContext.Provider value={{ 
