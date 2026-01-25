@@ -84,7 +84,6 @@ export class WhatsappMessageService {
       const messageEntity = this.messageRepository.create({
         message_id: whapiResponse.id ?? `agent_${Date.now()}`,
         external_id: whapiResponse.id,
-        chat_id: data.chat_id,
         commercial_id: data.commercial_id,
         direction: MessageDirection.OUT,
         from_me: true,
@@ -109,7 +108,6 @@ export class WhatsappMessageService {
       // 🧠 fallback : message en échec mais sauvegardé
       const failedMessage = this.messageRepository.create({
         message_id: `failed_${Date.now()}`,
-        chat_id: data.chat_id,
         commercial_id: data.commercial_id,
         direction: MessageDirection.OUT,
         from_me: true,
@@ -130,7 +128,7 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage | null> {
     try {
       return this.messageRepository.findOne({
-        where: { chat_id: chatId, channel: { id: channelId }, from_me: false },
+        where: { chat: { chat_id: chatId, channel_id: channelId }, from_me: false },
         order: { timestamp: 'DESC' },
         relations: ['chat', 'commercial', 'channel'],
       });
@@ -143,7 +141,7 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage | null> {
     try {
       return await this.messageRepository.findOne({
-        where: { chat_id: chatId, from_me: false },
+        where: { chat: { chat_id: chatId }, from_me: false },
         order: { timestamp: 'DESC' },
         relations: { channel: true },
       });
@@ -159,11 +157,14 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage[]> {
     try {
       // 1️⃣ Marquer les messages reçus comme lus
+      const chat = await this.chatRepository.findOne({ where: { chat_id: chatId }});
+      if (!chat) return [];
+
       await this.messageRepository
         .createQueryBuilder()
         .update(WhatsappMessage)
         .set({ status: WhatsappMessageStatus.READ })
-        .where('chat_id = :chatId', { chatId })
+        .where('chatId = :chatId', { chatId: chat.id })
         .andWhere('direction = :direction', { direction: MessageDirection.IN })
         .andWhere('status != :status', {
           status: WhatsappMessageStatus.READ,
@@ -172,7 +173,7 @@ export class WhatsappMessageService {
 
       // 2️⃣ Récupérer les messages
       return await this.messageRepository.find({
-        where: { chat_id: chatId },
+        where: { chat: { id: chat.id } },
         relations: ['chat', 'commercial'],
         order: { timestamp: 'ASC' },
         take: limit,
@@ -187,7 +188,7 @@ export class WhatsappMessageService {
     try {
       const count = await this.messageRepository.count({
         where: {
-          chat_id: chatId,
+          chat: { chat_id: chatId },
           from_me: false,
           status: In([
             WhatsappMessageStatus.SENT,
@@ -207,9 +208,10 @@ export class WhatsappMessageService {
     try {
       console.log('message reçue du dispache', message);
 
-      const chat = await this.chatRepository.find({
+      const chat = await this.chatRepository.findOne({
         where: {
           chat_id: message.chat_id,
+          channel_id: message.channel_id,
         },
       });
 
@@ -248,7 +250,6 @@ export class WhatsappMessageService {
       const data: Partial<WhatsappMessage> = {
         message_id: message.id,
         external_id: message.id,
-        chat_id: message.chat_id,
         direction: message.from_me ? MessageDirection.OUT : MessageDirection.IN,
         from_me: message.from_me,
         from: message.from,
@@ -257,6 +258,7 @@ export class WhatsappMessageService {
         timestamp: new Date(message.timestamp * 1000),
         source: message.source,
         channel: channel,
+        chat: chat,
       };
 
       const messageEntity = this.messageRepository.create(data);
@@ -270,7 +272,7 @@ export class WhatsappMessageService {
 
   async findAll(chatId: string) {
     const messages = await this.messageRepository.find({
-      where: { chat_id: chatId },
+      where: { chat: { chat_id: chatId } },
     });
     return messages;
   }
@@ -295,7 +297,7 @@ export class WhatsappMessageService {
   }) {
     try {
       const messages = await this.messageRepository.findOne({
-        where: { external_id: status.id, chat_id: status.recipient_id },
+        where: { external_id: status.id, chat: { chat_id: status.recipient_id } },
       });
 
       if (!messages) {

@@ -272,7 +272,7 @@ export class WhatsappMessageGateway
     try {
       console.log('le chat id est ici:', payload);
 
-      const message = await this.whatsappMessageService.sendMessageFromAgent({
+      await this.whatsappMessageService.sendMessageFromAgent({
         chat_id: payload.chatId,
         channel_id: payload.channelId,
         text: payload.text,
@@ -280,19 +280,19 @@ export class WhatsappMessageGateway
         timestamp: new Date(),
       });
 
-      const chat = await this.chatService.findByChatId(message.chat_id, message.channel.id);
+      const chat = await this.chatService.findByChatId(payload.chatId, payload.channelId);
 
       if (!chat) {
         return;
       }
       const lastMessage =
         await this.whatsappMessageService.findLastMessageByChatId(
-          message.chat_id, message.channel.id
+          payload.chatId, payload.channelId
         );
 
       // Compter les messages non lus
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
-        chat.chat_id,
+        payload.chatId
       );
 
       // Construire l'objet conversation
