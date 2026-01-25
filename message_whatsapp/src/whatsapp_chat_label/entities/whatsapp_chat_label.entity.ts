@@ -29,14 +29,7 @@ export class WhatsappChatLabel {
   })
   chat_label_id: string;
 
-  @Column({ name: 'chat_id', type: 'varchar', length: 100, nullable: false })
-  chat_id: string;
-
   @ManyToOne(() => WhatsappChat, (data) => data.chatLabel)
-  @JoinColumn({
-    name: 'chat_id',
-    referencedColumnName: 'chat_id',
-  })
   chat: WhatsappChat;
 
   @Column({
