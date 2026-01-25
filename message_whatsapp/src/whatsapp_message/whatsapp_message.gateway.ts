@@ -93,7 +93,7 @@ export class WhatsappMessageGateway
 
    
 
-    const lastMessage =await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+    const lastMessage =await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id, chat.channel_id);
 
     const conversation = {
         ...chat,
@@ -146,7 +146,7 @@ export class WhatsappMessageGateway
 
       // Récupérer le dernier message
       const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id, chat.channel_id);
 
       // Compter les messages non lus
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
@@ -202,7 +202,7 @@ export class WhatsappMessageGateway
         chats.map(async (chat) => {
           const lastMessage =
             await this.whatsappMessageService.findLastMessageByChatId(
-              chat.chat_id,
+              chat.chat_id, chat.channel_id
             );
           const unreadCount =
             await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
@@ -287,7 +287,7 @@ export class WhatsappMessageGateway
       }
       const lastMessage =
         await this.whatsappMessageService.findLastMessageByChatId(
-          message.chat_id,
+          message.chat_id, message.channel.id
         );
 
       // Compter les messages non lus
@@ -316,87 +316,13 @@ export class WhatsappMessageGateway
       // The dispatcher or another service should handle broadcasting this new message.
       // For now, we can emit an update to the sender.
       if (chat) {
-        this.emitConversationUpdate(chat.id);
+        this.emitConversationUpdate(chat.chat_id, chat.channel_id);
       }
     } catch (error) {
       client.emit('error', {
         message: 'Failed to send message',
         details: error.message,
       });
-    }
-  }
-
-  // =========================
-  // RECEVOIR UN MESSAGE (du client WhatsApp)
-  // =========================
-  async handleIncomingWhatsAppMessage(messageData: CreateWhatsappMessageDto) {
-    console.log('📩 Message WhatsApp entrant:', {
-      chat_id: messageData.chat_id,
-      from: messageData.sender_phone,
-      text: messageData.text,
-    });
-
-    const chat = await this.chatService.findByChatId(messageData.chat_id);
-    if (!chat) throw new Error('Chat not found');
-    const commercial = await this.commercialRepository.findOne({
-      where: {
-        id: messageData.commercial_id,
-      },
-    });
-
-    if (!commercial) {
-      return null;
-    }
-    if (!chat) throw new Error('Chat not found');
-
-    try {
-      // Sauvegarder le message en base
-      const savedMessage = this.messageRepository.create({
-        message_id: messageData.id ?? `agent_${Date.now()}`,
-        external_id: messageData.id,
-        chat: chat,
-        commercial: commercial,
-        direction: MessageDirection.OUT as MessageDirection,
-        from_me: true,
-        timestamp: new Date(messageData.timestamp).getTime(),
-        status: WhatsappMessageStatus.SENT as WhatsappMessageStatus,
-        source: 'agent_web',
-        text: messageData.text,
-        from: messageData.sender_phone,
-        from_name: messageData.from_name,
-      });
-
-      console.log('💾 Message WhatsApp sauvegardé:', savedMessage.id);
-
-      // Préparer l'objet message pour le frontend
-      const messageForFrontend = {
-        id: savedMessage.id,
-        text: savedMessage.text,
-        timestamp: new Date(savedMessage.timestamp).getTime(),
-        direction: 'IN',
-        from: savedMessage.from,
-        from_name: savedMessage.from_name || 'Client',
-        status: savedMessage.status,
-        from_me: false,
-      };
-
-      // Diffuser le message à tous les agents dans la room de la conversation
-      const roomName = messageData.chat_id;
-      this.server.to(roomName).emit('message:received', {
-        conversationId: messageData.chat_id,
-        message: messageForFrontend,
-      });
-
-      console.log(`📢 Message WhatsApp diffusé dans: ${roomName}`);
-
-      // Mettre à jour la conversation (dernier message)
-      await this.updateConversationLastMessage(messageData.chat_id, {
-        text: savedMessage.text ?? '(Message sans texte)',
-        timestamp: savedMessage.timestamp,
-        author: 'client',
-      });
-    } catch (error) {
-      console.error('❌ Erreur lors du traitement du message WhatsApp:', error);
     }
   }
 
@@ -430,62 +356,11 @@ export class WhatsappMessageGateway
     });
   }
 
-  async handleTypingStartFromWebhook(chatId: string) {
-    try {
-      const socketId = await this._getAgentSocketId(chatId);
-      if (socketId) {
-        this.server
-          .to(socketId)
-          .emit('typing:start', { conversationId: chatId });
-      }
-    } catch (error) {
-      console.error(`Erreur lors de l'émission du typing:start :`, error);
-    }
-  }
-
-  async handleTypingStopFromWebhook(chatId: string) {
-    try {
-      const socketId = await this._getAgentSocketId(chatId);
-      if (socketId) {
-        this.server
-          .to(socketId)
-          .emit('typing:stop', { conversationId: chatId });
-      }
-    } catch (error) {
-      console.error(`Erreur lors de l'émission du typing:stop :`, error);
-    }
-  }
-
-  async handleMessageStatusUpdate(
-    conversationId: string,
-    messageId: string,
-    status: string,
-  ) {
-    try {
-      const socketId = await this._getAgentSocketId(conversationId);
-      if (socketId) {
-        this.server.to(socketId).emit('message:status:update', {
-          conversationId,
-          messageId,
-          status,
-        });
-        console.log(
-          `[Socket] Statut du message ${messageId} mis à jour à "${status}" pour la conversation ${conversationId}`,
-        );
-      }
-    } catch (error) {
-      console.error(
-        `[Socket] Erreur lors de l'émission de la mise à jour du statut du message pour la conversation ${conversationId}:`,
-        error,
-      );
-    }
-  }
-
-  private async _getAgentSocketId(chatId: string): Promise<string | undefined> {
-    const chat = await this.chatService.findByChatId(chatId);
+  private async _getAgentSocketId(chatId: string, channelId: string): Promise<string | undefined> {
+    const chat = await this.chatService.findByChatId(chatId, channelId);
     if (!chat || !chat.commercial_id) {
       console.warn(
-        `[Socket] Impossible de trouver le chat ou l'agent pour le chatId ${chatId}.`,
+        `[Socket] Impossible de trouver le chat ou l'agent pour le chatId ${chatId} et channelId ${channelId}.`,
       );
       return undefined;
     }
@@ -548,9 +423,9 @@ export class WhatsappMessageGateway
     return connectedAgentIds.includes(agentId);
   }
 
-  public async emitConversationUpdate(chatId: string): Promise<void> {
+  public async emitConversationUpdate(chatId: string, channelId: string): Promise<void> {
     try {
-      const chat = await this.chatService.findByChatId(chatId);
+      const chat = await this.chatService.findByChatId(chatId, channelId);
       if (!chat || !chat.commercial_id) return;
 
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
@@ -560,7 +435,7 @@ export class WhatsappMessageGateway
       if (targetSocketId) {
         const lastMessage =
           await this.whatsappMessageService.findLastMessageByChatId(
-            chat.chat_id,
+            chat.chat_id, chat.channel_id
           );
         const unreadCount =
           await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
