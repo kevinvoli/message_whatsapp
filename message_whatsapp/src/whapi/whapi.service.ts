@@ -53,9 +53,18 @@ export class WhapiService {
     const bani = extractPhoneNumber(message.chat_id);
 
     if (bani.length >= 14) return;
-    // 🔒 ignorer les messages envoyés par ton propre compte
-    if (message.from_me) return;
 
+    // Si le message vient de nous, on le sauvegarde et on notifie le front.
+    if (message.from_me) {
+      const chat = await this.chatRepository.findOne({ where: { chat_id: message.chat_id, channel_id: message.channel_id } });
+      if (chat) {
+        await this.whatsappMessageService.saveFromWhapi(message, chat);
+        this.messageGateway.emitConversationUpdate(chat.chat_id, chat.channel_id);
+      }
+      return;
+    }
+
+    // Si le message vient du client, on suit le processus de dispatching.
     const content = this.extractMessageContent(message);
     const messageType = message.type;
     const mediaUrl =
@@ -93,7 +102,7 @@ export class WhapiService {
 
       // 2️⃣ Sauvegarde en base
       const savedMessage =
-        await this.whatsappMessageService.saveIncomingFromWhapi(
+        await this.whatsappMessageService.saveFromWhapi(
           message,
           conversation,
         );

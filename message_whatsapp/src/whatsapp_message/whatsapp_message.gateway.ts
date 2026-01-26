@@ -289,44 +289,9 @@ export class WhatsappMessageGateway
         timestamp: new Date(),
       });
 
-      const chat = await this.chatService.findByChatId(payload.chatId, payload.channelId);
-
-      if (!chat) {
-        return;
-      }
-      const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(
-          payload.chatId, payload.channelId
-        );
-
-      // Compter les messages non lus
-      const unreadCount = await this.whatsappMessageService.countUnreadMessages(
-        payload.chatId
-      );
-
-      // Construire l'objet conversation
-      const conversation = {
-        ...chat,
-        last_message: lastMessage,
-        unreadCount: unreadCount,
-      };
-
-      const commercialIds = chat.commercial?.id;
-      if (!commercialIds) return;
-      const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agentId]) => agentId === commercialIds,
-      )?.[0];
-      if (!targetSocketId) {
-        return;
-      }
-
-      this.server.to(targetSocketId).emit('conversation:updated', conversation);
-
-      // The dispatcher or another service should handle broadcasting this new message.
-      // For now, we can emit an update to the sender.
-      if (chat) {
-        this.emitConversationUpdate(chat.chat_id, chat.channel_id);
-      }
+      // Il n'y a plus rien à faire ici. La confirmation et la mise à jour
+      // de l'interface utilisateur se feront lorsque le message envoyé
+      // reviendra via le webhook avec `from_me: true`.
     } catch (error) {
       client.emit('error', {
         message: 'Failed to send message',

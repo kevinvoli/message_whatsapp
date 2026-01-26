@@ -42,7 +42,7 @@ export class WhatsappMessageService {
     text: string;
     commercial_id: string;
     timestamp: Date;
-  }): Promise<WhatsappMessage> {
+  }): Promise<void> {
     try {
       const chat = await this.chatService.findByChatId(data.chat_id, data.channel_id);
       if (!chat) throw new Error('Chat not found');
@@ -52,72 +52,25 @@ export class WhatsappMessageService {
       chat.unread_count = 0;
       await this.chatRepository.save(chat);
 
-      const lastMessage = await this.findLastMessageByChatId(data.chat_id, data.channel_id);
-
-      if (lastMessage && !lastMessage.from_me) {
-        const now = new Date();
-        const lastMessageDate = new Date(lastMessage.timestamp);
-        const diff = now.getTime() - lastMessageDate.getTime();
-        const diffHours = Math.ceil(diff / (1000 * 60 * 60));
-        if (diffHours > 24) {
-          throw new Error('Response timeout');
-        }
-      }
-
       // 1️⃣ Envoi réel vers WhatsApp
       function extractPhoneNumber(chatId: string): string {
         return chatId.split('@')[0];
       }
-      // const whapiResponse = await this.communicationWhapiService.sendToWhapi(
-      //   extractPhoneNumber(chat?.chat_id),
-      //   data.text,
-      // );
 
-      const whapiResponse =
-        await this.communicationWhapiService.sendToWhapiChannel({
-          to: extractPhoneNumber(chat?.chat_id),
-          text: data.text,
-          channelId: chat.channel_id,
-        });
-
-      // 2️⃣ Création message DB
-      const messageEntity = this.messageRepository.create({
-        message_id: whapiResponse.id ?? `agent_${Date.now()}`,
-        external_id: whapiResponse.id,
-        commercial_id: data.commercial_id,
-        direction: MessageDirection.OUT,
-        from_me: true,
-        timestamp: data.timestamp,
-        status: WhatsappMessageStatus.SENT,
-        source: 'agent_web',
+      await this.communicationWhapiService.sendToWhapiChannel({
+        to: extractPhoneNumber(chat?.chat_id),
         text: data.text,
-        chat: chat,
-        commercial: chat.commercial ?? undefined,
-        from: extractPhoneNumber(chat?.chat_id),
-        from_name: chat.name,
-        channel: chat.channel,
+        channelId: chat.channel_id,
       });
 
-      const mes = await this.messageRepository.save(messageEntity);
-      console.log("apres save ooooooooooooooooooooooo");
-      
-      return mes;
+      // La sauvegarde en base de données est maintenant gérée par le webhook
+      // pour assurer que nous avons l'ID et le timestamp corrects de Whapi.
     } catch (error) {
       console.error('WHAPI SEND FAILED:', error);
-      
-      // 🧠 fallback : message en échec mais sauvegardé
-      const failedMessage = this.messageRepository.create({
-        message_id: `failed_${Date.now()}`,
-        commercial_id: data.commercial_id,
-        direction: MessageDirection.OUT,
-        from_me: true,
-        timestamp: data.timestamp,
-        status: WhatsappMessageStatus.FAILED,
-        source: 'agent_web',
-        text: data.text,
-      });
-
-      await this.messageRepository.save(failedMessage);
+      // On ne sauvegarde plus de message en échec ici,
+      // car il n'y a pas de tentative de sauvegarde initiale.
+      // Le webhook ne sera jamais appelé si l'envoi échoue,
+      // donc aucune action supplémentaire n'est nécessaire.
       throw error;
     }
   }
@@ -316,7 +269,7 @@ export class WhatsappMessageService {
     }
   }
 
-  async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
+  async saveFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
     const channel = await this.channalRepository.findOne({
       where: {
         channel_id: message.channel_id,
@@ -340,8 +293,8 @@ export class WhatsappMessageService {
         channel: channel,
         message_id: message.id,
         external_id: message.id,
-        direction: MessageDirection.IN,
-        from_me: false,
+        direction: message.from_me ? MessageDirection.OUT : MessageDirection.IN,
+        from_me: message.from_me,
         from: message.from,
         from_name: message.from_name,
         text: message.text?.body ?? '',
