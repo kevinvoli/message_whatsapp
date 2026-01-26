@@ -25,6 +25,9 @@ interface ChatState {
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
   removeConversationByChatId: (conversationId: string) => void;
+  updateMessageStatus: (chatId: string | undefined, messageId: string, status: any) => void;
+  setTyping: (chatId: string) => void;
+  clearTyping: (chatId: string) => void;
 
   reset: () => void;
 }
