@@ -32,7 +32,7 @@ import { TasksService } from './jorbs/tasks.service';
         MYSQL_HOST:Joi.string().required(),
         MYSQL_PORT:Joi.number().required(),
         MYSQL_USER:Joi.string().required(),
-        MYSQL_PASSWORD: Joi.string().allow('').required(),
+        MYSQL_PASSWORD: Joi.string().required(),
         MYSQL_DATABASE:Joi.string().required(),
         SERVER_PORT:Joi.number().required()
       })
