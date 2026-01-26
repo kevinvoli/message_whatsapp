@@ -4,7 +4,7 @@ import { Socket } from "socket.io-client";
 import { Conversation, Message } from "@/types/chat";
 
 interface ChatState {
-  typingStatus: any;
+  typingStatus: { [chatId: string]: boolean };
   socket: Socket | null;
   conversations: Conversation[];
   messages: Message[];
@@ -25,6 +25,9 @@ interface ChatState {
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
   removeConversationByChatId: (conversationId: string) => void;
+
+  setTyping: (chatId: string) => void;
+  clearTyping: (chatId: string) => void;
 
   reset: () => void;
 }
@@ -242,13 +245,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  setTyping: (chatId) => {
+  setTyping: (chatId: string) => {
     set((state) => ({
       typingStatus: { ...state.typingStatus, [chatId]: true },
     }));
   },
 
-  clearTyping: (chatId) => {
+  clearTyping: (chatId: string) => {
     set((state) => {
       const newTypingStatus = { ...state.typingStatus };
       delete newTypingStatus[chatId];

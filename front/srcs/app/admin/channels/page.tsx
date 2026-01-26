@@ -32,7 +32,11 @@ export default function AdminChannelsPage() {
       const data = await response.json();
       setChannels(data);
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -57,7 +61,11 @@ export default function AdminChannelsPage() {
       setNewChannel({ token: '' }); // Réinitialiser le formulaire
       fetchChannels(); // Recharger la liste
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     }
   };
 

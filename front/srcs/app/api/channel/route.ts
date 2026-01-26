@@ -24,7 +24,8 @@ export async function GET() {
     const channels = await response.json();
     return NextResponse.json(channels);
   } catch (error) {
-    return NextResponse.json({ message: 'Internal Server Error', error: error.message }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ message: 'Internal Server Error', error: errorMessage }, { status: 500 });
   }
 }
 
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
     const newChannel = await response.json();
     return NextResponse.json(newChannel, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: 'Internal Server Error', error: error.message }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ message: 'Internal Server Error', error: errorMessage }, { status: 500 });
   }
 }

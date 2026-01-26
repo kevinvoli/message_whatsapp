@@ -91,6 +91,7 @@ interface RawMessageData {
 interface RawConversationData {
   id: string;
   chat_id: string;
+  channel_id: string;
   clientName?: string; // Gardé pour la compatibilité
   client_name?: string;
   name?: string;
@@ -150,6 +151,7 @@ export const transformToConversation = (
   const message = {
     id: rawData.id,
     chatId: rawData.chat_id,
+    channelId: rawData.channel_id,
     clientName:
       rawData.client_name ||
       rawData.name ||
