@@ -29,8 +29,24 @@ console.log(apiUrl);
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      try {
+        return storedUser ? JSON.parse(storedUser) : null;
+      } catch (e) {
+        console.error("Failed to parse user from localStorage", e);
+        return null;
+      }
+    }
+    return null;
+  });
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('token');
+    }
+    return null;
+  });
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     verifyAuth();
-  }, [logout]);
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
