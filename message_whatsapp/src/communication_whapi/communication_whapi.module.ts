@@ -12,5 +12,6 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
     ],
   controllers: [CommunicationWhapiController],
   providers: [CommunicationWhapiService],
+  exports: [CommunicationWhapiService],
 })
 export class CommunicationWhapiModule {}

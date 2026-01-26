@@ -36,6 +36,6 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
     CommunicationWhapiService,
     FirstResponseTimeoutJob
   ],
-  exports: [WhatsappMessageGateway],
+  exports: [WhatsappMessageGateway, WhatsappMessageService],
 })
 export class WhatsappMessageModule {}

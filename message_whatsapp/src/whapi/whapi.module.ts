@@ -19,6 +19,9 @@ import { CommunicationWhapiModule } from 'src/communication_whapi/communication_
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ChannelModule } from 'src/channel/channel.module';
+import { forwardRef } from '@nestjs/common';
+import { WhatsappCommercialModule } from 'src/whatsapp_commercial/whatsapp_commercial.module';
 
 
 @Module({
@@ -35,11 +38,10 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
     WhatsappMessageModule,
     WhatsappChatModule,
     CommunicationWhapiModule,
+    forwardRef(() => ChannelModule),
+    WhatsappCommercialModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhatsappMessageService,WhapiServiceDispacher,
-    WhatsappChatService,WhatsappCommercialService,
-    CommunicationWhapiService
-  ],
+  providers: [WhapiService, WhapiServiceDispacher],
 })
 export class WhapiModule {}

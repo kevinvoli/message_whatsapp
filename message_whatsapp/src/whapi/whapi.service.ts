@@ -15,6 +15,7 @@ import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.ga
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { ChannelService } from 'src/channel/channel.service';
 
 @Injectable()
 export class WhapiService {
@@ -23,6 +24,7 @@ export class WhapiService {
   constructor(
     private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
+    private readonly channelService: ChannelService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
     @InjectRepository(WhatsappChat)
@@ -64,6 +66,13 @@ export class WhapiService {
       null;
 
     try {
+      // 0️⃣ Vérifier si le canal existe
+      const channel = await this.channelService.findByChannelId(message.channel_id);
+      if (!channel) {
+        this.logger.error(`Message reçu d'un canal inconnu: ${message.channel_id}. Message ignoré.`);
+        return; // Arrêter le traitement ici
+      }
+
       //  1️⃣ Dispatcher (assignation agent ou pending)
       const conversation = await this.dispatcherService.assignConversation(
         message.chat_id,
@@ -106,9 +115,8 @@ export class WhapiService {
 
       this.messageGateway.emitIncomingConversation(conversation);
     } catch (error) {
-      console.log(error);
-
-      throw new NotFoundException(error);
+      this.logger.error(`Erreur inattendue lors du traitement du message entrant: ${error.message}`, error.stack);
+      // Ne pas relancer l'exception pour éviter de faire crasher le serveur
     }
   }
 
