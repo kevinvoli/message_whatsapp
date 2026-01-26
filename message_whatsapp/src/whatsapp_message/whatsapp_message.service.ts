@@ -270,6 +270,9 @@ export class WhatsappMessageService {
   }
 
   async saveFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
+
+    console.log("saveFromWhapi++++++++++++++++",message, chat);
+    
     const channel = await this.channalRepository.findOne({
       where: {
         channel_id: message.channel_id,

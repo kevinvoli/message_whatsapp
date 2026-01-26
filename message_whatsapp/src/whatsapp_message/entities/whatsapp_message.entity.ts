@@ -57,6 +57,14 @@ export class WhatsappMessage {
   external_id?: string;
 
   @Column({
+    name: 'chat_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  chat_id: string;
+
+  @Column({
     name: 'type',
     type: 'varchar',
     length: 100,
@@ -66,7 +74,19 @@ export class WhatsappMessage {
   type: string;
 
   @ManyToOne(() => WhatsappChat, (data) => data.messages)
+  @JoinColumn({
+    name: 'chat_id',
+    referencedColumnName: 'chat_id',
+  })
   chat: WhatsappChat;
+
+   @Column({
+    name: 'channel_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  channel_id: string;
 
     @ManyToOne(() => WhapiChannel, (data) => data.messages)
   @JoinColumn({

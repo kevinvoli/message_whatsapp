@@ -22,9 +22,7 @@ export enum WhatsappChatStatus {
 }
 
 @Entity()
-@Index('UQ_whatsapp_chat_channel_id_chat_id', ['channel_id', 'chat_id'], {
-  unique: true,
-})
+@Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -39,7 +37,7 @@ export class WhatsappChat {
     nullable: true,
   })
   commercial_id?: string | null;
-// pour les regle du dispatch
+  // pour les regle du dispatch
   @Column({ type: 'timestamp', nullable: true })
   assigned_at: Date | null;
 
@@ -59,7 +57,7 @@ export class WhatsappChat {
   @Column({ type: 'timestamp', nullable: true })
   last_commercial_message_at: Date | null;
 
-  // 
+  //
 
   @ManyToOne(() => WhatsappCommercial, (data) => data.chats)
   @JoinColumn({
@@ -73,12 +71,9 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
+    unique: true,
   })
   chat_id: string; // chat_id WHAPI
-
-  @ManyToOne(() => WhapiChannel, (channel) => channel.messages)
-  @JoinColumn({ name: 'channel_id', referencedColumnName: 'channel_id' })
-  channel: WhapiChannel;
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
@@ -172,6 +167,13 @@ export class WhatsappChat {
   @OneToMany(() => WhatsappMessage, (message) => message.chat)
   messages: WhatsappMessage[];
 
+  @ManyToOne(() => WhapiChannel, (data) => data.chat)
+  @JoinColumn({
+    name: 'channel_id',
+    referencedColumnName: 'channel_id',
+  })
+  channel: WhapiChannel;
+
   @CreateDateColumn({
     name: 'createdAt',
     type: 'timestamp',
@@ -197,5 +199,3 @@ export class WhatsappChat {
   })
   deletedAt: Date | null;
 }
-
-

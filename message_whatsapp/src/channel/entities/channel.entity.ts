@@ -1,3 +1,4 @@
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
@@ -32,6 +33,9 @@ export class WhapiChannel {
 
    @OneToMany(() => WhatsappMessage, (message) => message.channel)
     messages: WhatsappMessage[];
+
+    @OneToMany(() => WhatsappChat, (chat) => chat.channel)
+    chat: WhatsappChat[];
 
   // @Column(() => WhapiUser)
   // user: WhapiUser;

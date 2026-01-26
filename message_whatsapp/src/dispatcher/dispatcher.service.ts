@@ -36,7 +36,7 @@ export class DispatcherService {
    * ❌ Ne sauvegarde PAS le message WhatsApp
    */
 
-  async assignConversation(
+ async assignConversation(
     clientPhone: string,
     channel_id:string,
     clientName: string,
@@ -46,12 +46,12 @@ export class DispatcherService {
   ): Promise<WhatsappChat | null> {
     // 🔎 Chercher la conversation existante
     let conversation = await this.chatRepository.findOne({
-      where: { chat_id: clientPhone, channel_id: channel_id },
+      where: { chat_id: clientPhone },
       relations: ['commercial', 'messages'],
     });
     
 
-    // console.log(conversation);
+    console.log(conversation);
 
     // Déterminer si l'agent actuel est connecté
     const currentAgentId = conversation?.commercial?.id;

@@ -58,40 +58,19 @@ export class WhatsappMessageGateway
   private connectedAgents = new Map<string, string>();
 
   async handleConnection(client: Socket) {
-    console.log('🟢 Client in connection attempt:', client.id);
+    console.log('🟢 Client connecté:', client.id);
 
-    const token = client.handshake.auth?.token as string;
-    if (!token) {
-        client.emit('error', { message: 'Authentication error: Token not provided.' });
-        client.disconnect();
-        return;
-    }
-
-    try {
-        const payload = await this.jwtService.verifyAsync(token, {
-            secret: this.configService.get<string>('JWT_SECRET'),
-        });
-
-        const user = await this.userService.findOne(payload.sub);
-        if (!user) {
-            throw new Error('User not found.');
-        }
-
-        const commercialId = user.id;
-        this.connectedAgents.set(client.id, commercialId);
-        console.log(`👨‍💻 Agent ${commercialId} connected (socket: ${client.id})`);
-
-        await this.queueService.addToQueue(commercialId);
-        await this.userService.updateStatus(commercialId, true);
-        await this.emitQueueUpdate();
-
-        this.jobRunnner.startAgentSlaMonitor(commercialId);
-        await this.queueService.removeALlRankOnfline(commercialId);
-
-    } catch (error) {
-        console.error(`[Auth] WebSocket connection failed: ${error.message}`);
-        client.emit('error', { message: 'Authentication failed: Invalid token.' });
-        client.disconnect();
+    // Authentification via query params ou auth
+    const commercialId = client.handshake.auth?.commercialId as string;
+    if (commercialId) {
+      this.connectedAgents.set(client.id, commercialId);
+      console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
+      await this.queueService.addToQueue(commercialId);
+      await this.userService.updateStatus(commercialId, true);
+      await this.emitQueueUpdate();
+      console.log('nuew effff status socket', true);
+      this.jobRunnner.startAgentSlaMonitor(commercialId);
+      await this.queueService.removeALlRankOnfline(commercialId);
     }
   }
 
@@ -110,27 +89,27 @@ export class WhatsappMessageGateway
     }
   }
 
- async   emitConversationReassigned(
+  async emitConversationReassigned(
     chat: WhatsappChat,
-    oldCommercialId: string ,
+    oldCommercialId: string,
     newCommercialId: string,
   ) {
-
-   
-
-    const lastMessage =await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id, chat.channel_id);
+    const lastMessage =
+      await this.whatsappMessageService.findLastMessageByChatId(
+        chat.chat_id,
+        chat.channel_id,
+      );
 
     const conversation = {
-        ...chat,
-        last_message: lastMessage,
-      };
-
+      ...chat,
+      last_message: lastMessage,
+    };
 
     // 🔴 1. Ancien commercial → suppression
     if (oldCommercialId) {
       const oldSocketId = this.getSocketIdByCommercial(oldCommercialId);
       if (oldSocketId) {
-    console.log('emition des event ------------------ ', oldCommercialId);
+        console.log('emition des event ------------------ ', oldCommercialId);
 
         this.server.to(oldSocketId).emit('conversation:removed', {
           chatId: chat.chat_id,
@@ -141,7 +120,7 @@ export class WhatsappMessageGateway
     // 🟢 2. Nouveau commercial → ajout
     const newSocketId = this.getSocketIdByCommercial(newCommercialId);
     if (newSocketId) {
-    console.log('emition des event ------------------ ', newCommercialId);
+      console.log('emition des event ------------------ ', newCommercialId);
 
       this.server.to(newSocketId).emit('conversation:assigned', {
         conversation: conversation,
@@ -154,10 +133,9 @@ export class WhatsappMessageGateway
       chatId,
     });
   }
- 
 
   public async emitIncomingConversation(chat: WhatsappChat) {
-  
+    console.log('transmission du message ', chat);
 
     try {
       // Trouver le socket de l'agent assigné à cette conversation
@@ -171,7 +149,10 @@ export class WhatsappMessageGateway
 
       // Récupérer le dernier message
       const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id, chat.channel_id);
+        await this.whatsappMessageService.findLastMessageByChatId(
+          chat.chat_id,
+          chat.channel_id,
+        );
 
       // Compter les messages non lus
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
@@ -194,8 +175,10 @@ export class WhatsappMessageGateway
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
       };
-     
-      this.server.to(targetSocketId).emit('conversation:updated', conversationPayload);
+
+      this.server
+        .to(targetSocketId)
+        .emit('conversation:updated', conversationPayload);
     } catch (error) {
       console.error("Erreur lors de l'émission de la conversation:", error);
     }
@@ -235,7 +218,8 @@ export class WhatsappMessageGateway
         chats.map(async (chat) => {
           const lastMessage =
             await this.whatsappMessageService.findLastMessageByChatId(
-              chat.chat_id, chat.channel_id
+              chat.chat_id,
+              chat.channel_id,
             );
           const unreadCount =
             await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
@@ -364,7 +348,10 @@ export class WhatsappMessageGateway
     });
   }
 
-  private async _getAgentSocketId(chatId: string, channelId: string): Promise<string | undefined> {
+  private async _getAgentSocketId(
+    chatId: string,
+    channelId: string,
+  ): Promise<string | undefined> {
     const chat = await this.chatService.findByChatId(chatId, channelId);
     if (!chat || !chat.commercial_id) {
       console.warn(
@@ -431,7 +418,10 @@ export class WhatsappMessageGateway
     return connectedAgentIds.includes(agentId);
   }
 
-  public async emitConversationUpdate(chatId: string, channelId: string): Promise<void> {
+  public async emitConversationUpdate(
+    chatId: string,
+    channelId: string,
+  ): Promise<void> {
     try {
       const chat = await this.chatService.findByChatId(chatId, channelId);
       if (!chat || !chat.commercial_id) return;
@@ -443,7 +433,8 @@ export class WhatsappMessageGateway
       if (targetSocketId) {
         const lastMessage =
           await this.whatsappMessageService.findLastMessageByChatId(
-            chat.chat_id, chat.channel_id
+            chat.chat_id,
+            chat.channel_id,
           );
         const unreadCount =
           await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
