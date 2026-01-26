@@ -26,7 +26,10 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { UseGuards } from '@nestjs/common';
+import { WsJwtGuard } from '../auth/ws-jwt.guard';
 
+@UseGuards(WsJwtGuard)
 @WebSocketGateway(3001, {
   cors: {
     origin: '*',
@@ -47,8 +50,6 @@ export class WhatsappMessageGateway
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly jobRunnner: FirstResponseTimeoutJob,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
   ) {}
 
   @WebSocketServer()
@@ -59,40 +60,25 @@ export class WhatsappMessageGateway
 
   async handleConnection(client: Socket) {
     console.log('🟢 Client in connection attempt:', client.id);
+    const user = client['user'] as WhatsappCommercial;
 
-    const token = client.handshake.auth?.token as string;
-    if (!token) {
-        client.emit('error', { message: 'Authentication error: Token not provided.' });
-        client.disconnect();
-        return;
+    if (!user) {
+      console.error('[Auth] WebSocket connection failed: User not found in socket.');
+      client.emit('error', { message: 'Authentication failed.' });
+      client.disconnect();
+      return;
     }
 
-    try {
-        const payload = await this.jwtService.verifyAsync(token, {
-            secret: this.configService.get<string>('JWT_SECRET'),
-        });
+    const commercialId = user.id;
+    this.connectedAgents.set(client.id, commercialId);
+    console.log(`👨‍💻 Agent ${commercialId} connected (socket: ${client.id})`);
 
-        const user = await this.userService.findOne(payload.sub);
-        if (!user) {
-            throw new Error('User not found.');
-        }
+    await this.queueService.addToQueue(commercialId);
+    await this.userService.updateStatus(commercialId, true);
+    await this.emitQueueUpdate();
 
-        const commercialId = user.id;
-        this.connectedAgents.set(client.id, commercialId);
-        console.log(`👨‍💻 Agent ${commercialId} connected (socket: ${client.id})`);
-
-        await this.queueService.addToQueue(commercialId);
-        await this.userService.updateStatus(commercialId, true);
-        await this.emitQueueUpdate();
-
-        this.jobRunnner.startAgentSlaMonitor(commercialId);
-        await this.queueService.removeALlRankOnfline(commercialId);
-
-    } catch (error) {
-        console.error(`[Auth] WebSocket connection failed: ${error.message}`);
-        client.emit('error', { message: 'Authentication failed: Invalid token.' });
-        client.disconnect();
-    }
+    this.jobRunnner.startAgentSlaMonitor(commercialId);
+    await this.queueService.removeALlRankOnfline(commercialId);
   }
 
   async handleDisconnect(client: Socket) {

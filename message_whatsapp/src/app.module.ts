@@ -29,6 +29,7 @@ import { ChannelModule } from './channel/channel.module';
   imports: [
      ScheduleModule.forRoot(),
     ConfigModule.forRoot({
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
       isGlobal: true,
       validationSchema: Joi.object({
         MYSQL_HOST:Joi.string().required(),
