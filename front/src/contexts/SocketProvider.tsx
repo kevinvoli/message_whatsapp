@@ -23,16 +23,16 @@ export const useSocket = () => {
 const socketUrl = `${process.env.NEXT_PUBLIC_SOCKET_URL}`;
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (token) {
+    if (user) {
       const newSocket = io(socketUrl, {
         transports: ['websocket'],
         auth: {
-          token: token,
+          commercialId: user.id,
         },
       });
 
@@ -52,7 +52,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       setSocket(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [user]);
 
   // Memoize the context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({

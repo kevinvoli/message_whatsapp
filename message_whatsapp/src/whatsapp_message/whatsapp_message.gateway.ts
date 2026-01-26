@@ -47,8 +47,6 @@ export class WhatsappMessageGateway
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly jobRunnner: FirstResponseTimeoutJob,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
   ) {}
 
   @WebSocketServer()

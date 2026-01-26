@@ -110,14 +110,11 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage[]> {
     try {
       // 1️⃣ Marquer les messages reçus comme lus
-      const chat = await this.chatRepository.findOne({ where: { chat_id: chatId }});
-      if (!chat) return [];
-
       await this.messageRepository
         .createQueryBuilder()
         .update(WhatsappMessage)
         .set({ status: WhatsappMessageStatus.READ })
-        .where('chatId = :chatId', { chatId: chat.id })
+        .where('chat_id = :chatId', { chatId })
         .andWhere('direction = :direction', { direction: MessageDirection.IN })
         .andWhere('status != :status', {
           status: WhatsappMessageStatus.READ,
@@ -126,7 +123,7 @@ export class WhatsappMessageService {
 
       // 2️⃣ Récupérer les messages
       return await this.messageRepository.find({
-        where: { chat: { id: chat.id } },
+        where: { chat: { chat_id: chatId } },
         relations: ['chat', 'commercial'],
         order: { timestamp: 'ASC' },
         take: limit,
