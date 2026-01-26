@@ -1,4 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -26,7 +28,9 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
       WhapiChannel,
     ]),
     WhatsappChatModule,
-    forwardRef(() => DispatcherModule)
+    forwardRef(() => DispatcherModule),
+    JwtModule,
+    ConfigModule,
   ],
   providers: [
     WhatsappChatService,

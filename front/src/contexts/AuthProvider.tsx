@@ -61,30 +61,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [reset]);
 
   useEffect(() => {
-    const verifyAuth = async () => {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        try {
-          // Utiliser l'URL de l'API définie dans les variables d'environnement
-          const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-            headers: { 'Authorization': `Bearer ${storedToken}` }
-          });
-          setUser(response.data);
-          setToken(storedToken);
-        } catch (error) {
-          if (axios.isAxiosError(error) && error.response?.status === 404) {
-            // L'utilisateur n'existe plus, on le déconnecte
-            logout();
-          } else {
-            console.error('Error verifying auth token:', error);
-            logout(); // Déconnecter en cas d'autre erreur pour plus de sécurité
-          }
-        }
-      }
-      setInitialized(true);
-    };
-
-    verifyAuth();
+    // L'authentification est maintenant gérée par la connexion WebSocket.
+    // On se contente de marquer le fournisseur comme initialisé.
+    setInitialized(true);
   }, []);
 
   const login = async (email: string, password: string) => {
