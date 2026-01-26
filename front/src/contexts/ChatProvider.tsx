@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState } from 'react';
 
 const ChatContext = createContext(null);
 
-export const ChatProvider = ({ children }) => {
+export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [messages, setMessages] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
 
