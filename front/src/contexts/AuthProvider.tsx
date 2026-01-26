@@ -1,7 +1,7 @@
 // contexts/AuthContext.tsx
 'use client';
 
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import axios from 'axios';
 import { useChatStore } from '@/store/chatStore';
 
