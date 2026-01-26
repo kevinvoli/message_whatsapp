@@ -26,9 +26,9 @@ const WebSocketEvents = () => {
     addConversation,
     loadConversations,
     
-    // updateMessageStatus,
-    // setTyping,
-    // clearTyping,
+    updateMessageStatus,
+    setTyping,
+    clearTyping,
   } = useChatStore();
   const { user } = useAuth();
 
