@@ -59,7 +59,7 @@ export class WhapiService {
       const chat = await this.chatRepository.findOne({ where: { chat_id: message.chat_id, channel_id: message.channel_id } });
       if (chat) {
         await this.whatsappMessageService.saveFromWhapi(message, chat);
-        this.messageGateway.emitConversationUpdate(chat.chat_id, chat.channel_id);
+        this.messageGateway.emitConversationUpdate(chat.chat_id);
       }
       return;
     }

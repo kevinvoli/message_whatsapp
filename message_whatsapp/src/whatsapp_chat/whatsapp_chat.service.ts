@@ -127,9 +127,9 @@ export class WhatsappChatService {
     return this.chatRepository.find();
   }
 
-  async findByChatId(chatId: string, channelId: string): Promise<WhatsappChat | null> {
+  async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
-      where: { chat_id: chatId, channel_id: channelId },
+      where: { chat_id: chatId },
       relations: ['commercial', 'messages', 'channel'],
     });
   }
