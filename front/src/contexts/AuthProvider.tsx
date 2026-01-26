@@ -36,6 +36,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const { reset } = useChatStore();
 
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    reset(); // Vide le store Zustand
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }, [reset]);
+
   useEffect(() => {
     const verifyAuth = async () => {
       const storedToken = localStorage.getItem('token');
@@ -97,14 +105,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
       }
   };
-
-  const logout = useCallback(() => {
-    setUser(null);
-    setToken(null);
-    reset(); // Vide le store Zustand
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  }, [reset]);
 
   return (
     <AuthContext.Provider value={{ 
