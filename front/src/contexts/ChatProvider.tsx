@@ -1,11 +1,25 @@
 'use client';
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react';
 
-const ChatContext = createContext(null);
+// Define the shape of the context value
+interface ChatContextType {
+  messages: any[];
+  setMessages: Dispatch<SetStateAction<any[]>>;
+  activeConversation: any | null;
+  setActiveConversation: Dispatch<SetStateAction<any | null>>;
+}
 
-export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
-  const [messages, setMessages] = useState([]);
-  const [activeConversation, setActiveConversation] = useState(null);
+// Create the context with a default value that matches the interface
+const ChatContext = createContext<ChatContextType>({
+  messages: [],
+  setMessages: () => {},
+  activeConversation: null,
+  setActiveConversation: () => {},
+});
+
+export const ChatProvider = ({ children }: { children: ReactNode }) => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [activeConversation, setActiveConversation] = useState<any | null>(null);
 
   // Add functions to interact with chat state, e.g., sendMessage, setActiveConversation, etc.
 
