@@ -163,15 +163,23 @@ export class WhatsappMessageGateway
       );
 
       // Construire l'objet conversation
-      const conversation = {
-        ...chat,
-        last_message: lastMessage,
+      const conversationPayload = {
+        id: chat.id,
+        chatId: chat.chat_id,
+        channelId: chat.channel_id,
+        clientName: chat.name,
+        clientPhone: chat.contact_client,
+        lastMessage: lastMessage,
+        messages: [], // Laisser le front-end gérer le chargement des messages
         unreadCount: unreadCount,
+        commercialId: chat.commercial_id,
+        name: chat.name,
+        status: chat.status,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
       };
-
-      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee');
      
-      this.server.to(targetSocketId).emit('conversation:updated', conversation);
+      this.server.to(targetSocketId).emit('conversation:updated', conversationPayload);
     } catch (error) {
       console.error("Erreur lors de l'émission de la conversation:", error);
     }
@@ -218,9 +226,19 @@ export class WhatsappMessageGateway
           // console.log('chargement conversation:::::', lastMessage);
 
           return {
-            ...chat,
-            last_message: lastMessage,
-            unread_count: unreadCount,
+            id: chat.id,
+            chatId: chat.chat_id,
+            channelId: chat.channel_id,
+            clientName: chat.name,
+            clientPhone: chat.contact_client,
+            lastMessage: lastMessage,
+            messages: [],
+            unreadCount: unreadCount,
+            commercialId: chat.commercial_id,
+            name: chat.name,
+            status: chat.status,
+            createdAt: chat.createdAt,
+            updatedAt: chat.updatedAt,
           };
         }),
       );
@@ -415,11 +433,20 @@ export class WhatsappMessageGateway
           await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
 
         const conversationPayload = {
-          ...chat,
-          last_message: lastMessage,
-          unread_count: unreadCount,
+          id: chat.id,
+          chatId: chat.chat_id,
+          channelId: chat.channel_id,
+          clientName: chat.name,
+          clientPhone: chat.contact_client,
+          lastMessage: lastMessage,
+          messages: [],
+          unreadCount: unreadCount,
+          commercialId: chat.commercial_id,
+          name: chat.name,
+          status: chat.status,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
         };
-        console.log('chat est icciccccccccccccccccccccccccc', targetSocketId);
 
         this.server
           .to(targetSocketId)
