@@ -47,6 +47,8 @@ export class WhatsappMessageGateway
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly jobRunnner: FirstResponseTimeoutJob,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   @WebSocketServer()
@@ -56,19 +58,40 @@ export class WhatsappMessageGateway
   private connectedAgents = new Map<string, string>();
 
   async handleConnection(client: Socket) {
-    console.log('🟢 Client connecté:', client.id);
+    console.log('🟢 Client in connection attempt:', client.id);
 
-    // Authentification via query params ou auth
-    const commercialId = client.handshake.auth?.commercialId as string;
-    if (commercialId) {
-      this.connectedAgents.set(client.id, commercialId);
-      console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
-      await this.queueService.addToQueue(commercialId);
-      await this.userService.updateStatus(commercialId, true);
-      await this.emitQueueUpdate();
-      console.log('nuew effff status socket', true);
-      this.jobRunnner.startAgentSlaMonitor(commercialId);
-      await this.queueService.removeALlRankOnfline(commercialId);
+    const token = client.handshake.auth?.token as string;
+    if (!token) {
+        client.emit('error', { message: 'Authentication error: Token not provided.' });
+        client.disconnect();
+        return;
+    }
+
+    try {
+        const payload = await this.jwtService.verifyAsync(token, {
+            secret: this.configService.get<string>('JWT_SECRET'),
+        });
+
+        const user = await this.userService.findOne(payload.sub);
+        if (!user) {
+            throw new Error('User not found.');
+        }
+
+        const commercialId = user.id;
+        this.connectedAgents.set(client.id, commercialId);
+        console.log(`👨‍💻 Agent ${commercialId} connected (socket: ${client.id})`);
+
+        await this.queueService.addToQueue(commercialId);
+        await this.userService.updateStatus(commercialId, true);
+        await this.emitQueueUpdate();
+
+        this.jobRunnner.startAgentSlaMonitor(commercialId);
+        await this.queueService.removeALlRankOnfline(commercialId);
+
+    } catch (error) {
+        console.error(`[Auth] WebSocket connection failed: ${error.message}`);
+        client.emit('error', { message: 'Authentication failed: Invalid token.' });
+        client.disconnect();
     }
   }
 
@@ -95,7 +118,7 @@ export class WhatsappMessageGateway
 
    
 
-    const lastMessage =await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+    const lastMessage =await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id, chat.channel_id);
 
     const conversation = {
         ...chat,
@@ -148,7 +171,7 @@ export class WhatsappMessageGateway
 
       // Récupérer le dernier message
       const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id, chat.channel_id);
 
       // Compter les messages non lus
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
@@ -212,7 +235,7 @@ export class WhatsappMessageGateway
         chats.map(async (chat) => {
           const lastMessage =
             await this.whatsappMessageService.findLastMessageByChatId(
-              chat.chat_id,
+              chat.chat_id, chat.channel_id
             );
           const unreadCount =
             await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
@@ -282,7 +305,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('message:send')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: string; text: string },
+    @MessageBody() payload: { chatId: string; channelId: string; text: string },
   ) {
     const commercialId = this.connectedAgents.get(client.id);
     if (!commercialId) {
@@ -292,51 +315,13 @@ export class WhatsappMessageGateway
     try {
       console.log('le chat id est ici:', payload);
 
-      const message = await this.whatsappMessageService.createAgentMessage({
+      await this.whatsappMessageService.sendMessageFromAgent({
         chat_id: payload.chatId,
+        channel_id: payload.channelId,
         text: payload.text,
         commercial_id: commercialId,
         timestamp: new Date(),
       });
-
-      const chat = await this.chatService.findByChatId(message.chat.chat_id);
-
-      if (!chat) {
-        return;
-      }
-      const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(
-          message.chat.chat_id,
-        );
-
-      // Compter les messages non lus
-      const unreadCount = await this.whatsappMessageService.countUnreadMessages(
-        chat.chat_id,
-      );
-
-      // Construire l'objet conversation
-      const conversation = {
-        ...chat,
-        last_message: lastMessage,
-        unreadCount: unreadCount,
-      };
-
-      const commercialIds = chat.commercial?.id;
-      if (!commercialIds) return;
-      const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agentId]) => agentId === commercialIds,
-      )?.[0];
-      if (!targetSocketId) {
-        return;
-      }
-
-      this.server.to(targetSocketId).emit('conversation:updated', conversation);
-
-      // The dispatcher or another service should handle broadcasting this new message.
-      // For now, we can emit an update to the sender.
-      if (chat) {
-        this.emitConversationUpdate(chat.id);
-      }
 
       // Il n'y a plus rien à faire ici. La confirmation et la mise à jour
       // de l'interface utilisateur se feront lorsque le message envoyé
@@ -379,11 +364,11 @@ export class WhatsappMessageGateway
     });
   }
 
-  private async _getAgentSocketId(chatId: string): Promise<string | undefined> {
-    const chat = await this.chatService.findByChatId(chatId);
+  private async _getAgentSocketId(chatId: string, channelId: string): Promise<string | undefined> {
+    const chat = await this.chatService.findByChatId(chatId, channelId);
     if (!chat || !chat.commercial_id) {
       console.warn(
-        `[Socket] Impossible de trouver le chat ou l'agent pour le chatId ${chatId}.`,
+        `[Socket] Impossible de trouver le chat ou l'agent pour le chatId ${chatId} et channelId ${channelId}.`,
       );
       return undefined;
     }
@@ -446,9 +431,9 @@ export class WhatsappMessageGateway
     return connectedAgentIds.includes(agentId);
   }
 
-  public async emitConversationUpdate(chatId: string): Promise<void> {
+  public async emitConversationUpdate(chatId: string, channelId: string): Promise<void> {
     try {
-      const chat = await this.chatService.findByChatId(chatId);
+      const chat = await this.chatService.findByChatId(chatId, channelId);
       if (!chat || !chat.commercial_id) return;
 
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
@@ -458,17 +443,26 @@ export class WhatsappMessageGateway
       if (targetSocketId) {
         const lastMessage =
           await this.whatsappMessageService.findLastMessageByChatId(
-            chat.chat_id,
+            chat.chat_id, chat.channel_id
           );
         const unreadCount =
           await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
 
         const conversationPayload = {
-          ...chat,
-          last_message: lastMessage,
-          unread_count: unreadCount,
+          id: chat.id,
+          chatId: chat.chat_id,
+          channelId: chat.channel_id,
+          clientName: chat.name,
+          clientPhone: chat.contact_client,
+          lastMessage: lastMessage,
+          messages: [],
+          unreadCount: unreadCount,
+          commercialId: chat.commercial_id,
+          name: chat.name,
+          status: chat.status,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
         };
-        console.log('chat est icciccccccccccccccccccccccccc', targetSocketId);
 
         this.server
           .to(targetSocketId)

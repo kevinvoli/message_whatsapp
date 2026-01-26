@@ -44,7 +44,7 @@ export class WhatsappMessageService {
     timestamp: Date;
   }): Promise<void> {
     try {
-      const chat = await this.chatService.findByChatId(data.chat_id);
+      const chat = await this.chatService.findByChatId(data.chat_id, data.channel_id);
       if (!chat) throw new Error('Chat not found');
 
       // Réintégration de la logique de mise à jour du chat
@@ -60,7 +60,7 @@ export class WhatsappMessageService {
       await this.communicationWhapiService.sendToWhapiChannel({
         to: extractPhoneNumber(chat?.chat_id),
         text: data.text,
-        channelId: chat.id,
+        channelId: chat.channel_id,
       });
 
       // La sauvegarde en base de données est maintenant gérée par le webhook
@@ -77,44 +77,17 @@ export class WhatsappMessageService {
 
   async findLastMessageByChatId(
     chatId: string,
+    channelId: string,
   ): Promise<WhatsappMessage | null> {
     try {
       return this.messageRepository.findOne({
-        where: { chat: { chat_id: chatId }, from_me: false },
+        where: { chat: { chat_id: chatId, channel_id: channelId }, from_me: false },
         order: { timestamp: 'DESC' },
         relations: ['chat', 'commercial', 'channel'],
       });
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
-  }
-
-  async createAgentMessage(data: {
-    chat_id: string;
-    text: string;
-    commercial_id: string;
-    timestamp: Date;
-  }): Promise<WhatsappMessage> {
-    const chat = await this.chatService.findByChatId(data.chat_id);
-    if (!chat) throw new Error('Chat not found');
-
-    const commercial = await this.commercialRepository.findOne({
-      where: { id: data.commercial_id },
-    });
-    if (!commercial) throw new Error('Commercial not found');
-
-    const message = this.messageRepository.create({
-      chat,
-      commercial,
-      text: data.text,
-      timestamp: data.timestamp,
-      direction: MessageDirection.OUT,
-      from_me: true,
-      status: WhatsappMessageStatus.SENT,
-      source: 'agent_web',
-    });
-
-    return this.messageRepository.save(message);
   }
   async findLastMessageByClientId(
     chatId: string,
@@ -137,14 +110,11 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage[]> {
     try {
       // 1️⃣ Marquer les messages reçus comme lus
-      const chat = await this.chatRepository.findOne({ where: { chat_id: chatId }});
-      if (!chat) return [];
-
       await this.messageRepository
         .createQueryBuilder()
         .update(WhatsappMessage)
         .set({ status: WhatsappMessageStatus.READ })
-        .where('chatId = :chatId', { chatId: chat.id })
+        .where('chat_id = :chatId', { chatId })
         .andWhere('direction = :direction', { direction: MessageDirection.IN })
         .andWhere('status != :status', {
           status: WhatsappMessageStatus.READ,
@@ -153,7 +123,7 @@ export class WhatsappMessageService {
 
       // 2️⃣ Récupérer les messages
       return await this.messageRepository.find({
-        where: { chat: { id: chat.id } },
+        where: { chat: { chat_id: chatId } },
         relations: ['chat', 'commercial'],
         order: { timestamp: 'ASC' },
         take: limit,
