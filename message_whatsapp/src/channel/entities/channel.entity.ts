@@ -1,6 +1,14 @@
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('whapi_channels')
 export class WhapiChannel {
@@ -8,7 +16,7 @@ export class WhapiChannel {
   id: string;
 
   @Index({ unique: true })
-  @Column()
+  @Column({ name: 'channel_id', type: 'varchar', nullable: false })
   channel_id: string;
 
   @Index({ unique: true })
@@ -17,9 +25,6 @@ export class WhapiChannel {
 
   @Column({ type: 'int' })
   start_at: number;
-
-
-
 
   @Column({ type: 'int' })
   uptime: number;
@@ -30,8 +35,11 @@ export class WhapiChannel {
   @Column()
   version: string;
 
-   @OneToMany(() => WhatsappMessage, (message) => message.channel)
-    messages: WhatsappMessage[];
+  @OneToMany(() => WhatsappMessage, (message) => message.channel)
+  messages: WhatsappMessage[];
+
+  @OneToMany(() => WhatsappChat, (message) => message.channel)
+  chat: WhatsappChat[];
 
   // @Column(() => WhapiUser)
   // user: WhapiUser;
@@ -47,7 +55,6 @@ export class WhapiChannel {
 
   @Column()
   api_version: string;
-  
 
   @Column()
   core_version: string;
@@ -58,5 +65,3 @@ export class WhapiChannel {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-
