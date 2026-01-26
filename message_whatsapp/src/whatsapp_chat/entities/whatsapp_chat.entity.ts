@@ -77,7 +77,7 @@ export class WhatsappChat {
   chat_id: string; // chat_id WHAPI
 
   @ManyToOne(() => WhapiChannel, (channel) => channel.messages)
-  @JoinColumn({ name: 'channel_id' })
+  @JoinColumn({ name: 'channel_id', referencedColumnName: 'channel_id' })
   channel: WhapiChannel;
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })

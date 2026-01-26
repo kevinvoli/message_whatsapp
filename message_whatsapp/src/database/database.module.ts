@@ -19,7 +19,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           connectTimeout:10000,
           autoLoadEntities: true,
           retryAttempts:0,
-          synchronize: true,
+          synchronize: false,
         })
     })
   ],
