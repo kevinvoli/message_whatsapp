@@ -47,8 +47,6 @@ export class WhatsappMessageGateway
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly jobRunnner: FirstResponseTimeoutJob,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
   ) {}
 
   @WebSocketServer()
@@ -58,40 +56,19 @@ export class WhatsappMessageGateway
   private connectedAgents = new Map<string, string>();
 
   async handleConnection(client: Socket) {
-    console.log('🟢 Client in connection attempt:', client.id);
+    console.log('🟢 Client connecté:', client.id);
 
-    const token = client.handshake.auth?.token as string;
-    if (!token) {
-        client.emit('error', { message: 'Authentication error: Token not provided.' });
-        client.disconnect();
-        return;
-    }
-
-    try {
-        const payload = await this.jwtService.verifyAsync(token, {
-            secret: this.configService.get<string>('JWT_SECRET'),
-        });
-
-        const user = await this.userService.findOne(payload.sub);
-        if (!user) {
-            throw new Error('User not found.');
-        }
-
-        const commercialId = user.id;
-        this.connectedAgents.set(client.id, commercialId);
-        console.log(`👨‍💻 Agent ${commercialId} connected (socket: ${client.id})`);
-
-        await this.queueService.addToQueue(commercialId);
-        await this.userService.updateStatus(commercialId, true);
-        await this.emitQueueUpdate();
-
-        this.jobRunnner.startAgentSlaMonitor(commercialId);
-        await this.queueService.removeALlRankOnfline(commercialId);
-
-    } catch (error) {
-        console.error(`[Auth] WebSocket connection failed: ${error.message}`);
-        client.emit('error', { message: 'Authentication failed: Invalid token.' });
-        client.disconnect();
+    // Authentification via query params ou auth
+    const commercialId = client.handshake.auth?.commercialId as string;
+    if (commercialId) {
+      this.connectedAgents.set(client.id, commercialId);
+      console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
+      await this.queueService.addToQueue(commercialId);
+      await this.userService.updateStatus(commercialId, true);
+      await this.emitQueueUpdate();
+      console.log('nuew effff status socket', true);
+      this.jobRunnner.startAgentSlaMonitor(commercialId);
+      await this.queueService.removeALlRankOnfline(commercialId);
     }
   }
 
