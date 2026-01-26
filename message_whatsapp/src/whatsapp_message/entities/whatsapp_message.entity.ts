@@ -66,6 +66,7 @@ export class WhatsappMessage {
   type: string;
 
   @ManyToOne(() => WhatsappChat, (data) => data.messages)
+  @JoinColumn({ name: 'chat_id', referencedColumnName: 'chat_id' })
   chat: WhatsappChat;
 
     @ManyToOne(() => WhapiChannel, (data) => data.messages)
