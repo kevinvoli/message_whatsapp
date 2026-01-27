@@ -132,11 +132,7 @@ export class WhatsappMessageService {
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
-    return this.messageRepository.findOne({
-      where: { chat_id: chatId },
-      order: { timestamp: 'DESC' },
-      relations: ['chat', 'commercial'],
-    });
+   
   }
 
   async findByChatId(
@@ -193,16 +189,6 @@ export class WhatsappMessageService {
   async create(message: CreateWhatsappMessageDto, commercialId?: string) {
     try {
       console.log('message reçue du dispache', message);
-      // let chat;
-      //       if (commercialId) {
-      //   chat= await this.chatService.findOrCreateChat(
-      //         message.chat_id,
-      //         message.from,
-      //         message.from_name,
-      //         commercialId,
-      //       );
-      //       }
-
       const chat = await this.chatRepository.find({
         where: {
           chat_id: message.chat_id,

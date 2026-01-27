@@ -287,9 +287,7 @@ export class WhatsappMessageGateway
     }
 
     try {
-      console.log('le chat id est ici:', payload);
-
-      
+      // console.log('le chat id est ici:', payload);
 
       const chat = await this.chatService.findByChatId(payload.chatId);
 
@@ -303,6 +301,9 @@ export class WhatsappMessageGateway
         timestamp: new Date(),
         channel_id:chat?.last_msg_client_channel_id ?? payload.channel_id
       });
+
+      console.log("seponse de sauvegarde",message);
+      
       const lastMessage =
         await this.whatsappMessageService.findLastMessageByChatId(
           message.chat_id,

@@ -34,6 +34,8 @@ export class WhapiService {
     
     const message = payload.messages[0];
 
+    message.channel_id =  payload.channel_id;
+
 
     // console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
 
@@ -56,8 +58,6 @@ export class WhapiService {
       message.audio?.id ||
       message.document?.id ||
       null;
-
-
     try {
       //  1️⃣ Dispatcher (assignation agent ou pending)
       const conversation = await this.dispatcherService.assignConversation(
@@ -93,13 +93,13 @@ export class WhapiService {
 
 
       // 3️⃣ Temps réel (WebSocket)
-      this.messageGateway.emitIncomingMessage(
-        conversation.chat_id,
-        conversation.commercial_id,
-        savedMessage,
-      );
+      // this.messageGateway.emitIncomingMessage(
+      //   conversation.chat_id,
+      //   conversation.commercial_id,
+      //   savedMessage,
+      // );
 
-      this.messageGateway.emitIncomingConversation(
+      await this.messageGateway.emitIncomingConversation(
         conversation
       )
     } catch (error) {
