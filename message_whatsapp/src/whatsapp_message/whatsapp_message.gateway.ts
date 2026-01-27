@@ -24,6 +24,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
+import { channel } from 'diagnostics_channel';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -175,7 +176,7 @@ export class WhatsappMessageGateway
         unreadCount: unreadCount,
       };
 
-      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', conversation);
+      // console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', conversation);
 
       // Émettre l'événement de mise à jour de conversation à l'agent spécifique
       this.server.to(targetSocketId).emit('conversation:updated', conversation);
@@ -278,7 +279,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('message:send')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: string; text: string },
+    @MessageBody() payload: { chatId: string; text: string,channel_id:string },
   ) {
     const commercialId = this.connectedAgents.get(client.id);
     if (!commercialId) {
@@ -293,6 +294,7 @@ export class WhatsappMessageGateway
         text: payload.text,
         commercial_id: commercialId,
         timestamp: new Date(),
+        channel_id:payload.channel_id
       });
 
       const chat = await this.chatService.findByChatId(message.chat_id);

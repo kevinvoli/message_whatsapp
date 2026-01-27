@@ -1,3 +1,5 @@
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
@@ -63,11 +65,26 @@ export class WhatsappMessage {
   chat_id: string;
 
   @Column({
+    name: 'channel_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  channel_id: string;
+
+  @ManyToOne(() => WhapiChannel, (data) => data.messages)
+  @JoinColumn({
+    name: 'channel_id',
+    referencedColumnName: 'channel_id',
+  })
+  channel: WhapiChannel;
+
+  @Column({
     name: 'type',
     type: 'varchar',
     length: 100,
     nullable: false,
-    default: 'text'
+    default: 'text',
   })
   type: string;
 
@@ -85,7 +102,7 @@ export class WhatsappMessage {
     nullable: true,
   })
   commercial_id: string | null;
-  
+
   @Column({
     name: 'longtext',
     type: 'varchar',
@@ -93,7 +110,10 @@ export class WhatsappMessage {
   })
   text: string | null;
 
-  @ManyToOne(() => WhatsappCommercial, (data) => data.messages,{nullable:true,onDelete:'SET NULL'})
+  @ManyToOne(() => WhatsappCommercial, (data) => data.messages, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({
     name: 'commercial_id',
     referencedColumnName: 'id',
@@ -105,6 +125,16 @@ export class WhatsappMessage {
     (messageContent) => messageContent.message,
   )
   messageCnntent: WhatsappMessageContent[];
+
+  @Column({ name: 'contact_id', type: 'uuid' })
+  contact_id: string;
+
+  @ManyToOne(() => Contact, (contact) => contact.messages, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'contact_id' })
+  contact: Contact;
 
   @Column({
     name: 'direction',

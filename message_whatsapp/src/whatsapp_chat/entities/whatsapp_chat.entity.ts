@@ -36,6 +36,14 @@ export class WhatsappChat {
     nullable: true,
   })
   commercial_id?: string | null;
+
+   @Column({
+    name: 'last_msg_client_channel_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  last_msg_client_channel_id?: string 
 // pour les regle du dispatch
   @Column({ type: 'timestamp', nullable: true })
   assigned_at: Date | null;

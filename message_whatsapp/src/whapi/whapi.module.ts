@@ -4,7 +4,6 @@ import { WhapiController } from './whapi.controller';
 // import { WhatsappAgentService } from 'src/whatsapp_agent/whatsapp_agent.service';
 // import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { WhapiServiceDispacher } from './whatsapp_dispacher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -18,6 +17,10 @@ import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ChannelService } from 'src/channel/channel.service';
+import { Contact } from 'src/contact/entities/contact.entity';
+import { ContactService } from 'src/contact/contact.service';
 
 
 @Module({
@@ -28,6 +31,8 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
       WhatsappChat,
       PendingMessage,
       QueuePosition,
+      WhapiChannel,
+      Contact
     ]),
     DispatcherModule,
     WhatsappMessageModule,
@@ -35,8 +40,8 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
     CommunicationWhapiModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhatsappMessageService,WhapiServiceDispacher,
-    WhatsappChatService,WhatsappCommercialService,
+  providers: [WhapiService, WhatsappMessageService,
+    WhatsappChatService,WhatsappCommercialService,ChannelService, ContactService,
     CommunicationWhapiService
   ],
 })

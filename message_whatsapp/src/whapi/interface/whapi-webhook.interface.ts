@@ -36,6 +36,7 @@ export interface WhapiMessage {
   from_me: boolean;
   type: WhapiMessageType;
   chat_id: string;
+  channel_id:string
   timestamp: number;
   source: string;
   device_id: number;

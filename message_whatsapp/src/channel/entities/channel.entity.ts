@@ -1,4 +1,3 @@
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Column,
@@ -11,13 +10,18 @@ import {
 } from 'typeorm';
 
 @Entity('whapi_channels')
+@Index('UQ_whapi_channel_id', ['channel_id'], {unique:true})
 export class WhapiChannel {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
-  @Column({ name: 'channel_id', type: 'varchar', nullable: false })
-  channel_id: string;
+  @Column({
+    name: 'channel_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  channel_id: string
 
   @Index({ unique: true })
   @Column()
@@ -38,8 +42,6 @@ export class WhapiChannel {
   @OneToMany(() => WhatsappMessage, (message) => message.channel)
   messages: WhatsappMessage[];
 
-  @OneToMany(() => WhatsappChat, (message) => message.channel)
-  chat: WhatsappChat[];
 
   // @Column(() => WhapiUser)
   // user: WhapiUser;

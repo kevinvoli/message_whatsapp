@@ -6,17 +6,16 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 // import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
-import { WhapiUser } from './entities/whapi-user.entity';
-import { ChanneDatalDto } from './dto/channel-data.dto';
-import strict from 'assert/strict';
+// import { WhapiUser } from './entities/whapi-user.entity';
+// import { ChanneDatalDto } from './dto/channel-data.dto';
 
 @Injectable()
 export class ChannelService {
   constructor(
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
-    @InjectRepository(WhapiUser)
-    private readonly userRepository: Repository<WhapiUser>,
+    // @InjectRepository(WhapiUser)
+    // private readonly userRepository: Repository<WhapiUser>,
 
     private readonly connmunicationService: CommunicationWhapiService,
   ) {}
@@ -66,7 +65,7 @@ export class ChannelService {
   }
 
   async findAll() {
-    return this.channelRepository.find();
+    return await this.channelRepository.find();
   }
 
   async findOne(id: string) {

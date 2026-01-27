@@ -3,18 +3,18 @@ import { ChannelService } from './channel.service';
 import { ChannelController } from './channel.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhapiChannel } from './entities/channel.entity';
-import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
-import { WhapiUser } from './entities/whapi-user.entity';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+// import { WhapiUser } from './entities/whapi-user.entity';
 
 
-@Module({imports: [
+@Module({
+  imports: [
     TypeOrmModule.forFeature([
-      WhapiChannel,WhapiUser
+      WhapiChannel
     ]),
-    CommunicationWhapiModule,
   ],
   controllers: [ChannelController],
-  providers: [ChannelService],
+  providers: [ChannelService,CommunicationWhapiService],
   exports: [ChannelService],
 })
 export class ChannelModule {}

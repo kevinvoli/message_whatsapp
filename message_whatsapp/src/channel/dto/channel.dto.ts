@@ -34,7 +34,7 @@ export class WhapiChannel {
 
   version: string;
 
-  user: WhapiUser;
+  user?: WhapiUser;
 
   device_id: number;
 

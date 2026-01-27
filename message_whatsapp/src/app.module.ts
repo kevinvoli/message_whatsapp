@@ -23,6 +23,8 @@ import { AuthModule } from './auth/auth.module';
 import { JorbsModule } from './jorbs/jorbs.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksService } from './jorbs/tasks.service';
+import { ChannelModule } from './channel/channel.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -32,12 +34,12 @@ import { TasksService } from './jorbs/tasks.service';
         MYSQL_HOST:Joi.string().required(),
         MYSQL_PORT:Joi.number().required(),
         MYSQL_USER:Joi.string().required(),
-        MYSQL_PASSWORD: Joi.string().required(),
+        MYSQL_PASSWORD: Joi.string().allow('').required(),
         MYSQL_DATABASE:Joi.string().required(),
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule, ],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule,ChannelModule, ContactModule ],
   controllers: [AppController],
   providers: [AppService,TasksService],
 })
