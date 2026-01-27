@@ -21,7 +21,8 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactService } from 'src/contact/contact.service';
-
+import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { ContactService } from 'src/contact/contact.service';
       PendingMessage,
       QueuePosition,
       WhapiChannel,
-      Contact
+      Contact,
+      WhatsappPoste,
     ]),
     DispatcherModule,
     WhatsappMessageModule,
@@ -40,9 +42,15 @@ import { ContactService } from 'src/contact/contact.service';
     CommunicationWhapiModule,
   ],
   controllers: [WhapiController],
-  providers: [WhapiService, WhatsappMessageService,
-    WhatsappChatService,WhatsappCommercialService,ChannelService, ContactService,
-    CommunicationWhapiService
+  providers: [
+    WhapiService,
+    WhatsappMessageService,
+    WhatsappChatService,
+    WhatsappCommercialService,
+    ChannelService,
+    WhatsappPosteService,
+    ContactService,
+    CommunicationWhapiService,
   ],
 })
 export class WhapiModule {}

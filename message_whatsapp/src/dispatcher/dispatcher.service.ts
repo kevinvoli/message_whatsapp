@@ -53,7 +53,7 @@ export class DispatcherService {
     // console.log(conversation);
 
     // Déterminer si l'agent actuel est connecté
-    const currentAgentId = conversation?.commercial?.id;
+    const currentAgentId = conversation?.poste?.id;
     const isAgentConnected = currentAgentId
       ? this.messageGateway.isAgentConnected(currentAgentId)
       : false;
@@ -68,13 +68,13 @@ export class DispatcherService {
       if (conversation.status === WhatsappChatStatus.FERME) {
         conversation.status = WhatsappChatStatus.ACTIF;
       }
-      if (!conversation.commercial) {
+      if (!conversation.poste) {
         this.logger.warn(
           `📩 Conversation ${conversation.chat_id} sans commercial (réinjection ou offline)`,
         );
       }
       this.logger.log(
-        `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.commercial?.email ?? 'NON ASSIGNE'}`,
+        `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.description ?? 'NON ASSIGNE'}`,
       );
       return this.chatRepository.save(conversation);
     }
@@ -100,10 +100,10 @@ export class DispatcherService {
 
     if (conversation) {
       this.logger.log(
-        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${conversation.commercial?.email || 'aucun'}) à (${nextAgent.email})`,
+        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${conversation.poste?.description || 'aucun'}) à (${nextAgent.name})`,
       );
-      conversation.commercial = nextAgent;
-      conversation.commercial_id = nextAgent.id;
+      conversation.poste = nextAgent;
+      conversation.poste_id = nextAgent.id;
       conversation.status = WhatsappChatStatus.EN_ATTENTE;
       conversation.unread_count = 1;
       conversation.last_activity_at = new Date();
@@ -123,7 +123,7 @@ export class DispatcherService {
      * Cas 4️⃣ : nouvelle conversation
      */
     this.logger.log(
-      `🆕 Création nouvelle conversation pour ${clientPhone} avec agent (${nextAgent.email})`,
+      `🆕 Création nouvelle conversation pour ${clientPhone} avec agent (${nextAgent.name})`,
     );
 
     const newChat = this.chatRepository.create({
@@ -131,8 +131,8 @@ export class DispatcherService {
       name: clientName,
       type: 'private',
       contact_client: clientPhone,
-      commercial: nextAgent,
-      commercial_id: nextAgent.id,
+      poste: nextAgent,
+      poste_id: nextAgent.id,
       status: WhatsappChatStatus.EN_ATTENTE,
       unread_count: 1,
       last_activity_at: new Date(),
@@ -190,8 +190,8 @@ export class DispatcherService {
 
   async reinjectConversation(chat: WhatsappChat) {
     await this.chatRepository.update(chat.id, {
-      commercial: null,
-      commercial_id: null,
+      poste: null,
+      poste_id: null,
       assigned_mode: null,
       assigned_at: null,
       first_response_deadline_at: null,
@@ -202,7 +202,7 @@ export class DispatcherService {
   }
 
   async dispatchExistingConversation(chat: WhatsappChat) {
-    const oldCommercialId = chat.commercial_id;
+    const oldCommercialId = chat.poste_id;
     if (!oldCommercialId) {
       return;
     }
@@ -210,9 +210,9 @@ export class DispatcherService {
     if (!nextAgent) return;
 
     await this.chatRepository.update(chat.id, {
-      commercial: nextAgent,
-      commercial_id: nextAgent.id,
-      assigned_mode: nextAgent.isConnected ? 'ONLINE' : 'OFFLINE',
+      poste: nextAgent,
+      poste_id: nextAgent.id,
+      assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
       assigned_at: new Date(),
       first_response_deadline_at:  new Date(
         Date.now() + 5*60 * 1000,
@@ -238,16 +238,16 @@ export class DispatcherService {
     );
   }
 
-  async jobRunnertcheque(commercialId: string) {
+  async jobRunnertcheque(poste_id: string) {
     // console.log('mes verification sont ici', commercialId);
 
     const now = new Date();
 
     const chats = await this.chatRepository.find({
       where: {
-        commercial_id: commercialId,
+        poste_id: poste_id,
         status: WhatsappChatStatus.EN_ATTENTE,
-        last_commercial_message_at: IsNull(),
+        last_poste_message_at: IsNull(),
         first_response_deadline_at: LessThan(now),
       },
     });

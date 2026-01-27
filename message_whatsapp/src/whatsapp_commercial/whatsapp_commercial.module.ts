@@ -5,9 +5,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappCommercial } from './entities/user.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { QueueService } from 'src/dispatcher/services/queue.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WhatsappCommercial,QueuePosition])],
+  imports: [TypeOrmModule.forFeature([WhatsappCommercial,QueuePosition,WhatsappPoste])],
   controllers: [WhatsappCommercialController],
   providers: [WhatsappCommercialService,QueueService,],
   exports: [WhatsappCommercialService],

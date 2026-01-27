@@ -40,7 +40,7 @@ export class WhatsappMessageService {
   async createAgentMessage(data: {
     chat_id: string;
     text: string;
-    commercial_id: string;
+    poste_id: string;
     timestamp: Date;
     channel_id: string;
   }): Promise<WhatsappMessage> {
@@ -81,7 +81,7 @@ export class WhatsappMessageService {
       const messageEntity = this.messageRepository.create({
         message_id: whapiResponse.message.id ?? `agent_${Date.now()}`,
         external_id: whapiResponse.message.id,
-        commercial_id: data.commercial_id,
+        poste_id: data.poste_id,
         direction: MessageDirection.OUT,
         from_me: true,
         timestamp: data.timestamp,
@@ -89,7 +89,7 @@ export class WhatsappMessageService {
         source: 'agent_web',
         text: data.text,
         chat: chat,
-        commercial: chat.commercial ?? undefined,
+        poste: chat.poste ?? undefined,
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
         channel: channel,
@@ -106,7 +106,7 @@ export class WhatsappMessageService {
       const failedMessage = this.messageRepository.create({
         message_id: `failed_${Date.now()}`,
         chat_id: data.chat_id,
-        commercial_id: data.commercial_id,
+        poste_id: data.poste_id,
         direction: MessageDirection.OUT,
         from_me: true,
         timestamp: data.timestamp,

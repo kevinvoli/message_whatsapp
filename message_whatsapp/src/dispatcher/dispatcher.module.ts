@@ -16,14 +16,35 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PendingMessage, QueuePosition, WhatsappMessage, WhatsappChat,  WhatsappCommercial,WhapiChannel, Contact]),
+    TypeOrmModule.forFeature([
+      PendingMessage,
+      QueuePosition,
+      WhatsappMessage,
+      WhatsappChat,
+      WhatsappCommercial,
+      WhapiChannel,
+      Contact,
+      WhatsappPoste,
+    ]),
     forwardRef(() => WhatsappMessageModule),
   ],
   controllers: [],
-  providers: [DispatcherService ,QueueService,WhatsappMessageService,WhatsappChatService,CommunicationWhapiService,WhatsappCommercialService,ChannelService,ContactService],
-  exports: [DispatcherService, QueueService,],
+  providers: [
+    DispatcherService,
+    QueueService,
+    WhatsappMessageService,
+    WhatsappChatService,
+    CommunicationWhapiService,
+    WhatsappCommercialService,
+    ChannelService,
+    ContactService,
+    WhatsappPosteService,
+  ],
+  exports: [DispatcherService, QueueService],
 })
 export class DispatcherModule {}

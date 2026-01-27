@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -12,7 +13,6 @@ import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dt
 import { WhatsappCommercial } from './entities/user.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { QueueService } from 'src/dispatcher/services/queue.service';
-import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 
 export interface SafeWhatsappCommercial {
   id: string;
@@ -25,6 +25,7 @@ export class WhatsappCommercialService {
   constructor(
     @InjectRepository(WhatsappCommercial)
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
+
     @InjectRepository(QueuePosition)
     private readonly queuePositionRepository: Repository<QueuePosition>,
     private readonly queueService: QueueService,
@@ -160,10 +161,12 @@ export class WhatsappCommercialService {
     };
   }
 
-  async updateStatus(id: string, status: boolean) {
+async updateStatus(id: string, status: boolean) {
+  try {
     const user = await this.whatsappCommercialRepository.findOne({
       where: { id },
     });
+    
     if (!user) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
@@ -173,21 +176,37 @@ export class WhatsappCommercialService {
 
     const updatedUser = await this.whatsappCommercialRepository.save(user);
 
-    if (user.isConnected === false) {
-      console.log(
-        `🔌 Commercial ${user.name} (${user.id}) isConnected = ${status}`,
-      );
-    }
+    // Logging selon le statut
+    const statusText = status ? 'connecté' : 'déconnecté';
+    console.log(
+      `🔌 Commercial ${user.name} (${user.id}) est maintenant ${statusText}`,
+    );
 
-    if (user.isConnected === true) {
-      
-      console.log(
-        `🔌 Commercial ${user.name} (${user.id}) isConnected = ${status}`,
-      );
-    }
-
+    // Émettre un événement si nécessaire
+    // this.gateway.emitUserStatusUpdate(id, status);
+    
     return updatedUser;
+    
+  } catch (error) {
+    // Log détaillé de l'erreur
+    console.error(`❌ Erreur lors de la mise à jour du statut pour l'utilisateur ${id}:`, {
+      error: error.message,
+      stack: error.stack,
+      status,
+      timestamp: new Date().toISOString()
+    });
+
+    // Si l'erreur est déjà une HttpException, la relancer
+    if (error instanceof NotFoundException) {
+      throw error;
+    }
+
+    // Pour les autres erreurs, lancer une InternalServerErrorException
+    throw new InternalServerErrorException(
+      `Impossible de mettre à jour le statut de l'utilisateur ${id}. Erreur: ${error.message}`,
+    );
   }
+}
 
   async updatePassword(id: string, newPassword: string): Promise<void> {
     const user = await this.whatsappCommercialRepository.findOne({

@@ -2,8 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
-import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { Mutex } from 'async-mutex';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 @Injectable()
 export class QueueService {
@@ -14,8 +14,8 @@ export class QueueService {
     @InjectRepository(QueuePosition)
     private readonly queueRepository: Repository<QueuePosition>,
 
-    @InjectRepository(WhatsappCommercial)
-    private readonly userRepository: Repository<WhatsappCommercial>,
+    @InjectRepository(WhatsappPoste)
+    private readonly userRepository: Repository<WhatsappPoste>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -24,19 +24,19 @@ export class QueueService {
    * Adds a commercial to the end of the queue.
    * If the user is already in the queue, they are not added again.
    */
-  async addToQueue(userId: string): Promise<QueuePosition | null> {
+  async addToQueue(poste_id: string): Promise<QueuePosition | null> {
   
 
 
       const user = await this.userRepository.findOne({
-        where: { id: userId },
+        where: { id: poste_id },
       });
       if (!user) {
         return null; // ⬅️ plus de throw
       }
 
       const existingPosition = await this.queueRepository.findOne({
-        where: { userId },
+        where: { poste_id },
       });
 
       if (existingPosition) {
@@ -47,11 +47,9 @@ export class QueueService {
         .createQueryBuilder('qp')
         .select('MAX(qp.position)', 'max_position')
         .getRawOne<{ max_position: number | null }>();
-
       const nextPosition = (maxPositionResult?.max_position ?? 0) + 1;
-
       return this.queueRepository.save(
-        this.queueRepository.create({ userId, position: nextPosition }),
+        this.queueRepository.create({ poste_id, position: nextPosition }),
       );
     
   }
@@ -59,7 +57,7 @@ export class QueueService {
   /**
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
-  async removeFromQueue(userId: string): Promise<void> {
+  async removeFromQueue(poste_id: string): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -67,7 +65,7 @@ export class QueueService {
     try {
       const positionToRemove = await queryRunner.manager.findOne(
         QueuePosition,
-        { where: { userId } },
+        { where: { poste_id } },
       );
 
       if (!positionToRemove) {
@@ -97,12 +95,12 @@ export class QueueService {
   /**
    * Gets the next commercial in the queue (round-robin) and moves them to the end.
    */
-  async getNextInQueue(): Promise<WhatsappCommercial | null> {
+  async getNextInQueue(): Promise<WhatsappPoste | null> {
     return await this.queueLock.runExclusive(async () => {
       const nextInQueue = await this.queueRepository.findOne({
         where: {},
         order: { position: 'ASC' },
-        relations: ['user'],
+        relations: ['poste'],
       });
 
       this.logger.warn(
@@ -112,16 +110,16 @@ export class QueueService {
       if (!nextInQueue) {
         return null;
       }
-      if (!nextInQueue.user) {
+      if (!nextInQueue.poste) {
         throw new NotFoundException(
-          `User with ID ${nextInQueue.userId} not found for queue position.`,
+          `User with ID ${nextInQueue.poste_id} not found for queue position.`,
         );
       }
       this.logger.warn(
-        `⏳   agent disponible, a l'id: (${nextInQueue?.user.id})`,
+        `⏳   agent disponible, a l'id: (${nextInQueue?.poste.id})`,
       );
-      await this.moveToEnd(nextInQueue.userId);
-      return nextInQueue.user;
+      await this.moveToEnd(nextInQueue.poste_id);
+      return nextInQueue.poste;
     });
   }
 
@@ -165,7 +163,7 @@ export class QueueService {
     const rank = await this.queueRepository.find();
     const agent = await this. userRepository.find({
       where:{
-        isConnected:false
+        is_active:false
       }
     });
     

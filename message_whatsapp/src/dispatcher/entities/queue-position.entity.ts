@@ -1,4 +1,4 @@
-import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('queue_positions')
@@ -9,8 +9,8 @@ export class QueuePosition {
   })
   id: string;
 
-  @Column({ name: 'user_id' })
-  userId: string;
+  @Column({ name: 'poste_id' })
+  poste_id: string;
 
   @Column()
   position: number;
@@ -21,7 +21,7 @@ export class QueuePosition {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne(() => WhatsappCommercial)
-  @JoinColumn({ name: 'user_id' })
-  user: WhatsappCommercial;
+  @ManyToOne(() => WhatsappPoste)
+  @JoinColumn({ name: 'poste_id' })
+  poste: WhatsappPoste;
 }

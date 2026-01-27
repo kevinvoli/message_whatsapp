@@ -83,7 +83,7 @@ export class WhapiService {
         );
 
 
-      if (!conversation.chat_id || !conversation.commercial_id) {
+      if (!conversation.chat_id || !conversation.poste_id) {
         console.warn(
           "❌ Impossible d'émettre : chat_id ou commercial_id manquant",
           conversation,

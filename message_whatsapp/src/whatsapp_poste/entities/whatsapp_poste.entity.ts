@@ -1,10 +1,15 @@
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Column,
   CreateDateColumn,
+  Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
+@Entity()
 export class WhatsappPoste {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -20,7 +25,19 @@ export class WhatsappPoste {
     unique: true,
   })
   code: string;
-  // (SUPPORT, VENTE…)
+
+
+   @Column({
+    name: 'description',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
+   description: string;
+
+  @Column({ default: true })
+  is_active: boolean;
 
   @Column({
     name: 'name',
@@ -31,8 +48,13 @@ export class WhatsappPoste {
   })
   name: string; //(Service client)
 
-  description: string;
-  is_active: boolean;
+  @OneToMany(() => WhatsappChat, (chat) => chat.poste)
+  chats: WhatsappChat[];
+
+  @OneToMany(() => WhatsappMessage, (message) => message.poste)
+  messages: WhatsappMessage[];
+
+ 
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',

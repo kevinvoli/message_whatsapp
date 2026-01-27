@@ -1,8 +1,5 @@
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
-import { Entity, Column, PrimaryGeneratedColumn,CreateDateColumn, UpdateDateColumn, OneToMany, DeleteDateColumn } from 'typeorm';
-// import * as bcrypt from 'bcrypt';
 
+import { Entity, Column, PrimaryGeneratedColumn,CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 
 @Entity()
 export class WhatsappCommercial {
@@ -35,12 +32,6 @@ export class WhatsappCommercial {
 
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
-
-  @OneToMany(() => WhatsappChat, (chat) => chat.commercial)
-  chats: WhatsappChat[];
-
-  @OneToMany(() => WhatsappMessage, (message) => message.commercial)
-  messages: WhatsappMessage[];
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;

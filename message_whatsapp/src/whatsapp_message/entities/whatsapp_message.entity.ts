@@ -1,8 +1,8 @@
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import {
   BeforeInsert,
   Column,
@@ -97,12 +97,12 @@ export class WhatsappMessage {
   chat: WhatsappChat;
 
   @Column({
-    name: 'commercial_id',
+    name: 'poste_id',
     type: 'varchar',
     length: 100,
     nullable: true,
   })
-  commercial_id: string | null;
+  poste_id: string | null;
 
   @Column({
     name: 'longtext',
@@ -111,15 +111,15 @@ export class WhatsappMessage {
   })
   text: string | null;
 
-  @ManyToOne(() => WhatsappCommercial, (data) => data.messages, {
+  @ManyToOne(() => WhatsappPoste, (data) => data.messages, {
     nullable: true,
     onDelete: 'SET NULL',
   })
   @JoinColumn({
-    name: 'commercial_id',
+    name: 'poste_id',
     referencedColumnName: 'id',
   })
-  commercial?: WhatsappCommercial | null;
+  poste?: WhatsappPoste | null;
 
   @OneToMany(
     () => WhatsappMessageContent,

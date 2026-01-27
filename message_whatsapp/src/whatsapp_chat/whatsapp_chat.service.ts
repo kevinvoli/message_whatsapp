@@ -3,24 +3,23 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
-import { log } from 'console';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 
 @Injectable()
 export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
-        private readonly commercialService : WhatsappCommercialService,
+        private readonly posteService : WhatsappPosteService,
     
   ) {}
 
 // Dans WhatsappChatService
-async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
+async findByCommercialId(poste_id: string): Promise<WhatsappChat[]> {
 
   const  chats=
    await this.chatRepository.find({
-    where: { commercial_id: commercialId },
+    where: { poste_id: poste_id },
     order: { updatedAt: 'DESC' },
     relations: ['commercial','messages',],
   });
@@ -33,7 +32,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
     chatId: string,
     from: string,
     fromName: string,
-    commercialId: string,
+    posteId: string,
   ): Promise<WhatsappChat> {
     try {
       const existingChat = await this.chatRepository.findOne({
@@ -44,8 +43,8 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
         return existingChat;
       }
 
-      const commercial = await this.commercialService.findOneById(commercialId);
-      if (!commercial) {
+      const poste = await this.posteService.findOneById(posteId);
+      if (!poste) {
         throw new Error('Commercial not found');
       }
 
@@ -63,7 +62,7 @@ async findByCommercialId(commercialId: string): Promise<WhatsappChat[]> {
         unread_mention: false,
         read_only: false,
         not_spam: true,
-        commercial: commercial,
+        poste: poste,
         contact_client: from,
         last_activity_at: new Date(),
         createdAt: new Date(),

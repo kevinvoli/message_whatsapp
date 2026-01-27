@@ -17,6 +17,8 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
+import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 @Module({
   imports: [
@@ -26,10 +28,12 @@ import { Contact } from 'src/contact/entities/contact.entity';
       WhatsappMessageContent,
       WhatsappCommercial,
       QueuePosition,
-      WhapiChannel,Contact
+      WhapiChannel,
+      Contact,
+      WhatsappPoste
     ]),
     WhatsappChatModule,
-    forwardRef(() => DispatcherModule)
+    forwardRef(() => DispatcherModule),
   ],
   providers: [
     WhatsappChatService,
@@ -37,7 +41,10 @@ import { Contact } from 'src/contact/entities/contact.entity';
     WhatsappMessageService,
     WhatsappCommercialService,
     CommunicationWhapiService,
-    FirstResponseTimeoutJob,ChannelService,ContactService
+    FirstResponseTimeoutJob,
+    ChannelService,
+    ContactService,
+    WhatsappPosteService,
   ],
   exports: [WhatsappMessageGateway],
 })
