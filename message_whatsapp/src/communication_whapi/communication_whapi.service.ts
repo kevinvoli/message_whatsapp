@@ -66,4 +66,8 @@ export class CommunicationWhapiService {
     console.log(`Sending media to ${to} with URL ${mediaUrl}`);
     return Promise.resolve({ id: 'fake-media-id', status: 'sent' });
   }
+
+  getMediaUrl(mediaId: string): string {
+    return `https://gate.whapi.cloud/media/${mediaId}?token=${this.WHAPI_TOKEN}`;
+  }
 }

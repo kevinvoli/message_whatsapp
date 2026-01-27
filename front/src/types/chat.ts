@@ -26,6 +26,8 @@ export interface Message {
   sender_phone?: string;
   from_me: boolean;
   sender_name?: string;
+  type: string;
+  mediaUrl?: string;
 }
 
 export interface Conversation {
@@ -85,6 +87,8 @@ interface RawMessageData {
   from_name?: string;
   content?: string;
   createdAt?: string | number | Date;
+  type?: string;
+  mediaUrl?: string;
 }
 
 interface RawConversationData {
@@ -131,6 +135,8 @@ export const transformToMessage = (rawData: RawMessageData): Message => {
     sender_phone: rawData.from || "",
     sender_name: rawData.from_name || (rawData.from_me ? "Agent" : "Client"),
     from_me: !!rawData.from_me,
+    type: rawData.type || "text",
+    mediaUrl: rawData.mediaUrl,
   };
 };
 
