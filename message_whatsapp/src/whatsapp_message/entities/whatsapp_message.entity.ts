@@ -4,6 +4,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -126,15 +127,15 @@ export class WhatsappMessage {
   )
   messageCnntent: WhatsappMessageContent[];
 
-  @Column({ name: 'contact_id', type: 'uuid' })
-  contact_id: string;
+  @Column({ name: 'contact_id', type: 'uuid',nullable:true })
+  contact_id: string |null;
 
   @ManyToOne(() => Contact, (contact) => contact.messages, {
-    nullable: false,
+    nullable: true,
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'contact_id' })
-  contact: Contact;
+  contact: Contact | null;
 
   @Column({
     name: 'direction',
@@ -207,4 +208,11 @@ export class WhatsappMessage {
     comment: 'Timestamp when the trajet was deleted',
   })
   deletedAt: Date | null;
+
+  @BeforeInsert()
+  clearContactForAgentMessage() {
+    if (this.from_me) {
+      this.contact = null;
+    }
+  }
 }

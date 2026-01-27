@@ -44,10 +44,6 @@ export class WhatsappMessageService {
     timestamp: Date;
     channel_id: string;
   }): Promise<WhatsappMessage> {
-    console.log(
-      'qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq',
-      data,
-    );
 
     try {
       const chat = await this.chatService.findByChatId(data.chat_id);
@@ -83,9 +79,8 @@ export class WhatsappMessageService {
 
       // 2️⃣ Création message DB
       const messageEntity = this.messageRepository.create({
-        message_id: whapiResponse.id ?? `agent_${Date.now()}`,
-        external_id: whapiResponse.id,
-        chat_id: data.chat_id,
+        message_id: whapiResponse.message.id ?? `agent_${Date.now()}`,
+        external_id: whapiResponse.message.id,
         commercial_id: data.commercial_id,
         direction: MessageDirection.OUT,
         from_me: true,
@@ -98,6 +93,7 @@ export class WhatsappMessageService {
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
         channel: channel,
+        contact: null
       });
 
       const mes = await this.messageRepository.save(messageEntity);
@@ -308,6 +304,11 @@ export class WhatsappMessageService {
         message.from,
         message.from_name,
       );
+      if (!message.from_me) {
+        chat.last_msg_client_channel_id=channel.channel_id
+      }
+      await this.chatRepository.save(chat)
+
       const messagesss = await this.messageRepository.save(
         this.messageRepository.create({
           channel: channel,

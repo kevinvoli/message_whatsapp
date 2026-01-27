@@ -289,19 +289,20 @@ export class WhatsappMessageGateway
     try {
       console.log('le chat id est ici:', payload);
 
+      
+
+      const chat = await this.chatService.findByChatId(payload.chatId);
+
+      if (!chat) {
+        return;
+      }
       const message = await this.whatsappMessageService.createAgentMessage({
         chat_id: payload.chatId,
         text: payload.text,
         commercial_id: commercialId,
         timestamp: new Date(),
-        channel_id:payload.channel_id
+        channel_id:chat?.last_msg_client_channel_id ?? payload.channel_id
       });
-
-      const chat = await this.chatService.findByChatId(message.chat_id);
-
-      if (!chat) {
-        return;
-      }
       const lastMessage =
         await this.whatsappMessageService.findLastMessageByChatId(
           message.chat_id,

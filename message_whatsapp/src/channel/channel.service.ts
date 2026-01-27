@@ -70,8 +70,9 @@ export class ChannelService {
 
   async findOne(id: string) {
     const channel = await this.channelRepository.findOne({
-      where: { id },
+      where: { channel_id:id },
     });
+console.log("A la recherche du channel",channel);
 
     return channel;
   }

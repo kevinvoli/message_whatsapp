@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { WhapiSendMessageResponse } from './dto/whapi-send-message-response.dto';
 
 @Injectable()
 export class CommunicationWhapiService {
@@ -52,26 +53,26 @@ export class CommunicationWhapiService {
     text: string;
     to: string;
     channelId: string;
-  }): Promise<{
-    id: string;
-    status: number;
-    statusText: string;
-  }> {
+  }): Promise<WhapiSendMessageResponse> {
     const channel = await this.channelRepository.findOne({
       where: { channel_id: data.channelId },
     });
     const token = channel?.token;
 
     if (!channel) {
-      return { id: 'null', status: 500, statusText: 'null' };
+      throw new NotFoundException(
+    `Channel ${data.channelId} introuvable`,
+  );
     }
+console.log("affichage du channel trouver+++++++++++++++",channel);
 
     console.log("les channe a envoie =============================================",{
         to: data.to, // ex: "2250700000000"
         body: data.text,
+        channel:data.channelId
       },);
 
-    const response = await axios.post(
+    const response = await axios.post<WhapiSendMessageResponse>(
       this.WHAPI_URL,
       {
         to: data.to, // ex: "2250700000000"
@@ -84,12 +85,11 @@ export class CommunicationWhapiService {
         },
       },
     );
-    return response.data as {
-      id: string;
-      status: number;
-      statusText: string;
-    };
+console.log("affichage du channel trouver+++++++++++++++",response.data);
+
+    return response.data;
   }
+
 
   async getChannel(token: CreateChannelDto): Promise<ChanneDatalDto | null> {
     console.log('canal trouvye***********************', token.token);
