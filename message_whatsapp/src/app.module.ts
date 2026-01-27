@@ -25,6 +25,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TasksService } from './jorbs/tasks.service';
 import { ChannelModule } from './channel/channel.module';
 import { ContactModule } from './contact/contact.module';
+import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
 
 @Module({
   imports: [
@@ -39,7 +40,7 @@ import { ContactModule } from './contact/contact.module';
         SERVER_PORT:Joi.number().required()
       })
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule,ChannelModule, ContactModule ],
+    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule,ChannelModule, ContactModule, WhatsappPosteModule ],
   controllers: [AppController],
   providers: [AppService,TasksService],
 })
