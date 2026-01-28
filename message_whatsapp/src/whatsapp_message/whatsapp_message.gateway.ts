@@ -27,6 +27,7 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { channel } from 'diagnostics_channel';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 import { NotFoundException } from '@nestjs/common';
+import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -48,6 +49,7 @@ export class WhatsappMessageGateway
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly jobRunnner: FirstResponseTimeoutJob,
+     private readonly posteService: WhatsappPosteService,
   ) {}
 
   @WebSocketServer()
@@ -57,42 +59,67 @@ export class WhatsappMessageGateway
   private connectedAgents = new Map<string, string>();
 
   async handleConnection(client: Socket) {
-    console.log('🟢 Client connecté:', client.id);
-    try {
-      const commercialId = client.handshake.auth?.commercialId as string;
-      if (commercialId) {
-        this.connectedAgents.set(client.id, commercialId);
-        console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
-        await this.queueService.addToQueue(commercialId);
-        await this.dispatcherService.distributePendingMessages(commercialId);
-        await this.userService.updateStatus(commercialId, true);
-        await this.emitQueueUpdate();
-        console.log('nuew effff status socket', true);
-        this.jobRunnner.startAgentSlaMonitor(commercialId);
-        await this.queueService.removeALlRankOnfline(commercialId);
-      }
-    } catch (error) {
-      console.log('echec connection commercial', error);
+  console.log('🟢 Client connecté:', client.id);
 
-      throw new NotFoundException(error);
-    }
-    // Authentification via query params ou auth
-  }
+  try {
+    const commercialId = client.handshake.auth?.commercialId as string;
+    if (!commercialId) return;
 
-  async handleDisconnect(client: Socket) {
-    console.log('🔴 Client déconnecté:', client.id);
-    const commercialId = this.connectedAgents.get(client.id);
-    if (commercialId) {
-      this.connectedAgents.delete(client.id);
-      console.log(`👨‍💻 Agent ${commercialId} déconnecté (socket: ${client.id})`);
-      await this.queueService.removeFromQueue(commercialId);
-      console.log('nuew status AGent', false);
-      await this.userService.updateStatus(commercialId, false);
-      await this.queueService.tcheckALlRankAndAdd(commercialId);
-      this.jobRunnner.stopAgentSlaMonitor(commercialId);
-      await this.emitQueueUpdate();
-    }
+    this.connectedAgents.set(client.id, commercialId);
+
+    const commercial = await this.userService.findOne(commercialId);
+    if (!commercial.poste) return;
+
+    const posteId = commercial.poste.id;
+
+    // 1️⃣ Activer le commercial + le poste
+    await this.userService.updateStatus(commercialId, true);
+    await this.posteService.setActive(posteId, true);
+
+    // 2️⃣ Ajouter le poste à la queue
+    await this.queueService.addPosteToQueue(posteId);
+
+    // 3️⃣ Nettoyer les postes offline
+    await this.queueService.syncQueueWithActivePostes();
+
+    // 4️⃣ Dispatcher + SLA
+    await this.dispatcherService.distributePendingMessages(commercialId);
+    this.jobRunnner.startAgentSlaMonitor(commercialId);
+
+    await this.emitQueueUpdate();
+  } catch (error) {
+    console.error('❌ Échec connexion commercial', error);
   }
+}
+
+
+ async handleDisconnect(client: Socket) {
+  console.log('🔴 Client déconnecté:', client.id);
+
+  const commercialId = this.connectedAgents.get(client.id);
+  if (!commercialId) return;
+
+  this.connectedAgents.delete(client.id);
+
+  const commercial = await this.userService.findOne(commercialId);
+  if (!commercial?.poste) return;
+
+  const posteId = commercial.poste.id;
+
+  // 1️⃣ Désactiver
+  await this.userService.updateStatus(commercialId, false);
+  await this.posteService.setActive(posteId, false);
+
+  // 2️⃣ Retirer le poste de la queue
+  await this.queueService.removeFromQueue(posteId);
+
+  // 3️⃣ Réinitialiser si queue vide
+  await this.queueService.checkAndInitQueue();
+
+  this.jobRunnner.stopAgentSlaMonitor(commercialId);
+  await this.emitQueueUpdate();
+}
+
 
   public emitConversationReassigned(
     chat: WhatsappChat,

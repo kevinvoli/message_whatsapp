@@ -79,4 +79,10 @@ export class WhatsappPosteService {
       message: 'Poste désactivé avec succès',
     };
   }
+
+  async setActive(posteId: string, isActive: boolean): Promise<WhatsappPoste> {
+  const poste = await this.findOneById(posteId);
+  poste.is_active = isActive;
+  return await this.posteRepository.save(poste);
+}
 }

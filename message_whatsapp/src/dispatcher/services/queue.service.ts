@@ -9,7 +9,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private readonly queueLock: Mutex = new Mutex();
   constructor(
     @InjectRepository(QueuePosition)
@@ -18,54 +18,56 @@ export class QueueService {
     @InjectRepository(WhatsappPoste)
     private readonly posteRepository: Repository<WhatsappPoste>,
 
-    
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
 
-
     private readonly dataSource: DataSource,
+    
   ) {}
 
   /**
    * Adds a commercial to the end of the queue.
    * If the user is already in the queue, they are not added again.
    */
-  async addToQueue(poste_id: string): Promise<QueuePosition | null> {
-  
+  async addPosteToQueue(posteId: string): Promise<QueuePosition | null> {
+    const poste = await this.posteRepository.findOne({
+      where: { id: posteId },
+    });
 
-      const user = await this.commercialRepository.findOne({
-        where: { id: poste_id },
-        relations:['poste']
-      });
+    if (!poste) {
+      throw new NotFoundException('Poste introuvable');
+    }
 
+    // 2️⃣ Vérifier que le poste existe vraiment en DB
+ const existing = await this.queueRepository.findOne({
+    where: { poste_id: posteId },
+  });
 
-      if (!user) {
-        return null; // ⬅️ plus de throw
-      }
-    console.log("addition a la queu======", poste_id);
-      const existingPosition = await this.queueRepository.findOne({
-        where: { poste_id },
-      });
+  if (existing) return existing;
 
-      if (existingPosition) {
-        return existingPosition;
-      }
+    // 4️⃣ Calculer la prochaine position (globale)
 
-      const maxPositionResult = await this.queueRepository
-        .createQueryBuilder('qp')
-        .select('MAX(qp.position)', 'max_position')
-        .getRawOne<{ max_position: number | null }>();
-      const nextPosition = (maxPositionResult?.max_position ?? 0) + 1;
-      return this.queueRepository.save(
-        this.queueRepository.create({ poste_id, position: nextPosition }),
-      );
-    
+    const maxPositionResult = await this.queueRepository
+      .createQueryBuilder('qp')
+      .select('MAX(qp.position)', 'max_position')
+      .getRawOne<{ max_position: number | null }>();
+
+    const position  = (maxPositionResult?.max_position ?? 0) + 1;
+
+    // 5️⃣ Créer la position
+     const qp = this.queueRepository.create({
+    poste_id: posteId,
+    poste,
+    position,
+  });
+
+    return await this.queueRepository.save(qp);
   }
 
   /**
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
-  async removeFromQueue(poste_id: string): Promise<void> {
+  async removeFromQueue(posteId: string): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -73,7 +75,7 @@ export class QueueService {
     try {
       const positionToRemove = await queryRunner.manager.findOne(
         QueuePosition,
-        { where: { poste_id } },
+        { where: { poste_id: posteId } },
       );
 
       if (!positionToRemove) {
@@ -105,29 +107,23 @@ export class QueueService {
    */
   async getNextInQueue(): Promise<WhatsappPoste | null> {
     return await this.queueLock.runExclusive(async () => {
-      const nextInQueue = await this.queueRepository.findOne({
-        where: {},
+      const next = await this.queueRepository.findOne({
         order: { position: 'ASC' },
         relations: ['poste'],
       });
 
       this.logger.warn(
-        `⏳ Resherche  d'agent disponible, message mis en att---- (${nextInQueue?.id})`,
+        `⏳ Resherche  d'agent disponible, message mis en att---- (${next?.id})`,
       );
 
-      if (!nextInQueue) {
+      if (!next || !next.poste) {
         return null;
       }
-      if (!nextInQueue.poste) {
-        throw new NotFoundException(
-          `User with ID ${nextInQueue.poste_id} not found for queue position.`,
-        );
-      }
       this.logger.warn(
-        `⏳   agent disponible, a l'id: (${nextInQueue?.poste.id})`,
+        `✅ Poste disponible: ${next.poste.name} (${next.poste.id})`,
       );
-      await this.moveToEnd(nextInQueue.poste_id);
-      return nextInQueue.poste;
+      await this.moveToEnd(next.poste_id);
+      return next.poste;
     });
   }
 
@@ -142,50 +138,44 @@ export class QueueService {
 
   async moveToEnd(poste_id: string): Promise<void> {
     await this.removeFromQueue(poste_id);
-    await this.addToQueue(poste_id);
+    await this.addPosteToQueue(poste_id);
   }
 
-  async tcheckALlRankAndAdd(id: string) {
-    console.log('queue fantome', id);
+  async checkAndInitQueue(): Promise<void> {
+  const activeCount = await this.posteRepository.count({
+    where: { is_active: true },
+  });
 
-    const rank = await this.queueRepository.find();
-    const poste = await this.posteRepository.find();
-    
-    if (rank.length<=0) {
-      if (!poste) return null;
+  if (activeCount > 0) return;
 
-      for (const agen of poste) {
+  const postes = await this.posteRepository.find();
 
-        await this.addToQueue(agen.id);
-      }
+  for (const poste of postes) {
+    await this.addPosteToQueue(poste.id);
+  }
+}
+
+  async syncQueueWithActivePostes(): Promise<void> {
+  const activePostes = await this.posteRepository.find({
+    where: { is_active: true },
+  });
+
+  const activeIds = activePostes.map(p => p.id);
+  const queue = await this.queueRepository.find();
+
+  // supprimer les postes inactifs
+  for (const qp of queue) {
+    if (!activeIds.includes(qp.poste_id)) {
+      await this.removeFromQueue(qp.poste_id);
     }
-    const rankss = await this.queueRepository.find();
-
-    if (rank) return null;
-    return;
   }
 
-    async removeALlRankOnfline(id: string) {
-    console.log('queue fantome', id);
-
-    const rank = await this.queueRepository.find();
-    const agent = await this.posteRepository.find({
-      where:{
-        is_active:false
-      }
-    });
-    
-    if (rank) {
-      if (!agent) return null;
-
-      for (const agen of agent) {
-
-        await this.removeFromQueue(agen.id);
-      }
+  // ajouter les postes actifs absents
+  for (const poste of activePostes) {
+    const exists = queue.some(q => q.poste_id === poste.id);
+    if (!exists) {
+      await this.addPosteToQueue(poste.id);
     }
-    const rankss = await this.queueRepository.find();
-
-    if (rank) return null;
-    return;
   }
+}
 }
