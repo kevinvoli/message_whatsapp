@@ -14,11 +14,11 @@ export class WhatsappChatService {
   ) {}
 
   // Dans WhatsappChatService
-  async findByCommercialId(poste_id: string): Promise<WhatsappChat[]> {
+  async findByPosteId(poste_id: string): Promise<WhatsappChat[]> {
     const chats = await this.chatRepository.find({
       where: { poste_id: poste_id },
       order: { updatedAt: 'DESC' },
-      relations: ['commercial', 'messages'],
+      relations: ['poste', 'messages'],
     });
 
     return chats;
@@ -121,7 +121,7 @@ export class WhatsappChatService {
     if (chatId) {
       return this.chatRepository.find({
         where: { chat_id: chatId },
-        relations: ['commercial', 'messages'],
+        relations: ['poste', 'messages'],
       });
     }
     return this.chatRepository.find();
@@ -130,14 +130,14 @@ export class WhatsappChatService {
   async findByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { chat_id: chatId },
-      relations: ['commercial', 'messages'],
+      relations: ['poste', 'messages'],
     });
   }
 
   async findOne(id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { id },
-      relations: ['commercial', 'messages'],
+      relations: ['poste', 'messages'],
     });
   }
 

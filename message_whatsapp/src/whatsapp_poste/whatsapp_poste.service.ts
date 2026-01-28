@@ -30,9 +30,11 @@ export class WhatsappPosteService {
   /* =========================
       FIND ALL
   ========================== */
+  
   async findAll(): Promise<WhatsappPoste[]> {
     return await this.posteRepository.find({
       order: { created_at: 'DESC' },
+      relations:['commercial','messages']
     });
   }
 
@@ -48,6 +50,18 @@ export class WhatsappPosteService {
       throw new NotFoundException(`Poste avec l'id "${id}" introuvable`);
     }
 
+    return poste;
+  }
+
+  async findOneByCommercialId(commercialId: string): Promise<WhatsappPoste> {
+    const poste = await this.posteRepository.findOne({
+      where: { commercial:{id:commercialId},  },
+      relations:['commercial','messages']
+    });
+
+    if (!poste) {
+      throw new NotFoundException(`Poste avec l'id "${commercialId}" introuvable`);
+    }    
     return poste;
   }
 

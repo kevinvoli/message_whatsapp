@@ -72,7 +72,6 @@ export class ChannelService {
     const channel = await this.channelRepository.findOne({
       where: { channel_id:id },
     });
-console.log("A la recherche du channel",channel);
 
     return channel;
   }

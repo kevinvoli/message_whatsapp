@@ -127,7 +127,7 @@ export class WhatsappMessageService {
       return this.messageRepository.findOne({
         where: { chat_id: chatId },
         order: { timestamp: 'DESC' },
-        relations: ['chat', 'commercial'],
+        relations: ['chat', 'poste'],
       });
     } catch (error) {
       throw new NotFoundException(new Error(error));
@@ -154,13 +154,14 @@ export class WhatsappMessageService {
         .execute();
 
       // 2️⃣ Récupérer les messages
-      return await this.messageRepository.find({
+      const mess= await this.messageRepository.find({
         where: { chat_id: chatId },
-        relations: ['chat', 'commercial'],
+        relations: ['chat', 'poste'],
         order: { timestamp: 'ASC' },
         take: limit,
         skip: offset,
       });
+      return mess
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
     }

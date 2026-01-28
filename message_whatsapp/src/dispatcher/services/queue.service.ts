@@ -106,11 +106,15 @@ export class QueueService {
    * Gets the next commercial in the queue (round-robin) and moves them to the end.
    */
   async getNextInQueue(): Promise<WhatsappPoste | null> {
+    
     return await this.queueLock.runExclusive(async () => {
       const next = await this.queueRepository.findOne({
+        where: {}, 
         order: { position: 'ASC' },
         relations: ['poste'],
+        
       });
+
 
       this.logger.warn(
         `⏳ Resherche  d'agent disponible, message mis en att---- (${next?.id})`,
@@ -123,6 +127,8 @@ export class QueueService {
         `✅ Poste disponible: ${next.poste.name} (${next.poste.id})`,
       );
       await this.moveToEnd(next.poste_id);
+    console.log("================debut de la rechercher du puiste suivant=================",next.poste);
+
       return next.poste;
     });
   }

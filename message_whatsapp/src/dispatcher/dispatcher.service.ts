@@ -54,9 +54,9 @@ export class DispatcherService {
     console.log("=========================== conversation", conversation);
 
     // Déterminer si l'agent actuel est connecté
-    const currentAgentId = conversation?.poste?.id;
-    const isAgentConnected = currentAgentId
-      ? this.messageGateway.isAgentConnected(currentAgentId)
+    const currentPosteId = conversation?.poste?.id;
+    const isAgentConnected = currentPosteId
+      ? this.messageGateway.isAgentConnected(currentPosteId)
       : false;
 
     /**
@@ -64,6 +64,8 @@ export class DispatcherService {
      * → juste mettre à jour l’activité et le compteur de messages non lus
      */
     if (conversation && isAgentConnected) {
+      console.log("conversation existen et user connecte");
+      
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
       if (conversation.status === WhatsappChatStatus.FERME) {
@@ -93,7 +95,7 @@ export class DispatcherService {
 
     
     /**
-     * Cas 3️⃣ : conversation existante mais agent absent ou réassignation
+     * Cas 3️⃣ : conversation existante mais poste absent ou réassignation
      */
     console.log('conversation :', conversation);
 

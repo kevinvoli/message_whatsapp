@@ -17,10 +17,6 @@ export class WhatsappPosteController {
     return this.whatsappPosteService.findAll();
   }
 
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.whatsappPosteService.findOne(id);
-  // }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateWhatsappPosteDto: UpdateWhatsappPosteDto) {

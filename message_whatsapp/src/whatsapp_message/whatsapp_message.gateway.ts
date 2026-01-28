@@ -24,10 +24,8 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
-import { channel } from 'diagnostics_channel';
-import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
-import { NotFoundException } from '@nestjs/common';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
+import { NotFoundException } from '@nestjs/common';
 
 @WebSocketGateway(3001, {
   cors: {
@@ -156,24 +154,24 @@ export class WhatsappMessageGateway
   }
 
   public emitIncomingMessage(
-    chatId: string, // ⚠️ DOIT être chat.chat_id
-    posteId: string,
-    message: any,
+    // chatId: string, // ⚠️ DOIT être chat.chat_id
+    // posteId: string,
+    // message: any,
   ) {
-    const messageForFrontend = {
-      id: message.id,
-      text: message.text,
-      timestamp: new Date(`${message.timestamp}`).getTime(),
-      direction: message.direction,
-      from: message.from,
-      from_name: message.from_name || 'Client',
-      status: message.status,
-      from_me: false,
-    };
+    // const messageForFrontend = {
+    //   id: message.id,
+    //   text: message.text,
+    //   timestamp: new Date(`${message.timestamp}`).getTime(),
+    //   direction: message.direction,
+    //   from: message.from,
+    //   from_name: message.from_name || 'Client',
+    //   status: message.status,
+    //   from_me: false,
+    // };
 
-    const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-      ([_, agentId]) => agentId === posteId,
-    )?.[0];
+    // const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+    //   ([_, agentId]) => agentId === posteId,
+    // )?.[0];
   }
 
   public async emitIncomingConversation(chat: WhatsappChat) {
@@ -238,45 +236,75 @@ export class WhatsappMessageGateway
   // =========================
   // EVENT: conversations:get
   // =========================
-  @SubscribeMessage('conversations:get')
-  async handleGetConversations(@ConnectedSocket() client: Socket) {
-    const commercialId = this.connectedAgents.get(client.id);
-    if (!commercialId) {
-      return client.emit('error', { message: 'Not authenticated' });
-    }
+@SubscribeMessage('conversations:get')
+async handleGetConversations(@ConnectedSocket() client: Socket) {
+  const commercialId = this.connectedAgents.get(client.id);
 
-    try {
-      const chats = await this.chatService.findByCommercialId(commercialId);
-      const conversations = await Promise.all(
-        chats.map(async (chat) => {
-          const lastMessage =
-            await this.whatsappMessageService.findLastMessageByChatId(
-              chat.chat_id,
-            );
-          const unreadCount =
-            await this.whatsappMessageService.countUnreadMessages(chat.chat_id);
-          // console.log('chargement conversation:::::', lastMessage);
+  if (!commercialId) {
+    return client.emit('error', {
+      message: 'Not authenticated',
+    });
+  }
 
-          return {
-            ...chat,
-            last_message: lastMessage,
-            unread_count: unreadCount,
-          };
-        }),
-      );
+  try {
+    // 1️⃣ Récupérer le poste du commercial
+    const poste = await this.posteService.findOneByCommercialId(commercialId);
 
-      conversations.sort(
-        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-      );
-
-      client.emit('conversations:list', conversations);
-    } catch (error) {
-      client.emit('error', {
-        message: 'Failed to get conversations',
-        details: error.message,
+    // if (!poste || !poste.is_active) {
+    //   return client.emit('error', {
+    //     message: 'Aucun poste actif trouvé pour ce commercial',
+    //   });
+    // }
+     if (!poste) {
+      return client.emit('error', {
+        message: 'Aucun poste actif trouvé pour ce commercial',
       });
     }
+
+    // 2️⃣ Récupérer les chats du poste
+    const chats = await this.chatService.findByPosteId(poste.id);
+
+    if (!chats.length) {
+      return client.emit('conversations:list', []);
+    }
+
+    // console.log("chat trouve ========================",chats);
+    
+    // 3️⃣ Construire les conversations enrichies
+    const conversations = await Promise.all(
+      chats.map(async (chat) => {
+        const [lastMessage, unreadCount] = await Promise.all([
+          this.whatsappMessageService.findLastMessageByChatId(chat.chat_id),
+          this.whatsappMessageService.countUnreadMessages(chat.chat_id),
+        ]);
+        return {
+          ...chat,
+          last_message: lastMessage ?? null,
+          unread_count: unreadCount ?? 0,
+          last_activity:
+            lastMessage?.timestamp ?? chat.updatedAt ?? chat.createdAt,
+        };
+      }),
+    );
+
+
+    // 4️⃣ Trier par activité récente
+    conversations.sort(
+      (a, b) =>
+        new Date(b.last_activity).getTime() -
+        new Date(a.last_activity).getTime(),
+    );
+
+    // 5️⃣ Émettre au front
+    client.emit('conversations:list', conversations);
+  } catch (error) {
+    client.emit('error', {
+      message: 'Failed to get conversations',
+      details: error?.message ?? 'Unknown error',
+    });
   }
+}
+
 
   // =========================
   // EVENT: messages:get
@@ -290,12 +318,14 @@ export class WhatsappMessageGateway
     if (!commercialId) {
       return client.emit('error', { message: 'Not authenticated' });
     }
+console.log("chat trouve ========================",commercialId);
+    
 
     try {
       const messages = await this.whatsappMessageService.findByChatId(
         payload.chatId,
       );
-
+console.log("chat trouve ========================",messages);
       client.emit('messages:list', { chatId: payload.chatId, messages });
     } catch (error) {
       client.emit('error', {
@@ -314,6 +344,7 @@ export class WhatsappMessageGateway
     @MessageBody()
     payload: { chatId: string; text: string; channel_id: string },
   ) {
+
     const commercialId = this.connectedAgents.get(client.id);
     if (!commercialId) {
       return client.emit('error', { message: 'Not authenticated' });
@@ -323,6 +354,9 @@ export class WhatsappMessageGateway
       // console.log('le chat id est ici:', payload);
 
       const chat = await this.chatService.findByChatId(payload.chatId);
+
+console.log("chat trouve ========================++",chat);
+
 
       if (!chat) {
         return;
