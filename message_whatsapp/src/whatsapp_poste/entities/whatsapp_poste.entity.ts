@@ -1,4 +1,5 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   Column,
@@ -54,6 +55,8 @@ export class WhatsappPoste {
   @OneToMany(() => WhatsappMessage, (message) => message.poste)
   messages: WhatsappMessage[];
 
+   @OneToMany(() => WhatsappCommercial, (message) => message.poste)
+  commercial: WhatsappCommercial[];
  
   @CreateDateColumn({
     name: 'created_at',

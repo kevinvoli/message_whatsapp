@@ -1,12 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { EventEmitter } from 'events';
+import { ValidationPipe } from '@nestjs/common';
 
 
 
 async function bootstrap() {
    EventEmitter.defaultMaxListeners = 0;
   const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist:true,
+      forbidNonWhitelisted:true,
+      transform:true
+    })
+  )
 
   // Enable CORS for the frontend application
   app.enableCors({

@@ -4,6 +4,7 @@ import { DataSource, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
 import { Mutex } from 'async-mutex';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
 export class QueueService {
@@ -15,7 +16,12 @@ export class QueueService {
     private readonly queueRepository: Repository<QueuePosition>,
 
     @InjectRepository(WhatsappPoste)
-    private readonly userRepository: Repository<WhatsappPoste>,
+    private readonly posteRepository: Repository<WhatsappPoste>,
+
+    
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepository: Repository<WhatsappCommercial>,
+
 
     private readonly dataSource: DataSource,
   ) {}
@@ -27,14 +33,16 @@ export class QueueService {
   async addToQueue(poste_id: string): Promise<QueuePosition | null> {
   
 
-
-      const user = await this.userRepository.findOne({
+      const user = await this.commercialRepository.findOne({
         where: { id: poste_id },
+        relations:['poste']
       });
+
+
       if (!user) {
         return null; // ⬅️ plus de throw
       }
-
+    console.log("addition a la queu======", poste_id);
       const existingPosition = await this.queueRepository.findOne({
         where: { poste_id },
       });
@@ -126,27 +134,27 @@ export class QueueService {
   async getQueuePositions(): Promise<QueuePosition[]> {
     return await this.queueRepository.find({
       order: { position: 'ASC' },
-      relations: ['user'],
+      relations: ['poste'],
     });
   }
 
   //  suprime et ajouter a la queue
 
-  async moveToEnd(userId: string): Promise<void> {
-    await this.removeFromQueue(userId);
-    await this.addToQueue(userId);
+  async moveToEnd(poste_id: string): Promise<void> {
+    await this.removeFromQueue(poste_id);
+    await this.addToQueue(poste_id);
   }
 
   async tcheckALlRankAndAdd(id: string) {
     console.log('queue fantome', id);
 
     const rank = await this.queueRepository.find();
-    const agent = await this. userRepository.find();
+    const poste = await this.posteRepository.find();
     
     if (rank.length<=0) {
-      if (!agent) return null;
+      if (!poste) return null;
 
-      for (const agen of agent) {
+      for (const agen of poste) {
 
         await this.addToQueue(agen.id);
       }
@@ -161,7 +169,7 @@ export class QueueService {
     console.log('queue fantome', id);
 
     const rank = await this.queueRepository.find();
-    const agent = await this. userRepository.find({
+    const agent = await this.posteRepository.find({
       where:{
         is_active:false
       }

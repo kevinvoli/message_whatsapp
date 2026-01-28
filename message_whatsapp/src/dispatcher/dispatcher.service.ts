@@ -45,12 +45,13 @@ export class DispatcherService {
     mediaUrl?: string,
   ): Promise<WhatsappChat | null> {
     // 🔎 Chercher la conversation existante
+    
     let conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
-      relations: ['commercial', 'messages'],
+      relations: ['poste', 'messages'],
     });
 
-    // console.log(conversation);
+    console.log("=========================== conversation", conversation);
 
     // Déterminer si l'agent actuel est connecté
     const currentAgentId = conversation?.poste?.id;
@@ -90,9 +91,7 @@ export class DispatcherService {
       return null;
     }
 
-    console.log(
-      '______==__________il ne doit pas entre ici___________________',
-    );
+    
     /**
      * Cas 3️⃣ : conversation existante mais agent absent ou réassignation
      */
@@ -112,9 +111,7 @@ export class DispatcherService {
       conversation.first_response_deadline_at = new Date(
         Date.now() + 5*60 * 1000,
       );
-      // new Date(
-      //   Date.now() + 0.10 * 60 * 1000,
-      // );
+     
       conversation.last_client_message_at = new Date();
       return this.chatRepository.save(conversation);
     }
@@ -224,7 +221,7 @@ export class DispatcherService {
 
     const updatedChat = await this.chatRepository.findOne({
       where: { chat_id: chat.chat_id },
-      relations: ['commercial', 'messages'],
+      relations: ['poste', 'messages'],
     });
 
     if (!updatedChat) {

@@ -58,24 +58,25 @@ export class WhatsappMessageGateway
 
   async handleConnection(client: Socket) {
     console.log('🟢 Client connecté:', client.id);
-try {
-   const commercialId = client.handshake.auth?.commercialId as string;
-    if (commercialId) {
-      this.connectedAgents.set(client.id, commercialId);
-      console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
-      await this.queueService.addToQueue(commercialId);
-      await this.dispatcherService.distributePendingMessages(commercialId);
-      await this.userService.updateStatus(commercialId, true);
-      await this.emitQueueUpdate();
-      console.log('nuew effff status socket', true);
-      this.jobRunnner.startAgentSlaMonitor(commercialId);
-      await this.queueService.removeALlRankOnfline(commercialId);
+    try {
+      const commercialId = client.handshake.auth?.commercialId as string;
+      if (commercialId) {
+        this.connectedAgents.set(client.id, commercialId);
+        console.log(`👨‍💻 Agent ${commercialId} connecté (socket: ${client.id})`);
+        await this.queueService.addToQueue(commercialId);
+        await this.dispatcherService.distributePendingMessages(commercialId);
+        await this.userService.updateStatus(commercialId, true);
+        await this.emitQueueUpdate();
+        console.log('nuew effff status socket', true);
+        this.jobRunnner.startAgentSlaMonitor(commercialId);
+        await this.queueService.removeALlRankOnfline(commercialId);
+      }
+    } catch (error) {
+      console.log('echec connection commercial', error);
+
+      throw new NotFoundException(error);
     }
-} catch (error) {
-  throw new NotFoundException(error)
-}
     // Authentification via query params ou auth
-   
   }
 
   async handleDisconnect(client: Socket) {
@@ -95,16 +96,14 @@ try {
 
   public emitConversationReassigned(
     chat: WhatsappChat,
-    oldPosteId: string ,
+    oldPosteId: string,
     newPosteId: string,
   ) {
-
-
     // 🔴 1. Ancien commercial → suppression
     if (oldPosteId) {
       const oldSocketId = this.getSocketIdByCommercial(oldPosteId);
       if (oldSocketId) {
-    console.log('emition des event ------------------ ', oldPosteId);
+        console.log('emition des event ------------------ ', oldPosteId);
 
         this.server.to(oldSocketId).emit('conversation:removed', {
           chatId: chat.chat_id,
@@ -115,7 +114,7 @@ try {
     // 🟢 2. Nouveau commercial → ajout
     const newSocketId = this.getSocketIdByCommercial(newPosteId);
     if (newSocketId) {
-    console.log('emition des event ------------------ ', newPosteId);
+      console.log('emition des event ------------------ ', newPosteId);
 
       this.server.to(newSocketId).emit('conversation:assigned', {
         conversation: chat,
@@ -285,7 +284,8 @@ try {
   @SubscribeMessage('message:send')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: string; text: string,channel_id:string },
+    @MessageBody()
+    payload: { chatId: string; text: string; channel_id: string },
   ) {
     const commercialId = this.connectedAgents.get(client.id);
     if (!commercialId) {
@@ -305,11 +305,11 @@ try {
         text: payload.text,
         poste_id: commercialId,
         timestamp: new Date(),
-        channel_id:chat?.last_msg_client_channel_id ?? payload.channel_id
+        channel_id: chat?.last_msg_client_channel_id ?? payload.channel_id,
       });
 
-      console.log("seponse de sauvegarde",message);
-      
+      console.log('seponse de sauvegarde', message);
+
       const lastMessage =
         await this.whatsappMessageService.findLastMessageByChatId(
           message.chat_id,

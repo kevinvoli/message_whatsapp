@@ -1,47 +1,82 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateWhatsappPosteDto } from './dto/create-whatsapp_poste.dto';
-import { UpdateWhatsappPosteDto } from './dto/update-whatsapp_poste.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+
 import { WhatsappPoste } from './entities/whatsapp_poste.entity';
+import { CreateWhatsappPosteDto } from './dto/create-whatsapp_poste.dto';
+import { UpdateWhatsappPosteDto } from './dto/update-whatsapp_poste.dto';
 
 @Injectable()
 export class WhatsappPosteService {
-
   constructor(
-@InjectRepository(WhatsappPoste)
+    @InjectRepository(WhatsappPoste)
     private readonly posteRepository: Repository<WhatsappPoste>,
-   
-  ){}
+  ) {}
 
-  create(createWhatsappPosteDto: CreateWhatsappPosteDto) {
-    return 'This action adds a new whatsappPoste';
+  /* =========================
+      CREATE
+  ========================== */
+  async create(
+    createWhatsappPosteDto: CreateWhatsappPosteDto,
+  ): Promise<WhatsappPoste> {
+    const poste = this.posteRepository.create({
+      ...createWhatsappPosteDto,
+      is_active: createWhatsappPosteDto?.is_active ?? true,
+    });
+
+    return await this.posteRepository.save(poste);
   }
 
-  findAll() {
-    return `This action returns all whatsappPoste`;
+  /* =========================
+      FIND ALL
+  ========================== */
+  async findAll(): Promise<WhatsappPoste[]> {
+    return await this.posteRepository.find({
+      order: { created_at: 'DESC' },
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} whatsappPoste`;
-  }
+  /* =========================
+      FIND ONE BY ID
+  ========================== */
+  async findOneById(id: string): Promise<WhatsappPoste> {
+    const poste = await this.posteRepository.findOne({
+      where: { id },
+    });
 
-  async findOneById(id: string):Promise<WhatsappPoste> {
-      const poste = await this.posteRepository.findOne({
-        where: { id },
-      });
-      if (!poste) {
-        throw new NotFoundException(`User with ID "${id}" not found`);
-      }
-  
-      return poste
+    if (!poste) {
+      throw new NotFoundException(`Poste avec l'id "${id}" introuvable`);
     }
 
-  update(id: number, updateWhatsappPosteDto: UpdateWhatsappPosteDto) {
-    return `This action updates a #${id} whatsappPoste`;
+    return poste;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} whatsappPoste`;
+  /* =========================
+      UPDATE
+  ========================== */
+  async update(
+    id: string,
+    updateWhatsappPosteDto: UpdateWhatsappPosteDto,
+  ): Promise<WhatsappPoste> {
+    const poste = await this.findOneById(id);
+
+    Object.assign(poste, updateWhatsappPosteDto);
+
+    return await this.posteRepository.save(poste);
+  }
+
+  /* =========================
+      REMOVE (LOGICAL)
+  ========================== */
+  async remove(id: string): Promise<{ message: string }> {
+    const poste = await this.findOneById(id);
+
+    poste.is_active = false;
+
+    await this.posteRepository.save(poste);
+
+    return {
+      message: 'Poste désactivé avec succès',
+    };
   }
 }
