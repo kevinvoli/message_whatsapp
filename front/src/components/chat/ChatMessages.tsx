@@ -9,18 +9,7 @@ interface ChatMessagesProps {
 const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  console.log("📨 Messages reçus dans ChatMessages:", messages);
-  console.log("📊 Nombre de messages:", messages.length);
-  console.log("📋 Détail de chaque message:", 
-    messages.map((msg, index) => ({
-      index,
-      id: msg.id,
-      text: msg.text,
-      from: msg.from,
-      timestamp: msg.timestamp,
-      status: msg.status
-    }))
-  );
+
 
   const formatTime = (date: Date) => {
     try {
@@ -38,6 +27,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
     }
   };
 
+  console.log("dododododoodododododoodo",messages);
+  
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);

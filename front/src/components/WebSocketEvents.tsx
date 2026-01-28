@@ -25,7 +25,7 @@ const WebSocketEvents = () => {
     removeConversationByChatId,
     addConversation,
     loadConversations,
-    
+
     updateMessageStatus,
     setTyping,
     clearTyping,
@@ -43,8 +43,8 @@ const WebSocketEvents = () => {
       // --- Définition des handlers ---
 
       const handleConversationAssigned = (data: { conversation: any }) => {
-        console.log("================================bien recu==============================",data);
-        
+        console.log("================================bien recu==============================", data);
+
         const conversation = transformToConversation(data.conversation);
         addConversation(conversation);
       };
@@ -111,7 +111,7 @@ const WebSocketEvents = () => {
       socket.on('typing:stop', handleTypingStop);
       socket.on('error', handleError);
       socket.on('conversation:assigned', handleConversationAssigned);
-socket.on('conversation:removed', handleConversationRemoved);
+      socket.on('conversation:removed', handleConversationRemoved);
       // --- Nettoyage ---
       return () => {
         socket.off('conversations:list', handleConversationsList);

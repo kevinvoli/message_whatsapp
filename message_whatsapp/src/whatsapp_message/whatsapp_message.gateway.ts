@@ -320,7 +320,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       return client.emit('error', { message: 'Not authenticated' });
     }
 
-    console.log('chat trouve ========================', agent);
+    console.log('chat trouve ======ezvbhtngb==================', agent);
 
     try {
       const messages = await this.whatsappMessageService.findByChatId(

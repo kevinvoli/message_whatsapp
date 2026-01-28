@@ -128,6 +128,8 @@ removeConversationByChatId: (chatId: string) => {
   },
 
   addMessage: (message: Message) => {
+    console.log("ajouter les message++++++++++++++++",message);
+    
   set((state) => {
     const isActive =
       state.selectedConversation?.chat_id === message.sender_phone;
@@ -147,28 +149,64 @@ removeConversationByChatId: (chatId: string) => {
 },
 
 
-updateConversation: (conversation: Conversation) => {
-  console.log("mise a jour de la conversation",conversation);
-  
-  set((state) => {
-    const isSelected =
-      state.selectedConversation?.chat_id === conversation.chat_id;
+  updateConversation: (updatedConversation: Conversation) => {
+    set((state) => {
+      const isSelected =
+        state.selectedConversation?.chat_id === updatedConversation.chat_id;
+      const isOutgoing = updatedConversation.lastMessage?.from_me === true;
+      console.log("est ce que c'est faux", updatedConversation);
 
-    return {
-      conversations: state.conversations.some(
-        (c) => c.chat_id === conversation.chat_id,
-      )
+      const conversationExists = state.conversations.some(
+        (c) => c.chat_id === updatedConversation.chat_id,
+      );
+
+      // 🔥 Mise à jour du compteur unread
+      const conversationWithUnread: Conversation = {
+        ...updatedConversation,
+        unreadCount:
+          isSelected || isOutgoing
+            ? 0
+            : conversationExists
+              ? (state.conversations.find(
+                  (c) => c.chat_id === updatedConversation.chat_id,
+                )?.unreadCount ?? 0) + 1
+              : (updatedConversation.unreadCount ?? 1),
+      };
+
+      // 🔁 Liste des conversations
+      const newConversations = conversationExists
         ? state.conversations.map((c) =>
-            c.chat_id === conversation.chat_id ? conversation : c,
+            c.chat_id === updatedConversation.chat_id
+              ? conversationWithUnread
+              : c,
           )
-        : [conversation, ...state.conversations],
+        : [conversationWithUnread, ...state.conversations];
 
-      selectedConversation: isSelected
-        ? conversation
-        : state.selectedConversation,
-    };
-  });
-},
+      const newState: Partial<ChatState> = {
+        conversations: newConversations,
+      };
+
+      // 🟢 Conversation active
+      if (isSelected) {
+  newState.selectedConversation = conversationWithUnread;
+
+  if (
+    updatedConversation.lastMessage &&
+    !state.messages.find(
+      (m) => m.id === updatedConversation.lastMessage?.id
+    )
+  ) {
+    newState.messages = [
+      ...state.messages,
+      updatedConversation.lastMessage,
+    ];
+  }
+}
+
+      return newState;
+    });
+  },
+
 
 
 
