@@ -74,7 +74,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
       {messages.map((msg, index) => {
         // Validation des données
         const messageText = msg.text || "(Message sans texte)";
-        const messageFrom = msg.from === 'commercial' ? 'commercial' : 'client';
+        const messageFrom = msg.from_me? 'commercial'  : 'client';
         // Utilise une date valide ou null. La fonction formatTime gérera le cas null.
         const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
         // Crée un ID stable pour la clé en cas d'absence d'ID de message
