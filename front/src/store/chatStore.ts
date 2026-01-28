@@ -56,7 +56,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectConversation: (chatId: string) => {
   set((state) => {
     const conversation = state.conversations.find(
-      (c) => c.chatId === chatId
+      (c) => c.chat_id === chatId
     );
 
     if (!conversation) return state;
@@ -71,7 +71,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       selectedConversation: updatedConversation,
 
       conversations: state.conversations.map((c) =>
-        c.chatId === chatId ? updatedConversation : c
+        c.chat_id === chatId ? updatedConversation : c
       ),
 
       messages: [],
@@ -87,14 +87,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 removeConversationByChatId: (chatId: string) => {
   set((state) => ({
     conversations: state.conversations.filter(
-      (c) => c.chatId !== chatId,
+      (c) => c.chat_id !== chatId,
     ),
     selectedConversation:
-      state.selectedConversation?.chatId === chatId
+      state.selectedConversation?.chat_id === chatId
         ? null
         : state.selectedConversation,
     messages:
-      state.selectedConversation?.chatId === chatId
+      state.selectedConversation?.chat_id === chatId
         ? []
         : state.messages,
   }));
@@ -111,7 +111,7 @@ removeConversationByChatId: (chatId: string) => {
       );
 
       socket.emit("message:send", {
-        chatId: selectedConversation.chatId,
+        chatId: selectedConversation.chat_id,
         text,
       });
     }
@@ -122,7 +122,7 @@ removeConversationByChatId: (chatId: string) => {
   },
 
   setMessages: (chatId: string, messages) => {
-    if (get().selectedConversation?.chatId === chatId) {
+    if (get().selectedConversation?.chat_id === chatId) {
       set({ messages, isLoading: false });
     }
   },
@@ -130,7 +130,7 @@ removeConversationByChatId: (chatId: string) => {
   addMessage: (message: Message) => {
   set((state) => {
     const isActive =
-      state.selectedConversation?.chatId === message.sender_phone;
+      state.selectedConversation?.chat_id === message.sender_phone;
 
     return {
       messages: isActive
@@ -138,7 +138,7 @@ removeConversationByChatId: (chatId: string) => {
         : state.messages,
 
       conversations: state.conversations.map((c) =>
-        c.chatId === message.sender_phone
+        c.chat_id === message.sender_phone
           ? { ...c, lastMessage: message }
           : c,
       ),
@@ -148,16 +148,18 @@ removeConversationByChatId: (chatId: string) => {
 
 
 updateConversation: (conversation: Conversation) => {
+  console.log("mise a jour de la conversation",conversation);
+  
   set((state) => {
     const isSelected =
-      state.selectedConversation?.chatId === conversation.chatId;
+      state.selectedConversation?.chat_id === conversation.chat_id;
 
     return {
       conversations: state.conversations.some(
-        (c) => c.chatId === conversation.chatId,
+        (c) => c.chat_id === conversation.chat_id,
       )
         ? state.conversations.map((c) =>
-            c.chatId === conversation.chatId ? conversation : c,
+            c.chat_id === conversation.chat_id ? conversation : c,
           )
         : [conversation, ...state.conversations],
 
@@ -226,7 +228,7 @@ updateConversation: (conversation: Conversation) => {
   ) => {
     set((state) => {
       // Met à jour le message dans la liste des messages de la conversation active
-      if (state.selectedConversation?.chatId === chatId) {
+      if (state.selectedConversation?.chat_id === chatId) {
         return {
           messages: state.messages.map((m) =>
             m.id === messageId ? { ...m, status } : m,

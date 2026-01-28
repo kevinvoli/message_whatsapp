@@ -112,7 +112,6 @@ export class QueueService {
         where: {}, 
         order: { position: 'ASC' },
         relations: ['poste'],
-        
       });
 
 
@@ -127,7 +126,7 @@ export class QueueService {
         `✅ Poste disponible: ${next.poste.name} (${next.poste.id})`,
       );
       await this.moveToEnd(next.poste_id);
-    console.log("================debut de la rechercher du puiste suivant=================",next.poste);
+    // console.log("================debut de la rechercher du puiste suivant=================",next.poste);
 
       return next.poste;
     });

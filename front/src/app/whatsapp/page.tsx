@@ -37,7 +37,7 @@ const WhatsAppPage = () => {
     // Gérer la sélection d'une conversation
     const handleSelectConversation = useCallback((conversation: Conversation) => {
         console.log("🎯 Sélection de la conversation:", conversation.clientName);
-        selectConversation(conversation.chatId);
+        selectConversation(conversation.chat_id);
       }, [selectConversation]);
 
   // Envoyer un message

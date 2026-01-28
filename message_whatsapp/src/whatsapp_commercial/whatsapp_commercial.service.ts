@@ -28,6 +28,8 @@ export class WhatsappCommercialService {
     // private readonly queueService: QueueService,
   ) {}
 
+
+
    private toSafeUser(user: WhatsappCommercial): SafeWhatsappCommercial {
   const {
     password,
@@ -39,6 +41,16 @@ export class WhatsappCommercialService {
 
   return safe;
 }
+
+async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | null> {
+  return this.whatsappCommercialRepository
+    .createQueryBuilder('user')
+    .addSelect(['user.password', 'user.salt'])
+    .leftJoinAndSelect('user.poste', 'poste')
+    .where('user.email = :email', { email })
+    .getOne();
+}
+
 
 
   async findOneByEmail(email: string): Promise<WhatsappCommercial | null> {
@@ -254,7 +266,7 @@ async updateStatus(id: string, status: boolean):Promise<SafeWhatsappCommercial> 
   async findByEmail(email: string): Promise<SafeWhatsappCommercial | null> {
     return this.whatsappCommercialRepository.findOne({
       where: { email },
-      relations: ['roles', 'roles.permissions'],
+      relations: ['poste'],
     });
   }
 

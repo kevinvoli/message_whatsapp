@@ -9,6 +9,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  poste_id:string;
 }
 
 interface AuthContextType {
@@ -65,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
       });
-      console.log("mon user est connecté ici:", response);
+      console.debug("mon user est connecté ici:", response);
       
       const { token: authToken, user: userData } = response.data;
       

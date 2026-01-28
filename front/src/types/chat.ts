@@ -14,7 +14,7 @@ export interface Commercial {
   id: string;
   name: string;
   email: string;
-  posteId: string;
+  poste_id: string;
   poste?: Poste;
 }
 
@@ -32,8 +32,8 @@ export interface Message {
   status?: "sending" | "sent" | "delivered" | "read" | "error";
   direction?: "IN" | "OUT";
 
-  commercialId?: string | null; // UNIQUEMENT si from_me = true
-  posteId?: string; // toujours présent
+  commercial_id?: string | null; // UNIQUEMENT si from_me = true
+  poste_id?: string; // toujours présent
 }
 
 
@@ -47,9 +47,9 @@ export interface Poste {
 
 export interface Conversation {
   id: string;
-  chatId: string;
+  chat_id: string;
 
-  posteId: string;
+  poste_id: string;
   poste?: Poste;
 
   clientName: string;
@@ -75,12 +75,12 @@ export interface WebSocketMessage {
     | "message_status"
     | "conversation_reassigned"
     | "send_message";
-  commercialId?: string;
+  commercial_id?: string;
   token?: string;
-  conversationId?: string;
+  conversation_id?: string;
   conversation?: Conversation;
   message?: Message;
-  messageId?: string;
+  message_id?: string;
   status?: string;
   clientPhone?: string;
   text?: string;
@@ -124,7 +124,7 @@ interface RawConversationData {
     code: string;
   };
 
-  client_name?: string;
+  name?: string;
   client_phone?: string;
 
   last_message?: RawMessageData | null;
@@ -174,8 +174,8 @@ export const transformToMessage = (raw: RawMessageData): Message => ({
   direction: raw.direction,
   status: raw.status as MessageStatus,
 
-  commercialId: raw.from_me ? raw.commercial_id ?? null : null,
-  posteId: raw.poste_id,
+  commercial_id: raw.from_me ? raw.commercial_id ?? null : null,
+  poste_id: raw.poste_id,
 });
 
 
@@ -185,11 +185,13 @@ export const transformToMessage = (raw: RawMessageData): Message => ({
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
+  console.log('=========================================',raw);
+  
   return {
     id: raw.id,
-    chatId: raw.chat_id,
+    chat_id: raw.chat_id,
 
-    posteId: raw.poste_id,
+    poste_id: raw.poste_id,
     poste: raw.poste
       ? {
           id: raw.poste.id,
@@ -199,7 +201,7 @@ export const transformToConversation = (
         }
       : undefined,
 
-    clientName: raw.client_name || "Client inconnu",
+    clientName: raw.name || "Client inconnu",
     clientPhone:
       raw.client_phone || raw.chat_id?.split("@")[0] || "",
 
@@ -227,7 +229,7 @@ export const transformToCommercial = (
     name: raw.name || raw.username || "",
     email: raw.email,
 
-    posteId: raw.poste_id,
+    poste_id: raw.poste_id,
 
     poste: raw.poste
       ? {
@@ -273,8 +275,8 @@ export const isValidConversation = (
 
   return (
     typeof conv.id === "string" &&
-    typeof conv.chatId === "string" &&
-    typeof conv.posteId === "string" &&
+    typeof conv.chat_id === "string" &&
+    typeof conv.poste_id === "string" &&
     typeof conv.clientName === "string" &&
     typeof conv.clientPhone === "string" &&
     typeof conv.unreadCount === "number" &&

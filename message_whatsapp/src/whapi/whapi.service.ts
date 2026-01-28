@@ -76,7 +76,6 @@ export class WhapiService {
       }
 
       // 2️⃣ Sauvegarde en base
-      const savedMessage =
         await this.whatsappMessageService.saveIncomingFromWhapi(
           message,
           conversation,

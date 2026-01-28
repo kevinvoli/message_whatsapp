@@ -201,7 +201,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
         unreadCount: unreadCount,
       };
 
-      // console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', conversation);
+      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', conversation);
 
       // Émettre l'événement de mise à jour de conversation à l'agent spécifique
       this.server.to(targetSocketId).emit('conversation:updated', conversation);
@@ -654,7 +654,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
           last_message: lastMessage,
           unread_count: unreadCount,
         };
-        console.log('chat est icciccccccccccccccccccccccccc', targetSocketId);
+        console.log('chat est icciccccccccccccccccccccccccc', conversationPayload);
 
         this.server
           .to(targetSocketId)
