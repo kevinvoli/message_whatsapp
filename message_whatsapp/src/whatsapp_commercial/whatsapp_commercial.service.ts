@@ -52,6 +52,13 @@ export class WhatsappCommercialService {
     });
   }
 
+  findOneWithPoste(id: string) {
+  return this.whatsappCommercialRepository.findOne({
+    where: { id },
+    relations: ['poste'],
+  });
+}
+
   async create(
     createWhatsappCommercialDto: CreateWhatsappCommercialDto,
   ): Promise<SafeWhatsappCommercial> {

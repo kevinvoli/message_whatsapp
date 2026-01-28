@@ -14,34 +14,56 @@ export interface Commercial {
   id: string;
   name: string;
   email: string;
+  posteId: string;
+  poste?: Poste;
 }
 
 export interface Message {
   id: string;
   text: string;
   timestamp: Date;
+
   from: "commercial" | "client";
+  from_me: boolean;
+
+  sender_name?: string;
+  sender_phone?: string;
+
   status?: "sending" | "sent" | "delivered" | "read" | "error";
   direction?: "IN" | "OUT";
-  sender_phone?: string;
-  from_me: boolean;
-  sender_name?: string;
+
+  commercialId?: string | null; // UNIQUEMENT si from_me = true
+  posteId?: string; // toujours présent
+}
+
+
+export interface Poste {
+  id: string;
+  name: string; // ex: "Service client"
+  code: string;
+  description?: string;
+  isActive: boolean;
 }
 
 export interface Conversation {
   id: string;
   chatId: string;
+
+  posteId: string;
+  poste?: Poste;
+
   clientName: string;
   clientPhone: string;
+
   lastMessage: Message | null;
-  messages: Message[];
   unreadCount: number;
-  commercialId?: string | null;
-  name: string;
+
   status: "actif" | "en attente" | "fermé";
+
   createdAt: Date;
   updatedAt: Date;
 }
+
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "error";
 
@@ -77,41 +99,59 @@ export interface LoginFormData {
 interface RawMessageData {
   id: string;
   text?: string | null;
-  timestamp: string | number | Date;
+  timestamp?: string | number | Date;
+  createdAt?: string | number | Date;
+
   from_me: boolean;
-  status: string;
   direction: "IN" | "OUT";
+  status?: string;
+
   from: string;
   from_name?: string;
-  content?: string;
-  createdAt?: string | number | Date;
+
+  commercial_id?: string | null;
+  poste_id: string;
 }
 
 interface RawConversationData {
   id: string;
   chat_id: string;
-  clientName?: string; // Gardé pour la compatibilité
+
+  poste_id: string;
+  poste?: {
+    id: string;
+    name: string;
+    code: string;
+  };
+
   client_name?: string;
-  name?: string;
-  clientPhone?: string;
   client_phone?: string;
-  messages?: RawMessageData[];
+
   last_message?: RawMessageData | null;
-  lastMessage?: RawMessageData | null;
-  unreadCount?: number; // Gardé pour la compatibilité
   unread_count?: number;
-  commercial_id?: string | null;
+
   status: "actif" | "en attente" | "fermé";
+
   created_at: string | number | Date;
   updated_at: string | number | Date;
 }
+
 
 interface RawCommercialData {
   id: string;
   name?: string;
   username?: string;
   email: string;
+  poste_id: string;
+  poste?: {
+    id: string;
+    name: string;
+    code: string;
+    description?: string;
+    isActive?: boolean;
+  };
 }
+
 
 // ==============================================
 // FONCTIONS DE TRANSFORMATION
@@ -120,74 +160,87 @@ interface RawCommercialData {
 /**
  * Transforme des données brutes en un objet Message valide.
  */
-export const transformToMessage = (rawData: RawMessageData): Message => {
-  return {
-    id: rawData.id,
-    text: rawData.text || rawData.content || "",
-    timestamp: new Date(rawData.timestamp || rawData.createdAt || Date.now()),
-    from: rawData.from_me ? "commercial" : "client",
-    status: (rawData.status as MessageStatus) || "sent",
-    direction: rawData.direction || (rawData.from_me ? "OUT" : "IN"),
-    sender_phone: rawData.from || "",
-    sender_name: rawData.from_name || (rawData.from_me ? "Agent" : "Client"),
-    from_me: !!rawData.from_me,
-  };
-};
+export const transformToMessage = (raw: RawMessageData): Message => ({
+  id: raw.id,
+  text: raw.text || "",
+  timestamp: new Date(raw.timestamp || raw.createdAt || Date.now()),
+
+  from: raw.from_me ? "commercial" : "client",
+  from_me: !!raw.from_me,
+
+  sender_phone: raw.from,
+  sender_name: raw.from_name || (raw.from_me ? "Agent" : "Client"),
+
+  direction: raw.direction,
+  status: raw.status as MessageStatus,
+
+  commercialId: raw.from_me ? raw.commercial_id ?? null : null,
+  posteId: raw.poste_id,
+});
+
 
 /**
  * Transforme des données brutes en un objet Conversation valide.
  */
 export const transformToConversation = (
-  rawData: RawConversationData,
+  raw: RawConversationData,
 ): Conversation => {
-  const messages: Message[] = Array.isArray(rawData.messages)
-    ? rawData.messages.map(transformToMessage)
-    : [];
-  // console.log("dernier message", rawData);
+  return {
+    id: raw.id,
+    chatId: raw.chat_id,
 
-  const message = {
-    id: rawData.id,
-    chatId: rawData.chat_id,
-    clientName:
-      rawData.client_name ||
-      rawData.name ||
-      rawData.clientName ||
-      "Client Inconnu",
+    posteId: raw.poste_id,
+    poste: raw.poste
+      ? {
+          id: raw.poste.id,
+          name: raw.poste.name,
+          code: raw.poste.code,
+          isActive: true,
+        }
+      : undefined,
+
+    clientName: raw.client_name || "Client inconnu",
     clientPhone:
-      rawData.client_phone ||
-      rawData.clientPhone ||
-      rawData.chat_id?.split("@")[0] ||
-      "",
-    lastMessage: rawData.last_message
-  ? transformToMessage(rawData.last_message)
-  : rawData.lastMessage
-    ? transformToMessage(rawData.lastMessage)
-    : null,
+      raw.client_phone || raw.chat_id?.split("@")[0] || "",
 
-    messages,
-    unreadCount: rawData.unread_count ?? rawData.unreadCount ?? 0,
-    commercialId: rawData.commercial_id,
-    name: rawData.name || rawData.clientName || "Conversation",
-    status: rawData.status || "en attente",
-    createdAt: new Date(rawData.created_at),
-    updatedAt: new Date(rawData.updated_at),
+    lastMessage: raw.last_message
+      ? transformToMessage(raw.last_message)
+      : null,
+
+    unreadCount: raw.unread_count ?? 0,
+    status: raw.status,
+
+    createdAt: new Date(raw.created_at),
+    updatedAt: new Date(raw.updated_at),
   };
-
-  return message
 };
+
 
 /**
  * Transforme des données brutes en un objet Commercial valide.
  */
 export const transformToCommercial = (
-  rawData: RawCommercialData,
+  raw: RawCommercialData,
 ): Commercial => {
   return {
-    id: rawData.id,
-    name: rawData.name || rawData.username || "",
-    email: rawData.email,
+    id: raw.id,
+    name: raw.name || raw.username || "",
+    email: raw.email,
+
+    posteId: raw.poste_id,
+
+    poste: raw.poste
+      ? {
+          id: raw.poste.id,
+          name: raw.poste.name,
+          code: raw.poste.code,
+          description: raw.poste.description,
+          isActive: raw.poste.isActive ?? true,
+        }
+      : undefined,
   };
 };
+
 
 // ==============================================
 // FONCTIONS DE VALIDATION (TYPE GUARDS)
@@ -211,16 +264,24 @@ export const isValidMessage = (data: unknown): data is Message => {
 /**
  * Valide si un objet est une Conversation valide.
  */
-export const isValidConversation = (data: unknown): data is Conversation => {
+export const isValidConversation = (
+  data: unknown,
+): data is Conversation => {
   if (typeof data !== "object" || data === null) return false;
+
   const conv = data as Conversation;
+
   return (
     typeof conv.id === "string" &&
     typeof conv.chatId === "string" &&
+    typeof conv.posteId === "string" &&
     typeof conv.clientName === "string" &&
-    Array.isArray(conv.messages)
+    typeof conv.clientPhone === "string" &&
+    typeof conv.unreadCount === "number" &&
+    ["actif", "en attente", "fermé"].includes(conv.status)
   );
 };
+
 
 /**
  * Valide si un objet est un Commercial valide.

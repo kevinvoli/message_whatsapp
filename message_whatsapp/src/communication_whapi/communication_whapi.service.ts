@@ -64,13 +64,13 @@ export class CommunicationWhapiService {
     `Channel ${data.channelId} introuvable`,
   );
     }
-console.log("affichage du channel trouver+++++++++++++++",channel);
+// console.log("affichage du channel trouver+++++++++++++++",channel);
 
-    console.log("les channe a envoie =============================================",{
-        to: data.to, // ex: "2250700000000"
-        body: data.text,
-        channel:data.channelId
-      },);
+    // console.log("les channe a envoie =============================================",{
+    //     to: data.to, // ex: "2250700000000"
+    //     body: data.text,
+    //     channel:data.channelId
+    //   },);
 
     const response = await axios.post<WhapiSendMessageResponse>(
       this.WHAPI_URL,
@@ -85,7 +85,7 @@ console.log("affichage du channel trouver+++++++++++++++",channel);
         },
       },
     );
-console.log("affichage du channel trouver+++++++++++++++",response.data);
+// console.log("affichage du channel trouver+++++++++++++++",response.data);
 
     return response.data;
   }

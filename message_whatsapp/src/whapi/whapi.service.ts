@@ -37,7 +37,7 @@ export class WhapiService {
     message.channel_id =  payload.channel_id;
 
 
-      console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
+      // console.log('chaine a evitéttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt',message.from,message.from_name);
 
      function extractPhoneNumber(chatId: string): string {
       console.log("conversation bani:", toString());

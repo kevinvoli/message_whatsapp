@@ -53,7 +53,7 @@ export class WhatsappPosteService {
     return poste;
   }
 
-  async findOneByCommercialId(commercialId: string): Promise<WhatsappPoste> {
+  async findOneByPosteId(commercialId: string): Promise<WhatsappPoste> {
     const poste = await this.posteRepository.findOne({
       where: { commercial:{id:commercialId},  },
       relations:['commercial','messages']

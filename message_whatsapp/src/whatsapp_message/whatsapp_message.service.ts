@@ -179,7 +179,7 @@ export class WhatsappMessageService {
           ]),
         },
       });
-      console.log('c=============compteur message =================', count);
+      // console.log('c=============compteur message =================', count);
 
       return count;
     } catch (error) {
@@ -267,13 +267,13 @@ export class WhatsappMessageService {
         console.log('Message not found for status update:', status.id);
         return null;
       }
-      console.log('les info du status', messages);
+      // console.log('les info du status', messages);
       messages.status = status.status as WhatsappMessageStatus;
 
-      console.log('les info du status======', messages);
+      // console.log('les info du status======', messages);
 
       const result = await this.messageRepository.save(messages);
-      console.log('====== status======', result);
+      // console.log('====== status======', result);
     } catch (error) {
       throw new Error(`Failed to update message status: ${String(error)}`);
     }

@@ -61,6 +61,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (!conversation) return state;
 
+
     const updatedConversation = {
       ...conversation,
       unreadCount: 0,
@@ -85,7 +86,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
 removeConversationByChatId: (chatId: string) => {
   set((state) => ({
-    conversations: state.conversations.filter(c => c.chatId !== chatId),
+    conversations: state.conversations.filter(
+      (c) => c.chatId !== chatId,
+    ),
     selectedConversation:
       state.selectedConversation?.chatId === chatId
         ? null
@@ -96,6 +99,7 @@ removeConversationByChatId: (chatId: string) => {
         : state.messages,
   }));
 },
+
 
 
   sendMessage: (text: string) => {
@@ -124,62 +128,46 @@ removeConversationByChatId: (chatId: string) => {
   },
 
   addMessage: (message: Message) => {
-    set((state) => ({
-      messages: [...state.messages, message],
-    }));
-  },
-
- updateConversation: (updatedConversation: Conversation) => {
   set((state) => {
-    const isSelected =
-      state.selectedConversation?.id === updatedConversation.id;
+    const isActive =
+      state.selectedConversation?.chatId === message.sender_phone;
 
-    const conversationExists = state.conversations.some(
-      (c) => c.id === updatedConversation.id
-    );
+    return {
+      messages: isActive
+        ? [...state.messages, message]
+        : state.messages,
 
-    // 🔥 Mise à jour du compteur unread
-    const conversationWithUnread: Conversation = {
-      ...updatedConversation,
-      unreadCount: isSelected
-        ? 0
-        : conversationExists
-        ? (state.conversations.find(c => c.id === updatedConversation.id)
-            ?.unreadCount ?? 0) + 1
-        : updatedConversation.unreadCount ?? 1,
+      conversations: state.conversations.map((c) =>
+        c.chatId === message.sender_phone
+          ? { ...c, lastMessage: message }
+          : c,
+      ),
     };
-
-    // 🔁 Liste des conversations
-    const newConversations = conversationExists
-      ? state.conversations.map((c) =>
-          c.id === updatedConversation.id ? conversationWithUnread : c
-        )
-      : [conversationWithUnread, ...state.conversations];
-
-    const newState: Partial<ChatState> = {
-      conversations: newConversations,
-    };
-
-    // 🟢 Conversation active
-    if (isSelected) {
-      newState.selectedConversation = conversationWithUnread;
-
-      if (
-        updatedConversation.lastMessage &&
-        !state.messages.find(
-          (m) => m.id === updatedConversation.lastMessage?.id
-        )
-      ) {
-        newState.messages = [
-          ...state.messages,
-          updatedConversation.lastMessage,
-        ];
-      }
-    }
-
-    return newState;
   });
 },
+
+
+updateConversation: (conversation: Conversation) => {
+  set((state) => {
+    const isSelected =
+      state.selectedConversation?.chatId === conversation.chatId;
+
+    return {
+      conversations: state.conversations.some(
+        (c) => c.chatId === conversation.chatId,
+      )
+        ? state.conversations.map((c) =>
+            c.chatId === conversation.chatId ? conversation : c,
+          )
+        : [conversation, ...state.conversations],
+
+      selectedConversation: isSelected
+        ? conversation
+        : state.selectedConversation,
+    };
+  });
+},
+
 
 
   // updateConversation: (updatedConversation: Conversation) => {
