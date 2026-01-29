@@ -11,11 +11,11 @@ export class CreateWhatsappPosteDto {
   @Length(2, 100)
   code: string; // ex: "SUPPORT"
 
-  @IsString()
-  @IsNotEmpty()
-  @Length(5, 100)
-  @IsOptional()
-  description: string;
+  // @IsString()
+  // @IsNotEmpty()
+  // @Length(5, 100)
+  // @IsOptional()
+  // description: string;
 
   @IsOptional()
   @IsBoolean()
