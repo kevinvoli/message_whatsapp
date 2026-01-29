@@ -271,88 +271,72 @@ export class WhatsappMessageGateway
   // =========================
   // EVENT: conversations:get
   // =========================
-  @SubscribeMessage('conversations:get')
-  async handleGetConversations(@ConnectedSocket() client: Socket) {
-      console.log("chat trouve1 list ========================",client.id);
-      
+@SubscribeMessage('conversations:get')
+async handleGetConversations(@ConnectedSocket() client: Socket) {
+  console.log('📥 conversations:get', client.id);
 
-    const commercialId = this.connectedAgents.get(client.id);
-    if (!commercialId) {
-      console.log("chat trouve ======================== erreur");
-
-      return client.emit('error', { message: 'Not authenticated' });
-    }
-      console.log("chat trouve ========================",commercialId);
-
-    try {
-      // 1️⃣ On récupère le commercial AVEC son poste
-      const commercial = await this.commercialService.findOneWithPoste(
-        commercialId.commercialId,
-      );
-
-      if (!commercial || !commercial?.poste) {
-        throw new NotFoundException('Aucun poste associé à ce commercial');
-      }
-      console.log("chat trouve ========================",commercial);
-
-      const posteId = commercial.poste.id;
-
-      // 2️⃣ On récupère les chats DU POSTE
-      const chats = await this.chatService.findByPosteId(posteId);
-
-      console.log("chat trouve ========================",chats);
-
-      // 3️⃣ Construction du snapshot conversation
-      const conversations = await Promise.all(
-        chats.map(async (chat) => {
-          const lastMessage =
-            await this.whatsappMessageService.findLastMessageByChatId(
-              chat.chat_id,
-            );
-
-          return {
-            id: chat.id,
-            chat_id: chat.chat_id,
-
-            poste_id: chat.poste_id,
-            poste: {
-              id: commercial?.poste?.id,
-              name: commercial.poste?.name,
-              code: commercial.poste?.code,
-            },
-
-            name: chat.name,
-            contact_client: chat.contact_client,
-            type: chat.type,
-            status: chat.status,
-
-            last_message: lastMessage ?? null,
-            unread_count: chat.unread_count,
-
-            last_activity_at: chat.last_activity_at,
-            created_at: chat.createdAt,
-            updated_at: chat.updatedAt,
-          };
-        }),
-      );
-
-      // 4️⃣ Trier par activité récente
-      // 4️⃣ Tri métier correct
-      conversations.sort(
-        (a, b) =>
-          (b.last_activity_at?.getTime() ?? 0) -
-          (a.last_activity_at?.getTime() ?? 0),
-      );
-
-      // 5️⃣ Émettre au front
-      client.emit('conversations:list', conversations);
-    } catch (error) {
-      client.emit('error', {
-        message: 'Failed to get conversations',
-        details: error?.message ?? 'Unknown error',
-      });
-    }
+  // 🔐 1️⃣ Lire depuis le handshake (source fiable)
+  const commercialId = client.handshake.auth?.commercialId;
+  if (!commercialId) {
+    return client.emit('error', { message: 'Not authenticated' });
   }
+
+  // 🔄 2️⃣ S'assurer que connectedAgents est bien rempli
+  let agent = this.connectedAgents.get(client.id);
+
+  if (!agent) {
+    const commercial = await this.commercialService.findOneWithPoste(commercialId);
+    if (!commercial?.poste) {
+      return client.emit('error', { message: 'Aucun poste associé' });
+    }
+
+    agent = {
+      commercialId,
+      posteId: commercial.poste.id,
+    };
+
+    this.connectedAgents.set(client.id, agent);
+
+    // rejoindre la room poste (important)
+    await client.join(`poste_${agent.posteId}`);
+  }
+
+  const posteId = agent.posteId;
+
+  // 🔹 3️⃣ Récupération des conversations
+  const chats = await this.chatService.findByPosteId(posteId);
+
+  const conversations = await Promise.all(
+    chats.map(async (chat) => {
+      const lastMessage =
+        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+
+      return {
+        id: chat.id,
+        chat_id: chat.chat_id,
+        poste_id: posteId,
+        name: chat.name,
+        contact_client: chat.contact_client,
+        type: chat.type,
+        status: chat.status,
+        last_message: lastMessage ?? null,
+        unread_count: chat.unread_count,
+        last_activity_at: chat.last_activity_at,
+        created_at: chat.createdAt,
+        updated_at: chat.updatedAt,
+      };
+    }),
+  );
+
+  conversations.sort(
+    (a, b) =>
+      (b.last_activity_at?.getTime() ?? 0) -
+      (a.last_activity_at?.getTime() ?? 0),
+  );
+
+  client.emit('conversations:list', conversations);
+}
+
 
   // =========================
   // EVENT: messages:get
