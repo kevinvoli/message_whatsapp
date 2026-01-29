@@ -30,12 +30,10 @@ export class WhatsappPoste {
 
    @Column({
     name: 'description',
-    type: 'varchar',
-    length: 100,
+    type: 'text',
     nullable: true,
-    default:''
   })
-   description?: string;
+   description?: string |null;
 
   @Column({ default: true })
   is_active: boolean;

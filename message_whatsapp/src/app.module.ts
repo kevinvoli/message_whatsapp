@@ -29,19 +29,38 @@ import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
 
 @Module({
   imports: [
-     ScheduleModule.forRoot(),
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
-        MYSQL_HOST:Joi.string().required(),
-        MYSQL_PORT:Joi.number().required(),
-        MYSQL_USER:Joi.string().required(),
+        MYSQL_HOST: Joi.string().required(),
+        MYSQL_PORT: Joi.number().required(),
+        MYSQL_USER: Joi.string().required(),
         MYSQL_PASSWORD: Joi.string().allow('').required(),
-        MYSQL_DATABASE:Joi.string().required(),
-        SERVER_PORT:Joi.number().required()
-      })
+        MYSQL_DATABASE: Joi.string().required(),
+        SERVER_PORT: Joi.number().required(),
+      }),
     }),
-    DatabaseModule, WhatsappErrorModule, WhatsappChatModule, WhatsappChatLabelModule, WhatsappMessageModule, WhatsappMessageContentModule,  WhatsappCustomerModule, WhatsappContactsModule, WhatsappMediaModule, WhatsappButtonModule, WhatsappLastMessageModule, WhapiModule, DispatcherModule, CommunicationWhapiModule, AuthModule, JorbsModule,ChannelModule, ContactModule, WhatsappPosteModule ],
+    DatabaseModule,
+    WhatsappErrorModule,
+    WhatsappChatModule,
+    WhatsappChatLabelModule,
+    WhatsappMessageModule,
+    WhatsappMessageContentModule,
+    WhatsappCustomerModule,
+    WhatsappContactsModule,
+    WhatsappMediaModule,
+    WhatsappButtonModule,
+    WhatsappLastMessageModule,
+    WhapiModule,
+    DispatcherModule,
+    CommunicationWhapiModule,
+    AuthModule,
+    JorbsModule,
+    ChannelModule,
+    ContactModule,
+    WhatsappPosteModule,
+  ],
   controllers: [AppController],
-  providers: [AppService,TasksService],
+  providers: [AppService, TasksService],
 })
 export class AppModule {}
