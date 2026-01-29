@@ -82,17 +82,21 @@ export class WhatsappPosteService {
   /* =========================
       REMOVE (LOGICAL)
   ========================== */
-  async remove(id: string): Promise<{ message: string }> {
-    const poste = await this.findOneById(id);
-
-    poste.is_active = false;
-
-    await this.posteRepository.save(poste);
-
-    return {
-      message: 'Poste désactivé avec succès',
-    };
+  async remove(id: string) {
+    const contact = await this.findOneById(id);
+    return this.posteRepository.remove(contact);
   }
+  // async remove(id: string): Promise<{ message: string }> {
+  //   const poste = await this.findOneById(id);
+
+  //   poste.is_active = false;
+
+  //   await this.posteRepository.save(poste);
+
+  //   return {
+  //     message: 'Poste désactivé avec succès',
+  //   };
+  // }
 
   async setActive(posteId: string, isActive: boolean): Promise<WhatsappPoste> {
   const poste = await this.findOneById(posteId);
