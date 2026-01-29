@@ -44,14 +44,15 @@ export class WhatsappMessageService {
     timestamp: Date;
     channel_id: string;
   }): Promise<WhatsappMessage> {
-
     try {
       const chat = await this.chatService.findByChatId(data.chat_id);
       if (!chat) throw new Error('Chat not found');
       // console.log('chat a envoie', chat);
 
       const lastMessage = await this.findLastMessageByChatId(data.chat_id);
+
       if (lastMessage && !lastMessage.from_me) {
+
         const now = new Date();
         const lastMessageDate = new Date(lastMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
@@ -59,6 +60,7 @@ export class WhatsappMessageService {
         if (diffHours > 24) {
           throw new Error('Response timeout');
         }
+
       }
 
       // 1️⃣ Envoi réel vers WhatsApp
@@ -93,36 +95,50 @@ export class WhatsappMessageService {
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
         channel: channel,
-        contact: null
+        contact: null,
       });
 
+      
+
       const mes = await this.messageRepository.save(messageEntity);
+      await this.chatRepository.update(
+        { chat_id: chat.chat_id },
+        {
+          unread_count: 0,
+          last_poste_message_at: messageEntity.createdAt,
+          last_activity_at: new Date(),
+        },
+      );
 
       return mes;
     } catch (error) {
       console.error('WHAPI SEND FAILED:', error);
 
       // 🧠 fallback : message en échec mais sauvegardé
-      const failedMessage = this.messageRepository.create({
-        message_id: `failed_${Date.now()}`,
-        chat_id: data.chat_id,
-        poste_id: data.poste_id,
-        direction: MessageDirection.OUT,
-        from_me: true,
-        timestamp: data.timestamp,
-        status: WhatsappMessageStatus.FAILED,
-        source: 'agent_web',
-        text: data.text,
-      });
+      // const failedMessage = this.messageRepository.create({
+      //   message_id: `failed_${Date.now()}`,
+      //   chat_id: data.chat_id,
+      //   poste_id: data.poste_id,
+      //   direction: MessageDirection.OUT,
+      //   from_me: true,
+      //   timestamp: data.timestamp,
+      //   status: WhatsappMessageStatus.FAILED,
+      //   source: 'agent_web',
+      //   text: data.text,
+      // });
 
-      await this.messageRepository.save(failedMessage);
+      // await this.messageRepository.save(failedMessage);
+      console.error('WHAPI SEND FAILED:', error);
       throw error;
+      // throw error;
     }
   }
 
   async findLastMessageByChatId(
     chatId: string,
   ): Promise<WhatsappMessage | null> {
+    console.log('++++++++++++++++++++++++++++++++++++', chatId);
+
     try {
       return this.messageRepository.findOne({
         where: { chat_id: chatId },
@@ -132,7 +148,6 @@ export class WhatsappMessageService {
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
-   
   }
 
   async findByChatId(
@@ -154,14 +169,14 @@ export class WhatsappMessageService {
         .execute();
 
       // 2️⃣ Récupérer les messages
-      const mess= await this.messageRepository.find({
+      const mess = await this.messageRepository.find({
         where: { chat_id: chatId },
         relations: ['chat', 'poste'],
         order: { timestamp: 'ASC' },
         take: limit,
         skip: offset,
       });
-      return mess
+      return mess;
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
     }
@@ -292,9 +307,9 @@ export class WhatsappMessageService {
         message.from_name,
       );
       if (!message.from_me) {
-        chat.last_msg_client_channel_id=channel.channel_id
+        chat.last_msg_client_channel_id = channel.channel_id;
       }
-      await this.chatRepository.save(chat)
+      await this.chatRepository.save(chat);
 
       const messagesss = await this.messageRepository.save(
         this.messageRepository.create({

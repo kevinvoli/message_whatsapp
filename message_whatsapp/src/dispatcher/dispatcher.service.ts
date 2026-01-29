@@ -129,7 +129,7 @@ export class DispatcherService {
       chat_id: clientPhone,
       name: clientName,
       type: 'private',
-      contact_client: clientPhone,
+      contact_client:  clientPhone.split('@')[0],
       poste: nextAgent,
       poste_id: nextAgent.id,
       status: WhatsappChatStatus.EN_ATTENTE,
