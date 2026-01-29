@@ -32,7 +32,7 @@ export class WhatsappPoste {
     name: 'description',
     type: 'varchar',
     length: 100,
-    nullable: true,
+    nullable: false,
   })
    description: string;
 
