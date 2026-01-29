@@ -50,13 +50,6 @@ export class WhatsappMessage {
   message_id: string | null;
 
   @Column({
-  name: 'description',
-  type: 'text',
-  nullable: true,
-})
-description?: string;
-
-  @Column({
     name: 'external_id',
     type: 'varchar',
     length: 100,

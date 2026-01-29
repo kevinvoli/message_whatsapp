@@ -20,13 +20,6 @@ export class Contact {
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
-  @Column({
-    name: 'description',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
-  })
-  description?: string;
 
   @Column({ name: 'contact', type: 'varchar', length: 100, nullable: false })
   phone: string;
