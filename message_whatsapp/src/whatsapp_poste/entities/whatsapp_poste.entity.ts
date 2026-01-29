@@ -33,6 +33,7 @@ export class WhatsappPoste {
     type: 'varchar',
     length: 100,
     nullable: false,
+    default:'aucune description'
   })
    description: string;
 
