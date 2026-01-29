@@ -26,15 +26,7 @@ export class WhatsappPoste {
     unique: true,
   })
   code: string;
-
-
-   @Column({
-    name: 'description',
-    type: 'text',
-    nullable: true,
-  })
-   description?: string |null;
-
+ 
   @Column({ default: true })
   is_active: boolean;
 

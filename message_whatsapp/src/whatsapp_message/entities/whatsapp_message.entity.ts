@@ -105,8 +105,8 @@ export class WhatsappMessage {
   poste_id: string | null;
 
   @Column({
-    name: 'longtext',
-    type: 'varchar',
+    name: 'texte',
+    type: 'longtext',
     nullable: true,
   })
   text: string | null;

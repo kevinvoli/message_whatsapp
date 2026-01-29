@@ -77,7 +77,7 @@ export class DispatcherService {
         );
       }
       this.logger.log(
-        `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.description ?? 'NON ASSIGNE'}`,
+        `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.name ?? 'NON ASSIGNE'}`,
       );
       return this.chatRepository.save(conversation);
     }
@@ -101,7 +101,7 @@ export class DispatcherService {
 
     if (conversation) {
       this.logger.log(
-        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${conversation.poste?.description || 'aucun'}) à (${nextAgent.name})`,
+        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${  'aucun'}) à (${nextAgent.name})`,
       );
       conversation.poste = nextAgent;
       conversation.poste_id = nextAgent.id;
