@@ -55,15 +55,15 @@ export class WhatsappMessageGateway
 
   // Map pour suivre les agents connectés (socketId -> commercialId)
   private connectedAgents = new Map<
-  string,
-  { commercialId: string; posteId: string }
->();
+    string,
+    { commercialId: string; posteId: string }
+  >();
 
-private getSocketIdByPoste(posteId: string): string | undefined {
-  return Array.from(this.connectedAgents.entries()).find(
-    ([_, agent]) => agent.posteId === posteId,
-  )?.[0];
-}
+  private getSocketIdByPoste(posteId: string): string | undefined {
+    return Array.from(this.connectedAgents.entries()).find(
+      ([_, agent]) => agent.posteId === posteId,
+    )?.[0];
+  }
 
   async handleConnection(client: Socket) {
     console.log('🟢 Client connecté:', client.id);
@@ -72,23 +72,40 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       const commercialId = client.handshake.auth?.commercialId as string;
       if (!commercialId) return;
 
+      // 🔹 Récupérer le commercial avec son poste
       const commercial = await this.userService.findOne(commercialId);
       if (!commercial?.poste) return;
-
       const posteId = commercial.poste.id;
 
+      // 🔹 Stocker l'agent connecté
       this.connectedAgents.set(client.id, { commercialId, posteId });
 
+      // 🔹 Rejoindre la room globale du poste
+      await client.join(`poste_${posteId}`);
+
+      // 🔹 Rejoindre toutes les rooms chat associées au poste
+      const chats = await this.chatService.findByPosteId(posteId);
+      for (const chat of chats) {
+        await client.join(`chat_${chat.chat_id}`);
+      }
+
+      // 🔹 Mettre à jour le status du commercial et du poste
       await this.userService.updateStatus(commercialId, true);
       await this.posteService.setActive(posteId, true);
 
+      // 🔹 Ajouter le poste à la queue et synchroniser
       await this.queueService.addPosteToQueue(posteId);
       await this.queueService.syncQueueWithActivePostes();
 
-      await this.dispatcherService.distributePendingMessages(posteId);
+      // 🔹 Démarrer le suivi SLA pour l'agent
       this.jobRunnner.startAgentSlaMonitor(commercialId);
 
+      // 🔹 Émettre la mise à jour de la queue à tous les clients
       await this.emitQueueUpdate();
+
+      console.log(
+        `✅ Agent connecté et rooms rejointes pour le poste ${posteId}`,
+      );
     } catch (err) {
       console.error('❌ Connexion échouée', err);
     }
@@ -174,37 +191,60 @@ private getSocketIdByPoste(posteId: string): string | undefined {
 
     try {
       // Trouver le socket de l'agent assigné à cette conversation
-      const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agent]) =>  agent.posteId  === chat.poste?.id,
-      )?.[0];
+      // const targetSocketId = Array.from(this.connectedAgents.entries()).find(
+      //   ([_, agent]) => agent.posteId === chat.poste?.id,
+      // )?.[0];
 
-      if (!targetSocketId) {
-        return;
-      }
+      // if (!targetSocketId) {
+      //   return;
+      // }
 
       // Récupérer le dernier message
-      const lastMessage =
-        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
+      // const lastMessage =
+      //   await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
 
       // console.log("commit conversation!!!!!!!!!!!!!!!!!!",lastMessage );
 
       // Compter les messages non lus
+      // const unreadCount = await this.whatsappMessageService.countUnreadMessages(
+      //   chat.chat_id,
+      // );
+
+      // Construire l'objet conversation
+      // const conversation = {
+      //   ...chat,
+      //   // clientPhone: chat.chat_id?.split('@')[0] || '',
+      //   last_message: lastMessage,
+      //   unreadCount: unreadCount,
+      // };
+
+      // console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', targetSocketId);
+      const lastMessage =
+        await this.whatsappMessageService.findLastMessageByChatId(chat.chat_id);
       const unreadCount = await this.whatsappMessageService.countUnreadMessages(
         chat.chat_id,
       );
 
-      // Construire l'objet conversation
       const conversation = {
         ...chat,
-        // clientPhone: chat.chat_id?.split('@')[0] || '',
         last_message: lastMessage,
-        unreadCount: unreadCount,
+        unreadCount,
       };
-
-      console.log('cdidvveeeeeeeeeeeeeeeeeeeeeeeee', conversation);
-
       // Émettre l'événement de mise à jour de conversation à l'agent spécifique
-      this.server.to(targetSocketId).emit('conversation:updated', conversation);
+      // this.server
+      //   .to(`poste_${chat.poste_id}`)
+      //   .emit('conversation:updated', conversation);
+
+      // Diffuser à tous les commerciaux du poste
+      this.server
+        .to(`poste_${chat.poste?.id}`)
+        .emit('conversation:updated', conversation);
+
+      // Ajouter la room chat pour tous les sockets connectés
+      const sockets = await this.server
+        .in(`poste_${chat.poste?.id}`)
+        .fetchSockets();
+      sockets.forEach((s) => s.join(`chat_${chat.chat_id}`));
     } catch (error) {
       console.error("Erreur lors de l'émission de la conversation:", error);
     }
@@ -233,10 +273,16 @@ private getSocketIdByPoste(posteId: string): string | undefined {
   // =========================
   @SubscribeMessage('conversations:get')
   async handleGetConversations(@ConnectedSocket() client: Socket) {
+      console.log("chat trouve1 list ========================",client.id);
+      
+
     const commercialId = this.connectedAgents.get(client.id);
     if (!commercialId) {
+      console.log("chat trouve ======================== erreur");
+
       return client.emit('error', { message: 'Not authenticated' });
     }
+      console.log("chat trouve ========================",commercialId);
 
     try {
       // 1️⃣ On récupère le commercial AVEC son poste
@@ -247,13 +293,14 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       if (!commercial || !commercial?.poste) {
         throw new NotFoundException('Aucun poste associé à ce commercial');
       }
+      console.log("chat trouve ========================",commercial);
 
       const posteId = commercial.poste.id;
 
       // 2️⃣ On récupère les chats DU POSTE
       const chats = await this.chatService.findByPosteId(posteId);
 
-      // console.log("chat trouve ========================",chats);
+      console.log("chat trouve ========================",chats);
 
       // 3️⃣ Construction du snapshot conversation
       const conversations = await Promise.all(
@@ -320,8 +367,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       return client.emit('error', { message: 'Not authenticated' });
     }
 
-    console.log('chat trouve ======ezvbhtngb==================', agent);
-
+    console.log('chat trouve2 get ======ezvbhtngb==================', client.id);
     try {
       const messages = await this.whatsappMessageService.findByChatId(
         payload.chatId,
@@ -348,6 +394,8 @@ private getSocketIdByPoste(posteId: string): string | undefined {
     @MessageBody()
     payload: { chatId: string; text: string; channel_id: string },
   ) {
+      console.log("chat trouve3 send ========================",client.id);
+
     const commercialId = this.connectedAgents.get(client.id);
     console.log('id de connecte=============', commercialId);
 
@@ -393,13 +441,15 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       const posteId = chat.poste?.id;
       if (!posteId) return;
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agent]) =>  agent.posteId  === posteId,
+        ([_, agent]) => agent.posteId === posteId,
       )?.[0];
       if (!targetSocketId) {
         return;
       }
 
-      this.server.to(targetSocketId).emit('conversation:updated', conversation);
+      this.server
+        .to(`poste_${posteId}`)
+        .emit('conversation:updated', conversation);
 
       // The dispatcher or another service should handle broadcasting this new message.
       // For now, we can emit an update to the sender.
@@ -426,12 +476,14 @@ private getSocketIdByPoste(posteId: string): string | undefined {
 
     const chat = await this.chatService.findByChatId(messageData.chat_id);
     if (!chat) throw new Error('Chat not found');
-    const commercial = await this.commercialService.findOne(messageData.commercial_id,);
+    // const commercial = await this.commercialService.findOne(
+    //   messageData.commercial_id,
+    // );
 
-    if (!commercial) {
-      return null;
-    }
-    if (!chat) throw new Error('Chat not found');
+    // if (!commercial) {
+    //   return null;
+    // }
+    // if (!chat) throw new Error('Chat not found');
 
     try {
       // Sauvegarder le message en base
@@ -439,7 +491,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
         message_id: messageData.id ?? `agent_${Date.now()}`,
         external_id: messageData.id,
         chat: chat,
-        poste: commercial,
+        poste: chat.poste,
         direction: MessageDirection.OUT as MessageDirection,
         from_me: true,
         timestamp: new Date(messageData.timestamp).getTime(),
@@ -465,13 +517,22 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       };
 
       // Diffuser le message à tous les agents dans la room de la conversation
-      const roomName = messageData.chat_id;
-      this.server.to(roomName).emit('message:received', {
-        conversationId: messageData.chat_id,
+      // const roomName = messageData.chat_id;
+      // this.server.to(roomName).emit('message:received', {
+      //   conversationId: messageData.chat_id,
+      //   message: messageForFrontend,
+      // });
+
+      // this.server.to(`chat_${messageData.chat_id}`).emit('message:received', {
+      //   conversationId: messageData.chat_id,
+      //   message: messageForFrontend,
+      // });
+
+      this.server.to(`chat_${chat.chat_id}`).emit('message:received', {
+        conversationId: chat.chat_id,
         message: messageForFrontend,
       });
-
-      console.log(`📢 Message WhatsApp diffusé dans: ${roomName}`);
+      // console.log(`📢 Message WhatsApp diffusé dans: ${roomName}`);
 
       // Mettre à jour la conversation (dernier message)
       await this.updateConversationLastMessage(messageData.chat_id, {
@@ -575,7 +636,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
     }
 
     const socketEntry = Array.from(this.connectedAgents.entries()).find(
-      ([_, agent]) =>  agent.posteId  === chat.poste_id,
+      ([_, agent]) => agent.posteId === chat.poste_id,
     );
 
     return socketEntry ? socketEntry[0] : undefined;
@@ -627,10 +688,10 @@ private getSocketIdByPoste(posteId: string): string | undefined {
     client.emit('pong', { timestamp: new Date().toISOString() });
   }
 
- public isAgentConnected(agentId: string): boolean {
-  const connectedAgentIds = Array.from(this.connectedAgents.values());
-  return connectedAgentIds.some(agent => agent.commercialId === agentId);
-}
+  public isAgentConnected(agentId: string): boolean {
+    const connectedAgentIds = Array.from(this.connectedAgents.values());
+    return connectedAgentIds.some((agent) => agent.commercialId === agentId);
+  }
 
   public async emitConversationUpdate(chatId: string): Promise<void> {
     try {
@@ -638,7 +699,7 @@ private getSocketIdByPoste(posteId: string): string | undefined {
       if (!chat || !chat.poste_id) return;
 
       const targetSocketId = Array.from(this.connectedAgents.entries()).find(
-        ([_, agent]) => agent.posteId === chat.poste?.id
+        ([_, agent]) => agent.posteId === chat.poste?.id,
       )?.[0];
 
       if (targetSocketId) {
@@ -654,7 +715,10 @@ private getSocketIdByPoste(posteId: string): string | undefined {
           last_message: lastMessage,
           unread_count: unreadCount,
         };
-        console.log('chat est icciccccccccccccccccccccccccc', conversationPayload);
+        console.log(
+          'chat est icciccccccccccccccccccccccccc',
+          conversationPayload,
+        );
 
         this.server
           .to(targetSocketId)

@@ -65,6 +65,8 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
   }
 
   findOneWithPoste(id: string) {
+      console.log("chat trouve ========+++++++++++++================",id);
+
   return this.whatsappCommercialRepository.findOne({
     where: { id },
     relations: ['poste'],
