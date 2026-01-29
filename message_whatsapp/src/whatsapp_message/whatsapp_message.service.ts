@@ -314,7 +314,9 @@ export class WhatsappMessageService {
       const messagesss = await this.messageRepository.save(
         this.messageRepository.create({
           channel: channel,
+          channel_id:channel.channel_id,
           chat_id:chat.chat_id,
+          chat:chat,
           contact_id: contact.id,
           message_id: message.id,
           external_id: message.id,
