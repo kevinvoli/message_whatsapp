@@ -48,7 +48,7 @@ export class DispatcherService {
     
     let conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
-      relations: ['poste', 'messages'],
+      relations: ['messages'],
     });
 
     // console.log("=========================== conversation", conversation);
