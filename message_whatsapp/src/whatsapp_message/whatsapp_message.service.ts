@@ -295,27 +295,41 @@ export class WhatsappMessageService {
   }
 
   async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat) {
+      console.log("===============test=================");
+
     try {
       const channel = await this.channelService.findOne(message.channel_id);
+
+      console.log("===============test=================",message,chat);
+
       if (!channel) {
         // Utilisez une exception métier appropriée
         throw new Error(`Channel ${message.channel_id} non trouvé`);
       }
 
+      console.log("===============test=================");
+
       const contact = await this.contactService.findOrCreate(
         message.from,
         message.from_name,
+        message.chat_id
       );
+
+      console.log("===============test=================",message,chat);
+
       if (!message.from_me) {
+      console.log("===============test===========++++++++++++++======");
+
         chat.last_msg_client_channel_id = channel.channel_id;
       }
+      console.log("===============test=================");
+      
       await this.chatRepository.save(chat);
+      console.log("===============test=================");
 
       const messagesss = await this.messageRepository.save(
         this.messageRepository.create({
           channel: channel,
-          channel_id:channel.channel_id,
-          chat_id:chat.chat_id,
           chat:chat,
           contact_id: contact.id,
           message_id: message.id,
