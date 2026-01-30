@@ -98,7 +98,7 @@ export class WhatsappMessageGateway
       await this.queueService.syncQueueWithActivePostes();
 
       // 🔹 Démarrer le suivi SLA pour l'agent
-      this.jobRunnner.startAgentSlaMonitor(commercialId);
+      // this.jobRunnner.startAgentSlaMonitor(commercialId);
 
       // 🔹 Émettre la mise à jour de la queue à tous les clients
       await this.emitQueueUpdate();
@@ -129,7 +129,7 @@ export class WhatsappMessageGateway
     await this.queueService.removeFromQueue(posteId);
     await this.queueService.checkAndInitQueue();
 
-    this.jobRunnner.stopAgentSlaMonitor(commercialId);
+    // this.jobRunnner.stopAgentSlaMonitor(commercialId);
     await this.emitQueueUpdate();
   }
 
