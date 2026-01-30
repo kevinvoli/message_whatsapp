@@ -98,7 +98,7 @@ export class WhatsappMessageGateway
       await this.queueService.syncQueueWithActivePostes();
 
       // 🔹 Démarrer le suivi SLA pour l'agent
-      // this.jobRunnner.startAgentSlaMonitor(commercialId);
+      this.jobRunnner.startAgentSlaMonitor(posteId);
 
       // 🔹 Émettre la mise à jour de la queue à tous les clients
       await this.emitQueueUpdate();
@@ -129,7 +129,7 @@ export class WhatsappMessageGateway
     await this.queueService.removeFromQueue(posteId);
     await this.queueService.checkAndInitQueue();
 
-    // this.jobRunnner.stopAgentSlaMonitor(commercialId);
+    this.jobRunnner.stopAgentSlaMonitor(posteId);
     await this.emitQueueUpdate();
   }
 
@@ -144,7 +144,7 @@ export class WhatsappMessageGateway
       if (oldSocketId) {
         console.log('emition des event ------------------ ', oldPosteId);
 
-        this.server.to(oldSocketId).emit('conversation:removed', {
+        this.server.to(`poste_${oldPosteId}`).emit('conversation:removed', {
           chatId: chat.chat_id,
         });
       }
@@ -155,7 +155,7 @@ export class WhatsappMessageGateway
     if (newSocketId) {
       console.log('emition des event ------------------ ', newPosteId);
 
-      this.server.to(newSocketId).emit('conversation:assigned', {
+      this.server.to(`poste_${newPosteId}`).emit('conversation:assigned', {
         conversation: chat,
       });
     }

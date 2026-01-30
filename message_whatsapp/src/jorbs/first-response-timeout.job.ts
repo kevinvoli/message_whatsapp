@@ -18,28 +18,28 @@ export class FirstResponseTimeoutJob {
     
   ) {}
 
-  // startAgentSlaMonitor(agentId: string) {
+  startAgentSlaMonitor(posteId: string) {
 
-  //   if (this.agentIntervals.has(agentId)) return;
+    if (this.agentIntervals.has(posteId)) return;
 
-  //   // ⚠️ PAS async ici
-  //   const interval = setInterval(() => {
-  //     // ✅ encapsulation propre de l’async
-  //     console.log("runner est dans la place:___________________________________________________________________________________",agentId);
+    // ⚠️ PAS async ici
+    const interval = setInterval(() => {
+      // ✅ encapsulation propre de l’async
+      console.log("runner est dans la place:___________________________________________________________________________________",posteId);
       
-  //     void (async () => {
-  //    await this.dispatcher.jobRunnertcheque(agentId)
-  //     })();
-  //   }, 60_0000); // chaque minute
+      void (async () => {
+     await this.dispatcher.jobRunnertcheque(posteId)
+      })();
+    }, 60_000); // chaque minute
 
-  //   this.agentIntervals.set(agentId, interval);
-  // }
-  // stopAgentSlaMonitor(agentId: string) {
-  //   const interval = this.agentIntervals.get(agentId);
+    this.agentIntervals.set(posteId, interval);
+  }
+  stopAgentSlaMonitor(agentId: string) {
+    const interval = this.agentIntervals.get(agentId);
 
-  //   if (interval) {
-  //     clearInterval(interval);
-  //     this.agentIntervals.delete(agentId);
-  //   }
-  // }
+    if (interval) {
+      clearInterval(interval);
+      this.agentIntervals.delete(agentId);
+    }
+  }
 }

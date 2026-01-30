@@ -111,7 +111,7 @@ export class DispatcherService {
       conversation.assigned_at = new Date();
       conversation.assigned_mode = 'ONLINE';
       conversation.first_response_deadline_at = new Date(
-        Date.now() + 5*60 * 1000,
+        Date.now() + 5 * 60* 1000,
       );
      
       conversation.last_client_message_at = new Date();
@@ -140,10 +140,10 @@ export class DispatcherService {
       assigned_at: new Date(),
       assigned_mode: 'ONLINE',
       first_response_deadline_at:  new Date(
-        Date.now() + 5*60 * 1000,
+        Date.now() + 5 * 60* 1000,
       ),
       // new Date(
-      //   Date.now() + 0.10 * 60 * 1000,
+      //   Date.now() + 5 * 60 * 1000,
       // );
       last_client_message_at: new Date(),
     });
@@ -201,20 +201,20 @@ export class DispatcherService {
   }
 
   async dispatchExistingConversation(chat: WhatsappChat) {
-    const oldCommercialId = chat.poste_id;
-    if (!oldCommercialId) {
+    const oldPoste = chat.poste_id;
+    if (!oldPoste) {
       return;
     }
-    const nextAgent = await this.queueService.getNextInQueue();
-    if (!nextAgent) return;
+    const nextPoste = await this.queueService.getNextInQueue();
+    if (!nextPoste) return;
 
     await this.chatRepository.update(chat.id, {
-      poste: nextAgent,
-      poste_id: nextAgent.id,
-      assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
+      poste: nextPoste,
+      poste_id: nextPoste.id,
+      assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
       assigned_at: new Date(),
       first_response_deadline_at:  new Date(
-        Date.now() + 5*60 * 1000,
+        Date.now() + 5 * 60* 1000,
       )
       // new Date(
       //   Date.now() + 0.10 * 60 * 1000,
@@ -232,8 +232,8 @@ export class DispatcherService {
     // 🔥 EVENT CENTRAL
     this.messageGateway.emitConversationReassigned(
       updatedChat,
-      oldCommercialId,
-      nextAgent.id,
+      oldPoste,
+      nextPoste.id,
     );
   }
 
