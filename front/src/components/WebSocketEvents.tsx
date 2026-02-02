@@ -64,19 +64,36 @@ const WebSocketEvents = () => {
 
         switch (data.type) {
           case 'MESSAGE_ADD': {
-            console.log("add message",data.payload);
-            
-            const message: Message = transformToMessage(data.payload);
-            console.log("add message apres transfome",message);
 
+            console.log("messate+++===============");
+
+            const message: Message = transformToMessage(data.payload);
+            const tempId = (data.payload as any).tempId;
+
+            console.log("messate+++===============", tempId);
+
+            // Si tempId existe, on peut remplacer le message temporaire
+            if (tempId) {
+              const idx = useChatStore.getState().messages.findIndex((m) => m.id === tempId);
+              console.log("messate tmp.id===============", idx);
+
+              if (idx > -1) {
+                const updatedMessages = [...useChatStore.getState().messages];
+                updatedMessages[idx] = message;
+                useChatStore.getState().setMessages(message.chat_id, updatedMessages);
+                break;
+              }
+            }
+
+            // Sinon, on ajoute normalement
             addMessage(message);
             break;
           }
 
           case 'CONVERSATION_UPSERT': {
             const conversation: Conversation = transformToConversation(data.payload);
-            console.log("======conversation update,",conversation);
-            
+            console.log("======conversation update,", conversation);
+
             updateConversation(conversation);
             break;
           }

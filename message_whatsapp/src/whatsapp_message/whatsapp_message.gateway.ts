@@ -86,7 +86,8 @@ export class WhatsappMessageGateway
     await this.queueService.syncQueueWithActivePostes();
     this.jobRunner.startAgentSlaMonitor(posteId);
 
-    this.emitQueueUpdate();
+    await this.emitQueueUpdate();
+    await this.sendConversationsToClient(client);
   }
 
   async handleDisconnect(client: Socket) {
@@ -107,37 +108,40 @@ export class WhatsappMessageGateway
   // CLIENT → SERVER
   // ======================================================
 
+  private async sendConversationsToClient(client: Socket) {
+  const agent = this.connectedAgents.get(client.id);
+  if (!agent) return;
+
+  const chats = await this.chatService.findByPosteId(agent.posteId);
+
+  const conversations = await Promise.all(
+    chats.map(async (chat) => {
+      const lastMessage =
+        await this.messageService.findLastMessageBychat_id(chat.chat_id);
+
+      const unreadCount =
+        await this.messageService.countUnreadMessages(chat.chat_id);
+
+      return this.mapConversation(chat, lastMessage, unreadCount);
+    }),
+  );
+
+  client.emit(
+    'chat:event',
+    JSON.parse(
+      JSON.stringify({
+        type: 'CONVERSATION_LIST',
+        payload: conversations,
+      }),
+    ),
+  );
+}
+
+
   @SubscribeMessage('conversations:get')
   async handleGetConversations(@ConnectedSocket() client: Socket) {
 
-    const agent = this.connectedAgents.get(client.id);
-    if (!agent) return;
-
-    const chats = await this.chatService.findByPosteId(agent.posteId);
-    const conversations = await Promise.all(
-      chats.map(async (chat) => {
-        const lastMessage = await this.messageService.findLastMessageBychat_id(
-          chat.chat_id,
-        );
-        const unreadCount = await this.messageService.countUnreadMessages(
-          chat.chat_id,
-        );
-
-        return this.mapConversation(chat, lastMessage, unreadCount);
-      }),
-    );
-
-    console.log('recherche de conversation========================',conversations);
-
-    client.emit(
-      'chat:event',
-      JSON.parse(
-        JSON.stringify({
-          type: 'CONVERSATION_LIST',
-          payload: conversations,
-        }),
-      ),
-    );
+   await this.sendConversationsToClient(client);
   }
 
   @SubscribeMessage('messages:get')
@@ -160,8 +164,10 @@ export class WhatsappMessageGateway
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    payload: { chat_id: string; text: string; channel_id: string },
+    payload: { chat_id: string; text: string; tempId: string },
   ) {
+    console.log("channel id", payload.tempId);
+    
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
@@ -172,14 +178,14 @@ export class WhatsappMessageGateway
       chat_id: payload.chat_id,
       poste_id: agent.posteId,
       text: payload.text,
-      channel_id: payload.channel_id,
+      channel_id: chat.last_msg_client_channel_id!,
       timestamp: new Date(),
     });
-    console.log('message add', message);
+    // console.log('message add', message);
 
     this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
       type: 'MESSAGE_ADD',
-      payload: this.mapMessage(message),
+      payload: {...this.mapMessage(message),tempId:payload.tempId}
     });
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(

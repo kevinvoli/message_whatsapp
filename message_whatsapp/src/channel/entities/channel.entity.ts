@@ -1,3 +1,4 @@
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
@@ -45,7 +46,6 @@ export class WhapiChannel {
 
   @OneToMany(() => WhatsappMedia, (media) => media.chat)
   medias: WhatsappMedia[];
-
 
   // @Column(() => WhapiUser)
   // user: WhapiUser;

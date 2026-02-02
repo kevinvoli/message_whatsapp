@@ -12,7 +12,7 @@ interface ChatMessagesProps {
 const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  console.log("message a affiche", messages);
+  // console.log("message a affiche", messages);
 
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -26,7 +26,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
     currentAudioRef.current = audioEl;
   };
 
-  console.log("le message a afficher coté chate", messages);
+  // console.log("le message a afficher coté chate", messages);
 
 
   const formatTime = (date: Date) => {

@@ -73,7 +73,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set({ isLoading: true });
     console.log("novelle conversation");
-    
+
     socket?.emit("conversations:get");
   },
 
@@ -116,66 +116,64 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: (text: string) => {
     const { socket, selectedConversation } = get();
     if (!socket || !selectedConversation) return;
+
+     const tempId = crypto.randomUUID();
     const tempMessage: Message = {
       id: crypto.randomUUID(),
       chat_id: selectedConversation.chat_id,
       text,
       status: "sending",
       from_me: true,
-      // createdAt: new Date().toISOString(),
       timestamp: new Date(),
-      from: ""
+      from: "",
     };
 
     set((state) => ({
-    messages: [...state.messages, tempMessage],
-  }));
+      messages: [...state.messages, tempMessage],
+    }));
 
-  socket.emit("message:send", {
+    console.log("id temporaire==============", tempMessage);
+    
+     socket.emit("message:send", {
     chat_id: selectedConversation.chat_id,
     text,
-    tempId: tempMessage.id,
+    tempId:tempMessage.id, // ⚡ On envoie le tempId au backend
   });
   },
 
   setConversations: (conversations) => {
-    console.log("=======track1 setConversations=======", conversations);
+    // console.log("=======track1 setConversations=======", conversations);
 
     set({ conversations, isLoading: false });
   },
 
   setMessages: (chat_id, messages) => {
-  set((state) => {
-    if (state.selectedConversation?.chat_id !== chat_id) return state;
-    return { messages, isLoading: false };
-  });
-},
-
+    set((state) => {
+      if (state.selectedConversation?.chat_id !== chat_id) return state;
+      return { messages, isLoading: false };
+    });
+  },
 
   addMessage: (message) => {
+    console.log("dans le add message", message);
 
-    console.log("dans le add message",message);
-    
-  set((state) => {
-    const isActive =
-      state.selectedConversation?.chat_id === message.chat_id;
+    set((state) => {
+      const isActive = state.selectedConversation?.chat_id === message.chat_id;
 
-    return {
-      messages: isActive ? [...state.messages, message] : state.messages,
-      conversations: state.conversations.map((c) =>
-        c.chat_id === message.chat_id
-          ? {
-              ...c,
-              lastMessage: message,
-              unreadCount: isActive
-                ? 0
-                : (c.unreadCount ?? 0) + 1,
-            }
-          : c,
-      ),
-    };
-  });
-},
+      return {
+        messages: isActive ? [...state.messages, message] : state.messages,
+        conversations: state.conversations.map((c) =>
+          c.chat_id === message.chat_id
+            ? {
+                ...c,
+                lastMessage: message,
+                unreadCount: isActive ? 0 : (c.unreadCount ?? 0) + 1,
+              }
+            : c,
+        ),
+      };
+    });
+  },
 
   updateConversation: (updatedConversation: Conversation) => {
     set((state) => {
@@ -270,15 +268,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     messageId: string,
     status: Message["status"],
   ) => {
-     set((state) => {
-    if (state.selectedConversation?.chat_id !== chat_id) return state;
+    set((state) => {
+      if (state.selectedConversation?.chat_id !== chat_id) return state;
 
-    return {
-      messages: state.messages.map((m) =>
-        m.id === messageId ? { ...m, status } : m,
-      ),
-    };
-  });
+      return {
+        messages: state.messages.map((m) =>
+          m.id === messageId ? { ...m, status } : m,
+        ),
+      };
+    });
   },
 
   setTyping: (chat_id) => {
@@ -295,5 +293,5 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  reset: () => set({...initialState}),
+  reset: () => set({ ...initialState }),
 }));

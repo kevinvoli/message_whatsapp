@@ -36,6 +36,7 @@ export class WhatsappMessageService {
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
+  
 
   async createAgentMessage(data: {
     chat_id: string;
@@ -276,6 +277,11 @@ export class WhatsappMessageService {
   async findAll(chat_id: string) {
     const messages = await this.messageRepository.find({
       where: { chat_id: chat_id },
+      relations:{
+        medias:true,
+        poste:true,
+        chat:true
+      }
     });
     return messages;
   }
