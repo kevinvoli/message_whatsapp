@@ -26,6 +26,7 @@ import { TasksService } from './jorbs/tasks.service';
 import { ChannelModule } from './channel/channel.module';
 import { ContactModule } from './contact/contact.module';
 import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
+import { MessageAutoModule } from './message-auto/message-auto.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
     ChannelModule,
     ContactModule,
     WhatsappPosteModule,
+    MessageAutoModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

@@ -46,9 +46,11 @@ export class WhatsappMessageService {
     channel_id: string;
   }): Promise<WhatsappMessage> {
     try {
+      console.log('chat a envoie', data.chat_id);
+
       const chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
-      // console.log('chat a envoie', chat);
+      console.log('chat a envoie', chat);
 
       const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
 
@@ -61,7 +63,6 @@ export class WhatsappMessageService {
         if (diffHours > 24) {
           throw new Error('Response timeout');
         }
-
       }
 
       // 1️⃣ Envoi réel vers WhatsApp
@@ -154,7 +155,6 @@ export class WhatsappMessageService {
   async findLastMessageBychat_id(
     chat_id: string,
   ): Promise<WhatsappMessage | null> {
-    console.log('++++++++++++++++++++++++++++++++++++', chat_id);
 
     try {
       return this.messageRepository.findOne({

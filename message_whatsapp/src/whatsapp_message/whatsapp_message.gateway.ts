@@ -26,6 +26,7 @@ import {
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { from } from 'rxjs';
+import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 @WebSocketGateway(3001, {
   cors: { origin: '*', credentials: true },
@@ -43,6 +44,7 @@ export class WhatsappMessageGateway
     private readonly jobRunner: FirstResponseTimeoutJob,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
+
   ) {}
 
   @WebSocketServer()
@@ -86,13 +88,17 @@ export class WhatsappMessageGateway
     await this.queueService.syncQueueWithActivePostes();
     this.jobRunner.startAgentSlaMonitor(posteId);
 
+
     await this.emitQueueUpdate();
     await this.sendConversationsToClient(client);
+
+
   }
 
   async handleDisconnect(client: Socket) {
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
+console.log("les agent ",agent);
 
     this.connectedAgents.delete(client.id);
 
@@ -101,7 +107,7 @@ export class WhatsappMessageGateway
     await this.queueService.removeFromQueue(agent.posteId);
 
     this.jobRunner.stopAgentSlaMonitor(agent.posteId);
-    this.emitQueueUpdate();
+    await this.emitQueueUpdate();
   }
 
   // ======================================================
@@ -113,6 +119,10 @@ export class WhatsappMessageGateway
   if (!agent) return;
 
   const chats = await this.chatService.findByPosteId(agent.posteId);
+  
+  if (!chats) return;
+    this.jobRunner.testAutoMessage(chats[0].chat_id,1);
+
 
   const conversations = await Promise.all(
     chats.map(async (chat) => {
@@ -121,7 +131,6 @@ export class WhatsappMessageGateway
 
       const unreadCount =
         await this.messageService.countUnreadMessages(chat.chat_id);
-
       return this.mapConversation(chat, lastMessage, unreadCount);
     }),
   );
@@ -273,7 +282,7 @@ export class WhatsappMessageGateway
   // ======================================================
 
   private mapMessage = (message: WhatsappMessage) => {
-    console.log('mapinge de message');
+    // console.log('mapinge de message');
 
     return {
       id: message.id,

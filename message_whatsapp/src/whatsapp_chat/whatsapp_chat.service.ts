@@ -89,7 +89,11 @@ export class WhatsappChatService {
    * ➕ MESSAGE ENTRANT
    * ======================= */
   async incrementUnreadCount(chat_id: string): Promise<void> {
-    await this.chatRepository.increment({ chat_id: chat_id }, 'unread_count', 1);
+    await this.chatRepository.increment(
+      { chat_id: chat_id },
+      'unread_count',
+      1,
+    );
 
     await this.chatRepository.update(
       { chat_id: chat_id },
@@ -143,5 +147,21 @@ export class WhatsappChatService {
 
   remove(id: string) {
     return `This action removes a #${id} whatsappChat`;
+  }
+
+  async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
+    // console.log("a metre az jour",data,chat_id);
+    
+    await this.chatRepository.update({ chat_id }, data);
+  //  console.log("resultart mise a jour",up);
+   
+  }
+
+  async lockConversation(id: string) {
+    await this.update(id, { readonly: true });
+  }
+
+  async unlockConversation(id: string) {
+    await this.update(id, { readonly: false });
   }
 }

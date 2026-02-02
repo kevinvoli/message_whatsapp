@@ -166,6 +166,41 @@ export class WhatsappChat {
   })
   contact_client: string;
 
+    @Column({
+    name: 'auto_message_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  auto_message_id?: string| null;
+
+   @Column({
+    name: 'current_auto_message_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  current_auto_message_id?: string |null;
+
+   @Column({
+    name: 'readonly',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  readonly: boolean;
+
+
+   @Column({
+    name: 'auto_message_status',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  auto_message_status?: string |null
+
+
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 
@@ -174,6 +209,8 @@ export class WhatsappChat {
 
   @OneToMany(() => WhatsappMedia, (media) => media.chat)
   medias: WhatsappMedia[];
+
+
 
   @CreateDateColumn({
     name: 'createdAt',
