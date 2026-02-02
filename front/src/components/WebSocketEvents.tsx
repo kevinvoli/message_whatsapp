@@ -22,7 +22,7 @@ const WebSocketEvents = () => {
     setMessages,
     addMessage,
     updateConversation,
-    removeConversationByChatId,
+    removeConversationBychat_id,
     addConversation,
     loadConversations,
 
@@ -49,8 +49,8 @@ const WebSocketEvents = () => {
         addConversation(conversation);
       };
 
-      const handleConversationRemoved = (data: { chatId: string }) => {
-        removeConversationByChatId(data.chatId);
+      const handleConversationRemoved = (data: { chat_id: string }) => {
+        removeConversationBychat_id(data.chat_id);
       };
 
       const handleConversationsList = (rawConversations: any[]) => {
@@ -59,10 +59,62 @@ const WebSocketEvents = () => {
         setConversations(conversations);
       };
 
-      const handleMessagesList = (data: { chatId: string, messages: any[] }) => {
-        console.log(`Received raw messages for chat ${data.chatId}:`, data.messages);
+      const handleChatEvent = (data: { type: string; payload: any }) => {
+        // console.log("message reçu de event:",data.type, data);
+
+        switch (data.type) {
+          case 'MESSAGE_ADD': {
+            console.log("add message",data.payload);
+            
+            const message: Message = transformToMessage(data.payload);
+            console.log("add message apres transfome",message);
+
+            addMessage(message);
+            break;
+          }
+
+          case 'CONVERSATION_UPSERT': {
+            const conversation: Conversation = transformToConversation(data.payload);
+            console.log("======conversation update,",conversation);
+            
+            updateConversation(conversation);
+            break;
+          }
+
+          case 'MESSAGE_LIST': {
+            const messages: Message[] = data.payload.messages.map(transformToMessage);
+            setMessages(data.payload.chat_id, messages);
+            break;
+          }
+
+          case 'CONVERSATION_LIST': {
+            const conversations: Conversation[] = data.payload.map(transformToConversation);
+            setConversations(conversations);
+            break;
+          }
+
+          case 'CONVERSATION_REASSIGNED': {
+            const conversation: Conversation = transformToConversation(data.payload);
+            updateConversation(conversation);
+            break;
+          }
+
+          case 'CONVERSATION_READONLY': {
+            const conversation: Conversation = transformToConversation(data.payload);
+            updateConversation({ ...conversation, readonly: true });
+            break;
+          }
+
+          default:
+            console.warn('Unhandled chat event type:', data.type, data.payload);
+        }
+      };
+
+
+      const handleMessagesList = (data: { chat_id: string, messages: any[] }) => {
+        console.log(`Received raw messages for chat ${data.chat_id}:`, data.messages);
         const messages = data.messages.map(transformToMessage);
-        setMessages(data.chatId, messages);
+        setMessages(data.chat_id, messages);
       };
 
       const handleNewMessage = (rawMessage: any) => {
@@ -72,7 +124,7 @@ const WebSocketEvents = () => {
       };
 
       const handleConversationUpdated = (rawConversation: any) => {
-        console.log('Received raw conversation update:', rawConversation);
+        console.log('Received raw conversation update=======:', rawConversation);
         const conversation = transformToConversation(rawConversation);
         updateConversation(conversation);
       };
@@ -87,7 +139,17 @@ const WebSocketEvents = () => {
         status: string;
       }) => {
         console.log(`Received status update for message ${data.messageId}: ${data.status}`);
-        updateMessageStatus(data.conversationId, data.messageId, data.status);
+        const allowedStatuses = ["sending", "sent", "delivered", "read", "error"] as const;
+
+        if (allowedStatuses.includes(data.status as any)) {
+          updateMessageStatus(
+            data.conversationId,
+            data.messageId,
+            data.status as typeof allowedStatuses[number]
+          );
+        } else {
+          console.warn(`Received unknown status: ${data.status}`);
+        }
       };
 
       const handleTypingStart = (data: { conversationId: string }) => {
@@ -100,8 +162,39 @@ const WebSocketEvents = () => {
         clearTyping(data.conversationId);
       };
 
+      const handleConversationReassigned = (data: {
+        chat_id: string;
+        oldPosteId: string;
+        newPosteId: string;
+      }) => {
+        console.log('Conversation reassigned:', data);
+        // Ici tu peux mettre à jour le store pour refléter le changement d'agent
+        updateConversation({
+          chat_id: data.chat_id,
+          id: '',
+          poste_id: '',
+          clientName: '',
+          clientPhone: '',
+          lastMessage: null,
+          unreadCount: 0,
+          status: 'actif',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      };
+
+      const handleConversationReadonly = (data: { chat_id: string }) => {
+        console.log('Conversation readonly:', data);
+        // Tu peux ajouter un flag dans le store pour bloquer l’édition côté UI
+        updateConversation({
+          chat_id: data.chat_id,
+          readonly: true,
+        });
+      };
+
 
       // --- Enregistrement des listeners ---
+      socket.on('chat:event', handleChatEvent);
       socket.on('conversations:list', handleConversationsList);
       socket.on('messages:list', handleMessagesList);
       socket.on('message:new', handleNewMessage);
@@ -110,19 +203,24 @@ const WebSocketEvents = () => {
       socket.on('typing:start', handleTypingStart);
       socket.on('typing:stop', handleTypingStop);
       socket.on('error', handleError);
-      socket.on('conversation:assigned', handleConversationAssigned);
+      // socket.on('conversation:assigned', handleConversationAssigned);
       socket.on('conversation:removed', handleConversationRemoved);
+      socket.on('conversation:reassigned', handleConversationReassigned);
+      socket.on('conversation:readonly', handleConversationReadonly);
       // --- Nettoyage ---
       return () => {
+        socket.off('chat:event', handleChatEvent);
         socket.off('conversations:list', handleConversationsList);
         socket.off('messages:list', handleMessagesList);
+        socket.off('conversation:reassigned', handleConversationReassigned);
+        socket.off('conversation:readonly', handleConversationReadonly);
         socket.off('message:new', handleNewMessage);
         socket.off('conversation:updated', handleConversationUpdated);
         socket.off('error', handleError);
         setSocket(null);
       };
     }
-  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, addConversation, removeConversationByChatId]);
+  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, addConversation, removeConversationBychat_id, updateMessageStatus, setTyping, clearTyping]);
 
   return null; // Ce composant ne rend rien
 };

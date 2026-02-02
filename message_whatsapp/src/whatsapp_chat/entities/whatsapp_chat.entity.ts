@@ -1,4 +1,5 @@
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import {
@@ -170,6 +171,9 @@ export class WhatsappChat {
 
   @OneToMany(() => WhatsappMessage, (message) => message.chat)
   messages: WhatsappMessage[];
+
+  @OneToMany(() => WhatsappMedia, (media) => media.chat)
+  medias: WhatsappMedia[];
 
   @CreateDateColumn({
     name: 'createdAt',

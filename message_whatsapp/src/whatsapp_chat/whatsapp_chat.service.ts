@@ -25,14 +25,14 @@ export class WhatsappChatService {
   }
 
   async findOrCreateChat(
-    chatId: string,
+    chat_id: string,
     from: string,
     fromName: string,
     posteId: string,
   ): Promise<WhatsappChat> {
     try {
       const existingChat = await this.chatRepository.findOne({
-        where: { chat_id: chatId },
+        where: { chat_id: chat_id },
       });
 
       if (existingChat) {
@@ -45,7 +45,7 @@ export class WhatsappChatService {
       }
 
       const newChat = this.chatRepository.create({
-        chat_id: chatId,
+        chat_id: chat_id,
         name: fromName,
         type: 'private',
         chat_pic: '',
@@ -75,9 +75,9 @@ export class WhatsappChatService {
   /* =======================
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
-  async markChatAsRead(chatId: string): Promise<void> {
+  async markChatAsRead(chat_id: string): Promise<void> {
     await this.chatRepository.update(
-      { chat_id: chatId },
+      { chat_id: chat_id },
       {
         unread_count: 0,
         last_activity_at: new Date(),
@@ -88,11 +88,11 @@ export class WhatsappChatService {
   /* =======================
    * ➕ MESSAGE ENTRANT
    * ======================= */
-  async incrementUnreadCount(chatId: string): Promise<void> {
-    await this.chatRepository.increment({ chat_id: chatId }, 'unread_count', 1);
+  async incrementUnreadCount(chat_id: string): Promise<void> {
+    await this.chatRepository.increment({ chat_id: chat_id }, 'unread_count', 1);
 
     await this.chatRepository.update(
-      { chat_id: chatId },
+      { chat_id: chat_id },
       { last_activity_at: new Date() },
     );
   }
@@ -100,7 +100,7 @@ export class WhatsappChatService {
   /* =======================
    * 🔄 RECALCUL (SÉCURITÉ)
    * ======================= */
-  async recomputeUnreadCount(chatId: string): Promise<void> {
+  async recomputeUnreadCount(chat_id: string): Promise<void> {
     await this.chatRepository.query(
       `
       UPDATE whatsapp_chat c
@@ -113,23 +113,23 @@ export class WhatsappChatService {
       )
       WHERE c.chat_id = $1
     `,
-      [chatId],
+      [chat_id],
     );
   }
 
-  async findAll(chatId?: string) {
-    if (chatId) {
+  async findAll(chat_id?: string) {
+    if (chat_id) {
       return this.chatRepository.find({
-        where: { chat_id: chatId },
+        where: { chat_id: chat_id },
         relations: ['poste', 'messages'],
       });
     }
     return this.chatRepository.find();
   }
 
-  async findByChatId(chatId: string): Promise<WhatsappChat | null> {
+  async findBychat_id(chat_id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
-      where: { chat_id: chatId },
+      where: { chat_id: chat_id },
       relations: ['poste', 'messages'],
     });
   }

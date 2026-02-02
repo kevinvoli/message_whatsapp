@@ -4,7 +4,7 @@ import { Socket } from "socket.io-client";
 import { Conversation, Message } from "@/types/chat";
 
 interface ChatState {
-  typingStatus: any;
+  typingStatus: Record<string, boolean>;
   socket: Socket | null;
   conversations: Conversation[];
   messages: Message[];
@@ -15,24 +15,44 @@ interface ChatState {
   // Actions
   setSocket: (socket: Socket | null) => void;
   loadConversations: () => void;
-  selectConversation: (chatId: string) => void;
+  selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
 
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[]) => void;
-  setMessages: (chatId: string, messages: Message[]) => void;
+  setMessages: (chat_id: string, messages: Message[]) => void;
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
-  removeConversationByChatId: (conversationId: string) => void;
-  updateMessageStatus: (chatId: string | undefined, messageId: string, status: any) => void;
-  setTyping: (chatId: string) => void;
-  clearTyping: (chatId: string) => void;
+  removeConversationBychat_id: (conversationId: string) => void;
+  updateMessageStatus: (
+    chat_id: string | undefined,
+    messageId: string,
+    status: Message["status"],
+  ) => void;
+  setTyping: (chat_id: string) => void;
+  clearTyping: (chat_id: string) => void;
 
   reset: () => void;
 }
 
-const initialState = {
+const initialState: Omit<
+  ChatState,
+  | "setSocket"
+  | "loadConversations"
+  | "selectConversation"
+  | "sendMessage"
+  | "setConversations"
+  | "setMessages"
+  | "addMessage"
+  | "updateConversation"
+  | "addConversation"
+  | "removeConversationBychat_id"
+  | "updateMessageStatus"
+  | "setTyping"
+  | "clearTyping"
+  | "reset"
+> = {
   socket: null,
   conversations: [],
   messages: [],
@@ -49,112 +69,120 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadConversations: () => {
     const { socket } = get();
+    if (!socket) return;
+
     set({ isLoading: true });
+    console.log("novelle conversation");
+    
     socket?.emit("conversations:get");
   },
 
-  selectConversation: (chatId: string) => {
-  set((state) => {
-    const conversation = state.conversations.find(
-      (c) => c.chat_id === chatId
-    );
+  selectConversation: (chat_id: string) => {
+    set((state) => {
+      const conversation = state.conversations.find(
+        (c) => c.chat_id === chat_id,
+      );
 
-    if (!conversation) return state;
+      if (!conversation) return state;
 
+      return {
+        selectedConversation: { ...conversation, unreadCount: 0 },
+        conversations: state.conversations.map((c) =>
+          c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
+        ),
+        messages: [],
+        isLoading: true,
+      };
+    });
 
-    const updatedConversation = {
-      ...conversation,
-      unreadCount: 0,
-    };
+    // 🔔 Charge les messages + déclenche le READ côté backend
+    const socket = get().socket;
+    socket?.emit("messages:get", { chat_id });
+    socket?.emit("messages:read", { chat_id });
+  },
 
-    return {
-      selectedConversation: updatedConversation,
-
-      conversations: state.conversations.map((c) =>
-        c.chat_id === chatId ? updatedConversation : c
-      ),
-
-      messages: [],
-      isLoading: true,
-    };
-  });
-
-  // 🔔 Charge les messages + déclenche le READ côté backend
-  get().socket?.emit("messages:get", { chatId });
-  get().socket?.emit("messages:read", { chatId });
-},
-
-removeConversationByChatId: (chatId: string) => {
-  set((state) => ({
-    conversations: state.conversations.filter(
-      (c) => c.chat_id !== chatId,
-    ),
-    selectedConversation:
-      state.selectedConversation?.chat_id === chatId
-        ? null
-        : state.selectedConversation,
-    messages:
-      state.selectedConversation?.chat_id === chatId
-        ? []
-        : state.messages,
-  }));
-},
-
-
+  removeConversationBychat_id: (chat_id: string) => {
+    set((state) => ({
+      conversations: state.conversations.filter((c) => c.chat_id !== chat_id),
+      selectedConversation:
+        state.selectedConversation?.chat_id === chat_id
+          ? null
+          : state.selectedConversation,
+      messages:
+        state.selectedConversation?.chat_id === chat_id ? [] : state.messages,
+    }));
+  },
 
   sendMessage: (text: string) => {
     const { socket, selectedConversation } = get();
-    if (socket && selectedConversation) {
-      console.log(
-        "pres pour l'envoie du message_______________________________",
-        selectedConversation,
-      );
+    if (!socket || !selectedConversation) return;
+    const tempMessage: Message = {
+      id: crypto.randomUUID(),
+      chat_id: selectedConversation.chat_id,
+      text,
+      status: "sending",
+      from_me: true,
+      // createdAt: new Date().toISOString(),
+      timestamp: new Date(),
+      from: ""
+    };
 
-      socket.emit("message:send", {
-        chatId: selectedConversation.chat_id,
-        text,
-      });
-    }
+    set((state) => ({
+    messages: [...state.messages, tempMessage],
+  }));
+
+  socket.emit("message:send", {
+    chat_id: selectedConversation.chat_id,
+    text,
+    tempId: tempMessage.id,
+  });
   },
 
   setConversations: (conversations) => {
+    console.log("=======track1 setConversations=======", conversations);
+
     set({ conversations, isLoading: false });
   },
 
-  setMessages: (chatId: string, messages) => {
-    if (get().selectedConversation?.chat_id === chatId) {
-      set({ messages, isLoading: false });
-    }
-  },
+  setMessages: (chat_id, messages) => {
+  set((state) => {
+    if (state.selectedConversation?.chat_id !== chat_id) return state;
+    return { messages, isLoading: false };
+  });
+},
 
-  addMessage: (message: Message) => {
-    console.log("ajouter les message++++++++++++++++",message);
+
+  addMessage: (message) => {
+
+    console.log("dans le add message",message);
     
   set((state) => {
     const isActive =
-      state.selectedConversation?.chat_id === message.sender_phone;
+      state.selectedConversation?.chat_id === message.chat_id;
 
     return {
-      messages: isActive
-        ? [...state.messages, message]
-        : state.messages,
-
+      messages: isActive ? [...state.messages, message] : state.messages,
       conversations: state.conversations.map((c) =>
-        c.chat_id === message.sender_phone
-          ? { ...c, lastMessage: message }
+        c.chat_id === message.chat_id
+          ? {
+              ...c,
+              lastMessage: message,
+              unreadCount: isActive
+                ? 0
+                : (c.unreadCount ?? 0) + 1,
+            }
           : c,
       ),
     };
   });
 },
 
-
   updateConversation: (updatedConversation: Conversation) => {
     set((state) => {
       const isSelected =
         state.selectedConversation?.chat_id === updatedConversation.chat_id;
       const isOutgoing = updatedConversation.lastMessage?.from_me === true;
-      console.log("est ce que c'est faux", updatedConversation);
+      console.log("est ce que c'est faux====", updatedConversation);
 
       const conversationExists = state.conversations.some(
         (c) => c.chat_id === updatedConversation.chat_id,
@@ -187,62 +215,40 @@ removeConversationByChatId: (chatId: string) => {
       };
 
       // 🟢 Conversation active
+      // 🟢 Si cette conversation est celle qui est sélectionnée
       if (isSelected) {
-  newState.selectedConversation = conversationWithUnread;
+        newState.selectedConversation = conversationWithUnread;
 
-  if (
-    updatedConversation.lastMessage &&
-    !state.messages.find(
-      (m) => m.id === updatedConversation.lastMessage?.id
-    )
-  ) {
-    newState.messages = [
-      ...state.messages,
-      updatedConversation.lastMessage,
-    ];
-  }
-}
+        // 🆕 Le backend envoie messages[] (tableau complet) dans conversation:updated
+        // On les utilise directement si présents et non vides
+        if (
+          updatedConversation.messages &&
+          updatedConversation.messages.length > 0
+        ) {
+          // Merge intelligent : on garde les messages existants qui ne sont pas
+          // dans le nouveau tableau (ex: messages "sending" en cours) puis on ajoute les nouveaux
+          const newIds = new Set(updatedConversation.messages.map((m) => m.id));
+          const localOnly = state.messages.filter(
+            (m) => !newIds.has(m.id) && m.status === "sending",
+          );
+          newState.messages = [...updatedConversation.messages, ...localOnly];
+        } else if (
+          // Fallback : si pas de messages[] mais un lastMessage, on l'ajoute
+          updatedConversation.lastMessage &&
+          !state.messages.find(
+            (m) => m.id === updatedConversation.lastMessage?.id,
+          )
+        ) {
+          newState.messages = [
+            ...state.messages,
+            updatedConversation.lastMessage,
+          ];
+        }
+      }
 
       return newState;
     });
   },
-
-
-
-
-  // updateConversation: (updatedConversation: Conversation) => {
-  //   console.log("update des conversation", updatedConversation);
-
-  //   set((state) => {
-  //     const newState: Partial<ChatState> = {
-  //       // Met à jour la conversation dans la liste
-  //       conversations: state.conversations.map((c) =>
-  //         c.id === updatedConversation.id ? updatedConversation : c,
-  //       ),
-  //     };
-
-  //     // Si la conversation mise à jour est celle sélectionnée
-  //     if (state.selectedConversation?.id === updatedConversation.id) {
-  //       newState.selectedConversation = updatedConversation;
-
-  //       // Ajoute le nouveau message à la liste des messages, s'il existe et n'est pas déjà présent
-  //       if (
-  //         updatedConversation.lastMessage &&
-  //         !state.messages.find(
-  //           (m) => m.id === updatedConversation?.lastMessage.id,
-  //         )
-  //       ) {
-  //         newState.messages = [
-  //           ...state.messages,
-  //           updatedConversation.lastMessage,
-  //         ];
-  //       }
-  //     }
-  //     console.log("fffffffffffffffffffffffffffffffffffffffff", newState);
-
-  //     return newState;
-  //   });
-  // },
 
   addConversation: (newConversation: Conversation) => {
     set((state) => ({
@@ -260,36 +266,34 @@ removeConversationByChatId: (chatId: string) => {
   },
 
   updateMessageStatus: (
-    chatId: string | undefined,
+    chat_id: string | undefined,
     messageId: string,
-    status: any,
+    status: Message["status"],
   ) => {
-    set((state) => {
-      // Met à jour le message dans la liste des messages de la conversation active
-      if (state.selectedConversation?.chat_id === chatId) {
-        return {
-          messages: state.messages.map((m) =>
-            m.id === messageId ? { ...m, status } : m,
-          ),
-        };
-      }
-      return {};
-    });
+     set((state) => {
+    if (state.selectedConversation?.chat_id !== chat_id) return state;
+
+    return {
+      messages: state.messages.map((m) =>
+        m.id === messageId ? { ...m, status } : m,
+      ),
+    };
+  });
   },
 
-  setTyping: (chatId) => {
+  setTyping: (chat_id) => {
     set((state) => ({
-      typingStatus: { ...state.typingStatus, [chatId]: true },
+      typingStatus: { ...state.typingStatus, [chat_id]: true },
     }));
   },
 
-  clearTyping: (chatId) => {
+  clearTyping: (chat_id) => {
     set((state) => {
       const newTypingStatus = { ...state.typingStatus };
-      delete newTypingStatus[chatId];
+      delete newTypingStatus[chat_id];
       return { typingStatus: newTypingStatus };
     });
   },
 
-  reset: () => set(initialState),
+  reset: () => set({...initialState}),
 }));

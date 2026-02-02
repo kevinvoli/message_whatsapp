@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import {  Repository } from 'typeorm';
+import {  IsNull, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 
 @Injectable()
@@ -17,34 +17,34 @@ export class FirstResponseTimeoutJob {
 
 
 @Cron('0 9 * * *')
- offlineReinject() {
+ async offlineReinject() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 console.log("===================chaque matin===============");
 
-  // const chats = await this.chatRepo.find({
-  //   where: {
-  //     status: WhatsappChatStatus.ACTIF,
-  //     last_poste_message_at: IsNull(),
-  //   },
-  //   relations: ['poste'],
-  // });
+  const chats = await this.chatRepo.find({
+    where: {
+      status: WhatsappChatStatus.ACTIF,
+      last_poste_message_at: IsNull(),
+    },
+    relations: ['poste'],
+  });
 
   console.log("tcher de chaque journe a 9h",startOfDay);
   
-  // for (const chat of chats) {
-  //   const poste = chat.poste;
-  //   if (!poste) continue;
+  for (const chat of chats) {
+    const poste = chat.poste;
+    if (!poste) continue;
 
-  //   // const neverConnectedToday =
-  //   //   !poste.lastConnectionAt ||
-  //   //   poste.lastConnectionAt < startOfDay;
+    // const neverConnectedToday =
+    //   !poste.lastConnectionAt ||
+    //   poste.lastConnectionAt < startOfDay;
 
-  //   if (neverConnectedToday) {
-  //     await this.dispatcher.reinjectConversation(chat);
-  //     // this.gateway.emitConversationReassigned(chat.chat_id);
-  //   }
-  // }
+    // if (neverConnectedToday) {
+    //   await this.dispatcher.reinjectConversation(chat);
+    //   // this.gateway.emitConversationReassigned(chat.chat_id);
+    // }
+  }
 }
 
 

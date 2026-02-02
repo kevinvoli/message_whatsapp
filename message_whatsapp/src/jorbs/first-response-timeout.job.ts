@@ -27,9 +27,9 @@ export class FirstResponseTimeoutJob {
       // ✅ encapsulation propre de l’async
       console.log("runner est dans la place:___________________________________________________________________________________",posteId);
       
-      void (async () => {
-     await this.dispatcher.jobRunnertcheque(posteId)
-      })();
+    //   void (async () => {
+    //  await this.dispatcher.jobRunnertcheque(posteId)
+    //   })();
     }, 60_000); // chaque minute
 
     this.agentIntervals.set(posteId, interval);

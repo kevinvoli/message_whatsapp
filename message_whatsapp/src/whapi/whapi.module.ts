@@ -23,6 +23,7 @@ import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
       WhapiChannel,
       Contact,
       WhatsappPoste,
+      WhatsappMedia
     ]),
     DispatcherModule,
     WhatsappMessageModule,

@@ -9,7 +9,7 @@ export class WhapiController {
   constructor(private readonly whapiService: WhapiService) {}
    @Post()
    handleWebhook(@Body() payload: WhapiWebhookPayload) {
-    // console.log("mon payload whapi", payload);
+    console.log("mon payload whapi==============", payload);
 
     const eventType = payload.event.type;
   switch (eventType) {
@@ -28,7 +28,7 @@ export class WhapiController {
       break;
     case 'events':
       // Traiter les événements (calls, joins, etc.)
-      console.log('Événement events:', payload.event_datas);
+      console.log('Événement events:', payload.events);
       break;
     case 'polls':
       // Traiter les sondages
@@ -50,10 +50,10 @@ export class WhapiController {
       // Traiter les localisations en direct
       console.log('Événement live_locations:', payload.live_locations);
       break;
-    case 'hsm':
-      // Traiter les HSM (templates)
-      console.log('Événement hsm:', payload.hsms);
-      break;
+    // case 'hsm':
+    //   // Traiter les HSM (templates)
+    //   console.log('Événement hsm:', payload.hsms);
+    //   break;
     case 'orders':
       // Traiter les commandes
       console.log('Événement orders:', payload.orders);
@@ -66,10 +66,10 @@ export class WhapiController {
       // Traiter les catalogues
       console.log('Événement catalogs:', payload.catalogs);
       break;
-    case 'invites':
-      // Traiter les invitations
-      console.log('Événement invites:', payload.invites);
-      break;
+    // case 'invites':
+    //   // Traiter les invitations
+    //   console.log('Événement invites:', payload.invites);
+    //   break;
     default:
       // Cas par défaut pour les types non reconnus (bien que le type garantisse l'exhaustivité)
       console.log('Type d\'événement inconnu:', eventType);

@@ -12,8 +12,8 @@ export class WhatsappChatGateway {
 
 
   @SubscribeMessage('findAllWhatsappChat')
-  findAll(@MessageBody() chatId: string) {
-    return this.whatsappChatService.findAll(chatId);
+  findAll(@MessageBody() chat_id: string) {
+    return this.whatsappChatService.findAll(chat_id);
   }
 
   @SubscribeMessage('findOneWhatsappChat')

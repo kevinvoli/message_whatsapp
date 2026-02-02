@@ -1,6 +1,7 @@
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import {
@@ -73,14 +74,7 @@ export class WhatsappMessage {
   })
   channel_id: string;
 
-  @ManyToOne(() => WhapiChannel, (data) => data.messages)
-  @JoinColumn({
-    name: 'channel_id',
-    referencedColumnName: 'channel_id',
-  })
-  channel: WhapiChannel;
-
-  @Column({
+   @Column({
     name: 'type',
     type: 'varchar',
     length: 100,
@@ -89,14 +83,7 @@ export class WhatsappMessage {
   })
   type: string;
 
-  @ManyToOne(() => WhatsappChat, (data) => data.messages)
-  @JoinColumn({
-    name: 'chat_id',
-    referencedColumnName: 'chat_id',
-  })
-  chat: WhatsappChat;
-
-  @Column({
+   @Column({
     name: 'poste_id',
     type: 'varchar',
     length: 100,
@@ -109,7 +96,22 @@ export class WhatsappMessage {
     type: 'longtext',
     nullable: true,
   })
-  text: string | null;
+  text?: string | null;
+
+  @ManyToOne(() => WhapiChannel, (data) => data.messages)
+  @JoinColumn({
+    name: 'channel_id',
+    referencedColumnName: 'channel_id',
+  })
+  channel: WhapiChannel;
+
+  @ManyToOne(() => WhatsappChat, (data) => data.messages)
+  @JoinColumn({
+    name: 'chat_id',
+    referencedColumnName: 'chat_id',
+  })
+  chat: WhatsappChat;
+ 
 
   @ManyToOne(() => WhatsappPoste, (data) => data.messages, {
     nullable: true,
@@ -127,6 +129,8 @@ export class WhatsappMessage {
   )
   messageCnntent: WhatsappMessageContent[];
 
+
+
   @Column({ name: 'contact_id', type: 'uuid',nullable:true })
   contact_id: string |null;
 
@@ -136,6 +140,9 @@ export class WhatsappMessage {
   })
   @JoinColumn({ name: 'contact_id' })
   contact: Contact | null;
+
+   @OneToMany(() => WhatsappMedia, (media) => media.message)
+  medias: WhatsappMedia[];
 
   @Column({
     name: 'direction',
@@ -183,6 +190,9 @@ export class WhatsappMessage {
 
   @Column({ name: 'source', type: 'varchar', length: 100, nullable: false })
   source: string;
+
+    @Column({ name: 'commercial_id', type: 'varchar', length: 100, nullable: false })
+  commercial_id?: string | null;
 
   @CreateDateColumn({
     name: 'createdAt',

@@ -12,16 +12,18 @@ interface RawMessageData {
   direction?: 'IN' | 'OUT';
   from: string; // Le numéro de téléphone de l'expéditeur
   from_name?: string;
+  chat_id:string;
 }
 
 export const createMessage = (data: RawMessageData): Message => ({
   id: String(data.id || `msg_${new Date().getTime()}`),
   text: data.text || '',
   timestamp: new Date(data.timestamp || Date.now()),
-  from: data.from_me ? 'commercial' : 'client',
-  status: data.status  || 'sent',
+  from: data.from ,
+  status: data.status || 'sent',
   direction: data.direction || 'IN',
-  sender_phone: data.from,
-  sender_name: data.from_name || (data.from_me ? 'Agent' : 'Client'),
+  
+  from_name: data.from_name || (data.from_me ? 'Agent' : 'Client'),
   from_me: !!data.from_me,
+  chat_id: data.chat_id
 });

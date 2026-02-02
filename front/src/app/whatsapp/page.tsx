@@ -27,6 +27,8 @@ const WhatsAppPage = () => {
   } = useChatStore();
   const { isConnected: isWebSocketConnected } = useSocket();
 
+
+  
   // Protection de route
   useEffect(() => {
     if (initialized && !user) {
