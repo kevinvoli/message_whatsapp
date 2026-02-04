@@ -21,7 +21,7 @@ export class WhatsappCommercialService {
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
 
     @InjectRepository(WhatsappPoste)
-    private readonly PostelRepository: Repository<WhatsappPoste>,
+    private readonly posteRepository: Repository<WhatsappPoste>,
 
     // @InjectRepository(QueuePosition)
     // private readonly queuePositionRepository: Repository<QueuePosition>,
@@ -84,7 +84,7 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
       throw new ConflictException('Name already exists');
     }
 
-    const poste  = await this.PostelRepository.findOne({
+    const poste  = await this.posteRepository.findOne({
       where:{id:poste_id}
     })
 
@@ -182,7 +182,7 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
     }
 
     if (updateWhatsappCommercialDto.poste_id !== undefined) {
-      const poste = await this.PostelRepository.findOne({
+      const poste = await this.posteRepository.findOne({
         where: { id: updateWhatsappCommercialDto.poste_id },
       });
       if (!poste) {
