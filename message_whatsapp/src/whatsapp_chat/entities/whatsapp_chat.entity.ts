@@ -38,14 +38,14 @@ export class WhatsappChat {
   })
   poste_id?: string | null;
 
-   @Column({
+  @Column({
     name: 'last_msg_client_channel_id',
     type: 'varchar',
     length: 100,
     nullable: true,
   })
-  last_msg_client_channel_id?: string 
-// pour les regle du dispatch
+  last_msg_client_channel_id?: string;
+  // pour les regle du dispatch
   @Column({ type: 'timestamp', nullable: true })
   assigned_at: Date | null;
 
@@ -65,9 +65,9 @@ export class WhatsappChat {
   @Column({ type: 'timestamp', nullable: true })
   last_poste_message_at: Date | null;
 
-  // 
+  //
 
-  @ManyToOne(() => WhatsappPoste, (poste) => poste.chats )
+  @ManyToOne(() => WhatsappPoste, (poste) => poste.chats)
   @JoinColumn({
     name: 'poste_id',
     referencedColumnName: 'id',
@@ -166,23 +166,23 @@ export class WhatsappChat {
   })
   contact_client: string;
 
-    @Column({
+  @Column({
     name: 'auto_message_id',
     type: 'varchar',
     length: 100,
     nullable: true,
   })
-  auto_message_id?: string| null;
+  auto_message_id?: string | null;
 
-   @Column({
+  @Column({
     name: 'current_auto_message_id',
     type: 'varchar',
     length: 100,
     nullable: true,
   })
-  current_auto_message_id?: string |null;
+  current_auto_message_id?: string | null;
 
-   @Column({
+  @Column({
     name: 'readonly',
     type: 'varchar',
     length: 100,
@@ -190,16 +190,30 @@ export class WhatsappChat {
   })
   readonly: boolean;
 
-
-   @Column({
+  @Column({
     name: 'auto_message_status',
     type: 'varchar',
     length: 100,
     nullable: true,
   })
-  auto_message_status?: string |null
+  auto_message_status?: string | null;
 
+  @Column({ type: 'int', default: 0 })
+  auto_message_step: number;
+  // 0 = aucun envoyé
+  // 1 = message 1 envoyé
+  // 2 = message 2 envoyé
+  // 3 = message 3 envoyé (STOP)
 
+  @Column({ type: 'boolean', default: false })
+  waiting_client_reply: boolean;
+
+  @Column({
+    name: 'last_auto_message_sent_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  last_auto_message_sent_at: Date | null;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
@@ -209,8 +223,6 @@ export class WhatsappChat {
 
   @OneToMany(() => WhatsappMedia, (media) => media.chat)
   medias: WhatsappMedia[];
-
-
 
   @CreateDateColumn({
     name: 'createdAt',
@@ -237,5 +249,3 @@ export class WhatsappChat {
   })
   deletedAt: Date | null;
 }
-
-

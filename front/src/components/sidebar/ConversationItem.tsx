@@ -1,15 +1,17 @@
 import React from 'react';
 import { User } from 'lucide-react';
 import { Conversation } from '@/types/chat';
+import { TypingIndicator } from '../ui/typingIndicator';
 
 interface ConversationItemProps {
   conversation: Conversation;
   isSelected: boolean;
+  isTyping?: boolean; // 👈 AJOUT
   onClick: () => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({ 
-  conversation, isSelected, onClick }) => {
+  conversation, isSelected, isTyping,onClick }) => {
 
     
   const formatTime = (date: Date) => {
@@ -44,9 +46,17 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             </span>
           </div>
           <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
-          <p className="text-sm text-gray-500 truncate mt-1">
-            {conversation.lastMessage ? conversation.lastMessage.text : 'Aucun message pour le moment'}
-          </p>
+          <div className="mt-1">
+  {isTyping ? (
+    <TypingIndicator />
+  ) : (
+    <p className="text-sm text-gray-500 truncate">
+      {conversation.lastMessage
+        ? conversation.lastMessage.text
+        : 'Aucun message pour le moment'}
+    </p>
+  )}
+</div>
         </div>
         {conversation.unreadCount > 0 && (
           <div className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">

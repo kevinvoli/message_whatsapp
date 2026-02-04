@@ -17,6 +17,12 @@ export interface Commercial {
   poste?: Poste;
 }
 
+export interface TypingStore {
+  typingChats: Set<string>;
+  startTyping: (chatId: string) => void;
+  stopTyping: (chatId: string) => void;
+}
+
 export interface Message {
   id: string;
   text: string;
@@ -77,6 +83,8 @@ export interface Conversation {
 
   clientName: string;
   clientPhone: string;
+
+  auto_message_status:'scheduled' | 'sending' | 'sent';
 
   lastMessage: Message | null;
   unreadCount: number;
@@ -200,6 +208,8 @@ interface RawConversationData {
   name?: string;
   client_phone?: string;
 
+  auto_message_status:'scheduled' | 'sending' | 'sent';
+
   // 🔥 last_message peut être un objet RawMessageData OU une simple chaîne (ex: "[Media]")
   last_message?: RawMessageData | string | null;
 
@@ -284,7 +294,7 @@ export const transformToMessage = (raw: RawMessageData): Message => {
           caption: m.caption,
           file_name: m.file_name,
           file_size: m.file_size,
-          duration: m.seconds,
+          duration: m.duration,
           latitude: m.latitude,
           longitude: m.longitude,
         }))
@@ -357,45 +367,45 @@ export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
   return {
-    id: raw.id,
-    chat_id: raw.chat_id,
+  id: raw.id,
+  chat_id: raw.chat_id,
 
-    poste_id: raw.poste_id,
-    poste: raw.poste
-      ? {
-          id: raw.poste.id,
-          name: raw.poste.name,
-          code: raw.poste.code,
-          isActive: true,
-        }
-      : undefined,
+  poste_id: raw.poste_id,
+  poste: raw.poste
+    ? {
+      id: raw.poste.id,
+      name: raw.poste.name,
+      code: raw.poste.code,
+      isActive: true,
+    }
+    : undefined,
 
-    clientName: raw.name || "Client inconnu",
-    clientPhone: raw.client_phone || raw.chat_id?.split("@")[0] || "",
+  clientName: raw.name || "Client inconnu",
+  clientPhone: raw.client_phone || raw.chat_id?.split("@")[0] || "",
 
-    // 🔥 last_message : résolu via la fonction polymorphe
-    lastMessage: resolveLastMessage(raw.last_message),
+  // 🔥 last_message : résolu via la fonction polymorphe
+  lastMessage: resolveLastMessage(raw.last_message),
 
-    // 🆕 messages[] : transforme chaque message du tableau
-    messages: raw.messages?.map(transformToMessage) ?? [],
+  // 🆕 messages[] : transforme chaque message du tableau
+  messages: raw.messages?.map(transformToMessage) ?? [],
 
-    // 🆕 medias[] : transforme le tableau de médias
-    // medias: transformMedias(raw.medias),
+  // 🆕 medias[] : transforme le tableau de médias
+  // medias: transformMedias(raw.medias),
+  unreadCount: raw.unread_count ?? 0,
+  status: raw.status,
 
-    unreadCount: raw.unread_count ?? 0,
-    status: raw.status,
+  // 🆕 Timestamps
+  last_client_message_at: raw.last_client_message_at
+    ? new Date(raw.last_client_message_at)
+    : null,
+  last_poste_message_at: raw.last_poste_message_at
+    ? new Date(raw.last_poste_message_at)
+    : null,
 
-    // 🆕 Timestamps
-    last_client_message_at: raw.last_client_message_at
-      ? new Date(raw.last_client_message_at)
-      : null,
-    last_poste_message_at: raw.last_poste_message_at
-      ? new Date(raw.last_poste_message_at)
-      : null,
 
-    createdAt: new Date(raw.created_at || Date.now()),
-    updatedAt: new Date(raw.updated_at || Date.now()),
-  };
+  auto_message_status: "scheduled",
+
+};
 };
 
 /**

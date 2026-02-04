@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3000",
     "lint": "eslint"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "geist": "^1.5.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
+    
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "socket.io-client": "^4.8.3",

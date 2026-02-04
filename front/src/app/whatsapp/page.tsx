@@ -23,12 +23,14 @@ const WhatsAppPage = () => {
     error,
     selectConversation,
     sendMessage,
+    onTypingStart,
+    onTypingStop,
     loadConversations,
   } = useChatStore();
   const { isConnected: isWebSocketConnected } = useSocket();
 
 
-  
+
   // Protection de route
   useEffect(() => {
     if (initialized && !user) {
@@ -36,11 +38,11 @@ const WhatsAppPage = () => {
     }
   }, [initialized, user, router]);
 
-    // Gérer la sélection d'une conversation
-    const handleSelectConversation = useCallback((conversation: Conversation) => {
-        console.log("🎯 Sélection de la conversation:", conversation.clientName);
-        selectConversation(conversation.chat_id);
-      }, [selectConversation]);
+  // Gérer la sélection d'une conversation
+  const handleSelectConversation = useCallback((conversation: Conversation) => {
+    console.log("🎯 Sélection de la conversation:", conversation.clientName);
+    selectConversation(conversation.chat_id);
+  }, [selectConversation]);
 
   // Envoyer un message
   const handleSendMessage = useCallback(async (text: string) => {
@@ -49,8 +51,8 @@ const WhatsAppPage = () => {
       console.error('❌ Impossible d\'envoyer: aucune conversation sélectionnée');
       return;
     }
-    console.log("conversation selectionne",selectedConversation);
-    
+    console.log("conversation selectionne", selectedConversation);
+
     sendMessage(text);
   }, [selectedConversation, sendMessage]);
 
@@ -70,7 +72,7 @@ const WhatsAppPage = () => {
         searchTerm=""
         selectedConversation={selectedConversation}
         isConnected={isWebSocketConnected}
-        onSearchChange={() => {}}
+        onSearchChange={() => { }}
         onSelectConversation={handleSelectConversation}
         onLogout={logout}
       />
@@ -90,14 +92,17 @@ const WhatsAppPage = () => {
             ) : (
               <ChatMessages messages={messages} />
             )}
-            
+
             <ChatInput
-              onSendMessage={handleSendMessage}
+              chat_id={selectedConversation.chat_id}
+              onSendMessage={sendMessage}
+              onTypingStart={onTypingStart}
+              onTypingStop={onTypingStop}
               isConnected={isWebSocketConnected}
-              disabled={isLoading}
             />
 
-            {/* Affiche une erreur s'il y en a une */}
+
+            {/* Affiche une erreur s'il y en a une */}*
             {error && (
               <div className="bg-red-100 border-t border-red-200 p-2 text-center">
                 <p className="text-red-700 text-sm">{error}</p>
@@ -109,8 +114,8 @@ const WhatsAppPage = () => {
             <div className="text-center">
               <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
               <p className="text-xl font-semibold">
-                {conversations.length === 0 
-                  ? 'Aucune conversation disponible' 
+                {conversations.length === 0
+                  ? 'Aucune conversation disponible'
                   : 'Sélectionnez une conversation'}
               </p>
             </div>

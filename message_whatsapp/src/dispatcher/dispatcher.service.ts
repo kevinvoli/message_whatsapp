@@ -8,10 +8,7 @@ import { IsNull, LessThan, Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
-import {
-  PendingMessage,
-  PendingMessageStatus,
-} from './entities/pending-message.entity';
+
 
 @Injectable()
 export class DispatcherService {
@@ -22,8 +19,6 @@ export class DispatcherService {
 
     private readonly queueService: QueueService,
 
-    @InjectRepository(PendingMessage)
-    private readonly pendinMessageRepository: Repository<PendingMessage>,
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
@@ -40,13 +35,11 @@ export class DispatcherService {
   async assignConversation(
     clientPhone: string,
     clientName: string,
-    content: string,
-    messageType: string,
-    mediaUrl?: string,
+    
   ): Promise<WhatsappChat | null> {
     // 🔎 Chercher la conversation existante
     
-    let conversation = await this.chatRepository.findOne({
+    const conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
       relations: ['messages', 'poste'],
     });
@@ -153,39 +146,6 @@ export class DispatcherService {
     return this.chatRepository.save(newChat);
   }
 
-  async distributePendingMessages(forAgentId?: string): Promise<void> {
-    // Récupérer tous les messages en attente (avec leur message réel)
-    const pendingMessages = await this.pendinMessageRepository.find({
-      where: forAgentId ? { status: PendingMessageStatus.WAITING } : undefined,
-      order: { receivedAt: 'ASC' },
-      relations: ['message'], // On charge le message réel
-    });
-
-    for (const pending of pendingMessages) {
-      const realMessage = pending.message;
-
-      // 🔒 Vérifier que le message réel existe toujours
-      if (!realMessage) {
-        // Message réel supprimé, on supprime le pending
-        await this.pendinMessageRepository.remove(pending);
-        continue;
-      }
-
-      // 🔹 Assigner la conversation via le dispatcher
-      const conversation = await this.assignConversation(
-        realMessage.chat_id, // Phone du client depuis le message réel
-        realMessage.from_name ?? 'Client', // Nom du client
-        realMessage.text ?? pending.content, // Contenu du message réel, fallback si absent
-        pending.type, // Type du pending message
-        pending.mediaUrl, // Media du pending
-      );
-
-      if (conversation) {
-        // ✅ Une fois distribué, on supprime le pending
-        await this.pendinMessageRepository.remove(pending);
-      }
-    }
-  }
 
   async reinjectConversation(chat: WhatsappChat) {
     await this.chatRepository.update(chat.id, {

@@ -1,6 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateCommunicationWhapiDto } from './dto/create-communication_whapi.dto';
-import { UpdateCommunicationWhapiDto } from './dto/update-communication_whapi.dto';
+import { Body, Injectable, NotFoundException } from '@nestjs/common';
 import axios from 'axios';
 import { CreateChannelDto } from 'src/channel/dto/create-channel.dto';
 import { ChanneDatalDto } from 'src/channel/dto/channel-data.dto';
@@ -18,6 +16,8 @@ export class CommunicationWhapiService {
   constructor(
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
   // async sendToWhapi(
@@ -49,6 +49,46 @@ export class CommunicationWhapiService {
   //   };
   // }
 
+async sendTyping(chat_id: string, typing: boolean) {
+  try {
+    const chat = await this.chatRepository.findOne({
+      where: { chat_id },
+      relations: { poste: true },
+    });
+    if (!chat) return;
+
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: chat.last_msg_client_channel_id },
+    });
+    if (!channel) return;
+
+    const token = channel.token;
+
+    // PAS de messageId ici !
+    await axios.post(
+       `https://gate.whapi.cloud/messages/presence`,
+      // `${this.WHAPI_URL}`,
+      {
+        messaging_product: "whatsapp",
+        to: chat.contact_client,
+        type: "typing",
+        typing: typing ? "on" : "off", 
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("✅ Typing sent to Whapi:", chat.contact_client, typing);
+  } catch (err) {
+    console.error("❌ Whapi typing error", err?.response?.data || err);
+  }
+}
+
+
   async sendToWhapiChannel(data: {
     text: string;
     to: string;
@@ -60,18 +100,8 @@ export class CommunicationWhapiService {
     const token = channel?.token;
 
     if (!channel) {
-      throw new NotFoundException(
-    `Channel ${data.channelId} introuvable`,
-  );
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
     }
-// console.log("affichage du channel trouver+++++++++++++++",channel);
-
-    // console.log("les channe a envoie =============================================",{
-    //     to: data.to, // ex: "2250700000000"
-    //     body: data.text,
-    //     channel:data.channelId
-    //   },);
-
     const response = await axios.post<WhapiSendMessageResponse>(
       this.WHAPI_URL,
       {
@@ -85,17 +115,21 @@ export class CommunicationWhapiService {
         },
       },
     );
-// console.log("affichage du channel trouver+++++++++++++++",response.data);
 
     return response.data;
   }
 
-
+  generateWhapiMessageId(): string {
+    const part = (len: number) =>
+      Math.random()
+        .toString(36)
+        .substring(2, 2 + len)
+        .toUpperCase();
+    return `${part(8)}-${part(6)}-${part(4)}`;
+  }
   async getChannel(token: CreateChannelDto): Promise<ChanneDatalDto | null> {
-    console.log('canal trouvye***********************', token.token);
-
     try {
-      const response: { data: any } = await axios.get(
+      const response: { data: any } = await axios.get<WhapiSendMessageResponse>(
         'https://gate.whapi.cloud/health?wakeup=true&platform=Chrome%2CWhapi%2C1.6.0&channel_type=web',
         {
           headers: {
@@ -104,32 +138,14 @@ export class CommunicationWhapiService {
           },
         },
       );
-      console.log(
-        '===========eeerrr===============================================================',
-        response.data,
-      );
 
       if (!response) {
-        console.log(
-          '************************************************************************',
-        );
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.log(
-        'error===================error===================error====================================',
-        error,
-      );
       throw new NotFoundException(new Error(error));
     }
-  }
-
-  async sendMedia(to: string, mediaUrl: string): Promise<any> {
-    // This is a placeholder for the actual media sending logic.
-    // The implementation will depend on the Whapi.cloud API for sending media.
-    console.log(`Sending media to ${to} with URL ${mediaUrl}`);
-    return Promise.resolve({ id: 'fake-media-id', status: 'sent' });
   }
 }

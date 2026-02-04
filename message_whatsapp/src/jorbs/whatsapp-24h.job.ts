@@ -32,7 +32,7 @@ async enforce24h() {
     chat.read_only = true;
     await this.chatRepo.save(chat);
 
-    this.gateway.emitConversationReadonly(chat.chat_id);
+    this.gateway.emitConversationReadonly(chat);
   }
 }
 }

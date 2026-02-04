@@ -40,6 +40,8 @@ export class MessageAutoService {
    * 2️⃣ Lance l’envoi d’un message auto
    */
   async sendAutoMessage(chatId: string, position: number): Promise<void> {
+    // console.log("message automatique",chatId,position);
+
     const chat = await this.chatService.findBychat_id(chatId);
 
     if (!chat) return;
@@ -56,11 +58,15 @@ export class MessageAutoService {
       );
     }
 
+    console.log(
+      '====affichage des temple aleatoire====',
+      chat.auto_message_step,
+    );
+
     const template = await this.getAutoMessageByPosition(position);
 
     if (!template) return;
     // console.log("affichage des temple aleatoire",template);
-    
 
     // Marquer la conversation comme bloquée
     await this.chatService.update(chatId, {
@@ -68,25 +74,25 @@ export class MessageAutoService {
       auto_message_status: 'sending',
     });
 
-     const mes= this.formatMessageAuto({
-      message:template.body,
-      name:chat.name,
-      numero:chat.contact_client,
-    })
+    const mes = this.formatMessageAuto({
+      message: template.body,
+      name: chat.name,
+      numero: chat.contact_client,
+    });
 
-    console.log("affichage des temple aleatoire",mes);
+    const message = await this.messageService.createAgentMessage({
+      chat_id: chat.chat_id,
+      poste_id: chat.poste.id,
+      text: mes,
+      timestamp: new Date(
+        chat?.last_client_message_at
+          ? chat.last_client_message_at.getTime() + 1000
+          : Date.now(),
+      ),
+      channel_id: chat.last_msg_client_channel_id,
+    });
 
-
-    // const message = await this.messageService.createAgentMessage({
-    //   chat_id: chat.chat_id,
-    //   poste_id: chat.poste.id,
-    //   text: mes,
-    //   timestamp: new Date(),
-    //   channel_id: chat.last_msg_client_channel_id,
-    // });
-
-    // await this.gateway.notifyNewMessage(message, chat);
-
+    await this.gateway.notifyNewMessage(message, chat);
 
     // Débloquer après envoi
     await this.chatService.update(chatId, {
@@ -96,41 +102,38 @@ export class MessageAutoService {
     });
   }
 
-private formatMessageAuto(data: {
-  message: string;
-  name?: string;
-  numero?: string;
-}): string {
-  const safeName = this.normalizeClientName(data.name);
-// console.log("safeName",safeName);
+  private formatMessageAuto(data: {
+    message: string;
+    name?: string;
+    numero?: string;
+  }): string {
+    const safeName = this.normalizeClientName(data.name);
+    // console.log("safeName",safeName);
 
-  return data.message
-    .replace(/#name#/gi, safeName)
-    .replace(/#numero#/gi, data.numero ?? '');
-}
+    return data.message
+      .replace(/#name#/gi, safeName)
+      .replace(/#numero#/gi, data.numero ?? '');
+  }
 
-private normalizeClientName(rawName?: string): string {
-  if (!rawName) return 'Client';
+  private normalizeClientName(rawName?: string): string {
+    if (!rawName) return 'Client';
 
-const titlesRegex =
-  /(^|\s)(mr\.?|monsieur|mme\.?|madame|mademoiselle)\s+/gi;
+    const titlesRegex =
+      /(^|\s)(mr\.?|monsieur|mme\.?|madame|mademoiselle)\s+/gi;
 
+    const cleaned = rawName
+      .replace(titlesRegex, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-  const cleaned = rawName
-    .replace(titlesRegex, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+    if (!cleaned) return 'Client';
 
-  if (!cleaned) return 'Client';
+    // On prend le premier mot (souvent le prénom)
+    const firstName = cleaned.split(' ')[0];
 
-  // On prend le premier mot (souvent le prénom)
-  const firstName = cleaned.split(' ')[0];
-
-  // Capitalisation propre
-  return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
-}
-
-
+    // Capitalisation propre
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+  }
 }
 
 // "Bonjour Madame #name#,  J'espère que vous allez bien ? Je suis votre conseillère de GICOP, comment puis-je vous aider ?"

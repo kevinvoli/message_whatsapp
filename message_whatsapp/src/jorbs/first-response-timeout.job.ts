@@ -51,9 +51,9 @@ export class FirstResponseTimeoutJob {
   // Marquer que le message a été envoyé pour ne pas réexécuter
   // this.autoMessageIntervals.set(chatId, true)
 
-  console.log('Envoi d’un seul message', chatId);
+  // console.log('Envoi d’un seul message', chatId);
 
-  void this.messageAutoService.sendAutoMessage(chatId, position);
+  // void this.messageAutoService.sendAutoMessage(chatId, position);
 }
   // testAutoMessage(chatId: string, position: number) {
   //   if (this.autoMessageIntervals.has(chatId)) return;
@@ -69,13 +69,13 @@ export class FirstResponseTimeoutJob {
   //   this.autoMessageIntervals.set(chatId, interval);
   // }
 
-  stopAutoMessage(chatId: string) {
-    const interval = this.autoMessageIntervals.get(chatId);
-    if (!interval) return;
+  // stopAutoMessage(chatId: string) {
+  //   const interval = this.autoMessageIntervals.get(chatId);
+  //   if (!interval) return;
 
-    clearInterval(interval);
-    this.autoMessageIntervals.delete(chatId);
+  //   clearInterval(interval);
+  //   this.autoMessageIntervals.delete(chatId);
 
-    console.log('🛑 auto message arrêté', chatId);
-  }
+  //   console.log('🛑 auto message arrêté', chatId);
+  // }
 }

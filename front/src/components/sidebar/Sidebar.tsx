@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, LogOut, Wifi, WifiOff, User } from 'lucide-react';
 import { Commercial, Conversation } from '@/types/chat';
 import ConversationItem from './ConversationItem';
+import { useChatStore } from '@/store/chatStore';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -24,6 +25,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectConversation,
   onLogout
 }) => {
+
+  const typingStatus = useChatStore((state) => state.typingStatus);
+  
   return (
     <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
       <div className="bg-green-600 text-white p-4">
@@ -57,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <LogOut className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-200" />
           <input
@@ -82,6 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               key={conv.id}
               conversation={conv}
               isSelected={selectedConversation?.id === conv.id}
+              isTyping={!!typingStatus[conv.chat_id]} // 👈 ICI
               onClick={() => onSelectConversation(conv)}
             />
           ))

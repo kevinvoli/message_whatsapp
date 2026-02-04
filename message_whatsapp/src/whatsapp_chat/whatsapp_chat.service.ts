@@ -150,11 +150,7 @@ export class WhatsappChatService {
   }
 
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
-    // console.log("a metre az jour",data,chat_id);
-    
     await this.chatRepository.update({ chat_id }, data);
-  //  console.log("resultart mise a jour",up);
-   
   }
 
   async lockConversation(id: string) {

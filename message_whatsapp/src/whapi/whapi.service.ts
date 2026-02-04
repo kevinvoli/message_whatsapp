@@ -17,6 +17,7 @@ import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.ga
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { AutoMessageOrchestrator } from '../message-auto/auto-message-orchestrator.service';
 import {
   WhatsappMedia,
   WhatsappMediaType,
@@ -38,6 +39,8 @@ export class WhapiService {
 
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
+
+    private readonly autoMessageOrchestratorServcie: AutoMessageOrchestrator,
   ) {}
 
   // ======================================================
@@ -59,10 +62,7 @@ export class WhapiService {
       // 1️⃣ Dispatcher → attribution conversation
       const conversation = await this.dispatcherService.assignConversation(
         message.chat_id,
-        message.from_name ?? 'Client',
-        this.extractMessageContent(message),
-        message.type,
-        '',
+        message.from_name ?? 'Client',     
       );
 
       if (!conversation) {
@@ -83,13 +83,14 @@ export class WhapiService {
         throw new NotFoundException('Message non enregistré');
       }
 
+
+ await this.autoMessageOrchestratorServcie.handleClientMessage(conversation);
       // 3️⃣ Sauvegarde médias
       const medias = this.extractMedia(message);
       for (const media of medias) {
         await this.saveMedia(media, savedMessage, conversation);
       }
 
-      console.log("dans ========",medias);
 
       const fullMessage =
   await this.whatsappMessageService.findOneWithMedias(savedMessage.id);
@@ -99,6 +100,9 @@ export class WhapiService {
       // 4️⃣ NOTIFIER LE GATEWAY (POINT UNIQUE)
       await this.messageGateway.notifyNewMessage(
     fullMessage, conversation);
+
+         
+    
     } catch (error) {
       this.logger.error(error);
     }

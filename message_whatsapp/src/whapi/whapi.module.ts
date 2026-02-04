@@ -24,6 +24,9 @@ import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
+import { MessageAutoService } from 'src/message-auto/message-auto.service';
+import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 
 @Module({
   imports: [
@@ -36,7 +39,8 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
       WhapiChannel,
       Contact,
       WhatsappPoste,
-      WhatsappMedia
+      WhatsappMedia,
+      MessageAuto
     ]),
     DispatcherModule,
     WhatsappMessageModule,
@@ -53,6 +57,8 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
     WhatsappPosteService,
     ContactService,
     CommunicationWhapiService,
+    AutoMessageOrchestrator,
+    MessageAutoService
   ],
 })
 export class WhapiModule {}

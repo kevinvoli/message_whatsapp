@@ -17,6 +17,8 @@ interface ChatState {
   loadConversations: () => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
+  onTypingStart: (chat_id: string) => void;
+  onTypingStop: (chat_id: string) => void;
 
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[]) => void;
@@ -52,6 +54,8 @@ const initialState: Omit<
   | "setTyping"
   | "clearTyping"
   | "reset"
+  | "onTypingStart"
+  | "onTypingStop"
 > = {
   socket: null,
   conversations: [],
@@ -61,6 +65,7 @@ const initialState: Omit<
   error: null,
   typingStatus: {},
 };
+let typingTimeout: NodeJS.Timeout;
 
 export const useChatStore = create<ChatState>((set, get) => ({
   ...initialState,
@@ -117,7 +122,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { socket, selectedConversation } = get();
     if (!socket || !selectedConversation) return;
 
-     const tempId = crypto.randomUUID();
+    const tempId = crypto.randomUUID();
     const tempMessage: Message = {
       id: crypto.randomUUID(),
       chat_id: selectedConversation.chat_id,
@@ -133,12 +138,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     console.log("id temporaire==============", tempMessage);
-    
-     socket.emit("message:send", {
-    chat_id: selectedConversation.chat_id,
-    text,
-    tempId:tempMessage.id, // ⚡ On envoie le tempId au backend
-  });
+
+    socket.emit("message:send", {
+      chat_id: selectedConversation.chat_id,
+      text,
+      tempId: tempMessage.id, // ⚡ On envoie le tempId au backend
+    });
+  },
+
+  onTypingStart: (chat_id: string) => {
+    const { socket } = get();
+    if (!socket) return;
+    socket.emit("typing:start", { chat_id });
+  },
+
+  onTypingStop: (chat_id) => {
+    const { socket } = get();
+
+    if (!socket) return;
+
+    socket.emit("typing:stop", { chat_id });
   },
 
   setConversations: (conversations) => {
@@ -283,6 +302,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       typingStatus: { ...state.typingStatus, [chat_id]: true },
     }));
+
+    // 🧼 auto-clean après 6s
+    setTimeout(() => {
+      set((state) => {
+        if (!state.typingStatus[chat_id]) return state;
+        const next = { ...state.typingStatus };
+        delete next[chat_id];
+        return { typingStatus: next };
+      });
+    }, 6000);
   },
 
   clearTyping: (chat_id) => {

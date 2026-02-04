@@ -46,11 +46,9 @@ export class WhatsappMessageService {
     channel_id: string;
   }): Promise<WhatsappMessage> {
     try {
-      console.log('chat a envoie', data.chat_id);
 
       const chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
-      console.log('chat a envoie', chat);
 
       const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
 
@@ -81,6 +79,8 @@ export class WhatsappMessageService {
         throw new NotFoundException('Channel not found');
       }
 
+      console.log("=========",whapiResponse,"+++++++");
+      
       // 2️⃣ Création message DB
       const messageEntity = this.messageRepository.create({
         message_id: whapiResponse.message.id ?? `agent_${Date.now()}`,
@@ -134,6 +134,10 @@ export class WhatsappMessageService {
       throw error;
       // throw error;
     }
+  }
+
+  async typingStart(chat_id:string){
+    await this.communicationWhapiService.sendTyping(chat_id,true)
   }
 
 

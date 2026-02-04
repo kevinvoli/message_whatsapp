@@ -7,13 +7,7 @@ import { useChatStore } from '@/store/chatStore';
 import { useAuth } from '@/contexts/AuthProvider';
 import { Conversation, Message, transformToConversation, transformToMessage } from '@/types/chat';
 
-/**
- * @file WebSocketEvents.tsx
- * @description Ce composant (sans UI) agit comme un pont entre le contexte Socket.io et le store Zustand.
- * Il écoute les événements WebSocket entrants et appelle les actions correspondantes du store pour mettre à jour l'état de l'application.
- * Cela permet de centraliser toute la logique d'écoute des événements en un seul endroit,
- * en gardant les composants UI propres et découplés de la logique WebSocket.
- */
+
 const WebSocketEvents = () => {
   const { socket } = useSocket();
   const {
@@ -104,6 +98,17 @@ const WebSocketEvents = () => {
             break;
           }
 
+          case 'CONVERSATION_REMOVED':
+            removeConversationBychat_id(data.payload.chat_id);
+            break;
+
+          case 'AUTO_MESSAGE_STATUS':
+            updateConversation({
+              chat_id: data.payload.chat_id,
+              auto_message_status: data.payload.status,
+            });
+            break;
+
           case 'CONVERSATION_LIST': {
             const conversations: Conversation[] = data.payload.map(transformToConversation);
             setConversations(conversations);
@@ -169,14 +174,16 @@ const WebSocketEvents = () => {
         }
       };
 
-      const handleTypingStart = (data: { conversationId: string }) => {
-        console.log(`Typing started in chat ${data.conversationId}`);
-        setTyping(data.conversationId);
+      const handleTypingStart = (data: { chat_id: string,commercial_id:string }) => {
+        console.log(`Typing started in chat date: ${data}`,data);
+          if (data.commercial_id === user.id) return; 
+        setTyping(data.chat_id);
       };
 
-      const handleTypingStop = (data: { conversationId: string }) => {
-        console.log(`Typing stopped in chat ${data.conversationId}`);
-        clearTyping(data.conversationId);
+      const handleTypingStop = (data: { chat_id: string,commercial_id:string }) => {
+        console.log(`Typing stopped in chat ${data}`);
+        if (data.commercial_id === user.id) return;
+        clearTyping(data.chat_id);
       };
 
       const handleConversationReassigned = (data: {
@@ -188,15 +195,7 @@ const WebSocketEvents = () => {
         // Ici tu peux mettre à jour le store pour refléter le changement d'agent
         updateConversation({
           chat_id: data.chat_id,
-          id: '',
-          poste_id: '',
-          clientName: '',
-          clientPhone: '',
-          lastMessage: null,
-          unreadCount: 0,
           status: 'actif',
-          createdAt: new Date(),
-          updatedAt: new Date()
         });
       };
 
