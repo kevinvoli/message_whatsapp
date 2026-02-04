@@ -23,13 +23,13 @@ export class ChannelController {
     return this.communicationWhapiService.findOne(id);
   }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateCommunicationWhapiDto: UpdateChannelDto) {
-  //   return this.communicationWhapiService.update(id, updateCommunicationWhapiDto);
-  // }
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateCommunicationWhapiDto: any) {
+    return this.communicationWhapiService.update(id, updateCommunicationWhapiDto);
+  }
 
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.communicationWhapiService.remove(id);
-  // }
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.communicationWhapiService.remove(id);
+  }
 }

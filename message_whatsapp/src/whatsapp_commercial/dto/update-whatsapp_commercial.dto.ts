@@ -12,4 +12,12 @@ export class UpdateWhatsappCommercialDto {
   @IsOptional()
   @IsBoolean()
   isConnected?: boolean;
+
+  @IsOptional()
+  @IsString()
+  poste_id?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
 }

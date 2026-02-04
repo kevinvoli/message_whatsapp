@@ -43,6 +43,8 @@ Le projet est composé de trois parties principales :
 - **POST `/channel`** : Ajoute un nouveau channel.
   - Body: `{ token }`
 - **GET `/channel/:id`** : Récupère les détails d'un channel.
+- **PATCH `/channel/:id`** : Met à jour un channel.
+- **DELETE `/channel/:id`** : Supprime un channel.
 
 ### Postes (`/poste`)
 - **GET `/poste`** : Liste tous les postes.

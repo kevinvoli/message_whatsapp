@@ -81,4 +81,25 @@ export class ChannelService {
       where: { channel_id },
     });
   }
+
+  async remove(id: string) {
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: id },
+    });
+    if (!channel) {
+      throw new NotFoundException('Channel not found');
+    }
+    return this.channelRepository.remove(channel);
+  }
+
+  async update(id: string, dto: any) {
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: id },
+    });
+    if (!channel) {
+      throw new NotFoundException('Channel not found');
+    }
+    Object.assign(channel, dto);
+    return this.channelRepository.save(channel);
+  }
 }

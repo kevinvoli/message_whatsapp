@@ -14,4 +14,8 @@ export class CreateWhatsappCommercialDto {
 
   @IsString()
   poste_id: string;
+
+  @IsString()
+  @IsOptional()
+  role?: string;
 }
