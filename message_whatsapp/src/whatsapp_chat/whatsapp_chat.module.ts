@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
+import { WhatsappChatController } from './whatsapp_chat.controller';
 import { WhatsappChatGateway } from './whatsapp_chat.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
@@ -16,6 +17,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
     WhatsappChat,WhatsappChatLabel,   WhatsappCommercial, QueuePosition,
     WhatsappPoste
       ])],
+  controllers: [WhatsappChatController],
   providers: [WhatsappChatGateway, WhatsappChatService, WhatsappPosteService ,WhatsappCommercialService,QueueService],
 })
 export class WhatsappChatModule {}

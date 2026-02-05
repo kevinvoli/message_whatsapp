@@ -342,8 +342,8 @@ export class WhatsappMessageService {
 
 
       if (!message.from_me) {
-
         chat.last_msg_client_channel_id = channel.channel_id;
+        chat.channel_id = channel.channel_id;
       }
       
       await this.chatRepository.save(chat);

@@ -1,3 +1,4 @@
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -45,6 +46,19 @@ export class WhatsappChat {
     nullable: true,
   })
   last_msg_client_channel_id?: string;
+
+  @Column({
+    name: 'channel_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  channel_id?: string;
+
+  @ManyToOne(() => WhapiChannel, (channel) => channel.chats)
+  @JoinColumn({ name: 'channel_id', referencedColumnName: 'channel_id' })
+  channel: WhapiChannel;
+
   // pour les regle du dispatch
   @Column({ type: 'timestamp', nullable: true })
   assigned_at: Date | null;

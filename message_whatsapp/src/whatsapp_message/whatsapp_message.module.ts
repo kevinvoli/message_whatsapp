@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { WhatsappMessageService } from './whatsapp_message.service';
+import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
@@ -38,6 +39,7 @@ import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
     WhatsappChatModule,
     forwardRef(() => DispatcherModule),
   ],
+  controllers: [WhatsappMessageController],
   providers: [
     WhatsappChatService,
     WhatsappMessageGateway,

@@ -44,6 +44,9 @@ export class WhapiChannel {
   @OneToMany(() => WhatsappMessage, (message) => message.channel)
   messages: WhatsappMessage[];
 
+  @OneToMany(() => WhatsappChat, (chat) => chat.channel)
+  chats: WhatsappChat[];
+
   @OneToMany(() => WhatsappMedia, (media) => media.chat)
   medias: WhatsappMedia[];
 
