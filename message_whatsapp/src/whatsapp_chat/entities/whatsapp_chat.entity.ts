@@ -22,7 +22,7 @@ export enum WhatsappChatStatus {
   FERME = 'fermé',
 }
 
-@Entity()
+@Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
 @Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {

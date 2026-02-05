@@ -11,7 +11,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('whapi_channels')
+@Entity({ name: 'whapi_channels', engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
 @Index('UQ_whapi_channel_id', ['channel_id'], {unique:true})
 export class WhapiChannel {
   @PrimaryGeneratedColumn('uuid')

@@ -33,7 +33,7 @@ export enum WhatsappMessageStatus {
   DELETED = 'deleted',
 }
 
-@Entity()
+@Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
 @Index('UQ_whatsapp_message_message_id', ['message_id'], { unique: true })
 export class WhatsappMessage {
   @PrimaryGeneratedColumn('uuid', {

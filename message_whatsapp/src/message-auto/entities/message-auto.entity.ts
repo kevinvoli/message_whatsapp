@@ -15,7 +15,7 @@ export enum AutoMessageChannel {
   EMAIL = 'email',
 }
 
-@Entity('messages_predefinis')
+@Entity({ name: 'messages_predefinis', engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
 export class MessageAuto {
   @PrimaryGeneratedColumn('uuid')
   id: string;
