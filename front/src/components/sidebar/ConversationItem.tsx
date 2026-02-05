@@ -45,14 +45,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.lastMessage ? formatTime(conversation.lastMessage.timestamp) : formatTime(new Date())}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
-            {conversation.channel_id && (
-              <span className="text-[10px] bg-blue-50 text-blue-500 px-1 rounded border border-blue-100 uppercase">
-                {conversation.channel_id.split('_')[0]}
-              </span>
-            )}
-          </div>
+          <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
           <div className="mt-1">
   {isTyping ? (
     <TypingIndicator />

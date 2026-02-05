@@ -19,7 +19,6 @@ interface ChatState {
   sendMessage: (text: string) => void;
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
-  searchConversations: (search: string) => void;
 
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[]) => void;
@@ -57,7 +56,6 @@ const initialState: Omit<
   | "reset"
   | "onTypingStart"
   | "onTypingStop"
-  | "searchConversations"
 > = {
   socket: null,
   conversations: [],
@@ -93,7 +91,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!conversation) return state;
 
       return {
-        selectedConversation: conversation,
+        selectedConversation: { ...conversation, unreadCount: 0 },
+        conversations: state.conversations.map((c) =>
+          c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
+        ),
         messages: [],
         isLoading: true,
       };
@@ -159,12 +160,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.emit("typing:stop", { chat_id });
   },
 
-  searchConversations: (search: string) => {
-    const { socket } = get();
-    if (!socket) return;
-    socket.emit("conversations:get", { search });
-  },
-
   setConversations: (conversations) => {
     // console.log("=======track1 setConversations=======", conversations);
 
@@ -179,6 +174,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addMessage: (message) => {
+    console.log("dans le add message", message);
+
     set((state) => {
       const isActive = state.selectedConversation?.chat_id === message.chat_id;
 
@@ -189,7 +186,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ? {
                 ...c,
                 lastMessage: message,
-                // On ne calcule plus l'unreadCount ici, on attend le CONVERSATION_UPSERT du back
+                unreadCount: isActive ? 0 : (c.unreadCount ?? 0) + 1,
               }
             : c,
         ),
@@ -201,41 +198,68 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const isSelected =
         state.selectedConversation?.chat_id === updatedConversation.chat_id;
+      const isOutgoing = updatedConversation.lastMessage?.from_me === true;
+      console.log("est ce que c'est faux====", updatedConversation);
 
       const conversationExists = state.conversations.some(
         (c) => c.chat_id === updatedConversation.chat_id,
       );
 
-      // 🔁 Liste des conversations - Source de vérité Backend uniquement
+      // 🔥 Mise à jour du compteur unread
+      const conversationWithUnread: Conversation = {
+        ...updatedConversation,
+        unreadCount:
+          isSelected || isOutgoing
+            ? 0
+            : conversationExists
+              ? (state.conversations.find(
+                  (c) => c.chat_id === updatedConversation.chat_id,
+                )?.unreadCount ?? 0) + 1
+              : (updatedConversation.unreadCount ?? 1),
+      };
+
+      // 🔁 Liste des conversations
       const newConversations = conversationExists
         ? state.conversations.map((c) =>
             c.chat_id === updatedConversation.chat_id
-              ? { ...c, ...updatedConversation } // Merge des données du back
+              ? conversationWithUnread
               : c,
           )
-        : [updatedConversation, ...state.conversations];
+        : [conversationWithUnread, ...state.conversations];
 
       const newState: Partial<ChatState> = {
         conversations: newConversations,
       };
 
+      // 🟢 Conversation active
+      // 🟢 Si cette conversation est celle qui est sélectionnée
       if (isSelected) {
-        newState.selectedConversation = conversationExists
-          ? { ...state.selectedConversation!, ...updatedConversation }
-          : updatedConversation;
+        newState.selectedConversation = conversationWithUnread;
 
-        // Sync des messages si fournis
-        if (updatedConversation.messages && updatedConversation.messages.length > 0) {
+        // 🆕 Le backend envoie messages[] (tableau complet) dans conversation:updated
+        // On les utilise directement si présents et non vides
+        if (
+          updatedConversation.messages &&
+          updatedConversation.messages.length > 0
+        ) {
+          // Merge intelligent : on garde les messages existants qui ne sont pas
+          // dans le nouveau tableau (ex: messages "sending" en cours) puis on ajoute les nouveaux
           const newIds = new Set(updatedConversation.messages.map((m) => m.id));
           const localOnly = state.messages.filter(
             (m) => !newIds.has(m.id) && m.status === "sending",
           );
           newState.messages = [...updatedConversation.messages, ...localOnly];
         } else if (
+          // Fallback : si pas de messages[] mais un lastMessage, on l'ajoute
           updatedConversation.lastMessage &&
-          !state.messages.find((m) => m.id === updatedConversation.lastMessage?.id)
+          !state.messages.find(
+            (m) => m.id === updatedConversation.lastMessage?.id,
+          )
         ) {
-          newState.messages = [...state.messages, updatedConversation.lastMessage];
+          newState.messages = [
+            ...state.messages,
+            updatedConversation.lastMessage,
+          ];
         }
       }
 

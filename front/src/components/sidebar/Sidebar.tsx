@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, LogOut, Wifi, WifiOff, User, Settings } from 'lucide-react';
+import { Search, LogOut, Wifi, WifiOff, User } from 'lucide-react';
 import { Commercial, Conversation } from '@/types/chat';
 import ConversationItem from './ConversationItem';
 import { useChatStore } from '@/store/chatStore';
@@ -53,26 +53,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           </div>
-          <div className="flex gap-1">
-            {commercial.role === 'ADMIN' && (
-              <a
-                href="http://localhost:3001"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 hover:bg-green-700 rounded-full transition-colors"
-                title="Panel Administration"
-              >
-                <Settings className="w-5 h-5" />
-              </a>
-            )}
-            <button
-              onClick={onLogout}
-              className="p-2 hover:bg-green-700 rounded-full transition-colors"
-              title="Déconnexion"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={onLogout}
+            className="p-2 hover:bg-green-700 rounded-full transition-colors"
+            title="Déconnexion"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="relative">
