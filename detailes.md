@@ -6,6 +6,7 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 
 ### Authentification
 - `POST /auth/login` : Authentification initiale. [Présent]
+- `GET /auth/profile` : Récupération du profil utilisateur via JWT. [Créé]
 
 ### Global
 - `GET /stats` : Statistiques globales pour le dashboard (commerciaux, canaux, conversations). [Créé] (Sécurisé Admin)

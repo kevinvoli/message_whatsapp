@@ -56,4 +56,17 @@ export class AuthService {
       user,
     };
   }
+
+  async getProfile(userId: string): Promise<AuthUser | null> {
+    const user = await this.usersService.findOneById(userId);
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      posteId: user.poste?.id ?? null,
+    };
+  }
 }

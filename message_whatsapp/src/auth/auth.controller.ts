@@ -21,4 +21,14 @@ async login(@Body() loginDto: LoginDto) {
 
   return this.authService.login(user);
 }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('profile')
+  async getProfile(@Request() req) {
+    const user = await this.authService.getProfile(req.user.userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
 }
