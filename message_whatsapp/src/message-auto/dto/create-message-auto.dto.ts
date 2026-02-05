@@ -1,14 +1,26 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { AutoMessageChannel } from '../entities/message-auto.entity';
 
 export class CreateMessageAutoDto {
   @IsString()
-  contenu: string;
+  body: string;
+
+  @IsOptional()
+  @IsInt()
+  delai?: number;
+
+  @IsOptional()
+  @IsEnum(AutoMessageChannel)
+  canal?: AutoMessageChannel;
 
   @IsInt()
-  @Min(1)
+  @Min(0)
   position: number;
 
   @IsOptional()
   @IsBoolean()
-  actif?: boolean = true;
+  actif?: boolean;
+
+  @IsOptional()
+  conditions?: any;
 }

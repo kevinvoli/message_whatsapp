@@ -1,10 +1,12 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MessageAuto } from './entities/message-auto.entity';
 import { Repository } from 'typeorm';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { CreateMessageAutoDto } from './dto/create-message-auto.dto';
+import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
 
 @Injectable()
 export class MessageAutoService {
@@ -17,6 +19,36 @@ export class MessageAutoService {
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly gateway: WhatsappMessageGateway,
   ) {}
+
+  async create(dto: CreateMessageAutoDto): Promise<MessageAuto> {
+    const message = this.autoMessageRepo.create(dto);
+    return await this.autoMessageRepo.save(message);
+  }
+
+  async findAll(): Promise<MessageAuto[]> {
+    return await this.autoMessageRepo.find({ order: { position: 'ASC' } });
+  }
+
+  async findOne(id: string): Promise<MessageAuto> {
+    const message = await this.autoMessageRepo.findOne({ where: { id } });
+    if (!message) {
+      throw new NotFoundException(`Auto message with ID ${id} not found`);
+    }
+    return message;
+  }
+
+  async update(id: string, dto: UpdateMessageAutoDto): Promise<MessageAuto> {
+    const message = await this.findOne(id);
+    Object.assign(message, dto);
+    return await this.autoMessageRepo.save(message);
+  }
+
+  async remove(id: string): Promise<void> {
+    const result = await this.autoMessageRepo.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Auto message with ID ${id} not found`);
+    }
+  }
 
   /**
    * 1️⃣ Récupère un message auto actif par position

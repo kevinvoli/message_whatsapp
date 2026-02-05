@@ -36,15 +36,22 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 - `GET /messages/:chat_id` : Liste les messages d'une conversation. [Créé] (Sécurisé Admin)
 - WebSockets : Envoi/Réception temps réel. [Présent]
 
+### Messages Automatiques (Auto-Messages)
+- `GET /message-auto` : Liste tous les messages auto. [Créé] (Sécurisé Admin)
+- `POST /message-auto` : Crée un message auto. [Créé] (Sécurisé Admin)
+- `PATCH /message-auto/:id` : Modifie un message auto. [Créé] (Sécurisé Admin)
+- `DELETE /message-auto/:id` : Supprime un message auto. [Créé] (Sécurisé Admin)
+
 ## Panel Admin
 
 ### Fonctionnalités
 - Authentification HTTP : Connexion réservée aux ADMINs via HTTP. [Créé]
 - Dashboard : Vue d'ensemble avec statistiques de base. [Créé]
-- Gestion des Utilisateurs : CRUD complet via HTTP. [Créé]
+- Gestion des Utilisateurs : CRUD complet via HTTP avec attribution de poste. [Créé]
 - Gestion des Canaux Whapi : CRUD complet via HTTP. [Créé]
 - Gestion des Postes : CRUD complet via HTTP. [Créé]
-- Monitoring : Visualisation des conversations en cours sans Sockets (HTTP Refresh). [Créé]
+- Gestion des Messages Automatiques : Interface dédiée pour gérer le flux de réponse auto. [Créé]
+- Monitoring : Visualisation des conversations et de l'historique des messages sans Sockets (HTTP). [Créé]
 
 ## Modifications Structurelles
 - **Sécurité** : Implémentation de `RolesGuard` et décorateur `@Roles`.
