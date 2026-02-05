@@ -125,35 +125,38 @@ export class WhatsappMessageGateway
   }
 
   @SubscribeMessage('typing:start')
-  handleTypingStart(
+  async handleTypingStart(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
     const agent = this.connectedAgents.get(client.id);
-
-    console.log('============', agent, '===============');
-
     const commercialId = agent?.commercialId;
-      if (!commercialId) return;
+    if (!commercialId) return;
 
+    // 1️⃣ Notifier les autres agents du même poste
     client.to(`poste_${agent.posteId}`).emit("typing:start", {
       chat_id: payload.chat_id,
       commercial_id: commercialId,
     });
+
+    // 2️⃣ Notifier le client sur WhatsApp via Whapi
+    await this.messageService.typingStart(payload.chat_id);
   }
 
   @SubscribeMessage('typing:stop')
-  handleTypingStop(
+  async handleTypingStop(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
     const agent = this.connectedAgents.get(client.id);
-  if (!agent) return;
+    if (!agent) return;
 
-  client.to(`poste_${agent.posteId}`).emit('typing:stop', {
-    chat_id: payload.chat_id,
-    commercial_id: agent.commercialId,
-  });
+    client.to(`poste_${agent.posteId}`).emit('typing:stop', {
+      chat_id: payload.chat_id,
+      commercial_id: agent.commercialId,
+    });
+
+    // On pourrait notifier Whapi ici aussi si l'API le permet (généralement le typing s'arrête tout seul après un délai)
   }
 
   @SubscribeMessage('messages:get')
@@ -169,6 +172,14 @@ export class WhatsappMessageGateway
         messages: messages.map(this.mapMessage),
       },
     });
+  }
+
+  @SubscribeMessage('messages:read')
+  async handleReadMessages(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chat_id: string },
+  ) {
+    await this.messageService.markAsRead(payload.chat_id);
   }
 
   @SubscribeMessage('message:send')
@@ -205,6 +216,13 @@ export class WhatsappMessageGateway
     this.server.to(`poste_${agent.posteId}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
       payload: this.mapConversation(chat, lastMessage, unreadCount),
+    });
+  }
+
+  public emitMessageStatusUpdate(chatId: string, messageId: string, status: string): void {
+    this.server.to(`chat_${chatId}`).emit('chat:event', {
+      type: 'MESSAGE_STATUS',
+      payload: { chat_id: chatId, message_id: messageId, status },
     });
   }
 
@@ -302,6 +320,19 @@ export class WhatsappMessageGateway
     this.server.emit('chat:event', {
       type: 'CONVERSATION_READONLY',
       payload: { chat_id: chat },
+    });
+  }
+
+  public async emitConversationUpdate(chatId: string): Promise<void> {
+    const chat = await this.chatService.findBychat_id(chatId);
+    if (!chat) return;
+
+    const lastMessage = await this.messageService.findLastMessageBychat_id(chatId);
+    const unreadCount = await this.messageService.countUnreadMessages(chatId);
+
+    this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, lastMessage, unreadCount),
     });
   }
 

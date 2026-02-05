@@ -115,6 +115,12 @@ const WebSocketEvents = () => {
             break;
           }
 
+          case 'CONVERSATION_ASSIGNED': {
+            const conversation: Conversation = transformToConversation(data.payload);
+            addConversation(conversation);
+            break;
+          }
+
           case 'CONVERSATION_REASSIGNED': {
             const conversation: Conversation = transformToConversation(data.payload);
             updateConversation(conversation);
@@ -123,7 +129,16 @@ const WebSocketEvents = () => {
 
           case 'CONVERSATION_READONLY': {
             const conversation: Conversation = transformToConversation(data.payload);
-            updateConversation({ ...conversation, readonly: true });
+            updateConversation({ ...conversation, readonly: true } as any);
+            break;
+          }
+
+          case 'MESSAGE_STATUS': {
+            const { chat_id, message_id, status } = data.payload;
+            const allowedStatuses = ["sending", "sent", "delivered", "read", "error"] as const;
+            if (allowedStatuses.includes(status)) {
+              updateMessageStatus(chat_id, message_id, status as any);
+            }
             break;
           }
 
@@ -133,105 +148,32 @@ const WebSocketEvents = () => {
       };
 
 
-      const handleMessagesList = (data: { chat_id: string, messages: any[] }) => {
-        console.log(`Received raw messages for chat ${data.chat_id}:`, data.messages);
-        const messages = data.messages.map(transformToMessage);
-        setMessages(data.chat_id, messages);
-      };
-
-      const handleNewMessage = (rawMessage: any) => {
-        console.log('Received raw new message:ccccccccccccccccccccccccccccccccccccccccccccccccccccccc', rawMessage);
-        const message = transformToMessage(rawMessage);
-        addMessage(message);
-      };
-
-      const handleConversationUpdated = (rawConversation: any) => {
-        console.log('Received raw conversation update=======:', rawConversation);
-        const conversation = transformToConversation(rawConversation);
-        updateConversation(conversation);
-      };
-
       const handleError = (error: { message: string, details?: string }) => {
         console.error('Socket error received:', error.message, error.details || '');
       };
 
-      const handleMessageStatusUpdate = (data: {
-        conversationId: string;
-        messageId: string;
-        status: string;
-      }) => {
-        console.log(`Received status update for message ${data.messageId}: ${data.status}`);
-        const allowedStatuses = ["sending", "sent", "delivered", "read", "error"] as const;
-
-        if (allowedStatuses.includes(data.status as any)) {
-          updateMessageStatus(
-            data.conversationId,
-            data.messageId,
-            data.status as typeof allowedStatuses[number]
-          );
-        } else {
-          console.warn(`Received unknown status: ${data.status}`);
-        }
-      };
-
-      const handleTypingStart = (data: { chat_id: string,commercial_id:string }) => {
-        console.log(`Typing started in chat date: ${data}`,data);
-          if (data.commercial_id === user.id) return; 
+      const handleTypingStart = (data: { chat_id: string, commercial_id: string }) => {
+        if (data.commercial_id === user.id) return;
         setTyping(data.chat_id);
       };
 
-      const handleTypingStop = (data: { chat_id: string,commercial_id:string }) => {
-        console.log(`Typing stopped in chat ${data}`);
+      const handleTypingStop = (data: { chat_id: string, commercial_id: string }) => {
         if (data.commercial_id === user.id) return;
         clearTyping(data.chat_id);
-      };
-
-      const handleConversationReassigned = (data: {
-        chat_id: string;
-        oldPosteId: string;
-        newPosteId: string;
-      }) => {
-        console.log('Conversation reassigned:', data);
-        // Ici tu peux mettre à jour le store pour refléter le changement d'agent
-        updateConversation({
-          chat_id: data.chat_id,
-          status: 'actif',
-        });
-      };
-
-      const handleConversationReadonly = (data: { chat_id: string }) => {
-        console.log('Conversation readonly:', data);
-        // Tu peux ajouter un flag dans le store pour bloquer l’édition côté UI
-        updateConversation({
-          chat_id: data.chat_id,
-          readonly: true,
-        });
       };
 
 
       // --- Enregistrement des listeners ---
       socket.on('chat:event', handleChatEvent);
-      socket.on('conversations:list', handleConversationsList);
-      socket.on('messages:list', handleMessagesList);
-      socket.on('message:new', handleNewMessage);
-      socket.on('conversation:updated', handleConversationUpdated);
-      socket.on('message:status:update', handleMessageStatusUpdate);
       socket.on('typing:start', handleTypingStart);
       socket.on('typing:stop', handleTypingStop);
       socket.on('error', handleError);
-      // socket.on('conversation:assigned', handleConversationAssigned);
-      socket.on('conversation:removed', handleConversationRemoved);
-      socket.on('conversation:reassigned', handleConversationReassigned);
-      socket.on('conversation:readonly', handleConversationReadonly);
+
       // --- Nettoyage ---
       return () => {
         socket.off('chat:event', handleChatEvent);
-        socket.off('conversations:list', handleConversationsList);
-        socket.off('messages:list', handleMessagesList);
-        socket.off('conversation:reassigned', handleConversationReassigned);
-        socket.off('conversation:readonly', handleConversationReadonly);
-        socket.off('message:new', handleNewMessage);
-        socket.off('conversation:updated', handleConversationUpdated);
+        socket.off('typing:start', handleTypingStart);
+        socket.off('typing:stop', handleTypingStop);
         socket.off('error', handleError);
         setSocket(null);
       };

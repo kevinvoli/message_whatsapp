@@ -190,6 +190,13 @@ export class WhapiService {
     for (const status of payload.statuses) {
       await this.whatsappMessageService.updateByStatus(status);
       this.logger.log(`📌 Status | ${status.id} → ${status.status}`);
+
+      // Notifier le gateway
+      this.messageGateway.emitMessageStatusUpdate(
+        status.recipient_id,
+        status.id,
+        status.status
+      );
     }
   }
 }

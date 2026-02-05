@@ -171,6 +171,21 @@ export class WhatsappMessageService {
     }
   }
 
+  async markAsRead(chat_id: string): Promise<void> {
+    await this.messageRepository
+      .createQueryBuilder()
+      .update(WhatsappMessage)
+      .set({ status: WhatsappMessageStatus.READ })
+      .where('chat_id = :chat_id', { chat_id })
+      .andWhere('direction = :direction', { direction: MessageDirection.IN })
+      .andWhere('status != :status', {
+        status: WhatsappMessageStatus.READ,
+      })
+      .execute();
+
+    await this.chatRepository.update({ chat_id }, { unread_count: 0 });
+  }
+
   async findBychat_id(
     chat_id: string,
     limit = 100,
@@ -178,16 +193,7 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage[]> {
     try {
       // 1️⃣ Marquer les messages reçus comme lus
-      await this.messageRepository
-        .createQueryBuilder()
-        .update(WhatsappMessage)
-        .set({ status: WhatsappMessageStatus.READ })
-        .where('chat_id = :chat_id', { chat_id })
-        .andWhere('direction = :direction', { direction: MessageDirection.IN })
-        .andWhere('status != :status', {
-          status: WhatsappMessageStatus.READ,
-        })
-        .execute();
+      await this.markAsRead(chat_id);
 
       // 2️⃣ Récupérer les messages
       const mess = await this.messageRepository.find({

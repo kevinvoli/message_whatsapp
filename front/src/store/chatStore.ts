@@ -24,7 +24,7 @@ interface ChatState {
   setConversations: (conversations: Conversation[]) => void;
   setMessages: (chat_id: string, messages: Message[]) => void;
   addMessage: (message: Message) => void;
-  updateConversation: (conversation: Conversation) => void;
+  updateConversation: (conversation: Partial<Conversation> & { chat_id: string }) => void;
   addConversation: (conversation: Conversation) => void;
   removeConversationBychat_id: (conversationId: string) => void;
   updateMessageStatus: (
@@ -194,29 +194,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  updateConversation: (updatedConversation: Conversation) => {
+  updateConversation: (updatedConversation: Partial<Conversation> & { chat_id: string }) => {
     set((state) => {
       const isSelected =
         state.selectedConversation?.chat_id === updatedConversation.chat_id;
       const isOutgoing = updatedConversation.lastMessage?.from_me === true;
-      console.log("est ce que c'est faux====", updatedConversation);
 
-      const conversationExists = state.conversations.some(
+      const existingConv = state.conversations.find(
         (c) => c.chat_id === updatedConversation.chat_id,
       );
+      const conversationExists = !!existingConv;
 
       // 🔥 Mise à jour du compteur unread
       const conversationWithUnread: Conversation = {
+        ...(existingConv || {} as Conversation),
         ...updatedConversation,
         unreadCount:
           isSelected || isOutgoing
             ? 0
-            : conversationExists
-              ? (state.conversations.find(
-                  (c) => c.chat_id === updatedConversation.chat_id,
-                )?.unreadCount ?? 0) + 1
-              : (updatedConversation.unreadCount ?? 1),
-      };
+            : updatedConversation.unreadCount !== undefined
+              ? updatedConversation.unreadCount
+              : (existingConv?.unreadCount ?? 0),
+      } as Conversation;
 
       // 🔁 Liste des conversations
       const newConversations = conversationExists
@@ -271,7 +270,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       conversations: [
         newConversation,
-        ...state.conversations.filter((c) => c.id !== newConversation.id),
+        ...state.conversations.filter((c) => c.chat_id !== newConversation.chat_id),
       ],
     }));
   },
