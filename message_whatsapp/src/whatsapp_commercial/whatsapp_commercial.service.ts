@@ -21,7 +21,7 @@ export class WhatsappCommercialService {
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
 
     @InjectRepository(WhatsappPoste)
-    private readonly PostelRepository: Repository<WhatsappPoste>,
+    private readonly posteRepository: Repository<WhatsappPoste>,
 
     // @InjectRepository(QueuePosition)
     // private readonly queuePositionRepository: Repository<QueuePosition>,
@@ -75,7 +75,7 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
   async create(
     createWhatsappCommercialDto: CreateWhatsappCommercialDto,
   ): Promise<SafeWhatsappCommercial> {
-    const { email, name, password, poste_id } = createWhatsappCommercialDto;
+    const { email, name, password, poste_id, role } = createWhatsappCommercialDto;
 
     const existingUser = await this.whatsappCommercialRepository.findOne({
       where: { name },
@@ -84,7 +84,7 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
       throw new ConflictException('Name already exists');
     }
 
-    const poste  = await this.PostelRepository.findOne({
+    const poste  = await this.posteRepository.findOne({
       where:{id:poste_id}
     })
 
@@ -93,7 +93,8 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
       email,
       name,
       password: password,
-      poste: poste
+      poste: poste,
+      role: role || 'COMMERCIAL'
     });
 
     console.log("utilisateur pres a etre enregistre", user);
@@ -171,6 +172,23 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
     // Mettre à jour le nom si fourni
     if (updateWhatsappCommercialDto.name !== undefined) {
       user.name = updateWhatsappCommercialDto.name;
+    }
+
+    if (updateWhatsappCommercialDto.role !== undefined) {
+      if (!['ADMIN', 'COMMERCIAL'].includes(updateWhatsappCommercialDto.role)) {
+        throw new BadRequestException('Invalid role');
+      }
+      user.role = updateWhatsappCommercialDto.role;
+    }
+
+    if (updateWhatsappCommercialDto.poste_id !== undefined) {
+      const poste = await this.posteRepository.findOne({
+        where: { id: updateWhatsappCommercialDto.poste_id },
+      });
+      if (!poste) {
+        throw new NotFoundException(`Poste with ID "${updateWhatsappCommercialDto.poste_id}" not found`);
+      }
+      user.poste = poste;
     }
 
     const updatedUser = await this.whatsappCommercialRepository.save(user);

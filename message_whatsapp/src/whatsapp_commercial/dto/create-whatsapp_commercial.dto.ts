@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateWhatsappCommercialDto {
   @IsEmail()
@@ -14,4 +14,8 @@ export class CreateWhatsappCommercialDto {
 
   @IsString()
   poste_id: string;
+
+  @IsString()
+  @IsOptional()
+  role?: string;
 }

@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "dev:back": "cd message_whatsapp && npm run start:dev",
+    "dev:front": "cd front && npm run dev",
+    "dev:admin": "cd admin && npm run dev",
+    "install:all": "npm install && cd message_whatsapp && npm install && cd ../front && npm install && cd ../admin && npm install"
+  },
   "dependencies": {
     "axios": "^1.13.2"
   }

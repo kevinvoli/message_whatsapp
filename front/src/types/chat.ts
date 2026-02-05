@@ -1,4 +1,3 @@
-import { MessageDirection } from "../../../message_whatsapp/src/whatsapp_message/entities/whatsapp_message.entity";
 /**
  * @fileoverview Ce fichier définit les types et interfaces principaux utilisés
  * dans l'application de chat, ainsi que des fonctions utilitaires pour
@@ -106,6 +105,11 @@ export interface Conversation {
 }
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "error";
+
+export enum MessageDirection {
+  IN = 'IN',
+  OUT = 'OUT',
+}
 
 export interface WebSocketMessage {
   type:
@@ -220,6 +224,7 @@ interface RawConversationData {
   medias?: RawMediaData[];
 
   unread_count?: number;
+  unreadCount?: number;
 
   status: "actif" | "en attente" | "fermé";
 
@@ -391,7 +396,7 @@ export const transformToConversation = (
 
   // 🆕 medias[] : transforme le tableau de médias
   // medias: transformMedias(raw.medias),
-  unreadCount: raw.unread_count ?? 0,
+  unreadCount: raw.unreadCount ?? raw.unread_count ?? 0,
   status: raw.status,
 
   // 🆕 Timestamps
@@ -405,6 +410,8 @@ export const transformToConversation = (
 
   auto_message_status: "scheduled",
 
+  createdAt: raw.created_at ? new Date(raw.created_at) : new Date(),
+  updatedAt: raw.updated_at ? new Date(raw.updated_at) : new Date(),
 };
 };
 

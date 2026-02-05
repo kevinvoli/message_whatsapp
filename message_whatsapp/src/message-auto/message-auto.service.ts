@@ -73,6 +73,7 @@ export class MessageAutoService {
       readonly: true,
       auto_message_status: 'sending',
     });
+    await this.gateway.emitConversationUpdate(chatId);
 
     const mes = this.formatMessageAuto({
       message: template.body,
@@ -100,6 +101,7 @@ export class MessageAutoService {
       auto_message_status: 'sent',
       auto_message_id: template.id,
     });
+    await this.gateway.emitConversationUpdate(chatId);
   }
 
   private formatMessageAuto(data: {
