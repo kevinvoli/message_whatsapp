@@ -414,7 +414,7 @@ export const transformToConversation = (
     : null,
 
 
-  auto_message_status: "scheduled",
+  auto_message_status: raw.auto_message_status || "scheduled",
 
 };
 };

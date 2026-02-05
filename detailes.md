@@ -7,6 +7,9 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 ### Authentification
 - `POST /auth/login` : Authentification initiale. [Présent]
 
+### Global
+- `GET /stats` : Statistiques globales pour le dashboard (commerciaux, canaux, conversations). [Créé] (Sécurisé Admin)
+
 ### Utilisateurs (Agents)
 - `GET /users` : Liste tous les utilisateurs. [Présent] (Sécurisé Admin)
 - `GET /users/:id` : Récupère un utilisateur par ID. [Présent] (Sécurisé Admin)

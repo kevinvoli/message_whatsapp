@@ -22,14 +22,19 @@ import { CommunicationWhapiModule } from './communication_whapi/communication_wh
 import { AuthModule } from './auth/auth.module';
 import { JorbsModule } from './jorbs/jorbs.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { TasksService } from './jorbs/tasks.service';
 import { ChannelModule } from './channel/channel.module';
 import { ContactModule } from './contact/contact.module';
 import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
 import { MessageAutoModule } from './message-auto/message-auto.module';
+import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity';
+import { WhapiChannel } from './channel/entities/channel.entity';
+import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([WhatsappCommercial, WhapiChannel, WhatsappChat]),
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
