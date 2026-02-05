@@ -116,6 +116,7 @@ export class WhatsappMessageService {
     } catch (error) {
       console.error('WHAPI SEND FAILED:', error);
 
+      
       // 🧠 fallback : message en échec mais sauvegardé
       // const failedMessage = this.messageRepository.create({
       //   message_id: `failed_${Date.now()}`,
