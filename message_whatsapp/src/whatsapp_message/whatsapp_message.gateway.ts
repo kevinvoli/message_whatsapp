@@ -351,6 +351,8 @@ export class WhatsappMessageGateway
     return {
       id: chat.id,
       chat_id: chat.chat_id,
+      channel_id: chat.channel_id,
+      last_msg_client_channel_id: chat.last_msg_client_channel_id,
       name: chat.name,
       poste_id: chat.poste_id,
       status: chat.status,

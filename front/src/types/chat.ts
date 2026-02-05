@@ -13,6 +13,7 @@ export interface Commercial {
   id: string;
   name: string;
   email: string;
+  role: string;
   poste_id: string;
   poste?: Poste;
 }
@@ -77,6 +78,9 @@ export interface ConversationMedia {
 export interface Conversation {
   id: string;
   chat_id: string;
+
+  channel_id?: string;
+  last_msg_client_channel_id?: string;
 
   poste_id: string;
   poste?: Poste;
@@ -198,6 +202,9 @@ interface RawConversationData {
   id: string;
   chat_id: string;
 
+  channel_id?: string;
+  last_msg_client_channel_id?: string;
+
   poste_id: string;
   poste?: {
     id: string;
@@ -236,6 +243,7 @@ interface RawCommercialData {
   name?: string;
   username?: string;
   email: string;
+  role: string;
   poste_id: string;
   poste?: {
     id: string;
@@ -370,6 +378,9 @@ export const transformToConversation = (
   id: raw.id,
   chat_id: raw.chat_id,
 
+  channel_id: raw.channel_id,
+  last_msg_client_channel_id: raw.last_msg_client_channel_id,
+
   poste_id: raw.poste_id,
   poste: raw.poste
     ? {
@@ -416,6 +427,7 @@ export const transformToCommercial = (raw: RawCommercialData): Commercial => {
     id: raw.id,
     name: raw.name || raw.username || "",
     email: raw.email,
+    role: raw.role,
 
     poste_id: raw.poste_id,
 
