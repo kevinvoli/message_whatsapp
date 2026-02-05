@@ -48,7 +48,7 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 
 ## Modifications Structurelles
 - **Sécurité** : Implémentation de `RolesGuard` et décorateur `@Roles`.
-- **Base de données** : Relation formelle entre `WhatsappChat` et `WhapiChannel`. Optimisation du format de ligne (`ROW_FORMAT=DYNAMIC`) pour éviter les erreurs `ER_TOO_BIG_ROWSIZE`.
+- **Base de données** : Relation formelle entre `WhatsappChat` et `WhapiChannel`. Optimisation du format de ligne (`ROW_FORMAT=DYNAMIC`) et conversion des colonnes JSON complexes en `longtext` avec transformer pour éviter les erreurs `ER_TOO_BIG_ROWSIZE`.
 - **Compatibilité** : Préservation du champ `last_msg_client_channel_id` pour le front tout en ajoutant `channel_id` pour le backend et l'admin.
 
 ## États

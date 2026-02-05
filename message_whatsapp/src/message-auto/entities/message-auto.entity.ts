@@ -41,13 +41,20 @@ export class MessageAuto {
   actif: boolean;
 
 
-  @Column({ type: 'json', nullable: true })
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value) => (value ? JSON.stringify(value) : null),
+      from: (value) => (value ? JSON.parse(value) : null),
+    },
+  })
   conditions?: {
     poste_id?: string;
     channel_id?: string;
     client_type?: string;
     [key: string]: any;
-  }| null;
+  } | null;
 
   @CreateDateColumn()
   created_at: Date;
