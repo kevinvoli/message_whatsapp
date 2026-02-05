@@ -18,8 +18,8 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 - `GET /channel` : Liste tous les canaux. [Présent] (Sécurisé Admin)
 - `GET /channel/:id` : Récupère un canal par ID. [Présent] (Sécurisé Admin)
 - `POST /channel` : Crée un nouveau canal. [Présent] (Sécurisé Admin)
-- `PATCH /channel/:id` : Met à jour un canal. [Présent] (Sécurisé Admin)
-- `DELETE /channel/:id` : Supprime un canal. [Présent] (Sécurisé Admin)
+- `PATCH /channel/:id` : Met à jour un canal. [Créé] (Sécurisé Admin)
+- `DELETE /channel/:id` : Supprime un canal. [Créé] (Sécurisé Admin)
 
 ### Postes
 - `GET /poste` : Liste tous les postes. [Présent] (Sécurisé Admin)

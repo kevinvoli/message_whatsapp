@@ -13,6 +13,6 @@ export class WhatsappMessageController {
   @Get(':chat_id')
   @Roles('ADMIN')
   async findByChatId(@Param('chat_id') chat_id: string) {
-    return this.messageService.findByChatId(chat_id);
+    return this.messageService.findBychat_id(chat_id);
   }
 }

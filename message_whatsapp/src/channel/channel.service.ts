@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { CreateChannelDto } from './dto/create-channel.dto';
-// import { UpdateChannelDto } from './dto/update-channel.dto';
+import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 // import { WhapiUser } from './entities/whapi-user.entity';
@@ -80,5 +80,22 @@ export class ChannelService {
     return this.channelRepository.findOne({
       where: { channel_id },
     });
+  }
+
+  async update(id: string, dto: UpdateChannelDto) {
+    const channel = await this.channelRepository.findOne({ where: { id } });
+    if (!channel) {
+      throw new NotFoundException(`Channel with ID ${id} not found`);
+    }
+    Object.assign(channel, dto);
+    return await this.channelRepository.save(channel);
+  }
+
+  async remove(id: string) {
+    const result = await this.channelRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Channel with ID ${id} not found`);
+    }
+    return { deleted: true };
   }
 }
