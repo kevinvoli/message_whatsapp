@@ -33,7 +33,7 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 ### Conversations (Chats)
 - `GET /chats` : Liste toutes les conversations (Monitoring Admin). [Créé] (Sécurisé Admin)
 - `GET /chats/:chat_id` : Détails d'une conversation. [Créé] (Sécurisé Admin)
-- WebSockets : Gestion temps réel pour les agents. [Présent]
+- WebSockets : Gestion temps réel pour les agents avec support du filtrage (search) côté serveur. [Réfléchi]
 
 ### Messages
 - `GET /messages/:chat_id` : Liste les messages d'une conversation. [Créé] (Sécurisé Admin)
@@ -60,6 +60,7 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 - **Sécurité** : Implémentation de `RolesGuard` et décorateur `@Roles`.
 - **Base de données** : Relation formelle entre `WhatsappChat` et `WhapiChannel`. Optimisation du format de ligne (`ROW_FORMAT=DYNAMIC`) et conversion des colonnes JSON complexes en `longtext` avec transformer pour éviter les erreurs `ER_TOO_BIG_ROWSIZE`.
 - **Compatibilité** : Préservation du champ `last_msg_client_channel_id` pour le front tout en ajoutant `channel_id` pour le backend et l'admin.
+- **Source de vérité** : Centralisation de tous les calculs de logique métier (compteurs de messages non lus, filtrage de recherche) sur le backend pour garantir la cohérence des données entre toutes les interfaces.
 
 ## États
 - **Présent** : Déjà implémenté et fonctionnel avant intervention.

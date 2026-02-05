@@ -94,12 +94,22 @@ export class WhatsappMessageGateway
   // ======================================================
   // CLIENT → SERVER
   // ======================================================
-  private async sendConversationsToClient(client: Socket) {
+  private async sendConversationsToClient(client: Socket, searchTerm?: string) {
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    const chats = await this.chatService.findByPosteId(agent.posteId);
+    let chats = await this.chatService.findByPosteId(agent.posteId);
     if (!chats) return;
+
+    // Calcul de filtrage côté back
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      chats = chats.filter(
+        (c) =>
+          c.name.toLowerCase().includes(lowerSearch) ||
+          c.chat_id.includes(lowerSearch),
+      );
+    }
 
     const conversations = await Promise.all(
       chats.map(async (chat) => {
@@ -120,8 +130,11 @@ export class WhatsappMessageGateway
   }
 
   @SubscribeMessage('conversations:get')
-  async handleGetConversations(@ConnectedSocket() client: Socket) {
-    await this.sendConversationsToClient(client);
+  async handleGetConversations(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload?: { search?: string },
+  ) {
+    await this.sendConversationsToClient(client, payload?.search);
   }
 
   @SubscribeMessage('typing:start')
@@ -168,6 +181,26 @@ export class WhatsappMessageGateway
         chat_id: payload.chat_id,
         messages: messages.map(this.mapMessage),
       },
+    });
+  }
+
+  @SubscribeMessage('messages:read')
+  async handleMarkAsRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chat_id: string },
+  ) {
+    await this.chatService.markChatAsRead(payload.chat_id);
+
+    const chat = await this.chatService.findBychat_id(payload.chat_id);
+    if (!chat) return;
+
+    const lastMessage = await this.messageService.findLastMessageBychat_id(
+      chat.chat_id,
+    );
+
+    this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, lastMessage, 0),
     });
   }
 
@@ -346,7 +379,7 @@ export class WhatsappMessageGateway
   private mapConversation(
     chat: WhatsappChat,
     lastMessage?: WhatsappMessage | null,
-    unreadCount = 0,
+    unreadCount?: number,
   ) {
     return {
       id: chat.id,
@@ -356,7 +389,7 @@ export class WhatsappMessageGateway
       name: chat.name,
       poste_id: chat.poste_id,
       status: chat.status,
-      unreadCount,
+      unreadCount: unreadCount ?? chat.unread_count ?? 0,
       last_message: lastMessage
         ? {
             id: lastMessage.id,

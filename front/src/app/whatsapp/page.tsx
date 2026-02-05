@@ -15,6 +15,7 @@ import { Conversation } from '@/types/chat';
 const WhatsAppPage = () => {
   const { user, initialized, logout } = useAuth();
   const router = useRouter();
+  const [searchTerm, setSearchTerm] = React.useState('');
   const {
     conversations,
     selectedConversation,
@@ -26,6 +27,7 @@ const WhatsAppPage = () => {
     onTypingStart,
     onTypingStop,
     loadConversations,
+    searchConversations,
   } = useChatStore();
   const { isConnected: isWebSocketConnected } = useSocket();
 
@@ -64,15 +66,20 @@ const WhatsAppPage = () => {
     );
   }
 
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    searchConversations(term);
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar
         commercial={user}
         conversations={conversations}
-        searchTerm=""
+        searchTerm={searchTerm}
         selectedConversation={selectedConversation}
         isConnected={isWebSocketConnected}
-        onSearchChange={() => { }}
+        onSearchChange={handleSearch}
         onSelectConversation={handleSelectConversation}
         onLogout={logout}
       />
