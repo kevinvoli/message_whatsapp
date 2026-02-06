@@ -16,11 +16,9 @@ export default function LoginPage() {
         setError('');
         try {
             if (isLoginAsAdmin) {
-                const { access_token } = await loginAdmin(email, password);
-                localStorage.setItem('jwt_token', access_token); // Store admin token
+                await loginAdmin(email, password); // No access_token in response
             } else {
-                const { access_token } = await login(email, password);
-                localStorage.setItem('jwt_token', access_token); // Store commercial token
+                await login(email, password); // No access_token in response
             }
             router.push('/');
         } catch (err) {

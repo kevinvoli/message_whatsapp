@@ -15,9 +15,10 @@ import ClientsView from '@/app/ui/ClientsView';
 import RapportsView from '@/app/ui/RapportsView';
 import PostesView from '@/app/ui/PostesView';
 import ChannelsView from '@/app/ui/ChannelsView';
-import MessageAutoView from '@/app/ui/MessageAutoView'; // Import the new view
-import { ViewMode, Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client } from '@/app/lib/definitions'; // Import Client
-import { getCommerciaux, getStatsGlobales, getPostes, getChannels, getMessageAuto, getClients } from '@/app/lib/api'; // Import getClients
+import MessageAutoView from '@/app/ui/MessageAutoView';
+import ConversationsView from '@/app/ui/ConversationsView'; // Import ConversationsView
+import { ViewMode, Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat } from '@/app/lib/definitions';
+import { getCommerciaux, getStatsGlobales, getPostes, getChannels, getMessageAuto, getClients, getChats } from '@/app/lib/api';
 import { Spinner } from '@/app/ui/Spinner';
 
 export default function AdminDashboard() {
@@ -29,30 +30,26 @@ export default function AdminDashboard() {
     const [statsGlobales, setStatsGlobales] = useState<StatsGlobales | null>(null);
     const [postes, setPostes] = useState<Poste[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
-    const [messagesAuto, setMessagesAuto] = useState<MessageAuto[]>([]); // New state for messagesAuto
-    const [clients, setClients] = useState<Client[]>([]); // New state for clients
+    const [messagesAuto, setMessagesAuto] = useState<MessageAuto[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [chats, setChats] = useState<WhatsappChat[]>([]); // New state for chats
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchData = async () => {
         setLoading(true);
         setError(null);
-        const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-
-        if (!token) {
-            setError("Authentification requise.");
-            setLoading(false);
-            return;
-        }
+        // Authentication is now handled by HTTP-only cookies, no need for localStorage token or explicit check here.
 
         try {
-            const [statsData, commerciauxData, postesData, channelsData, messagesAutoData, clientsData] = await Promise.all([
-                getStatsGlobales(token),
-                getCommerciaux(token),
-                getPostes(token),
-                getChannels(token),
-                getMessageAuto(token),
-                getClients(token)
+            const [statsData, commerciauxData, postesData, channelsData, messagesAutoData, clientsData, chatsData] = await Promise.all([
+                getStatsGlobales(),
+                getCommerciaux(),
+                getPostes(),
+                getChannels(),
+                getMessageAuto(),
+                getClients(),
+                getChats() // Fetch chats data
             ]);
             setStatsGlobales(statsData);
             setCommerciaux(commerciauxData);
@@ -60,7 +57,10 @@ export default function AdminDashboard() {
             setChannels(channelsData);
             setMessagesAuto(messagesAutoData);
             setClients(clientsData);
+            setChats(chatsData); // Set chats data
         } catch (err) {
+            // If an API call fails due to authentication, the checkAdminAuth in page.tsx will redirect.
+            // This error likely indicates a network issue or a backend error other than authentication.
             setError(err instanceof Error ? err.message : "Erreur lors de la récupération des données.");
         } finally {
             setLoading(false);
@@ -125,14 +125,16 @@ export default function AdminDashboard() {
             return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} />;
           case 'automessages':
             return <MessageAutoView initialMessagesAuto={messagesAuto} onMessageAutoUpdated={fetchData} />;
+          case 'conversations': // New case for conversations
+            return <ConversationsView initialChats={chats} onChatUpdated={fetchData} />;
           case 'performance':
             return <PerformanceView />;
           case 'analytics':
             return <AnalyticsView />;
           case 'messages':
             return <MessagesView />;
-          case 'clients': // New case for clients
-            return <ClientsView clients={clients} />;
+          case 'clients':
+            return <ClientsView initialClients={clients} onClientUpdated={fetchData} />;
           case 'rapports':
             return <RapportsView />;
           default:

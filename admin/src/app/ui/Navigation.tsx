@@ -1,7 +1,7 @@
-import React from 'react';
 import { Settings, LogOut, Menu, X } from 'lucide-react';
 import { NavigationItem, ViewMode } from '@/app/lib/definitions';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
+import { logoutAdmin } from '@/app/lib/api'; // Import logoutAdmin
 
 interface NavigationProps {
     sidebarOpen: boolean;
@@ -12,10 +12,18 @@ interface NavigationProps {
 }
 
 export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationItems }: NavigationProps) {
-    const router = useRouter(); // Initialize useRouter
+    const router = useRouter();
 
-    const handleLogout = () => {
-        localStorage.removeItem('jwt_token'); // Clear the JWT token
+    const handleLogout = async () => {
+        try {
+            await logoutAdmin(); // Call without token, relies on HTTP-only cookie
+        } catch (error) {
+            console.error("Logout failed on backend", error);
+            // Frontend doesn't store token, so no localStorage to clear for token itself.
+            // If there were other local storage items related to auth state, they'd be cleared here.
+        }
+        // Since the actual token is in an HTTP-only cookie, we don't clear localStorage for 'jwt_token'.
+        // Any other client-side session state might be cleared here if applicable.
         router.push('/login'); // Redirect to login page
     };
 

@@ -1,10 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
-
 export class CreateContactDto {
-  @IsString()
-  phone: string;
-
-  @IsString()
-  @IsOptional()
-  name?: string;
+    phone: string;
+    chat_id?: string |null; // chat_id is optional as it might be created later
+    name: string;
 }

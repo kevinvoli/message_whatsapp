@@ -42,17 +42,17 @@ export class AuthService {
     };
   }
 
-  login(user: AuthUser) {
+  login(user: AuthUser): { accessToken: string; refreshToken: string } {
     const payload = {
       sub: user.id,
       email: user.email,
       posteId: user.posteId,
     };
 
-    return {
-      access_token: this.jwtService.sign(payload),
-      user,
-    };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' }); // Short-lived access token
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' }); // Long-lived refresh token
+
+    return { accessToken, refreshToken };
   }
 
   async getProfile(userId: string): Promise<AuthUser | null> {

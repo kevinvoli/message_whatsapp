@@ -22,49 +22,37 @@ export class AppService {
 
   async getStats() {
     const [commerciaux, totalCanaux, totalConversations, commerciauxActifs] = await Promise.all([
-      this.commercialRepo.find(),
+      this.commercialRepo.count(), // Use count() for total number
       this.channelRepo.count(),
       this.chatRepo.count(),
       this.commercialRepo.count({ where: { isConnected: true } }),
     ]);
-
-    // Pour l'instant, beaucoup de valeurs sont statiques ou simulées.
-    // Elles devront être remplacées par de vrais calculs.
-    const totalConversions = 38;
-    const totalCA = 1130000;
-    const totalMessages = 600;
-    const totalConversationsActives = 41;
-    const tauxConversionMoyen = 32;
-    const satisfactionMoyenne = "4.7";
-    const objectifGlobal = 75;
-    const caObjectifGlobal = 2500000;
     
     return {
-      // Données réelles
-      commerciaux: commerciaux.length,
+      commerciaux: commerciaux,
       canaux: totalCanaux,
       conversations: totalConversations,
       commerciauxActifs: commerciauxActifs,
-
-      // Données simulées pour correspondre à l'interface StatsGlobales
-      totalConversions,
-      totalCA,
-      totalMessages,
-      totalConversationsActives,
-      tauxConversionMoyen,
-      satisfactionMoyenne,
-      objectifGlobal,
-      caObjectifGlobal,
-      totalRDV: 20,
-      totalRDVHonores: 15,
-      totalDevis: 29,
-      totalDevisAcceptes: 17,
-      totalAppelsSortants: 71,
-      totalAppelsRecus: 107,
-      totalNouveauxContacts: 88,
-      panierMoyen: 30000,
-      tauxFidelisationMoyen: 75,
-      productiviteMoyenne: 82,
+      // Les métriques suivantes nécessiteraient des entités ou des logiques métier supplémentaires
+      // pour des calculs précis, et sont donc omises pour éviter des données statiques trompeuses.
+      // totalConversions: 0,
+      // totalCA: 0,
+      // totalMessages: 0,
+      // totalConversationsActives: 0,
+      // tauxConversionMoyen: 0,
+      // satisfactionMoyenne: "0",
+      // objectifGlobal: 0,
+      // caObjectifGlobal: 0,
+      // totalRDV: 0,
+      // totalRDVHonores: 0,
+      // totalDevis: 0,
+      // totalDevisAcceptes: 0,
+      // totalAppelsSortants: 0,
+      // totalAppelsRecus: 0,
+      // totalNouveauxContacts: 0,
+      // panierMoyen: 0,
+      // tauxFidelisationMoyen: 0,
+      // productiviteMoyenne: 0,
     };
   }
 }

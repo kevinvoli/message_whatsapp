@@ -27,17 +27,17 @@ export class AuthAdminService {
     };
   }
 
-  login(admin: AuthAdminUser) {
+  login(admin: AuthAdminUser): { accessToken: string; refreshToken: string } {
     const payload = {
       sub: admin.id,
       email: admin.email,
       name: admin.name,
     };
 
-    return {
-      access_token: this.jwtService.sign(payload),
-      admin, // Return admin details
-    };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' }); // Short-lived access token
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' }); // Long-lived refresh token
+
+    return { accessToken, refreshToken };
   }
 
   async getProfile(adminId: string): Promise<AuthAdminUser | null> {

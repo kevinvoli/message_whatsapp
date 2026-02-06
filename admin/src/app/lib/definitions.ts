@@ -42,7 +42,7 @@ export type Commercial = {
     productivite: number;
 };
 
-export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages';
+export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages' | 'conversations'; // Added 'conversations'
 
 import React from 'react'; // Import React for React.ElementType
 import { Icon } from 'lucide-react';
@@ -55,25 +55,30 @@ export type NavigationItem = {
 };
 
 export type StatsGlobales = {
-    totalConversions: number;
-    totalCA: number;
-    totalMessages: number;
-    totalConversationsActives: number;
-    tauxConversionMoyen: number;
-    satisfactionMoyenne: string;
-    objectifGlobal: number;
-    totalRDV: number;
-    totalRDVHonores: number;
-    totalDevis: number;
-    totalDevisAcceptes: number;
-    totalAppelsSortants: number;
-    totalAppelsRecus: number;
-    totalNouveauxContacts: number;
-    panierMoyen: number;
-    tauxFidelisationMoyen: number;
-    productiviteMoyenne: number;
+    commerciaux: number;
+    canaux: number;
+    conversations: number;
     commerciauxActifs: number;
-    caObjectifGlobal: number;
+    // Les métriques suivantes nécessiteraient des entités ou des logiques métier supplémentaires
+    // pour des calculs précis, et sont donc omises pour éviter des données statiques trompeuses.
+    // totalConversions: number;
+    // totalCA: number;
+    // totalMessages: number;
+    // totalConversationsActives: number;
+    // tauxConversionMoyen: number;
+    // satisfactionMoyenne: string;
+    // objectifGlobal: number;
+    // caObjectifGlobal: number;
+    // totalRDV: number;
+    // totalRDVHonores: number;
+    // totalDevis: number;
+    // totalDevisAcceptes: number;
+    // totalAppelsSortants: number;
+    // totalAppelsRecus: number;
+    // totalNouveauxContacts: number;
+    // panierMoyen: number;
+    // tauxFidelisationMoyen: number;
+    // productiviteMoyenne: number;
 };
 
 export type PerformanceData = {
@@ -147,4 +152,42 @@ export type Client = {
   is_active: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type WhatsappMessage = {
+  id: string;
+  chat_id: string;
+  text: string;
+  direction: 'IN' | 'OUT'; // IN for messages received, OUT for messages sent
+  status: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
+  timestamp: string; // ISO date string
+  mediaUrl?: string;
+  mediaType?: string;
+  caption?: string;
+  is_deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WhatsappChat = {
+  id: string; // Internal UUID
+  chat_id: string; // External WhatsApp chat ID
+  name: string;
+  type: string;
+  chat_pic: string;
+  chat_pic_full: string;
+  is_pinned: boolean;
+  is_muted: boolean;
+  mute_until: string | null;
+  is_archived: boolean;
+  unread_count: number;
+  unread_mention: boolean;
+  read_only: boolean;
+  not_spam: boolean;
+  contact_client: string; // The phone number or identifier of the contact
+  last_activity_at: string; // ISO date string
+  createdAt: string;
+  updatedAt: string;
+  poste: Poste; // Relation to Poste
+  messages: WhatsappMessage[]; // Relation to Messages
 };

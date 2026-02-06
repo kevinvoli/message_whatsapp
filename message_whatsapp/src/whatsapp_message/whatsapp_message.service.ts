@@ -142,20 +142,7 @@ export class WhatsappMessageService {
   }
 
 
-  async createIncomingMessage(dto: CreateWhatsappMessageDto): Promise<WhatsappMessage> {
-  const chat = await this.chatRepository.findOne({ where: { chat_id: dto.chat_id } });
-  if (!chat) throw new NotFoundException(`Chat ${dto.chat_id} not found`);
 
-  const message = this.messageRepository.create({
-    chat,
-    text: dto.text ?? '',
-    from_me: false,
-    timestamp: dto.timestamp ?? new Date(),
-    channel_id: dto.channel_id ,
-  });
-
-  return await this.messageRepository.save(message);
-}
 
   async findLastMessageBychat_id(
     chat_id: string,
@@ -224,10 +211,10 @@ export class WhatsappMessageService {
     }
   }
 
-  async create(message: CreateWhatsappMessageDto, commercialId?: string) {
+  async createInternalMessage(message: any, commercialId?: string) {
     try {
       console.log('message reçue du dispache', message);
-      const chat = await this.chatRepository.find({
+      const chat = await this.chatRepository.findOne({
         where: {
           chat_id: message.chat_id,
         },
@@ -352,7 +339,7 @@ export class WhatsappMessageService {
         this.messageRepository.create({
           channel: channel,
           chat:chat,
-          contact_id: contact.id,
+          contact_id: contact?.id,
           message_id: message.id,
           external_id: message.id,
           direction: MessageDirection.IN,

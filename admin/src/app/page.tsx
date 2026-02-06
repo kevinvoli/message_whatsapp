@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminDashboard from './dashboard/commercial/page';
 import { Spinner } from './ui/Spinner';
+import { checkAdminAuth } from './lib/api'; // Import checkAdminAuth
 
 export default function Home() {
   const router = useRouter();
@@ -11,20 +12,24 @@ export default function Home() {
   const [loading, setLoading] = useState(true); // Start as loading
 
   useEffect(() => {
-    // This code runs only on the client side
-    const token = localStorage.getItem('jwt_token');
-    
-    if (token) {
-      setIsAuthenticated(true); // Set authenticated
-    } else {
-      router.replace('/login'); // Redirect immediately if no token
-      // No need to set isAuthenticated here, as we are redirecting
-      // Also, no need to setLoading(false) here, as the component will unmount
-      return; // Exit early as a redirect is happening
+    async function checkAuthStatus() {
+      try {
+        const authenticated = await checkAdminAuth();
+        if (authenticated) {
+          setIsAuthenticated(true);
+        } else {
+          router.replace('/login');
+        }
+      } catch (error) {
+        console.error("Authentication check failed:", error);
+        router.replace('/login');
+      } finally {
+        setLoading(false);
+      }
     }
-    
-    setLoading(false); // Only set loading to false if we are NOT redirecting
-  }, [router]); // Dependency array should include router as it's used inside
+
+    checkAuthStatus();
+  }, [router]);
 
   if (loading) {
     return (

@@ -11,10 +11,12 @@ export class ContactService{
     private readonly repo: Repository<Contact>,
   ) {}
 
-  async findOrCreate(phone: string,chat_id:string, name?: string, ) {
+  async findOrCreate(phone: string,chat_id?:string|null, name?: string, ) {
 
     let contact = await this.repo.findOne({ where: { phone } });
-
+    if (!chat_id) {
+      return
+    }
     if (!contact) {
       contact = this.repo.create({ phone, name ,chat_id:chat_id});
 
