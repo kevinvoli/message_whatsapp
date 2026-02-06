@@ -21,16 +21,50 @@ export class AppService {
   }
 
   async getStats() {
-    const [commerciaux, canaux, conversations] = await Promise.all([
-      this.commercialRepo.count(),
+    const [commerciaux, totalCanaux, totalConversations, commerciauxActifs] = await Promise.all([
+      this.commercialRepo.find(),
       this.channelRepo.count(),
       this.chatRepo.count(),
+      this.commercialRepo.count({ where: { isConnected: true } }),
     ]);
 
+    // Pour l'instant, beaucoup de valeurs sont statiques ou simulées.
+    // Elles devront être remplacées par de vrais calculs.
+    const totalConversions = 38;
+    const totalCA = 1130000;
+    const totalMessages = 600;
+    const totalConversationsActives = 41;
+    const tauxConversionMoyen = 32;
+    const satisfactionMoyenne = "4.7";
+    const objectifGlobal = 75;
+    const caObjectifGlobal = 2500000;
+    
     return {
-      commerciaux,
-      canaux,
-      conversations,
+      // Données réelles
+      commerciaux: commerciaux.length,
+      canaux: totalCanaux,
+      conversations: totalConversations,
+      commerciauxActifs: commerciauxActifs,
+
+      // Données simulées pour correspondre à l'interface StatsGlobales
+      totalConversions,
+      totalCA,
+      totalMessages,
+      totalConversationsActives,
+      tauxConversionMoyen,
+      satisfactionMoyenne,
+      objectifGlobal,
+      caObjectifGlobal,
+      totalRDV: 20,
+      totalRDVHonores: 15,
+      totalDevis: 29,
+      totalDevisAcceptes: 17,
+      totalAppelsSortants: 71,
+      totalAppelsRecus: 107,
+      totalNouveauxContacts: 88,
+      panierMoyen: 30000,
+      tauxFidelisationMoyen: 75,
+      productiviteMoyenne: 82,
     };
   }
 }
