@@ -21,7 +21,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
     useEffect(() => {
         setChats(initialChats);
@@ -54,14 +54,11 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     };
 
     const fetchMessages = async (chatId: string) => {
-        if (!token) {
-            setError("Authentication token is missing.");
-            return;
-        }
+        // Removed: if (!token) { setError("Authentication token is missing."); return; }
         setLoadingMessages(true);
         setError(null);
         try {
-            const fetchedMessages = await getMessagesForChat(token, chatId);
+            const fetchedMessages = await getMessagesForChat(chatId); // Removed token parameter
             setMessages(fetchedMessages);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to fetch messages.");
@@ -72,7 +69,8 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!messageInput.trim() || !selectedChat || !token) {
+        // Removed: if (!messageInput.trim() || !selectedChat || !token) { return; }
+        if (!messageInput.trim() || !selectedChat) { // Keep checks for messageInput and selectedChat
             return;
         }
 
@@ -98,8 +96,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
         try {
             // TODO: Dynamically get the actual poste_id for the logged-in admin
             const PLACEHOLDER_POSTE_ID = 'a1b2c3d4-e5f6-7890-1234-567890abcdef'; // Replace with actual poste_id
-            const sentMessage = await sendMessage(
-                token,
+            const sentMessage = await sendMessage( // Removed token parameter
                 selectedChat.chat_id,
                 currentMessageText,
                 PLACEHOLDER_POSTE_ID,

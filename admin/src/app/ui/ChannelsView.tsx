@@ -25,7 +25,7 @@ export default function ChannelsView({ initialChannels, onChannelUpdated }: Chan
         setChannels(initialChannels);
     }, [initialChannels]);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
     const handleOpenAddModal = () => {
         setFormToken('');
@@ -54,15 +54,12 @@ export default function ChannelsView({ initialChannels, onChannelUpdated }: Chan
 
     const handleAddChannel = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!token) {
-            setOperationError("Authentication token is missing.");
-            return;
-        }
+        // Removed: if (!token) { setOperationError("Authentication token is missing."); return; }
         setLoading(true);
         setOperationError(null);
         try {
             // Backend's createChannel only takes 'token'
-            await createChannel(token, { token: formToken });
+            await createChannel({ token: formToken }); // Removed token parameter
             onChannelUpdated();
             handleCloseAddModal();
         } catch (err) {
@@ -74,15 +71,16 @@ export default function ChannelsView({ initialChannels, onChannelUpdated }: Chan
 
     const handleUpdateChannel = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!token || !currentChannel) {
-            setOperationError("Authentication token or channel ID is missing.");
+        // Removed: if (!token || !currentChannel) { setOperationError("Authentication token or channel ID is missing."); return; }
+        if (!currentChannel) { // Keep check for currentChannel
+            setOperationError("Channel ID is missing.");
             return;
         }
         setLoading(true);
         setOperationError(null);
         try {
             // Update only editable fields like is_business or token if needed
-            await updateChannel(token, currentChannel.id, { token: formToken, is_business: formIsBusiness });
+            await updateChannel(currentChannel.id, { token: formToken, is_business: formIsBusiness }); // Removed token parameter
             onChannelUpdated();
             handleCloseEditModal();
         } catch (err) {
@@ -93,13 +91,14 @@ export default function ChannelsView({ initialChannels, onChannelUpdated }: Chan
     };
 
     const handleDeleteChannel = async (id: string) => {
-        if (!token || !window.confirm('Are you sure you want to delete this channel?')) {
+        // Removed: if (!token || !window.confirm('Are you sure you want to delete this channel?')) { return; }
+        if (!window.confirm('Are you sure you want to delete this channel?')) { // Keep confirmation
             return;
         }
         setLoading(true);
         setOperationError(null);
         try {
-            await deleteChannel(token, id);
+            await deleteChannel(id); // Removed token parameter
             onChannelUpdated();
         } catch (err) {
             setOperationError(err instanceof Error ? err.message : "Failed to delete channel.");

@@ -8,7 +8,19 @@ import { ConfigService } from '@nestjs/config';
 export class JwtAdminStrategy extends PassportStrategy(Strategy, 'jwt-admin') {
   constructor(private configService: ConfigService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: (req) => {
+
+        let token = null;
+        if (req && req.cookies) {
+          token = req.cookies['AuthenticationAdmin'];
+
+        }
+        console.log("ma requete de guard", token);
+
+        // console.log("ma requete de guard", req.cookies);
+
+        return token;
+      },
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'), // Use the same JWT secret for now
     });

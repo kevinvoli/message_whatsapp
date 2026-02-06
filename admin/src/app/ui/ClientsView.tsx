@@ -27,7 +27,7 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
         setClients(initialClients);
     }, [initialClients]);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
     const handleOpenAddModal = () => {
         setFormName('');
@@ -61,14 +61,11 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
 
     const handleAddClient = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!token) {
-            setOperationError("Authentication token is missing.");
-            return;
-        }
+        // Removed: if (!token) { setOperationError("Authentication token is missing."); return; }
         setLoading(true);
         setOperationError(null);
         try {
-            await createClient(token, { name: formName, phone: formPhone, chat_id: formChatId, is_active: formIsActive });
+            await createClient({ name: formName, phone: formPhone, chat_id: formChatId, is_active: formIsActive }); // Removed token parameter
             onClientUpdated();
             handleCloseAddModal();
         } catch (err) {
@@ -80,14 +77,15 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
 
     const handleUpdateClient = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!token || !currentClient) {
-            setOperationError("Authentication token or client ID is missing.");
+        // Removed: if (!token || !currentClient) { setOperationError("Authentication token or client ID is missing."); return; }
+        if (!currentClient) { // Keep check for currentClient
+            setOperationError("Client ID is missing.");
             return;
         }
         setLoading(true);
         setOperationError(null);
         try {
-            await updateClient(token, currentClient.id, { name: formName, phone: formPhone, chat_id: formChatId, is_active: formIsActive });
+            await updateClient(currentClient.id, { name: formName, phone: formPhone, chat_id: formChatId, is_active: formIsActive }); // Removed token parameter
             onClientUpdated();
             handleCloseEditModal();
         } catch (err) {
@@ -98,13 +96,14 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
     };
 
     const handleDeleteClient = async (id: string) => {
-        if (!token || !window.confirm('Are you sure you want to delete this client?')) {
+        // Removed: if (!token || !window.confirm('Are you sure you want to delete this client?')) { return; }
+        if (!window.confirm('Are you sure you want to delete this client?')) { // Keep confirmation
             return;
         }
         setLoading(true);
         setOperationError(null);
         try {
-            await deleteClient(token, id);
+            await deleteClient(id); // Removed token parameter
             onClientUpdated();
         } catch (err) {
             setOperationError(err instanceof Error ? err.message : "Failed to delete client.");

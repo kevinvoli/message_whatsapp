@@ -11,6 +11,8 @@ export class AuthAdminController {
 
   @Post('login')
   async login(@Body() loginAdminDto: LoginAdminDto, @Res({ passthrough: true }) res: Response) {
+    console.log("connection admin",loginAdminDto);
+    
     const admin = await this.authAdminService.validateAdmin(
       loginAdminDto.email,
       loginAdminDto.password,
@@ -36,13 +38,18 @@ export class AuthAdminController {
       secure: process.env.NODE_ENV === 'production',
     });
 
+    console.log("les retour",admin);
+    
+
     return { admin }; // Return admin object without the token in the body
   }
 
   @UseGuards(AuthGuard('jwt-admin'))
   @Get('profile')
   async getProfile(@Request() req) {
-    const admin = await this.authAdminService.getProfile(req.user.userId);
+
+    
+    const admin = await this.authAdminService.getProfile(req.user.email);
     if (!admin) {
       throw new UnauthorizedException('Admin not found');
     }

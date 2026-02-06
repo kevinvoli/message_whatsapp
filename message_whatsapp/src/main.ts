@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { EventEmitter } from 'events';
 import { ValidationPipe } from '@nestjs/common';
 import { AdminService } from './admin/admin.service';
+import * as cookieParser from 'cookie-parser'; // Import cookie-parser
 
 async function bootstrap() {
    EventEmitter.defaultMaxListeners = 0;
@@ -13,12 +14,14 @@ async function bootstrap() {
       forbidNonWhitelisted:true,
       transform:true
     })
-  )
+  );
+
+  // Use cookie-parser middleware
+  app.use(cookieParser());
 
   // Enable CORS for the frontend application
   app.enableCors({
-    origin: '*', // T
-    // he origin of the frontend app
+    origin: 'http://localhost:3006',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

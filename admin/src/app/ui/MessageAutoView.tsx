@@ -30,7 +30,7 @@ export default function MessageAutoView({ initialMessagesAuto, onMessageAutoUpda
         setMessagesAuto(initialMessagesAuto);
     }, [initialMessagesAuto]);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
     const handleOpenAddModal = () => {
         setFormBody('');
@@ -66,14 +66,11 @@ export default function MessageAutoView({ initialMessagesAuto, onMessageAutoUpda
 
     const handleAddMessageAuto = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!token) {
-            setOperationError("Authentication token is missing.");
-            return;
-        }
+        // Removed: if (!token) { setOperationError("Authentication token is missing."); return; }
         setLoading(true);
         setOperationError(null);
         try {
-            await createMessageAuto(token, {
+            await createMessageAuto({ // Removed token parameter
                 body: formBody,
                 delai: formDelai,
                 canal: formCanal,
@@ -91,14 +88,15 @@ export default function MessageAutoView({ initialMessagesAuto, onMessageAutoUpda
 
     const handleUpdateMessageAuto = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!token || !currentMessageAuto) {
-            setOperationError("Authentication token or message ID is missing.");
+        // Removed: if (!token || !currentMessageAuto) { setOperationError("Authentication token or message ID is missing."); return; }
+        if (!currentMessageAuto) { // Keep check for currentMessageAuto
+            setOperationError("Message ID is missing.");
             return;
         }
         setLoading(true);
         setOperationError(null);
         try {
-            await updateMessageAuto(token, currentMessageAuto.id, {
+            await updateMessageAuto(currentMessageAuto.id, { // Removed token parameter
                 body: formBody,
                 delai: formDelai,
                 canal: formCanal,
@@ -115,13 +113,14 @@ export default function MessageAutoView({ initialMessagesAuto, onMessageAutoUpda
     };
 
     const handleDeleteMessageAuto = async (id: string) => {
-        if (!token || !window.confirm('Are you sure you want to delete this automated message?')) {
+        // Removed: if (!token || !window.confirm('Are you sure you want to delete this automated message?')) { return; }
+        if (!window.confirm('Are you sure you want to delete this automated message?')) { // Keep confirmation
             return;
         }
         setLoading(true);
         setOperationError(null);
         try {
-            await deleteMessageAuto(token, id);
+            await deleteMessageAuto(id); // Removed token parameter
             onMessageAutoUpdated();
         } catch (err) {
             setOperationError(err instanceof Error ? err.message : "Failed to delete automated message.");
