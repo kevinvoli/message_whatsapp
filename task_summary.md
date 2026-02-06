@@ -1,44 +1,26 @@
-La refactorisation du système de gestion des utilisateurs, séparant les administrateurs des commerciaux, a été complétée. Voici un résumé détaillé des changements effectués :
-
-**Backend (`message_whatsapp`) :**
-
-1.  **Module Admin dédié :**
-    *   Création de l'entité `Admin` (`src/admin/entities/admin.entity.ts`) avec ses propres champs d'authentification (`email`, `name`, `password`, `salt`).
-    *   Création de `src/admin/admin.service.ts` (`AdminService`) pour gérer la logique métier des administrateurs, incluant la vérification et la création d'un administrateur par défaut (`ensureAdminUserExists`).
-    *   Création de `src/admin/admin.module.ts` pour encapsuler la logique du module `Admin`.
-    *   Le `AppModule` (`src/app.module.ts`) a été mis à jour pour importer `AdminModule` et inclure l'entité `Admin` dans `TypeOrmModule.forFeature`.
-    *   Le fichier `src/main.ts` a été modifié pour appeler `AdminService.ensureAdminUserExists()` au démarrage de l'application, assurant la présence d'un admin par défaut si nécessaire (email: `admin@admin.com`, mot de passe: `adminpassword`).
-
-2.  **Module d'Authentification Admin séparé (`AuthAdmin`) :**
-    *   Création de `src/auth_admin/dto/login_admin.dto.ts` pour les données de connexion spécifiques aux administrateurs.
-    *   Création de `src/auth_admin/types/auth_admin_user.types.ts` pour le type d'utilisateur administrateur.
-    *   Création de `src/auth_admin/jwt_admin.strategy.ts` pour une stratégie JWT dédiée aux administrateurs (`jwt-admin`).
-    *   Création de `src/auth_admin/auth_admin.service.ts` pour la logique d'authentification des administrateurs.
-    *   Création de `src/auth_admin/auth_admin.controller.ts` exposant l'endpoint de connexion pour les administrateurs (`/auth/admin/login`) et la récupération de profil.
-    *   Création de `src/auth_admin/auth_admin.module.ts` pour gérer l'authentification des administrateurs.
-    *   Le `AppModule` (`src/app.module.ts`) a été mis à jour pour importer `AuthAdminModule`.
-
-3.  **Refactorisation de l'entité Commercial et des modules d'authentification existants :**
-    *   La propriété `role` a été supprimée de l'entité `WhatsappCommercial` (`src/whatsapp_commercial/entities/user.entity.ts`).
-    *   La méthode `ensureAdminUserExists` a été supprimée de `WhatsappCommercialService` (`src/whatsapp_commercial/whatsapp_commercial.service.ts`), car cette logique a été déplacée vers `AdminService`.
-    *   Le type `AuthUser` (`src/auth/types/auth-user.types.ts`) a été mis à jour en supprimant la propriété `role`.
-    *   Le `AuthService` (`src/auth/auth.service.ts`) a été mis à jour pour retirer toute logique liée au `role`.
-    *   La stratégie `JwtStrategy` (`src/auth/jwt.strategy.ts`) a été mise à jour pour ne plus inclure la propriété `role` dans le payload validé.
-    *   Les fichiers `src/auth/roles.guard.ts` et `src/auth/roles.decorator.ts` ont été supprimés.
-
-4.  **Mise à jour des contrôleurs :**
-    *   Tous les contrôleurs qui utilisaient `RolesGuard` et le décorateur `@Roles` (`AppController`, `ChannelController`, `WhatsappCommercialController`, `WhatsappPosteController`, `MessageAutoController`) ont été mis à jour. Ils utilisent désormais un simple `AuthGuard('jwt')` pour la protection des routes, en attendant une granularité plus fine si nécessaire.
+Le CRUD complet pour l'entité "Postes" a été implémenté et intégré entre le frontend et le backend.
+Le CRUD complet pour l'entité "Canaux" a été implémenté et intégré entre le frontend et le backend.
+Le CRUD complet pour l'entité "Messages Automatiques" a été implémenté et intégré entre le frontend et le backend.
 
 **Frontend (`admin`) :**
+- `admin/src/app/lib/api.ts` : Fonctions `createPoste`, `updatePoste`, `deletePoste`, `createChannel`, `updateChannel`, `deleteChannel`, `createMessageAuto`, `updateMessageAuto`, `deleteMessageAuto` ajoutées.
+- `admin/src/app/ui/PostesView.tsx` : Composant mis à jour pour inclure les formulaires d'ajout/édition via des modals, la gestion des états de chargement et d'erreur, et l'intégration des appels API pour créer, modifier et supprimer des postes. La liste des postes est automatiquement rafraîchie après chaque opération.
+- `admin/src/app/ui/ChannelsView.tsx` : Composant mis à jour pour inclure les formulaires d'ajout/édition via des modals, la gestion des états de chargement et d'erreur, et l'intégration des appels API pour créer, modifier et supprimer des canaux. La liste des canaux est automatiquement rafraîchie après chaque opération.
+- `admin/src/app/ui/MessageAutoView.tsx` : Composant mis à jour pour inclure les formulaires d'ajout/édition via des modals, la gestion des états de chargement et d'erreur, et l'intégration des appels API pour créer, modifier et supprimer des messages automatiques. La liste des messages automatiques est automatiquement rafraîchie après chaque opération.
+- `admin/src/app/dashboard/commercial/page.tsx` : Le composant `AdminDashboard` a été mis à jour pour extraire la logique `fetchData` dans une fonction nommée et passer cette fonction comme callbacks `onPosteUpdated`, `onChannelUpdated` et `onMessageAutoUpdated` aux `PostesView`, `ChannelsView` et `MessageAutoView` respectivement. Cela garantit que les listes sont mises à jour dynamiquement après chaque opération CRUD.
 
-1.  **Mise à jour de `admin/src/app/lib/api.ts` :**
-    *   Ajout de la fonction `loginAdmin` pour interagir avec le nouvel endpoint d'authentification administrateur.
-2.  **Mise à jour de la page de connexion (`admin/src/app/login/page.tsx`) :**
-    *   La page offre maintenant un mécanisme de basculement (`toggle`) pour choisir entre la connexion en tant qu'administrateur ou commercial.
-    *   Elle utilise `loginAdmin` ou `login` en fonction du choix, et stocke le `access_token` dans la clé `jwt_token` du `localStorage`.
+Les entités "Postes", "Canaux" et "Messages Automatiques" sont maintenant entièrement gérables via le panel admin.
 
-Ces modifications séparent clairement les entités et processus d'authentification des administrateurs et des commerciaux, tout en fournissant un mécanisme de création d'administrateur par défaut.
+**Corrections d'erreurs suite à la refactorisation**
+- La méthode `remove` a été réintégrée dans `WhatsappCommercialService`.
+- Toutes les erreurs de compilation liées à la suppression des rôles et au déplacement de la logique admin ont été corrigées.
 
-Si vous démarrez le backend, un utilisateur admin `admin@admin.com` avec le mot de passe `adminpassword` sera créé. Vous pourrez ensuite vous connecter via le panel admin.
+**Correction de l'authentification Admin et de la déconnexion**
+- **Frontend (`admin`)** : La fonction `handleLogout` a été implémentée dans `admin/src/app/ui/Navigation.tsx` pour effacer le token JWT et rediriger l'utilisateur vers la page de connexion.
+- **Backend (`message_whatsapp`)** :
+    - Le `AdminGuard` (`message_whatsapp/src/auth/admin.guard.ts`) a été correctement configuré pour utiliser la stratégie JWT `jwt-admin`.
+    - Ce `AdminGuard` a été appliqué à tous les contrôleurs qui gèrent les fonctionnalités d'administration (`AppController`, `ChannelController`, `WhatsappCommercialController`, `WhatsappPosteController`, `MessageAutoController`) pour s'assurer que seules les requêtes avec un token administrateur valide peuvent y accéder.
+
+L'authentification et la déconnexion de l'administrateur devraient maintenant fonctionner correctement.
 
 Comment souhaitez-vous que je procède ensuite ?

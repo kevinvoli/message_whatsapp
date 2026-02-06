@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import {
     navigationItems
@@ -13,7 +15,7 @@ import ClientsView from '@/app/ui/ClientsView';
 import RapportsView from '@/app/ui/RapportsView';
 import PostesView from '@/app/ui/PostesView';
 import ChannelsView from '@/app/ui/ChannelsView';
-import MessageAutoView from '@/app/ui/MessageAutoView';
+import MessageAutoView from '@/app/ui/MessageAutoView'; // Import the new view
 import { ViewMode, Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client } from '@/app/lib/definitions'; // Import Client
 import { getCommerciaux, getStatsGlobales, getPostes, getChannels, getMessageAuto, getClients } from '@/app/lib/api'; // Import getClients
 import { Spinner } from '@/app/ui/Spinner';
@@ -27,16 +29,15 @@ export default function AdminDashboard() {
     const [statsGlobales, setStatsGlobales] = useState<StatsGlobales | null>(null);
     const [postes, setPostes] = useState<Poste[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
-    const [messagesAuto, setMessagesAuto] = useState<MessageAuto[]>([]);
+    const [messagesAuto, setMessagesAuto] = useState<MessageAuto[]>([]); // New state for messagesAuto
     const [clients, setClients] = useState<Client[]>([]); // New state for clients
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Extract fetchData logic into a named function
     const fetchData = async () => {
         setLoading(true);
         setError(null);
-        const token = localStorage.getItem('jwt_token');
+        const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
         if (!token) {
             setError("Authentification requise.");
@@ -70,12 +71,74 @@ export default function AdminDashboard() {
         fetchData();
     }, []);
 
-    // ...
+    const getStatusColor = (status: 'online' | 'away' | 'offline') => {
+        switch(status) {
+          case 'online': return 'bg-green-500';
+          case 'away': return 'bg-yellow-500';
+          case 'offline': return 'bg-gray-500';
+          default: return 'bg-gray-500';
+        }
+      };
+    
+      const getPerformanceBadge = (performance: 'excellent' | 'moyen' | 'faible') => {
+        switch(performance) {
+          case 'excellent': return 'bg-green-100 text-green-800';
+          case 'moyen': return 'bg-yellow-100 text-yellow-800';
+          case 'faible': return 'bg-red-100 text-red-800';
+          default: return 'bg-gray-100 text-gray-800';
+        }
+      };
 
+    const renderContent = () => {
+        if (loading) {
+            return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+        }
+
+        if (error) {
+            return <div className="text-red-500 text-center">{error}</div>;
+        }
+
+        switch(viewMode) {
+          case 'overview':
+            return (
+                statsGlobales && <OverviewView
+                    statsGlobales={statsGlobales}
+                    performanceData={[]}
+                    sourcesClients={[]}
+                    heuresActivite={[]}
+                    produitsPopulaires={[]}
+                    commerciaux={commerciaux}
+                    getStatusColor={getStatusColor}
+                />
+            );
+          case 'commerciaux':
+            return (
+                <CommerciauxView
+                    commerciaux={commerciaux}
+                    getStatusColor={getStatusColor}
+                    getPerformanceBadge={getPerformanceBadge}
+                />
+            );
           case 'postes':
             return <PostesView initialPostes={postes} onPosteUpdated={fetchData} />;
-    // ...
-
+          case 'canaux':
+            return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} />;
+          case 'automessages':
+            return <MessageAutoView initialMessagesAuto={messagesAuto} onMessageAutoUpdated={fetchData} />;
+          case 'performance':
+            return <PerformanceView />;
+          case 'analytics':
+            return <AnalyticsView />;
+          case 'messages':
+            return <MessagesView />;
+          case 'clients': // New case for clients
+            return <ClientsView clients={clients} />;
+          case 'rapports':
+            return <RapportsView />;
+          default:
+            return null;
+        }
+      };
 
     return (
         <div className="flex h-screen bg-gray-100">

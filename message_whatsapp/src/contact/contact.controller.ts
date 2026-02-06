@@ -1,12 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch,  } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ContactService } from './contact.service';
 import { UpdateContactDto } from './dto/update-contact.dto';
-// import { CreateContactDto } from './dto/create-contact.dto';
-// import { UpdateContactDto } from './dto/update-contact.dto';
+import { CreateContactDto } from './dto/create-contact.dto'; // Added import
+import { AdminGuard } from '../auth/admin.guard'; // Added import
 
 @Controller('contact')
+@UseGuards(AdminGuard) // Protect all contact routes with AdminGuard
 export class ContactController {
   constructor(private readonly service: ContactService) {}
+
+  @Post()
+  create(@Body() dto: CreateContactDto) {
+    // Call findOrCreate since it handles both cases
+    return this.service.findOrCreate(dto.phone, dto.chat_id, dto.name);
+  }
 
   @Get()
   findAll() {

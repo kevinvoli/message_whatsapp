@@ -336,8 +336,8 @@ export class WhatsappMessageService {
 
       const contact = await this.contactService.findOrCreate(
         message.from,
+        message.chat_id,
         message.from_name ?? message.from,
-        message.chat_id
       );
 
 

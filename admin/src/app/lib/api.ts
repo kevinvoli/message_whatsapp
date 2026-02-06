@@ -101,6 +101,40 @@ export async function getChannels(token: string): Promise<Channel[]> {
     return handleResponse<Channel[]>(response);
 }
 
+export async function createChannel(token: string, channel: Omit<Channel, 'id' | 'start_at' | 'uptime' | 'version' | 'device_id' | 'ip' | 'is_business' | 'api_version' | 'core_version' | 'createdAt' | 'updatedAt'>): Promise<Channel> {
+    const response = await fetch(`${API_BASE_URL}/channel`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(channel),
+    });
+    return handleResponse<Channel>(response);
+}
+
+export async function updateChannel(token: string, id: string, channel: Partial<Channel>): Promise<Channel> {
+    const response = await fetch(`${API_BASE_URL}/channel/${id}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(channel),
+    });
+    return handleResponse<Channel>(response);
+}
+
+export async function deleteChannel(token: string, id: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/channel/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+    });
+    return handleResponse<{ message: string }>(response);
+}
+
 export async function getMessageAuto(token: string): Promise<MessageAuto[]> {
     const response = await fetch(`${API_BASE_URL}/message-auto`, {
         method: 'GET',
@@ -109,10 +143,78 @@ export async function getMessageAuto(token: string): Promise<MessageAuto[]> {
     return handleResponse<MessageAuto[]>(response);
 }
 
+export async function createMessageAuto(token: string, messageAuto: Omit<MessageAuto, 'id' | 'created_at' | 'updated_at' | 'conditions' >): Promise<MessageAuto> {
+    const response = await fetch(`${API_BASE_URL}/message-auto`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(messageAuto),
+    });
+    return handleResponse<MessageAuto>(response);
+}
+
+export async function updateMessageAuto(token: string, id: string, messageAuto: Partial<MessageAuto>): Promise<MessageAuto> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/${id}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(messageAuto),
+    });
+    return handleResponse<MessageAuto>(response);
+}
+
+export async function deleteMessageAuto(token: string, id: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+    });
+    return handleResponse<{ message: string }>(response);
+}
+
 export async function getClients(token: string): Promise<Client[]> {
     const response = await fetch(`${API_BASE_URL}/contact`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
     });
     return handleResponse<Client[]>(response);
+}
+
+export async function createClient(token: string, client: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<Client> {
+    const response = await fetch(`${API_BASE_URL}/contact`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(client),
+    });
+    return handleResponse<Client>(response);
+}
+
+export async function updateClient(token: string, id: string, client: Partial<Client>): Promise<Client> {
+    const response = await fetch(`${API_BASE_URL}/contact/${id}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(client),
+    });
+    return handleResponse<Client>(response);
+}
+
+export async function deleteClient(token: string, id: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/contact/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+    });
+    return handleResponse<{ message: string }>(response);
 }

@@ -2,10 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { MessageAutoService } from './message-auto.service';
 import { CreateMessageAutoDto } from './dto/create-message-auto.dto';
 import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 
 @Controller('message-auto')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AdminGuard) // Use AdminGuard
 export class MessageAutoController {
   constructor(private readonly messageAutoService: MessageAutoService) {}
 

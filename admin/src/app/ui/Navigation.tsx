@@ -1,6 +1,7 @@
 import React from 'react';
 import { Settings, LogOut, Menu, X } from 'lucide-react';
 import { NavigationItem, ViewMode } from '@/app/lib/definitions';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 interface NavigationProps {
     sidebarOpen: boolean;
@@ -11,6 +12,13 @@ interface NavigationProps {
 }
 
 export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationItems }: NavigationProps) {
+    const router = useRouter(); // Initialize useRouter
+
+    const handleLogout = () => {
+        localStorage.removeItem('jwt_token'); // Clear the JWT token
+        router.push('/login'); // Redirect to login page
+    };
+
     return (
         <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-blue-900 to-blue-800 text-white transition-all duration-300 flex flex-col`}>
             {/* Logo et toggle */}
@@ -88,7 +96,10 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
                         Paramètres
                     </button>
                 )}
-                <button className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-900 rounded-lg transition-colors">
+                <button
+                    onClick={handleLogout} // Attach logout function here
+                    className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-900 rounded-lg transition-colors"
+                >
                     <LogOut className="w-4 h-4" />
                     {sidebarOpen && 'Déconnexion'}
                 </button>

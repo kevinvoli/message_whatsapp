@@ -2,11 +2,11 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 
 
 @Controller('users')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AdminGuard) // Use AdminGuard
 export class WhatsappCommercialController {
   constructor(private readonly whatsappCommercialService: WhatsappCommercialService) {}
 

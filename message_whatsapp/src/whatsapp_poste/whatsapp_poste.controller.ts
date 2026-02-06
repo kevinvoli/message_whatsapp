@@ -2,10 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { WhatsappPosteService } from './whatsapp_poste.service';
 import { CreateWhatsappPosteDto } from './dto/create-whatsapp_poste.dto';
 import { UpdateWhatsappPosteDto } from './dto/update-whatsapp_poste.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 
 @Controller('poste')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AdminGuard) // Use AdminGuard
 export class WhatsappPosteController {
   constructor(private readonly whatsappPosteService: WhatsappPosteService) {}
 

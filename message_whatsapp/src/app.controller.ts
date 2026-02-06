@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
-import { AuthGuard } from '@nestjs/passport';
+import { AdminGuard } from './auth/admin.guard'; // Import AdminGuard
 
 @Controller()
 export class AppController {
@@ -12,7 +12,7 @@ export class AppController {
   }
 
   @Get('stats')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AdminGuard) // Use AdminGuard
   async getStats() {
     return this.appService.getStats();
   }

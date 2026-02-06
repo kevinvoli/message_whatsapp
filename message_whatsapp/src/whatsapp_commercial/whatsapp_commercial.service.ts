@@ -291,44 +291,11 @@ async updateStatus(id: string, status: boolean):Promise<SafeWhatsappCommercial> 
     await this.whatsappCommercialRepository.save(user);
   }
 
-  async updateRole(id: string, role: string): Promise<SafeWhatsappCommercial> {
-    const user = await this.whatsappCommercialRepository.findOne({
-      where: { id },
-    });
-    if (!user) {
-      throw new NotFoundException(`User with ID "${id}" not found`);
-    }
-
-    // Vérifier que le rôle est valide
-    if (!['ADMIN', 'COMMERCIAL'].includes(role)) {
-      throw new BadRequestException('Invalid role');
-    }
-
-    user.role = role;
-    const updatedUser = await this.whatsappCommercialRepository.save(user);
-    return this.toSafeUser(updatedUser)
-  }
-
   async remove(id: string): Promise<void> {
     const result = await this.whatsappCommercialRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
-  }
-
-  // This method is for internal use by AuthService and should return the full user object
-  async findByEmail(email: string): Promise<SafeWhatsappCommercial | null> {
-    return this.whatsappCommercialRepository.findOne({
-      where: { email },
-      relations: ['poste'],
-    });
-  }
-
-  // This method is for internal use by AuthService
-  async findById(id: string): Promise<SafeWhatsappCommercial | null> {
-    return this.whatsappCommercialRepository.findOne({
-      where: { id },
-    });
   }
 
   // Find multiple users by their IDs
@@ -342,6 +309,6 @@ async updateStatus(id: string, status: boolean):Promise<SafeWhatsappCommercial> 
       passwordResetExpires: expires,
     });
   }
-
-
 }
+
+
