@@ -343,11 +343,5 @@ async updateStatus(id: string, status: boolean):Promise<SafeWhatsappCommercial> 
     });
   }
 
-  async findByPasswordResetToken(
-    token: string,
-  ): Promise<SafeWhatsappCommercial | null> {
-    return this.whatsappCommercialRepository.findOne({
-      where: { passwordResetToken: token },
-    });
-  }
+
 }

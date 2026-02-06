@@ -138,3 +138,13 @@ export type MessageAuto = {
   created_at: string;
   updated_at: string;
 };
+
+export type Client = {
+  id: string;
+  name: string;
+  phone: string;
+  chat_id?: string;
+  is_active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};

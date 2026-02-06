@@ -28,13 +28,12 @@ import { ChannelModule } from './channel/channel.module';
 import { ContactModule } from './contact/contact.module';
 import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
 import { MessageAutoModule } from './message-auto/message-auto.module';
-import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity';
-import { WhapiChannel } from './channel/entities/channel.entity';
-import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity';
+import { AdminModule } from './admin/admin.module';
+import { Admin } from './admin/entities/admin.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappCommercial, WhapiChannel, WhatsappChat]),
+    TypeOrmModule.forFeature([WhatsappCommercial, WhapiChannel, WhatsappChat, Admin]),
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
@@ -47,6 +46,7 @@ import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity';
       }),
     }),
     DatabaseModule,
+    AdminModule, // Import AdminModule
     WhatsappErrorModule,
     WhatsappChatModule,
     WhatsappChatLabelModule,
@@ -61,6 +61,7 @@ import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity';
     DispatcherModule,
     CommunicationWhapiModule,
     AuthModule,
+    AuthAdminModule,
     JorbsModule,
     ChannelModule,
     ContactModule,

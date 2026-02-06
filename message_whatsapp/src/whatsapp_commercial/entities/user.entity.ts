@@ -30,14 +30,6 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', nullable: false, select: false })
   password: string;
 
-  @Column({
-    type: 'enum',
-    enum: ['ADMIN', 'COMMERCIAL'],
-    default: 'COMMERCIAL',
-  })
-  role: string;
-
-
   @ManyToOne(() => WhatsappPoste, (poste) => poste.messages, {
     nullable: true,
     onDelete: 'SET NULL',
