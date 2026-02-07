@@ -33,6 +33,7 @@ import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity';
 import { WhapiChannel } from './channel/entities/channel.entity'; // Added import
 import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity'; // Added import
 import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added import
+import { MetriquesModule } from './metriques/metriques.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added impor
     ContactModule,
     WhatsappPosteModule,
     MessageAutoModule,
+    MetriquesModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

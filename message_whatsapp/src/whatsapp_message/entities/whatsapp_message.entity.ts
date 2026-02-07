@@ -226,7 +226,7 @@ export class WhatsappMessage {
     nullable: true,
     comment: 'Timestamp when the trajet was deleted',
   })
-  deletedAt: Date | null;
+  deletedAt?: Date | null;
 
   @BeforeInsert()
   clearContactForAgentMessage() {

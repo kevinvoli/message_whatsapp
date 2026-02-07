@@ -1,49 +1,20 @@
 export type Commercial = {
-    id: number;
-    name: string;
-    avatar: string;
-    status: 'online' | 'away' | 'offline';
-    email: string;
-    phone: string;
-    messages: WhatsappMessage[];
-    chats?:WhatsappChat[] |null;
-    poste: Poste ;
-    region: string;
+id: string;
+  name: string;
+  avatar: string;
+  status: 'online' | 'offline';
+  email: string;
+  region: string;
+  dernierLogin: string;
 
-    anciennete: string;
-    messagesTraites: number;
-    conversionsJour: number;
-    objectifJour: number;
-    tauxConversion: number;
-    ca: number;
-    caObjectif: number;
-    tauxReponse: number;
-    tempsReponse: string;
-    satisfaction: number;
-    conversationsActives: number;
-    nouveauxContacts: number;
-    rdvPris: number;
-    rdvHonores: number;
-    devisEnvoyes: number;
-    devisAcceptes: number;
-    appelsSortants: number;
-    appelsRecus: number;
-    emailsEnvoyes: number;
-    premiereReponse: string;
-    tauxFidelisation: number;
-    clientsActifs: number;
-    panierMoyen: number;
-    performance: 'excellent' | 'moyen' | 'faible';
-    progression7j: number;
-    progression30j: number;
-    heuresActives: string;
-    pauseTotal: string;
-    conversationsGagnees: number;
-    conversationsPerdues: number;
-    relancesEffectuees: number;
-    tauxOuverture: number;
-    dernierLogin: string;
-    productivite: number;
+  messagesEnvoyes: number;
+  messagesRecus: number;
+
+  conversationsActives: number;
+  conversationsEnAttente: number;
+
+  nouveauxContacts: number;
+  productivite: number;
 };
 
 export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages' | 'conversations'; // Added 'conversations'

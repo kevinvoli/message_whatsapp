@@ -169,15 +169,26 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
 
     for (const user of users) {
        // Récupérer tous les messages OUT et IN pour ce commercial
+  //      if (!user.poste) {
+  //   continue; // ou throw si c’est une incohérence métier
+  // }
+       const posteId = user.poste?.id;
       const messagesEnvoyes = await this.messageRepository.count({
-        where: { poste_id: user.id, from_me: true },
+        where: { poste_id: posteId, from_me: true },
       });
+      console.log("message envoye",messagesEnvoyes);
+      
       const messagesRecus = await this.messageRepository.count({
-        where: { poste_id: user.id, from_me: false },
+        where: { poste_id: posteId, from_me: false },
       });
 
+      const chats= user.poste?.chats || []
+
+      console.log("message reçue",messagesRecus);
+      
+
       // Chats actifs / en attente
-      const chats = user.poste?.chats || [];
+      
       const conversationsActives = chats.filter(c => c.status === WhatsappChatStatus.ACTIF).length;
       const conversationsEnAttente = chats.filter(c => c.status === WhatsappChatStatus.EN_ATTENTE).length;
 

@@ -18,10 +18,10 @@ export default function CommerciauxView({ commerciaux, getStatusColor, getPerfor
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [formIsActive, setFormIsActive] = useState(true);
-      const [currentCommercial, setCurrentCommercial] = useState<Commercial | null>(null);
-  
+  const [currentCommercial, setCurrentCommercial] = useState<Commercial | null>(null);
+
   console.log("le commercial==", commerciaux);
-  
+
 
   const handleDeletePoste = async (id: string) => {
     // Removed: if (!token || !window.confirm('Are you sure you want to delete this poste?')) { return; }
@@ -58,6 +58,14 @@ export default function CommerciauxView({ commerciaux, getStatusColor, getPerfor
       setLoading(false);
     }
   };
+
+  const getPerformanceFromProductivite = (p: number) => {
+    if (p >= 50) return 'excellent';
+    if (p >= 20) return 'moyen';
+    return 'faible';
+  };
+
+
 
   const handleOpenAddModal = () => {
     setFormName('');
@@ -118,62 +126,86 @@ export default function CommerciauxView({ commerciaux, getStatusColor, getPerfor
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {commerciaux.map((commercial) => (
-                <tr key={commercial.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold relative`}>
-                        {commercial.avatar}
-                        <div className={`absolute bottom-0 right-0 w-3 h-3 ${getStatusColor(commercial.status)} border-2 border-white rounded-full`}></div>
+              {commerciaux.map((commercial) => {
+                const performance = getPerformanceFromProductivite(commercial.productivite);
+
+                return (
+
+                  <tr key={commercial.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold relative`}>
+                          {commercial.avatar}
+                          <div className={`absolute bottom-0 right-0 w-3 h-3 ${getStatusColor(commercial.status)} border-2 border-white rounded-full`}></div>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{commercial.name}</p>
+                          <p className="text-xs text-gray-500">{commercial.region}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{commercial.name}</p>
-                        <p className="text-xs text-gray-500">{commercial.region}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.status === 'online' ? 'bg-green-100 text-green-800' :
-                      commercial.status === 'away' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                      {commercial.status === 'online' ? 'En ligne' : commercial.status === 'away' ? 'Absent' : 'Hors ligne'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{commercial?.messages?.length}</td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm">
-                      <p className="font-medium text-gray-900">{2}/{commercial.poste.chats?.length}</p>
-                      {/* <p className="text-gray-500">{Math.round((commercial.objectifJour / commercial.objectifJour) * 100)}%</p> */}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{(commercial.ca / 1000).toFixed(0)}K</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(commercial.performance)}`}>
-                      {commercial.performance.charAt(0).toUpperCase() + commercial.performance.slice(1)}
-                    </span>
-                  </td>
-                   <td className="px-6 py-4 text-gray-900">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-900}`}>
-                      {commercial.dernierLogin}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button className="p-1 text-blue-600 hover:bg-blue-50 rounded">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenEditModal(commercial)}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        disabled={loading}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+
+                        {commercial.status === 'online'
+                          ? 'En ligne'
+                          : 'Hors ligne'}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {commercial.messagesEnvoyes + commercial.messagesRecus}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {commercial.conversationsActives}/
+                      {commercial.conversationsActives + commercial.conversationsEnAttente}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      —
+                    </td>
+                    {/* <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <p className="font-medium text-gray-900">{2}/{commercial.poste.chats?.length}</p> */}
+                    {/* <p className="text-gray-500">{Math.round((commercial.objectifJour / commercial.objectifJour) * 100)}%</p> */}
+                    {/* </div>
+                    </td> */}
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(
+                          performance
+                        )}`}
                       >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {performance.charAt(0).toUpperCase() + performance.slice(1)}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 text-gray-900">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-900}`}>
+                        {commercial.dernierLogin}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button className="p-1 text-blue-600 hover:bg-blue-50 rounded">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditModal(commercial)}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          disabled={loading}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+
+                );
+              })}
             </tbody>
           </table>
         </div>
