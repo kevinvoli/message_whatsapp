@@ -17,8 +17,8 @@ import PostesView from '@/app/ui/PostesView';
 import ChannelsView from '@/app/ui/ChannelsView';
 import MessageAutoView from '@/app/ui/MessageAutoView';
 import ConversationsView from '@/app/ui/ConversationsView'; // Import ConversationsView
-import { ViewMode, Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat } from '@/app/lib/definitions';
-import { getCommerciaux, getStatsGlobales, getPostes, getChannels, getMessageAuto, getClients, getChats } from '@/app/lib/api';
+import { ViewMode, Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage } from '@/app/lib/definitions';
+import { getCommerciaux, getStatsGlobales, getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages } from '@/app/lib/api';
 import { Spinner } from '@/app/ui/Spinner';
 
 export default function AdminDashboard() {
@@ -27,6 +27,7 @@ export default function AdminDashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
     const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
+    const [messages, setmessages] = useState<WhatsappMessage[]>([]);
     const [statsGlobales, setStatsGlobales] = useState<StatsGlobales | null>(null);
     const [postes, setPostes] = useState<Poste[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
@@ -42,14 +43,15 @@ export default function AdminDashboard() {
         // Authentication is now handled by HTTP-only cookies, no need for localStorage token or explicit check here.
 
         try {
-            const [statsData, commerciauxData, postesData, channelsData, messagesAutoData, clientsData, chatsData] = await Promise.all([
+            const [statsData, commerciauxData, postesData, channelsData, messagesAutoData, clientsData, chatsData,messagesData] = await Promise.all([
                 getStatsGlobales(),
                 getCommerciaux(),
                 getPostes(),
                 getChannels(),
                 getMessageAuto(),
                 getClients(),
-                getChats() // Fetch chats data
+                getChats(),
+                getMessages(), // Fetch chats data
             ]);
             setStatsGlobales(statsData);
             setCommerciaux(commerciauxData);
@@ -57,7 +59,8 @@ export default function AdminDashboard() {
             setChannels(channelsData);
             setMessagesAuto(messagesAutoData);
             setClients(clientsData);
-            setChats(chatsData); // Set chats data
+            setChats(chatsData);
+            setmessages(messagesData) // Set chats data
         } catch (err) {
             // If an API call fails due to authentication, the checkAdminAuth in page.tsx will redirect.
             // This error likely indicates a network issue or a backend error other than authentication.
@@ -132,7 +135,7 @@ export default function AdminDashboard() {
           case 'analytics':
             return <AnalyticsView />;
           case 'messages':
-            return <MessagesView />;
+            return <MessagesView messages={messages} onMessageUpdated={fetchData} />;
           case 'clients':
             return <ClientsView initialClients={clients} onClientUpdated={fetchData} />;
           case 'rapports':

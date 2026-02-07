@@ -10,7 +10,7 @@ export class WhatsappChatController {
 
   @Get()
   async findAll(@Query('chat_id') chat_id?: string) {
-    // console.log("liste de chat");
+    console.log("liste de chat");
     
     return this.chatService.findAll(chat_id);
   }

@@ -44,6 +44,16 @@ export async function getCommerciaux(): Promise<Commercial[]> {
     return handleResponse<Commercial[]>(response);
 }
 
+export async function getMessages(): Promise<WhatsappMessage[]> {
+    const response = await fetch(`${API_BASE_URL}/messages`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    console.log("retous des message =================",response);
+    
+    return handleResponse<WhatsappMessage[]>(response);
+}
+
 export async function getPostes(): Promise<Poste[]> {
     const response = await fetch(`${API_BASE_URL}/poste`, {
         method: 'GET',

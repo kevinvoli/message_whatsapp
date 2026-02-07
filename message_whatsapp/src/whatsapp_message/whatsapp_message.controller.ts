@@ -24,4 +24,11 @@ export class WhatsappMessageController {
   async findByChatId(@Param('chat_id') chat_id: string) {
     return this.messageService.findBychat_id(chat_id);
   }
+
+  @Get()
+  async findAll() {
+    console.log("affichage de tous les message ");
+    
+    return await this.messageService.findAll();
+  }
 }

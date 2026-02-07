@@ -15,7 +15,7 @@ export class JwtAdminStrategy extends PassportStrategy(Strategy, 'jwt-admin') {
           token = req.cookies['AuthenticationAdmin'];
 
         }
-        console.log("ma requete de guard", token);
+        // console.log("ma requete de guard", token);
 
         // console.log("ma requete de guard", req.cookies);
 

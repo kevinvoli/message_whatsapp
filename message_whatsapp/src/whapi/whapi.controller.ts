@@ -1,28 +1,30 @@
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { WhapiService } from './whapi.service';
 
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
 
 
 @Controller('webhooks/whapi')
 export class WhapiController {
   constructor(private readonly whapiService: WhapiService) {}
    @Post()
-   handleWebhook(@Body() payload: WhapiWebhookPayload) {
+  async handleWebhook(@Body() payload: WhapiWebhookPayload) {
     console.log("mon payload whapi==============", payload);
     const eventType = payload.event.type;
+    try {
+      
   switch (eventType) {
     case 'messages':
       // Traiter les messages
       // console.log('Événement messages:', payload.messages);
-     this.whapiService.handleIncomingMessage(payload);
+     await this.whapiService.handleIncomingMessage(payload);
 
       break;
     case 'statuses':
       // Traiter les statuts
       // console.log('Événement statuses:', payload.statuses);
 
-      this.whapiService.updateStatusMessage(payload);
+     await this.whapiService.updateStatusMessage(payload);
 
       break;
     case 'events':
@@ -69,11 +71,23 @@ export class WhapiController {
     //   // Traiter les invitations
     //   console.log('Événement invites:', payload.invites);
     //   break;
-    default:
-      // Cas par défaut pour les types non reconnus (bien que le type garantisse l'exhaustivité)
-      console.log('Type d\'événement inconnu:', eventType);
-      break;
+   default:
+          throw new HttpException(
+            `Unsupported event type: ${eventType}`,
+            HttpStatus.BAD_REQUEST,
+          );
   }
+    } catch (err) {
+      throw new HttpException(
+        {
+          status: 'error',
+          message: err.message || 'Webhook processing failed',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+
     return { status: 'ok' };
   }
 }

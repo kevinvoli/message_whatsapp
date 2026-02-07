@@ -39,10 +39,9 @@ export class AuthAdminService {
 
     return { accessToken, refreshToken };
   }
-
   async getProfile(adminId: string): Promise<AuthAdminUser | null> {
     const admin = await this.adminService.findOneByEmail(adminId);
-    console.log("mon administrateur ", admin);
+    // console.log("mon administrateur ", admin);
     if (!admin) return null;
     
     return {

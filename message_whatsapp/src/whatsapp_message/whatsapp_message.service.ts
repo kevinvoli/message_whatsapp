@@ -15,6 +15,7 @@ import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
+import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -266,7 +267,7 @@ export class WhatsappMessageService {
     }
   }
 
-  async findAll(chat_id: string) {
+  async findAllByChatId(chat_id: string) {
     const messages = await this.messageRepository.find({
       where: { chat_id: chat_id },
       relations:{
@@ -278,8 +279,31 @@ export class WhatsappMessageService {
     return messages;
   }
 
-  findOne(id: string) {
-    return `This action returns a #${id} whatsappMessage`;
+    async findAll() {
+    const messages = await this.messageRepository.find({
+      relations:{
+        medias:true,
+        poste:true,
+        chat:true,
+        contact:true
+      }
+    });
+    console.log(messages.length);
+    
+    return messages;
+  }
+
+  async findByAllByMessageId(id: string) {
+    try {
+      const message  = await this.messageRepository.findOne({
+        where:{id:id}
+      })
+      if (message) {
+        throw new NotFoundException("message non trouver")
+      }
+    } catch (err) {
+      throw new Error(err)
+    }
   }
 
   async updateByStatus(status: {

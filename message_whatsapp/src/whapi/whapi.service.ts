@@ -4,6 +4,8 @@ import {
   Inject,
   forwardRef,
   NotFoundException,
+  HttpStatus,
+  HttpException,
 } from '@nestjs/common';
 import {
   ExtractedMedia,
@@ -103,8 +105,14 @@ export class WhapiService {
 
          
     
-    } catch (error) {
-      this.logger.error(error);
+    } catch (err) {
+      throw new HttpException(
+        {
+          status: 'error',
+          message: err.message || 'Webhook processing failed',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
