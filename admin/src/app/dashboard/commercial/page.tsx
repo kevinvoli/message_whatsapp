@@ -41,6 +41,7 @@ export default function AdminDashboard() {
         setLoading(true);
         setError(null);
         // Authentication is now handled by HTTP-only cookies, no need for localStorage token or explicit check here.
+console.log("admin message ", );
 
         try {
             const [statsData, commerciauxData, postesData, channelsData, messagesAutoData, clientsData, chatsData,messagesData] = await Promise.all([
@@ -53,6 +54,8 @@ export default function AdminDashboard() {
                 getChats(),
                 getMessages(), // Fetch chats data
             ]);
+            console.log("admin data",commerciauxData);
+            
             setStatsGlobales(statsData);
             setCommerciaux(commerciauxData);
             setPostes(postesData);
@@ -117,10 +120,11 @@ export default function AdminDashboard() {
           case 'commerciaux':
             return (
                 <CommerciauxView
-                    commerciaux={commerciaux}
-                    getStatusColor={getStatusColor}
-                    getPerformanceBadge={getPerformanceBadge}
-                />
+                commerciaux={commerciaux}
+                getStatusColor={getStatusColor}
+                getPerformanceBadge={getPerformanceBadge} onCommercialUpdate={function (): void {
+                  throw new Error('Function not implemented.');
+                } }                />
             );
           case 'postes':
             return <PostesView initialPostes={postes} onPosteUpdated={fetchData} />;
@@ -148,12 +152,12 @@ export default function AdminDashboard() {
     return (
         <div className="flex h-screen bg-gray-100">
             <Navigation
-                sidebarOpen={sidebarOpen}
-                setSidebarOpen={setSidebarOpen}
-                viewMode={viewMode}
-                setViewMode={setViewMode}
-                navigationItems={navigationItems}
-            />
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          navigationItems={navigationItems} 
+          message={messages}            />
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header

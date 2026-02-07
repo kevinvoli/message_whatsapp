@@ -32,10 +32,16 @@ export class WhatsappPosteService {
   ========================== */
   
   async findAll(): Promise<WhatsappPoste[]> {
-    return await this.posteRepository.find({
+    
+
+    const poste=  await this.posteRepository.find({
       order: { created_at: 'DESC' },
-      relations:['commercial','messages']
+      relations:['commercial','messages','chats']
     });
+
+    // console.log("poste a afficcher",poste);
+    return poste;
+    
   }
 
   /* =========================
@@ -56,7 +62,7 @@ export class WhatsappPosteService {
   async findOneByPosteId(commercialId: string): Promise<WhatsappPoste> {
     const poste = await this.posteRepository.findOne({
       where: { commercial:{id:commercialId},  },
-      relations:['commercial','messages']
+      relations:['commercial','messages','chats']
     });
 
     if (!poste) {

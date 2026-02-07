@@ -13,7 +13,9 @@ export class ContactService{
 
   async findOrCreate(phone: string,chat_id?:string|null, name?: string, ) {
 
-    let contact = await this.repo.findOne({ where: { phone } });
+    let contact = await this.repo.findOne({ where: { phone },relations:{
+      messages:true
+    } });
     if (!chat_id) {
       return
     }
@@ -27,12 +29,20 @@ export class ContactService{
     return contact;
   }
 
-  findAll() {
-    return this.repo.find({ order: { createdAt: 'DESC' } });
+  async findAll() {
+    const contact= await this.repo.find({ order: { createdAt: 'DESC' },relations:{
+      messages:true,
+    } });
+    // console.log("mes contact====",contact);
+    
+
+    return contact
   }
 
   async findOne(id: string) {
-    const contact = await this.repo.findOne({ where: { id } });
+    const contact = await this.repo.findOne({ where: { id },relations:{
+      messages:true
+    } });
     if (!contact) throw new NotFoundException('Contact introuvable');
     return contact;
   }

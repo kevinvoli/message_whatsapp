@@ -9,9 +9,12 @@ import {
   ManyToOne,
   JoinColumn,
   BeforeInsert,
+  OneToMany,
+  BeforeUpdate,
 } from 'typeorm';
 
 import * as bcrypt from 'bcrypt';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Entity()
 export class WhatsappCommercial {
@@ -30,7 +33,7 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', nullable: false, select: false })
   password: string;
 
-  @ManyToOne(() => WhatsappPoste, (poste) => poste.messages, {
+  @ManyToOne(() => WhatsappPoste, (poste) => poste.commercial, {
     nullable: true,
     onDelete: 'SET NULL',
   })
@@ -39,6 +42,11 @@ export class WhatsappCommercial {
     referencedColumnName: 'id',
   })
   poste?: WhatsappPoste | null;
+
+  @OneToMany(() => WhatsappMessage, (message) => message.commercial, {
+    cascade: false,
+  })
+  messages: WhatsappMessage[];
 
   @Column({ type: 'varchar', nullable: true })
   passwordResetToken?: string | null;
@@ -52,12 +60,12 @@ export class WhatsappCommercial {
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
 
-   @Column("varchar", { 
-    name: "salt",
+  @Column('varchar', {
+    name: 'salt',
     length: 255,
     select: false,
-    nullable: false, 
-    default:'1232'
+    nullable: false,
+    default: '1232',
   })
   salt: string;
 
@@ -70,8 +78,6 @@ export class WhatsappCommercial {
   @DeleteDateColumn({ type: 'timestamp', nullable: true })
   deleted_at?: Date;
 
-
-  
   @BeforeInsert()
   private async hashPassword() {
     if (this.password) {
@@ -80,25 +86,31 @@ export class WhatsappCommercial {
     }
   }
 
-  
+  @BeforeUpdate()
+  private updateLastConnection() {
+    if (this.isConnected) {
+      this.lastConnectionAt = new Date();
+    }
+  }
+
   // Méthodes
   async validatePassword(password: string): Promise<boolean> {
-  if (!password || !this.password || !this.salt) {
-    return false;
+    if (!password || !this.password || !this.salt) {
+      return false;
+    }
+
+    try {
+      console.log("l'utilisateur", password);
+
+      // On compare directement le mot de passe fourni avec le hash stocké
+      return await bcrypt.compare(password, this.password);
+    } catch (error) {
+      console.error('Password validation error:', error);
+      return false;
+    }
   }
 
-  try {
-console.log("l'utilisateur", password);
-
-    // On compare directement le mot de passe fourni avec le hash stocké
-    return await bcrypt.compare(password, this.password);
-  } catch (error) {
-    console.error("Password validation error:", error);
-    return false;
-  }
-}
-
-   async passwordHash(password: string) {
+  async passwordHash(password: string) {
     this.salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(password, this.salt);
   }

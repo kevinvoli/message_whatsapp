@@ -5,7 +5,11 @@ export type Commercial = {
     status: 'online' | 'away' | 'offline';
     email: string;
     phone: string;
+    messages: WhatsappMessage[];
+    chats?:WhatsappChat[] |null;
+    poste: Poste ;
     region: string;
+
     anciennete: string;
     messagesTraites: number;
     conversionsJour: number;
@@ -45,7 +49,6 @@ export type Commercial = {
 export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages' | 'conversations'; // Added 'conversations'
 
 import React from 'react'; // Import React for React.ElementType
-import { Icon } from 'lucide-react';
 
 export type NavigationItem = {
     id: ViewMode;
@@ -114,6 +117,9 @@ export type Poste = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  chats?:WhatsappChat[];
+  messages?:WhatsappMessage[];
+  commercial?:Commercial[];
 };
 
 export type Channel = {
@@ -139,7 +145,7 @@ export type MessageAuto = {
   canal?: 'whatsapp' | 'sms' | 'email' | null;
   position: number;
   actif: boolean;
-  conditions?: any | null; // This will be JSON parsed
+  // conditions?: any | null; // This will be JSON parsed
   created_at: string;
   updated_at: string;
 };
@@ -150,6 +156,7 @@ export type Client = {
   phone: string;
   chat_id?: string;
   is_active: boolean;
+  messages?: WhatsappMessage[];
   createdAt: string;
   updatedAt: string;
 };

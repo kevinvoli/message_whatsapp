@@ -221,6 +221,7 @@ export class WhatsappMessageGateway
       text: payload.text,
       channel_id: chat.last_msg_client_channel_id!,
       timestamp: new Date(),
+      commercial_id: agent.commercialId
     });
 
     this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {

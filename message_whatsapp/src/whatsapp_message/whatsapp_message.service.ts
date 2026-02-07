@@ -44,12 +44,18 @@ export class WhatsappMessageService {
     text: string;
     poste_id: string;
     timestamp: Date;
+    commercial_id?:string| null;
     channel_id: string;
   }): Promise<WhatsappMessage> {
     try {
 
       const chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
+      let commercial:WhatsappCommercial | null=null;
+      if (data.commercial_id) {
+         commercial = await this.commercialRepository.findOne({where:{id: data.commercial_id}});
+      }
+   
 
       const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
 
@@ -63,7 +69,6 @@ export class WhatsappMessageService {
           throw new Error('Response timeout');
         }
       }
-
       // 1️⃣ Envoi réel vers WhatsApp
       function extractPhoneNumber(chat_id: string): string {
         return chat_id.split('@')[0];
@@ -98,6 +103,7 @@ export class WhatsappMessageService {
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
         channel: channel,
+        commercial: commercial ,
         contact: null,
       });
 
@@ -231,7 +237,7 @@ export class WhatsappMessageService {
 
       // assuming commercial with id "1"
       if (chekMessage) {
-        console.log('Message already exists with id:', chekMessage.id);
+        // console.log('Message already exists with id:', chekMessage.id);
         return chekMessage;
       }
 

@@ -213,7 +213,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                 disabled={true}
                                 // disabled={loadingMessages || !messageInput.trim()}
                             >
-                                {loadingMessages ? <Spinner size="small" /> : <Send className="w-5 h-5" />}
+                                {loadingMessages ? <Spinner  /> : <Send className="w-5 h-5" />}
                             </button>
                         </form>
                     </>

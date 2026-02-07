@@ -119,7 +119,7 @@ export class MessageAutoService {
       timestamp: new Date(
         chat?.last_client_message_at
           ? chat.last_client_message_at.getTime() + 1000
-          : Date.now(),
+          : Date.now()
       ),
       channel_id: chat.last_msg_client_channel_id,
     });

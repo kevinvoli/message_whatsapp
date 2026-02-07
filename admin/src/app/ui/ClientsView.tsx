@@ -27,6 +27,9 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
         setClients(initialClients);
     }, [initialClients]);
 
+    console.log("les comntact ", clients);
+    
+
     // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
 
     const handleOpenAddModal = () => {
@@ -141,6 +144,7 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Téléphone</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chat ID</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">nb Message</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Créé le</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -152,6 +156,8 @@ export default function ClientsView({ initialClients, onClientUpdated }: Clients
                                     <td className="px-6 py-4 font-medium text-gray-900">{client.name}</td>
                                     <td className="px-6 py-4 text-gray-700">{client.phone}</td>
                                     <td className="px-6 py-4 text-gray-700">{client.chat_id || 'N/A'}</td>
+                                     <td className="px-6 py-4 text-gray-700">{client.messages?.length || 'N/A'}</td>
+
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                             client.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'

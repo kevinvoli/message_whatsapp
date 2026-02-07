@@ -13,6 +13,9 @@ import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dt
 import { WhatsappCommercial } from './entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { SafeWhatsappCommercial } from './dto/safe-whatsapp-commercial';
+import { MessageDirection, WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CommercialDashboardDto } from './dto/commercial-Dashboard.dto';
 
 @Injectable()
 export class WhatsappCommercialService {
@@ -21,11 +24,15 @@ export class WhatsappCommercialService {
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
 
     @InjectRepository(WhatsappPoste)
-    private readonly PostelRepository: Repository<WhatsappPoste>,
+    private readonly postelRepository: Repository<WhatsappPoste>,
 
-    // @InjectRepository(QueuePosition)
-    // private readonly queuePositionRepository: Repository<QueuePosition>,
-    // private readonly queueService: QueueService,
+    
+    @InjectRepository(WhatsappMessage)
+    private readonly messageRepository: Repository<WhatsappMessage>,
+
+    
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
 
 
@@ -84,7 +91,7 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
       throw new ConflictException('Name already exists');
     }
 
-    const poste  = await this.PostelRepository.findOne({
+    const poste  = await this.postelRepository.findOne({
       where:{id:poste_id}
     })
 
@@ -105,64 +112,120 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
 
   async findAll() {
     const users = await this.whatsappCommercialRepository.find({
-      relations: ['poste'],
+      // relations: ['poste', 'messages'],
+      relations:{
+        poste:{chats:true},
+        messages:true
+      }
     });
 
+    
     // Mapper les utilisateurs du backend au type `Commercial` du frontend
-    const commerciaux = users.map(user => {
-      // Les valeurs suivantes sont directement disponibles ou facilement dérivables.
-      // Les métriques plus complexes nécessiteraient des entités ou des logiques métier
-      // supplémentaires et sont donc omises pour éviter des données statiques trompeuses.
-      return {
-        id: user.id, // L'ID est un UUID (string)
-        name: user.name,
-        avatar: user.name.charAt(0).toUpperCase(), // Initiales du nom
-        status: user.isConnected ? 'online' : 'offline',
-        email: user.email,
-        phone: 'N/A', // Donnée non directement disponible
-        region: user.poste?.name || 'N/A',
-        dernierLogin: user.lastConnectionAt?.toLocaleTimeString() || 'N/A',
+  const commerciaux = users.map(user => ({
+  id: user.id,
+  name: user.name,
+  avatar: user.name.charAt(0).toUpperCase(),
+  status: user.isConnected ? 'online' : 'offline',
+  email: user.email,
+  region: user.poste?.name || 'N/A',
+  dernierLogin: user.lastConnectionAt
+    ? new Date(user.lastConnectionAt).toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'N/A',
+  messagesTraites: user.messages?.length,
+  messagesEnvoyes: user.messages?.filter(m => m.direction === MessageDirection.OUT).length,
+  messagesRecus: user.messages?.filter(m => m.direction === MessageDirection.IN).length,
+  conversationsActives: user.poste?.chats?.filter(c => c.status === WhatsappChatStatus.ACTIF).length || 0,
+  conversationsEnAttente: user.poste?.chats?.filter(c => c.status === WhatsappChatStatus.EN_ATTENTE).length || 0,
+  nouveauxContacts: user.poste?.chats?.filter(c => {
+    const createdAt = new Date(c.createdAt);
+    const today = new Date();
+    return (
+      createdAt.getDate() === today.getDate() &&
+      createdAt.getMonth() === today.getMonth() &&
+      createdAt.getFullYear() === today.getFullYear()
+    );
+  }).length || 0,
+  productivite: 0, // calculé ensuite
+}));
 
-        // Les métriques suivantes nécessiteraient des entités ou des logiques métier supplémentaires
-        // pour des calculs précis, et sont donc omises ou laissées à des valeurs par défaut pour le frontend.
-        anciennete: 'N/A',
-        messagesTraites: 0,
-        conversionsJour: 0,
-        objectifJour: 0,
-        tauxConversion: 0,
-        ca: 0,
-        caObjectif: 0,
-        tauxReponse: 0,
-        tempsReponse: 'N/A',
-        satisfaction: 0,
-        conversationsActives: 0,
-        nouveauxContacts: 0,
-        rdvPris: 0,
-        rdvHonores: 0,
-        devisEnvoyes: 0,
-        devisAcceptes: 0,
-        appelsSortants: 0,
-        appelsRecus: 0,
-        emailsEnvoyes: 0,
-        premiereReponse: 'N/A',
-        tauxFidelisation: 0,
-        clientsActifs: 0,
-        panierMoyen: 0,
-        performance: 'moyen', // Valeur par défaut
-        progression7j: 0,
-        progression30j: 0,
-        heuresActives: 'N/A',
-        pauseTotal: 'N/A',
-        conversationsGagnees: 0,
-        conversationsPerdues: 0,
-        relancesEffectuees: 0,
-        tauxOuverture: 0,
-        productivite: 0,
-      };
-    });
     
     return commerciaux;
   }
+
+
+  async getCommercialsDashboard():Promise< CommercialDashboardDto[]> {
+    const users = await this.whatsappCommercialRepository.find({
+      relations: ['poste', 'poste.chats'],      
+    });
+
+
+    const dashboard: CommercialDashboardDto[] = [];
+
+    for (const user of users) {
+       // Récupérer tous les messages OUT et IN pour ce commercial
+      const messagesEnvoyes = await this.messageRepository.count({
+        where: { poste_id: user.id, from_me: true },
+      });
+      const messagesRecus = await this.messageRepository.count({
+        where: { poste_id: user.id, from_me: false },
+      });
+
+      // Chats actifs / en attente
+      const chats = user.poste?.chats || [];
+      const conversationsActives = chats.filter(c => c.status === WhatsappChatStatus.ACTIF).length;
+      const conversationsEnAttente = chats.filter(c => c.status === WhatsappChatStatus.EN_ATTENTE).length;
+
+       // Contacts créés aujourd'hui
+      const today = new Date();
+      const nouveauxContacts = chats.filter(c => {
+        const createdAt = new Date(c.createdAt);
+        return (
+          createdAt.getDate() === today.getDate() &&
+          createdAt.getMonth() === today.getMonth() &&
+          createdAt.getFullYear() === today.getFullYear()
+        );
+      }).length;
+
+          // Productivité = simple exemple : messagesEnvoyes + chatsActifs*2 - messagesRecus*0.5
+      const productivite = messagesEnvoyes + conversationsActives * 2 - messagesRecus * 0.5;
+
+       dashboard.push({
+        id: user.id,
+        name: user.name,
+        avatar: user.name.charAt(0).toUpperCase(),
+        status: user.isConnected ? 'online' : 'offline',
+        email: user.email,
+        region: user.poste?.name || 'N/A',
+        dernierLogin: user.lastConnectionAt
+          ? new Date(user.lastConnectionAt).toLocaleString('fr-FR', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : 'N/A',
+        messagesEnvoyes,
+        messagesRecus,
+        conversationsActives,
+        conversationsEnAttente,
+        nouveauxContacts,
+        productivite,
+      });
+
+
+    }
+      return dashboard;
+
+  }
+
+  
 
   async findOne(id: string): Promise<SafeWhatsappCommercial> {
     const user = await this.whatsappCommercialRepository.findOne({

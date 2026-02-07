@@ -90,6 +90,16 @@ export async function deletePoste(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
+export async function updatCommercial(id: string, poste: Partial<Commercial>): Promise<Commercial> {
+    const response = await fetch(`${API_BASE_URL}/chats/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(poste),
+        credentials: 'include',
+    });
+    return handleResponse<Commercial>(response);
+}
+
 export async function getChannels(): Promise<Channel[]> {
     const response = await fetch(`${API_BASE_URL}/channel`, {
         method: 'GET',

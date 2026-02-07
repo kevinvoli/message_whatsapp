@@ -17,7 +17,7 @@ export class WhatsappCommercialController {
 
   @Get()
   async findAll() {
-    return await this.whatsappCommercialService.findAll();
+    return await this.whatsappCommercialService.getCommercialsDashboard();
   }
 
   @Get(':id')

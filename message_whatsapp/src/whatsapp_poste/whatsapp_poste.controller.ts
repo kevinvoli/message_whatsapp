@@ -15,8 +15,8 @@ export class WhatsappPosteController {
   }
 
   @Get()
-  findAll() {
-    return this.whatsappPosteService.findAll();
+  async  findAll() {
+    return await this.whatsappPosteService.findAll();
   }
 
 

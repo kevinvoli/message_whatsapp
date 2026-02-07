@@ -27,7 +27,7 @@ export class WhatsappMessageController {
 
   @Get()
   async findAll() {
-    console.log("affichage de tous les message ");
+    // console.log("affichage de tous les message ");
     
     return await this.messageService.findAll();
   }

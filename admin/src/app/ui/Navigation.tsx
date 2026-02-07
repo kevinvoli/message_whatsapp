@@ -1,5 +1,5 @@
 import { Settings, LogOut, Menu, X } from 'lucide-react';
-import { NavigationItem, ViewMode } from '@/app/lib/definitions';
+import { NavigationItem, ViewMode, WhatsappMessage } from '@/app/lib/definitions';
 import { useRouter } from 'next/navigation';
 import { logoutAdmin } from '@/app/lib/api'; // Import logoutAdmin
 
@@ -9,9 +9,10 @@ interface NavigationProps {
     viewMode: string;
     setViewMode: (view: ViewMode) => void;
     navigationItems: NavigationItem[];
+    message: WhatsappMessage[]
 }
 
-export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationItems }: NavigationProps) {
+export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationItems, message }: NavigationProps) {
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -74,7 +75,7 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
                                                     ? 'bg-green-500 text-white' 
                                                     : 'bg-blue-600 text-white'
                                             }`}>
-                                                {item.badge}
+                                                {item.id === "messages" ? `${message.length}`:item.badge}
                                             </span>
                                         )}
                                     </>

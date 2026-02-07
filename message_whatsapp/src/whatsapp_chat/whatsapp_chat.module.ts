@@ -11,11 +11,12 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { QueueService } from 'src/dispatcher/services/queue.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([
     WhatsappChat,WhatsappChatLabel,   WhatsappCommercial, QueuePosition,
-    WhatsappPoste
+    WhatsappPoste,WhatsappMessage
       ])],
   controllers: [WhatsappChatController],
   providers: [WhatsappChatGateway, WhatsappChatService, WhatsappPosteService ,WhatsappCommercialService,QueueService],

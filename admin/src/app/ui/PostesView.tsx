@@ -28,6 +28,7 @@ export default function PostesView({ initialPostes, onPosteUpdated }: PostesView
     }, [initialPostes]);
 
     // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+console.log("le poste retourne:", postes);
 
     const handleOpenAddModal = () => {
         setFormName('');
@@ -61,7 +62,12 @@ export default function PostesView({ initialPostes, onPosteUpdated }: PostesView
         setLoading(true);
         setOperationError(null);
         try {
-            await createPoste({ name: formName, code: formCode, is_active: formIsActive }); // Removed token parameter
+            await createPoste({
+                name: formName, code: formCode, is_active: formIsActive,
+                chats: [],
+                messages: [],
+                commercial: []
+            }); // Removed token parameter
             onPosteUpdated(); // Trigger parent to re-fetch all postes
             handleCloseAddModal();
         } catch (err) {
@@ -135,6 +141,9 @@ export default function PostesView({ initialPostes, onPosteUpdated }: PostesView
                         <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom du Poste</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nb chats</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nb sms</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nb Agent</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Créé le</th>
@@ -145,6 +154,9 @@ export default function PostesView({ initialPostes, onPosteUpdated }: PostesView
                             {postes.map((poste) => (
                                 <tr key={poste.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{poste.name}</td>
+                                    <td className="px-6 py-4 text-gray-700">{poste.chats?.length}</td>
+                                     <td className="px-6 py-4 text-gray-700">{poste.messages?.length}</td>
+                                      <td className="px-6 py-4 text-gray-700">{poste.commercial?.length}</td>
                                     <td className="px-6 py-4 text-gray-700">{poste.code}</td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

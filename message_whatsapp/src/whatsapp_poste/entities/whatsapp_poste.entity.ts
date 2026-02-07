@@ -45,7 +45,7 @@ export class WhatsappPoste {
   @OneToMany(() => WhatsappMessage, (message) => message.poste)
   messages: WhatsappMessage[];
 
-   @OneToMany(() => WhatsappCommercial, (message) => message.poste)
+   @OneToMany(() => WhatsappCommercial, (commercial) => commercial.poste)
   commercial: WhatsappCommercial[];
  
   @CreateDateColumn({

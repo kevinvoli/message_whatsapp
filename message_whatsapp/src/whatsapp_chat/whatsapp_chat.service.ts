@@ -150,6 +150,7 @@ export class WhatsappChatService {
   }
 
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
+    
     await this.chatRepository.update({ chat_id }, data);
   }
 
