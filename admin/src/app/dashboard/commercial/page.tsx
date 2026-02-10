@@ -16,9 +16,9 @@ import RapportsView from '@/app/ui/RapportsView';
 import PostesView from '@/app/ui/PostesView';
 import ChannelsView from '@/app/ui/ChannelsView';
 import MessageAutoView from '@/app/ui/MessageAutoView';
-import ConversationsView from '@/app/ui/ConversationsView'; // Import ConversationsView
-import { ViewMode, Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage } from '@/app/lib/definitions';
-import { getCommerciaux, getStatsGlobales, getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages } from '@/app/lib/api';
+import ConversationsView from '@/app/ui/ConversationsView';
+import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel } from '@/app/lib/definitions';
+import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques } from '@/app/lib/api';
 import { Spinner } from '@/app/ui/Spinner';
 
 export default function AdminDashboard() {
@@ -26,47 +26,62 @@ export default function AdminDashboard() {
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
-    const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
-    const [messages, setmessages] = useState<WhatsappMessage[]>([]);
-    const [statsGlobales, setStatsGlobales] = useState<StatsGlobales | null>(null);
+    // États pour les métriques
+    const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
+    const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[]>([]);
+    const [statutChannels, setStatutChannels] = useState<StatutChannel[]>([]);
+
+    // États existants
+    const [messages, setMessages] = useState<WhatsappMessage[]>([]);
     const [postes, setPostes] = useState<Poste[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [messagesAuto, setMessagesAuto] = useState<MessageAuto[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
-    const [chats, setChats] = useState<WhatsappChat[]>([]); // New state for chats
+    const [chats, setChats] = useState<WhatsappChat[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchData = async () => {
         setLoading(true);
         setError(null);
-        // Authentication is now handled by HTTP-only cookies, no need for localStorage token or explicit check here.
-console.log("admin message ", );
 
         try {
-            const [statsData, commerciauxData, postesData, channelsData, messagesAutoData, clientsData, chatsData,messagesData] = await Promise.all([
-                getStatsGlobales(),
-                getCommerciaux(),
+            // Charger les métriques et les autres données en parallèle
+            const [
+                overviewData,
+                postesData,
+                channelsData,
+                messagesAutoData,
+                clientsData,
+                chatsData,
+                messagesData
+            ] = await Promise.all([
+                getOverviewMetriques(), // Nouveau: charge metriques, performanceCommercial et statutChannels
                 getPostes(),
                 getChannels(),
                 getMessageAuto(),
                 getClients(),
                 getChats(),
-                getMessages(), // Fetch chats data
+                getMessages(),
             ]);
-            console.log("admin data",commerciauxData);
-            
-            setStatsGlobales(statsData);
-            setCommerciaux(commerciauxData);
+
+            console.log("Overview data:", overviewData);
+
+            // Mettre à jour les états avec les données des métriques
+            setMetriques(overviewData.metriques);
+            setPerformanceCommercial(overviewData.performanceCommercial);
+            setStatutChannels(overviewData.statutChannels);
+
+            // Mettre à jour les états existants
             setPostes(postesData);
             setChannels(channelsData);
             setMessagesAuto(messagesAutoData);
             setClients(clientsData);
             setChats(chatsData);
-            setmessages(messagesData) // Set chats data
+            setMessages(messagesData);
+
         } catch (err) {
-            // If an API call fails due to authentication, the checkAdminAuth in page.tsx will redirect.
-            // This error likely indicates a network issue or a backend error other than authentication.
+            console.error("Erreur lors du chargement des données:", err);
             setError(err instanceof Error ? err.message : "Erreur lors de la récupération des données.");
         } finally {
             setLoading(false);
@@ -75,25 +90,32 @@ console.log("admin message ", );
 
     useEffect(() => {
         fetchData();
+
+        // Auto-refresh toutes les 30 secondes
+        const interval = setInterval(() => {
+            fetchData();
+        }, 30000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const getStatusColor = (status: 'online' | 'away' | 'offline') => {
         switch(status) {
-          case 'online': return 'bg-green-500';
-          case 'away': return 'bg-yellow-500';
-          case 'offline': return 'bg-gray-500';
-          default: return 'bg-gray-500';
+            case 'online': return 'bg-green-500';
+            case 'away': return 'bg-yellow-500';
+            case 'offline': return 'bg-gray-500';
+            default: return 'bg-gray-500';
         }
-      };
-    
-      const getPerformanceBadge = (performance: 'excellent' | 'moyen' | 'faible') => {
+    };
+
+    const getPerformanceBadge = (performance: 'excellent' | 'moyen' | 'faible') => {
         switch(performance) {
-          case 'excellent': return 'bg-green-100 text-green-800';
-          case 'moyen': return 'bg-yellow-100 text-yellow-800';
-          case 'faible': return 'bg-red-100 text-red-800';
-          default: return 'bg-gray-100 text-gray-800';
+            case 'excellent': return 'bg-green-100 text-green-800';
+            case 'moyen': return 'bg-yellow-100 text-yellow-800';
+            case 'faible': return 'bg-red-100 text-red-800';
+            default: return 'bg-gray-100 text-gray-800';
         }
-      };
+    };
 
     const renderContent = () => {
         if (loading) {
@@ -105,59 +127,56 @@ console.log("admin message ", );
         }
 
         switch(viewMode) {
-          case 'overview':
-            return (
-                statsGlobales && <OverviewView
-                    statsGlobales={statsGlobales}
-                    performanceData={[]}
-                    sourcesClients={[]}
-                    heuresActivite={[]}
-                    produitsPopulaires={[]}
-                    commerciaux={commerciaux}
-                    getStatusColor={getStatusColor}
-                />
-            );
-          case 'commerciaux':
-            return (
-                <CommerciauxView
-                commerciaux={commerciaux}
-                getStatusColor={getStatusColor}
-                getPerformanceBadge={getPerformanceBadge} onCommercialUpdate={function (): void {
-                  throw new Error('Function not implemented.');
-                } }                />
-            );
-          case 'postes':
-            return <PostesView initialPostes={postes} onPosteUpdated={fetchData} />;
-          case 'canaux':
-            return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} />;
-          case 'automessages':
-            return <MessageAutoView initialMessagesAuto={messagesAuto} onMessageAutoUpdated={fetchData} />;
-          case 'conversations': // New case for conversations
-            return <ConversationsView initialChats={chats} onChatUpdated={fetchData} />;
-          case 'performance':
-            return <PerformanceView />;
-          case 'analytics':
-            return <AnalyticsView />;
-          case 'messages':
-            return <MessagesView messages={messages} onMessageUpdated={fetchData} />;
-          case 'clients':
-            return <ClientsView initialClients={clients} onClientUpdated={fetchData} />;
-          case 'rapports':
-            return <RapportsView />;
-          default:
-            return null;
+            case 'overview':
+                return (
+                    metriques && (
+                        <OverviewView
+                            metriques={metriques}
+                            performanceCommercial={performanceCommercial}
+                            statutChannels={statutChannels}
+                        />
+                    )
+                );
+            case 'commerciaux':
+                return (
+                    <CommerciauxView
+                        commerciaux={performanceCommercial}
+                        onCommercialUpdate={fetchData}
+                    />
+                );
+            case 'postes':
+                return <PostesView initialPostes={postes} onPosteUpdated={fetchData} />;
+            case 'canaux':
+                return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} />;
+            case 'automessages':
+                return <MessageAutoView initialMessagesAuto={messagesAuto} onMessageAutoUpdated={fetchData} />;
+            case 'conversations':
+                return <ConversationsView initialChats={chats} onChatUpdated={fetchData} />;
+            case 'performance':
+                return <PerformanceView />;
+            case 'analytics':
+                return <AnalyticsView />;
+            case 'messages':
+                return <MessagesView messages={messages} onMessageUpdated={fetchData} />;
+            case 'clients':
+                return <ClientsView initialClients={clients} onClientUpdated={fetchData} />;
+            case 'rapports':
+                return <RapportsView />;
+            default:
+                return null;
         }
-      };
+    };
 
     return (
         <div className="flex h-screen bg-gray-100">
             <Navigation
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          navigationItems={navigationItems} 
-          message={messages}            />
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                navigationItems={navigationItems}
+                message={messages}
+            />
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header

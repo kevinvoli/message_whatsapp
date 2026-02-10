@@ -119,6 +119,7 @@ export class WhatsappMessageGateway
         const unreadCount = await this.messageService.countUnreadMessages(
           chat.chat_id,
         );
+        
         return this.mapConversation(chat, lastMessage, unreadCount);
       }),
     );
@@ -197,6 +198,8 @@ export class WhatsappMessageGateway
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
     );
+    console.log("laste dessage", lastMessage);
+    
 
     this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
@@ -236,6 +239,8 @@ export class WhatsappMessageGateway
       chat.chat_id,
     );
 
+    // const unreadCount = chat.unread_count
+
     this.server.to(`poste_${agent.posteId}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
       payload: this.mapConversation(chat, lastMessage, unreadCount),
@@ -264,6 +269,8 @@ export class WhatsappMessageGateway
       chat.chat_id,
     );
 
+    console.log("compteur message", unreadCount);
+    
     this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
       payload: this.mapConversation(chat, lastMessage, unreadCount),
@@ -321,6 +328,7 @@ export class WhatsappMessageGateway
     oldPosteId: string,
     newPosteId: string,
   ): void {
+    
     this.server.to(`poste_${newPosteId}`).emit('chat:event', {
       type: 'CONVERSATION_ASSIGNED',
       payload: this.mapConversation(chat),
@@ -355,7 +363,7 @@ export class WhatsappMessageGateway
     chat_id: message.chat.chat_id,
     from_me: message.from_me,
     text: message.text ?? undefined,
-    timestamp: Number(message.timestamp),
+    timestamp:message.timestamp,
     status: message.status,
     from: message.from,
     from_name: message.from_name,

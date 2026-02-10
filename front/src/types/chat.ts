@@ -101,8 +101,8 @@ export interface Conversation {
   last_client_message_at?: Date | null;
   last_poste_message_at?: Date | null;
 
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt:  string | number | Date;
+  updatedAt: string | number | Date;
 }
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "error";
@@ -219,10 +219,10 @@ interface RawConversationData {
   // 🆕 Tableau de médias au niveau conversation
   medias?: RawMediaData[];
 
-  unread_count?: number;
+  unreadCount: number;
 
   status: "actif" | "en attente" | "fermé";
-
+channel_id: string;
   created_at?: string | number | Date;
   updated_at?: string | number | Date;
 
@@ -258,7 +258,7 @@ interface RawCommercialData {
  *   - Le frontend utilise "audio: { url, duration, mimeType }"
  */
 export const transformToMessage = (raw: RawMessageData): Message => {
-  console.log("entre dans transformtoMessage====", raw);
+  // console.log("entre dans transformtoMessage====",new Date(raw.timestamp?? Date.now()) );
 
   const hasText = typeof raw.text === "string" && raw.text.trim().length > 0;
 
@@ -275,7 +275,8 @@ export const transformToMessage = (raw: RawMessageData): Message => {
     chat_id: raw.chat_id,
 
     timestamp: new Date(raw.timestamp || raw.createdAt || Date.now()),
-
+    //,
+    // timestamp: raw.timestamp,
     from: raw.from,
     from_me: Boolean(raw.from_me),
     from_name: raw.from_name || (raw.from_me ? "Agent" : "Client"),
@@ -342,7 +343,8 @@ const resolveLastMessage = (
   raw: RawMessageData | string | null | undefined,
 ): Message | null => {
   if (!raw) return null;
-
+  console.log("transforme message ",raw);
+  
   // Si c'est déjà un objet avec un "id", c'est un RawMessageData
   if (typeof raw === "object" && "id" in raw) {
     return transformToMessage(raw as RawMessageData);
@@ -366,7 +368,9 @@ const resolveLastMessage = (
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
-  return {
+            
+  
+  const conv= {
   id: raw.id,
   chat_id: raw.chat_id,
 
@@ -391,7 +395,7 @@ export const transformToConversation = (
 
   // 🆕 medias[] : transforme le tableau de médias
   // medias: transformMedias(raw.medias),
-  unreadCount: raw.unread_count ?? 0,
+  unreadCount: raw.unreadCount,
   status: raw.status,
 
   // 🆕 Timestamps
@@ -403,9 +407,15 @@ export const transformToConversation = (
     : null,
 
 
-  auto_message_status: "scheduled",
 
+  auto_message_status: "scheduled",
+ 
+  createdAt: raw.created_at,
+  updatedAt: raw.updated_at
 };
+console.log("apres transfro",conv);
+
+return conv;
 };
 
 /**

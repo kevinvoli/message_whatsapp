@@ -228,10 +228,10 @@ export class WhatsappMessage {
   })
   deletedAt?: Date | null;
 
-  @BeforeInsert()
-  clearContactForAgentMessage() {
-    if (this.from_me) {
-      this.contact = null;
-    }
-  }
+  // @BeforeInsert()
+  // clearContactForAgentMessage() {
+  //   if (this.from_me) {
+  //     this.contact = null;
+  //   }
+  // }
 }

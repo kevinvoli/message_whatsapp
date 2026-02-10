@@ -64,12 +64,12 @@ const WebSocketEvents = () => {
             const message: Message = transformToMessage(data.payload);
             const tempId = (data.payload as any).tempId;
 
-            console.log("messate+++===============", tempId);
+            // console.log("messate+++===============", tempId);
 
             // Si tempId existe, on peut remplacer le message temporaire
             if (tempId) {
               const idx = useChatStore.getState().messages.findIndex((m) => m.id === tempId);
-              console.log("messate tmp.id===============", idx);
+              // console.log("messate tmp.id===============", idx);
 
               if (idx > -1) {
                 const updatedMessages = [...useChatStore.getState().messages];
@@ -85,8 +85,9 @@ const WebSocketEvents = () => {
           }
 
           case 'CONVERSATION_UPSERT': {
+            console.log("======conversation update,");
+
             const conversation: Conversation = transformToConversation(data.payload);
-            console.log("======conversation update,", conversation);
 
             updateConversation(conversation);
             break;
@@ -111,12 +112,15 @@ const WebSocketEvents = () => {
 
           case 'CONVERSATION_LIST': {
             const conversations: Conversation[] = data.payload.map(transformToConversation);
+
             setConversations(conversations);
             break;
           }
 
           case 'CONVERSATION_REASSIGNED': {
+
             const conversation: Conversation = transformToConversation(data.payload);
+            
             updateConversation(conversation);
             break;
           }

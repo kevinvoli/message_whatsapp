@@ -26,6 +26,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout
 }) => {
 
+  // console.log("sidebar==", conversations);
+  
   const typingStatus = useChatStore((state) => state.typingStatus);
   
   return (

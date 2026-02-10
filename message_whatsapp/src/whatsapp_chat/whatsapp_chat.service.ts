@@ -76,13 +76,16 @@ export class WhatsappChatService {
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chat_id: string): Promise<void> {
-    await this.chatRepository.update(
+    const chat =  await this.chatRepository.update(
       { chat_id: chat_id },
       {
         unread_count: 0,
         last_activity_at: new Date(),
       },
     );
+
+    console.log("mise a jour du chat", chat);
+    // return chat;
   }
 
   /* =======================
@@ -132,10 +135,12 @@ export class WhatsappChatService {
   }
 
   async findBychat_id(chat_id: string): Promise<WhatsappChat | null> {
-    return this.chatRepository.findOne({
+
+    const chat= await this.chatRepository.findOne({
       where: { chat_id: chat_id },
       relations: ['poste', 'messages'],
     });
+    return chat;
   }
 
   async findOne(id: string): Promise<WhatsappChat | null> {

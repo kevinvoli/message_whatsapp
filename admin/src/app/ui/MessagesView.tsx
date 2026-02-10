@@ -35,9 +35,10 @@ export default function MessagesView({
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom du Poste</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">conversation</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">messages</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">direction</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Créé le</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
@@ -54,6 +55,7 @@ export default function MessagesView({
                                             {messae.direction ? 'Actif' : 'Inactif'}
                                         </span>
                                     </td>
+                                    <td className="px-6 py-4 text-gray-700">{messae.direction}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{new Date(messae.timestamp).toLocaleDateString()}</td>
                                 </tr>
                             ))}

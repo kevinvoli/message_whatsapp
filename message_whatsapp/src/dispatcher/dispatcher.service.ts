@@ -125,7 +125,7 @@ export class DispatcherService {
       contact_client:  clientPhone.split('@')[0],
       poste: nextAgent,
       poste_id: nextAgent.id,
-      status: WhatsappChatStatus.EN_ATTENTE,
+      status: WhatsappChatStatus.ACTIF,
       unread_count: 1,
       last_activity_at: new Date(),
       createdAt: new Date(),
@@ -135,9 +135,7 @@ export class DispatcherService {
       first_response_deadline_at:  new Date(
         Date.now() + 5 * 60* 1000,
       ),
-      // new Date(
-      //   Date.now() + 5 * 60 * 1000,
-      // );
+     
       last_client_message_at: new Date(),
     });
 
@@ -176,9 +174,6 @@ export class DispatcherService {
       first_response_deadline_at:  new Date(
         Date.now() + 5 * 60* 1000,
       )
-      // new Date(
-      //   Date.now() + 0.10 * 60 * 1000,
-      // );
     });
 
     const updatedChat = await this.chatRepository.findOne({

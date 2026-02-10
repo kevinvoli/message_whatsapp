@@ -156,11 +156,13 @@ export class WhatsappMessageService {
   ): Promise<WhatsappMessage | null> {
 
     try {
-      return this.messageRepository.findOne({
+
+      const message= await this.messageRepository.findOne({
         where: { chat_id: chat_id },
         order: { timestamp: 'DESC' },
         relations: ['chat', 'poste','medias'],
       });
+      return message;
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
@@ -172,6 +174,18 @@ export class WhatsappMessageService {
     offset = 0,
   ): Promise<WhatsappMessage[]> {
     try {
+
+
+        // 2️⃣ Récupérer les messages
+      // const meverifss = await this.messageRepository.find({
+      //   where: { chat_id: chat_id },
+      //   relations: ['chat', 'poste','medias'],
+      //   order: { timestamp: 'ASC' },
+      //   take: limit,
+      //   skip: offset,
+      // });
+      // console.log("message mise a joure ",meverifss);
+
       // 1️⃣ Marquer les messages reçus comme lus
       await this.messageRepository
         .createQueryBuilder()
@@ -188,10 +202,12 @@ export class WhatsappMessageService {
       const mess = await this.messageRepository.find({
         where: { chat_id: chat_id },
         relations: ['chat', 'poste','medias'],
-        order: { timestamp: 'ASC' },
+        order: { createdAt: 'ASC' },
         take: limit,
         skip: offset,
       });
+      // console.log("message mise a joure ",mess);
+      
       return mess;
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
@@ -220,7 +236,7 @@ export class WhatsappMessageService {
 
   async createInternalMessage(message: any, commercialId?: string) {
     try {
-      console.log('message reçue du dispache', message);
+      // console.log('message reçue du dispache', message);
       const chat = await this.chatRepository.findOne({
         where: {
           chat_id: message.chat_id,
@@ -342,14 +358,10 @@ export class WhatsappMessageService {
 
     try {
       const channel = await this.channelService.findOne(message.channel_id);
-
-
       if (!channel ) {
         // Utilisez une exception métier appropriée
         throw new Error(`Channel ${message.channel_id} non trouvé`);
       }
-
-
 
       const contact = await this.contactService.findOrCreate(
         message.from,
@@ -381,6 +393,7 @@ export class WhatsappMessageService {
           timestamp: new Date(message.timestamp * 1000),
           status: WhatsappMessageStatus.SENT,
           source: 'whapi',
+          poste: chat.poste
         }),
       );
       return messagesss;
@@ -402,7 +415,7 @@ export class WhatsappMessageService {
   }
 
   async findOneWithMedias(id: string) {
-  return this.messageRepository.findOne({
+  return await this.messageRepository.findOne({
     where: { id },
     relations: {
       medias: true,

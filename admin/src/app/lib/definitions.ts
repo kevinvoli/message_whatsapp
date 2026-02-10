@@ -1,84 +1,65 @@
+import React from 'react';
+
+// ============================================
+// TYPES EXISTANTS (conservés)
+// ============================================
+
 export type Commercial = {
-id: string;
+  id: string;
   name: string;
   avatar: string;
   status: 'online' | 'offline';
   email: string;
   region: string;
   dernierLogin: string;
-
   messagesEnvoyes: number;
   messagesRecus: number;
-
   conversationsActives: number;
   conversationsEnAttente: number;
-
   nouveauxContacts: number;
   productivite: number;
 };
 
-export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages' | 'conversations'; // Added 'conversations'
-
-import React from 'react'; // Import React for React.ElementType
+export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages' | 'conversations';
 
 export type NavigationItem = {
-    id: ViewMode;
-    name: string;
-    icon: React.ElementType; // Use React.ElementType for the icon component type
-    badge: string | null;
+  id: ViewMode;
+  name: string;
+  icon: React.ElementType;
+  badge: string | null;
 };
 
 export type StatsGlobales = {
-    commerciaux: number;
-    canaux: number;
-    conversations: number;
-    commerciauxActifs: number;
-    // Les métriques suivantes nécessiteraient des entités ou des logiques métier supplémentaires
-    // pour des calculs précis, et sont donc omises pour éviter des données statiques trompeuses.
-    // totalConversions: number;
-    // totalCA: number;
-    // totalMessages: number;
-    // totalConversationsActives: number;
-    // tauxConversionMoyen: number;
-    // satisfactionMoyenne: string;
-    // objectifGlobal: number;
-    // caObjectifGlobal: number;
-    // totalRDV: number;
-    // totalRDVHonores: number;
-    // totalDevis: number;
-    // totalDevisAcceptes: number;
-    // totalAppelsSortants: number;
-    // totalAppelsRecus: number;
-    // totalNouveauxContacts: number;
-    // panierMoyen: number;
-    // tauxFidelisationMoyen: number;
-    // productiviteMoyenne: number;
+  commerciaux: number;
+  canaux: number;
+  conversations: number;
+  commerciauxActifs: number;
 };
 
 export type PerformanceData = {
-    jour: string;
-    conversions: number;
-    ca: number;
-    messages: number;
-    rdv: number;
+  jour: string;
+  conversions: number;
+  ca: number;
+  messages: number;
+  rdv: number;
 };
 
 export type SourcesClients = {
-    name: string;
-    value: number;
-    conversions: number;
-    color: string;
+  name: string;
+  value: number;
+  conversions: number;
+  color: string;
 };
 
 export type HeuresActivite = {
-    heure: string;
-    activite: number;
+  heure: string;
+  activite: number;
 };
 
 export type ProduitsPopulaires = {
-    nom: string;
-    ventes: number;
-    ca: number;
+  nom: string;
+  ventes: number;
+  ca: number;
 };
 
 export type Poste = {
@@ -88,9 +69,9 @@ export type Poste = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  chats?:WhatsappChat[];
-  messages?:WhatsappMessage[];
-  commercial?:Commercial[];
+  chats?: WhatsappChat[];
+  messages?: WhatsappMessage[];
+  commercial?: Commercial[];
 };
 
 export type Channel = {
@@ -116,7 +97,6 @@ export type MessageAuto = {
   canal?: 'whatsapp' | 'sms' | 'email' | null;
   position: number;
   actif: boolean;
-  // conditions?: any | null; // This will be JSON parsed
   created_at: string;
   updated_at: string;
 };
@@ -136,9 +116,9 @@ export type WhatsappMessage = {
   id: string;
   chat_id: string;
   text: string;
-  direction: 'IN' | 'OUT'; // IN for messages received, OUT for messages sent
+  direction: 'IN' | 'OUT';
   status: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
-  timestamp: string; // ISO date string
+  timestamp: string;
   mediaUrl?: string;
   mediaType?: string;
   caption?: string;
@@ -148,8 +128,8 @@ export type WhatsappMessage = {
 };
 
 export type WhatsappChat = {
-  id: string; // Internal UUID
-  chat_id: string; // External WhatsApp chat ID
+  id: string;
+  chat_id: string;
   name: string;
   type: string;
   chat_pic: string;
@@ -162,10 +142,201 @@ export type WhatsappChat = {
   unread_mention: boolean;
   read_only: boolean;
   not_spam: boolean;
-  contact_client: string; // The phone number or identifier of the contact
-  last_activity_at: string; // ISO date string
+  contact_client: string;
+  last_activity_at: string;
   createdAt: string;
   updatedAt: string;
-  poste: Poste; // Relation to Poste
-  messages: WhatsappMessage[]; // Relation to Messages
+  poste: Poste;
+  messages: WhatsappMessage[];
 };
+
+// ============================================
+// NOUVEAUX TYPES POUR LES MÉTRIQUES OVERVIEW
+// ============================================
+
+/**
+ * Métriques globales pour le dashboard Overview
+ * Basées sur votre structure de base de données existante
+ */
+export type MetriquesGlobales = {
+  // Métriques Messages
+  totalMessages: number;
+  messagesEntrants: number;
+  messagesSortants: number;
+  messagesAujourdhui: number;
+  tauxReponse: number;
+  tempsReponseMoyen: number;
+
+  // Métriques Chats
+  totalChats: number;
+  chatsActifs: number;
+  chatsEnAttente: number;
+  chatsFermes: number;
+  chatsNonLus: number;
+  chatsArchives: number;
+
+  // Métriques Commerciaux
+  commerciauxTotal: number;
+  commerciauxConnectes: number;
+  commerciauxActifs: number;
+
+  // Métriques Contacts
+  totalContacts: number;
+  nouveauxContactsAujourdhui: number;
+  contactsActifs: number;
+
+  // Métriques Postes
+  totalPostes: number;
+  postesActifs: number;
+  chargePostes: ChargePoste[];
+
+  // Métriques Channels
+  totalChannels: number;
+  channelsActifs: number;
+
+  // Métriques Performance
+  messagesEnAttente: number;
+  tauxAssignation: number;
+  tempsPremiereReponse: number;
+};
+
+/**
+ * Charge de travail par poste
+ */
+export type ChargePoste = {
+  poste_id: string;
+  poste_name: string;
+  poste_code: string;
+  nb_chats: number;
+  nb_chats_actifs: number;
+  nb_chats_attente: number;
+};
+
+/**
+ * Performance détaillée d'un commercial
+ */
+export type PerformanceCommercial = {
+  id: string;
+  name: string;
+  email: string;
+  isConnected: boolean;
+  poste_name: string;
+  poste_id: string | null;
+  nbChatsActifs: number;
+  nbMessagesEnvoyes: number;
+  nbMessagesRecus: number;
+  tauxReponse: number;
+  tempsReponseMoyen: number;
+  lastConnectionAt: string | null;
+};
+
+/**
+ * Statut détaillé d'un channel WhatsApp
+ */
+export type StatutChannel = {
+  id: string;
+  channel_id: string;
+  is_business: boolean;
+  uptime: number;
+  version: string;
+  api_version: string;
+  core_version: string;
+  ip: string;
+  nb_chats_actifs: number;
+  nb_messages: number;
+};
+
+/**
+ * Données de performance sur une période
+ */
+export type PerformanceTemporelle = {
+  periode: string;
+  nb_messages: number;
+  messages_in: number;
+  messages_out: number;
+  nb_conversations?: number;
+  nb_commerciaux_actifs?: number;
+};
+
+/**
+ * Statistiques par type de message
+ */
+export type StatistiquesParType = {
+  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  count: number;
+  percentage?: number;
+};
+
+/**
+ * Nouveaux contacts par jour
+ */
+export type NouveauxContactsParJour = {
+  date: string;
+  nb_nouveaux_contacts: number;
+};
+
+/**
+ * Alertes et notifications
+ */
+export type Alerte = {
+  type: 'warning' | 'error' | 'info' | 'success';
+  titre: string;
+  message: string;
+  count?: number;
+  action?: string;
+};
+
+/**
+ * Props du composant OverviewView
+ */
+export type OverviewViewProps = {
+  metriques: MetriquesGlobales;
+  performanceCommercial: PerformanceCommercial[];
+  statutChannels: StatutChannel[];
+  performanceTemporelle?: PerformanceTemporelle[];
+  alertes?: Alerte[];
+};
+
+// ============================================
+// TYPES UTILITAIRES
+// ============================================
+
+export type StatutChat = 'actif' | 'en attente' | 'fermé';
+export type DirectionMessage = 'IN' | 'OUT';
+export type TypeMessage = 'text' | 'image' | 'audio' | 'video' | 'document';
+export type StatutMessage = 'failed' | 'pending' | 'sent' | 'delivered' | 'read' | 'played' | 'deleted';
+export type ModeAssignation = 'ONLINE' | 'OFFLINE';
+
+/**
+ * Filtre pour les requêtes de métriques
+ */
+export type FiltreMetriques = {
+  dateDebut?: string;
+  dateFin?: string;
+  commercialIds?: string[];
+  posteIds?: string[];
+  channelIds?: string[];
+  statutChats?: StatutChat[];
+};
+
+// ============================================
+// CONSTANTES
+// ============================================
+
+export const SEUILS_ALERTES = {
+  MESSAGES_EN_ATTENTE_WARNING: 10,
+  MESSAGES_EN_ATTENTE_CRITICAL: 50,
+  CHATS_NON_LUS_WARNING: 5,
+  CHATS_NON_LUS_CRITICAL: 20,
+  TAUX_REPONSE_MIN: 60,
+  TAUX_ASSIGNATION_MIN: 70,
+  TEMPS_REPONSE_MAX_MINUTES: 15,
+} as const;
+
+export const COULEURS_STATUT = {
+  actif: 'green',
+  'en attente': 'yellow',
+  'fermé': 'gray',
+  online: 'green',
+  offline: 'gray',
+} as const;

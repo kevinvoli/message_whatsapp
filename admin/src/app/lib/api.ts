@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage } from './definitions'; // Added WhatsappChat, WhatsappMessage
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle } from './definitions'; // Added WhatsappChat, WhatsappMessage
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -284,4 +284,85 @@ export async function logoutAdmin(): Promise<{ message: string }> {
         credentials: 'include',
     });
     return handleResponse<{ message: string }>(response);
+}
+
+
+
+// admin/src/app/lib/api.ts - AJOUTER CES FONCTIONS
+
+
+
+// ... (garder toutes tes fonctions existantes)
+
+// ============================================
+// NOUVELLES FONCTIONS POUR LES MÉTRIQUES
+// ============================================
+
+/**
+ * Récupère toutes les métriques globales du dashboard
+ */
+export async function getMetriquesGlobales(): Promise<MetriquesGlobales> {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/globales`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<MetriquesGlobales>(response);
+}
+
+/**
+ * Récupère la performance détaillée de tous les commerciaux
+ */
+export async function getPerformanceCommerciaux(): Promise<PerformanceCommercial[]> {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<PerformanceCommercial[]>(response);
+}
+
+/**
+ * Récupère le statut de tous les channels WhatsApp
+ */
+export async function getStatutChannels(): Promise<StatutChannel[]> {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/channels`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<StatutChannel[]>(response);
+}
+
+/**
+ * Récupère les données de performance sur une période
+ * @param jours - Nombre de jours (défaut: 7)
+ */
+export async function getPerformanceTemporelle(jours: number = 7): Promise<PerformanceTemporelle[]> {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/performance-temporelle?jours=${jours}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<PerformanceTemporelle[]>(response);
+}
+
+/**
+ * Récupère toutes les données du dashboard en une seule requête
+ * C'est l'endpoint le plus optimisé pour charger le dashboard
+ */
+export async function getOverviewMetriques() {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/overview`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    
+    const result = await handleResponse<{
+        success: boolean;
+        timestamp: string;
+        data: {
+            metriques: MetriquesGlobales;
+            performanceCommercial: PerformanceCommercial[];
+            statutChannels: StatutChannel[];
+            performanceTemporelle: PerformanceTemporelle[];
+        };
+    }>(response);
+    
+    return result.data;
 }

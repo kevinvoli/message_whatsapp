@@ -24,7 +24,7 @@ async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Respons
   
   res.cookie('Authentication', accessToken, {
     httpOnly: true,
-    maxAge: 15 * 60 * 1000, // 15 minutes for access token
+    maxAge: 7 * 24 * 60 * 1000, // 15 minutes for access token
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   });

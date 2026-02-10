@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, User, MessageCircleMore } from 'lucide-react';
 import { getMessagesForChat, sendMessage } from '@/app/lib/api'; // Import sendMessage
 import { Spinner } from './Spinner';
+import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
 
 interface ConversationsViewProps {
     initialChats: WhatsappChat[];
@@ -100,7 +101,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                 selectedChat.chat_id,
                 currentMessageText,
                 PLACEHOLDER_POSTE_ID,
-                selectedChat.channel_id // Assuming channel_id is available on the chat object
+                selectedChat.chat_id // Assuming channel_id is available on the chat object
             );
 
             // Replace optimistic update with actual message from backend

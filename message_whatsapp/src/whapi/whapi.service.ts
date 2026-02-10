@@ -64,13 +64,11 @@ export class WhapiService {
       // 1️⃣ Dispatcher → attribution conversation
       const conversation = await this.dispatcherService.assignConversation(
         message.chat_id,
-        message.from_name ?? 'Client',     
+        message.from_name ?? 'Client',
       );
 
       if (!conversation) {
-        this.logger.warn(
-          `⏳ Aucun agent disponible (${message.chat_id})`,
-        );
+        this.logger.warn(`⏳ Aucun agent disponible (${message.chat_id})`);
         return;
       }
 
@@ -85,26 +83,25 @@ export class WhapiService {
         throw new NotFoundException('Message non enregistré');
       }
 
-
- await this.autoMessageOrchestratorServcie.handleClientMessage(conversation);
+      // await this.autoMessageOrchestratorServcie.handleClientMessage(
+      //   conversation,
+      // );
       // 3️⃣ Sauvegarde médias
       const medias = this.extractMedia(message);
       for (const media of medias) {
         await this.saveMedia(media, savedMessage, conversation);
       }
 
+      const fullMessage = await this.whatsappMessageService.findOneWithMedias(
+        savedMessage.id,
+      );
 
-      const fullMessage =
-  await this.whatsappMessageService.findOneWithMedias(savedMessage.id);
+      if (!fullMessage) return;
+    // console.log("la conversation",conversation);
 
-  if (!fullMessage) return;
-      
+
       // 4️⃣ NOTIFIER LE GATEWAY (POINT UNIQUE)
-      await this.messageGateway.notifyNewMessage(
-    fullMessage, conversation);
-
-         
-    
+      await this.messageGateway.notifyNewMessage(fullMessage, conversation);
     } catch (err) {
       throw new HttpException(
         {
@@ -119,11 +116,7 @@ export class WhapiService {
   // ======================================================
   // MEDIA
   // ======================================================
-  private async saveMedia(
-    media: ExtractedMedia,
-    messageEntity,
-    chatEntity,
-  ) {
+  private async saveMedia(media: ExtractedMedia, messageEntity, chatEntity) {
     const entity = new WhatsappMedia();
 
     entity.media_type = media.type as WhatsappMediaType;
@@ -154,22 +147,58 @@ export class WhapiService {
     const medias: ExtractedMedia[] = [];
 
     if (message.image)
-      medias.push({ type: 'image', media_id: message.image.id, mime_type: message.image.mime_type, caption: message.image.caption, payload: message.image });
+      medias.push({
+        type: 'image',
+        media_id: message.image.id,
+        mime_type: message.image.mime_type,
+        caption: message.image.caption,
+        payload: message.image,
+      });
 
     if (message.video)
-      medias.push({ type: 'video', media_id: message.video.id, mime_type: message.video.mime_type, caption: message.video.caption, seconds: message.video.seconds, payload: message.video });
+      medias.push({
+        type: 'video',
+        media_id: message.video.id,
+        mime_type: message.video.mime_type,
+        caption: message.video.caption,
+        seconds: message.video.seconds,
+        payload: message.video,
+      });
 
     if (message.audio)
-      medias.push({ type: 'audio', media_id: message.audio.id, mime_type: message.audio.mime_type, seconds: message.audio.seconds, payload: message.audio });
+      medias.push({
+        type: 'audio',
+        media_id: message.audio.id,
+        mime_type: message.audio.mime_type,
+        seconds: message.audio.seconds,
+        payload: message.audio,
+      });
 
     if (message.voice)
-      medias.push({ type: 'voice', media_id: message.voice.id, mime_type: message.voice.mime_type ?? 'audio/ogg', seconds: message.voice.seconds, payload: message.voice });
+      medias.push({
+        type: 'voice',
+        media_id: message.voice.id,
+        mime_type: message.voice.mime_type ?? 'audio/ogg',
+        seconds: message.voice.seconds,
+        payload: message.voice,
+      });
 
     if (message.document)
-      medias.push({ type: 'document', media_id: message.document.id, mime_type: message.document.mime_type, file_name: message.document.filename, file_size: message.document.file_size, payload: message.document });
+      medias.push({
+        type: 'document',
+        media_id: message.document.id,
+        mime_type: message.document.mime_type,
+        file_name: message.document.filename,
+        file_size: message.document.file_size,
+        payload: message.document,
+      });
 
     if (message.location)
-      medias.push({ type: 'location', latitude: message.location.latitude, longitude: message.location.longitude });
+      medias.push({
+        type: 'location',
+        latitude: message.location.latitude,
+        longitude: message.location.longitude,
+      });
 
     return medias;
   }
@@ -179,13 +208,19 @@ export class WhapiService {
   // ======================================================
   private extractMessageContent(message: WhapiMessage): string {
     switch (message.type) {
-      case 'text': return message.text?.body ?? '';
-      case 'image': return message.image?.caption ?? '[Image]';
-      case 'video': return message.video?.caption ?? '[Vidéo]';
+      case 'text':
+        return message.text?.body ?? '';
+      case 'image':
+        return message.image?.caption ?? '[Image]';
+      case 'video':
+        return message.video?.caption ?? '[Vidéo]';
       case 'audio':
-      case 'voice': return '[Audio]';
-      case 'document': return message.document?.filename ?? '[Document]';
-      default: return '[Message]';
+      case 'voice':
+        return '[Audio]';
+      case 'document':
+        return message.document?.filename ?? '[Document]';
+      default:
+        return '[Message]';
     }
   }
 
