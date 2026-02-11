@@ -90,6 +90,11 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
 
         const messageId = msg.id || `msg-fallback-${index}`;
 
+        // {currentConv?.messages.map(msg => (
+                    // <ChatMessage key={msg.id} msg={msg} />
+                // ))}
+
+
         return (
           <div
             key={messageId}

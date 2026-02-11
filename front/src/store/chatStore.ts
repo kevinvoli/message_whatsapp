@@ -82,6 +82,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket?.emit("conversations:get");
   },
 
+  
   selectConversation: (chat_id: string) => {
     set((state) => {
       const conversation = state.conversations.find(

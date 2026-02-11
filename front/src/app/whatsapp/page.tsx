@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -11,9 +11,11 @@ import { useChatStore } from '@/store/chatStore';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useRouter } from 'next/navigation';
 import { Conversation } from '@/types/chat';
+import { useStatsStore } from '@/store/stats.store';
+import ChatMainArea from '@/components/chat/ChatMainArea';
 
 const WhatsAppPage = () => {
-  const { user, initialized, logout } = useAuth();
+  const { user, initialized } = useAuth();
   const router = useRouter();
   const {
     conversations,
@@ -26,13 +28,13 @@ const WhatsAppPage = () => {
     onTypingStart,
     onTypingStop,
     loadConversations,
+ 
   } = useChatStore();
   const { isConnected: isWebSocketConnected } = useSocket();
+const { stats } = useStatsStore();
 
-  // console.log("whatsAppPages",conversations);
-  
-
-
+  const [showStats, setShowStats] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
   // Protection de route
   useEffect(() => {
     if (initialized && !user) {
@@ -47,16 +49,17 @@ const WhatsAppPage = () => {
   }, [selectConversation]);
 
   // Envoyer un message
-  const handleSendMessage = useCallback(async (text: string) => {
 
-    if (!selectedConversation) {
-      console.error('❌ Impossible d\'envoyer: aucune conversation sélectionnée');
-      return;
-    }
-    console.log("conversation selectionne", selectedConversation);
+    const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
+  const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
-    sendMessage(text);
-  }, [selectedConversation, sendMessage]);
+    const filteredConversations = conversations.filter(conv => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'unread') return conv.unreadCount > 0;
+    if (filterStatus === 'nouveau') return conv.status === 'nouveau';
+    if (filterStatus === 'urgent') return conv.priority === 'haute';
+    return true;
+  });
 
   if (!initialized || !user) {
     return (
@@ -70,60 +73,22 @@ const WhatsAppPage = () => {
     <div className="flex h-screen bg-gray-100">
       <Sidebar
         commercial={user}
-        conversations={conversations}
+        conversations={filteredConversations}
         searchTerm=""
         selectedConversation={selectedConversation}
         isConnected={isWebSocketConnected}
         onSearchChange={() => { }}
         onSelectConversation={handleSelectConversation}
-        onLogout={logout}
+        
+        setFilterStatus={setFilterStatus}
+        stats={stats} 
+        filterStatus={filterStatus}
+         totalUnread={totalUnread}
+         setShowStats={setShowStats}
+         showStats={showStats}
       />
 
-      <div className="flex-1 flex flex-col">
-        {selectedConversation ? (
-          <>
-            <ChatHeader conversation={selectedConversation} />
-
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                  <p className="text-gray-500">Chargement...</p>
-                </div>
-              </div>
-            ) : (
-              <ChatMessages messages={messages} />
-            )}
-
-            <ChatInput
-              chat_id={selectedConversation.chat_id}
-              onSendMessage={sendMessage}
-              onTypingStart={onTypingStart}
-              onTypingStop={onTypingStop}
-              isConnected={isWebSocketConnected}
-            />
-
-
-            {/* Affiche une erreur s'il y en a une */}*
-            {error && (
-              <div className="bg-red-100 border-t border-red-200 p-2 text-center">
-                <p className="text-red-700 text-sm">{error}</p>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <div className="text-center">
-              <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
-              <p className="text-xl font-semibold">
-                {conversations.length === 0
-                  ? 'Aucune conversation disponible'
-                  : 'Sélectionnez une conversation'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <ChatMainArea/>
     </div>
   );
 };

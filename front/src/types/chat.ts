@@ -1,9 +1,56 @@
+import { Tag, Tags } from "lucide-react";
 import { MessageDirection } from "../../../message_whatsapp/src/whatsapp_message/entities/whatsapp_message.entity";
 /**
  * @fileoverview Ce fichier définit les types et interfaces principaux utilisés
  * dans l'application de chat, ainsi que des fonctions utilitaires pour
  * créer, transformer et valider ces objets.
  */
+export type ConversationStatus =
+  | "nouveau"
+  | "en_cours"
+  | "attente"
+  | "converti";
+
+export type Priority = "haute" | "moyenne" | "basse";
+export type Source = {
+    name: string;
+    value: number;
+    color: string;
+};
+
+export type PerformanceData = {
+    jour: string;
+    conversions: number;
+};
+
+export type Stats = {
+    messagesTraites: number;
+    tauxReponse: number;
+    tempsReponse: string;
+    conversationsActives: number;
+    conversionsJour: number;
+    satisfaction: number;
+    objectifJour: number;
+    ca: number;
+    nouveauxContacts: number;
+    relances: number;
+    rdvPris: number;
+    tauxConversion: number;
+    messagesMoyen: number;
+    horairesPic: string;
+    sourcesPrincipales: Source[];
+    performanceHebdo: PerformanceData[];
+};
+
+export type StatsState = {
+    stats: Stats | null;
+    loading: boolean;
+    error: string | null;
+    
+    // Actions
+    setStats: (stats: Stats) => void;
+    updateStats: (updates: Partial<Stats>) => void;
+};
 
 // ==============================================
 // INTERFACES PRINCIPALES
@@ -34,7 +81,7 @@ export interface Message {
   from_name?: string;
   chat_id: string;
 
-  status?: "sending" | "sent" | "delivered" | "read" | "error";
+  status?: MessageStatus;
   direction?: "IN" | "OUT";
 
   commercial_id?: string | null;
@@ -84,7 +131,7 @@ export interface Conversation {
   clientName: string;
   clientPhone: string;
 
-  auto_message_status:'scheduled' | 'sending' | 'sent';
+  auto_message_status: "scheduled" | "sending" | "sent";
 
   lastMessage: Message | null;
   unreadCount: number;
@@ -95,13 +142,15 @@ export interface Conversation {
   // 🆕 Tableau de médias au niveau conversation
   medias?: ConversationMedia[];
 
-  status: "actif" | "en attente" | "fermé";
-
+  status: ConversationStatus;
+  source: string;
+  priority: Priority;
+  tags: string[];
   // 🆕 Timestamps backend
   last_client_message_at?: Date | null;
   last_poste_message_at?: Date | null;
 
-  createdAt:  string | number | Date;
+  createdAt: string | number | Date;
   updatedAt: string | number | Date;
 }
 
@@ -181,17 +230,17 @@ interface RawMessageData {
   // Audio : interface alternative (pour compatibilité)
   audio?: RawAudioData;
   medias?: Array<{
-  id?: string;
-  type: 'audio' | 'voice' | 'image' | 'video' | 'document' | 'location';
-  url: string;
-  mime_type?: string;
-  caption?: string;
-  file_name?: string;
-  file_size?: number;
-  duration?: number;
-  latitude?: number;
-  longitude?: number;
-}>;
+    id?: string;
+    type: "audio" | "voice" | "image" | "video" | "document" | "location";
+    url: string;
+    mime_type?: string;
+    caption?: string;
+    file_name?: string;
+    file_size?: number;
+    duration?: number;
+    latitude?: number;
+    longitude?: number;
+  }>;
 }
 
 interface RawConversationData {
@@ -204,11 +253,12 @@ interface RawConversationData {
     name: string;
     code: string;
   };
-
+  tags: string[];
+  priority: Priority;
   name?: string;
   client_phone?: string;
 
-  auto_message_status:'scheduled' | 'sending' | 'sent';
+  auto_message_status: "scheduled" | "sending" | "sent";
 
   // 🔥 last_message peut être un objet RawMessageData OU une simple chaîne (ex: "[Media]")
   last_message?: RawMessageData | string | null;
@@ -221,10 +271,10 @@ interface RawConversationData {
 
   unreadCount: number;
 
-  status: "actif" | "en attente" | "fermé";
-channel_id: string;
-  created_at?: string | number | Date;
-  updated_at?: string | number | Date;
+  status: ConversationStatus;
+  channel_id: string;
+  created_at: string | number | Date;
+  updated_at: string | number | Date;
 
   // 🆕 Timestamps du backend
   last_client_message_at?: string | number | Date | null;
@@ -312,13 +362,13 @@ const transformMedias = (rawMedias?: any): ConversationMedia[] => {
 
   return rawMedias.map(
     (media: {
-      media_id: any;
-      media_type: any;
-      url: any;
-      duration_seconds: any;
-      caption: any;
-      latitude: any;
-      longitude: any;
+      media_id: string;
+      media_type: string;
+      url: string;
+      duration_seconds: number | null;
+      caption: string;
+      latitude: string | number;
+      longitude: string | number;
     }) => ({
       media_id: media.media_id,
       type: media.media_type,
@@ -343,8 +393,8 @@ const resolveLastMessage = (
   raw: RawMessageData | string | null | undefined,
 ): Message | null => {
   if (!raw) return null;
-  console.log("transforme message ",raw);
-  
+  console.log("transforme message ", raw);
+
   // Si c'est déjà un objet avec un "id", c'est un RawMessageData
   if (typeof raw === "object" && "id" in raw) {
     return transformToMessage(raw as RawMessageData);
@@ -368,54 +418,54 @@ const resolveLastMessage = (
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
-            
-  
-  const conv= {
-  id: raw.id,
-  chat_id: raw.chat_id,
+  const conv = {
+    id: raw.id,
+    chat_id: raw.chat_id,
 
-  poste_id: raw.poste_id,
-  poste: raw.poste
-    ? {
-      id: raw.poste.id,
-      name: raw.poste.name,
-      code: raw.poste.code,
-      isActive: true,
-    }
-    : undefined,
+    poste_id: raw.poste_id,
+    poste: raw.poste
+      ? {
+          id: raw.poste.id,
+          name: raw.poste.name,
+          code: raw.poste.code,
+          isActive: true,
+        }
+      : undefined,
 
-  clientName: raw.name || "Client inconnu",
-  clientPhone: raw.client_phone || raw.chat_id?.split("@")[0] || "",
+    clientName: raw.name || "Client inconnu",
+    clientPhone: raw.client_phone || raw.chat_id?.split("@")[0] || "",
 
-  // 🔥 last_message : résolu via la fonction polymorphe
-  lastMessage: resolveLastMessage(raw.last_message),
+    // 🔥 last_message : résolu via la fonction polymorphe
+    lastMessage: resolveLastMessage(raw.last_message),
 
-  // 🆕 messages[] : transforme chaque message du tableau
-  messages: raw.messages?.map(transformToMessage) ?? [],
+    // 🆕 messages[] : transforme chaque message du tableau
+    messages: raw.messages?.map(transformToMessage) ?? [],
 
-  // 🆕 medias[] : transforme le tableau de médias
-  // medias: transformMedias(raw.medias),
-  unreadCount: raw.unreadCount,
-  status: raw.status,
+    // 🆕 medias[] : transforme le tableau de médias
+    // medias: transformMedias(raw.medias),
+    unreadCount: raw.unreadCount,
+    status: raw.status,
 
-  // 🆕 Timestamps
-  last_client_message_at: raw.last_client_message_at
-    ? new Date(raw.last_client_message_at)
-    : null,
-  last_poste_message_at: raw.last_poste_message_at
-    ? new Date(raw.last_poste_message_at)
-    : null,
+    // 🆕 Timestamps
+    last_client_message_at: raw.last_client_message_at
+      ? new Date(raw.last_client_message_at)
+      : null,
+    last_poste_message_at: raw.last_poste_message_at
+      ? new Date(raw.last_poste_message_at)
+      : null,
 
+    source: raw.channel_id || "inconnu",
+    priority: raw.priority || "moyenne",
+    tags: raw.tags || [],
 
+    auto_message_status: raw.auto_message_status,
 
-  auto_message_status: "scheduled",
- 
-  createdAt: raw.created_at,
-  updatedAt: raw.updated_at
-};
-console.log("apres transfro",conv);
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+  };
+  console.log("apres transfro", conv);
 
-return conv;
+  return conv;
 };
 
 /**

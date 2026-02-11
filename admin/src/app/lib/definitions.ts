@@ -121,6 +121,8 @@ export type WhatsappMessage = {
   timestamp: string;
   mediaUrl?: string;
   mediaType?: string;
+  poste?: Poste;
+  commercial?: Commercial;
   caption?: string;
   is_deleted: boolean;
   createdAt: string;

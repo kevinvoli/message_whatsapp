@@ -2,6 +2,7 @@ import React from 'react';
 import { User } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
+import { getStatusBadge } from '@/lib/utils';
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -10,18 +11,18 @@ interface ConversationItemProps {
   onClick: () => void;
 }
 
-const ConversationItem: React.FC<ConversationItemProps> = ({ 
-  conversation, isSelected, isTyping,onClick }) => {
+const ConversationItem: React.FC<ConversationItemProps> = ({
+  conversation, isSelected, isTyping, onClick }) => {
 
 
-    // console.log("conversation item==",conversation.lastMessage);
-    
+  // console.log("conversation item==",conversation.lastMessage);
+
   const formatTime = (date: Date) => {
     // console.log("formatage de la date",date);
-    
+
     const now = new Date();
     const diff = now.getTime() - new Date(date).getTime();
-    
+
     if (diff < 86400000) {
       return new Date(date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     } else if (diff < 604800000) {
@@ -30,18 +31,22 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
     }
   };
-    // console.log("formatage de la date",formatTime(conversation.lastMessage?.timestamp?));
+  // console.log("formatage de la date",formatTime(conversation.lastMessage?.timestamp?));
 
   return (
     <div
       onClick={onClick}
-      className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-        isSelected ? 'bg-green-50' : ''
-      }`}
+      className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? 'bg-green-50 border-l-4 border-l-green-600' : 'hover:bg-gray-50'
+        }`}
     >
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 relative">
           <User className="w-6 h-6 text-green-600" />
+          {conversation.clientName === 'haute' && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs">!</span>
+            </div>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
@@ -52,20 +57,34 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           </div>
           <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
           <div className="mt-1">
-  {isTyping ? (
-    <TypingIndicator />
-  ) : (
-    <p className="text-sm text-gray-500 truncate">
-      {conversation.lastMessage
-        ? conversation.lastMessage.text
-        : 'Aucun message pour le moment'}
-    </p>
-  )}
-</div>
+            {isTyping ? (
+              <TypingIndicator />
+            ) : (
+              <p className="text-sm text-gray-500 truncate">
+                {conversation.lastMessage
+                  ? conversation.lastMessage.text
+                  : 'Aucun message pour le moment'}
+              </p>
+            )}
+          </div>
+
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(conversation.status)}`}>
+              {conversation.status.replace('_', ' ')}
+            </span>
+            {/* <span className="text-xs text-gray-500">{conversation.status}</span> */}
+            {conversation?.tags?.map((tag, idx) => (
+              <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
+                {tag}
+              </span>
+            ))}
+          </div>
+
         </div>
         {conversation.unreadCount > 0 && (
           <div className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-            {conversation.unreadCount}
+             <span className="text-xs text-white font-bold">{conversation.unreadCount}</span>
           </div>
         )}
       </div>
