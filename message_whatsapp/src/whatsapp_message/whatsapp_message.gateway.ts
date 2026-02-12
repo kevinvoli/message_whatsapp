@@ -22,6 +22,8 @@ import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { last } from 'rxjs';
+import { ContactService } from 'src/contact/contact.service';
 
 @WebSocketGateway(3001, {
   cors: { origin: '*', credentials: true },
@@ -40,7 +42,7 @@ export class WhatsappMessageGateway
 
   constructor(
     private readonly messageService: WhatsappMessageService,
-    private readonly chatService: WhatsappChatService,
+    private readonly chatService: WhatsappChatService,    
     private readonly commercialService: WhatsappCommercialService,
     private readonly posteService: WhatsappPosteService,
     private readonly queueService: QueueService,
@@ -49,6 +51,8 @@ export class WhatsappMessageGateway
     private readonly autoMessageService: MessageAutoService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
+    private readonly contactService: ContactService
+    
   ) {}
 
   // ======================================================
@@ -77,6 +81,7 @@ export class WhatsappMessageGateway
 
     await this.emitQueueUpdate();
     await this.sendConversationsToClient(client);
+    await this.sendContactsToClient(client);
   }
 
   async handleDisconnect(client: Socket) {
@@ -130,12 +135,36 @@ export class WhatsappMessageGateway
     });
   }
 
+    private async sendContactsToClient(client: Socket) {
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+
+    const contacts = await this.contactService.findAll();
+    // console.log("la liste des contact ", contacts);
+    
+
+    client.emit('contact:event', {
+      type: 'CONTACT_LIST',
+      payload: contacts,
+    });
+  }
+
   @SubscribeMessage('conversations:get')
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload?: { search?: string },
   ) {
     await this.sendConversationsToClient(client, payload?.search);
+  }
+
+   @SubscribeMessage('contacts:get')
+  async handleGetContacts(
+    @ConnectedSocket() client: Socket,
+    // @MessageBody() payload?: { search?: string },
+  ) {
+
+    console.log("bienvenue dans la liste des contact");
+    await this.sendContactsToClient(client,);
   }
 
   @SubscribeMessage('typing:start')
@@ -198,8 +227,6 @@ export class WhatsappMessageGateway
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
     );
-    console.log("laste dessage", lastMessage);
-    
 
     this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
@@ -399,11 +426,18 @@ export class WhatsappMessageGateway
       poste_id: chat.poste_id,
       status: chat.status,
       unreadCount: unreadCount ?? chat.unread_count ?? 0,
+      createdAt:chat.createdAt,
+      auto_message_status: chat.auto_message_status,
+      last_activity_at: chat.last_activity_at,
+      last_client_message_at: chat.last_client_message_at || null,
+      last_poste_message_at: chat.last_poste_message_at || null,
+      updatedAt: chat.updatedAt,
+      poste: chat.poste || null,
       last_message: lastMessage
         ? {
             id: lastMessage.id,
             text: lastMessage.text ?? '',
-            timestamp: Number(lastMessage.timestamp),
+            timestamp: lastMessage.timestamp,
             from_me: lastMessage.from_me,
             status: lastMessage.status,
             type: lastMessage.type,

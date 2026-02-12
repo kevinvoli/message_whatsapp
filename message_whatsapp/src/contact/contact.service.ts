@@ -33,8 +33,6 @@ export class ContactService{
     const contact= await this.repo.find({ order: { createdAt: 'DESC' },relations:{
       messages:true,
     } });
-    // console.log("mes contact====",contact);
-    
 
     return contact
   }

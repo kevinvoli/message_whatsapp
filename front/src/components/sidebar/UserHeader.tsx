@@ -1,19 +1,40 @@
 import React from 'react';
-import { User, Search, BarChart3, Wifi, WifiOff, LogOut } from 'lucide-react';
-import { Commercial, Stats } from '@/types/chat';
+import { User, Search, BarChart3, Wifi, WifiOff, LogOut, MessageSquare, Users } from 'lucide-react';
+import { Commercial, Conversation } from '@/types/chat';
 
+type ViewMode = 'conversations' | 'contacts';
 
 interface UserHeaderProps {
-    stats?: Stats | null;
+    conversation: Conversation[];
     totalUnread: number;
     setShowStats: (show: boolean) => void;
     showStats: boolean;
     commercial: Commercial;
     isConnected: boolean;
     onLogout: () => void;
+    // 🆕 Nouveaux props pour la gestion des vues
+    viewMode?: ViewMode;
+    onViewModeChange?: (mode: ViewMode) => void;
+    searchQuery?: string;
+    onSearchChange?: (query: string) => void;
 }
 
-export default function UserHeader({ stats, totalUnread, setShowStats, showStats, commercial, isConnected,onLogout }: UserHeaderProps) {
+export default function UserHeader({
+    conversation,
+    totalUnread,
+    commercial,
+    isConnected,
+    onLogout,
+    viewMode = 'conversations',
+    onViewModeChange,
+    searchQuery = '',
+    onSearchChange,
+}: UserHeaderProps) {
+    
+    const handleViewChange = (mode: ViewMode) => {
+        onViewModeChange?.(mode);
+    };
+
     return (
         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4">
             <div className="flex items-center justify-between mb-3">
@@ -31,33 +52,64 @@ export default function UserHeader({ stats, totalUnread, setShowStats, showStats
                             {isConnected ? (
                                 <>
                                     <Wifi className="w-3 h-3" />
-                                    <span>Connecté</span>
+                                    <span className="text-xs">Connecté</span>
                                 </>
                             ) : (
-
                                 <>
                                     <WifiOff className="w-3 h-3" />
-                                    <span>Déconnecté</span>
+                                    <span className="text-xs">Déconnecté</span>
                                 </>
-
                             )}
                         </div>
                     </div>
                 </div>
-                 <button
-            onClick={onLogout}
-             className="p-2 hover:bg-green-700 rounded-full transition-colors"
-             title="Déconnexion"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
+                <button
+                    onClick={onLogout}
+                    className="p-2 hover:bg-green-700 rounded-full transition-colors"
+                    title="Déconnexion"
+                >
+                    <LogOut className="w-5 h-5" />
+                </button>
             </div>
 
+            {/* 🆕 Switch entre Conversations et Contacts */}
+            {onViewModeChange && (
+                <div className="mb-3 bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
+                    <button
+                        onClick={() => handleViewChange('conversations')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md transition-all ${
+                            viewMode === 'conversations'
+                                ? 'bg-white text-green-700 shadow-md font-medium'
+                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                        }`}
+                    >
+                        <MessageSquare className="w-4 h-4" />
+                        <span className="text-sm">Conversations</span>
+                    </button>
+                    <button
+                        onClick={() => handleViewChange('contacts')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md transition-all ${
+                            viewMode === 'contacts'
+                                ? 'bg-white text-green-700 shadow-md font-medium'
+                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                        }`}
+                    >
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm">Contacts</span>
+                    </button>
+                </div>
+            )}
+
             {/* Stats rapides */}
-            <div className="grid grid-cols-3 gap-2 mb-3">
+
+            {
+               viewMode === 'conversations' ? (
+                  <div className="grid grid-cols-3 gap-2 mb-3">
                 <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
                     <p className="text-xs text-green-100">Actives</p>
-                    <p className="text-lg font-bold">{stats?.conversationsActives}</p>
+                    <p className="text-lg font-bold">
+                        {conversation?.filter((con) => con.status === 'actif').length}
+                    </p>
                 </div>
                 <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
                     <p className="text-xs text-green-100">Non lus</p>
@@ -65,16 +117,29 @@ export default function UserHeader({ stats, totalUnread, setShowStats, showStats
                 </div>
                 <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
                     <p className="text-xs text-green-100">Conv.</p>
-                    <p className="text-lg font-bold">{stats?.conversionsJour}</p>
+                    <p className="text-lg font-bold">{conversation?.length}</p>
                 </div>
             </div>
+               ) : <div></div>
+            }
+
+          
+
+
+
 
             {/* Barre de recherche */}
             <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                     type="text"
-                    placeholder="Rechercher une conversation..."
+                    value={searchQuery}
+                    onChange={(e) => onSearchChange?.(e.target.value)}
+                    placeholder={
+                        viewMode === 'conversations'
+                            ? 'Rechercher une conversation...'
+                            : 'Rechercher un contact...'
+                    }
                     className="w-full pl-10 pr-4 py-2 rounded-lg bg-green-700 text-white placeholder-green-200 focus:outline-none focus:ring-2 focus:ring-white"
                 />
             </div>

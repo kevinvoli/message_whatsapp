@@ -1,13 +1,16 @@
 import React from 'react';
 import { Target, Star, Users, Calendar } from 'lucide-react';
-import { Conversation } from '@/lib/definitions';
-import { getPriorityColor } from '@/lib/utils';
+import { Conversation, getPriorityColor } from '@/types/chat';
 
 interface ClientInfoBannerProps {
-    currentConv: Conversation | undefined;
+    currentConv: Conversation;
 }
 
+
 export default function ClientInfoBanner({ currentConv }: ClientInfoBannerProps) {
+
+console.log("mes conversation sont la :", currentConv);
+
     return (
         <div className="flex items-center gap-4 text-xs text-gray-600 bg-blue-50 p-3 rounded-lg">
             <div className="flex items-center gap-1">
@@ -20,11 +23,11 @@ export default function ClientInfoBanner({ currentConv }: ClientInfoBannerProps)
             </div>
             <div className="flex items-center gap-1">
                 <Users className="w-4 h-4 text-purple-600" />
-                <span>Assigné: <strong>{currentConv?.assignedTo}</strong></span>
+                <span>Assigné: <strong>{currentConv?.poste?.name }</strong></span>
             </div>
             <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4 text-green-600" />
-                <span>Dernier contact: <strong>Aujourd hui</strong></span>
+                <span>Dernier contact: <strong>{currentConv?.lastMessage?.timestamp.toDateString()} </strong></span>
             </div>
         </div>
     );

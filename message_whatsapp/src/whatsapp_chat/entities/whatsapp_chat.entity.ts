@@ -214,10 +214,6 @@ export class WhatsappChat {
 
   @Column({ type: 'int', default: 0 })
   auto_message_step: number;
-  // 0 = aucun envoyé
-  // 1 = message 1 envoyé
-  // 2 = message 2 envoyé
-  // 3 = message 3 envoyé (STOP)
 
   @Column({ type: 'boolean', default: false })
   waiting_client_reply: boolean;

@@ -77,7 +77,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket) return;
 
     set({ isLoading: true });
-    console.log("novelle conversation");
+    // console.log("novelle conversation");
 
     socket?.emit("conversations:get");
   },

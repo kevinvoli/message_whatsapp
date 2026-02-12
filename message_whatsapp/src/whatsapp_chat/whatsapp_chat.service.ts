@@ -18,7 +18,7 @@ export class WhatsappChatService {
     const chats = await this.chatRepository.find({
       where: { poste_id: poste_id },
       order: { updatedAt: 'DESC' },
-      relations: ['poste', 'messages'],
+      relations: ['poste', 'messages', 'channel'],
     });
 
     return chats;
@@ -33,11 +33,13 @@ export class WhatsappChatService {
     try {
       const existingChat = await this.chatRepository.findOne({
         where: { chat_id: chat_id },
+        relations: ['poste', 'messages', 'channel'],
       });
 
       if (existingChat) {
         return existingChat;
       }
+
 
       const poste = await this.posteService.findOneById(posteId);
       if (!poste) {
@@ -59,6 +61,7 @@ export class WhatsappChatService {
         read_only: false,
         not_spam: true,
         poste: poste,
+      
         contact_client: from,
         last_activity_at: new Date(),
         createdAt: new Date(),
@@ -128,7 +131,7 @@ export class WhatsappChatService {
     if (chat_id) {
       return this.chatRepository.find({
         where: { chat_id: chat_id },
-        relations: ['poste', 'messages'],
+        relations: ['poste', 'messages','channel'],
       });
     }
     return this.chatRepository.find();
@@ -138,7 +141,7 @@ export class WhatsappChatService {
 
     const chat= await this.chatRepository.findOne({
       where: { chat_id: chat_id },
-      relations: ['poste', 'messages'],
+      relations: ['poste', 'messages', 'channel'],
     });
     return chat;
   }
@@ -146,7 +149,7 @@ export class WhatsappChatService {
   async findOne(id: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { id },
-      relations: ['poste', 'messages'],
+      relations: ['poste', 'messages', 'channel'],
     });
   }
 

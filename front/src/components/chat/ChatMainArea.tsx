@@ -38,13 +38,13 @@ export default function ChatMainArea({
             console.error('❌ Impossible d\'envoyer: aucune conversation sélectionnée');
             return;
         }
-        console.log("conversation selectionne", selectedConversation);
+     
 
         sendMessage(text);
     }, [selectedConversation, sendMessage]);
 
-    const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
-    const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+    const totalMessages = selectedConversation ? messages?.length : 0;
+
     return (
         <div className="flex-1 flex flex-col">
             {selectedConversation ? (
@@ -60,8 +60,8 @@ export default function ChatMainArea({
                         <>
                             <ChatHeader currentConv={selectedConversation}
                                 totalMessages={totalMessages || 0} />
-                                
-                            <ChatMessages messages={messages} />
+                            <ClientInfoBanner currentConv={selectedConversation} />
+                            <ChatMessages messages={messages} currentConv={selectedConversation} />
                         </>
 
                     )}

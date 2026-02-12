@@ -160,7 +160,7 @@ export class WhatsappMessageService {
       const message= await this.messageRepository.findOne({
         where: { chat_id: chat_id },
         order: { timestamp: 'DESC' },
-        relations: ['chat', 'poste','medias'],
+        relations: ['medias'],
       });
       return message;
     } catch (error) {

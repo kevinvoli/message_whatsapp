@@ -1,5 +1,3 @@
-import { Tag, Tags } from "lucide-react";
-import { MessageDirection } from "../../../message_whatsapp/src/whatsapp_message/entities/whatsapp_message.entity";
 /**
  * @fileoverview Ce fichier définit les types et interfaces principaux utilisés
  * dans l'application de chat, ainsi que des fonctions utilitaires pour
@@ -7,50 +5,110 @@ import { MessageDirection } from "../../../message_whatsapp/src/whatsapp_message
  */
 export type ConversationStatus =
   | "nouveau"
-  | "en_cours"
+  | "actif"
   | "attente"
-  | "converti";
+  | "converti"
+  | "fermé";
+  
+
+   export type  ViewMode = 'conversations' | 'contacts'
 
 export type Priority = "haute" | "moyenne" | "basse";
+
+export type CallStatus = "à_appeler" | "appelé" | "rappeler" | "non_joignable";
+
 export type Source = {
-    name: string;
-    value: number;
-    color: string;
+  name: string;
+  value: number;
+  color: string;
 };
 
 export type PerformanceData = {
-    jour: string;
-    conversions: number;
+  jour: string;
+  conversions: number;
 };
 
+
+
 export type Stats = {
-    messagesTraites: number;
-    tauxReponse: number;
-    tempsReponse: string;
-    conversationsActives: number;
-    conversionsJour: number;
-    satisfaction: number;
-    objectifJour: number;
-    ca: number;
-    nouveauxContacts: number;
-    relances: number;
-    rdvPris: number;
-    tauxConversion: number;
-    messagesMoyen: number;
-    horairesPic: string;
-    sourcesPrincipales: Source[];
-    performanceHebdo: PerformanceData[];
+  messagesTraites: number;
+  tauxReponse: number;
+  tempsReponse: string;
+  conversationsActives: number;
+  conversionsJour: number;
+  satisfaction: number;
+  objectifJour: number;
+  ca: number;
+  nouveauxContacts: number;
+  relances: number;
+  rdvPris: number;
+  tauxConversion: number;
+  messagesMoyen: number;
+  horairesPic: string;
+  sourcesPrincipales: Source[];
+  performanceHebdo: PerformanceData[];
 };
 
 export type StatsState = {
-    stats: Stats | null;
-    loading: boolean;
-    error: string | null;
-    
-    // Actions
-    setStats: (stats: Stats) => void;
-    updateStats: (updates: Partial<Stats>) => void;
+  stats: Stats | null;
+  loading: boolean;
+  error: string | null;
+
+  // Actions
+  setStats: (stats: Stats) => void;
+  updateStats: (updates: Partial<Stats>) => void;
 };
+
+export const getPriorityColor = (
+  priority: "haute" | "moyenne" | "basse" | string,
+) => {
+  switch (priority) {
+    case "haute":
+      return "text-red-600";
+    case "moyenne":
+      return "text-orange-600";
+    case "basse":
+      return "text-gray-600";
+    default:
+      return "text-gray-600";
+  }
+};
+
+export const getCallStatusColor = (status: CallStatus): string => {
+  switch (status) {
+    case "appelé":
+      return "text-green-600 bg-green-50";
+    case "à_appeler":
+      return "text-blue-600 bg-blue-50";
+    case "rappeler":
+      return "text-orange-600 bg-orange-50";
+    case "non_joignable":
+      return "text-gray-600 bg-gray-50";
+    default:
+      return "text-gray-600 bg-gray-50";
+  }
+};
+
+
+
+export const getCallStatusLabel = (status: CallStatus): string => {
+  switch (status) {
+    case "appelé":
+      return "Appelé";
+    case "à_appeler":
+      return "À appeler";
+    case "rappeler":
+      return "À rappeler";
+    case "non_joignable":
+      return "Non joignable";
+    default:
+      return "À appeler";
+  }
+};
+
+
+
+
 
 // ==============================================
 // INTERFACES PRINCIPALES
@@ -121,6 +179,51 @@ export interface ConversationMedia {
   longitude?: number;
 }
 
+export interface CallHistory {
+  id: string;
+  conversation_id: string;
+  contact_id: string;
+  commercial_id: string;
+  call_date: Date;
+  call_status: CallStatus;
+  duration?: number; // durée en secondes
+  notes?: string;
+  outcome?: "répondu" | "messagerie" | "pas_de_réponse" | "occupé";
+  next_call_date?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  contact: string; // numéro de téléphone
+  chat_id: string;
+  is_active: boolean;
+  
+  // Informations d'appel
+  call_status: CallStatus;
+  last_call_date?: Date;
+  last_call_outcome?: string;
+  next_call_date?: Date;
+  call_count: number;
+  call_notes?: string;
+  
+  // Statistiques
+  total_messages?: number;
+  last_message_date?: Date;
+  conversion_status?: "nouveau" | "prospect" | "client" | "perdu";
+  messages:Message[];
+  // Métadonnées
+  source?: string;
+  priority?: Priority;
+  tags?: string[];
+  
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+}
+
 export interface Conversation {
   id: string;
   chat_id: string;
@@ -136,25 +239,49 @@ export interface Conversation {
   lastMessage: Message | null;
   unreadCount: number;
 
-  // 🆕 Tableau de messages (envoyé par le backend dans conversation:updated)
   messages?: Message[];
-
-  // 🆕 Tableau de médias au niveau conversation
   medias?: ConversationMedia[];
 
   status: ConversationStatus;
   source: string;
   priority: Priority;
   tags: string[];
-  // 🆕 Timestamps backend
+  
+  // 🆕 Informations d'appel
+  call_status?: CallStatus;
+  last_call_date?: Date | null;
+  last_call_notes?: string;
+  next_call_date?: Date | null;
+  
+  // Timestamps backend
   last_client_message_at?: Date | null;
   last_poste_message_at?: Date | null;
+  
+  // 🆕 Date de conversion/fermeture
+  closed_at?: Date | null;
+  converted_at?: Date | null;
+  closed_by?: string; // ID du commercial
 
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
 }
 
+
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "error";
+
+export interface ConversationAction {
+  type: "close" | "convert" | "reopen" | "mark_call" | "update_priority" | "add_tag";
+  conversation_id: string;
+  commercial_id: string;
+  data?: {
+    status?: ConversationStatus;
+    call_status?: CallStatus;
+    call_notes?: string;
+    priority?: Priority;
+    tag?: string;
+  };
+  timestamp: Date;
+}
 
 export interface WebSocketMessage {
   type:
@@ -163,7 +290,10 @@ export interface WebSocketMessage {
     | "new_message"
     | "message_status"
     | "conversation_reassigned"
-    | "send_message";
+    | "send_message"
+    | "conversation_updated"
+    | "call_marked"
+    | "status_changed";
   commercial_id?: string;
   token?: string;
   conversation_id?: string;
@@ -174,6 +304,7 @@ export interface WebSocketMessage {
   clientPhone?: string;
   text?: string;
   timestamp?: Date;
+  action?: ConversationAction;
 }
 
 export interface LoginFormData {
@@ -181,6 +312,38 @@ export interface LoginFormData {
   password: string;
 }
 
+
+// ==============================================
+// INTERFACES POUR FILTRES ET VUES
+// ==============================================
+
+
+export interface ContactFilters {
+  search?: string;
+  call_status?: CallStatus[];
+  conversion_status?: string[];
+  source?: string[];
+  priority?: Priority[];
+  date_range?: {
+    start: Date;
+    end: Date;
+  };
+  has_upcoming_call?: boolean;
+  sort_by?: "name" | "last_call" | "next_call" | "priority" | "created_at";
+  sort_order?: "asc" | "desc";
+}
+
+export interface ConversationFilters {
+  status?: ConversationStatus[];
+  priority?: Priority[];
+  call_status?: CallStatus[];
+  poste_id?: string[];
+  has_unread?: boolean;
+  date_range?: {
+    start: Date;
+    end: Date;
+  };
+}
 // ==============================================
 // INTERFACES POUR LES DONNÉES BRUTES (API / WEBSOCKET)
 // ==============================================
@@ -260,25 +423,30 @@ interface RawConversationData {
 
   auto_message_status: "scheduled" | "sending" | "sent";
 
-  // 🔥 last_message peut être un objet RawMessageData OU une simple chaîne (ex: "[Media]")
   last_message?: RawMessageData | string | null;
-
-  // 🆕 Tableau complet de messages envoyé par le backend
   messages?: RawMessageData[];
-
-  // 🆕 Tableau de médias au niveau conversation
   medias?: RawMediaData[];
 
   unreadCount: number;
 
   status: ConversationStatus;
   channel_id: string;
+  
+  // 🆕 Champs d'appel
+  call_status?: CallStatus;
+  last_call_date?: string | number | Date | null;
+  last_call_notes?: string;
+  next_call_date?: string | number | Date | null;
+  
   created_at: string | number | Date;
   updated_at: string | number | Date;
 
-  // 🆕 Timestamps du backend
   last_client_message_at?: string | number | Date | null;
   last_poste_message_at?: string | number | Date | null;
+  
+  closed_at?: string | number | Date | null;
+  converted_at?: string | number | Date | null;
+  closed_by?: string;
 }
 
 interface RawCommercialData {
@@ -294,6 +462,33 @@ interface RawCommercialData {
     description?: string;
     isActive?: boolean;
   };
+}
+
+interface RawContactData {
+  id: string;
+  name: string;
+  phone: string;
+  chat_id: string;
+  is_active: boolean;
+  
+  call_status?: CallStatus;
+  last_call_date?: string | number | Date | null;
+  last_call_outcome?: string;
+  next_call_date?: string | number | Date | null;
+  call_count?: number;
+  call_notes?: string;
+  
+  total_messages?: number;
+  last_message_date?: string | number | Date | null;
+  conversion_status?: string;
+  
+  source?: string;
+  priority?: Priority;
+  tags?: string[];
+  
+  createdAt: string | number | Date;
+  updatedAt: string | number | Date;
+  deletedAt?: string | number | Date | null;
 }
 
 // ==============================================
@@ -357,31 +552,31 @@ export const transformToMessage = (raw: RawMessageData): Message => {
  * Transforme un raw médias[] en ConversationMedia[].
  */
 
-const transformMedias = (rawMedias?: any): ConversationMedia[] => {
-  if (!rawMedias || rawMedias.length === 0) return [];
+// const transformMedias = (rawMedias?: any): ConversationMedia[] => {
+//   if (!rawMedias || rawMedias.length === 0) return [];
 
-  return rawMedias.map(
-    (media: {
-      media_id: string;
-      media_type: string;
-      url: string;
-      duration_seconds: number | null;
-      caption: string;
-      latitude: string | number;
-      longitude: string | number;
-    }) => ({
-      media_id: media.media_id,
-      type: media.media_type,
-      url: media.url ?? undefined,
-      duration_seconds: media.duration_seconds
-        ? Number(media.duration_seconds)
-        : undefined,
-      caption: media.caption ?? undefined,
-      latitude: media.latitude ? Number(media.latitude) : undefined,
-      longitude: media.longitude ? Number(media.longitude) : undefined,
-    }),
-  );
-};
+//   return rawMedias.map(
+//     (media: {
+//       media_id: string;
+//       media_type: string;
+//       url: string;
+//       duration_seconds: number | null;
+//       caption: string;
+//       latitude: string | number;
+//       longitude: string | number;
+//     }) => ({
+//       media_id: media.media_id,
+//       type: media.media_type,
+//       url: media.url ?? undefined,
+//       duration_seconds: media.duration_seconds
+//         ? Number(media.duration_seconds)
+//         : undefined,
+//       caption: media.caption ?? undefined,
+//       latitude: media.latitude ? Number(media.latitude) : undefined,
+//       longitude: media.longitude ? Number(media.longitude) : undefined,
+//     }),
+//   );
+// };
 
 /**
  * Résout last_message qui peut être :
@@ -389,20 +584,19 @@ const transformMedias = (rawMedias?: any): ConversationMedia[] => {
  *   - une string (ex "[Media]") → on crée un Message factice avec cette string
  *   - null/undefined            → null
  */
+
+
 const resolveLastMessage = (
   raw: RawMessageData | string | null | undefined,
 ): Message | null => {
   if (!raw) return null;
-  console.log("transforme message ", raw);
+  // console.log("transforme message ", raw);
 
   // Si c'est déjà un objet avec un "id", c'est un RawMessageData
   if (typeof raw === "object" && "id" in raw) {
     return transformToMessage(raw as RawMessageData);
   }
 
-  // Sinon c'est une string comme "[Media]" — on ne peut pas vraiment créer
-  // un Message valide, on retourne null (vous pouvez afficher la string
-  // séparément si besoin dans l'UI)
   return null;
 };
 
@@ -418,7 +612,7 @@ const resolveLastMessage = (
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
-  const conv = {
+  return {
     id: raw.id,
     chat_id: raw.chat_id,
 
@@ -435,18 +629,18 @@ export const transformToConversation = (
     clientName: raw.name || "Client inconnu",
     clientPhone: raw.client_phone || raw.chat_id?.split("@")[0] || "",
 
-    // 🔥 last_message : résolu via la fonction polymorphe
     lastMessage: resolveLastMessage(raw.last_message),
-
-    // 🆕 messages[] : transforme chaque message du tableau
     messages: raw.messages?.map(transformToMessage) ?? [],
 
-    // 🆕 medias[] : transforme le tableau de médias
-    // medias: transformMedias(raw.medias),
     unreadCount: raw.unreadCount,
     status: raw.status,
 
-    // 🆕 Timestamps
+    // 🆕 Champs d'appel transformés
+    call_status: raw.call_status,
+    last_call_date: raw.last_call_date ? new Date(raw.last_call_date) : null,
+    last_call_notes: raw.last_call_notes,
+    next_call_date: raw.next_call_date ? new Date(raw.next_call_date) : null,
+
     last_client_message_at: raw.last_client_message_at
       ? new Date(raw.last_client_message_at)
       : null,
@@ -460,14 +654,14 @@ export const transformToConversation = (
 
     auto_message_status: raw.auto_message_status,
 
+    closed_at: raw.closed_at ? new Date(raw.closed_at) : null,
+    converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
+    closed_by: raw.closed_by,
+
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
-  console.log("apres transfro", conv);
-
-  return conv;
 };
-
 /**
  * Transforme des données brutes en un objet Commercial valide.
  */
@@ -488,6 +682,35 @@ export const transformToCommercial = (raw: RawCommercialData): Commercial => {
           isActive: raw.poste.isActive ?? true,
         }
       : undefined,
+  };
+};
+
+export const transformToContact = (raw: RawContactData): Contact => {
+  return {
+    id: raw.id,
+    name: raw.name,
+    contact: raw.phone,
+    chat_id: raw.chat_id,
+    is_active: raw.is_active,
+    
+    call_status: raw.call_status || "à_appeler",
+    last_call_date: raw.last_call_date ? new Date(raw.last_call_date) : undefined,
+    last_call_outcome: raw.last_call_outcome,
+    next_call_date: raw.next_call_date ? new Date(raw.next_call_date) : undefined,
+    call_count: raw.call_count || 0,
+    call_notes: raw.call_notes,
+    
+    total_messages: raw.total_messages,
+    last_message_date: raw.last_message_date ? new Date(raw.last_message_date) : undefined,
+    conversion_status: raw.conversion_status as any,
+    
+    source: raw.source,
+    priority: raw.priority,
+    tags: raw.tags,
+    
+    createdAt: new Date(raw.createdAt),
+    updatedAt: new Date(raw.updatedAt),
+    deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : undefined,
   };
 };
 

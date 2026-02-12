@@ -5,7 +5,8 @@ import { useEffect } from 'react';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useAuth } from '@/contexts/AuthProvider';
-import { Conversation, Message, transformToConversation, transformToMessage } from '@/types/chat';
+import { Contact, Conversation, Message, transformToContact, transformToConversation, transformToMessage } from '@/types/chat';
+import { useContactStore } from '@/store/contactStore';
 
 
 const WebSocketEvents = () => {
@@ -24,6 +25,8 @@ const WebSocketEvents = () => {
     setTyping,
     clearTyping,
   } = useChatStore();
+
+    const {loadContacts,setContacts} = useContactStore()
   const { user } = useAuth();
 
   useEffect(() => {
@@ -32,9 +35,11 @@ const WebSocketEvents = () => {
       setSocket(socket);
 
       // Charge les conversations initiales une fois la connexion établie
-      loadConversations();
+      // loadConversations();
 
       // --- Définition des handlers ---
+      // loadContacts();
+
 
       const handleConversationAssigned = (data: { conversation: any }) => {
         console.log("================================bien recu==============================", data);
@@ -54,12 +59,12 @@ const WebSocketEvents = () => {
       };
 
       const handleChatEvent = (data: { type: string; payload: any }) => {
-        // console.log("message reçu de event:",data.type, data);
+        // console.log("message reçu de event:", data.type, data);
 
         switch (data.type) {
           case 'MESSAGE_ADD': {
 
-            console.log("messate+++===============");
+            // console.log("messate+++===============");
 
             const message: Message = transformToMessage(data.payload);
             const tempId = (data.payload as any).tempId;
@@ -120,7 +125,7 @@ const WebSocketEvents = () => {
           case 'CONVERSATION_REASSIGNED': {
 
             const conversation: Conversation = transformToConversation(data.payload);
-            
+
             updateConversation(conversation);
             break;
           }
@@ -131,6 +136,23 @@ const WebSocketEvents = () => {
             break;
           }
 
+          default:
+            console.warn('Unhandled chat event type:', data.type, data.payload);
+        }
+      };
+
+      const handleContactEvent = (data: { type: string; payload: any }) => {
+        // console.log("message reçu de event:", data.type, data);
+
+        switch (data.type) {
+          case 'CONTACT_LIST': {
+
+             const contact: Contact[] = data.payload.map(transformToContact);
+            console.log("ici le chargement de la liste des contact",contact);
+
+            setContacts(contact);
+            break;
+          }
           default:
             console.warn('Unhandled chat event type:', data.type, data.payload);
         }
@@ -178,13 +200,13 @@ const WebSocketEvents = () => {
         }
       };
 
-      const handleTypingStart = (data: { chat_id: string,commercial_id:string }) => {
-        console.log(`Typing started in chat date: ${data}`,data);
-          if (data.commercial_id === user.id) return; 
+      const handleTypingStart = (data: { chat_id: string, commercial_id: string }) => {
+        console.log(`Typing started in chat date: ${data}`, data);
+        if (data.commercial_id === user.id) return;
         setTyping(data.chat_id);
       };
 
-      const handleTypingStop = (data: { chat_id: string,commercial_id:string }) => {
+      const handleTypingStop = (data: { chat_id: string, commercial_id: string }) => {
         console.log(`Typing stopped in chat ${data}`);
         if (data.commercial_id === user.id) return;
         clearTyping(data.chat_id);
@@ -215,6 +237,7 @@ const WebSocketEvents = () => {
 
       // --- Enregistrement des listeners ---
       socket.on('chat:event', handleChatEvent);
+      socket.on('contact:event', handleContactEvent);
       socket.on('conversations:list', handleConversationsList);
       socket.on('messages:list', handleMessagesList);
       socket.on('message:new', handleNewMessage);
@@ -227,6 +250,9 @@ const WebSocketEvents = () => {
       socket.on('conversation:removed', handleConversationRemoved);
       socket.on('conversation:reassigned', handleConversationReassigned);
       socket.on('conversation:readonly', handleConversationReadonly);
+
+      socket.on('contact:get', handleConversationReassigned);
+      socket.on('contact:update', handleConversationReadonly);
       // --- Nettoyage ---
       return () => {
         socket.off('chat:event', handleChatEvent);
@@ -237,10 +263,12 @@ const WebSocketEvents = () => {
         socket.off('message:new', handleNewMessage);
         socket.off('conversation:updated', handleConversationUpdated);
         socket.off('error', handleError);
+        socket.off('contact:get', handleConversationReassigned);
+        socket.off('contact:update', handleConversationReadonly);
         setSocket(null);
       };
     }
-  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, addConversation, removeConversationBychat_id, updateMessageStatus, setTyping, clearTyping]);
+  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, addConversation, removeConversationBychat_id, updateMessageStatus, setTyping, clearTyping, loadContacts, setContacts]);
 
   return null; // Ce composant ne rend rien
 };

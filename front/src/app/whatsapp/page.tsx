@@ -10,31 +10,40 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useRouter } from 'next/navigation';
-import { Conversation } from '@/types/chat';
+import { CallStatus, Conversation, ViewMode } from '@/types/chat';
 import { useStatsStore } from '@/store/stats.store';
 import ChatMainArea from '@/components/chat/ChatMainArea';
+import { useContactStore } from '@/store/contactStore';
+import { ContactsListView } from '@/components/contact/contactListview';
 
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
+  const {contacts} = useContactStore()
   const {
     conversations,
     selectedConversation,
-    messages,
-    isLoading,
-    error,
     selectConversation,
-    sendMessage,
-    onTypingStart,
-    onTypingStop,
-    loadConversations,
- 
+
+    // messages,
+    // isLoading,
+    // error,
+    // sendMessage,
+    // onTypingStart,
+    // onTypingStop,
+    // loadConversations,
+
   } = useChatStore();
+  
   const { isConnected: isWebSocketConnected } = useSocket();
-const { stats } = useStatsStore();
+  const { stats } = useStatsStore();
 
   const [showStats, setShowStats] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+
+   const [viewMode, setViewMode] = useState<ViewMode>('conversations');
+    const [searchQuery, setSearchQuery] = useState('');
+
   // Protection de route
   useEffect(() => {
     if (initialized && !user) {
@@ -50,16 +59,43 @@ const { stats } = useStatsStore();
 
   // Envoyer un message
 
-    const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
+  
+  const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
   const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
-    const filteredConversations = conversations.filter(conv => {
+  const filteredConversations = conversations.filter(conv => {
     if (filterStatus === 'all') return true;
     if (filterStatus === 'unread') return conv.unreadCount > 0;
     if (filterStatus === 'nouveau') return conv.status === 'nouveau';
     if (filterStatus === 'urgent') return conv.priority === 'haute';
     return true;
   });
+
+  const filteredSercheConversation = conversations.filter((conv) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            conv.clientName.toLowerCase().includes(query) ||
+            conv.clientPhone.includes(query) ||
+            conv.lastMessage?.text.toLowerCase().includes(query)
+        );
+    });
+
+    // Filtrage des contacts basé sur la recherche
+    const filteredContacts = contacts.filter((contact) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            contact.name.toLowerCase().includes(query) ||
+            contact.contact.includes(query) ||
+            contact.call_notes?.toLowerCase().includes(query)
+        );
+    });
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
+        setSearchQuery(''); // Réinitialiser la recherche lors du changement de vue
+    };
 
   if (!initialized || !user) {
     return (
@@ -71,24 +107,37 @@ const { stats } = useStatsStore();
 
   return (
     <div className="flex h-screen bg-gray-100">
+
       <Sidebar
         commercial={user}
         conversations={filteredConversations}
         searchTerm=""
         selectedConversation={selectedConversation}
         isConnected={isWebSocketConnected}
-        onSearchChange={() => { }}
         onSelectConversation={handleSelectConversation}
-        
-        setFilterStatus={setFilterStatus}
-        stats={stats} 
-        filterStatus={filterStatus}
-         totalUnread={totalUnread}
-         setShowStats={setShowStats}
-         showStats={showStats}
-      />
 
-      <ChatMainArea/>
+        setFilterStatus={setFilterStatus}
+        stats={stats}
+        filterStatus={filterStatus}
+        totalUnread={totalUnread}
+        setShowStats={setShowStats}
+        showStats={showStats}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        contacts={contacts}
+
+      />
+      {
+        viewMode === 'conversations' ?<ChatMainArea />: <ContactsListView contacts={contacts}
+         onCallStatusChange={function (contactId: string, callStatus: CallStatus, notes?: string): void {
+          throw new Error('Function not implemented.');
+        } }        
+        />
+      }
+
+      
     </div>
   );
 };

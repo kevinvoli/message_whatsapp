@@ -65,21 +65,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="bg-white border-t border-gray-200 p-4">
+    <div className="bg-white border-t border-gray-200 p-3">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
-          <button className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full whitespace-nowrap">
-            👋 Salutation
-          </button>
-          <button className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full whitespace-nowrap">
-            💰 Prix
-          </button>
-          <button className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full whitespace-nowrap">
-            📅 Rendez-vous
-          </button>
-          <button className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full whitespace-nowrap">
-            ✅ Confirmation
-          </button>
         </div>
         <div className="flex items-end gap-3">
           <button className="p-3 text-gray-500 hover:text-green-600">
@@ -89,13 +77,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
             value={message}
             onChange={(e) => {
               setMessage(e.target.value);
-              handleTyping();
+              // handleTyping();
             }}
             onFocus={handleTyping}
             onKeyDown={handleKeyDown}
             placeholder="Tapez votre message..."
             className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-gray-500"
-            rows={2}
+            rows={1}
             disabled={disabled || !isConnected}
           />
           <button className="p-3 text-gray-500 hover:text-green-600">

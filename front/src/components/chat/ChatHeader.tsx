@@ -10,7 +10,7 @@ interface ChatHeaderProps {
 }
 
 export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderProps) {
-  console.log("la conv selecte ============================", currentConv);
+//   console.log("la conv selecte ============================", currentConv);
   
     return (
         <div className="bg-white border-b border-gray-200 p-4">
