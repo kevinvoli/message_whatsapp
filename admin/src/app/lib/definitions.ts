@@ -79,6 +79,7 @@ export type Poste = {
   name: string;
   code: string;
   is_active: boolean;
+  is_queue_enabled?: boolean;
   created_at?: string;
   updated_at?: string;
   createdAt?: string;

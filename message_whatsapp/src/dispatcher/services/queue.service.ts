@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
@@ -7,7 +7,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
-export class QueueService {
+export class QueueService implements OnModuleInit {
   private readonly logger = new Logger(QueueService.name);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   private readonly queueLock: Mutex = new Mutex();
@@ -24,11 +24,26 @@ export class QueueService {
     private readonly dataSource: DataSource,
   ) {}
 
-  /**
-   * Adds a commercial to the end of the queue.
-   * If the user is already in the queue, they are not added again.
-   */
-  async addPosteToQueue(posteId: string): Promise<QueuePosition | null> {
+  async onModuleInit(): Promise<void> {
+    await this.resetQueueState();
+  }
+
+  private logQueueEvent(
+    action: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.logger.log(
+      `QUEUE_EVENT ${JSON.stringify({
+        action,
+        at: new Date().toISOString(),
+        ...payload,
+      })}`,
+    );
+  }
+
+  private async addPosteToQueueInternal(
+    posteId: string,
+  ): Promise<QueuePosition | null> {
     const poste = await this.posteRepository.findOne({
       where: { id: posteId },
     });
@@ -37,14 +52,18 @@ export class QueueService {
       throw new NotFoundException('Poste introuvable');
     }
 
-    // 2️⃣ Vérifier que le poste existe vraiment en DB
+    if (!poste.is_queue_enabled) {
+      this.logQueueEvent('skip_add_blocked', {
+        poste_id: posteId,
+      });
+      return null;
+    }
+
     const existing = await this.queueRepository.findOne({
       where: { poste_id: posteId },
     });
 
     if (existing) return existing;
-
-    // 4️⃣ Calculer la prochaine position (globale)
 
     const maxPositionResult = await this.queueRepository
       .createQueryBuilder('qp')
@@ -53,60 +72,78 @@ export class QueueService {
 
     const position = (maxPositionResult?.max_position ?? 0) + 1;
 
-    // 5️⃣ Créer la position
     const qp = this.queueRepository.create({
       poste_id: posteId,
       poste,
       position,
     });
 
-    return await this.queueRepository.save(qp);
+    const saved = await this.queueRepository.save(qp);
+    this.logQueueEvent('add', {
+      poste_id: posteId,
+      position: saved.position,
+    });
+    return saved;
+  }
+
+  /**
+   * Adds a commercial to the end of the queue.
+   * If the user is already in the queue, they are not added again.
+   */
+  async addPosteToQueue(posteId: string): Promise<QueuePosition | null> {
+    return this.queueLock.runExclusive(async () =>
+      this.addPosteToQueueInternal(posteId),
+    );
   }
 
   /**
    * Removes a commercial from the queue and updates the positions of subsequent users.
    */
-  async removeFromQueue(posteId: string): Promise<void> {
+  private async removeFromQueueInternal(posteId: string): Promise<void> {
+    this.logger.debug(`waiting lock ${posteId}`);
 
-     this.logger.debug(`⏳ waiting lock ${posteId}`);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // return this.queueLock.runExclusive(async () => {
+    try {
+      const positionToRemove = await queryRunner.manager.findOne(
+        QueuePosition,
+        { where: { poste_id: posteId } },
+      );
 
-       this.logger.debug(`🔒 lock acquired ${posteId}`);
-
-      const queryRunner = this.dataSource.createQueryRunner();
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-
-      try {
-        const positionToRemove = await queryRunner.manager.findOne(
-          QueuePosition,
-          { where: { poste_id: posteId } },
-        );
-
-        if (!positionToRemove) {
-          await queryRunner.commitTransaction();
-          return;
-        }
-
-        const removedPosition = positionToRemove.position;
-        await queryRunner.manager.remove(positionToRemove);
-
-        await queryRunner.manager
-          .createQueryBuilder()
-          .update(QueuePosition)
-          .set({ position: () => 'position - 1' })
-          .where('position > :removedPosition', { removedPosition })
-          .execute();
-
+      if (!positionToRemove) {
         await queryRunner.commitTransaction();
-      } catch (err) {
-        await queryRunner.rollbackTransaction();
-        throw err;
-      } finally {
-        await queryRunner.release();
+        return;
       }
-    // });
+
+      const removedPosition = positionToRemove.position;
+      await queryRunner.manager.remove(positionToRemove);
+
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update(QueuePosition)
+        .set({ position: () => 'position - 1' })
+        .where('position > :removedPosition', { removedPosition })
+        .execute();
+
+      await queryRunner.commitTransaction();
+      this.logQueueEvent('remove', {
+        poste_id: posteId,
+        removed_position: removedPosition,
+      });
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async removeFromQueue(posteId: string): Promise<void> {
+    return this.queueLock.runExclusive(async () =>
+      this.removeFromQueueInternal(posteId),
+    );
   }
 
   /**
@@ -121,17 +158,16 @@ export class QueueService {
       });
 
       this.logger.warn(
-        `⏳ Resherche  d'agent disponible, message mis en att---- (${next?.id})`,
+        `Resherche d'agent disponible, message mis en attente (${next?.id})`,
       );
 
       if (!next || !next.poste) {
         return null;
       }
       this.logger.warn(
-        `✅ Poste disponible: ${next.poste.name} (${next.poste.id})`,
+        `Poste disponible: ${next.poste.name} (${next.poste.id})`,
       );
       await this.moveToEnd(next.poste_id);
-      // console.log("================debut de la rechercher du puiste suivant=================",next.poste);
 
       return next.poste;
     });
@@ -144,11 +180,17 @@ export class QueueService {
     });
   }
 
-  //  suprime et ajouter a la queue
-
   async moveToEnd(poste_id: string): Promise<void> {
-    await this.removeFromQueue(poste_id);
-    await this.addPosteToQueue(poste_id);
+    await this.queueLock.runExclusive(async () => {
+      await this.removeFromQueueInternal(poste_id);
+      const saved = await this.addPosteToQueueInternal(poste_id);
+      if (saved) {
+        this.logQueueEvent('move_to_end', {
+          poste_id: poste_id,
+          new_position: saved.position,
+        });
+      }
+    });
   }
 
   async checkAndInitQueue(): Promise<void> {
@@ -166,26 +208,72 @@ export class QueueService {
   }
 
   async syncQueueWithActivePostes(): Promise<void> {
-    const activePostes = await this.posteRepository.find({
-      where: { is_active: true },
+    await this.queueLock.runExclusive(async () => {
+      const activePostes = await this.posteRepository.find({
+        where: { is_active: true, is_queue_enabled: true },
+      });
+
+      const activeIds = activePostes.map((p) => p.id);
+      const queue = await this.queueRepository.find();
+
+      for (const qp of queue) {
+        if (!activeIds.includes(qp.poste_id)) {
+          await this.removeFromQueueInternal(qp.poste_id);
+        }
+      }
+
+      for (const poste of activePostes) {
+        const exists = queue.some((q) => q.poste_id === poste.id);
+        if (!exists) {
+          await this.addPosteToQueueInternal(poste.id);
+        }
+      }
+
+      this.logQueueEvent('sync', {
+        active_count: activePostes.length,
+        queue_count: queue.length,
+      });
     });
+  }
 
-    const activeIds = activePostes.map((p) => p.id);
-    const queue = await this.queueRepository.find();
+  async blockPoste(posteId: string): Promise<void> {
+    await this.queueLock.runExclusive(async () => {
+      await this.posteRepository.update(posteId, { is_queue_enabled: false });
+      await this.removeFromQueueInternal(posteId);
+      this.logQueueEvent('block', { poste_id: posteId });
+    });
+  }
 
-    // supprimer les postes inactifs
-    for (const qp of queue) {
-      if (!activeIds.includes(qp.poste_id)) {
-        await this.removeFromQueue(qp.poste_id);
+  async unblockPoste(posteId: string): Promise<void> {
+    await this.queueLock.runExclusive(async () => {
+      await this.posteRepository.update(posteId, { is_queue_enabled: true });
+      const poste = await this.posteRepository.findOne({
+        where: { id: posteId },
+      });
+      if (poste?.is_active) {
+        await this.addPosteToQueueInternal(posteId);
       }
-    }
+      this.logQueueEvent('unblock', { poste_id: posteId });
+    });
+  }
 
-    // ajouter les postes actifs absents
-    for (const poste of activePostes) {
-      const exists = queue.some((q) => q.poste_id === poste.id);
-      if (!exists) {
-        await this.addPosteToQueue(poste.id);
-      }
-    }
+  async resetQueueState(): Promise<void> {
+    await this.queueLock.runExclusive(async () => {
+      await this.queueRepository.clear();
+      await this.posteRepository
+        .createQueryBuilder()
+        .update(WhatsappPoste)
+        .set({ is_active: false })
+        .execute();
+      await this.commercialRepository
+        .createQueryBuilder()
+        .update(WhatsappCommercial)
+        .set({ isConnected: false })
+        .execute();
+
+      this.logger.warn('QUEUE_BOOTSTRAP reset completed');
+    });
   }
 }
+
+

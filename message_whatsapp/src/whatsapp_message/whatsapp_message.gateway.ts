@@ -96,11 +96,18 @@ export class WhatsappMessageGateway
 
     await this.commercialService.updateStatus(commercialId, true);
     await this.posteService.setActive(posteId, true);
-    await this.queueService.addPosteToQueue(posteId);
-    await this.queueService.syncQueueWithActivePostes();
+    const poste = await this.posteService.findOneById(posteId);
+    if (poste.is_queue_enabled) {
+      await this.queueService.addPosteToQueue(posteId);
+      await this.queueService.syncQueueWithActivePostes();
+    } else {
+      this.logger.warn(
+        `Queue disabled for poste ${posteId}, skip enqueue on connect`,
+      );
+    }
     this.jobRunner.startAgentSlaMonitor(posteId);
 
-    await this.emitQueueUpdate();
+    await this.emitQueueUpdate('agent_connected');
     await this.sendConversationsToClient(client);
     await this.sendContactsToClient(client);
   }
@@ -149,7 +156,7 @@ export class WhatsappMessageGateway
     await this.posteService.setActive(agent.posteId, false);
     await this.queueService.removeFromQueue(agent.posteId);
     this.jobRunner.stopAgentSlaMonitor(agent.posteId);
-    await this.emitQueueUpdate();
+    await this.emitQueueUpdate('agent_disconnected');
   }
 
   // ======================================================
@@ -551,9 +558,17 @@ export class WhatsappMessageGateway
   // ======================================================
   // QUEUE
   // ======================================================
-  private async emitQueueUpdate() {
+  public async emitQueueUpdatePublic(reason: string): Promise<void> {
+    await this.emitQueueUpdate(reason);
+  }
+
+  private async emitQueueUpdate(reason: string) {
     const queue = await this.queueService.getQueuePositions();
-    this.server.emit('queue:updated', queue);
+    this.server.emit('queue:updated', {
+      timestamp: new Date().toISOString(),
+      reason,
+      data: queue,
+    });
   }
 
   // ======================================================

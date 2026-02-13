@@ -275,3 +275,24 @@ export class PerformanceTemporelleDto {
   @IsNumber()
   nb_commerciaux_actifs?: number;
 }
+
+/**
+ * DTO pour les metriques de queue
+ */
+export class QueueMetricsDto {
+  @ApiProperty({ description: 'Nombre total de postes en queue' })
+  @IsNumber()
+  queue_size: number;
+
+  @ApiProperty({ description: 'Age moyen en queue (secondes)' })
+  @IsNumber()
+  average_age_seconds: number;
+
+  @ApiProperty({ description: 'Age max en queue (secondes)' })
+  @IsNumber()
+  max_age_seconds: number;
+
+  @ApiProperty({ description: 'Churn 24h (positions mises a jour)' })
+  @IsNumber()
+  churn_24h: number;
+}

@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle } from './definitions'; // Added WhatsappChat, WhatsappMessage
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition } from './definitions'; // Added WhatsappChat, WhatsappMessage
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -225,6 +225,38 @@ export async function getChats(): Promise<WhatsappChat[]> {
       status?: string;
     }>>(response);
     return chats.map(normalizeWhatsappChat);
+}
+
+export async function getQueue(): Promise<QueuePosition[]> {
+    const response = await fetch(`${API_BASE_URL}/queue`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<QueuePosition[]>(response);
+}
+
+export async function resetQueue(): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/queue/reset`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<{ success: boolean }>(response);
+}
+
+export async function blockPosteFromQueue(posteId: string): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/queue/block/${posteId}`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<{ success: boolean }>(response);
+}
+
+export async function unblockPosteFromQueue(posteId: string): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE_URL}/queue/unblock/${posteId}`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<{ success: boolean }>(response);
 }
 
 export async function getMessagesForChat(chat_id: string): Promise<WhatsappMessage[]> {

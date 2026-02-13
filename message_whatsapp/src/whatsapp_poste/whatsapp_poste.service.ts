@@ -22,6 +22,7 @@ export class WhatsappPosteService {
     const poste = this.posteRepository.create({
       ...createWhatsappPosteDto,
       is_active: createWhatsappPosteDto?.is_active ?? true,
+      is_queue_enabled: createWhatsappPosteDto?.is_queue_enabled ?? true,
     });
 
     return await this.posteRepository.save(poste);
@@ -109,4 +110,13 @@ export class WhatsappPosteService {
   poste.is_active = isActive;
   return await this.posteRepository.save(poste);
 }
+
+  async setQueueEnabled(
+    posteId: string,
+    isQueueEnabled: boolean,
+  ): Promise<WhatsappPoste> {
+    const poste = await this.findOneById(posteId);
+    poste.is_queue_enabled = isQueueEnabled;
+    return await this.posteRepository.save(poste);
+  }
 }

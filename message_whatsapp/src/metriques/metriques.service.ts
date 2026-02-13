@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
+import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -10,10 +11,13 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { ChargePosteDto, MetriquesGlobalesDto, PerformanceCommercialDto, StatutChannelDto } from './dto/create-metrique.dto';
 import { PendingMessageStatus } from './utils';
+import { QueueMetricsDto } from './dto/create-metrique.dto';
 
 // Importer vos entités existantes
 @Injectable()
 export class MetriquesService {
+  private readonly logger = new Logger(MetriquesService.name);
+  private readonly queueWarningThreshold = 20;
   constructor(
     @InjectRepository(WhatsappMessage)
     private messageRepository: Repository<WhatsappMessage>,
@@ -35,6 +39,9 @@ export class MetriquesService {
     
     @InjectRepository(PendingMessage)
     private pendingMessageRepository: Repository<PendingMessage>,
+
+    @InjectRepository(QueuePosition)
+    private queueRepository: Repository<QueuePosition>,
   ) {}
 
   /**
@@ -473,5 +480,46 @@ export class MetriquesService {
       messages_out: parseInt(p.messages_out),
       nb_conversations: parseInt(p.nb_conversations),
     }));
+  }
+
+  /**
+   * Metriques Queue
+   */
+  async getQueueMetrics(): Promise<QueueMetricsDto> {
+    const queue = await this.queueRepository.find();
+    const now = Date.now();
+
+    const ages = queue
+      .map((qp) => qp.addedAt?.getTime())
+      .filter((value): value is number => typeof value === 'number')
+      .map((value) => Math.max(0, Math.floor((now - value) / 1000)));
+
+    const queueSize = queue.length;
+    const averageAgeSeconds =
+      ages.length > 0
+        ? Math.floor(ages.reduce((sum, age) => sum + age, 0) / ages.length)
+        : 0;
+    const maxAgeSeconds = ages.length > 0 ? Math.max(...ages) : 0;
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const churn24h = await this.queueRepository.count({
+      where: { updatedAt: MoreThanOrEqual(since) },
+    });
+
+    if (queueSize === 0) {
+      this.logger.warn('QUEUE_ALERT empty_queue');
+    }
+    if (queueSize >= this.queueWarningThreshold) {
+      this.logger.warn('QUEUE_ALERT high_backlog', {
+        queue_size: queueSize,
+      });
+    }
+
+    return {
+      queue_size: queueSize,
+      average_age_seconds: averageAgeSeconds,
+      max_age_seconds: maxAgeSeconds,
+      churn_24h: churn24h,
+    };
   }
 }

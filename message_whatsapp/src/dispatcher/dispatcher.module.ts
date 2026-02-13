@@ -19,6 +19,7 @@ import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { LoggingModule } from 'src/logging/logging.module';
+import { DispatcherController } from './dispatcher.controller';
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
   ],
-  controllers: [],
+  controllers: [DispatcherController],
   providers: [
     DispatcherService,
     QueueService,

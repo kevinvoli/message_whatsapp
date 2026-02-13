@@ -20,4 +20,8 @@ export class CreateWhatsappPosteDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  is_queue_enabled?: boolean;
 }

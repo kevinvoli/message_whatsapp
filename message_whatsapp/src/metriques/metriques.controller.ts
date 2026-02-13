@@ -7,6 +7,7 @@ import {
   PerformanceTemporelleDto,
   StatutChannelDto,
 } from './dto/create-metrique.dto';
+import { QueueMetricsDto } from './dto/create-metrique.dto';
 import { MetriquesService } from './metriques.service';
 
 @ApiTags('Metriques')
@@ -59,6 +60,17 @@ export class MetriquesController {
     @Query('jours') jours: number = 7,
   ): Promise<PerformanceTemporelleDto[]> {
     return this.metriquesService.getPerformanceTemporelle(jours);
+  }
+
+  @Get('queue')
+  @ApiOperation({ summary: 'Recupere les metriques de queue' })
+  @ApiResponse({
+    status: 200,
+    description: 'Metriques queue recuperees avec succes',
+    type: QueueMetricsDto,
+  })
+  async getQueueMetrics(): Promise<QueueMetricsDto> {
+    return this.metriquesService.getQueueMetrics();
   }
 
   @Get('overview')

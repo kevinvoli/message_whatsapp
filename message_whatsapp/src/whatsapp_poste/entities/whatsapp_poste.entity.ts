@@ -30,6 +30,9 @@ export class WhatsappPoste {
   @Column({ default: true })
   is_active: boolean;
 
+  @Column({ default: true })
+  is_queue_enabled: boolean;
+
   @Column({
     name: 'name',
     type: 'varchar',
