@@ -177,7 +177,6 @@ export default function ChannelsView({
         onClose={closeAddModal}
         onSubmit={handleAdd}
         loading={loading}
-        error={error}
         submitLabel="Ajouter"
         loadingLabel="Adding..."
       >
@@ -202,7 +201,6 @@ export default function ChannelsView({
         onClose={closeEditModal}
         onSubmit={handleUpdate}
         loading={loading}
-        error={error}
         submitLabel="Sauvegarder"
         loadingLabel="Saving..."
       >
@@ -235,4 +233,5 @@ export default function ChannelsView({
     </div>
   );
 }
+
 

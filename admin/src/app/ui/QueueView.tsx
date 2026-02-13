@@ -116,10 +116,12 @@ const QueueView = () => {
 
     socket.on("reconnect_attempt", () => {
       setStatus("reconnecting");
+      addToast({ type: "info", message: "Reconnexion au websocket..." });
     });
 
     socket.on("reconnect", () => {
       setStatus("connected");
+      addToast({ type: "success", message: "Websocket reconnecte." });
     });
 
     socket.on("connect_error", (err: Error) => {

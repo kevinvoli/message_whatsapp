@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target } from 'lucide-react';
 import { PerformanceCommercial } from '@/app/lib/definitions';
 import { updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
+import { useToast } from '@/app/ui/ToastProvider';
 
 interface CommerciauxViewProps {
   commerciaux: PerformanceCommercial[];
@@ -15,13 +16,13 @@ export default function CommerciauxView({
 }: CommerciauxViewProps) {
 
   const [loading, setLoading] = useState(false);
-  const [operationError, setOperationError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [formIsActive, setFormIsActive] = useState(true);
   const [formName, setFormName] = useState('');
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const { addToast } = useToast();
 
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
 
@@ -30,7 +31,7 @@ export default function CommerciauxView({
     return isConnected ? 'bg-green-500' : 'bg-gray-400';
   };
 
-  // Fonction pour obtenir le badge de performance basé sur le taux de réponse
+  // Fonction pour obtenir le badge de performance basÃ© sur le taux de rÃ©ponse
   const getPerformanceBadge = (tauxReponse: number) => {
     if (tauxReponse >= 80) return 'bg-green-100 text-green-800';
     if (tauxReponse >= 60) return 'bg-yellow-100 text-yellow-800';
@@ -67,16 +68,19 @@ export default function CommerciauxView({
   };
 
   const handleDeleteCommercial = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce commercial ?')) {
+    if (!window.confirm('ÃŠtes-vous sÃ»r de vouloir supprimer ce commercial ?')) {
       return;
     }
     setLoading(true);
-    setOperationError(null);
     try {
       // await deleteCommercial(id);
       onCommercialUpdate();
+      addToast({ type: 'success', message: 'Commercial supprime.' });
     } catch (err) {
-      setOperationError(err instanceof Error ? err.message : "Échec de la suppression du commercial.");
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : "Ã‰chec de la suppression du commercial.",
+      });
     } finally {
       setLoading(false);
     }
@@ -85,11 +89,10 @@ export default function CommerciauxView({
   const handleUpdateCommercial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentCommercial) {
-      setOperationError("L'ID du commercial est manquant.");
+      addToast({ type: 'error', message: "L'ID du commercial est manquant." });
       return;
     }
     setLoading(true);
-    setOperationError(null);
     try {
       await updateCommercial(currentCommercial.id.toString(), {
         name: formName, 
@@ -97,8 +100,12 @@ export default function CommerciauxView({
       });
       onCommercialUpdate();
       handleCloseEditModal();
+      addToast({ type: 'success', message: 'Commercial mis a jour.' });
     } catch (err) {
-      setOperationError(err instanceof Error ? err.message : "Échec de la mise à jour du commercial.");
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : "Ã‰chec de la mise Ã  jour du commercial.",
+      });
     } finally {
       setLoading(false);
     }
@@ -191,7 +198,7 @@ export default function CommerciauxView({
               <TrendingUp className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Taux réponse</p>
+              <p className="text-sm text-gray-600">Taux rÃ©ponse</p>
               <p className="text-2xl font-bold text-gray-900">{statsGlobales.tauxReponseGlobal}%</p>
             </div>
           </div>
@@ -232,9 +239,9 @@ export default function CommerciauxView({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chats actifs</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Messages</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux réponse</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux rÃ©ponse</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temps moy.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DerniÃ¨re co.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -242,7 +249,7 @@ export default function CommerciauxView({
               {commerciauxFiltres.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
-                    {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
+                    {searchTerm ? 'Aucun commercial trouvÃ©' : 'Aucun commercial disponible'}
                   </td>
                 </tr>
               ) : (
@@ -295,12 +302,12 @@ export default function CommerciauxView({
                           {commercial.nbMessagesEnvoyes + commercial.nbMessagesRecus}
                         </p>
                         <p className="text-xs text-gray-500">
-                          ↑{commercial.nbMessagesEnvoyes} ↓{commercial.nbMessagesRecus}
+                          â†‘{commercial.nbMessagesEnvoyes} â†“{commercial.nbMessagesRecus}
                         </p>
                       </div>
                     </td>
 
-                    {/* Taux de réponse */}
+                    {/* Taux de rÃ©ponse */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -324,7 +331,7 @@ export default function CommerciauxView({
                       </div>
                     </td>
 
-                    {/* Dernière connexion */}
+                    {/* DerniÃ¨re connexion */}
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600">
                         {formatDate(commercial.lastConnectionAt)}
@@ -336,7 +343,7 @@ export default function CommerciauxView({
                       <div className="flex items-center gap-2">
                         <button 
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Voir les détails"
+                          title="Voir les dÃ©tails"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -358,7 +365,7 @@ export default function CommerciauxView({
         </div>
       </div>
 
-      {/* Modal d'édition - À compléter selon vos besoins */}
+      {/* Modal d'Ã©dition - Ã€ complÃ©ter selon vos besoins */}
       {showEditModal && currentCommercial && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -378,12 +385,6 @@ export default function CommerciauxView({
                   required
                 />
               </div>
-              
-              {operationError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-                  {operationError}
-                </div>
-              )}
 
               <div className="flex justify-end gap-2">
                 <button
@@ -409,3 +410,5 @@ export default function CommerciauxView({
     </div>
   );
 }
+
+

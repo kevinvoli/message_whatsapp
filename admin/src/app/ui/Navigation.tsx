@@ -3,6 +3,7 @@ import { NavigationItem, ViewMode, WhatsappMessage } from '@/app/lib/definitions
 import { useRouter } from 'next/navigation';
 import { logoutAdmin } from '@/app/lib/api'; // Import logoutAdmin
 import { logger } from '@/app/lib/logger';
+import { useToast } from '@/app/ui/ToastProvider';
 
 interface NavigationProps {
     sidebarOpen: boolean;
@@ -15,6 +16,7 @@ interface NavigationProps {
 
 export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationItems, message }: NavigationProps) {
     const router = useRouter();
+    const { addToast } = useToast();
 
     const handleLogout = async () => {
         try {
@@ -22,6 +24,10 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
         } catch (error) {
             logger.error("Logout failed on backend", {
                 error: error instanceof Error ? error.message : String(error),
+            });
+            addToast({
+                type: 'error',
+                message: "La deconnexion a echoue. Merci de reessayer.",
             });
             // Frontend doesn't store token, so no localStorage to clear for token itself.
             // If there were other local storage items related to auth state, they'd be cleared here.

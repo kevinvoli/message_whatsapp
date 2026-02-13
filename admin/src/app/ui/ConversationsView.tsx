@@ -21,6 +21,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     const [loadingChats, setLoadingChats] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const { addToast } = useToast();
+    const loadingToastRef = useRef(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +63,10 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     const fetchMessages = async (chatId: string) => {
         // Removed: if (!token) { setError("Authentication token is missing."); return; }
         setLoadingMessages(true);
+        if (!loadingToastRef.current) {
+            addToast({ type: 'info', message: 'Chargement des messages...' });
+            loadingToastRef.current = true;
+        }
         try {
             const fetchedMessages = await getMessagesForChat(chatId); // Removed token parameter
             setMessages(fetchedMessages);
@@ -72,6 +77,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
             });
         } finally {
             setLoadingMessages(false);
+            loadingToastRef.current = false;
         }
     };
 
