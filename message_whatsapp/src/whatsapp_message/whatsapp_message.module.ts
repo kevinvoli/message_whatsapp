@@ -3,6 +3,8 @@ import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -26,6 +28,14 @@ import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
   imports: [
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+      }),
+      inject: [ConfigService],
+    }),
     TypeOrmModule.forFeature([
       WhatsappMessage,
       WhatsappChat,

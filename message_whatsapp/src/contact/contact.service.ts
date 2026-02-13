@@ -5,6 +5,7 @@ import { UpdateContactCallDto } from './dto/update-contact-call.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact } from './entities/contact.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
 export class ContactService{
@@ -55,6 +56,19 @@ export class ContactService{
     } });
 
     return contact
+  }
+
+  async findAllByPosteId(posteId: string) {
+    return this.repo
+      .createQueryBuilder('contact')
+      .innerJoin(
+        WhatsappChat,
+        'chat',
+        'chat.chat_id = contact.chat_id AND chat.poste_id = :posteId',
+        { posteId },
+      )
+      .orderBy('contact.createdAt', 'DESC')
+      .getMany();
   }
 
   async findOne(id: string) {

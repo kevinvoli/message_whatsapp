@@ -68,6 +68,16 @@ const initialState: Omit<
 };
 let typingTimeout: NodeJS.Timeout;
 
+const dedupeMessagesById = (messages: Message[]): Message[] => {
+  const map = new Map<string, Message>();
+  for (const message of messages) {
+    map.set(message.id, message);
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+  );
+};
+
 export const useChatStore = create<ChatState>((set, get) => ({
   ...initialState,
 
@@ -174,7 +184,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setMessages: (chat_id, messages) => {
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
-      return { messages, isLoading: false };
+      return { messages: dedupeMessagesById(messages), isLoading: false };
     });
   },
 
@@ -185,10 +195,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     set((state) => {
+      const alreadyExists = state.messages.some((m) => m.id === message.id);
       const isActive = state.selectedConversation?.chat_id === message.chat_id;
 
       return {
-        messages: isActive ? [...state.messages, message] : state.messages,
+        messages:
+          isActive && !alreadyExists
+            ? dedupeMessagesById([...state.messages, message])
+            : state.messages,
         conversations: state.conversations.map((c) =>
           c.chat_id === message.chat_id
             ? {
@@ -206,7 +220,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const isSelected =
         state.selectedConversation?.chat_id === updatedConversation.chat_id;
-      const isOutgoing = updatedConversation.lastMessage?.from_me === true;
       logger.debug("Conversation update received", {
         chat_id: updatedConversation.chat_id,
       });
@@ -218,14 +231,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // 🔥 Mise à jour du compteur unread
       const conversationWithUnread: Conversation = {
         ...updatedConversation,
-        unreadCount:
-          isSelected || isOutgoing
-            ? 0
-            : conversationExists
-              ? (state.conversations.find(
-                  (c) => c.chat_id === updatedConversation.chat_id,
-                )?.unreadCount ?? 0) + 1
-              : (updatedConversation.unreadCount ?? 1),
+        unreadCount: isSelected ? 0 : (updatedConversation.unreadCount ?? 0),
       };
 
       // 🔁 Liste des conversations
@@ -258,7 +264,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const localOnly = state.messages.filter(
             (m) => !newIds.has(m.id) && m.status === "sending",
           );
-          newState.messages = [...updatedConversation.messages, ...localOnly];
+          newState.messages = dedupeMessagesById([
+            ...updatedConversation.messages,
+            ...localOnly,
+          ]);
         } else if (
           // Fallback : si pas de messages[] mais un lastMessage, on l'ajoute
           updatedConversation.lastMessage &&
@@ -266,10 +275,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             (m) => m.id === updatedConversation.lastMessage?.id,
           )
         ) {
-          newState.messages = [
+          newState.messages = dedupeMessagesById([
             ...state.messages,
             updatedConversation.lastMessage,
-          ];
+          ]);
         }
       }
 

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   Logger,
   Inject,
@@ -7,6 +7,7 @@ import {
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import {
   ExtractedMedia,
   WhapiMessage,
@@ -81,26 +82,35 @@ export class WhapiService {
 
     const message = payload.messages[0];
     message.channel_id = payload.channel_id;
+    const traceId = this.buildMessageTraceId(message.id, message.chat_id);
+    this.logger.log(`INCOMING_RECEIVED trace=${traceId} type=${message.type}`);
 
-    // 🔒 ignore self messages
+    // ðŸ”’ ignore self messages
     if (message.from_me) return;
 
-    const chatPhone = message.chat_id.split('@')[0];
-    if (chatPhone.length >= 14) return;
+    const chatValidation = this.validateIncomingChatId(message.chat_id);
+    if (!chatValidation.valid) {
+      this.logger.warn(
+        `INCOMING_IGNORED trace=${traceId} reason=${chatValidation.reason} chat_id=${message.chat_id ?? 'unknown'}`,
+      );
+      return;
+    }
 
     try {
-      // 1️⃣ Dispatcher → attribution conversation
+      // 1ï¸âƒ£ Dispatcher â†’ attribution conversation
       const conversation = await this.dispatcherService.assignConversation(
         message.chat_id,
         message.from_name ?? 'Client',
       );
 
       if (!conversation) {
-        this.logger.warn(`⏳ Aucun agent disponible (${message.chat_id})`);
+        this.logger.warn(
+          `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chat_id}`,
+        );
         return;
       }
 
-      // 2️⃣ Sauvegarde message
+      // 2ï¸âƒ£ Sauvegarde message
       const savedMessage =
         await this.whatsappMessageService.saveIncomingFromWhapi(
           message,
@@ -108,13 +118,16 @@ export class WhapiService {
         );
 
       if (!savedMessage) {
-        throw new NotFoundException('Message non enregistré');
+        throw new NotFoundException('Message non enregistrÃ©');
       }
+      this.logger.log(
+        `INCOMING_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
+      );
 
       // await this.autoMessageOrchestratorServcie.handleClientMessage(
       //   conversation,
       // );
-      // 3️⃣ Sauvegarde médias
+      // 3ï¸âƒ£ Sauvegarde mÃ©dias
       const medias = this.extractMedia(message);
       for (const media of medias) {
         await this.saveMedia(media, savedMessage, conversation);
@@ -128,8 +141,11 @@ export class WhapiService {
     // console.log("la conversation",conversation);
 
 
-      // 4️⃣ NOTIFIER LE GATEWAY (POINT UNIQUE)
+      // 4ï¸âƒ£ NOTIFIER LE GATEWAY (POINT UNIQUE)
       await this.messageGateway.notifyNewMessage(fullMessage, conversation);
+      this.logger.log(
+        `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
+      );
     } catch (err) {
       throw new HttpException(
         {
@@ -241,7 +257,7 @@ export class WhapiService {
       case 'image':
         return message.image?.caption ?? '[Image]';
       case 'video':
-        return message.video?.caption ?? '[Vidéo]';
+        return message.video?.caption ?? '[VidÃ©o]';
       case 'audio':
       case 'voice':
         return '[Audio]';
@@ -260,8 +276,38 @@ export class WhapiService {
 
     for (const status of payload.statuses) {
       await this.whatsappMessageService.updateByStatus(status);
-      this.logger.log(`📌 Status | ${status.id} → ${status.status}`);
+      this.logger.log(`ðŸ“Œ Status | ${status.id} â†’ ${status.status}`);
     }
+  }
+
+  private validateIncomingChatId(
+    chatId: string | null | undefined,
+  ): { valid: boolean; reason?: string } {
+    if (!chatId || typeof chatId !== 'string') {
+      return { valid: false, reason: 'missing_chat_id' };
+    }
+
+    const trimmedChatId = chatId.trim();
+    if (!trimmedChatId.includes('@')) {
+      return { valid: false, reason: 'invalid_chat_id_format' };
+    }
+
+    // g.us = group chat, currently unsupported in assignment flow.
+    if (trimmedChatId.endsWith('@g.us')) {
+      return { valid: false, reason: 'group_chat_not_supported' };
+    }
+
+    const phoneCandidate = trimmedChatId.split('@')[0] ?? '';
+    const normalizedPhone = phoneCandidate.replace(/[^\d]/g, '');
+    if (!normalizedPhone) {
+      return { valid: false, reason: 'missing_phone_in_chat_id' };
+    }
+
+    if (normalizedPhone.length < 8 || normalizedPhone.length > 20) {
+      return { valid: false, reason: 'phone_length_out_of_range' };
+    }
+
+    return { valid: true };
   }
 
   private buildIdempotencyKeys(
@@ -292,7 +338,7 @@ export class WhapiService {
       return keys;
     }
 
-    return [`${base}:hash:${JSON.stringify(payload)}`];
+    return [`${base}:hash:${this.hashPayload(payload)}`];
   }
 
   private async tryRegisterEventKey(
@@ -313,11 +359,36 @@ export class WhapiService {
       if (
         error instanceof QueryFailedError &&
         typeof (error as any).driverError?.code === 'string' &&
-        (error as any).driverError.code === 'ER_DUP_ENTRY'
+        ['ER_DUP_ENTRY', '23505', 'SQLITE_CONSTRAINT'].includes(
+          (error as any).driverError.code,
+        )
       ) {
         return false;
+      }
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).driverError?.code === 'ER_NO_SUCH_TABLE'
+      ) {
+        this.logger.warn(
+          'Webhook idempotency table missing, continuing without dedupe',
+        );
+        return true;
       }
       throw error;
     }
   }
+
+  private buildMessageTraceId(
+    messageId?: string | null,
+    chatId?: string,
+  ): string {
+    return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+
+  private hashPayload(payload: WhapiWebhookPayload): string {
+    return createHash('sha256')
+      .update(JSON.stringify(payload))
+      .digest('hex');
+  }
 }
+

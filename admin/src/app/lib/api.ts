@@ -215,7 +215,16 @@ export async function getChats(): Promise<WhatsappChat[]> {
         method: 'GET',
         credentials: 'include',
     });
-    return handleResponse<WhatsappChat[]>(response);
+    const chats = await handleResponse<Array<Partial<WhatsappChat> & {
+      unreadCount?: number;
+      unread_count?: number;
+      channel_id?: string;
+      last_msg_client_channel_id?: string;
+      client_phone?: string;
+      contact_client?: string;
+      status?: string;
+    }>>(response);
+    return chats.map(normalizeWhatsappChat);
 }
 
 export async function getMessagesForChat(chat_id: string): Promise<WhatsappMessage[]> {
@@ -224,6 +233,54 @@ export async function getMessagesForChat(chat_id: string): Promise<WhatsappMessa
         credentials: 'include',
     });
     return handleResponse<WhatsappMessage[]>(response);
+}
+
+function normalizeWhatsappChat(
+  chat: Partial<WhatsappChat> & {
+    unreadCount?: number;
+    unread_count?: number;
+    channel_id?: string;
+    last_msg_client_channel_id?: string;
+    client_phone?: string;
+    contact_client?: string;
+    status?: string;
+  },
+): WhatsappChat {
+  const unread = chat.unread_count ?? chat.unreadCount ?? 0;
+  const status =
+    chat.status === 'en attente'
+      ? 'attente'
+      : (chat.status as WhatsappChat['status']) ?? 'attente';
+
+  return {
+    id: chat.id ?? '',
+    chat_id: chat.chat_id ?? '',
+    channel_id: chat.channel_id ?? chat.last_msg_client_channel_id,
+    last_msg_client_channel_id: chat.last_msg_client_channel_id ?? chat.channel_id,
+    poste_id: chat.poste_id ?? chat.poste?.id,
+    name: chat.name ?? 'Client inconnu',
+    type: chat.type ?? 'private',
+    chat_pic: chat.chat_pic ?? '',
+    chat_pic_full: chat.chat_pic_full ?? '',
+    is_pinned: chat.is_pinned ?? false,
+    is_muted: chat.is_muted ?? false,
+    mute_until: chat.mute_until ?? null,
+    is_archived: chat.is_archived ?? false,
+    unread_count: unread,
+    unreadCount: unread,
+    status,
+    unread_mention: chat.unread_mention ?? false,
+    read_only: chat.read_only ?? false,
+    not_spam: chat.not_spam ?? true,
+    contact_client: chat.contact_client ?? chat.client_phone ?? '',
+    client_phone: chat.client_phone ?? chat.contact_client,
+    last_activity_at: chat.last_activity_at ?? '',
+    createdAt: chat.createdAt ?? new Date(0).toISOString(),
+    updatedAt: chat.updatedAt ?? new Date(0).toISOString(),
+    poste: chat.poste as WhatsappChat['poste'],
+    messages: (chat.messages ?? []) as WhatsappChat['messages'],
+    last_message: (chat as any).last_message ?? null,
+  };
 }
 
 export async function sendMessage(chat_id: string, text: string, poste_id: string, channel_id: string): Promise<WhatsappMessage> {

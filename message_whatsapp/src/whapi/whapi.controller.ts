@@ -116,10 +116,22 @@ export class WhapiController {
   private assertWhapiSecret(
     headers: Record<string, string | string[] | undefined>,
   ): void {
-    const expectedSecret = process.env.WEBHOOK_WHAPI_SECRET;
-    if (!expectedSecret) {
+    const configuredHeader =
+      process.env.WHAPI_WEBHOOK_SECRET_HEADER?.trim().toLowerCase();
+    const configuredValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE?.trim();
+    const legacySecret = process.env.WEBHOOK_WHAPI_SECRET?.trim();
+
+    // New mode: explicit configurable header + value (preferred).
+    if (configuredHeader && configuredValue) {
+      const provided = this.headerValue(headers[configuredHeader])?.trim();
+      if (!provided || provided !== configuredValue) {
+        throw new ForbiddenException('Invalid webhook secret header');
+      }
       return;
     }
+
+    // Legacy compatibility mode.
+    if (!legacySecret) return;
 
     const secretHeader = this.headerValue(headers['x-whapi-secret']);
     const fallbackHeader = this.headerValue(headers['x-webhook-secret']);
@@ -129,7 +141,7 @@ export class WhapiController {
       : null;
 
     const provided = secretHeader || fallbackHeader || bearerSecret;
-    if (!provided || provided !== expectedSecret) {
+    if (!provided || provided !== legacySecret) {
       throw new ForbiddenException('Invalid webhook secret');
     }
   }

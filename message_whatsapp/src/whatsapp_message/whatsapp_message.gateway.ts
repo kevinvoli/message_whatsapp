@@ -11,6 +11,7 @@ import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -25,6 +26,13 @@ import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
+import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
+
+type AuthPayload = {
+  sub: string;
+  email?: string;
+  posteId?: string;
+};
 
 const wsPort =
   process.env.NODE_ENV === 'test'
@@ -59,7 +67,8 @@ export class WhatsappMessageGateway
     private readonly autoMessageService: MessageAutoService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
-    private readonly contactService: ContactService
+    private readonly contactService: ContactService,
+    private readonly jwtService: JwtService,
     
   ) {}
 
@@ -67,8 +76,11 @@ export class WhatsappMessageGateway
   // CONNECTION / DISCONNECTION
   // ======================================================
   async handleConnection(client: Socket) {
-    const commercialId = client.handshake.auth?.commercialId;
-    if (!commercialId) return;
+    const commercialId = await this.resolveCommercialId(client);
+    if (!commercialId) {
+      client.disconnect();
+      return;
+    }
 
     const commercial =
       await this.commercialService.findOneWithPoste(commercialId);
@@ -90,6 +102,41 @@ export class WhatsappMessageGateway
     await this.emitQueueUpdate();
     await this.sendConversationsToClient(client);
     await this.sendContactsToClient(client);
+  }
+
+  private async resolveCommercialId(client: Socket): Promise<string | null> {
+    const token = this.extractAuthToken(client);
+    if (!token) {
+      this.logger.warn(`Socket auth refused: missing token (${client.id})`);
+      return null;
+    }
+
+    try {
+      const payload = await this.jwtService.verifyAsync<AuthPayload>(token);
+      return payload.sub ?? null;
+    } catch (error) {
+      this.logger.warn(`Socket auth refused: invalid token (${client.id})`);
+      return null;
+    }
+  }
+
+  private extractAuthToken(client: Socket): string | null {
+    const authToken = client.handshake.auth?.token;
+    if (typeof authToken === 'string' && authToken.trim().length > 0) {
+      return authToken;
+    }
+
+    const cookieHeader = client.handshake.headers.cookie;
+    if (!cookieHeader) return null;
+
+    const authCookie = cookieHeader
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('Authentication='));
+
+    if (!authCookie) return null;
+    const token = authCookie.slice('Authentication='.length);
+    return token ? decodeURIComponent(token) : null;
   }
 
   async handleDisconnect(client: Socket) {
@@ -143,11 +190,11 @@ export class WhatsappMessageGateway
     });
   }
 
-    private async sendContactsToClient(client: Socket) {
+  private async sendContactsToClient(client: Socket) {
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    const contacts = await this.contactService.findAll();
+    const contacts = await this.contactService.findAllByPosteId(agent.posteId);
     // console.log("la liste des contact ", contacts);
     
 
@@ -254,15 +301,59 @@ export class WhatsappMessageGateway
 
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;
+    const resolvedChannelId = await this.resolveChannelIdForChat(chat);
+    if (!resolvedChannelId) {
+      this.logger.warn(
+        `Message send refused: channel not resolved for chat ${chat.chat_id}`,
+      );
+      client.emit('chat:event', {
+        type: 'MESSAGE_SEND_ERROR',
+        payload: {
+          chat_id: payload.chat_id,
+          tempId: payload.tempId,
+          code: 'CHANNEL_NOT_FOUND',
+          message: 'Impossible de determiner le channel de la conversation',
+        },
+      });
+      return;
+    }
 
-    const message = await this.messageService.createAgentMessage({
-      chat_id: payload.chat_id,
-      poste_id: agent.posteId,
-      text: payload.text,
-      channel_id: chat.last_msg_client_channel_id!,
-      timestamp: new Date(),
-      commercial_id: agent.commercialId
-    });
+    let message: WhatsappMessage;
+    try {
+      message = await this.messageService.createAgentMessage({
+        chat_id: payload.chat_id,
+        poste_id: agent.posteId,
+        text: payload.text,
+        channel_id: resolvedChannelId,
+        timestamp: new Date(),
+        commercial_id: agent.commercialId
+      });
+      this.logger.log(
+        `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,
+      );
+    } catch (error) {
+      const outboundCode =
+        error instanceof WhapiOutboundError
+          ? error.kind === 'transient'
+            ? 'WHAPI_TRANSIENT_ERROR'
+            : 'WHAPI_PERMANENT_ERROR'
+          : 'MESSAGE_SEND_FAILED';
+      const outboundMessage =
+        error instanceof Error ? error.message : 'Echec envoi message';
+      this.logger.warn(
+        `Message send failed for chat ${payload.chat_id}: ${outboundCode}`,
+      );
+      client.emit('chat:event', {
+        type: 'MESSAGE_SEND_ERROR',
+        payload: {
+          chat_id: payload.chat_id,
+          tempId: payload.tempId,
+          code: outboundCode,
+          message: outboundMessage,
+        },
+      });
+      return;
+    }
 
     this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
       type: 'MESSAGE_ADD',
@@ -298,6 +389,9 @@ export class WhatsappMessageGateway
       type: 'MESSAGE_ADD',
       payload: this.mapMessage(message),
     });
+    this.logger.log(
+      `INCOMING_SOCKET_EMIT trace=${message.message_id ?? message.id} chat_id=${chat.chat_id}`,
+    );
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
@@ -330,12 +424,19 @@ export class WhatsappMessageGateway
         const chat = await this.chatService.findBychat_id(chatId);
         if (!chat) return;
         if (!chat.poste) return;
+        const resolvedChannelId = await this.resolveChannelIdForChat(chat);
+        if (!resolvedChannelId) {
+          this.logger.warn(
+            `Auto message skipped: channel not resolved for chat ${chat.chat_id}`,
+          );
+          return;
+        }
 
         const message = await this.messageService.createAgentMessage({
           chat_id: chat.chat_id,
           poste_id: chat.poste?.id,
           text,
-          channel_id: chat.last_msg_client_channel_id!,
+          channel_id: resolvedChannelId,
           timestamp: new Date(),
         });
 
@@ -345,6 +446,27 @@ export class WhatsappMessageGateway
         this.typingChats.delete(chatId);
       });
     }, typingTime);
+  }
+
+  private async resolveChannelIdForChat(
+    chat: WhatsappChat,
+  ): Promise<string | null> {
+    if (chat.last_msg_client_channel_id) {
+      return chat.last_msg_client_channel_id;
+    }
+
+    if (chat.channel_id) {
+      return chat.channel_id;
+    }
+
+    const lastMessage = await this.messageService.findLastMessageBychat_id(
+      chat.chat_id,
+    );
+    if (lastMessage?.channel_id) {
+      return lastMessage.channel_id;
+    }
+
+    return null;
   }
 
   private emitTyping(chatId: string, isTyping: boolean) {

@@ -56,7 +56,10 @@ import { LoggingModule } from './logging/logging.module';
           .valid('error', 'warn', 'log', 'debug', 'verbose', 'info')
           .default('info'),
         WEBHOOK_WHAPI_SECRET: Joi.string().optional(),
+        WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().optional(),
+        WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().optional(),
         WHATSAPP_APP_SECRET: Joi.string().optional(),
+        MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number().min(1).max(240).default(24),
         ADMIN_NAME: Joi.string().optional(),
         ADMIN_EMAIL: Joi.when('NODE_ENV', {
           is: 'production',
@@ -68,7 +71,7 @@ import { LoggingModule } from './logging/logging.module';
           then: Joi.string().min(12).required(),
           otherwise: Joi.string().min(8).optional(),
         }),
-      }),
+      }).and('WHAPI_WEBHOOK_SECRET_HEADER', 'WHAPI_WEBHOOK_SECRET_VALUE'),
     }),
     DatabaseModule,
     AdminModule, // Import AdminModule

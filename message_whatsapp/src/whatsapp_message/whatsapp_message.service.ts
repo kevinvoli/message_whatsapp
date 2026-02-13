@@ -5,9 +5,10 @@ import {
   WhatsappMessageStatus,
 } from './entities/whatsapp_message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -79,11 +80,13 @@ export class WhatsappMessageService {
     commercial_id?:string| null;
     channel_id: string;
   }): Promise<WhatsappMessage> {
+    const traceId = this.buildTraceId(undefined, data.chat_id);
+    let chat: WhatsappChat | null = null;
+    let commercial:WhatsappCommercial | null=null;
     try {
-
-      const chat = await this.chatService.findBychat_id(data.chat_id);
+      this.logger.log(`OUTBOUND_REQUEST trace=${traceId} chat_id=${data.chat_id}`);
+      chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
-      let commercial:WhatsappCommercial | null=null;
       if (data.commercial_id) {
          commercial = await this.commercialRepository.findOne({where:{id: data.commercial_id}});
       }
@@ -97,8 +100,10 @@ export class WhatsappMessageService {
         const lastMessageDate = new Date(lastMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
-        if (diffHours > 24) {
-          throw new Error('Response timeout');
+        if (diffHours > this.getResponseTimeoutHours()) {
+          throw new Error(
+            `Response timeout exceeded (${this.getResponseTimeoutHours()}h)`,
+          );
         }
       }
       // 1️⃣ Envoi réel vers WhatsApp
@@ -111,6 +116,9 @@ export class WhatsappMessageService {
           text: data.text,
           channelId: data.channel_id,
         });
+      this.logger.log(
+        `OUTBOUND_PROVIDER_OK trace=${traceId} external_id=${whapiResponse.message.id ?? 'unknown'}`,
+      );
 
       const channel = await this.channelService.findOne(data.channel_id);
       if (!channel) {
@@ -140,6 +148,9 @@ export class WhatsappMessageService {
       
 
       const mes = await this.messageRepository.save(messageEntity);
+      this.logger.log(
+        `OUTBOUND_PERSISTED trace=${traceId} db_message_id=${mes.id}`,
+      );
       await this.chatRepository.update(
         { chat_id: chat.chat_id },
         {
@@ -151,8 +162,11 @@ export class WhatsappMessageService {
 
       return mes;
     } catch (error) {
+      if (error instanceof WhapiOutboundError && chat) {
+        await this.persistFailedAgentMessage(data, chat, commercial);
+      }
       this.logger.error(
-        `WHAPI send failed for chat ${data.chat_id}`,
+        `OUTBOUND_FAILED trace=${traceId} chat_id=${data.chat_id}`,
         error instanceof Error ? error.stack : undefined,
       );
 
@@ -174,6 +188,50 @@ export class WhatsappMessageService {
       throw error;
       // throw error;
     }
+  }
+
+  private async persistFailedAgentMessage(
+    data: {
+      chat_id: string;
+      text: string;
+      poste_id: string;
+      timestamp: Date;
+      commercial_id?: string | null;
+      channel_id: string;
+    },
+    chat: WhatsappChat,
+    commercial: WhatsappCommercial | null,
+  ): Promise<void> {
+    const channel = await this.channelService.findOne(data.channel_id);
+    if (!channel) {
+      return;
+    }
+
+    const failedMessage = this.messageRepository.create({
+      message_id: `failed_${Date.now()}`,
+      external_id: undefined,
+      poste_id: data.poste_id,
+      direction: MessageDirection.OUT,
+      from_me: true,
+      timestamp: data.timestamp,
+      status: WhatsappMessageStatus.FAILED,
+      source: 'agent_web',
+      text: data.text,
+      chat,
+      poste: chat.poste ?? undefined,
+      from: chat.contact_client?.split('@')[0] ?? chat.chat_id.split('@')[0],
+      from_name: chat.name,
+      channel,
+      commercial,
+      contact: null,
+    });
+
+    await this.messageRepository.save(failedMessage);
+  }
+
+  private getResponseTimeoutHours(): number {
+    const parsed = Number(process.env.MESSAGE_RESPONSE_TIMEOUT_HOURS ?? 24);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
   }
 
   async typingStart(chat_id:string){
@@ -385,12 +443,18 @@ return messages;
   }
 
   async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat):Promise<WhatsappMessage> {
-
+    const traceId = this.buildTraceId(message.id, message.chat_id);
     try {
+      this.logger.log(
+        `INCOMING_SAVE_REQUEST trace=${traceId} chat_id=${message.chat_id}`,
+      );
       const existingMessage = await this.messageRepository.findOne({
         where: { message_id: message.id },
       });
       if (existingMessage) {
+        this.logger.log(
+          `INCOMING_DUPLICATE trace=${traceId} db_message_id=${existingMessage.id}`,
+        );
         return existingMessage;
       }
 
@@ -414,30 +478,55 @@ return messages;
       
       await this.chatRepository.save(chat);
 
-      const messagesss = await this.messageRepository.save(
-        this.messageRepository.create({
-          channel: channel,
-          chat:chat,
-          contact_id: contact?.id,
-          message_id: message.id,
-          external_id: message.id,
-          direction: MessageDirection.IN,
-          from_me: message.from_me,
-          from: message.from,
-          from_name: message.from_name,
-          text: this.resolveIncomingText(message),
-          type: message.type,
-          timestamp: new Date(message.timestamp * 1000),
-          status: WhatsappMessageStatus.SENT,
-          source: 'whapi',
-          poste: chat.poste
-        }),
-      );
-      return messagesss;
+      try {
+        const messagesss = await this.messageRepository.save(
+          this.messageRepository.create({
+            channel: channel,
+            chat: chat,
+            contact_id: contact?.id,
+            message_id: message.id,
+            external_id: message.id,
+            direction: MessageDirection.IN,
+            from_me: message.from_me,
+            from: message.from,
+            from_name: message.from_name,
+            text: this.resolveIncomingText(message),
+            type: message.type,
+            timestamp: new Date(message.timestamp * 1000),
+            status: WhatsappMessageStatus.SENT,
+            source: 'whapi',
+            poste: chat.poste,
+          }),
+        );
+        this.logger.log(
+          `INCOMING_SAVED trace=${traceId} db_message_id=${messagesss.id}`,
+        );
+        return messagesss;
+      } catch (error) {
+        // Race condition safe path: unique constraint can be hit on retries.
+        if (
+          error instanceof QueryFailedError &&
+          typeof (error as any).driverError?.code === 'string' &&
+          ['ER_DUP_ENTRY', '23505', 'SQLITE_CONSTRAINT'].includes(
+            (error as any).driverError.code,
+          )
+        ) {
+          const duplicated = await this.messageRepository.findOne({
+            where: { message_id: message.id },
+          });
+          if (duplicated) {
+            this.logger.log(
+              `INCOMING_DUPLICATE_RACE trace=${traceId} db_message_id=${duplicated.id}`,
+            );
+            return duplicated;
+          }
+        }
+        throw error;
+      }
     } catch (error) {
       // Log de l'erreur (important pour le débogage)
       this.logger.error(
-        `Erreur lors de la sauvegarde du message: ${error.message}`,
+        `INCOMING_SAVE_FAILED trace=${traceId} error=${error.message}`,
         error.stack,
       );
 
@@ -462,5 +551,9 @@ return messages;
     },
   });
 }
+
+  private buildTraceId(messageId?: string | null, chatId?: string): string {
+    return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
 }
 

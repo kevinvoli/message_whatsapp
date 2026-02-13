@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { MessageAutoController } from './message-auto.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { MessageAuto } from './entities/message-auto.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
@@ -26,6 +28,14 @@ import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
    imports: [
+      ConfigModule,
+      JwtModule.registerAsync({
+        imports: [ConfigModule],
+        useFactory: async (configService: ConfigService) => ({
+          secret: configService.get<string>('JWT_SECRET'),
+        }),
+        inject: [ConfigService],
+      }),
       TypeOrmModule.forFeature([
         MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,PendingMessage,WhapiChannel,
         Contact

@@ -30,6 +30,7 @@ const WebSocketEvents = () => {
     updateMessageStatus,
     setTyping,
     clearTyping,
+    loadConversations,
   } = useChatStore();
 
   const { setContacts } = useContactStore();
@@ -40,6 +41,16 @@ const WebSocketEvents = () => {
     }
 
     setSocket(socket);
+
+    const refreshAfterConnect = () => {
+      loadConversations();
+      socket.emit('contacts:get');
+
+      const selectedChatId = useChatStore.getState().selectedConversation?.chat_id;
+      if (selectedChatId) {
+        socket.emit('messages:get', { chat_id: selectedChatId });
+      }
+    };
 
     const upsertConversationPatch = (
       chatId: string,
@@ -128,6 +139,26 @@ const WebSocketEvents = () => {
           });
           break;
 
+        case 'MESSAGE_SEND_ERROR': {
+          const tempId = (data.payload as { tempId?: string }).tempId;
+          if (tempId) {
+            const current = useChatStore.getState().messages;
+            const next = current.map((msg) =>
+              msg.id === tempId ? { ...msg, status: 'error' as const } : msg,
+            );
+            const selectedChatId =
+              useChatStore.getState().selectedConversation?.chat_id;
+            if (selectedChatId) {
+              useChatStore.getState().setMessages(selectedChatId, next);
+            }
+          }
+          logger.warn('Message send error received', {
+            code: data.payload?.code,
+            message: data.payload?.message,
+          });
+          break;
+        }
+
         default:
           logger.warn('Unhandled chat event type', { type: data.type });
       }
@@ -186,6 +217,12 @@ const WebSocketEvents = () => {
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
     socket.on('error', handleSocketError);
+    socket.on('connect', refreshAfterConnect);
+    socket.on('reconnect', refreshAfterConnect);
+
+    if (socket.connected) {
+      refreshAfterConnect();
+    }
 
     return () => {
       socket.off('chat:event', handleChatEvent);
@@ -194,6 +231,8 @@ const WebSocketEvents = () => {
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
       socket.off('error', handleSocketError);
+      socket.off('connect', refreshAfterConnect);
+      socket.off('reconnect', refreshAfterConnect);
       setSocket(null);
     };
   }, [
@@ -209,6 +248,7 @@ const WebSocketEvents = () => {
     updateMessageStatus,
     setTyping,
     clearTyping,
+    loadConversations,
     setContacts,
   ]);
 

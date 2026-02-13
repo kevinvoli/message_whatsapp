@@ -136,6 +136,9 @@ export type WhatsappMessage = {
 export type WhatsappChat = {
   id: string;
   chat_id: string;
+  channel_id?: string;
+  last_msg_client_channel_id?: string;
+  poste_id?: string;
   name: string;
   type: string;
   chat_pic: string;
@@ -145,13 +148,17 @@ export type WhatsappChat = {
   mute_until: string | null;
   is_archived: boolean;
   unread_count: number;
+  unreadCount?: number;
+  status?: 'actif' | 'attente' | 'en attente' | 'fermé' | 'nouveau' | 'converti';
   unread_mention: boolean;
   read_only: boolean;
   not_spam: boolean;
   contact_client: string;
+  client_phone?: string;
   last_activity_at: string;
   createdAt: string;
   updatedAt: string;
+  last_message?: WhatsappMessage | null;
   poste: Poste;
   messages: WhatsappMessage[];
 };

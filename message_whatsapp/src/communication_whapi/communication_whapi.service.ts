@@ -1,5 +1,5 @@
-import { Body, Injectable, NotFoundException } from '@nestjs/common';
-import axios from 'axios';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import axios, { AxiosError } from 'axios';
 import { CreateChannelDto } from 'src/channel/dto/create-channel.dto';
 import { ChanneDatalDto } from 'src/channel/dto/channel-data.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,11 +8,13 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhapiSendMessageResponse } from './dto/whapi-send-message-response.dto';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { WhapiFailureKind, WhapiOutboundError } from './errors/whapi-outbound.error';
 
 @Injectable()
 export class CommunicationWhapiService {
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
   private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN;
+  private readonly maxRetries = Number(process.env.WHAPI_OUTBOUND_MAX_RETRIES ?? 2);
 
   constructor(
     @InjectRepository(WhapiChannel)
@@ -103,6 +105,9 @@ async sendTyping(chat_id: string, typing: boolean) {
     to: string;
     channelId: string;
   }): Promise<WhapiSendMessageResponse> {
+    const to = this.validateWhapiRecipient(data.to);
+    const body = this.validateWhapiBody(data.text);
+
     const channel = await this.channelRepository.findOne({
       where: { channel_id: data.channelId },
     });
@@ -111,21 +116,97 @@ async sendTyping(chat_id: string, typing: boolean) {
     if (!channel) {
       throw new NotFoundException(`Channel ${data.channelId} introuvable`);
     }
-    const response = await axios.post<WhapiSendMessageResponse>(
-      this.WHAPI_URL,
-      {
-        to: data.to, // ex: "2250700000000"
-        body: data.text,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      },
-    );
+    let attempt = 0;
+    while (attempt <= this.maxRetries) {
+      try {
+        const response = await axios.post<WhapiSendMessageResponse>(
+          this.WHAPI_URL,
+          {
+            to,
+            body,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
 
-    return response.data;
+        return response.data;
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status;
+        const kind = this.classifyFailure(axiosError);
+        const lastAttempt = attempt >= this.maxRetries;
+
+        if (kind === 'transient' && !lastAttempt) {
+          const delayMs = 250 * Math.pow(2, attempt);
+          this.logger.warn(
+            `Whapi transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) channel=${data.channelId} status=${statusCode ?? 'unknown'}`,
+            CommunicationWhapiService.name,
+          );
+          await this.delay(delayMs);
+          attempt += 1;
+          continue;
+        }
+
+        this.logger.error(
+          `Whapi outbound failed (channel=${data.channelId}, kind=${kind}, status=${statusCode ?? 'unknown'})`,
+          axiosError.stack,
+          CommunicationWhapiService.name,
+        );
+        throw new WhapiOutboundError(
+          'Whapi outbound delivery failed',
+          kind,
+          statusCode,
+        );
+      }
+    }
+
+    throw new WhapiOutboundError('Whapi outbound delivery failed', 'transient');
+  }
+
+  private validateWhapiRecipient(to: string): string {
+    const candidate = typeof to === 'string' ? to.trim() : '';
+    if (!candidate) {
+      throw new BadRequestException('Recipient is required');
+    }
+
+    if (!/^\d{8,20}$/.test(candidate)) {
+      throw new BadRequestException(
+        'Invalid recipient format: only digits (8-20) are allowed',
+      );
+    }
+
+    return candidate;
+  }
+
+  private validateWhapiBody(text: string): string {
+    const body = typeof text === 'string' ? text.trim() : '';
+    if (!body) {
+      throw new BadRequestException('Message body cannot be empty');
+    }
+
+    const utf8Length = Buffer.byteLength(body, 'utf8');
+    if (utf8Length > 4096) {
+      throw new BadRequestException('Message body is too large');
+    }
+
+    return body;
+  }
+
+  private classifyFailure(error: AxiosError): WhapiFailureKind {
+    const statusCode = error.response?.status;
+    if (!statusCode) return 'transient';
+    if ([408, 425, 429, 500, 502, 503, 504].includes(statusCode)) {
+      return 'transient';
+    }
+    return 'permanent';
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   generateWhapiMessageId(): string {

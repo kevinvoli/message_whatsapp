@@ -31,9 +31,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     if (user?.id) {
       const newSocket = io(socketUrl, {
         transports: ['websocket'],
-        auth: {
-          commercialId: user.id,
-        },
+        withCredentials: true,
       });
 
       setSocket(newSocket);

@@ -412,27 +412,30 @@ interface RawConversationData {
   id: string;
   chat_id: string;
 
-  poste_id: string;
+  poste_id?: string;
   poste?: {
     id: string;
     name: string;
     code: string;
   };
-  tags: string[];
+  tags?: string[];
   priority: Priority;
   name?: string;
   client_phone?: string;
+  contact_client?: string;
+  last_msg_client_channel_id?: string;
 
-  auto_message_status: "scheduled" | "sending" | "sent";
+  auto_message_status?: "scheduled" | "sending" | "sent";
 
   last_message?: RawMessageData | string | null;
   messages?: RawMessageData[];
   medias?: RawMediaData[];
 
-  unreadCount: number;
+  unreadCount?: number;
+  unread_count?: number;
 
-  status: ConversationStatus;
-  channel_id: string;
+  status?: ConversationStatus | string;
+  channel_id?: string;
   
   // 🆕 Champs d'appel
   call_status?: CallStatus;
@@ -623,11 +626,25 @@ const resolveLastMessage = (
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
+  const normalizedStatus =
+    raw.status === "en attente"
+      ? "attente"
+      : raw.status === "attente" ||
+          raw.status === "actif" ||
+          raw.status === "nouveau" ||
+          raw.status === "converti" ||
+          raw.status === "fermé"
+        ? raw.status
+        : "attente";
+  const unreadCount = raw.unreadCount ?? raw.unread_count ?? 0;
+  const sourceChannel =
+    raw.channel_id || raw.last_msg_client_channel_id || "inconnu";
+
   return {
     id: raw.id,
     chat_id: raw.chat_id,
 
-    poste_id: raw.poste_id,
+    poste_id: raw.poste_id ?? raw.poste?.id ?? "",
     poste: raw.poste
       ? {
           id: raw.poste.id,
@@ -638,13 +655,14 @@ export const transformToConversation = (
       : undefined,
 
     clientName: raw.name || "Client inconnu",
-    clientPhone: raw.client_phone || raw.chat_id?.split("@")[0] || "",
+    clientPhone:
+      raw.client_phone || raw.contact_client || raw.chat_id?.split("@")[0] || "",
 
     lastMessage: resolveLastMessage(raw.last_message),
     messages: raw.messages?.map(transformToMessage) ?? [],
 
-    unreadCount: raw.unreadCount,
-    status: raw.status === "en attente" ? "attente" : raw.status,
+    unreadCount,
+    status: normalizedStatus,
 
     // 🆕 Champs d'appel transformés
     call_status: raw.call_status,
@@ -659,11 +677,11 @@ export const transformToConversation = (
       ? new Date(raw.last_poste_message_at)
       : null,
 
-    source: raw.channel_id || "inconnu",
+    source: sourceChannel,
     priority: raw.priority || "moyenne",
     tags: raw.tags || [],
 
-    auto_message_status: raw.auto_message_status,
+    auto_message_status: raw.auto_message_status ?? "scheduled",
 
     closed_at: raw.closed_at ? new Date(raw.closed_at) : null,
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,

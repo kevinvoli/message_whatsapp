@@ -55,6 +55,9 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
+    const getUnreadCount = (chat: WhatsappChat) =>
+      chat.unread_count ?? chat.unreadCount ?? 0;
+
     const fetchMessages = async (chatId: string) => {
         // Removed: if (!token) { setError("Authentication token is missing."); return; }
         setLoadingMessages(true);
@@ -75,6 +78,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
         if (!messageInput.trim() || !selectedChat) { // Keep checks for messageInput and selectedChat
             return;
         }
+        setError(null);
 
         const currentMessageText = messageInput;
         setMessageInput(''); // Clear input immediately for better UX
@@ -96,15 +100,14 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
 
 
         try {
-            const posteId =
-              selectedChat.poste?.id ||
-              (selectedChat as unknown as { poste_id?: string }).poste_id;
-            const channelId =
-              (selectedChat as unknown as { channel_id?: string }).channel_id ||
-              selectedChat.chat_id;
+            const posteId = selectedChat.poste?.id || selectedChat.poste_id;
+            const channelId = selectedChat.channel_id;
 
             if (!posteId) {
                 throw new Error("Impossible d'envoyer: poste_id manquant pour cette conversation.");
+            }
+            if (!channelId) {
+                throw new Error("Impossible d'envoyer: channel_id manquant pour cette conversation.");
             }
 
             const sentMessage = await sendMessage(
@@ -154,14 +157,16 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                     <p className="font-semibold text-gray-800">{chat.name}</p>
                                     <p className="text-sm text-gray-500 truncate">
                                         {/* Display last message text if available */}
-                                        {chat.messages && chat.messages.length > 0
+                                        {chat.last_message
+                                            ? resolveAdminMessageText(chat.last_message)
+                                            : chat.messages && chat.messages.length > 0
                                             ? resolveAdminMessageText(chat.messages[chat.messages.length - 1])
                                             : '[Message client]'}
                                     </p>
                                 </div>
-                                {chat.unread_count > 0 && (
+                                {getUnreadCount(chat) > 0 && (
                                     <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
-                                        {chat.unread_count}
+                                        {getUnreadCount(chat)}
                                     </span>
                                 )}
                             </div>
@@ -174,6 +179,11 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
             <div className="w-2/3 flex flex-col bg-gray-50">
                 {selectedChat ? (
                     <>
+                        {error && (
+                            <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                {error}
+                            </div>
+                        )}
                         <div className="p-4 border-b border-gray-200 bg-white flex items-center">
                             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-blue-800 font-bold">
                                 {selectedChat.name.charAt(0).toUpperCase()}
