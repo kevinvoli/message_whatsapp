@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
 export class AutoMessageOrchestrator {
@@ -11,12 +12,16 @@ export class AutoMessageOrchestrator {
   constructor(
     private readonly messageAutoService: MessageAutoService,
     private readonly chatService: WhatsappChatService,
+    private readonly logger: AppLogger,
   ) {}
 
   async handleClientMessage(chat: WhatsappChat) {
     const chatId = chat.chat_id;
 
-    console.log('orchestrator step =', chat.auto_message_step);
+    this.logger.debug(
+      `Orchestrator step ${chat.auto_message_step} for ${chatId}`,
+      AutoMessageOrchestrator.name,
+    );
 
     const lastClient = chat.last_client_message_at;
     const lastAuto = chat.last_auto_message_sent_at;
@@ -24,19 +29,22 @@ export class AutoMessageOrchestrator {
     if (!lastClient) {
       return;
     }
-    console.log('orchestrator step =', chat.last_auto_message_sent_at);
+    this.logger.debug(
+      `Last auto message at ${chat.last_auto_message_sent_at}`,
+      AutoMessageOrchestrator.name,
+    );
 
     // 🔐 Idempotence DB
     // if (lastAuto && lastAuto >= lastClient) {
     //   return;
     // }
-    console.log('orchestrator step =', chat.poste_id);
+    this.logger.debug(`Poste ID ${chat.poste_id}`, AutoMessageOrchestrator.name);
 
     // 🔐 Verrou mémoire (anti double webhook)
     if (this.locks.has(chatId)) {
       return;
     }
-    console.log('orchestrator step =', chat.auto_message_step);
+    this.logger.debug(`Lock check step ${chat.auto_message_step}`, AutoMessageOrchestrator.name);
 
 
     // ❌ Stop si déjà terminé
@@ -62,13 +70,16 @@ export class AutoMessageOrchestrator {
 
     // ⏱️ Délai humain random (20–45s)
     const delay = Math.floor(Math.random() * (45 - 20 + 1) + 20) * 10;
-    console.log('orchestrator step =', delay);
+    this.logger.debug(`Scheduling auto message after ${delay}ms`, AutoMessageOrchestrator.name);
 
     const timeout = setTimeout(() => {
       void this.executeAutoMessage(chatId)
         .catch((err) => {
-          // log propre
-          console.error('AutoMessage error', err);
+          this.logger.error(
+            'AutoMessage execution failed',
+            err instanceof Error ? err.stack : undefined,
+            AutoMessageOrchestrator.name,
+          );
         })
         .finally(() => {
           this.locks.delete(chatId);
@@ -82,7 +93,7 @@ export class AutoMessageOrchestrator {
   private async executeAutoMessage(chatId: string) {
     const freshChat = await this.chatService.findBychat_id(chatId);
     if (!freshChat) return;
-    console.log('orchestrator step =', chatId);
+    this.logger.debug(`Rechecking chat ${chatId}`, AutoMessageOrchestrator.name);
 
     // 🔐 Recheck DB (double sécurité)
     const lastClient = freshChat.last_client_message_at;
@@ -99,7 +110,7 @@ export class AutoMessageOrchestrator {
     // }
 
     const nextStep = freshChat.auto_message_step + 1;
-    console.log('orchestrator step =', nextStep);
+    this.logger.debug(`Next auto message step ${nextStep}`, AutoMessageOrchestrator.name);
 
     // 🚀 Envoi réel
     await this.messageAutoService.sendAutoMessage(chatId, nextStep);

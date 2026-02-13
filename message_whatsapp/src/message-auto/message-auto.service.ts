@@ -7,6 +7,7 @@ import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.se
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { CreateMessageAutoDto } from './dto/create-message-auto.dto';
 import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
+import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
 export class MessageAutoService {
@@ -18,6 +19,7 @@ export class MessageAutoService {
     private readonly messageService: WhatsappMessageService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly gateway: WhatsappMessageGateway,
+    private readonly logger: AppLogger,
   ) {}
 
   async create(dto: CreateMessageAutoDto): Promise<MessageAuto> {
@@ -72,8 +74,6 @@ export class MessageAutoService {
    * 2️⃣ Lance l’envoi d’un message auto
    */
   async sendAutoMessage(chatId: string, position: number): Promise<void> {
-    // console.log("message automatique",chatId,position);
-
     const chat = await this.chatService.findBychat_id(chatId);
 
     if (!chat) return;
@@ -90,16 +90,14 @@ export class MessageAutoService {
       );
     }
 
-    console.log(
-      '====affichage des temple aleatoire====',
-      chat.auto_message_step,
+    this.logger.debug(
+      `Auto message step ${chat.auto_message_step} for ${chat.chat_id}`,
+      MessageAutoService.name,
     );
 
     const template = await this.getAutoMessageByPosition(position);
 
     if (!template) return;
-    // console.log("affichage des temple aleatoire",template);
-
     // Marquer la conversation comme bloquée
     await this.chatService.update(chatId, {
       read_only: true,
@@ -140,7 +138,6 @@ export class MessageAutoService {
     numero?: string;
   }): string {
     const safeName = this.normalizeClientName(data.name);
-    // console.log("safeName",safeName);
 
     return data.message
       .replace(/#name#/gi, safeName)

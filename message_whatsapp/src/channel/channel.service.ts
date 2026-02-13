@@ -6,6 +6,7 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { AppLogger } from 'src/logging/app-logger.service';
 // import { WhapiUser } from './entities/whapi-user.entity';
 // import { ChanneDatalDto } from './dto/channel-data.dto';
 
@@ -18,6 +19,7 @@ export class ChannelService {
     // private readonly userRepository: Repository<WhapiUser>,
 
     private readonly connmunicationService: CommunicationWhapiService,
+    private readonly logger: AppLogger,
   ) {}
 
   async create(dto: CreateChannelDto) {
@@ -48,8 +50,8 @@ export class ChannelService {
       }
     ) 
 
-    const newSave = await  this.channelRepository.save(newChannel)
-    console.log("channel save",newSave);
+    const newSave = await this.channelRepository.save(newChannel);
+    this.logger.debug(`Channel persisted: ${newSave.channel_id}`, ChannelService.name);
     
     if (ifExisteChannel) {
       throw new NotFoundException('cette chaine a existe déja');
