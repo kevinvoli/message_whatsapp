@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState } from 'react';
-import { Ban, Edit, PlusCircle, ShieldCheck, Trash2 } from 'lucide-react';
+import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
 import {
   blockPosteFromQueue,
   createPoste,
@@ -18,11 +18,13 @@ import { useToast } from '@/app/ui/ToastProvider';
 interface PostesViewProps {
   initialPostes: Poste[];
   onPosteUpdated: () => Promise<void> | void;
+  onRefresh?: () => void;
 }
 
 export default function PostesView({
   initialPostes,
   onPosteUpdated,
+  onRefresh,
 }: PostesViewProps) {
   const {
     items: postes,
@@ -106,7 +108,7 @@ export default function PostesView({
     if (currentPoste.is_queue_enabled === false && formIsActive) {
       addToast({
         type: 'error',
-        message: 'Ce poste est bloque dans la file. Debloque-le avant de lâ€™activer.',
+        message: 'Ce poste est bloque dans la file. Debloque-le avant de l’activer.',
       });
       return;
     }
@@ -119,7 +121,7 @@ export default function PostesView({
       addToast({
         type: 'error',
         message:
-          'Activation refusee: ce poste est bloque dans la file. Debloque-le avant de lâ€™activer.',
+          'Activation refusee: ce poste est bloque dans la file. Debloque-le avant de l’activer.',
       });
     }
     if (result.ok) {
@@ -159,6 +161,19 @@ export default function PostesView({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+      </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Postes</h2>
         <button

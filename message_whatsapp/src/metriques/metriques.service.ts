@@ -344,7 +344,7 @@ export class MetriquesService {
       .createQueryBuilder('commercial')
       .leftJoin('commercial.poste', 'poste')
       .leftJoin('poste.chats', 'chat', 'chat.deletedAt IS NULL')
-      .leftJoin('chat.messages', 'message', 'message.deletedAt IS NULL AND DATE(message.createdAt) = CURDATE()')
+      .leftJoin('chat.messages', 'message', 'message.deletedAt IS NULL')
       .select([
         'commercial.id as id',
         'commercial.name as name',
@@ -380,7 +380,6 @@ export class MetriquesService {
           .where('msg_out.poste_id = :posteId', { posteId: perf.poste_id })
           .andWhere('msg_out.deletedAt IS NULL')
           .andWhere('msg_in.deletedAt IS NULL')
-          .andWhere('DATE(msg_out.createdAt) = CURDATE()')
           .andWhere('TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600')
           .select('AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))', 'avg')
           .getRawOne();

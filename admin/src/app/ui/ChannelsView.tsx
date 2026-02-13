@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState } from 'react';
-import { Edit, PlusCircle, Trash2 } from 'lucide-react';
+import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
 import { Channel } from '@/app/lib/definitions';
 import { createChannel, deleteChannel, updateChannel } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -11,11 +11,13 @@ import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 interface ChannelsViewProps {
   initialChannels: Channel[];
   onChannelUpdated: () => Promise<void> | void;
+  onRefresh?: () => void;
 }
 
 export default function ChannelsView({
   initialChannels,
   onChannelUpdated,
+  onRefresh,
 }: ChannelsViewProps) {
   const { items: channels, loading, clearStatus, create, update, remove } =
     useCrudResource<Channel, { token: string }, Partial<Channel>>({
@@ -83,6 +85,19 @@ export default function ChannelsView({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+      </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Canaux WHAPI</h2>
         <button

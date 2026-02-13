@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore } from 'lucide-react';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw } from 'lucide-react';
 import { getMessagesForChat, sendMessage } from '@/app/lib/api'; // Import sendMessage
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
@@ -11,9 +11,10 @@ import { useToast } from './ToastProvider';
 interface ConversationsViewProps {
     initialChats: WhatsappChat[];
     onChatUpdated: () => void;
+    onRefresh?: () => void;
 }
 
-export default function ConversationsView({ initialChats, onChatUpdated }: ConversationsViewProps) {
+export default function ConversationsView({ initialChats, onChatUpdated, onRefresh }: ConversationsViewProps) {
     const [chats, setChats] = useState<WhatsappChat[]>(initialChats);
     const [selectedChat, setSelectedChat] = useState<WhatsappChat | null>(null);
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
@@ -85,32 +86,76 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
       return remaining === 0 ? `${hours} h` : `${hours} h ${remaining} min`;
     };
 
-    const formatUptime = (value?: number | null) => {
-      if (value === null || value === undefined) return '—';
-      const minutes = Math.floor(value / 60);
-      if (minutes < 60) return `${minutes} min`;
-      const hours = Math.floor(minutes / 60);
-      const remaining = minutes % 60;
-      return remaining === 0 ? `${hours} h` : `${hours} h ${remaining} min`;
+
+    const badgeClass = (value?: string | null) => {
+      if (!value) return 'bg-gray-100 text-gray-700';
+      const v = String(value).toLowerCase();
+      if (v.includes('actif') || v.includes('online') || v.includes('oui')) {
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+      }
+      if (v.includes('attente') || v.includes('pending') || v.includes('rappeler')) {
+        return 'bg-amber-50 text-amber-800 border border-amber-100';
+      }
+      if (v.includes('fermé') || v.includes('ferme') || v.includes('offline') || v.includes('non')) {
+        return 'bg-slate-100 text-slate-700 border border-slate-200';
+      }
+      if (v.includes('haute') || v.includes('urgent')) {
+        return 'bg-rose-50 text-rose-700 border border-rose-100';
+      }
+      if (v.includes('moyenne')) {
+        return 'bg-blue-50 text-blue-700 border border-blue-100';
+      }
+      if (v.includes('basse')) {
+        return 'bg-slate-50 text-slate-700 border border-slate-200';
+      }
+      if (v.includes('client') || v.includes('converti') || v.includes('prospect')) {
+        return 'bg-violet-50 text-violet-700 border border-violet-100';
+      }
+      return 'bg-gray-100 text-gray-700';
     };
 
-    const DetailItem = ({ label, value }: { label: string; value: string }) => (
+    const DetailItem = ({
+      label,
+      value,
+      badge,
+    }: {
+      label: string;
+      value: string;
+      badge?: boolean;
+    }) => (
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-gray-500">{label}</span>
-        <span className="text-xs text-gray-800 text-right">{value}</span>
+        <span className="text-[11px] text-slate-500">{label}</span>
+        {badge ? (
+          <span className={`text-[11px] px-2 py-0.5 rounded-full ${badgeClass(value)}`}>
+            {value}
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-800 text-right">{value}</span>
+        )}
       </div>
     );
 
     const InfoCard = ({
       title,
+      icon: Icon,
+      accent,
       children,
     }: {
       title: string;
+      icon: React.ElementType;
+      accent: string;
       children: React.ReactNode;
     }) => (
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          {title}
+      <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.06)] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className={`w-7 h-7 rounded-md flex items-center justify-center ${accent}`}>
+              <Icon className="w-3.5 h-3.5" />
+            </span>
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+              {title}
+            </span>
+          </div>
         </div>
         <div className="space-y-2">{children}</div>
       </div>
@@ -195,11 +240,25 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     };
 
     return (
-        <div className="flex h-full bg-gray-100 rounded-lg shadow-sm overflow-hidden">
+        <div className="h-full flex flex-col gap-3">
+            <div className="flex items-center justify-end">
+                {onRefresh && (
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        title="Rafraîchir"
+                        aria-label="Rafraîchir"
+                        className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+            <div className="flex h-full bg-slate-100 rounded-lg shadow-sm overflow-hidden">
             {/* Left Panel: Chat List */}
             <div className="w-1/3 border-r border-gray-200 bg-white flex flex-col">
-                <div className="p-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+                    <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
                         <MessageSquare className="w-5 h-5" /> Conversations
                     </h3>
                 </div>
@@ -212,8 +271,8 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                         chats.map(chat => (
                             <div
                                 key={chat.id}
-                                className={`flex items-center p-4 border-b border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors ${
-                                    selectedChat?.id === chat.id ? 'bg-blue-100' : ''
+                                className={`flex items-center p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors ${
+                                    selectedChat?.id === chat.id ? 'bg-slate-100 border-l-2 border-l-slate-900' : ''
                                 }`}
                                 onClick={() => setSelectedChat(chat)}
                             >
@@ -221,8 +280,8 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                     {chat.name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="ml-3 flex-1">
-                                    <p className="font-semibold text-gray-800">{chat.name}</p>
-                                    <p className="text-sm text-gray-500 truncate">
+                                    <p className="font-semibold text-slate-800 text-sm">{chat.name}</p>
+                                    <p className="text-xs text-slate-500 truncate">
                                         {/* Display last message text if available */}
                                         {chat.last_message
                                             ? resolveAdminMessageText(chat.last_message)
@@ -230,12 +289,12 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                             ? resolveAdminMessageText(chat.messages[chat.messages.length - 1])
                                             : '[Message client]'}
                                     </p>
-                                    <p className="text-xs text-gray-400 mt-1 truncate">
+                                    <p className="text-[11px] text-slate-400 mt-1 truncate">
                                         {getStatusLabel(chat)} • Poste: {resolvePosteLabel(chat)} • Canal: {resolveChannelLabel(chat)}
                                     </p>
                                 </div>
                                 {getUnreadCount(chat) > 0 && (
-                                    <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                                    <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-slate-900 text-white text-[11px] rounded-full">
                                         {getUnreadCount(chat)}
                                     </span>
                                 )}
@@ -246,77 +305,174 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
             </div>
 
             {/* Right Panel: Message Area */}
-            <div className="w-2/3 flex flex-col bg-gray-50">
+            <div className="w-2/3 flex flex-col bg-slate-50">
                 {selectedChat ? (
                     <>
-                        <div className="p-4 border-b border-gray-200 bg-white flex items-center">
+                        <div className="p-4 border-b border-slate-200 bg-white flex items-center justify-between gap-4 sticky top-0 z-10">
                             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-blue-800 font-bold">
                                 {selectedChat.name.charAt(0).toUpperCase()}
                             </div>
                             <div className="ml-3">
-                                <h3 className="font-semibold text-gray-800">{selectedChat.name}</h3>
-                                <p className="text-sm text-gray-500">{selectedChat.contact_client}</p>
+                                <h3 className="font-semibold text-slate-800">{selectedChat.name}</h3>
+                                <p className="text-sm text-slate-500">{selectedChat.contact_client}</p>
                                 <div className="mt-1 flex flex-wrap gap-2">
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                                         {getStatusLabel(selectedChat)}
                                     </span>
                                     {selectedChat.read_only && (
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-100">
                                             Lecture seule
                                         </span>
                                     )}
                                     {selectedChat.is_archived && (
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                                             Archivée
                                         </span>
                                     )}
                                     {selectedChat.is_muted && (
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                                             Silencieuse
                                         </span>
                                     )}
                                     {selectedChat.is_pinned && (
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">
+                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                                             Épinglée
                                         </span>
                                     )}
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="border-b border-gray-200 bg-white px-4 py-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <DetailItem label="Téléphone" value={selectedChat.client_phone ?? selectedChat.contact_client ?? '—'} />
-                                <DetailItem label="Contact" value={selectedChat.contact_client ?? '—'} />
-                                <DetailItem label="Poste" value={resolvePosteLabel(selectedChat)} />
-                                <DetailItem label="Poste code" value={selectedChat.poste?.code ?? '—'} />
-                                <DetailItem label="Canal" value={resolveChannelLabel(selectedChat)} />
-                                <DetailItem label="Canal uptime" value={formatUptime(selectedChat.channel?.uptime)} />
-                                <DetailItem label="Canal version" value={selectedChat.channel?.version ?? '—'} />
-                                <DetailItem label="Call status" value={selectedChat.contact?.call_status ?? '—'} />
-                                <DetailItem label="Call count" value={String(selectedChat.contact?.call_count ?? 0)} />
-                                <DetailItem label="Dernier appel" value={formatDateTime(selectedChat.contact?.last_call_date)} />
-                                <DetailItem label="Notes appel" value={selectedChat.contact?.call_notes ?? '—'} />
-                                <DetailItem label="Priority" value={selectedChat.contact?.priority ?? '—'} />
-                                <DetailItem label="Conversion" value={selectedChat.contact?.conversion_status ?? '—'} />
-                                <DetailItem label="Assignée le" value={formatDateTime(selectedChat.assigned_at)} />
-                                <DetailItem label="Mode assignation" value={selectedChat.assigned_mode ?? '—'} />
-                                <DetailItem label="Deadline 1ère réponse" value={formatDateTime(selectedChat.first_response_deadline_at)} />
-                                <DetailItem label="Dernier msg client" value={formatDateTime(selectedChat.last_client_message_at)} />
-                                <DetailItem label="Dernier msg poste" value={formatDateTime(selectedChat.last_poste_message_at)} />
-                                <DetailItem label="Dernière activité" value={formatDateTime(selectedChat.last_activity_at)} />
-                                <DetailItem label="Non lus" value={String(getUnreadCount(selectedChat))} />
-                                <DetailItem label="Auto-msg status" value={selectedChat.auto_message_status ?? '—'} />
-                                <DetailItem label="Auto-msg step" value={String(selectedChat.auto_message_step ?? 0)} />
-                                <DetailItem label="En attente réponse" value={formatBool(selectedChat.waiting_client_reply)} />
-                                <DetailItem label="Dernier auto-msg" value={formatDateTime(selectedChat.last_auto_message_sent_at)} />
-                                <DetailItem label="Muter jusqu'à" value={formatDateTime(selectedChat.mute_until)} />
-                                <DetailItem label="Not spam" value={formatBool(selectedChat.not_spam)} />
-                                <DetailItem label="Créée le" value={formatDateTime(selectedChat.createdAt)} />
-                                <DetailItem label="Mise à jour" value={formatDateTime(selectedChat.updatedAt)} />
+                            <div className="ml-auto flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('conversation')}
+                                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                                        activeTab === 'conversation'
+                                            ? 'bg-slate-900 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Conversation
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('infos')}
+                                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                                        activeTab === 'infos'
+                                            ? 'bg-slate-900 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Infos
+                                </button>
                             </div>
                         </div>
 
+                        {activeTab === 'infos' && (
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <InfoCard title="Client" icon={UserRound} accent="bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2">
+                                                <DetailItem label="Nom" value={selectedChat.name ?? '—'} />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Téléphone" value={selectedChat.client_phone ?? selectedChat.contact_client ?? '—'} />
+                                                <DetailItem label="Contact" value={selectedChat.contact_client ?? '—'} />
+                                                <DetailItem label="Statut" value={getStatusLabel(selectedChat)} badge />
+                                                <DetailItem label="Non lus" value={String(getUnreadCount(selectedChat))} />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+
+                                    <InfoCard title="Affectation" icon={Briefcase} accent="bg-blue-50 text-blue-700 border border-blue-100">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2">
+                                                <DetailItem label="Poste" value={resolvePosteLabel(selectedChat)} />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Poste code" value={selectedChat.poste?.code ?? '—'} />
+                                                <DetailItem label="Assignée le" value={formatDateTime(selectedChat.assigned_at)} />
+                                                <DetailItem label="Mode assignation" value={selectedChat.assigned_mode ?? '—'} badge />
+                                                <DetailItem label="Deadline 1ère réponse" value={formatDateTime(selectedChat.first_response_deadline_at)} />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+
+                                    <InfoCard title="Activité" icon={Activity} accent="bg-amber-50 text-amber-800 border border-amber-100">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2 space-y-2">
+                                                <DetailItem label="Dernier msg client" value={formatDateTime(selectedChat.last_client_message_at)} />
+                                                <DetailItem label="Dernier msg poste" value={formatDateTime(selectedChat.last_poste_message_at)} />
+                                                <DetailItem label="Dernière activité" value={formatDateTime(selectedChat.last_activity_at)} />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Lecture seule" value={formatBool(selectedChat.read_only)} badge />
+                                                <DetailItem label="Archivée" value={formatBool(selectedChat.is_archived)} badge />
+                                                <DetailItem label="Silencieuse" value={formatBool(selectedChat.is_muted)} badge />
+                                                <DetailItem label="Épinglée" value={formatBool(selectedChat.is_pinned)} badge />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+
+                                    <InfoCard title="Canal" icon={Wifi} accent="bg-slate-50 text-slate-700 border border-slate-200">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2">
+                                                <DetailItem label="Canal" value={resolveChannelLabel(selectedChat)} />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Uptime" value={formatUptime(selectedChat.channel?.uptime)} />
+                                                <DetailItem label="Version" value={selectedChat.channel?.version ?? '—'} />
+                                                <DetailItem label="API" value={selectedChat.channel?.api_version ?? '—'} />
+                                                <DetailItem label="Core" value={selectedChat.channel?.core_version ?? '—'} />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+
+                                    <InfoCard title="Appels" icon={PhoneCall} accent="bg-rose-50 text-rose-700 border border-rose-100">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2">
+                                                <DetailItem label="Call status" value={selectedChat.contact?.call_status ?? '—'} badge />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Call count" value={String(selectedChat.contact?.call_count ?? 0)} />
+                                                <DetailItem label="Dernier appel" value={formatDateTime(selectedChat.contact?.last_call_date)} />
+                                                <DetailItem label="Notes appel" value={selectedChat.contact?.call_notes ?? '—'} />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+
+                                    <InfoCard title="Qualification" icon={BadgeCheck} accent="bg-violet-50 text-violet-700 border border-violet-100">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2 space-y-2">
+                                                <DetailItem label="Priority" value={selectedChat.contact?.priority ?? '—'} badge />
+                                                <DetailItem label="Conversion" value={selectedChat.contact?.conversion_status ?? '—'} badge />
+                                                <DetailItem label="Not spam" value={formatBool(selectedChat.not_spam)} badge />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Auto-msg status" value={selectedChat.auto_message_status ?? '—'} badge />
+                                                <DetailItem label="Auto-msg step" value={String(selectedChat.auto_message_step ?? 0)} />
+                                                <DetailItem label="En attente réponse" value={formatBool(selectedChat.waiting_client_reply)} badge />
+                                                <DetailItem label="Dernier auto-msg" value={formatDateTime(selectedChat.last_auto_message_sent_at)} />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+
+                                    <InfoCard title="Système" icon={Settings} accent="bg-gray-50 text-gray-700 border border-gray-200">
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="pb-2">
+                                                <DetailItem label="Mute jusqu'à" value={formatDateTime(selectedChat.mute_until)} />
+                                            </div>
+                                            <div className="pt-2 space-y-2">
+                                                <DetailItem label="Créée le" value={formatDateTime(selectedChat.createdAt)} />
+                                                <DetailItem label="Mise à jour" value={formatDateTime(selectedChat.updatedAt)} />
+                                            </div>
+                                        </div>
+                                    </InfoCard>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'conversation' && (
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {loadingMessages ? (
                                 <div className="flex justify-center items-center h-full"><Spinner /></div>
@@ -341,20 +497,21 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                             )}
                             <div ref={messagesEndRef} />
                         </div>
+                        )}
 
-                        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white flex items-center gap-2">
+                        <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-200 bg-white flex items-center gap-2 sticky bottom-0">
                             <input
                                 type="text"
                                 value={messageInput}
                                 onChange={(e) => setMessageInput(e.target.value)}
                                 placeholder="Écrire un message..."
                                 className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={loadingMessages}
+                                disabled={loadingMessages || activeTab !== 'conversation'}
                             />
                             <button
                                 type="submit"
                                 className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                disabled={loadingMessages || !messageInput.trim()}
+                                disabled={loadingMessages || !messageInput.trim() || activeTab !== 'conversation'}
                             >
                                 {loadingMessages ? <Spinner  /> : <Send className="w-5 h-5" />}
                             </button>
@@ -367,6 +524,8 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                     </div>
                 )}
             </div>
+            </div>
         </div>
     );
 }
+

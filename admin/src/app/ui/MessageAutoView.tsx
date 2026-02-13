@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState } from 'react';
-import { Edit, PlusCircle, Trash2 } from 'lucide-react';
+import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
 import { MessageAuto } from '@/app/lib/definitions';
 import { createMessageAuto, deleteMessageAuto, updateMessageAuto } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -11,6 +11,7 @@ import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 interface MessageAutoViewProps {
   initialMessagesAuto: MessageAuto[];
   onMessageAutoUpdated: () => Promise<void> | void;
+  onRefresh?: () => void;
 }
 
 type AutoMessageChannel = 'whatsapp' | 'sms' | 'email';
@@ -18,6 +19,7 @@ type AutoMessageChannel = 'whatsapp' | 'sms' | 'email';
 export default function MessageAutoView({
   initialMessagesAuto,
   onMessageAutoUpdated,
+  onRefresh,
 }: MessageAutoViewProps) {
   const {
     items: messagesAuto,
@@ -125,6 +127,19 @@ export default function MessageAutoView({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+      </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Messages Automatiques</h2>
         <button

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import UnderDevelopmentView from './UnderDevelopmentView';
 import { WhatsappMessage } from '../lib/definitions';
-import { Edit, Eye, Search } from 'lucide-react';
+import { Edit, Eye, Search, RefreshCw } from 'lucide-react';
 import { getPerformanceBadge, resolveAdminMessageText } from '../lib/utils';
 import { Spinner } from './Spinner';
 
@@ -9,14 +9,28 @@ import { Spinner } from './Spinner';
 interface MessagesViewProps {
     messages: WhatsappMessage[];
     onMessageUpdated: () => void; // Callback to refresh data in parent
+    onRefresh?: () => void;
 }
 export default function MessagesView({
-    messages, onMessageUpdated
+    messages, onMessageUpdated, onRefresh
 }: MessagesViewProps) {
 
     const [loading, setLoading] = useState(false);
     return (<>
         <div className="space-y-6">
+            <div className="flex items-center justify-end">
+                {onRefresh && (
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        title="Rafraîchir"
+                        aria-label="Rafraîchir"
+                        className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
             <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex items-center gap-4">
                     <div className="flex-1 relative">

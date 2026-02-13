@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState } from 'react';
-import { Edit, MessageCircle, Trash2, UserPlus } from 'lucide-react';
+import { Edit, MessageCircle, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import { Client } from '@/app/lib/definitions';
 import { createClient, deleteClient, updateClient } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -11,11 +11,13 @@ import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 interface ClientsViewProps {
   initialClients: Client[];
   onClientUpdated: () => Promise<void> | void;
+  onRefresh?: () => void;
 }
 
 export default function ClientsView({
   initialClients,
   onClientUpdated,
+  onRefresh,
 }: ClientsViewProps) {
   const { items: clients, loading, clearStatus, create, update, remove } =
     useCrudResource<
@@ -106,6 +108,19 @@ export default function ClientsView({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+      </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Clients</h2>
         <button

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Clock, ListChecks, RefreshCw } from 'lucide-react';
@@ -19,7 +19,7 @@ const ageSeconds = (value?: string | null) => {
   return Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
 };
 
-export default function DispatchView() {
+export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) {
   const [snapshot, setSnapshot] = useState<DispatchSnapshot | null>(null);
   const [settings, setSettings] = useState<DispatchSettings | null>(null);
   const [audit, setAudit] = useState<DispatchSettingsAudit[]>([]);
@@ -129,12 +129,16 @@ export default function DispatchView() {
         </div>
         <button
           type="button"
-          onClick={refresh}
+          onClick={() => {
+            refresh();
+            onRefresh?.();
+          }}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-700"
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60"
         >
           <RefreshCw className="h-4 w-4" />
-          Rafraichir
         </button>
       </div>
 
@@ -405,9 +409,11 @@ export default function DispatchView() {
               setAudit(data);
               setAuditOffset(0);
             }}
-            className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-700 hover:bg-gray-100"
+            title="Rafraîchir l'historique"
+            aria-label="Rafraîchir l'historique"
+            className="p-2 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100"
           >
-            Rafraichir
+            <RefreshCw className="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -471,3 +477,4 @@ export default function DispatchView() {
     </div>
   );
 }
+

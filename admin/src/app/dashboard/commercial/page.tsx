@@ -93,12 +93,7 @@ export default function AdminDashboard() {
     useEffect(() => {
         fetchData();
 
-        // Auto-refresh toutes les 30 secondes
-        const interval = setInterval(() => {
-            fetchData();
-        }, 30000);
-
-        return () => clearInterval(interval);
+        return undefined;
     }, []);
 
     const getStatusColor = (status: 'online' | 'away' | 'offline') => {
@@ -136,6 +131,7 @@ export default function AdminDashboard() {
                             metriques={metriques}
                             performanceCommercial={performanceCommercial}
                             statutChannels={statutChannels}
+                            onRefresh={fetchData}
                         />
                     )
                 );
@@ -144,30 +140,31 @@ export default function AdminDashboard() {
                     <CommerciauxView
                         commerciaux={performanceCommercial}
                         onCommercialUpdate={fetchData}
+                        onRefresh={fetchData}
                     />
                 );
             case 'postes':
-                return <PostesView initialPostes={postes} onPosteUpdated={fetchData} />;
+                return <PostesView initialPostes={postes} onPosteUpdated={fetchData} onRefresh={fetchData} />;
             case 'queue':
-                return <QueueView />;
+                return <QueueView onRefresh={fetchData} />;
             case 'dispatch':
-                return <DispatchView />;
+                return <DispatchView onRefresh={fetchData} />;
             case 'canaux':
-                return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} />;
+                return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} onRefresh={fetchData} />;
             case 'automessages':
-                return <MessageAutoView initialMessagesAuto={messagesAuto} onMessageAutoUpdated={fetchData} />;
+                return <MessageAutoView initialMessagesAuto={messagesAuto} onMessageAutoUpdated={fetchData} onRefresh={fetchData} />;
             case 'conversations':
-                return <ConversationsView initialChats={chats} onChatUpdated={fetchData} />;
+                return <ConversationsView initialChats={chats} onChatUpdated={fetchData} onRefresh={fetchData} />;
             case 'performance':
-                return <PerformanceView />;
+                return <PerformanceView onRefresh={fetchData} />;
             case 'analytics':
-                return <AnalyticsView />;
+                return <AnalyticsView onRefresh={fetchData} />;
             case 'messages':
-                return <MessagesView messages={messages} onMessageUpdated={fetchData} />;
+                return <MessagesView messages={messages} onMessageUpdated={fetchData} onRefresh={fetchData} />;
             case 'clients':
-                return <ClientsView initialClients={clients} onClientUpdated={fetchData} />;
+                return <ClientsView initialClients={clients} onClientUpdated={fetchData} onRefresh={fetchData} />;
             case 'rapports':
-                return <RapportsView />;
+                return <RapportsView onRefresh={fetchData} />;
             default:
                 return null;
         }

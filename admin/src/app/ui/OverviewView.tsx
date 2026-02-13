@@ -3,7 +3,7 @@ import {
   MessageCircle, Users, Activity, TrendingUp, 
   UserCheck, Clock, Archive, Target, 
   Zap, CheckCircle, AlertCircle, Mail,
-  ArrowUpRight, BarChart3
+  ArrowUpRight, BarChart3, RefreshCw
 } from 'lucide-react';
 import { MetriquesGlobales, PerformanceCommercial, StatutChannel } from '@/app/lib/definitions';
 
@@ -11,12 +11,14 @@ interface OverviewViewProps {
   metriques: MetriquesGlobales;
   performanceCommercial: PerformanceCommercial[];
   statutChannels: StatutChannel[];
+  onRefresh?: () => void;
 }
 
 export default function OverviewView({
   metriques,
   performanceCommercial,
-  statutChannels
+  statutChannels,
+  onRefresh,
 }: OverviewViewProps) {
   
   // Fonction pour obtenir la couleur du statut
@@ -41,6 +43,19 @@ export default function OverviewView({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+      </div>
       {/* Stats globales principales */}
       <div className="grid grid-cols-5 gap-4">
         {/* Total Messages */}

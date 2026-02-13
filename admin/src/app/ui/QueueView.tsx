@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { RefreshCw } from "lucide-react";
 import { QueuePosition, Poste } from "@/app/lib/definitions";
 import {
   blockPosteFromQueue,
@@ -19,8 +19,6 @@ type ConnectionState =
   | "reconnecting"
   | "disconnected"
   | "error";
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
 
 const formatDate = (value?: string) => {
   if (!value) return "-";
@@ -61,10 +59,10 @@ const sortQueue = (data: QueuePosition[]) => {
     .sort((a, b) => a.position - b.position);
 };
 
-const QueueView = () => {
+const QueueView = ({ onRefresh }: { onRefresh?: () => void }) => {
   const [queue, setQueue] = useState<QueuePosition[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
-  const [status, setStatus] = useState<ConnectionState>("connecting");
+  const [status, setStatus] = useState<ConnectionState>("disconnected");
   const [actionLoading, setActionLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [lastReason, setLastReason] = useState<string | null>(null);
@@ -81,77 +79,23 @@ const QueueView = () => {
     setPostes(data);
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([refreshQueueFromRest(), refreshPostes()]);
+    onRefresh?.();
+  };
+
   useEffect(() => {
-    let socket: Socket | null = null;
-
-    try {
-      socket = io(WS_URL, {
-        transports: ["websocket"],
-        withCredentials: true,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setStatus("error");
-      addToast({ type: "error", message });
-      logger.error("QueueView socket init failed", { message });
-      return undefined;
-    }
-
-    setStatus("connecting");
-
-    const handleQueueUpdate = (payload: unknown) => {
-      const normalized = normalizeQueue(payload);
-      setQueue(normalized.queue);
-      setLastUpdated(normalized.timestamp ?? new Date().toISOString());
-      setLastReason(normalized.reason ?? null);
-    };
-
-    socket.on("connect", () => {
-      setStatus("connected");
-    });
-
-    socket.on("disconnect", () => {
-      setStatus("disconnected");
-    });
-
-    socket.on("reconnect_attempt", () => {
-      setStatus("reconnecting");
-      addToast({ type: "info", message: "Reconnexion au websocket..." });
-    });
-
-    socket.on("reconnect", () => {
-      setStatus("connected");
-      addToast({ type: "success", message: "Websocket reconnecte." });
-    });
-
-    socket.on("connect_error", (err: Error) => {
-      setStatus("error");
-      addToast({
-        type: "error",
-        message: err?.message ?? "Erreur de connexion socket",
-      });
-      logger.error("QueueView socket connect error", {
-        message: err?.message ?? "unknown",
-      });
-    });
-
-    socket.on("queue:updated", handleQueueUpdate);
-
     void (async () => {
       try {
         await Promise.all([refreshQueueFromRest(), refreshPostes()]);
       } catch (err) {
-        logger.error("QueueView REST fallback failed", {
+        logger.error("QueueView initial load failed", {
           message: err instanceof Error ? err.message : String(err),
         });
       }
     })();
-
-    return () => {
-      socket?.off("queue:updated", handleQueueUpdate);
-      socket?.disconnect();
-    };
   }, []);
+
 
   const handleReset = async () => {
     const confirmed = window.confirm(
@@ -247,6 +191,17 @@ const QueueView = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={handleRefresh}
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">
