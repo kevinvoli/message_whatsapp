@@ -26,6 +26,7 @@ import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
+import { Contact } from 'src/contact/entities/contact.entity';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 
 type AuthPayload = {
@@ -204,6 +205,46 @@ export class WhatsappMessageGateway
     });
   }
 
+  private async emitContactEventForChat(
+    contact: Contact,
+    type: string,
+    payload: unknown,
+  ) {
+    if (!contact.chat_id) {
+      return;
+    }
+
+    const chat = await this.chatService.findBychat_id(contact.chat_id);
+    const posteId = chat?.poste_id;
+    if (!posteId) {
+      return;
+    }
+
+    this.server.to(`poste_${posteId}`).emit('contact:event', {
+      type,
+      payload,
+    });
+  }
+
+  public async emitContactUpsert(contact: Contact) {
+    await this.emitContactEventForChat(contact, 'CONTACT_UPSERT', contact);
+  }
+
+  public async emitContactRemoved(contact: Contact) {
+    await this.emitContactEventForChat(contact, 'CONTACT_REMOVED', {
+      contact_id: contact.id,
+      chat_id: contact.chat_id,
+    });
+  }
+
+  public async emitContactCallStatusUpdated(contact: Contact) {
+    await this.emitContactEventForChat(
+      contact,
+      'CONTACT_CALL_STATUS_UPDATED',
+      contact,
+    );
+  }
+
   @SubscribeMessage('conversations:get')
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
@@ -221,39 +262,36 @@ export class WhatsappMessageGateway
     await this.sendContactsToClient(client,);
   }
 
-  @SubscribeMessage('typing:start')
-  handleTypingStart(
+  @SubscribeMessage('chat:event')
+  handleChatEvent(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chat_id: string },
+    @MessageBody()
+    data: { type: string; payload?: { chat_id?: string } },
   ) {
-    const agent = this.connectedAgents.get(client.id);
-    if (agent) {
-      this.logger.debug(
-        `Typing start (${agent.commercialId}) chat ${payload.chat_id}`,
-      );
+    if (data.type !== 'TYPING_START' && data.type !== 'TYPING_STOP') {
+      return;
     }
 
-    const commercialId = agent?.commercialId;
-      if (!commercialId) return;
-
-    client.to(`poste_${agent.posteId}`).emit("typing:start", {
-      chat_id: payload.chat_id,
-      commercial_id: commercialId,
-    });
-  }
-
-  @SubscribeMessage('typing:stop')
-  handleTypingStop(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chat_id: string },
-  ) {
     const agent = this.connectedAgents.get(client.id);
-  if (!agent) return;
+    if (!agent) return;
 
-  client.to(`poste_${agent.posteId}`).emit('typing:stop', {
-    chat_id: payload.chat_id,
-    commercial_id: agent.commercialId,
-  });
+    const chatId = data.payload?.chat_id;
+    if (!chatId) return;
+
+    const commercialId = agent.commercialId;
+    if (!commercialId) return;
+
+    this.logger.debug(
+      `Typing ${data.type === 'TYPING_START' ? 'start' : 'stop'} (${commercialId}) chat ${chatId}`,
+    );
+
+    client.to(`poste_${agent.posteId}`).emit('chat:event', {
+      type: data.type,
+      payload: {
+        chat_id: chatId,
+        commercial_id: commercialId,
+      },
+    });
   }
 
   @SubscribeMessage('messages:get')
@@ -474,9 +512,10 @@ export class WhatsappMessageGateway
       `Typing ${isTyping ? 'start' : 'stop'} (${chatId})`,
     );
     
-    this.server
-      .to(`chat_${chatId}`)
-      .emit(isTyping ? 'typing:start' : 'typing:stop', { chat_id: chatId });
+    this.server.to(`chat_${chatId}`).emit('chat:event', {
+      type: isTyping ? 'TYPING_START' : 'TYPING_STOP',
+      payload: { chat_id: chatId },
+    });
   }
 
   public isAgentConnected(posteId: string): boolean {

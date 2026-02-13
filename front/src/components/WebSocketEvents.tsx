@@ -27,13 +27,12 @@ const WebSocketEvents = () => {
     updateConversation,
     removeConversationBychat_id,
     addConversation,
-    updateMessageStatus,
     setTyping,
     clearTyping,
     loadConversations,
   } = useChatStore();
 
-  const { setContacts } = useContactStore();
+  const { setContacts, upsertContact, removeContact } = useContactStore();
 
   useEffect(() => {
     if (!socket || !user) {
@@ -115,29 +114,35 @@ const WebSocketEvents = () => {
           break;
         }
 
-        case 'AUTO_MESSAGE_STATUS':
-          upsertConversationPatch(data.payload.chat_id, {
-            auto_message_status: data.payload.status,
-          });
-          break;
-
         case 'CONVERSATION_LIST': {
           const conversations: Conversation[] = data.payload.map(transformToConversation);
           setConversations(conversations);
           break;
         }
 
-        case 'CONVERSATION_REASSIGNED':
-          upsertConversationPatch(data.payload.chat_id, {
-            status: 'actif',
-          });
-          break;
-
         case 'CONVERSATION_READONLY':
           upsertConversationPatch(data.payload.chat_id, {
             readonly: true,
           });
           break;
+
+        case 'TYPING_START': {
+          const payload = data.payload as { chat_id: string; commercial_id?: string };
+          if (payload.commercial_id && payload.commercial_id === user.id) {
+            break;
+          }
+          setTyping(payload.chat_id);
+          break;
+        }
+
+        case 'TYPING_STOP': {
+          const payload = data.payload as { chat_id: string; commercial_id?: string };
+          if (payload.commercial_id && payload.commercial_id === user.id) {
+            break;
+          }
+          clearTyping(payload.chat_id);
+          break;
+        }
 
         case 'MESSAGE_SEND_ERROR': {
           const tempId = (data.payload as { tempId?: string }).tempId;
@@ -165,43 +170,33 @@ const WebSocketEvents = () => {
     };
 
     const handleContactEvent = (data: { type: string; payload: any }) => {
-      if (data.type !== 'CONTACT_LIST') {
-        return;
+      switch (data.type) {
+        case 'CONTACT_LIST': {
+          const contacts: Contact[] = data.payload.map(transformToContact);
+          setContacts(contacts);
+          break;
+        }
+        case 'CONTACT_UPSERT': {
+          const contact: Contact = transformToContact(data.payload);
+          upsertContact(contact);
+          break;
+        }
+        case 'CONTACT_REMOVED': {
+          const contactId =
+            data.payload?.contact_id ?? data.payload?.id ?? data.payload;
+          if (typeof contactId === 'string') {
+            removeContact(contactId);
+          }
+          break;
+        }
+        case 'CONTACT_CALL_STATUS_UPDATED': {
+          const contact: Contact = transformToContact(data.payload);
+          upsertContact(contact);
+          break;
+        }
+        default:
+          logger.warn('Unhandled contact event type', { type: data.type });
       }
-
-      const contacts: Contact[] = data.payload.map(transformToContact);
-      setContacts(contacts);
-    };
-
-    const handleMessageStatusUpdate = (data: {
-      conversationId: string;
-      messageId: string;
-      status: string;
-    }) => {
-      const allowedStatuses = ['sending', 'sent', 'delivered', 'read', 'error'] as const;
-      if (!allowedStatuses.includes(data.status as (typeof allowedStatuses)[number])) {
-        return;
-      }
-
-      updateMessageStatus(
-        data.conversationId,
-        data.messageId,
-        data.status as (typeof allowedStatuses)[number],
-      );
-    };
-
-    const handleTypingStart = (data: { chat_id: string; commercial_id: string }) => {
-      if (data.commercial_id === user.id) {
-        return;
-      }
-      setTyping(data.chat_id);
-    };
-
-    const handleTypingStop = (data: { chat_id: string; commercial_id: string }) => {
-      if (data.commercial_id === user.id) {
-        return;
-      }
-      clearTyping(data.chat_id);
     };
 
     const handleSocketError = (error: { message: string; details?: string }) => {
@@ -213,9 +208,6 @@ const WebSocketEvents = () => {
 
     socket.on('chat:event', handleChatEvent);
     socket.on('contact:event', handleContactEvent);
-    socket.on('message:status:update', handleMessageStatusUpdate);
-    socket.on('typing:start', handleTypingStart);
-    socket.on('typing:stop', handleTypingStop);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
     socket.on('reconnect', refreshAfterConnect);
@@ -227,9 +219,6 @@ const WebSocketEvents = () => {
     return () => {
       socket.off('chat:event', handleChatEvent);
       socket.off('contact:event', handleContactEvent);
-      socket.off('message:status:update', handleMessageStatusUpdate);
-      socket.off('typing:start', handleTypingStart);
-      socket.off('typing:stop', handleTypingStop);
       socket.off('error', handleSocketError);
       socket.off('connect', refreshAfterConnect);
       socket.off('reconnect', refreshAfterConnect);
@@ -245,11 +234,12 @@ const WebSocketEvents = () => {
     updateConversation,
     removeConversationBychat_id,
     addConversation,
-    updateMessageStatus,
     setTyping,
     clearTyping,
     loadConversations,
     setContacts,
+    upsertContact,
+    removeContact,
   ]);
 
   return null;

@@ -5,15 +5,21 @@ import { CreateContactDto } from './dto/create-contact.dto'; // Added import
 import { UpdateContactCallDto } from './dto/update-contact-call.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Added import
 import { AuthGuard } from '@nestjs/passport';
+import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 
 @Controller('contact')
 export class ContactController {
-  constructor(private readonly service: ContactService) {}
+  constructor(
+    private readonly service: ContactService,
+    private readonly gateway: WhatsappMessageGateway,
+  ) {}
 
   @Post()
   @UseGuards(AdminGuard)
-  create(@Body() dto: CreateContactDto) {
-    return this.service.create(dto);
+  async create(@Body() dto: CreateContactDto) {
+    const contact = await this.service.create(dto);
+    await this.gateway.emitContactUpsert(contact);
+    return contact;
   }
 
   @Get()
@@ -30,19 +36,28 @@ export class ContactController {
 
   @Patch(':id')
   @UseGuards(AdminGuard)
-  update(@Param('id') id: string, @Body() dto: UpdateContactDto) {
-    return this.service.update(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateContactDto) {
+    const contact = await this.service.update(id, dto);
+    await this.gateway.emitContactUpsert(contact);
+    return contact;
   }
 
   @Patch(':id/call-status')
   @UseGuards(AuthGuard('jwt'))
-  updateCallStatus(@Param('id') id: string, @Body() dto: UpdateContactCallDto) {
-    return this.service.updateCallStatus(id, dto);
+  async updateCallStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateContactCallDto,
+  ) {
+    const contact = await this.service.updateCallStatus(id, dto);
+    await this.gateway.emitContactCallStatusUpdated(contact);
+    return contact;
   }
 
   @Delete(':id')
   @UseGuards(AdminGuard)
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  async remove(@Param('id') id: string) {
+    const contact = await this.service.remove(id);
+    await this.gateway.emitContactRemoved(contact);
+    return contact;
   }
 }

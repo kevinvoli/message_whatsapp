@@ -1,4 +1,4 @@
-// src/store/chatStore.ts
+﻿// src/store/chatStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
 import { Contact  } from "@/types/chat";
@@ -15,6 +15,8 @@ interface ContactState {
   // Setters for WebSocket events
   selectContact: (contact_id: string) => void;
   setContacts: (contact: Contact[]) => void;
+  upsertContact: (contact: Contact) => void;
+  removeContact: (contact_id: string) => void;
   // updateContactStatus: (contact: Contact) => void;
   loadContacts: () => void;
   reset: () => void;
@@ -73,15 +75,50 @@ export const useContactStore = create<ContactState>((set, get) => ({
       };
     });
 
-    // 🔔 Charge les messages + déclenche le READ côté backend
-    const socket = get().socket;
-    socket?.emit("contact:get", { contact_id });
+    // Charge les messages + declenche le READ cote backend
   },
 
   setContacts: (contacts) => {
     logger.debug("Contacts loaded", { count: contacts.length });
 
     set({ contacts, isLoading: false });
+  },
+
+  upsertContact: (contact) => {
+    set((state) => {
+      const existingIndex = state.contacts.findIndex(
+        (c) => c.id === contact.id,
+      );
+      const nextContacts =
+        existingIndex === -1
+          ? [contact, ...state.contacts]
+          : state.contacts.map((c) =>
+              c.id === contact.id ? { ...c, ...contact } : c,
+            );
+
+      const nextSelected =
+        state.selectedContact?.id === contact.id
+          ? { ...state.selectedContact, ...contact }
+          : state.selectedContact;
+
+      return {
+        contacts: nextContacts,
+        selectedContact: nextSelected,
+      };
+    });
+  },
+
+  removeContact: (contact_id) => {
+    set((state) => {
+      const nextContacts = state.contacts.filter((c) => c.id !== contact_id);
+      const nextSelected =
+        state.selectedContact?.id === contact_id ? null : state.selectedContact;
+
+      return {
+        contacts: nextContacts,
+        selectedContact: nextSelected,
+      };
+    });
   },
 
 
@@ -114,3 +151,4 @@ export const useContactStore = create<ContactState>((set, get) => ({
   
   reset: () => set({ ...initialState }),
 }));
+

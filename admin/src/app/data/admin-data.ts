@@ -1,10 +1,11 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare } from 'lucide-react'; // Import MessageSquareText, MessageSquare
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered } from 'lucide-react'; // Import MessageSquareText, MessageSquare
 
 export const navigationItems: NavigationItem[] = [
   { id: 'overview', name: 'Vue d\'ensemble', icon: Home, badge: null },
   { id: 'commerciaux', name: 'Équipe', icon: Users, badge: '5' },
   { id: 'postes', name: 'Postes', icon: Network, badge: null },
+  { id: 'queue', name: 'Queue', icon: ListOrdered, badge: null },
   { id: 'canaux', name: 'Canaux', icon: Globe, badge: null },
   { id: 'automessages', name: 'Messages auto', icon: MessageSquareText, badge: null }, // Nouveau: Messages auto
   { id: 'conversations', name: 'Conversations', icon: MessageSquare, badge: null }, // Nouveau: Conversations

@@ -1,19 +1,128 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
-import { WhatsappMessageService } from './whatsapp_message.service';
 
-describe('WhatsappMessageGateway', () => {
-  let gateway: WhatsappMessageGateway;
+describe('WhatsappMessageGateway protocol events', () => {
+  const chatService = {
+    findBychat_id: jest.fn(),
+  };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [WhatsappMessageGateway, WhatsappMessageService],
-    }).compile();
+  const makeGateway = () => {
+    return new WhatsappMessageGateway(
+      {} as any,
+      chatService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+  };
 
-    gateway = module.get<WhatsappMessageGateway>(WhatsappMessageGateway);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('should be defined', () => {
-    expect(gateway).toBeDefined();
+  it('emits CONTACT_UPSERT on contact:event', async () => {
+    const gateway = makeGateway();
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    (gateway as any).server = { to } as any;
+
+    chatService.findBychat_id.mockResolvedValue({ poste_id: 'poste-1' });
+
+    await gateway.emitContactUpsert({
+      id: 'contact-1',
+      chat_id: 'chat-1',
+    } as any);
+
+    expect(to).toHaveBeenCalledWith('poste_poste-1');
+    expect(emit).toHaveBeenCalledWith('contact:event', {
+      type: 'CONTACT_UPSERT',
+      payload: expect.objectContaining({
+        id: 'contact-1',
+        chat_id: 'chat-1',
+      }),
+    });
+  });
+
+  it('emits CONTACT_REMOVED on contact:event', async () => {
+    const gateway = makeGateway();
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    (gateway as any).server = { to } as any;
+
+    chatService.findBychat_id.mockResolvedValue({ poste_id: 'poste-2' });
+
+    await gateway.emitContactRemoved({
+      id: 'contact-2',
+      chat_id: 'chat-2',
+    } as any);
+
+    expect(to).toHaveBeenCalledWith('poste_poste-2');
+    expect(emit).toHaveBeenCalledWith('contact:event', {
+      type: 'CONTACT_REMOVED',
+      payload: {
+        contact_id: 'contact-2',
+        chat_id: 'chat-2',
+      },
+    });
+  });
+
+  it('emits CONTACT_CALL_STATUS_UPDATED on contact:event', async () => {
+    const gateway = makeGateway();
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    (gateway as any).server = { to } as any;
+
+    chatService.findBychat_id.mockResolvedValue({ poste_id: 'poste-3' });
+
+    await gateway.emitContactCallStatusUpdated({
+      id: 'contact-3',
+      chat_id: 'chat-3',
+      call_status: 'appelé',
+    } as any);
+
+    expect(to).toHaveBeenCalledWith('poste_poste-3');
+    expect(emit).toHaveBeenCalledWith('contact:event', {
+      type: 'CONTACT_CALL_STATUS_UPDATED',
+      payload: expect.objectContaining({
+        id: 'contact-3',
+        chat_id: 'chat-3',
+      }),
+    });
+  });
+
+  it('broadcasts TYPING_START via chat:event', () => {
+    const gateway = makeGateway();
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    const client = { id: 'client-1', to } as any;
+
+    const connectedAgents = (gateway as any).connectedAgents as Map<
+      string,
+      { commercialId: string; posteId: string }
+    >;
+    connectedAgents.set('client-1', {
+      commercialId: 'commercial-1',
+      posteId: 'poste-9',
+    });
+
+    gateway.handleChatEvent(client, {
+      type: 'TYPING_START',
+      payload: { chat_id: 'chat-9' },
+    });
+
+    expect(to).toHaveBeenCalledWith('poste_poste-9');
+    expect(emit).toHaveBeenCalledWith('chat:event', {
+      type: 'TYPING_START',
+      payload: {
+        chat_id: 'chat-9',
+        commercial_id: 'commercial-1',
+      },
+    });
   });
 });

@@ -164,7 +164,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   onTypingStart: (chat_id: string) => {
     const { socket } = get();
     if (!socket) return;
-    socket.emit("typing:start", { chat_id });
+    socket.emit("chat:event", { type: "TYPING_START", payload: { chat_id } });
   },
 
   onTypingStop: (chat_id) => {
@@ -172,7 +172,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (!socket) return;
 
-    socket.emit("typing:stop", { chat_id });
+    socket.emit("chat:event", { type: "TYPING_STOP", payload: { chat_id } });
   },
 
   setConversations: (conversations) => {

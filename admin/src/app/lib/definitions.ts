@@ -20,7 +20,19 @@ export type Commercial = {
   productivite: number;
 };
 
-export type ViewMode = 'overview' | 'commerciaux' | 'performance' | 'analytics' | 'messages' | 'clients' | 'rapports' | 'postes' | 'canaux' | 'automessages' | 'conversations';
+export type ViewMode =
+  | 'overview'
+  | 'commerciaux'
+  | 'performance'
+  | 'analytics'
+  | 'messages'
+  | 'clients'
+  | 'rapports'
+  | 'postes'
+  | 'canaux'
+  | 'automessages'
+  | 'conversations'
+  | 'queue';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -161,6 +173,15 @@ export type WhatsappChat = {
   last_message?: WhatsappMessage | null;
   poste: Poste;
   messages: WhatsappMessage[];
+};
+
+export type QueuePosition = {
+  id: string;
+  poste_id: string;
+  position: number;
+  addedAt?: string;
+  updatedAt?: string;
+  poste?: Poste;
 };
 
 // ============================================
