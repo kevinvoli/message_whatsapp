@@ -20,6 +20,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     const [messageInput, setMessageInput] = useState('');
     const [loadingChats, setLoadingChats] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [activeTab, setActiveTab] = useState<'conversation' | 'infos'>('conversation');
     const { addToast } = useToast();
     const loadingToastRef = useRef(false);
 
@@ -43,6 +44,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     useEffect(() => {
         if (selectedChat) {
             fetchMessages(selectedChat.chat_id);
+            setActiveTab('conversation');
         } else {
             setMessages([]);
         }
@@ -59,6 +61,60 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
 
     const getUnreadCount = (chat: WhatsappChat) =>
       chat.unread_count ?? chat.unreadCount ?? 0;
+
+    const formatDateTime = (value?: string | null) =>
+      value ? new Date(value).toLocaleString('fr-FR') : '—';
+
+    const formatBool = (value?: boolean) => (value ? 'Oui' : 'Non');
+
+    const resolvePosteLabel = (chat: WhatsappChat) =>
+      chat.poste?.name ?? chat.poste_id ?? '—';
+
+    const resolveChannelLabel = (chat: WhatsappChat) =>
+      chat.channel?.channel_id ?? chat.channel_id ?? '—';
+
+    const getStatusLabel = (chat: WhatsappChat) =>
+      chat.status ? chat.status.replace('_', ' ') : 'attente';
+
+    const formatUptime = (value?: number | null) => {
+      if (value === null || value === undefined) return '—';
+      const minutes = Math.floor(value / 60);
+      if (minutes < 60) return `${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      const remaining = minutes % 60;
+      return remaining === 0 ? `${hours} h` : `${hours} h ${remaining} min`;
+    };
+
+    const formatUptime = (value?: number | null) => {
+      if (value === null || value === undefined) return '—';
+      const minutes = Math.floor(value / 60);
+      if (minutes < 60) return `${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      const remaining = minutes % 60;
+      return remaining === 0 ? `${hours} h` : `${hours} h ${remaining} min`;
+    };
+
+    const DetailItem = ({ label, value }: { label: string; value: string }) => (
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-gray-500">{label}</span>
+        <span className="text-xs text-gray-800 text-right">{value}</span>
+      </div>
+    );
+
+    const InfoCard = ({
+      title,
+      children,
+    }: {
+      title: string;
+      children: React.ReactNode;
+    }) => (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          {title}
+        </div>
+        <div className="space-y-2">{children}</div>
+      </div>
+    );
 
     const fetchMessages = async (chatId: string) => {
         // Removed: if (!token) { setError("Authentication token is missing."); return; }
@@ -174,6 +230,9 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                             ? resolveAdminMessageText(chat.messages[chat.messages.length - 1])
                                             : '[Message client]'}
                                     </p>
+                                    <p className="text-xs text-gray-400 mt-1 truncate">
+                                        {getStatusLabel(chat)} • Poste: {resolvePosteLabel(chat)} • Canal: {resolveChannelLabel(chat)}
+                                    </p>
                                 </div>
                                 {getUnreadCount(chat) > 0 && (
                                     <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
@@ -197,6 +256,64 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                             <div className="ml-3">
                                 <h3 className="font-semibold text-gray-800">{selectedChat.name}</h3>
                                 <p className="text-sm text-gray-500">{selectedChat.contact_client}</p>
+                                <div className="mt-1 flex flex-wrap gap-2">
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                        {getStatusLabel(selectedChat)}
+                                    </span>
+                                    {selectedChat.read_only && (
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
+                                            Lecture seule
+                                        </span>
+                                    )}
+                                    {selectedChat.is_archived && (
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                                            Archivée
+                                        </span>
+                                    )}
+                                    {selectedChat.is_muted && (
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                                            Silencieuse
+                                        </span>
+                                    )}
+                                    {selectedChat.is_pinned && (
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800">
+                                            Épinglée
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-b border-gray-200 bg-white px-4 py-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <DetailItem label="Téléphone" value={selectedChat.client_phone ?? selectedChat.contact_client ?? '—'} />
+                                <DetailItem label="Contact" value={selectedChat.contact_client ?? '—'} />
+                                <DetailItem label="Poste" value={resolvePosteLabel(selectedChat)} />
+                                <DetailItem label="Poste code" value={selectedChat.poste?.code ?? '—'} />
+                                <DetailItem label="Canal" value={resolveChannelLabel(selectedChat)} />
+                                <DetailItem label="Canal uptime" value={formatUptime(selectedChat.channel?.uptime)} />
+                                <DetailItem label="Canal version" value={selectedChat.channel?.version ?? '—'} />
+                                <DetailItem label="Call status" value={selectedChat.contact?.call_status ?? '—'} />
+                                <DetailItem label="Call count" value={String(selectedChat.contact?.call_count ?? 0)} />
+                                <DetailItem label="Dernier appel" value={formatDateTime(selectedChat.contact?.last_call_date)} />
+                                <DetailItem label="Notes appel" value={selectedChat.contact?.call_notes ?? '—'} />
+                                <DetailItem label="Priority" value={selectedChat.contact?.priority ?? '—'} />
+                                <DetailItem label="Conversion" value={selectedChat.contact?.conversion_status ?? '—'} />
+                                <DetailItem label="Assignée le" value={formatDateTime(selectedChat.assigned_at)} />
+                                <DetailItem label="Mode assignation" value={selectedChat.assigned_mode ?? '—'} />
+                                <DetailItem label="Deadline 1ère réponse" value={formatDateTime(selectedChat.first_response_deadline_at)} />
+                                <DetailItem label="Dernier msg client" value={formatDateTime(selectedChat.last_client_message_at)} />
+                                <DetailItem label="Dernier msg poste" value={formatDateTime(selectedChat.last_poste_message_at)} />
+                                <DetailItem label="Dernière activité" value={formatDateTime(selectedChat.last_activity_at)} />
+                                <DetailItem label="Non lus" value={String(getUnreadCount(selectedChat))} />
+                                <DetailItem label="Auto-msg status" value={selectedChat.auto_message_status ?? '—'} />
+                                <DetailItem label="Auto-msg step" value={String(selectedChat.auto_message_step ?? 0)} />
+                                <DetailItem label="En attente réponse" value={formatBool(selectedChat.waiting_client_reply)} />
+                                <DetailItem label="Dernier auto-msg" value={formatDateTime(selectedChat.last_auto_message_sent_at)} />
+                                <DetailItem label="Muter jusqu'à" value={formatDateTime(selectedChat.mute_until)} />
+                                <DetailItem label="Not spam" value={formatBool(selectedChat.not_spam)} />
+                                <DetailItem label="Créée le" value={formatDateTime(selectedChat.createdAt)} />
+                                <DetailItem label="Mise à jour" value={formatDateTime(selectedChat.updatedAt)} />
                             </div>
                         </div>
 

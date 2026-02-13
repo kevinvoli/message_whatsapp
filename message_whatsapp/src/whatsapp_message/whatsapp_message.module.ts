@@ -64,6 +64,6 @@ import { LoggingModule } from 'src/logging/logging.module';
     WhatsappPosteService,
     MessageAutoService
   ],
-  exports: [WhatsappMessageGateway],
+  exports: [WhatsappMessageGateway, WhatsappMessageService, FirstResponseTimeoutJob],
 })
 export class WhatsappMessageModule {}

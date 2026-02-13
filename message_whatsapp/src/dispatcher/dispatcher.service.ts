@@ -4,7 +4,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { IsNull, LessThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
@@ -16,6 +16,7 @@ export class DispatcherService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+
 
     private readonly queueService: QueueService,
 
@@ -35,14 +36,24 @@ export class DispatcherService {
   async assignConversation(
     clientPhone: string,
     clientName: string,
-    
+    traceId?: string,
   ): Promise<WhatsappChat | null> {
+    if (traceId) {
+      this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
+    }
     // 🔎 Chercher la conversation existante
     
     const conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
       relations: ['messages', 'poste'],
     });
+
+    if (conversation?.read_only) {
+      this.logger.warn(
+        `Conversation read_only ignoree (${conversation.chat_id})`,
+      );
+      return null;
+    }
 
     // console.log("=========================== conversation", conversation);
 
@@ -63,6 +74,11 @@ export class DispatcherService {
       
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
+      if (!conversation.first_response_deadline_at && !conversation.last_poste_message_at) {
+        conversation.first_response_deadline_at = new Date(
+          Date.now() + 5 * 60 * 1000,
+        );
+      }
       if (conversation.status === WhatsappChatStatus.FERME) {
         conversation.status = WhatsappChatStatus.ACTIF;
       }
@@ -97,11 +113,13 @@ export class DispatcherService {
       );
       conversation.poste = nextAgent;
       conversation.poste_id = nextAgent.id;
-      conversation.status = WhatsappChatStatus.EN_ATTENTE;
+      conversation.status = nextAgent.is_active
+        ? WhatsappChatStatus.ACTIF
+        : WhatsappChatStatus.EN_ATTENTE;
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
       conversation.assigned_at = new Date();
-      conversation.assigned_mode = 'ONLINE';
+      conversation.assigned_mode = nextAgent.is_active ? 'ONLINE' : 'OFFLINE';
       conversation.first_response_deadline_at = new Date(
         Date.now() + 5 * 60* 1000,
       );
@@ -124,13 +142,15 @@ export class DispatcherService {
       contact_client:  clientPhone.split('@')[0],
       poste: nextAgent,
       poste_id: nextAgent.id,
-      status: WhatsappChatStatus.ACTIF,
+      status: nextAgent.is_active
+        ? WhatsappChatStatus.ACTIF
+        : WhatsappChatStatus.EN_ATTENTE,
       unread_count: 1,
       last_activity_at: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
       assigned_at: new Date(),
-      assigned_mode: 'ONLINE',
+      assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
       first_response_deadline_at:  new Date(
         Date.now() + 5 * 60* 1000,
       ),
@@ -147,6 +167,12 @@ export class DispatcherService {
 
 
   async reinjectConversation(chat: WhatsappChat) {
+    if (chat.read_only) {
+      this.logger.warn(
+        `Reinjection ignoree: conversation read_only (${chat.chat_id})`,
+      );
+      return;
+    }
     await this.chatRepository.update(chat.id, {
       poste: null,
       poste_id: null,
@@ -161,6 +187,12 @@ export class DispatcherService {
 
   async dispatchExistingConversation(chat: WhatsappChat) {
     const oldPoste = chat.poste_id;
+    if (chat.read_only) {
+      this.logger.warn(
+        `Dispatch ignore: conversation read_only (${chat.chat_id})`,
+      );
+      return;
+    }
     if (!oldPoste) {
       return;
     }
@@ -171,6 +203,9 @@ export class DispatcherService {
       poste: nextPoste,
       poste_id: nextPoste.id,
       assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
+      status: nextPoste.is_active
+        ? WhatsappChatStatus.ACTIF
+        : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
       first_response_deadline_at:  new Date(
         Date.now() + 5 * 60* 1000,
@@ -201,7 +236,7 @@ export class DispatcherService {
     const chats = await this.chatRepository.find({
       where: {
         poste_id: poste_id,
-        status: WhatsappChatStatus.EN_ATTENTE,
+        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
         last_poste_message_at: IsNull(),
         first_response_deadline_at: LessThan(now),
       },
@@ -213,5 +248,25 @@ export class DispatcherService {
     for (const chat of chats) {
       await this.reinjectConversation(chat);
     }
+  }
+
+  async getDispatchSnapshot(): Promise<{
+    queue_size: number;
+    waiting_count: number;
+    waiting_items: WhatsappChat[];
+  }> {
+    const queue = await this.queueService.getQueuePositions();
+    const waitingChats = await this.chatRepository.find({
+      where: { status: WhatsappChatStatus.EN_ATTENTE },
+      relations: ['poste'],
+      order: { updatedAt: 'DESC' },
+      take: 50,
+    });
+
+    return {
+      queue_size: queue.length,
+      waiting_count: waitingChats.length,
+      waiting_items: waitingChats,
+    };
   }
 }

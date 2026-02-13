@@ -8,7 +8,6 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
-import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 
 // Importer vos entités
@@ -23,7 +22,6 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
       Contact,
       WhatsappPoste,
       WhapiChannel,
-      PendingMessage,
       QueuePosition,
     ]),
   ],

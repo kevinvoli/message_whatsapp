@@ -295,4 +295,5 @@ export class QueueMetricsDto {
   @ApiProperty({ description: 'Churn 24h (positions mises a jour)' })
   @IsNumber()
   churn_24h: number;
+
 }

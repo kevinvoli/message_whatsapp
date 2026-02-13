@@ -2,8 +2,9 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DispatcherService } from './dispatcher.service';
 import { QueueService } from './services/queue.service';
-import { PendingMessage } from './entities/pending-message.entity';
 import { QueuePosition } from './entities/queue-position.entity';
+import { DispatchSettings } from './entities/dispatch-settings.entity';
+import { DispatchSettingsAudit } from './entities/dispatch-settings-audit.entity';
 import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -20,12 +21,16 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { LoggingModule } from 'src/logging/logging.module';
 import { DispatcherController } from './dispatcher.controller';
+import { OfflineReinjectionJob } from 'src/jorbs/offline-reinjection.job';
+import { DispatchSettingsService } from './services/dispatch-settings.service';
+import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      PendingMessage,
       QueuePosition,
+      DispatchSettings,
+      DispatchSettingsAudit,
       WhatsappMessage,
       WhatsappChat,
       WhatsappCommercial,
@@ -47,7 +52,10 @@ import { DispatcherController } from './dispatcher.controller';
     ChannelService,
     ContactService,
     WhatsappPosteService,
+    OfflineReinjectionJob,
+    ReadOnlyEnforcementJob,
+    DispatchSettingsService,
   ],
-  exports: [DispatcherService, QueueService],
+  exports: [DispatcherService, QueueService, DispatchSettingsService],
 })
 export class DispatcherModule {}

@@ -32,7 +32,8 @@ export type ViewMode =
   | 'canaux'
   | 'automessages'
   | 'conversations'
-  | 'queue';
+  | 'queue'
+  | 'dispatch';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -124,6 +125,17 @@ export type Client = {
   phone: string;
   chat_id?: string;
   is_active: boolean;
+  call_status?: string;
+  last_call_date?: string | null;
+  last_call_outcome?: string | null;
+  next_call_date?: string | null;
+  call_count?: number;
+  call_notes?: string | null;
+  total_messages?: number;
+  last_message_date?: string | null;
+  conversion_status?: string | null;
+  source?: string | null;
+  priority?: string | null;
   messages?: WhatsappMessage[];
   createdAt: string;
   updatedAt: string;
@@ -131,15 +143,36 @@ export type Client = {
 
 export type WhatsappMessage = {
   id: string;
+  message_id?: string | null;
+  external_id?: string;
   chat_id: string;
+  channel_id?: string;
   text: string;
+  type?: string;
   direction: 'IN' | 'OUT';
   status: 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
   timestamp: string;
   mediaUrl?: string;
   mediaType?: string;
+  medias?: Array<{
+    id?: string;
+    type?: string;
+    url?: string;
+    mime_type?: string;
+    caption?: string;
+    file_name?: string;
+    file_size?: number;
+    seconds?: number;
+    latitude?: number;
+    longitude?: number;
+  }>;
   poste?: Poste;
+  poste_id?: string | null;
   commercial?: Commercial;
+  commercial_id?: string | null;
+  from?: string;
+  from_name?: string;
+  source?: string;
   caption?: string;
   is_deleted: boolean;
   createdAt: string;
@@ -168,10 +201,23 @@ export type WhatsappChat = {
   not_spam: boolean;
   contact_client: string;
   client_phone?: string;
+  assigned_at?: string | null;
+  assigned_mode?: 'ONLINE' | 'OFFLINE' | null;
+  first_response_deadline_at?: string | null;
+  last_client_message_at?: string | null;
+  last_poste_message_at?: string | null;
+  auto_message_id?: string | null;
+  current_auto_message_id?: string | null;
+  auto_message_status?: string | null;
+  auto_message_step?: number;
+  waiting_client_reply?: boolean;
+  last_auto_message_sent_at?: string | null;
   last_activity_at: string;
   createdAt: string;
   updatedAt: string;
   last_message?: WhatsappMessage | null;
+  channel?: Channel;
+  contact?: Client;
   poste: Poste;
   messages: WhatsappMessage[];
 };
@@ -183,6 +229,34 @@ export type QueuePosition = {
   addedAt?: string;
   updatedAt?: string;
   poste?: Poste;
+};
+
+export type DispatchSnapshot = {
+  queue_size: number;
+  waiting_count: number;
+  waiting_items: Array<{
+    id: string;
+    chat_id: string;
+    status: string;
+    poste_id?: string | null;
+    assigned_at?: string | null;
+    last_client_message_at?: string | null;
+    first_response_deadline_at?: string | null;
+    poste?: Poste | null;
+  }>;
+};
+
+export type DispatchSettings = {
+  no_reply_reinject_interval_minutes: number;
+  read_only_check_interval_minutes: number;
+  offline_reinject_cron: string;
+};
+
+export type DispatchSettingsAudit = {
+  id: string;
+  settings_id: string;
+  payload: string;
+  created_at: string;
 };
 
 // ============================================

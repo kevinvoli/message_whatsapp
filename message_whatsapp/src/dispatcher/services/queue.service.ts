@@ -157,14 +157,13 @@ export class QueueService implements OnModuleInit {
         relations: ['poste'],
       });
 
-      this.logger.warn(
-        `Resherche d'agent disponible, message mis en attente (${next?.id})`,
-      );
-
       if (!next || !next.poste) {
+        this.logger.warn(
+          `Aucun poste disponible, message mis en attente (queue vide)`,
+        );
         return null;
       }
-      this.logger.warn(
+      this.logger.debug(
         `Poste disponible: ${next.poste.name} (${next.poste.id})`,
       );
       await this.moveToEnd(next.poste_id);

@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition } from './definitions'; // Added WhatsappChat, WhatsappMessage
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit } from './definitions'; // Added WhatsappChat, WhatsappMessage
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -235,6 +235,70 @@ export async function getQueue(): Promise<QueuePosition[]> {
     return handleResponse<QueuePosition[]>(response);
 }
 
+export async function getDispatchSnapshot(): Promise<DispatchSnapshot> {
+    const response = await fetch(`${API_BASE_URL}/queue/dispatch`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<DispatchSnapshot>(response);
+}
+
+export async function getDispatchSettings(): Promise<DispatchSettings> {
+    const response = await fetch(`${API_BASE_URL}/queue/dispatch/settings`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<DispatchSettings>(response);
+}
+
+export async function updateDispatchSettings(
+  payload: Partial<DispatchSettings>,
+): Promise<DispatchSettings> {
+    const response = await fetch(`${API_BASE_URL}/queue/dispatch/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<DispatchSettings>(response);
+}
+
+export async function resetDispatchSettings(): Promise<DispatchSettings> {
+    const response = await fetch(`${API_BASE_URL}/queue/dispatch/settings/reset`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<DispatchSettings>(response);
+}
+
+export async function getDispatchSettingsAudit(
+  params: { limit?: number; offset?: number; resetOnly?: boolean; q?: string; from?: string; to?: string } = {},
+): Promise<DispatchSettingsAudit[]> {
+    const { limit = 50, offset = 0, resetOnly = false, q = '', from = '', to = '' } = params;
+    const response = await fetch(
+      `${API_BASE_URL}/queue/dispatch/settings/audit?limit=${limit}&offset=${offset}&reset_only=${resetOnly}&q=${encodeURIComponent(q)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      },
+    );
+    return handleResponse<DispatchSettingsAudit[]>(response);
+}
+
+export async function getDispatchSettingsAuditPage(
+  params: { page?: number; limit?: number; resetOnly?: boolean; q?: string; from?: string; to?: string } = {},
+): Promise<{ data: DispatchSettingsAudit[]; total: number }> {
+    const { page = 1, limit = 50, resetOnly = false, q = '', from = '', to = '' } = params;
+    const response = await fetch(
+      `${API_BASE_URL}/queue/dispatch/settings/audit/page?page=${page}&limit=${limit}&reset_only=${resetOnly}&q=${encodeURIComponent(q)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      },
+    );
+    return handleResponse<{ data: DispatchSettingsAudit[]; total: number }>(response);
+}
+
 export async function resetQueue(): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/queue/reset`, {
         method: 'POST',
@@ -306,10 +370,23 @@ function normalizeWhatsappChat(
     not_spam: chat.not_spam ?? true,
     contact_client: chat.contact_client ?? chat.client_phone ?? '',
     client_phone: chat.client_phone ?? chat.contact_client,
+    assigned_at: chat.assigned_at ?? null,
+    assigned_mode: chat.assigned_mode ?? null,
+    first_response_deadline_at: chat.first_response_deadline_at ?? null,
+    last_client_message_at: chat.last_client_message_at ?? null,
+    last_poste_message_at: chat.last_poste_message_at ?? null,
+    auto_message_id: chat.auto_message_id ?? null,
+    current_auto_message_id: chat.current_auto_message_id ?? null,
+    auto_message_status: chat.auto_message_status ?? null,
+    auto_message_step: chat.auto_message_step ?? 0,
+    waiting_client_reply: chat.waiting_client_reply ?? false,
+    last_auto_message_sent_at: chat.last_auto_message_sent_at ?? null,
     last_activity_at: chat.last_activity_at ?? '',
     createdAt: chat.createdAt ?? new Date(0).toISOString(),
     updatedAt: chat.updatedAt ?? new Date(0).toISOString(),
     poste: chat.poste as WhatsappChat['poste'],
+    channel: chat.channel as WhatsappChat['channel'],
+    contact: (chat as any).contact as WhatsappChat['contact'],
     messages: (chat.messages ?? []) as WhatsappChat['messages'],
     last_message: (chat as any).last_message ?? null,
   };

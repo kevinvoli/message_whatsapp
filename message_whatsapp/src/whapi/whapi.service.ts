@@ -101,6 +101,7 @@ export class WhapiService {
       const conversation = await this.dispatcherService.assignConversation(
         message.chat_id,
         message.from_name ?? 'Client',
+        traceId,
       );
 
       if (!conversation) {
@@ -247,27 +248,11 @@ export class WhapiService {
     return medias;
   }
 
+
+
   // ======================================================
   // TEXT FALLBACK
   // ======================================================
-  private extractMessageContent(message: WhapiMessage): string {
-    switch (message.type) {
-      case 'text':
-        return message.text?.body ?? '';
-      case 'image':
-        return message.image?.caption ?? '[Image]';
-      case 'video':
-        return message.video?.caption ?? '[VidÃ©o]';
-      case 'audio':
-      case 'voice':
-        return '[Audio]';
-      case 'document':
-        return message.document?.filename ?? '[Document]';
-      default:
-        return '[Message]';
-    }
-  }
-
   // ======================================================
   // STATUS UPDATE
   // ======================================================
@@ -391,4 +376,3 @@ export class WhapiService {
       .digest('hex');
   }
 }
-

@@ -105,7 +105,7 @@ export class WhatsappMessageGateway
         `Queue disabled for poste ${posteId}, skip enqueue on connect`,
       );
     }
-    this.jobRunner.startAgentSlaMonitor(posteId);
+    await this.jobRunner.startAgentSlaMonitor(posteId);
 
     await this.emitQueueUpdate('agent_connected');
     await this.sendConversationsToClient(client);

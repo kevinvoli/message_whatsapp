@@ -183,6 +183,7 @@ export const getUptimeColor = (uptime: number): string => {
 type AdminMessageLike = {
   text?: string | null;
   mediaType?: string;
+  type?: string;
 };
 
 /**
@@ -194,7 +195,8 @@ export const resolveAdminMessageText = (message: AdminMessageLike): string => {
     return text;
   }
 
-  switch ((message.mediaType || '').toLowerCase()) {
+  const mediaType = (message.mediaType || message.type || '').toLowerCase();
+  switch (mediaType) {
     case 'image':
       return '[Photo client]';
     case 'video':

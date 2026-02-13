@@ -18,6 +18,7 @@ import ChannelsView from '@/app/ui/ChannelsView';
 import MessageAutoView from '@/app/ui/MessageAutoView';
 import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
+import DispatchView from '@/app/ui/DispatchView';
 import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel } from '@/app/lib/definitions';
 import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques } from '@/app/lib/api';
 import { Spinner } from '@/app/ui/Spinner';
@@ -149,6 +150,8 @@ export default function AdminDashboard() {
                 return <PostesView initialPostes={postes} onPosteUpdated={fetchData} />;
             case 'queue':
                 return <QueueView />;
+            case 'dispatch':
+                return <DispatchView />;
             case 'canaux':
                 return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} />;
             case 'automessages':

@@ -21,7 +21,6 @@ import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
-import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { LoggingModule } from 'src/logging/logging.module';
@@ -37,7 +36,7 @@ import { LoggingModule } from 'src/logging/logging.module';
         inject: [ConfigService],
       }),
       TypeOrmModule.forFeature([
-        MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,PendingMessage,WhapiChannel,
+        MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,WhapiChannel,
         Contact
       ]),
       LoggingModule,

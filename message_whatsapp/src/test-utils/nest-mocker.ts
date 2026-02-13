@@ -6,8 +6,7 @@ export const createMocker = (token: unknown): Record<string, unknown> => {
   if (typeof token === 'function') {
     const metadata = moduleMocker.getMetadata(token as Function);
     if (metadata) {
-      const Mock = moduleMocker.generateFromMetadata(metadata);
-      return new Mock();
+      return moduleMocker.generateFromMetadata(metadata) as unknown as Record<string, unknown>;
     }
   }
 

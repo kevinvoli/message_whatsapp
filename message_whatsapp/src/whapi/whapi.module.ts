@@ -9,7 +9,6 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
-import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
@@ -36,7 +35,6 @@ import { LoggingModule } from 'src/logging/logging.module';
       WhatsappCommercial,
       WhatsappMessage,
       WhatsappChat,
-      PendingMessage,
       QueuePosition,
       WhapiChannel,
       Contact,

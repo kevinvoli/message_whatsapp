@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
-import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
@@ -10,10 +9,9 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { ChargePosteDto, MetriquesGlobalesDto, PerformanceCommercialDto, StatutChannelDto } from './dto/create-metrique.dto';
-import { PendingMessageStatus } from './utils';
 import { QueueMetricsDto } from './dto/create-metrique.dto';
 
-// Importer vos entités existantes
+// Importer vos entitÃ©s existantes
 @Injectable()
 export class MetriquesService {
   private readonly logger = new Logger(MetriquesService.name);
@@ -37,18 +35,16 @@ export class MetriquesService {
     @InjectRepository(WhapiChannel)
     private channelRepository: Repository<WhapiChannel>,
     
-    @InjectRepository(PendingMessage)
-    private pendingMessageRepository: Repository<PendingMessage>,
 
     @InjectRepository(QueuePosition)
     private queueRepository: Repository<QueuePosition>,
   ) {}
 
   /**
-   * Récupère toutes les métriques globales du dashboard
+   * RÃ©cupÃ¨re toutes les mÃ©triques globales du dashboard
    */
   async getMetriquesGlobales(): Promise<MetriquesGlobalesDto> {
-    // Utiliser Promise.all pour paralléliser les requêtes
+    // Utiliser Promise.all pour parallÃ©liser les requÃªtes
     const [
       metriquesMessages,
       metriquesChats,
@@ -79,7 +75,7 @@ export class MetriquesService {
   }
 
   /**
-   * Métriques Messages
+   * MÃ©triques Messages
    */
   private async getMetriquesMessages() {
     const today = new Date();
@@ -110,12 +106,12 @@ export class MetriquesService {
       },
     });
 
-    // Taux de réponse
+    // Taux de rÃ©ponse
     const tauxReponse = messagesEntrants > 0 
       ? Math.round((messagesSortants / messagesEntrants) * 100) 
       : 0;
 
-    // Temps de réponse moyen
+    // Temps de rÃ©ponse moyen
     const tempsReponse = await this.messageRepository
       .createQueryBuilder('msg_out')
       .innerJoin(
@@ -143,7 +139,7 @@ export class MetriquesService {
   }
 
   /**
-   * Métriques Chats
+   * MÃ©triques Chats
    */
   private async getMetriquesChats() {
     const totalChats = await this.chatRepository.count({
@@ -161,7 +157,7 @@ export class MetriquesService {
 
     const chatsActifs = parseInt(chatsParStatut.find(c => c.status === 'actif')?.count || 0);
     const chatsEnAttente = parseInt(chatsParStatut.find(c => c.status === 'en attente')?.count || 0);
-    const chatsFermes = parseInt(chatsParStatut.find(c => c.status === 'fermé')?.count || 0);
+    const chatsFermes = parseInt(chatsParStatut.find(c => c.status === 'fermÃ©')?.count || 0);
 
     // Chats non lus
     const chatsNonLus = await this.chatRepository.count({
@@ -171,7 +167,7 @@ export class MetriquesService {
       },
     });
 
-    // Chats archivés
+    // Chats archivÃ©s
     const chatsArchives = await this.chatRepository.count({
       where: {
         deletedAt: IsNull(),
@@ -191,7 +187,7 @@ export class MetriquesService {
       ? Math.round((chatsAssignes / totalChats) * 100) 
       : 0;
 
-    // Temps première réponse
+    // Temps premiÃ¨re rÃ©ponse
     const tempsPremiereReponse = await this.chatRepository
       .createQueryBuilder('chat')
       .select('AVG(TIMESTAMPDIFF(SECOND, chat.last_client_message_at, chat.first_response_deadline_at))', 'avg_seconds')
@@ -213,7 +209,7 @@ export class MetriquesService {
   }
 
   /**
-   * Métriques Commerciaux
+   * MÃ©triques Commerciaux
    */
   private async getMetriquesCommerciaux() {
     const commerciauxTotal = await this.commercialRepository.count({
@@ -245,7 +241,7 @@ export class MetriquesService {
   }
 
   /**
-   * Métriques Contacts
+   * MÃ©triques Contacts
    */
   private async getMetriquesContacts() {
     const today = new Date();
@@ -277,7 +273,7 @@ export class MetriquesService {
   }
 
   /**
-   * Métriques Postes
+   * MÃ©triques Postes
    */
   private async getMetriquesPostes() {
     const totalPostes = await this.posteRepository.count();
@@ -321,7 +317,7 @@ export class MetriquesService {
   }
 
   /**
-   * Métriques Channels
+   * MÃ©triques Channels
    */
   private async getMetriquesChannels() {
     const totalChannels = await this.channelRepository.count();
@@ -337,14 +333,8 @@ export class MetriquesService {
       channelsActifs,
     };
   }
-
-  /**
-   * Messages Pending
-   */
-
-
-  /**
-   * Performance détaillée par commercial
+/**
+   * Performance dÃ©taillÃ©e par commercial
    */
   async getPerformanceCommerciaux(): Promise<PerformanceCommercialDto[]> {
     const today = new Date();
@@ -371,7 +361,7 @@ export class MetriquesService {
       .groupBy('commercial.id, commercial.name, commercial.email, commercial.isConnected, commercial.lastConnectionAt, poste.name, poste.id')
       .getRawMany();
 
-    // Calculer le taux de réponse et temps moyen pour chaque commercial
+    // Calculer le taux de rÃ©ponse et temps moyen pour chaque commercial
     const performanceAvecCalculs = await Promise.all(
       performance.map(async (perf) => {
         const nbMessagesRecus = parseInt(perf.nbMessagesRecus) || 0;
@@ -381,7 +371,7 @@ export class MetriquesService {
           ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100) 
           : 0;
 
-        // Temps de réponse moyen pour ce commercial
+        // Temps de rÃ©ponse moyen pour ce commercial
         const tempsReponse = await this.messageRepository
           .createQueryBuilder('msg_out')
           .innerJoin('whatsapp_message', 'msg_in', 
@@ -401,7 +391,7 @@ export class MetriquesService {
           email: perf.email,
           isConnected: Boolean(perf.isConnected),
           lastConnectionAt: perf.lastConnectionAt,
-          poste_name: perf.poste_name || 'Non assigné',
+          poste_name: perf.poste_name || 'Non assignÃ©',
           poste_id: perf.poste_id,
           nbChatsActifs: parseInt(perf.nbChatsActifs) || 0,
           nbMessagesEnvoyes,
@@ -416,7 +406,7 @@ export class MetriquesService {
   }
 
   /**
-   * Statut détaillé des channels
+   * Statut dÃ©taillÃ© des channels
    */
   async getStatutChannels(): Promise<StatutChannelDto[]> {
     const today = new Date();
@@ -523,3 +513,6 @@ export class MetriquesService {
     };
   }
 }
+
+
+

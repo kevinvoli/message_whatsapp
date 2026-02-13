@@ -3,6 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 
 @Injectable()
@@ -134,28 +136,81 @@ export class WhatsappChatService {
 
   async findAll(chat_id?: string) {
     if (chat_id) {
-      return this.chatRepository.find({
-        where: { chat_id: chat_id },
-        relations: ['poste', 'messages','channel'],
-      });
+      return this.chatRepository
+        .createQueryBuilder('chat')
+        .leftJoinAndSelect('chat.poste', 'poste')
+        .leftJoinAndSelect('chat.channel', 'channel')
+        .leftJoinAndSelect('chat.messages', 'messages')
+        .leftJoinAndMapOne(
+          'chat.contact',
+          Contact,
+          'contact',
+          'contact.chat_id = chat.chat_id',
+        )
+        .where('chat.chat_id = :chat_id', { chat_id })
+        .getMany();
     }
-    return this.chatRepository.find();
+    return this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .leftJoinAndMapOne(
+        'chat.last_message',
+        WhatsappMessage,
+        'last_message',
+        `last_message.id = (${this.chatRepository
+          .createQueryBuilder()
+          .subQuery()
+          .select('m.id')
+          .from(WhatsappMessage, 'm')
+          .where('m.chat_id = chat.chat_id')
+          .andWhere('m.deletedAt IS NULL')
+          .orderBy('m.timestamp', 'DESC')
+          .limit(1)
+          .getQuery()})`,
+      )
+      .orderBy('chat.updatedAt', 'DESC')
+      .getMany();
   }
 
   async findBychat_id(chat_id: string): Promise<WhatsappChat | null> {
-
-    const chat= await this.chatRepository.findOne({
-      where: { chat_id: chat_id },
-      relations: ['poste', 'messages', 'channel'],
-    });
-    return chat;
+    const chat = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.messages', 'messages')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .where('chat.chat_id = :chat_id', { chat_id })
+      .getOne();
+    return chat ?? null;
   }
 
   async findOne(id: string): Promise<WhatsappChat | null> {
-    return this.chatRepository.findOne({
-      where: { id },
-      relations: ['poste', 'messages', 'channel'],
-    });
+    const chat = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.messages', 'messages')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .where('chat.id = :id', { id })
+      .getOne();
+    return chat ?? null;
   }
 
   remove(id: string) {
