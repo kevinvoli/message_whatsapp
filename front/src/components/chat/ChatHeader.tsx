@@ -1,7 +1,9 @@
 import React from 'react';
 import { MessageCircle, User, Phone, MoreVertical } from 'lucide-react';
-import { Conversation } from '@/types/chat';
+import { CallStatus, Conversation, ConversationStatus } from '@/types/chat';
 import { getStatusBadge } from '@/lib/utils';
+import { CallButton } from '../conversation/callButton';
+import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 
 
 interface ChatHeaderProps {
@@ -35,8 +37,13 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
                         <MessageCircle className="w-4 h-4" />
                         <span className="font-medium">{totalMessages} messages</span>
                     </div>
-                    <Phone className="w-5 h-5 text-gray-600 cursor-pointer hover:text-green-600" />
-                    <MoreVertical className="w-5 h-5 text-gray-600 cursor-pointer hover:text-green-600" />
+                    <CallButton conversation={currentConv} 
+                    onCallStatusChange={function (conversationId: string, callStatus: CallStatus, notes?: string): void {
+                        throw new Error('Function not implemented.');
+                    } }                    />
+                    <ConversationOptionsMenu conversation={currentConv} onStatusChange={function (conversationId: string, newStatus: ConversationStatus): void {
+                        throw new Error('Function not implemented.');
+                    } }                    />
                 </div>
             </div>
         </div>
