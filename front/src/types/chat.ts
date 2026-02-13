@@ -374,7 +374,7 @@ interface RawMediaData {
 
 interface RawMessageData {
   id: string;
-  text?: string | null;
+  text?: string | { body?: string } | null;
   timestamp?: string | number | Date;
   createdAt?: string | number | Date;
 
@@ -515,12 +515,19 @@ export const transformToMessage = (raw: RawMessageData): Message => {
   //    puis fallback sur "audio" pour compatibilité
   let medias: Message["medias"] | undefined;
 
+  const resolveText = (value: RawMessageData["text"]) => {
+    if (typeof value === "string") return value;
+    if (value && typeof value === "object" && typeof value.body === "string") {
+      return value.body;
+    }
+    return "";
+  };
+
+  const normalizedText = resolveText(raw.text);
+
   return {
     id: raw.id,
-    text:
-      typeof raw.text === "string" && raw.text.trim().length > 0
-        ? raw.text
-        : "",
+    text: normalizedText,
     chat_id: raw.chat_id,
 
     timestamp: new Date(raw.timestamp || raw.createdAt || Date.now()),

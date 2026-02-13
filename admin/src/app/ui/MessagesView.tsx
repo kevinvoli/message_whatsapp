@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import UnderDevelopmentView from './UnderDevelopmentView';
 import { WhatsappMessage } from '../lib/definitions';
 import { Edit, Eye, Search } from 'lucide-react';
-import { getPerformanceBadge } from '../lib/utils';
+import { getPerformanceBadge, resolveAdminMessageText } from '../lib/utils';
 import { Spinner } from './Spinner';
 
 
@@ -49,7 +49,7 @@ export default function MessagesView({
                             {messages.map((messae) => (
                                 <tr key={messae.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900">{messae.chat_id}</td>
-                                    <td className="px-6 py-4 text-gray-700">{messae.text}</td>
+                                    <td className="px-6 py-4 text-gray-700">{resolveAdminMessageText(messae)}</td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${messae.status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                             }`}>

@@ -16,6 +16,7 @@ import ChatMainArea from '@/components/chat/ChatMainArea';
 import { useContactStore } from '@/store/contactStore';
 import { ContactsListView } from '@/components/contact/contactListview';
 import { logger } from '@/lib/logger';
+import { updateContactCallStatus } from '@/lib/contactApi';
 
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
@@ -134,19 +135,28 @@ const WhatsAppPage = () => {
       />
       {
         viewMode === 'conversations' ?<ChatMainArea />: <ContactsListView contacts={contacts}
-         onCallStatusChange={(contactId: string, callStatus: CallStatus, notes?: string) => {
-          const nextContacts = contacts.map((contact) =>
-            contact.id === contactId
-              ? {
-                  ...contact,
-                  call_status: callStatus,
-                  call_notes: notes ?? contact.call_notes,
-                  last_call_date: new Date(),
-                }
-              : contact,
-          );
-          setContacts(nextContacts);
-        }}        
+         onCallStatusChange={async (contactId: string, callStatus: CallStatus, notes?: string) => {
+          try {
+            await updateContactCallStatus(contactId, callStatus, notes);
+            const nextContacts = contacts.map((contact) =>
+              contact.id === contactId
+                ? {
+                    ...contact,
+                    call_status: callStatus,
+                    call_notes: notes ?? contact.call_notes,
+                    last_call_date: new Date(),
+                    call_count: (contact.call_count ?? 0) + 1,
+                  }
+                : contact,
+            );
+            setContacts(nextContacts);
+          } catch (error) {
+            logger.error('Failed to persist contact call status', {
+              contact_id: contactId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }}
         />
       }
 

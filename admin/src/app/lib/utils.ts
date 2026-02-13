@@ -179,3 +179,35 @@ export const getUptimeColor = (uptime: number): string => {
     case 'warning': return 'bg-red-500';
   }
 };
+
+type AdminMessageLike = {
+  text?: string | null;
+  mediaType?: string;
+};
+
+/**
+ * Harmonise l'affichage des messages sans texte en admin.
+ */
+export const resolveAdminMessageText = (message: AdminMessageLike): string => {
+  const text = typeof message.text === 'string' ? message.text.trim() : '';
+  if (text.length > 0) {
+    return text;
+  }
+
+  switch ((message.mediaType || '').toLowerCase()) {
+    case 'image':
+      return '[Photo client]';
+    case 'video':
+      return '[Video client]';
+    case 'audio':
+    case 'voice':
+      return '[Message vocal client]';
+    case 'document':
+      return '[Document client]';
+    case 'location':
+    case 'live_location':
+      return '[Localisation client]';
+    default:
+      return '[Message client]';
+  }
+};

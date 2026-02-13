@@ -39,7 +39,7 @@ export class Contact {
     name: 'chat_id',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
   })
   chat_id?: string;
 

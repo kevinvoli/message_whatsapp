@@ -5,6 +5,7 @@ import { MessageSquare, Send, User, MessageCircleMore } from 'lucide-react';
 import { getMessagesForChat, sendMessage } from '@/app/lib/api'; // Import sendMessage
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import { resolveAdminMessageText } from '../lib/utils';
 
 interface ConversationsViewProps {
     initialChats: WhatsappChat[];
@@ -154,8 +155,8 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                     <p className="text-sm text-gray-500 truncate">
                                         {/* Display last message text if available */}
                                         {chat.messages && chat.messages.length > 0
-                                            ? chat.messages[chat.messages.length - 1].text
-                                            : "No messages yet."}
+                                            ? resolveAdminMessageText(chat.messages[chat.messages.length - 1])
+                                            : '[Message client]'}
                                     </p>
                                 </div>
                                 {chat.unread_count > 0 && (
@@ -197,7 +198,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                         <div className={`max-w-xs px-4 py-2 rounded-lg shadow ${
                                             msg.direction === 'OUT' ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-800'
                                         }`}>
-                                            <p>{msg.text}</p>
+                                            <p>{resolveAdminMessageText(msg)}</p>
                                             <span className="block text-right text-xs mt-1 opacity-75">
                                                 {new Date(msg.timestamp).toLocaleTimeString()}
                                             </span>

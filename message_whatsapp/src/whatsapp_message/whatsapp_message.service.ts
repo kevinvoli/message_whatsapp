@@ -37,6 +37,38 @@ export class WhatsappMessageService {
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
   ) {}
+
+  private resolveIncomingText(message: WhapiMessage): string {
+    if (typeof message.text === 'string') {
+      return message.text;
+    }
+    if (message.text?.body) {
+      return message.text.body;
+    }
+
+    switch (message.type) {
+      case 'image':
+        return message.image?.caption ?? '[Photo client]';
+      case 'video':
+      case 'gif':
+      case 'short':
+        return message.video?.caption ?? '[Video client]';
+      case 'audio':
+      case 'voice':
+        return '[Message vocal client]';
+      case 'document':
+        return message.document?.filename ?? '[Document client]';
+      case 'location':
+      case 'live_location':
+        return '[Localisation client]';
+      case 'interactive':
+      case 'buttons':
+      case 'list':
+        return '[Reponse interactive client]';
+      default:
+        return '[Message client]';
+    }
+  }
   
 
   async createAgentMessage(data: {
@@ -393,7 +425,7 @@ return messages;
           from_me: message.from_me,
           from: message.from,
           from_name: message.from_name,
-          text: message.text?.body ?? '',
+          text: this.resolveIncomingText(message),
           type: message.type,
           timestamp: new Date(message.timestamp * 1000),
           status: WhatsappMessageStatus.SENT,
