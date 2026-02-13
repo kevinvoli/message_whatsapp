@@ -1,4 +1,4 @@
-Le CRUD complet pour l'entité "Postes" a été implémenté et intégré entre le frontend et le backend.
+﻿Le CRUD complet pour l'entité "Postes" a été implémenté et intégré entre le frontend et le backend.
 Le CRUD complet pour l'entité "Canaux" a été implémenté et intégré entre le frontend et le backend.
 Le CRUD complet pour l'entité "Messages Automatiques" a été implémenté et intégré entre le frontend et le backend.
 Le CRUD complet pour l'entité "Clients" a été implémenté et intégré entre le frontend et le backend.
@@ -57,3 +57,5 @@ L'authentification et la déconnexion de l'administrateur devraient maintenant f
 La prochaine étape consistera à implémenter la gestion des Refresh Tokens sur le backend, ce qui inclura la création d'une entité pour stocker ces tokens, ainsi que des endpoints pour leur validation et le renouvellement des tokens d'accès.
 
 Souhaitez-vous que je procède à cette implémentation ?
+
+

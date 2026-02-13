@@ -1,4 +1,4 @@
-# Analyse d'Intégration : Admin Panel & Backend
+﻿# Analyse d'Intégration : Admin Panel & Backend
 
 Ce document détaille les différences entre le panneau d'administration (`admin`) et le backend (`message_whatsapp`), et propose un plan d'action pour leur intégration.
 
@@ -93,3 +93,5 @@ Le backend gère des entités qui n'ont pas encore de vue dédiée dans le panel
 8.  **Développer la vue `ClientsView`** pour afficher la liste des `Contacts` depuis le backend.
 9.  **Commencer l'implémentation** des vues de monitoring (`MessagesView`, `AnalyticsView`, etc.).
 10. **Assurer la gestion des erreurs** et des états de chargement dans le panel admin.
+
+

@@ -1,4 +1,4 @@
-# 📘 Cahier des charges – Dispatcher Multi-Channels (WHAPI)
+﻿# 📘 Cahier des charges – Dispatcher Multi-Channels (WHAPI)
 
 ## 1. Contexte
 
@@ -66,3 +66,5 @@ Chaque traitement doit être **scopé par `channel_id`**.
 ### 6.1 Channel
 
 ```ts
+
+

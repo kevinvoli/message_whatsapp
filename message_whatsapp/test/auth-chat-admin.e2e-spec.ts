@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import * as cookieParser from 'cookie-parser';
 
 const shouldRun = process.env.E2E_RUN === 'true';
 const describeMaybe = shouldRun ? describe : describe.skip;
@@ -39,6 +40,7 @@ describeMaybe('Auth/Chat/Admin (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     await app.init();
 
     const adminLogin = await request(app.getHttpServer())

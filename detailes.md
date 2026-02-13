@@ -1,4 +1,4 @@
-# Détails du Projet - Backend & Panel Admin
+﻿# Détails du Projet - Backend & Panel Admin
 
 Ce document récapitule les routes et fonctionnalités du backend ainsi que le statut du panel admin.
 
@@ -66,5 +66,8 @@ Ce document récapitule les routes et fonctionnalités du backend ainsi que le s
 
 ## États
 - **Présent** : Déjà implémenté et fonctionnel avant intervention.
-- **Créé** : Implémenté lors de cette tâche.
+- **Créé** : Implémenté lors de cette tche.
 - **À venir** : Fonctionnalités futures possibles (ex: statistiques détaillées, logs système).
+
+
+
