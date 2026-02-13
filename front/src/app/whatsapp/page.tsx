@@ -19,7 +19,7 @@ import { ContactsListView } from '@/components/contact/contactListview';
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
-  const {contacts} = useContactStore()
+  const { contacts, setContacts } = useContactStore();
   const {
     conversations,
     selectedConversation,
@@ -131,9 +131,19 @@ const WhatsAppPage = () => {
       />
       {
         viewMode === 'conversations' ?<ChatMainArea />: <ContactsListView contacts={contacts}
-         onCallStatusChange={function (contactId: string, callStatus: CallStatus, notes?: string): void {
-          throw new Error('Function not implemented.');
-        } }        
+         onCallStatusChange={(contactId: string, callStatus: CallStatus, notes?: string) => {
+          const nextContacts = contacts.map((contact) =>
+            contact.id === contactId
+              ? {
+                  ...contact,
+                  call_status: callStatus,
+                  call_notes: notes ?? contact.call_notes,
+                  last_call_date: new Date(),
+                }
+              : contact,
+          );
+          setContacts(nextContacts);
+        }}        
         />
       }
 

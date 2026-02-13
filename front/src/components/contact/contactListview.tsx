@@ -20,7 +20,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import { Contact, CallStatus, ContactFilters } from '@/types';
+import { Contact, CallStatus, ContactFilters } from '@/types/chat';
 
 interface ContactsListViewProps {
   contacts: Contact[];

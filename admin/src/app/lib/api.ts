@@ -90,11 +90,14 @@ export async function deletePoste(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
-export async function updatCommercial(id: string, poste: Partial<Commercial>): Promise<Commercial> {
-    const response = await fetch(`${API_BASE_URL}/chats/${id}`, {
+export async function updateCommercial(
+  id: string,
+  payload: { name?: string; is_active?: boolean; poste_id?: string | null },
+): Promise<Commercial> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(poste),
+        body: JSON.stringify(payload),
         credentials: 'include',
     });
     return handleResponse<Commercial>(response);
@@ -108,7 +111,7 @@ export async function getChannels(): Promise<Channel[]> {
     return handleResponse<Channel[]>(response);
 }
 
-export async function createChannel(channel: Omit<Channel, 'id' | 'start_at' | 'uptime' | 'version' | 'device_id' | 'ip' | 'is_business' | 'api_version' | 'core_version' | 'createdAt' | 'updatedAt'>): Promise<Channel> {
+export async function createChannel(channel: { token: string }): Promise<Channel> {
     const response = await fetch(`${API_BASE_URL}/channel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -4,6 +4,7 @@ import { CallStatus, Conversation, ConversationStatus } from '@/types/chat';
 import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
+import { useChatStore } from '@/store/chatStore';
 
 
 interface ChatHeaderProps {
@@ -12,7 +13,30 @@ interface ChatHeaderProps {
 }
 
 export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderProps) {
-//   console.log("la conv selecte ============================", currentConv);
+    const { updateConversation } = useChatStore();
+
+    const handleCallStatusChange = (
+      _conversationId: string,
+      callStatus: CallStatus,
+      notes?: string,
+    ) => {
+      updateConversation({
+        ...currentConv,
+        call_status: callStatus,
+        last_call_notes: notes,
+        last_call_date: new Date(),
+      });
+    };
+
+    const handleConversationStatusChange = (
+      _conversationId: string,
+      newStatus: ConversationStatus,
+    ) => {
+      updateConversation({
+        ...currentConv,
+        status: newStatus,
+      });
+    };
   
     return (
         <div className="bg-white border-b border-gray-200 p-4">
@@ -38,12 +62,8 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
                         <span className="font-medium">{totalMessages} messages</span>
                     </div>
                     <CallButton conversation={currentConv} 
-                    onCallStatusChange={function (conversationId: string, callStatus: CallStatus, notes?: string): void {
-                        throw new Error('Function not implemented.');
-                    } }                    />
-                    <ConversationOptionsMenu conversation={currentConv} onStatusChange={function (conversationId: string, newStatus: ConversationStatus): void {
-                        throw new Error('Function not implemented.');
-                    } }                    />
+                    onCallStatusChange={handleCallStatusChange} />
+                    <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />
                 </div>
             </div>
         </div>

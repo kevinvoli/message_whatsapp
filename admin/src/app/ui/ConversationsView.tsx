@@ -95,13 +95,22 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
 
 
         try {
-            // TODO: Dynamically get the actual poste_id for the logged-in admin
-            const PLACEHOLDER_POSTE_ID = 'a1b2c3d4-e5f6-7890-1234-567890abcdef'; // Replace with actual poste_id
-            const sentMessage = await sendMessage( // Removed token parameter
+            const posteId =
+              selectedChat.poste?.id ||
+              (selectedChat as unknown as { poste_id?: string }).poste_id;
+            const channelId =
+              (selectedChat as unknown as { channel_id?: string }).channel_id ||
+              selectedChat.chat_id;
+
+            if (!posteId) {
+                throw new Error("Impossible d'envoyer: poste_id manquant pour cette conversation.");
+            }
+
+            const sentMessage = await sendMessage(
                 selectedChat.chat_id,
                 currentMessageText,
-                PLACEHOLDER_POSTE_ID,
-                selectedChat.chat_id // Assuming channel_id is available on the chat object
+                posteId,
+                channelId
             );
 
             // Replace optimistic update with actual message from backend
@@ -206,13 +215,12 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
                                 onChange={(e) => setMessageInput(e.target.value)}
                                 placeholder="Écrire un message..."
                                 className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={true}
+                                disabled={loadingMessages}
                             />
                             <button
                                 type="submit"
-                                className="p-2 bg-gray-300 text-white rounded-full hover:bg-blue-200 transition-colors"
-                                disabled={true}
-                                // disabled={loadingMessages || !messageInput.trim()}
+                                className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                disabled={loadingMessages || !messageInput.trim()}
                             >
                                 {loadingMessages ? <Spinner  /> : <Send className="w-5 h-5" />}
                             </button>

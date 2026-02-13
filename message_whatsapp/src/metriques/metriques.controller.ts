@@ -1,95 +1,78 @@
-import { Controller, Get, Query,  } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse,  } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AdminGuard } from 'src/auth/admin.guard';
+import {
+  MetriquesGlobalesDto,
+  PerformanceCommercialDto,
+  PerformanceTemporelleDto,
+  StatutChannelDto,
+} from './dto/create-metrique.dto';
 import { MetriquesService } from './metriques.service';
-import { MetriquesGlobalesDto, PerformanceCommercialDto, PerformanceTemporelleDto, StatutChannelDto } from './dto/create-metrique.dto';
 
-// import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // Votre guard d'authentification
-
-@ApiTags('Métriques')
+@ApiTags('Metriques')
 @Controller('api/metriques')
-// @UseGuards(JwtAuthGuard) // Décommenter si vous utilisez l'authentification
-// @ApiBearerAuth()
+@UseGuards(AdminGuard)
 export class MetriquesController {
   constructor(private readonly metriquesService: MetriquesService) {}
 
-  /**
-   * GET /api/metriques/globales
-   * Récupère toutes les métriques globales du dashboard
-   */
   @Get('globales')
-  @ApiOperation({ summary: 'Récupère toutes les métriques globales' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Métriques globales récupérées avec succès',
-    type: MetriquesGlobalesDto
+  @ApiOperation({ summary: 'Recupere toutes les metriques globales' })
+  @ApiResponse({
+    status: 200,
+    description: 'Metriques globales recuperees avec succes',
+    type: MetriquesGlobalesDto,
   })
   async getMetriquesGlobales(): Promise<MetriquesGlobalesDto> {
-    return await this.metriquesService.getMetriquesGlobales();
+    return this.metriquesService.getMetriquesGlobales();
   }
 
-  /**
-   * GET /api/metriques/commerciaux
-   * Récupère la performance détaillée de tous les commerciaux
-   */
   @Get('commerciaux')
-  @ApiOperation({ summary: 'Récupère la performance des commerciaux' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Performance des commerciaux récupérée avec succès',
-    type: [PerformanceCommercialDto]
+  @ApiOperation({ summary: 'Recupere la performance des commerciaux' })
+  @ApiResponse({
+    status: 200,
+    description: 'Performance des commerciaux recuperee avec succes',
+    type: [PerformanceCommercialDto],
   })
   async getPerformanceCommerciaux(): Promise<PerformanceCommercialDto[]> {
-    return await this.metriquesService.getPerformanceCommerciaux();
+    return this.metriquesService.getPerformanceCommerciaux();
   }
 
-  /**
-   * GET /api/metriques/channels
-   * Récupère le statut de tous les channels WhatsApp
-   */
   @Get('channels')
-  @ApiOperation({ summary: 'Récupère le statut des channels' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Statut des channels récupéré avec succès',
-    type: [StatutChannelDto]
+  @ApiOperation({ summary: 'Recupere le statut des channels' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statut des channels recupere avec succes',
+    type: [StatutChannelDto],
   })
   async getStatutChannels(): Promise<StatutChannelDto[]> {
-    return await this.metriquesService.getStatutChannels();
+    return this.metriquesService.getStatutChannels();
   }
 
-  /**
-   * GET /api/metriques/performance-temporelle
-   * Récupère les données de performance sur une période
-   */
   @Get('performance-temporelle')
-  @ApiOperation({ summary: 'Récupère la performance temporelle' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Performance temporelle récupérée avec succès',
-    type: [PerformanceTemporelleDto]
+  @ApiOperation({ summary: 'Recupere la performance temporelle' })
+  @ApiResponse({
+    status: 200,
+    description: 'Performance temporelle recuperee avec succes',
+    type: [PerformanceTemporelleDto],
   })
   async getPerformanceTemporelle(
-    @Query('jours') jours: number = 7
+    @Query('jours') jours: number = 7,
   ): Promise<PerformanceTemporelleDto[]> {
-    return await this.metriquesService.getPerformanceTemporelle(jours);
+    return this.metriquesService.getPerformanceTemporelle(jours);
   }
 
-  /**
-   * GET /api/metriques/overview
-   * Récupère toutes les données nécessaires pour le dashboard en une seule requête
-   */
   @Get('overview')
-  @ApiOperation({ summary: 'Récupère toutes les données du dashboard' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Données du dashboard récupérées avec succès'
+  @ApiOperation({ summary: 'Recupere toutes les donnees du dashboard' })
+  @ApiResponse({
+    status: 200,
+    description: 'Donnees du dashboard recuperees avec succes',
   })
   async getOverview() {
     const [
       metriques,
       performanceCommercial,
       statutChannels,
-      performanceTemporelle
+      performanceTemporelle,
     ] = await Promise.all([
       this.metriquesService.getMetriquesGlobales(),
       this.metriquesService.getPerformanceCommerciaux(),

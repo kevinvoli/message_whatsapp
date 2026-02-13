@@ -7,7 +7,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { ChargePosteDto, MetriquesGlobalesDto, PerformanceCommercialDto, StatutChannelDto } from './dto/create-metrique.dto';
 import { PendingMessageStatus } from './utils';
 
@@ -99,7 +99,7 @@ export class MetriquesService {
     const messagesAujourdhui = await this.messageRepository.count({
       where: {
         deletedAt: IsNull(),
-        createdAt: { $gte: today } as any,
+        createdAt: MoreThanOrEqual(today),
       },
     });
 
@@ -160,7 +160,7 @@ export class MetriquesService {
     const chatsNonLus = await this.chatRepository.count({
       where: {
         deletedAt: IsNull(),
-        unread_count: { $gt: 0 } as any,
+        unread_count: MoreThan(0),
       },
     });
 
@@ -176,7 +176,7 @@ export class MetriquesService {
     const chatsAssignes = await this.chatRepository.count({
       where: {
         deletedAt: IsNull(),
-        poste_id: { $ne: IsNull() } as any,
+        poste_id: Not(IsNull()),
       },
     });
 
@@ -251,7 +251,7 @@ export class MetriquesService {
     const nouveauxContactsAujourdhui = await this.contactRepository.count({
       where: {
         deletedAt: IsNull(),
-        createdAt: { $gte: today } as any,
+        createdAt: MoreThanOrEqual(today),
       },
     });
 
@@ -321,7 +321,7 @@ export class MetriquesService {
 
     const channelsActifs = await this.channelRepository.count({
       where: {
-        uptime: { $gt: 0 } as any,
+        uptime: MoreThan(0),
       },
     });
 

@@ -165,7 +165,9 @@ console.log("le poste retourne:", postes);
                                             {poste.is_active ? 'Actif' : 'Inactif'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">{new Date(poste.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                      {new Date(poste.created_at || poste.createdAt || Date.now()).toLocaleDateString()}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <button

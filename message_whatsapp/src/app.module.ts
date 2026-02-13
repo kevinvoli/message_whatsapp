@@ -41,12 +41,27 @@ import { MetriquesModule } from './metriques/metriques.module';
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
         MYSQL_HOST: Joi.string().required(),
         MYSQL_PORT: Joi.number().required(),
         MYSQL_USER: Joi.string().required(),
         MYSQL_PASSWORD: Joi.string().allow('').required(),
         MYSQL_DATABASE: Joi.string().required(),
         SERVER_PORT: Joi.number().required(),
+        TYPEORM_SYNCHRONIZE: Joi.string().valid('true', 'false').default('false'),
+        ADMIN_NAME: Joi.string().optional(),
+        ADMIN_EMAIL: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().email().required(),
+          otherwise: Joi.string().email().optional(),
+        }),
+        ADMIN_PASSWORD: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().min(12).required(),
+          otherwise: Joi.string().min(8).optional(),
+        }),
       }),
     }),
     DatabaseModule,

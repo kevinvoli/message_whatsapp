@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target } from 'lucide-react';
 import { PerformanceCommercial } from '@/app/lib/definitions';
-import { updatCommercial } from '@/app/lib/api';
+import { updateCommercial } from '@/app/lib/api';
 
 interface CommerciauxViewProps {
   commerciaux: PerformanceCommercial[];
@@ -90,7 +90,7 @@ export default function CommerciauxView({
     setLoading(true);
     setOperationError(null);
     try {
-      await updatCommercial(currentCommercial.id.toString(), { 
+      await updateCommercial(currentCommercial.id.toString(), {
         name: formName, 
         is_active: formIsActive 
       });

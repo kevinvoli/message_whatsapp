@@ -67,8 +67,10 @@ export type Poste = {
   name: string;
   code: string;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
   chats?: WhatsappChat[];
   messages?: WhatsappMessage[];
   commercial?: Commercial[];
@@ -97,8 +99,10 @@ export type MessageAuto = {
   canal?: 'whatsapp' | 'sms' | 'email' | null;
   position: number;
   actif: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Client = {

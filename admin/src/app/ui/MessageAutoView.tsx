@@ -178,7 +178,9 @@ export default function MessageAutoView({ initialMessagesAuto, onMessageAutoUpda
                                             {msg.actif ? 'Oui' : 'Non'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">{new Date(msg.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                      {new Date(msg.created_at || msg.createdAt || Date.now()).toLocaleDateString()}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <button

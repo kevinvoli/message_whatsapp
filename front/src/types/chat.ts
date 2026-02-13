@@ -7,6 +7,7 @@ export type ConversationStatus =
   | "nouveau"
   | "actif"
   | "attente"
+  | "en attente"
   | "converti"
   | "fermé";
   
@@ -213,7 +214,7 @@ export interface Contact {
   total_messages?: number;
   last_message_date?: Date;
   conversion_status?: "nouveau" | "prospect" | "client" | "perdu";
-  messages:Message[];
+  messages?: Message[];
   // Métadonnées
   source?: string;
   priority?: Priority;
@@ -235,6 +236,7 @@ export interface Conversation {
   clientPhone: string;
 
   auto_message_status: "scheduled" | "sending" | "sent";
+  readonly?: boolean;
 
   lastMessage: Message | null;
   unreadCount: number;
@@ -260,7 +262,7 @@ export interface Conversation {
   // 🆕 Date de conversion/fermeture
   closed_at?: Date | null;
   converted_at?: Date | null;
-  closed_by?: string; // ID du commercial
+  closed_by?: string;
 
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
@@ -438,8 +440,8 @@ interface RawConversationData {
   last_call_notes?: string;
   next_call_date?: string | number | Date | null;
   
-  created_at: string | number | Date;
-  updated_at: string | number | Date;
+  created_at?: string | number | Date;
+  updated_at?: string | number | Date;
 
   last_client_message_at?: string | number | Date | null;
   last_poste_message_at?: string | number | Date | null;
@@ -447,6 +449,8 @@ interface RawConversationData {
   closed_at?: string | number | Date | null;
   converted_at?: string | number | Date | null;
   closed_by?: string;
+  createdAt?: string | number | Date;
+  updatedAt?: string | number | Date;
 }
 
 interface RawCommercialData {
@@ -633,7 +637,7 @@ export const transformToConversation = (
     messages: raw.messages?.map(transformToMessage) ?? [],
 
     unreadCount: raw.unreadCount,
-    status: raw.status,
+    status: raw.status === "en attente" ? "attente" : raw.status,
 
     // 🆕 Champs d'appel transformés
     call_status: raw.call_status,
@@ -658,8 +662,8 @@ export const transformToConversation = (
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
     closed_by: raw.closed_by,
 
-    createdAt: raw.created_at,
-    updatedAt: raw.updated_at,
+    createdAt: raw.created_at ?? raw.createdAt ?? Date.now(),
+    updatedAt: raw.updated_at ?? raw.updatedAt ?? Date.now(),
   };
 };
 /**
@@ -748,7 +752,7 @@ export const isValidConversation = (data: unknown): data is Conversation => {
     typeof conv.clientName === "string" &&
     typeof conv.clientPhone === "string" &&
     typeof conv.unreadCount === "number" &&
-    ["actif", "en attente", "fermé"].includes(conv.status)
+    ["actif", "attente", "en attente", "fermé"].includes(conv.status)
   );
 };
 
@@ -783,6 +787,9 @@ export const WEBSOCKET_MESSAGE_TYPES = [
   "message_status",
   "conversation_reassigned",
   "send_message",
+  "conversation_updated",
+  "call_marked",
+  "status_changed",
 ] as const;
 
 /**
@@ -806,3 +813,5 @@ export const isWebSocketMessageType = (
     WEBSOCKET_MESSAGE_TYPES.includes(type as WebSocketMessage["type"])
   );
 };
+
+
