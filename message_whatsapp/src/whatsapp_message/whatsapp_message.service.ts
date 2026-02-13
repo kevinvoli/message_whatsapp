@@ -85,8 +85,6 @@ export class WhatsappMessageService {
         throw new NotFoundException('Channel not found');
       }
 
-      console.log("=========",whapiResponse,"+++++++");
-      
       // 2️⃣ Création message DB
       const messageEntity = this.messageRepository.create({
         message_id: whapiResponse.message.id ?? `agent_${Date.now()}`,
@@ -121,7 +119,10 @@ export class WhatsappMessageService {
 
       return mes;
     } catch (error) {
-      console.error('WHAPI SEND FAILED:', error);
+      this.logger.error(
+        `WHAPI send failed for chat ${data.chat_id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
 
       
       // 🧠 fallback : message en échec mais sauvegardé
@@ -138,7 +139,6 @@ export class WhatsappMessageService {
       // });
 
       // await this.messageRepository.save(failedMessage);
-      console.error('WHAPI SEND FAILED:', error);
       throw error;
       // throw error;
     }
@@ -284,7 +284,7 @@ export class WhatsappMessageService {
 
       return this.messageRepository.save(messageEntity);
     } catch (error) {
-      console.error('Error creating message:', error);
+      this.logger.error('Error creating internal message', error instanceof Error ? error.stack : undefined);
       throw new Error(`Failed to create message: ${error}`);
     }
   }
@@ -310,9 +310,7 @@ export class WhatsappMessageService {
         contact:true
       }
     });
-    console.log(messages.length);
-    
-    return messages;
+return messages;
   }
 
   async findByAllByMessageId(id: string) {
@@ -339,7 +337,7 @@ export class WhatsappMessageService {
       });
 
       if (!messages) {
-        console.log('Message not found for status update:', status.id);
+        this.logger.warn(`Message not found for status update: ${status.id}`);
         return null;
       }
       // console.log('les info du status', messages);
@@ -357,6 +355,13 @@ export class WhatsappMessageService {
   async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat):Promise<WhatsappMessage> {
 
     try {
+      const existingMessage = await this.messageRepository.findOne({
+        where: { message_id: message.id },
+      });
+      if (existingMessage) {
+        return existingMessage;
+      }
+
       const channel = await this.channelService.findOne(message.channel_id);
       if (!channel ) {
         // Utilisez une exception métier appropriée
@@ -426,3 +431,4 @@ export class WhatsappMessageService {
   });
 }
 }
+

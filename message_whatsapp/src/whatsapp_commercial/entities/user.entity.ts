@@ -100,12 +100,9 @@ export class WhatsappCommercial {
     }
 
     try {
-      console.log("l'utilisateur", password);
-
       // On compare directement le mot de passe fourni avec le hash stocké
       return await bcrypt.compare(password, this.password);
     } catch (error) {
-      console.error('Password validation error:', error);
       return false;
     }
   }

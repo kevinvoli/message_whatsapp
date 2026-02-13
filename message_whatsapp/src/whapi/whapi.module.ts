@@ -27,6 +27,7 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
+import { WebhookEventLog } from './entities/webhook-event.entity';
 
 @Module({
   imports: [
@@ -40,7 +41,8 @@ import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
       Contact,
       WhatsappPoste,
       WhatsappMedia,
-      MessageAuto
+      MessageAuto,
+      WebhookEventLog,
     ]),
     DispatcherModule,
     WhatsappMessageModule,

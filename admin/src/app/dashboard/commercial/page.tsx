@@ -64,9 +64,6 @@ export default function AdminDashboard() {
                 getChats(),
                 getMessages(),
             ]);
-
-            console.log("Overview data:", overviewData);
-
             // Mettre à jour les états avec les données des métriques
             setMetriques(overviewData.metriques);
             setPerformanceCommercial(overviewData.performanceCommercial);

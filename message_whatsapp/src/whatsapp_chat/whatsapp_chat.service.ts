@@ -163,10 +163,11 @@ export class WhatsappChatService {
   }
 
   async lockConversation(id: string) {
-    await this.update(id, { readonly: true });
+    await this.update(id, { read_only: true });
   }
 
   async unlockConversation(id: string) {
-    await this.update(id, { readonly: false });
+    await this.update(id, { read_only: false });
   }
 }
+

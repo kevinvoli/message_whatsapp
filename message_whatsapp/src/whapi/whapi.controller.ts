@@ -2,12 +2,16 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Headers,
   Get,
   HttpException,
   HttpStatus,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { Request } from 'express';
 import { WhapiService } from './whapi.service';
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { MetaWebhookPayload } from './interface/whatsapp-whebhook.interface';
@@ -18,7 +22,15 @@ export class WhapiController {
   constructor(private readonly whapiService: WhapiService) {}
 
   @Post('whapi')
-  async handleWebhook(@Body() payload: WhapiWebhookPayload) {
+  async handleWebhook(
+    @Body() payload: WhapiWebhookPayload,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    this.assertWhapiSecret(headers);
+    if (await this.whapiService.isReplayEvent(payload, 'whapi')) {
+      return { status: 'duplicate_ignored' };
+    }
+
     const eventType = payload?.event?.type;
 
     try {
@@ -73,10 +85,25 @@ export class WhapiController {
   }
 
   @Post('whatsapp')
-  async handleWebhooks(@Body() payload: unknown) {
+  async handleWebhooks(
+    @Body() payload: unknown,
+    @Req() request: Request & { rawBody?: Buffer },
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    this.assertMetaSignature(headers, request.rawBody, payload);
+
     const transformedPayload = metaToWhapi(payload as MetaWebhookPayload);
     if (!transformedPayload) {
       return { status: 'ignored' };
+    }
+
+    if (
+      await this.whapiService.isReplayEvent(
+        transformedPayload as WhapiWebhookPayload,
+        'meta',
+      )
+    ) {
+      return { status: 'duplicate_ignored' };
     }
 
     await this.whapiService.handleIncomingMessage(
@@ -84,5 +111,67 @@ export class WhapiController {
     );
 
     return { status: 'EVENT_RECEIVED' };
+  }
+
+  private assertWhapiSecret(
+    headers: Record<string, string | string[] | undefined>,
+  ): void {
+    const expectedSecret = process.env.WEBHOOK_WHAPI_SECRET;
+    if (!expectedSecret) {
+      return;
+    }
+
+    const secretHeader = this.headerValue(headers['x-whapi-secret']);
+    const fallbackHeader = this.headerValue(headers['x-webhook-secret']);
+    const authHeader = this.headerValue(headers.authorization);
+    const bearerSecret = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice('Bearer '.length).trim()
+      : null;
+
+    const provided = secretHeader || fallbackHeader || bearerSecret;
+    if (!provided || provided !== expectedSecret) {
+      throw new ForbiddenException('Invalid webhook secret');
+    }
+  }
+
+  private assertMetaSignature(
+    headers: Record<string, string | string[] | undefined>,
+    rawBody: Buffer | undefined,
+    payload: unknown,
+  ): void {
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (!appSecret) {
+      return;
+    }
+
+    const signatureHeader = this.headerValue(headers['x-hub-signature-256']);
+    if (!signatureHeader?.startsWith('sha256=')) {
+      throw new ForbiddenException('Missing signature');
+    }
+
+    const payloadBuffer = rawBody ?? Buffer.from(JSON.stringify(payload));
+    const digest = createHmac('sha256', appSecret)
+      .update(payloadBuffer)
+      .digest('hex');
+    const expected = `sha256=${digest}`;
+
+    const expectedBuffer = Buffer.from(expected);
+    const receivedBuffer = Buffer.from(signatureHeader);
+    const isValid =
+      expectedBuffer.length === receivedBuffer.length &&
+      timingSafeEqual(expectedBuffer, receivedBuffer);
+
+    if (!isValid) {
+      throw new ForbiddenException('Invalid webhook signature');
+    }
+  }
+
+  private headerValue(
+    value: string | string[] | undefined,
+  ): string | undefined {
+    if (Array.isArray(value)) {
+      return value[0];
+    }
+    return value;
   }
 }

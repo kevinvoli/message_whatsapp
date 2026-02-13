@@ -1,337 +1,324 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Edit, PlusCircle, Trash2 } from 'lucide-react';
+import { createPoste, deletePoste, updatePoste } from '@/app/lib/api';
 import { Poste } from '@/app/lib/definitions';
-import { PlusCircle, Edit, Trash2, Save, XCircle } from 'lucide-react';
-import { createPoste, updatePoste, deletePoste, getPostes } from '@/app/lib/api'; // Import CRUD API functions
-import { Spinner } from './Spinner'; // Assuming Spinner is available
+import { useCrudResource } from '@/app/hooks/useCrudResource';
+import { EntityTable } from '@/app/ui/crud/EntityTable';
+import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 
 interface PostesViewProps {
-    initialPostes: Poste[];
-    onPosteUpdated: () => void; // Callback to refresh data in parent
+  initialPostes: Poste[];
+  onPosteUpdated: () => Promise<void> | void;
 }
 
-export default function PostesView({ initialPostes, onPosteUpdated }: PostesViewProps) {
-    const [postes, setPostes] = useState<Poste[]>(initialPostes);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [currentPoste, setCurrentPoste] = useState<Poste | null>(null);
-    const [formName, setFormName] = useState('');
-    const [formCode, setFormCode] = useState('');
-    const [formIsActive, setFormIsActive] = useState(true);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [operationError, setOperationError] = useState<string | null>(null);
+export default function PostesView({
+  initialPostes,
+  onPosteUpdated,
+}: PostesViewProps) {
+  const {
+    items: postes,
+    loading,
+    error,
+    success,
+    clearStatus,
+    create,
+    update,
+    remove,
+  } = useCrudResource<
+    Poste,
+    { name: string; code: string; is_active: boolean; chats: []; messages: []; commercial: [] },
+    Partial<Poste>
+  >({
+    initialItems: initialPostes,
+    onRefresh: onPosteUpdated,
+    createItem: createPoste,
+    updateItem: updatePoste,
+    deleteItem: deletePoste,
+    getId: (item) => item.id,
+  });
 
-    useEffect(() => {
-        setPostes(initialPostes);
-    }, [initialPostes]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [currentPoste, setCurrentPoste] = useState<Poste | null>(null);
+  const [formName, setFormName] = useState('');
+  const [formCode, setFormCode] = useState('');
+  const [formIsActive, setFormIsActive] = useState(true);
 
-    // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-console.log("le poste retourne:", postes);
+  const openAddModal = () => {
+    setFormName('');
+    setFormCode('');
+    setFormIsActive(true);
+    clearStatus();
+    setShowAddModal(true);
+  };
 
-    const handleOpenAddModal = () => {
-        setFormName('');
-        setFormCode('');
-        setFormIsActive(true);
-        setShowAddModal(true);
-    };
+  const openEditModal = (poste: Poste) => {
+    setCurrentPoste(poste);
+    setFormName(poste.name);
+    setFormCode(poste.code);
+    setFormIsActive(poste.is_active);
+    clearStatus();
+    setShowEditModal(true);
+  };
 
-    const handleCloseAddModal = () => {
-        setShowAddModal(false);
-        setOperationError(null);
-    };
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    clearStatus();
+  };
 
-    const handleOpenEditModal = (poste: Poste) => {
-        setCurrentPoste(poste);
-        setFormName(poste.name);
-        setFormCode(poste.code);
-        setFormIsActive(poste.is_active);
-        setShowEditModal(true);
-    };
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setCurrentPoste(null);
+    clearStatus();
+  };
 
-    const handleCloseEditModal = () => {
-        setShowEditModal(false);
-        setCurrentPoste(null);
-        setOperationError(null);
-    };
-
-    const handleAddPoste = async (e: React.FormEvent) => {
-        e.preventDefault();
-        // Removed: if (!token) { setOperationError("Authentication token is missing."); return; }
-        setLoading(true);
-        setOperationError(null);
-        try {
-            await createPoste({
-                name: formName, code: formCode, is_active: formIsActive,
-                chats: [],
-                messages: [],
-                commercial: []
-            }); // Removed token parameter
-            onPosteUpdated(); // Trigger parent to re-fetch all postes
-            handleCloseAddModal();
-        } catch (err) {
-            setOperationError(err instanceof Error ? err.message : "Failed to add poste.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUpdatePoste = async (e: React.FormEvent) => {
-        e.preventDefault();
-        // Removed: if (!token || !currentPoste) { setOperationError("Authentication token or poste ID is missing."); return; }
-        if (!currentPoste) { // Keep check for currentPoste
-            setOperationError("Poste ID is missing.");
-            return;
-        }
-        setLoading(true);
-        setOperationError(null);
-        try {
-            await updatePoste(currentPoste.id, { name: formName, code: formCode, is_active: formIsActive }); // Removed token parameter
-            onPosteUpdated(); // Trigger parent to re-fetch all postes
-            handleCloseEditModal();
-        } catch (err) {
-            setOperationError(err instanceof Error ? err.message : "Failed to update poste.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDeletePoste = async (id: string) => {
-        // Removed: if (!token || !window.confirm('Are you sure you want to delete this poste?')) { return; }
-        if (!window.confirm('Are you sure you want to delete this poste?')) { // Keep confirmation
-            return;
-        }
-        setLoading(true);
-        setOperationError(null);
-        try {
-            await deletePoste(id); // Removed token parameter
-            onPosteUpdated(); // Trigger parent to re-fetch all postes
-        } catch (err) {
-            setOperationError(err instanceof Error ? err.message : "Failed to delete poste.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Gestion des Postes</h2>
-                <button
-                    onClick={handleOpenAddModal}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                    disabled={loading}
-                >
-                    <PlusCircle className="w-4 h-4" />
-                    Ajouter un poste
-                </button>
-            </div>
-
-            {operationError && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                    <strong className="font-bold">Error:</strong>
-                    <span className="block sm:inline"> {operationError}</span>
-                </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom du Poste</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nb chats</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nb sms</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nb Agent</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Créé le</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {postes.map((poste) => (
-                                <tr key={poste.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 font-medium text-gray-900">{poste.name}</td>
-                                    <td className="px-6 py-4 text-gray-700">{poste.chats?.length}</td>
-                                     <td className="px-6 py-4 text-gray-700">{poste.messages?.length}</td>
-                                      <td className="px-6 py-4 text-gray-700">{poste.commercial?.length}</td>
-                                    <td className="px-6 py-4 text-gray-700">{poste.code}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            poste.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                        }`}>
-                                            {poste.is_active ? 'Actif' : 'Inactif'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">
-                                      {new Date(poste.created_at || poste.createdAt || Date.now()).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleOpenEditModal(poste)}
-                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                disabled={loading}
-                                            >
-                                                <Edit className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeletePoste(poste.id)}
-                                                className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                disabled={loading}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {postes.length === 0 && !loading && (
-                        <p className="text-center text-gray-500 py-4">Aucun poste trouvé.</p>
-                    )}
-                    {loading && (
-                        <div className="flex justify-center py-4">
-                            <Spinner />
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Add Poste Modal */}
-            {showAddModal && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center">
-                    <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
-                        <h3 className="text-lg font-semibold mb-4">Ajouter un nouveau poste</h3>
-                        {operationError && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                                {operationError}
-                            </div>
-                        )}
-                        <form onSubmit={handleAddPoste}>
-                            <div className="mb-4">
-                                <label htmlFor="name" className="block text-gray-700 text-sm font-bold mb-2">Nom</label>
-                                <input
-                                    type="text"
-                                    id="name"
-                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                    value={formName}
-                                    onChange={(e) => setFormName(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="mb-4">
-                                <label htmlFor="code" className="block text-gray-700 text-sm font-bold mb-2">Code</label>
-                                <input
-                                    type="text"
-                                    id="code"
-                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                    value={formCode}
-                                    onChange={(e) => setFormCode(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="mb-4 flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="is_active"
-                                    className="mr-2 leading-tight"
-                                    checked={formIsActive}
-                                    onChange={(e) => setFormIsActive(e.target.checked)}
-                                />
-                                <label htmlFor="is_active" className="text-gray-700 text-sm font-bold">Actif</label>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={handleCloseAddModal}
-                                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
-                                    disabled={loading}
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
-                                    disabled={loading}
-                                >
-                                    {loading && <Spinner />}
-                                    {loading ? 'Adding...' : 'Ajouter'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Poste Modal */}
-            {showEditModal && currentPoste && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center">
-                    <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
-                        <h3 className="text-lg font-semibold mb-4">Modifier le poste</h3>
-                        {operationError && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                                {operationError}
-                            </div>
-                        )}
-                        <form onSubmit={handleUpdatePoste}>
-                            <div className="mb-4">
-                                <label htmlFor="edit-name" className="block text-gray-700 text-sm font-bold mb-2">Nom</label>
-                                <input
-                                    type="text"
-                                    id="edit-name"
-                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                    value={formName}
-                                    onChange={(e) => setFormName(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="mb-4">
-                                <label htmlFor="edit-code" className="block text-gray-700 text-sm font-bold mb-2">Code</label>
-                                <input
-                                    type="text"
-                                    id="edit-code"
-                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                    value={formCode}
-                                    onChange={(e) => setFormCode(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="mb-4 flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="edit-is_active"
-                                    className="mr-2 leading-tight"
-                                    checked={formIsActive}
-                                    onChange={(e) => setFormIsActive(e.target.checked)}
-                                />
-                                <label htmlFor="edit-is_active" className="text-gray-700 text-sm font-bold">Actif</label>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={handleCloseEditModal}
-                                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
-                                    disabled={loading}
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
-                                    disabled={loading}
-                                >
-                                    {loading && <Spinner />}
-                                    {loading ? 'Saving...' : 'Sauvegarder'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-        </div>
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = await create(
+      {
+        name: formName,
+        code: formCode,
+        is_active: formIsActive,
+        chats: [],
+        messages: [],
+        commercial: [],
+      },
+      'Poste ajoute.',
     );
+    if (result.ok) {
+      closeAddModal();
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPoste) return;
+    const result = await update(
+      currentPoste.id,
+      { name: formName, code: formCode, is_active: formIsActive },
+      'Poste mis a jour.',
+    );
+    if (result.ok) {
+      closeEditModal();
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this poste?')) return;
+    await remove(id, 'Poste supprime.');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Gestion des Postes</h2>
+        <button
+          onClick={openAddModal}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          disabled={loading}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Ajouter un poste
+        </button>
+      </div>
+
+      {error && (
+        <div
+          className="relative rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700"
+          role="alert"
+        >
+          <strong className="font-bold">Error:</strong>
+          <span className="sm:inline"> {error}</span>
+        </div>
+      )}
+      {success && (
+        <div
+          className="relative rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700"
+          role="status"
+        >
+          {success}
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <EntityTable
+          items={postes}
+          loading={loading}
+          emptyMessage="Aucun poste trouve."
+          getRowKey={(poste) => poste.id}
+          columns={[
+            {
+              header: 'Nom du Poste',
+              render: (poste) => (
+                <span className="font-medium text-gray-900">{poste.name}</span>
+              ),
+            },
+            {
+              header: 'Nb chats',
+              render: (poste) => <span className="text-gray-700">{poste.chats?.length ?? 0}</span>,
+            },
+            {
+              header: 'Nb sms',
+              render: (poste) => <span className="text-gray-700">{poste.messages?.length ?? 0}</span>,
+            },
+            {
+              header: 'Nb Agent',
+              render: (poste) => (
+                <span className="text-gray-700">{poste.commercial?.length ?? 0}</span>
+              ),
+            },
+            {
+              header: 'Code',
+              render: (poste) => <span className="text-gray-700">{poste.code}</span>,
+            },
+            {
+              header: 'Statut',
+              render: (poste) => (
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    poste.is_active
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {poste.is_active ? 'Actif' : 'Inactif'}
+                </span>
+              ),
+            },
+            {
+              header: 'Cree le',
+              render: (poste) => (
+                <span className="text-sm text-gray-500">
+                  {new Date(poste.created_at || poste.createdAt || Date.now()).toLocaleDateString()}
+                </span>
+              ),
+            },
+            {
+              header: 'Actions',
+              render: (poste) => (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEditModal(poste)}
+                    className="rounded p-1 text-blue-600 hover:bg-blue-50"
+                    disabled={loading}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(poste.id)}
+                    className="rounded p-1 text-red-600 hover:bg-red-50"
+                    disabled={loading}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </div>
+
+      <EntityFormModal
+        isOpen={showAddModal}
+        title="Ajouter un nouveau poste"
+        onClose={closeAddModal}
+        onSubmit={handleAdd}
+        loading={loading}
+        error={error}
+        submitLabel="Ajouter"
+        loadingLabel="Adding..."
+      >
+        <div className="mb-4">
+          <label htmlFor="name" className="mb-2 block text-sm font-bold text-gray-700">
+            Nom
+          </label>
+          <input
+            type="text"
+            id="name"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="code" className="mb-2 block text-sm font-bold text-gray-700">
+            Code
+          </label>
+          <input
+            type="text"
+            id="code"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formCode}
+            onChange={(e) => setFormCode(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4 flex items-center">
+          <input
+            type="checkbox"
+            id="is_active"
+            className="mr-2 leading-tight"
+            checked={formIsActive}
+            onChange={(e) => setFormIsActive(e.target.checked)}
+          />
+          <label htmlFor="is_active" className="text-sm font-bold text-gray-700">
+            Actif
+          </label>
+        </div>
+      </EntityFormModal>
+
+      <EntityFormModal
+        isOpen={showEditModal && !!currentPoste}
+        title="Modifier le poste"
+        onClose={closeEditModal}
+        onSubmit={handleUpdate}
+        loading={loading}
+        error={error}
+        submitLabel="Sauvegarder"
+        loadingLabel="Saving..."
+      >
+        <div className="mb-4">
+          <label htmlFor="edit-name" className="mb-2 block text-sm font-bold text-gray-700">
+            Nom
+          </label>
+          <input
+            type="text"
+            id="edit-name"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-code" className="mb-2 block text-sm font-bold text-gray-700">
+            Code
+          </label>
+          <input
+            type="text"
+            id="edit-code"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formCode}
+            onChange={(e) => setFormCode(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4 flex items-center">
+          <input
+            type="checkbox"
+            id="edit-is_active"
+            className="mr-2 leading-tight"
+            checked={formIsActive}
+            onChange={(e) => setFormIsActive(e.target.checked)}
+          />
+          <label htmlFor="edit-is_active" className="text-sm font-bold text-gray-700">
+            Actif
+          </label>
+        </div>
+      </EntityFormModal>
+    </div>
+  );
 }

@@ -38,13 +38,13 @@ Regle: un ticket = une livraison atomique verifiable.
 | TKT-P1-003 | P1 | Admin/Back | Correction update commercial (/users/:id) | TKT-P0-002 | 0.5j | done |
 | TKT-P1-004 | P1 | Admin | Finalisation ConversationsView admin | TKT-P1-003 | 1j | done |
 | TKT-P1-005 | P1 | Front/Admin/Back | Unification types status/date | TKT-P0-005 | 1j | done |
-| TKT-P1-006 | P1 | Back | Correction type `readonly` entite chat + migration | TKT-P2-001 | 1j | todo |
+| TKT-P1-006 | P1 | Back | Correction type `readonly` entite chat + migration | TKT-P2-001 | 1j | done |
 | TKT-P2-001 | P2 | Back | Migrations TypeORM + synchronize conditionnel | TKT-P0-001 | 1j | done |
-| TKT-P2-002 | P2 | Repo | Nettoyage fichiers inutiles et docs runtime | - | 0.5j | todo |
+| TKT-P2-002 | P2 | Repo | Nettoyage fichiers inutiles et docs runtime | - | 0.5j | done |
 | TKT-P2-003 | P2 | Front | Suppression doublons composants chat | TKT-P1-002 | 0.5j | done |
-| TKT-P2-004 | P2 | Admin | Factorisation CRUD (hook + composants) | TKT-P1-003 | 1.5j | todo |
-| TKT-P2-005 | P2 | Back | Webhook hardening (signature + idempotence) | TKT-P0-006 | 1.5j | todo |
-| TKT-P2-006 | P2 | Observabilite | Remplacement logs sensibles par logger structure | TKT-P0-001 | 1j | todo |
+| TKT-P2-004 | P2 | Admin | Factorisation CRUD (hook + composants) | TKT-P1-003 | 1.5j | done |
+| TKT-P2-005 | P2 | Back | Webhook hardening (signature + idempotence) | TKT-P0-006 | 1.5j | done |
+| TKT-P2-006 | P2 | Observabilite | Remplacement logs sensibles par logger structure | TKT-P0-001 | 1j | in_progress |
 | TKT-P2-007 | P2 | Qualite | Suite de tests E2E transverse auth/chat/admin | TKT-P0-* + TKT-P1-* | 1.5j | todo |
 
 ---
@@ -588,14 +588,19 @@ Suite de tests transverse (auth/chat/admin)
 | TKT-P1-003 | done |  |  |  |  |  |
 | TKT-P1-004 | done |  |  |  |  |  |
 | TKT-P1-005 | done |  |  |  |  |  |
-| TKT-P1-006 | todo |  |  |  |  |  |
+| TKT-P1-006 | done |  |  |  |  |  |
 | TKT-P2-001 | done |  |  |  |  |  |
-| TKT-P2-002 | todo |  |  |  |  |  |
+| TKT-P2-002 | done |  |  |  |  |  |
 | TKT-P2-003 | done |  |  |  |  |  |
-| TKT-P2-004 | todo |  |  |  |  |  |
-| TKT-P2-005 | todo |  |  |  |  |  |
-| TKT-P2-006 | todo |  |  |  |  |  |
+| TKT-P2-004 | done |  |  |  |  |  |
+| TKT-P2-005 | done |  |  |  |  |  |
+| TKT-P2-006 | in_progress |  |  |  |  |  |
 | TKT-P2-007 | todo |  |  |  |  |  |
+
+
+
+
+
 
 
 

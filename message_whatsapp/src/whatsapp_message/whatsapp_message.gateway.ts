@@ -370,7 +370,7 @@ export class WhatsappMessageGateway
   public emitConversationReadonly(chat: WhatsappChat): void {
     this.server.emit('chat:event', {
       type: 'CONVERSATION_READONLY',
-      payload: { chat_id: chat },
+      payload: { chat_id: chat.chat_id, read_only: chat.read_only },
     });
   }
 
@@ -446,3 +446,4 @@ export class WhatsappMessageGateway
     };
   }
 }
+

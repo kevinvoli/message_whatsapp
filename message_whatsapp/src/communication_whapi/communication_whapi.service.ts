@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhapiSendMessageResponse } from './dto/whapi-send-message-response.dto';
+import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
 export class CommunicationWhapiService {
@@ -18,6 +19,7 @@ export class CommunicationWhapiService {
     private readonly channelRepository: Repository<WhapiChannel>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    private readonly logger: AppLogger,
   ) {}
 
   // async sendToWhapi(
@@ -82,9 +84,16 @@ async sendTyping(chat_id: string, typing: boolean) {
       }
     );
 
-    console.log("✅ Typing sent to Whapi:", chat.contact_client, typing);
+    this.logger.log(
+      `Typing sent to Whapi for ${chat.contact_client}`,
+      CommunicationWhapiService.name,
+    );
   } catch (err) {
-    console.error("❌ Whapi typing error", err?.response?.data || err);
+    this.logger.error(
+      'Whapi typing error',
+      err instanceof Error ? err.stack : undefined,
+      CommunicationWhapiService.name,
+    );
   }
 }
 

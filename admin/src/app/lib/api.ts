@@ -49,8 +49,6 @@ export async function getMessages(): Promise<WhatsappMessage[]> {
         method: 'GET',
         credentials: 'include',
     });
-    console.log("retous des message =================",response);
-    
     return handleResponse<WhatsappMessage[]>(response);
 }
 
@@ -258,8 +256,6 @@ export async function login(email: string, password: string): Promise<{ user: an
         body: JSON.stringify({ email, password }),
         credentials: 'include',
     });
-    console.log("reponse user connection",response);
-    
     return handleResponse<{ user: any }>(response);
 }
 

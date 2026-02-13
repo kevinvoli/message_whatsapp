@@ -17,13 +17,14 @@ import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.se
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { AutoMessageOrchestrator } from '../message-auto/auto-message-orchestrator.service';
 import {
   WhatsappMedia,
   WhatsappMediaType,
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { WebhookEventLog } from './entities/webhook-event.entity';
 
 @Injectable()
 export class WhapiService {
@@ -42,8 +43,35 @@ export class WhapiService {
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
 
+    @InjectRepository(WebhookEventLog)
+    private readonly webhookEventRepository: Repository<WebhookEventLog>,
+
     private readonly autoMessageOrchestratorServcie: AutoMessageOrchestrator,
   ) {}
+
+  async isReplayEvent(
+    payload: WhapiWebhookPayload,
+    provider: 'whapi' | 'meta',
+  ): Promise<boolean> {
+    const keys = this.buildIdempotencyKeys(payload, provider);
+    if (!keys.length) {
+      return false;
+    }
+
+    let insertedCount = 0;
+    for (const key of keys) {
+      const inserted = await this.tryRegisterEventKey(
+        key,
+        provider,
+        payload?.event?.type ?? null,
+      );
+      if (inserted) {
+        insertedCount += 1;
+      }
+    }
+
+    return insertedCount === 0;
+  }
 
   // ======================================================
   // INCOMING MESSAGE
@@ -233,6 +261,63 @@ export class WhapiService {
     for (const status of payload.statuses) {
       await this.whatsappMessageService.updateByStatus(status);
       this.logger.log(`📌 Status | ${status.id} → ${status.status}`);
+    }
+  }
+
+  private buildIdempotencyKeys(
+    payload: WhapiWebhookPayload,
+    provider: string,
+  ): string[] {
+    const base = `${provider}:${payload?.channel_id ?? 'unknown'}:${
+      payload?.event?.type ?? 'unknown'
+    }`;
+
+    const messageIds =
+      payload?.messages
+        ?.map((message) => message?.id)
+        .filter((id): id is string => Boolean(id))
+        .map((id) => `${base}:message:${id}`) ?? [];
+
+    const statusIds =
+      payload?.statuses
+        ?.map((status) =>
+          status?.id
+            ? `${base}:status:${status.id}:${status.status ?? 'unknown'}`
+            : null,
+        )
+        .filter((value): value is string => Boolean(value)) ?? [];
+
+    const keys = [...messageIds, ...statusIds];
+    if (keys.length > 0) {
+      return keys;
+    }
+
+    return [`${base}:hash:${JSON.stringify(payload)}`];
+  }
+
+  private async tryRegisterEventKey(
+    eventKey: string,
+    provider: string,
+    eventType: string | null,
+  ): Promise<boolean> {
+    try {
+      await this.webhookEventRepository.save(
+        this.webhookEventRepository.create({
+          event_key: eventKey,
+          provider,
+          event_type: eventType ?? undefined,
+        }),
+      );
+      return true;
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        typeof (error as any).driverError?.code === 'string' &&
+        (error as any).driverError.code === 'ER_DUP_ENTRY'
+      ) {
+        return false;
+      }
+      throw error;
     }
   }
 }

@@ -11,8 +11,6 @@ export class AuthAdminController {
 
   @Post('login')
   async login(@Body() loginAdminDto: LoginAdminDto, @Res({ passthrough: true }) res: Response) {
-    console.log("connection admin",loginAdminDto);
-    
     const admin = await this.authAdminService.validateAdmin(
       loginAdminDto.email,
       loginAdminDto.password,
@@ -37,9 +35,6 @@ export class AuthAdminController {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
-
-    console.log("les retour",admin);
-    
 
     return { admin }; // Return admin object without the token in the body
   }

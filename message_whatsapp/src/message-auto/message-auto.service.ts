@@ -102,7 +102,7 @@ export class MessageAutoService {
 
     // Marquer la conversation comme bloquée
     await this.chatService.update(chatId, {
-      readonly: true,
+      read_only: true,
       auto_message_status: 'sending',
     });
 
@@ -128,7 +128,7 @@ export class MessageAutoService {
 
     // Débloquer après envoi
     await this.chatService.update(chatId, {
-      readonly: false,
+      read_only: false,
       auto_message_status: 'sent',
       auto_message_id: template.id,
     });
@@ -169,3 +169,4 @@ export class MessageAutoService {
 }
 
 // "Bonjour Madame #name#,  J'espère que vous allez bien ? Je suis votre conseillère de GICOP, comment puis-je vous aider ?"
+

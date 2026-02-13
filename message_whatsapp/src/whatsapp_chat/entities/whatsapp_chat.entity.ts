@@ -197,14 +197,6 @@ export class WhatsappChat {
   current_auto_message_id?: string | null;
 
   @Column({
-    name: 'readonly',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
-  readonly: boolean;
-
-  @Column({
     name: 'auto_message_status',
     type: 'varchar',
     length: 100,
@@ -259,3 +251,4 @@ export class WhatsappChat {
   })
   deletedAt: Date | null;
 }
+

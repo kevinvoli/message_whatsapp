@@ -34,6 +34,7 @@ import { WhapiChannel } from './channel/entities/channel.entity'; // Added impor
 import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity'; // Added import
 import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added import
 import { MetriquesModule } from './metriques/metriques.module';
+import { AppLogger } from './logging/app-logger.service';
 
 @Module({
   imports: [
@@ -51,6 +52,11 @@ import { MetriquesModule } from './metriques/metriques.module';
         MYSQL_DATABASE: Joi.string().required(),
         SERVER_PORT: Joi.number().required(),
         TYPEORM_SYNCHRONIZE: Joi.string().valid('true', 'false').default('false'),
+        LOG_LEVEL: Joi.string()
+          .valid('error', 'warn', 'log', 'debug', 'verbose', 'info')
+          .default('info'),
+        WEBHOOK_WHAPI_SECRET: Joi.string().optional(),
+        WHATSAPP_APP_SECRET: Joi.string().optional(),
         ADMIN_NAME: Joi.string().optional(),
         ADMIN_EMAIL: Joi.when('NODE_ENV', {
           is: 'production',
@@ -87,8 +93,8 @@ import { MetriquesModule } from './metriques/metriques.module';
     WhatsappPosteModule,
     MessageAutoModule,
     MetriquesModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService, TasksService],
+    ],
+    controllers: [AppController],
+    providers: [AppService, TasksService, AppLogger],
 })
 export class AppModule {}
