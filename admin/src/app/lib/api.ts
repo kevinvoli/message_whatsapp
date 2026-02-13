@@ -1,6 +1,7 @@
 // admin/src/app/lib/api.ts
 
 import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle } from './definitions'; // Added WhatsappChat, WhatsappMessage
+import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -244,7 +245,9 @@ export async function checkAdminAuth(): Promise<boolean> {
         });
         return response.ok;
     } catch (error) {
-        console.error("Error checking admin auth status:", error);
+        logger.error("Error checking admin auth status", {
+            error: error instanceof Error ? error.message : String(error),
+        });
         return false;
     }
 }

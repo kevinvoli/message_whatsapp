@@ -2,6 +2,7 @@ import { Settings, LogOut, Menu, X } from 'lucide-react';
 import { NavigationItem, ViewMode, WhatsappMessage } from '@/app/lib/definitions';
 import { useRouter } from 'next/navigation';
 import { logoutAdmin } from '@/app/lib/api'; // Import logoutAdmin
+import { logger } from '@/app/lib/logger';
 
 interface NavigationProps {
     sidebarOpen: boolean;
@@ -19,7 +20,9 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
         try {
             await logoutAdmin(); // Call without token, relies on HTTP-only cookie
         } catch (error) {
-            console.error("Logout failed on backend", error);
+            logger.error("Logout failed on backend", {
+                error: error instanceof Error ? error.message : String(error),
+            });
             // Frontend doesn't store token, so no localStorage to clear for token itself.
             // If there were other local storage items related to auth state, they'd be cleared here.
         }

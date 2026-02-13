@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -19,6 +20,8 @@ import { CommercialDashboardDto } from './dto/commercial-Dashboard.dto';
 
 @Injectable()
 export class WhatsappCommercialService {
+  private readonly logger = new Logger(WhatsappCommercialService.name);
+
   constructor(
     @InjectRepository(WhatsappCommercial)
     private readonly whatsappCommercialRepository: Repository<WhatsappCommercial>,
@@ -103,7 +106,9 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
       poste: poste
     });
 
-    console.log("utilisateur pres a etre enregistre", user);
+    this.logger.debug(
+      `Utilisateur pret a etre enregistre (${email}) poste=${poste_id}`,
+    );
     
     const savedUser = await this.whatsappCommercialRepository.save(user);
 
@@ -176,7 +181,9 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
       const messagesEnvoyes = await this.messageRepository.count({
         where: { poste_id: posteId, from_me: true },
       });
-      console.log("message envoye",messagesEnvoyes);
+      this.logger.debug(
+        `Messages envoyes pour ${user.id}: ${messagesEnvoyes}`,
+      );
       
       const messagesRecus = await this.messageRepository.count({
         where: { poste_id: posteId, from_me: false },
@@ -184,7 +191,9 @@ async findOneByEmailWithPassword(email: string): Promise<WhatsappCommercial | nu
 
       const chats= user.poste?.chats || []
 
-      console.log("message reçue",messagesRecus);
+      this.logger.debug(
+        `Messages recus pour ${user.id}: ${messagesRecus}`,
+      );
       
 
       // Chats actifs / en attente
@@ -325,8 +334,8 @@ async updateStatus(id: string, status: boolean):Promise<SafeWhatsappCommercial> 
 
     // Logging selon le statut
     const statusText = status ? 'connecté' : 'déconnecté';
-    console.log(
-      `🔌 Commercial ${user.name} (${user.id}) est maintenant ${statusText}`,
+    this.logger.log(
+      `Commercial ${user.name} (${user.id}) est maintenant ${statusText}`,
     );
 
     // Émettre un événement si nécessaire
@@ -336,12 +345,10 @@ async updateStatus(id: string, status: boolean):Promise<SafeWhatsappCommercial> 
     
   } catch (error) {
     // Log détaillé de l'erreur
-    console.error(`❌ Erreur lors de la mise à jour du statut pour l'utilisateur ${id}:`, {
-      error: error.message,
-      stack: error.stack,
-      status,
-      timestamp: new Date().toISOString()
-    });
+    this.logger.error(
+      `Erreur lors de la mise a jour du statut pour l'utilisateur ${id}`,
+      error instanceof Error ? error.stack : undefined,
+    );
 
     // Si l'erreur est déjà une HttpException, la relancer
     if (error instanceof NotFoundException) {

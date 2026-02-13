@@ -44,8 +44,8 @@ Regle: un ticket = une livraison atomique verifiable.
 | TKT-P2-003 | P2 | Front | Suppression doublons composants chat | TKT-P1-002 | 0.5j | done |
 | TKT-P2-004 | P2 | Admin | Factorisation CRUD (hook + composants) | TKT-P1-003 | 1.5j | done |
 | TKT-P2-005 | P2 | Back | Webhook hardening (signature + idempotence) | TKT-P0-006 | 1.5j | done |
-| TKT-P2-006 | P2 | Observabilite | Remplacement logs sensibles par logger structure | TKT-P0-001 | 1j | in_progress |
-| TKT-P2-007 | P2 | Qualite | Suite de tests E2E transverse auth/chat/admin | TKT-P0-* + TKT-P1-* | 1.5j | todo |
+| TKT-P2-006 | P2 | Observabilite | Remplacement logs sensibles par logger structure | TKT-P0-001 | 1j | done |
+| TKT-P2-007 | P2 | Qualite | Suite de tests E2E transverse auth/chat/admin | TKT-P0-* + TKT-P1-* | 1.5j | in_progress |
 
 ---
 
@@ -594,8 +594,10 @@ Suite de tests transverse (auth/chat/admin)
 | TKT-P2-003 | done |  |  |  |  |  |
 | TKT-P2-004 | done |  |  |  |  |  |
 | TKT-P2-005 | done |  |  |  |  |  |
-| TKT-P2-006 | in_progress |  |  |  |  |  |
-| TKT-P2-007 | todo |  |  |  |  |  |
+| TKT-P2-006 | done | 2026-02-13 | 2026-02-13 |  |  | Logger structure + DI/LoggingModule fix |
+| TKT-P2-007 | in_progress | 2026-02-13 |  |  |  | E2E tests auth/chat/admin added (backend) |
+
+
 
 
 

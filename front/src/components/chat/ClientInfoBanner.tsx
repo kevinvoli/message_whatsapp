@@ -1,6 +1,7 @@
 import React from 'react';
 import { Target, Star, Users, Calendar } from 'lucide-react';
 import { Conversation, getPriorityColor } from '@/types/chat';
+import { logger } from '@/lib/logger';
 
 interface ClientInfoBannerProps {
     currentConv: Conversation;
@@ -9,7 +10,9 @@ interface ClientInfoBannerProps {
 
 export default function ClientInfoBanner({ currentConv }: ClientInfoBannerProps) {
 
-console.log("mes conversation sont la :", currentConv);
+logger.debug("Client info banner rendered", {
+  chat_id: currentConv?.chat_id,
+});
 
     return (
         <div className="flex items-center gap-4 text-xs text-gray-600 bg-blue-50 p-3 rounded-lg">

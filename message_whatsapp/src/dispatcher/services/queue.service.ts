@@ -68,11 +68,11 @@ export class QueueService {
    */
   async removeFromQueue(posteId: string): Promise<void> {
 
-     console.log('⏳ waiting lock', posteId);
+     this.logger.debug(`⏳ waiting lock ${posteId}`);
 
     // return this.queueLock.runExclusive(async () => {
 
-       console.log('🔒 lock acquired', posteId);
+       this.logger.debug(`🔒 lock acquired ${posteId}`);
 
       const queryRunner = this.dataSource.createQueryRunner();
       await queryRunner.connect();

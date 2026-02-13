@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
 import { Contact  } from "@/types/chat";
+import { logger } from "@/lib/logger";
 
 interface ContactState {
   socket: Socket | null;
@@ -48,7 +49,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
     if (!socket) return;
 
     set({ isLoading: true });
-    console.log("novelle contacts");
+    logger.debug("Contacts load requested");
 
     socket?.emit("contacts:get");
   },
@@ -78,7 +79,7 @@ export const useContactStore = create<ContactState>((set, get) => ({
   },
 
   setContacts: (contacts) => {
-    console.log("=======track1 setContacts=======", contacts);
+    logger.debug("Contacts loaded", { count: contacts.length });
 
     set({ contacts, isLoading: false });
   },

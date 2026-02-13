@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { AlertCircle, Mic, Paperclip, Send, Smile } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -39,7 +40,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleTyping = () => {
-    console.log("typing", chat_id);
+    logger.debug("Typing started", { chat_id });
 
     if (!isTyping.current) {
       isTyping.current = true;

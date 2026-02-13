@@ -34,7 +34,7 @@ import { WhapiChannel } from './channel/entities/channel.entity'; // Added impor
 import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity'; // Added import
 import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added import
 import { MetriquesModule } from './metriques/metriques.module';
-import { AppLogger } from './logging/app-logger.service';
+import { LoggingModule } from './logging/logging.module';
 
 @Module({
   imports: [
@@ -93,8 +93,9 @@ import { AppLogger } from './logging/app-logger.service';
     WhatsappPosteModule,
     MessageAutoModule,
     MetriquesModule,
+    LoggingModule,
     ],
     controllers: [AppController],
-    providers: [AppService, TasksService, AppLogger],
+    providers: [AppService, TasksService],
 })
 export class AppModule {}

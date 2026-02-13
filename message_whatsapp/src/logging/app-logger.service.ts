@@ -1,11 +1,11 @@
-import { Injectable, Logger, LoggerService } from '@nestjs/common';
+import { ConsoleLogger, Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 const LOG_LEVELS = ['error', 'warn', 'log', 'debug', 'verbose'] as const;
 
 @Injectable()
 export class AppLogger implements LoggerService {
-  private readonly logger = new Logger(AppLogger.name);
+  private readonly logger = new ConsoleLogger(AppLogger.name);
   private readonly minLevelIndex: number;
 
   constructor(private readonly configService: ConfigService) {

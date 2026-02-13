@@ -7,6 +7,7 @@ import {
   OnGatewayDisconnect,
   ConnectedSocket,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -25,7 +26,12 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
 
-@WebSocketGateway(3001, {
+const wsPort =
+  process.env.NODE_ENV === 'test'
+    ? 0
+    : Number(process.env.WS_PORT ?? 3001);
+
+@WebSocketGateway(wsPort, {
   cors: { origin: '*', credentials: true },
 })
 export class WhatsappMessageGateway
@@ -33,6 +39,8 @@ export class WhatsappMessageGateway
 {
   @WebSocketServer()
   server: Server;
+
+  private readonly logger = new Logger(WhatsappMessageGateway.name);
 
   private connectedAgents = new Map<
     string,
@@ -162,8 +170,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     // @MessageBody() payload?: { search?: string },
   ) {
-
-    console.log("bienvenue dans la liste des contact");
+    this.logger.debug(`Contacts list requested (${client.id})`);
     await this.sendContactsToClient(client,);
   }
 
@@ -173,8 +180,11 @@ export class WhatsappMessageGateway
     @MessageBody() payload: { chat_id: string },
   ) {
     const agent = this.connectedAgents.get(client.id);
-
-    console.log('============', agent, '===============');
+    if (agent) {
+      this.logger.debug(
+        `Typing start (${agent.commercialId}) chat ${payload.chat_id}`,
+      );
+    }
 
     const commercialId = agent?.commercialId;
       if (!commercialId) return;
@@ -295,8 +305,9 @@ export class WhatsappMessageGateway
     const unreadCount = await this.messageService.countUnreadMessages(
       chat.chat_id,
     );
-
-    console.log("compteur message", unreadCount);
+    this.logger.debug(
+      `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
+    );
     
     this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
@@ -337,7 +348,9 @@ export class WhatsappMessageGateway
   }
 
   private emitTyping(chatId: string, isTyping: boolean) {
-    console.log("==================",chatId);
+    this.logger.debug(
+      `Typing ${isTyping ? 'start' : 'stop'} (${chatId})`,
+    );
     
     this.server
       .to(`chat_${chatId}`)

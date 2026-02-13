@@ -57,7 +57,9 @@ export class DispatcherService {
      * → juste mettre à jour l’activité et le compteur de messages non lus
      */
     if (conversation && isAgentConnected) {
-      console.log("===============conversation existen et user connecte=================");
+      this.logger.debug(
+        `Conversation existante avec agent connecte (${conversation.chat_id})`,
+      );
       
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
@@ -79,9 +81,6 @@ export class DispatcherService {
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
       this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);
-      console.log(
-        '________________il ne doit pas entre ici___________________',
-      );
 
       return null;
     }
@@ -139,7 +138,9 @@ export class DispatcherService {
       last_client_message_at: new Date(),
     });
 
-    console.log('mes message', newChat);
+    this.logger.debug(
+      `Nouvelle conversation creee (${newChat.chat_id})`,
+    );
 
     return this.chatRepository.save(newChat);
   }
@@ -205,7 +206,9 @@ export class DispatcherService {
         first_response_deadline_at: LessThan(now),
       },
     });
-    console.log('lencement du tcheque des reponse', chats, now);
+    this.logger.debug(
+      `Verification SLA reponses (${poste_id}) - ${chats.length} conversations`,
+    );
 
     for (const chat of chats) {
       await this.reinjectConversation(chat);

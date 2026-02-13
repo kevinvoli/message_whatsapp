@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
 import { Conversation, Message } from "@/types/chat";
+import { logger } from "@/lib/logger";
 
 interface ChatState {
   typingStatus: Record<string, boolean>;
@@ -138,7 +139,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [...state.messages, tempMessage],
     }));
 
-    console.log("id temporaire==============", tempMessage);
+    logger.debug("Temporary message created", {
+      chat_id: selectedConversation.chat_id,
+      temp_id: tempMessage.id,
+    });
 
     socket.emit("message:send", {
       chat_id: selectedConversation.chat_id,
@@ -175,7 +179,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addMessage: (message) => {
-    console.log("dans le add message", message);
+    logger.debug("Message added to store", {
+      chat_id: message.chat_id,
+      message_id: message.id,
+    });
 
     set((state) => {
       const isActive = state.selectedConversation?.chat_id === message.chat_id;
@@ -200,7 +207,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const isSelected =
         state.selectedConversation?.chat_id === updatedConversation.chat_id;
       const isOutgoing = updatedConversation.lastMessage?.from_me === true;
-      console.log("est ce que c'est faux====", updatedConversation);
+      logger.debug("Conversation update received", {
+        chat_id: updatedConversation.chat_id,
+      });
 
       const conversationExists = state.conversations.some(
         (c) => c.chat_id === updatedConversation.chat_id,

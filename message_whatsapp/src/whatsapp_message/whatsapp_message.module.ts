@@ -22,6 +22,7 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
+import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
     ]),
     WhatsappChatModule,
     forwardRef(() => DispatcherModule),
+    LoggingModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

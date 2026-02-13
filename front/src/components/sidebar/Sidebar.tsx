@@ -7,6 +7,7 @@ import UserHeader from './UserHeader';
 import ConversationFilters from './ConversationFilters';
 import ConversationList from './ConversationList';
 import { useAuth } from '@/contexts/AuthProvider';
+import { logger } from '@/lib/logger';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -58,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Données (à remplacer par vos vraies données)
-  console.log("contacte charge ", contacts);
+  logger.debug("Contacts loaded in sidebar", { count: contacts.length });
 
 
   const filteredConversations = conversations?.filter((conv) => {

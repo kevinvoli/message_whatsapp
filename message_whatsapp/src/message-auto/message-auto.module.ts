@@ -22,6 +22,7 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
+import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
    imports: [
@@ -29,6 +30,7 @@ import { Contact } from 'src/contact/entities/contact.entity';
         MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,PendingMessage,WhapiChannel,
         Contact
       ]),
+      LoggingModule,
     ],
   controllers: [MessageAutoController],
   providers: [MessageAutoService,WhatsappMessageGateway, WhatsappChatService, WhatsappMessageService,WhatsappCommercialService,WhatsappPosteService,QueueService,DispatcherService,FirstResponseTimeoutJob,WhatsappPosteService,CommunicationWhapiService,ChannelService,ContactService

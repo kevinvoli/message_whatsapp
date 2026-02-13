@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -7,6 +7,8 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 
 @Injectable()
 export class WhatsappChatService {
+  private readonly logger = new Logger(WhatsappChatService.name);
+
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
@@ -70,7 +72,10 @@ export class WhatsappChatService {
 
       return this.chatRepository.save(newChat);
     } catch (error) {
-      console.error('Error finding or creating chat:', error);
+      this.logger.error(
+        'Error finding or creating chat',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error(`Failed to find or create chat: ${String(error)}`);
     }
   }
@@ -87,7 +92,7 @@ export class WhatsappChatService {
       },
     );
 
-    console.log("mise a jour du chat", chat);
+    this.logger.debug(`Chat marked as read (${chat_id})`);
     // return chat;
   }
 

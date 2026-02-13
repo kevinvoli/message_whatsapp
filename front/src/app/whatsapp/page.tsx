@@ -15,6 +15,7 @@ import { useStatsStore } from '@/store/stats.store';
 import ChatMainArea from '@/components/chat/ChatMainArea';
 import { useContactStore } from '@/store/contactStore';
 import { ContactsListView } from '@/components/contact/contactListview';
+import { logger } from '@/lib/logger';
 
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
@@ -53,7 +54,9 @@ const WhatsAppPage = () => {
 
   // Gérer la sélection d'une conversation
   const handleSelectConversation = useCallback((conversation: Conversation) => {
-    console.log("🎯 Sélection de la conversation:", conversation.clientName);
+    logger.debug('Conversation selected', {
+      chat_id: conversation.chat_id,
+    });
     selectConversation(conversation.chat_id);
   }, [selectConversation]);
 

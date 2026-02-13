@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AdminDashboard from './dashboard/commercial/page';
 import { Spinner } from './ui/Spinner';
 import { checkAdminAuth } from './lib/api'; // Import checkAdminAuth
+import { logger } from './lib/logger';
 
 export default function Home() {
   const router = useRouter();
@@ -21,7 +22,9 @@ export default function Home() {
           router.replace('/login');
         }
       } catch (error) {
-        console.error("Authentication check failed:", error);
+        logger.error("Authentication check failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
         router.replace('/login');
       } finally {
         setLoading(false);

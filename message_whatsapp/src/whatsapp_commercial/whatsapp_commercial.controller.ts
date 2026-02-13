@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Logger } from '@nestjs/common';
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
@@ -8,6 +8,8 @@ import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 @Controller('users')
 @UseGuards(AdminGuard) // Use AdminGuard
 export class WhatsappCommercialController {
+  private readonly logger = new Logger(WhatsappCommercialController.name);
+
   constructor(private readonly whatsappCommercialService: WhatsappCommercialService) {}
 
   @Post()
@@ -22,13 +24,13 @@ export class WhatsappCommercialController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    console.log("get on user", id);
+    this.logger.debug(`Get user ${id}`);
     return await this.whatsappCommercialService.findOne(id);
   }
 
-  @Patch(':id')
+ @Patch(':id')
  async update(@Param('id') id: string, @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto) {
-  console.log("tentative de modification", updateWhatsappCommercialDto);
+  this.logger.debug(`Update user ${id}`);
   
     return await this.whatsappCommercialService.update(id, updateWhatsappCommercialDto);
   }

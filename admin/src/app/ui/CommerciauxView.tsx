@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target } from 'lucide-react';
 import { PerformanceCommercial } from '@/app/lib/definitions';
 import { updateCommercial } from '@/app/lib/api';
+import { logger } from '@/app/lib/logger';
 
 interface CommerciauxViewProps {
   commerciaux: PerformanceCommercial[];
@@ -22,7 +23,7 @@ export default function CommerciauxView({
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  console.log("les commerciaux==", commerciaux);
+  logger.debug("Commerciaux loaded", { count: commerciaux.length });
 
   // Fonction pour obtenir la couleur du statut
   const getStatusColor = (isConnected: boolean) => {

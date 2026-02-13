@@ -28,6 +28,7 @@ import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestra
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { WebhookEventLog } from './entities/webhook-event.entity';
+import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { WebhookEventLog } from './entities/webhook-event.entity';
     WhatsappMessageModule,
     WhatsappChatModule,
     CommunicationWhapiModule,
+    LoggingModule,
   ],
   controllers: [WhapiController],
   providers: [

@@ -14,8 +14,6 @@ interface ConversationListProps {
 export default function ConversationList({ filteredConversations, selectedConv , selectedConversation,onSelectConversation}: ConversationListProps) {
 
       const typingStatus = useChatStore((state) => state.typingStatus);
-      console.log();
-      
     return (
         <div className="flex-1 overflow-y-auto">
             {filteredConversations?.map(conv => (

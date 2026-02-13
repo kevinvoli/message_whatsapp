@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 
 @Injectable()
 export class FirstResponseTimeoutJob {
+  private readonly logger = new Logger(FirstResponseTimeoutJob.name);
   // ✅ DÉCLARATION OBLIGATOIRE
   private readonly agentSlaIntervals = new Map<string, NodeJS.Timeout>();
   private readonly autoMessageIntervals = new Map<string, NodeJS.Timeout>();
@@ -24,10 +25,7 @@ export class FirstResponseTimeoutJob {
     // ⚠️ PAS async ici
     const interval = setInterval(() => {
       // ✅ encapsulation propre de l’async
-      console.log(
-        'runner est dans la place:___________________________________________________________________________________',
-        posteId,
-      );
+      this.logger.debug(`SLA runner tick (${posteId})`);
 
       //   void (async () => {
       //  await this.dispatcher.jobRunnertcheque(posteId)

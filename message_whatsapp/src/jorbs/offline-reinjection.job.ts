@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -8,6 +8,7 @@ import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class FirstResponseTimeoutJob {
+  private readonly logger = new Logger(FirstResponseTimeoutJob.name);
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
@@ -20,7 +21,7 @@ export class FirstResponseTimeoutJob {
  async offlineReinject() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-console.log("===================chaque matin===============");
+  this.logger.debug("Offline reinjection cron started");
 
   const chats = await this.chatRepo.find({
     where: {
@@ -30,7 +31,7 @@ console.log("===================chaque matin===============");
     relations: ['poste'],
   });
 
-  console.log("tcher de chaque journe a 9h",startOfDay);
+  this.logger.debug(`Offline reinjection check startOfDay=${startOfDay.toISOString()}`);
   
   for (const chat of chats) {
     const poste = chat.poste;

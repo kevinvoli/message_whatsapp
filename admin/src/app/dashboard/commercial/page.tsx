@@ -20,6 +20,7 @@ import ConversationsView from '@/app/ui/ConversationsView';
 import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel } from '@/app/lib/definitions';
 import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques } from '@/app/lib/api';
 import { Spinner } from '@/app/ui/Spinner';
+import { logger } from '@/app/lib/logger';
 
 export default function AdminDashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('today');
@@ -78,7 +79,9 @@ export default function AdminDashboard() {
             setMessages(messagesData);
 
         } catch (err) {
-            console.error("Erreur lors du chargement des données:", err);
+            logger.error("Erreur lors du chargement des données", {
+                error: err instanceof Error ? err.message : String(err),
+            });
             setError(err instanceof Error ? err.message : "Erreur lors de la récupération des données.");
         } finally {
             setLoading(false);

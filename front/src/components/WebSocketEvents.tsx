@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
+import { logger } from '@/lib/logger';
 import {
   Contact,
   Conversation,
@@ -128,7 +129,7 @@ const WebSocketEvents = () => {
           break;
 
         default:
-          console.warn('Unhandled chat event type:', data.type);
+          logger.warn('Unhandled chat event type', { type: data.type });
       }
     };
 
@@ -173,7 +174,10 @@ const WebSocketEvents = () => {
     };
 
     const handleSocketError = (error: { message: string; details?: string }) => {
-      console.error('Socket error received:', error.message, error.details || '');
+      logger.error('Socket error received', {
+        message: error.message,
+        details: error.details,
+      });
     };
 
     socket.on('chat:event', handleChatEvent);
