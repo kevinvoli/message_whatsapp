@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { CommunicationWhapiController } from './communication_whapi.controller';
 import { CommunicationWhapiService } from './communication_whapi.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('CommunicationWhapiController', () => {
   let controller: CommunicationWhapiController;
@@ -9,7 +10,7 @@ describe('CommunicationWhapiController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CommunicationWhapiController],
       providers: [CommunicationWhapiService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     controller = module.get<CommunicationWhapiController>(CommunicationWhapiController);
   });
@@ -18,3 +19,4 @@ describe('CommunicationWhapiController', () => {
     expect(controller).toBeDefined();
   });
 });
+

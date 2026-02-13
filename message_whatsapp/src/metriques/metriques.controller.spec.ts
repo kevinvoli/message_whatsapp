@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { MetriquesController } from './metriques.controller';
 import { MetriquesService } from './metriques.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('MetriquesController', () => {
   let controller: MetriquesController;
@@ -9,7 +10,7 @@ describe('MetriquesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MetriquesController],
       providers: [MetriquesService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     controller = module.get<MetriquesController>(MetriquesController);
   });
@@ -18,3 +19,4 @@ describe('MetriquesController', () => {
     expect(controller).toBeDefined();
   });
 });
+

@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { WhatsappCustomerGateway } from './whatsapp_customer.gateway';
 import { WhatsappCustomerService } from './whatsapp_customer.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('WhatsappCustomerGateway', () => {
   let gateway: WhatsappCustomerGateway;
@@ -8,7 +9,7 @@ describe('WhatsappCustomerGateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappCustomerGateway, WhatsappCustomerService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     gateway = module.get<WhatsappCustomerGateway>(WhatsappCustomerGateway);
   });
@@ -17,3 +18,4 @@ describe('WhatsappCustomerGateway', () => {
     expect(gateway).toBeDefined();
   });
 });
+

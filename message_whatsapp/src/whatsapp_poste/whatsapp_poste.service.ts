@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -81,7 +81,21 @@ export class WhatsappPosteService {
   ): Promise<WhatsappPoste> {
     const poste = await this.findOneById(id);
 
+    const nextQueueEnabled =
+      updateWhatsappPosteDto.is_queue_enabled ?? poste.is_queue_enabled;
+    const nextIsActive =
+      updateWhatsappPosteDto.is_active ?? poste.is_active;
+
+    if (nextQueueEnabled === false && nextIsActive) {
+      throw new BadRequestException(
+        'Ce poste est bloque dans la file. Debloquez-le avant de l’activer.',
+      );
+    }
+
     Object.assign(poste, updateWhatsappPosteDto);
+    if (nextQueueEnabled === false) {
+      poste.is_active = false;
+    }
 
     return await this.posteRepository.save(poste);
   }
@@ -107,6 +121,11 @@ export class WhatsappPosteService {
 
   async setActive(posteId: string, isActive: boolean): Promise<WhatsappPoste> {
   const poste = await this.findOneById(posteId);
+  if (poste.is_queue_enabled === false && isActive) {
+    throw new BadRequestException(
+      'Ce poste est bloque dans la file. Debloquez-le avant de l’activer.',
+    );
+  }
   poste.is_active = isActive;
   return await this.posteRepository.save(poste);
 }
@@ -117,6 +136,9 @@ export class WhatsappPosteService {
   ): Promise<WhatsappPoste> {
     const poste = await this.findOneById(posteId);
     poste.is_queue_enabled = isQueueEnabled;
+    if (!isQueueEnabled) {
+      poste.is_active = false;
+    }
     return await this.posteRepository.save(poste);
   }
 }

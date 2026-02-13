@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { MessageAutoController } from './message-auto.controller';
 import { MessageAutoService } from './message-auto.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('MessageAutoController', () => {
   let controller: MessageAutoController;
@@ -9,7 +10,7 @@ describe('MessageAutoController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MessageAutoController],
       providers: [MessageAutoService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     controller = module.get<MessageAutoController>(MessageAutoController);
   });
@@ -18,3 +19,4 @@ describe('MessageAutoController', () => {
     expect(controller).toBeDefined();
   });
 });
+

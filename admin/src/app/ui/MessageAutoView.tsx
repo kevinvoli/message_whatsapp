@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from 'react';
 import { Edit, PlusCircle, Trash2 } from 'lucide-react';
@@ -22,8 +22,6 @@ export default function MessageAutoView({
   const {
     items: messagesAuto,
     loading,
-    error,
-    success,
     clearStatus,
     create,
     update,
@@ -138,24 +136,6 @@ export default function MessageAutoView({
           Ajouter un message auto
         </button>
       </div>
-
-      {error && (
-        <div
-          className="relative rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700"
-          role="alert"
-        >
-          <strong className="font-bold">Error:</strong>
-          <span className="sm:inline"> {error}</span>
-        </div>
-      )}
-      {success && (
-        <div
-          className="relative rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700"
-          role="status"
-        >
-          {success}
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <EntityTable
@@ -395,3 +375,4 @@ export default function MessageAutoView({
     </div>
   );
 }
+

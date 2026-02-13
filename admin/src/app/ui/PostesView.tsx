@@ -1,12 +1,19 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from 'react';
-import { Edit, PlusCircle, Trash2 } from 'lucide-react';
-import { createPoste, deletePoste, updatePoste } from '@/app/lib/api';
+import { Ban, Edit, PlusCircle, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  blockPosteFromQueue,
+  createPoste,
+  deletePoste,
+  unblockPosteFromQueue,
+  updatePoste,
+} from '@/app/lib/api';
 import { Poste } from '@/app/lib/definitions';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
+import { useToast } from '@/app/ui/ToastProvider';
 
 interface PostesViewProps {
   initialPostes: Poste[];
@@ -20,8 +27,6 @@ export default function PostesView({
   const {
     items: postes,
     loading,
-    error,
-    success,
     clearStatus,
     create,
     update,
@@ -45,6 +50,9 @@ export default function PostesView({
   const [formName, setFormName] = useState('');
   const [formCode, setFormCode] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [queueActionLoadingId, setQueueActionLoadingId] = useState<string | null>(null);
+  const [queueFilter, setQueueFilter] = useState<'all' | 'blocked' | 'allowed'>('all');
+  const { addToast } = useToast();
 
   const openAddModal = () => {
     setFormName('');
@@ -58,7 +66,7 @@ export default function PostesView({
     setCurrentPoste(poste);
     setFormName(poste.name);
     setFormCode(poste.code);
-    setFormIsActive(poste.is_active);
+    setFormIsActive(poste.is_queue_enabled === false ? false : poste.is_active);
     clearStatus();
     setShowEditModal(true);
   };
@@ -95,11 +103,25 @@ export default function PostesView({
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPoste) return;
+    if (currentPoste.is_queue_enabled === false && formIsActive) {
+      addToast({
+        type: 'error',
+        message: 'Ce poste est bloque dans la file. Debloque-le avant de lâ€™activer.',
+      });
+      return;
+    }
     const result = await update(
       currentPoste.id,
       { name: formName, code: formCode, is_active: formIsActive },
       'Poste mis a jour.',
     );
+    if (!result.ok && result.error?.toLowerCase().includes('bloque')) {
+      addToast({
+        type: 'error',
+        message:
+          'Activation refusee: ce poste est bloque dans la file. Debloque-le avant de lâ€™activer.',
+      });
+    }
     if (result.ok) {
       closeEditModal();
     }
@@ -108,6 +130,31 @@ export default function PostesView({
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this poste?')) return;
     await remove(id, 'Poste supprime.');
+  };
+
+  const handleQueueToggle = async (poste: Poste) => {
+    const isQueueEnabled = poste.is_queue_enabled !== false;
+    setQueueActionLoadingId(poste.id);
+    try {
+      if (isQueueEnabled) {
+        await blockPosteFromQueue(poste.id);
+        addToast({ type: 'success', message: 'Poste bloque dans la file.' });
+      } else {
+        await unblockPosteFromQueue(poste.id);
+        addToast({
+          type: 'success',
+          message: 'Poste debloque et autorise dans la file.',
+        });
+      }
+      await onPosteUpdated();
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Action echouee.',
+      });
+    } finally {
+      setQueueActionLoadingId(null);
+    }
   };
 
   return (
@@ -124,27 +171,47 @@ export default function PostesView({
         </button>
       </div>
 
-      {error && (
-        <div
-          className="relative rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700"
-          role="alert"
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-gray-600">Filtre Queue:</span>
+        <button
+          onClick={() => setQueueFilter('all')}
+          className={`rounded-full px-3 py-1 text-sm ${
+            queueFilter === 'all'
+              ? 'bg-gray-900 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
         >
-          <strong className="font-bold">Error:</strong>
-          <span className="sm:inline"> {error}</span>
-        </div>
-      )}
-      {success && (
-        <div
-          className="relative rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700"
-          role="status"
+          Tous
+        </button>
+        <button
+          onClick={() => setQueueFilter('allowed')}
+          className={`rounded-full px-3 py-1 text-sm ${
+            queueFilter === 'allowed'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+          }`}
         >
-          {success}
-        </div>
-      )}
+          Autorises
+        </button>
+        <button
+          onClick={() => setQueueFilter('blocked')}
+          className={`rounded-full px-3 py-1 text-sm ${
+            queueFilter === 'blocked'
+              ? 'bg-orange-600 text-white'
+              : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+          }`}
+        >
+          Bloques
+        </button>
+      </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <EntityTable
-          items={postes}
+          items={postes.filter((poste) => {
+            if (queueFilter === 'blocked') return poste.is_queue_enabled === false;
+            if (queueFilter === 'allowed') return poste.is_queue_enabled !== false;
+            return true;
+          })}
           loading={loading}
           emptyMessage="Aucun poste trouve."
           getRowKey={(poste) => poste.id}
@@ -188,6 +255,23 @@ export default function PostesView({
               ),
             },
             {
+              header: 'Queue',
+              render: (poste) => {
+                const isQueueEnabled = poste.is_queue_enabled !== false;
+                return (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      isQueueEnabled
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-orange-100 text-orange-800'
+                    }`}
+                  >
+                    {isQueueEnabled ? 'Autorise' : 'Bloque'}
+                  </span>
+                );
+              },
+            },
+            {
               header: 'Cree le',
               render: (poste) => (
                 <span className="text-sm text-gray-500">
@@ -199,6 +283,22 @@ export default function PostesView({
               header: 'Actions',
               render: (poste) => (
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleQueueToggle(poste)}
+                    className="rounded p-1 text-amber-600 hover:bg-amber-50"
+                    disabled={loading || queueActionLoadingId === poste.id}
+                    title={
+                      poste.is_queue_enabled === false
+                        ? 'Debloquer dans la queue'
+                        : 'Bloquer dans la queue'
+                    }
+                  >
+                    {poste.is_queue_enabled === false ? (
+                      <ShieldCheck className="h-4 w-4" />
+                    ) : (
+                      <Ban className="h-4 w-4" />
+                    )}
+                  </button>
                   <button
                     onClick={() => openEditModal(poste)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50"
@@ -313,12 +413,19 @@ export default function PostesView({
             className="mr-2 leading-tight"
             checked={formIsActive}
             onChange={(e) => setFormIsActive(e.target.checked)}
+            disabled={currentPoste?.is_queue_enabled === false}
           />
           <label htmlFor="edit-is_active" className="text-sm font-bold text-gray-700">
             Actif
           </label>
+          {currentPoste?.is_queue_enabled === false && (
+            <span className="ml-3 text-xs text-orange-600">
+              Debloque la queue pour activer ce poste.
+            </span>
+          )}
         </div>
       </EntityFormModal>
     </div>
   );
 }
+

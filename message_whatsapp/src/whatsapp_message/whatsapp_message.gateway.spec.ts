@@ -1,4 +1,5 @@
-import { WhatsappMessageGateway } from './whatsapp_message.gateway';
+﻿import { WhatsappMessageGateway } from './whatsapp_message.gateway';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('WhatsappMessageGateway protocol events', () => {
   const chatService = {
@@ -9,7 +10,6 @@ describe('WhatsappMessageGateway protocol events', () => {
     return new WhatsappMessageGateway(
       {} as any,
       chatService as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -83,7 +83,7 @@ describe('WhatsappMessageGateway protocol events', () => {
     await gateway.emitContactCallStatusUpdated({
       id: 'contact-3',
       chat_id: 'chat-3',
-      call_status: 'appelé',
+      call_status: 'appelÃ©',
     } as any);
 
     expect(to).toHaveBeenCalledWith('poste_poste-3');
@@ -126,3 +126,4 @@ describe('WhatsappMessageGateway protocol events', () => {
     });
   });
 });
+

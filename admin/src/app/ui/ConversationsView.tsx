@@ -6,6 +6,7 @@ import { getMessagesForChat, sendMessage } from '@/app/lib/api'; // Import sendM
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText } from '../lib/utils';
+import { useToast } from './ToastProvider';
 
 interface ConversationsViewProps {
     initialChats: WhatsappChat[];
@@ -19,7 +20,7 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     const [messageInput, setMessageInput] = useState('');
     const [loadingChats, setLoadingChats] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { addToast } = useToast();
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -61,12 +62,14 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
     const fetchMessages = async (chatId: string) => {
         // Removed: if (!token) { setError("Authentication token is missing."); return; }
         setLoadingMessages(true);
-        setError(null);
         try {
             const fetchedMessages = await getMessagesForChat(chatId); // Removed token parameter
             setMessages(fetchedMessages);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to fetch messages.");
+            addToast({
+                type: 'error',
+                message: err instanceof Error ? err.message : "Failed to fetch messages.",
+            });
         } finally {
             setLoadingMessages(false);
         }
@@ -78,7 +81,6 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
         if (!messageInput.trim() || !selectedChat) { // Keep checks for messageInput and selectedChat
             return;
         }
-        setError(null);
 
         const currentMessageText = messageInput;
         setMessageInput(''); // Clear input immediately for better UX
@@ -121,7 +123,10 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
             setMessages(prev => prev.map(msg => msg.id === newMessage.id ? sentMessage : msg));
             onChatUpdated(); // Refresh parent data to update last message etc.
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to send message.");
+            addToast({
+                type: 'error',
+                message: err instanceof Error ? err.message : "Failed to send message.",
+            });
             // Revert optimistic update on error
             setMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
         }
@@ -179,11 +184,6 @@ export default function ConversationsView({ initialChats, onChatUpdated }: Conve
             <div className="w-2/3 flex flex-col bg-gray-50">
                 {selectedChat ? (
                     <>
-                        {error && (
-                            <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                                {error}
-                            </div>
-                        )}
                         <div className="p-4 border-b border-gray-200 bg-white flex items-center">
                             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-blue-800 font-bold">
                                 {selectedChat.name.charAt(0).toUpperCase()}

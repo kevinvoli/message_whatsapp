@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { ChannelService } from './channel.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('ChannelService', () => {
   let service: ChannelService;
@@ -7,7 +8,7 @@ describe('ChannelService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [ChannelService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     service = module.get<ChannelService>(ChannelService);
   });
@@ -16,3 +17,4 @@ describe('ChannelService', () => {
     expect(service).toBeDefined();
   });
 });
+

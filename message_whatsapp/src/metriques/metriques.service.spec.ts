@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { MetriquesService } from './metriques.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('MetriquesService', () => {
   let service: MetriquesService;
@@ -7,7 +8,7 @@ describe('MetriquesService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [MetriquesService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     service = module.get<MetriquesService>(MetriquesService);
   });
@@ -16,3 +17,4 @@ describe('MetriquesService', () => {
     expect(service).toBeDefined();
   });
 });
+

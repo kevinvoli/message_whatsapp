@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { WhatsappChatLabelGateway } from './whatsapp_chat_label.gateway';
 import { WhatsappChatLabelService } from './whatsapp_chat_label.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('WhatsappChatLabelGateway', () => {
   let gateway: WhatsappChatLabelGateway;
@@ -8,7 +9,7 @@ describe('WhatsappChatLabelGateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappChatLabelGateway, WhatsappChatLabelService],
-    }).compile();
+    }).useMocker(createMocker).compile();
 
     gateway = module.get<WhatsappChatLabelGateway>(WhatsappChatLabelGateway);
   });
@@ -17,3 +18,4 @@ describe('WhatsappChatLabelGateway', () => {
     expect(gateway).toBeDefined();
   });
 });
+

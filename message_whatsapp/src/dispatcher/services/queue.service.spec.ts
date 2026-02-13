@@ -1,5 +1,6 @@
 ﻿import { QueueService } from './queue.service';
 import { QueuePosition } from '../entities/queue-position.entity';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 const makeQueryRunner = () => {
   const manager = {
@@ -93,3 +94,4 @@ describe('QueueService', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });
+

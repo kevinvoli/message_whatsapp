@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from 'react';
 import { Edit, MessageCircle, Trash2, UserPlus } from 'lucide-react';
@@ -17,7 +17,7 @@ export default function ClientsView({
   initialClients,
   onClientUpdated,
 }: ClientsViewProps) {
-  const { items: clients, loading, error, success, clearStatus, create, update, remove } =
+  const { items: clients, loading, clearStatus, create, update, remove } =
     useCrudResource<
       Client,
       { name: string; phone: string; chat_id?: string; is_active: boolean },
@@ -117,24 +117,6 @@ export default function ClientsView({
           Ajouter un client
         </button>
       </div>
-
-      {error && (
-        <div
-          className="relative rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700"
-          role="alert"
-        >
-          <strong className="font-bold">Error:</strong>
-          <span className="sm:inline"> {error}</span>
-        </div>
-      )}
-      {success && (
-        <div
-          className="relative rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700"
-          role="status"
-        >
-          {success}
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <EntityTable
@@ -339,3 +321,4 @@ export default function ClientsView({
     </div>
   );
 }
+

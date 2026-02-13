@@ -1,4 +1,7 @@
+"use client";
+
 import { useEffect, useMemo, useState } from 'react';
+import { useToast } from '@/app/ui/ToastProvider';
 
 type CrudConfig<TItem, TCreate, TUpdate> = {
   initialItems: TItem[];
@@ -21,6 +24,7 @@ export function useCrudResource<TItem, TCreate, TUpdate>(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   useEffect(() => {
     setItems(config.initialItems);
@@ -41,10 +45,12 @@ export function useCrudResource<TItem, TCreate, TUpdate>(
     try {
       await operation();
       setSuccess(successMessage);
+      addToast({ type: 'success', message: successMessage });
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Operation failed.';
       setError(message);
+      addToast({ type: 'error', message });
       return { ok: false, error: message };
     } finally {
       setLoading(false);

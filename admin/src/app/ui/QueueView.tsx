@@ -11,6 +11,7 @@ import {
   unblockPosteFromQueue,
 } from "@/app/lib/api";
 import { logger } from "@/app/lib/logger";
+import { useToast } from "@/app/ui/ToastProvider";
 
 type ConnectionState =
   | "connecting"
@@ -64,11 +65,10 @@ const QueueView = () => {
   const [queue, setQueue] = useState<QueuePosition[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [status, setStatus] = useState<ConnectionState>("connecting");
-  const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [lastReason, setLastReason] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   const refreshQueueFromRest = async () => {
     const data = await getQueue();
@@ -92,7 +92,7 @@ const QueueView = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setStatus("error");
-      setError(message);
+      addToast({ type: "error", message });
       logger.error("QueueView socket init failed", { message });
       return undefined;
     }
@@ -108,7 +108,6 @@ const QueueView = () => {
 
     socket.on("connect", () => {
       setStatus("connected");
-      setError(null);
     });
 
     socket.on("disconnect", () => {
@@ -125,7 +124,10 @@ const QueueView = () => {
 
     socket.on("connect_error", (err: Error) => {
       setStatus("error");
-      setError(err?.message ?? "Erreur de connexion socket");
+      addToast({
+        type: "error",
+        message: err?.message ?? "Erreur de connexion socket",
+      });
       logger.error("QueueView socket connect error", {
         message: err?.message ?? "unknown",
       });
@@ -156,14 +158,16 @@ const QueueView = () => {
     if (!confirmed) return;
     try {
       setActionLoading(true);
-      setActionError(null);
       await resetQueue();
       await Promise.all([refreshQueueFromRest(), refreshPostes()]);
       setLastReason("admin_reset");
+      addToast({ type: "success", message: "Queue reinitialisee." });
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Erreur lors du reset de la queue",
-      );
+      addToast({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : "Erreur lors du reset de la queue",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -176,14 +180,15 @@ const QueueView = () => {
     if (!confirmed) return;
     try {
       setActionLoading(true);
-      setActionError(null);
       await blockPosteFromQueue(posteId);
       await Promise.all([refreshQueueFromRest(), refreshPostes()]);
       setLastReason("admin_block");
+      addToast({ type: "success", message: "Poste bloque dans la queue." });
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Erreur lors du blocage",
-      );
+      addToast({
+        type: "error",
+        message: err instanceof Error ? err.message : "Erreur lors du blocage",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -192,14 +197,15 @@ const QueueView = () => {
   const handleUnblock = async (posteId: string) => {
     try {
       setActionLoading(true);
-      setActionError(null);
       await unblockPosteFromQueue(posteId);
       await Promise.all([refreshQueueFromRest(), refreshPostes()]);
       setLastReason("admin_unblock");
+      addToast({ type: "success", message: "Poste debloque." });
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Erreur lors du deblocage",
-      );
+      addToast({
+        type: "error",
+        message: err instanceof Error ? err.message : "Erreur lors du deblocage",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -270,18 +276,6 @@ const QueueView = () => {
           )}
         </div>
       </div>
-
-      {actionError && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {actionError}
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
