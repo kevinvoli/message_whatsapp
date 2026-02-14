@@ -33,6 +33,17 @@ export class WebhookMetricsService {
     this.inc(`idempotency_insert_conflict_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`);
   }
 
+  recordIdempotencyPurge(total: number): void {
+    if (!Number.isFinite(total) || total <= 0) return;
+    this.inc(`idempotency_ttl_purge_total`);
+    if (total > 1) {
+      this.counters.set(
+        'idempotency_ttl_purge_total',
+        (this.counters.get('idempotency_ttl_purge_total') ?? 1) + (total - 1),
+      );
+    }
+  }
+
   recordError(provider: string, tenantId: string | null, errorClass: string): void {
     this.inc(`webhook_error_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}|class=${errorClass}`);
   }
@@ -67,8 +78,71 @@ export class WebhookMetricsService {
     };
   }
 
+  renderPrometheus(): string {
+    const lines: string[] = [];
+    const metricTypes: Record<string, 'counter' | 'gauge'> = {
+      webhook_received_total: 'counter',
+      webhook_duplicate_total: 'counter',
+      webhook_signature_invalid_total: 'counter',
+      tenant_resolution_failed_total: 'counter',
+      webhook_error_total: 'counter',
+      idempotency_insert_conflict_total: 'counter',
+      idempotency_ttl_purge_total: 'counter',
+      webhook_latency_p95_ms: 'gauge',
+      webhook_latency_p99_ms: 'gauge',
+    };
+
+    const counters = this.snapshot().counters as Record<string, number>;
+    const latency = this.snapshot().latency as Record<
+      string,
+      { p95: number; p99: number }
+    >;
+
+    Object.entries(metricTypes).forEach(([name, type]) => {
+      lines.push(`# TYPE ${name} ${type}`);
+    });
+
+    for (const [key, value] of Object.entries(counters)) {
+      const { metric, labels } = this.parseKey(key);
+      lines.push(`${metric}${this.formatLabels(labels)} ${value}`);
+    }
+
+    for (const [provider, stats] of Object.entries(latency)) {
+      lines.push(
+        `webhook_latency_p95_ms${this.formatLabels({ provider })} ${stats.p95}`,
+      );
+      lines.push(
+        `webhook_latency_p99_ms${this.formatLabels({ provider })} ${stats.p99}`,
+      );
+    }
+
+    return lines.join('\n') + '\n';
+  }
+
   private inc(key: CounterKey): void {
     this.counters.set(key, (this.counters.get(key) ?? 0) + 1);
+  }
+
+  private parseKey(key: string): { metric: string; labels: Record<string, string> } {
+    const parts = key.split('|');
+    const metric = parts.shift() ?? key;
+    const labels: Record<string, string> = {};
+    for (const part of parts) {
+      const [k, v] = part.split('=');
+      if (k && v) {
+        labels[k] = v;
+      }
+    }
+    return { metric, labels };
+  }
+
+  private formatLabels(labels: Record<string, string>): string {
+    const entries = Object.entries(labels);
+    if (entries.length === 0) return '';
+    const rendered = entries
+      .map(([k, v]) => `${k}="${String(v).replace(/\"/g, '\\\"')}"`)
+      .join(',');
+    return `{${rendered}}`;
   }
 
   private prune(provider: string): void {

@@ -62,11 +62,7 @@ export interface MetaTextMessage extends MetaMessageBase {
 
 export interface MetaImageMessage extends MetaMessageBase {
   type: 'image';
-  image: {
-    id: string;
-    mime_type: string;
-    caption?: string;
-  };
+  image: MetaMedia;
 }
 
 export interface MetaMedia {

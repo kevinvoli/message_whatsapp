@@ -19,8 +19,9 @@ import MessageAutoView from '@/app/ui/MessageAutoView';
 import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
 import DispatchView from '@/app/ui/DispatchView';
-import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel } from '@/app/lib/definitions';
-import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques } from '@/app/lib/api';
+import ObservabiliteView from '@/app/ui/ObservabiliteView';
+import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
 import { Spinner } from '@/app/ui/Spinner';
 import { logger } from '@/app/lib/logger';
 
@@ -33,6 +34,7 @@ export default function AdminDashboard() {
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
     const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[]>([]);
     const [statutChannels, setStatutChannels] = useState<StatutChannel[]>([]);
+    const [webhookMetrics, setWebhookMetrics] = useState<WebhookMetricsSnapshot | null>(null);
 
     // États existants
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
@@ -57,7 +59,8 @@ export default function AdminDashboard() {
                 messagesAutoData,
                 clientsData,
                 chatsData,
-                messagesData
+                messagesData,
+                webhookData
             ] = await Promise.all([
                 getOverviewMetriques(), // Nouveau: charge metriques, performanceCommercial et statutChannels
                 getPostes(),
@@ -66,11 +69,13 @@ export default function AdminDashboard() {
                 getClients(),
                 getChats(),
                 getMessages(),
+                getWebhookMetrics(),
             ]);
             // Mettre à jour les états avec les données des métriques
             setMetriques(overviewData.metriques);
             setPerformanceCommercial(overviewData.performanceCommercial);
             setStatutChannels(overviewData.statutChannels);
+            setWebhookMetrics(webhookData);
 
             // Mettre à jour les états existants
             setPostes(postesData);
@@ -131,6 +136,7 @@ export default function AdminDashboard() {
                             metriques={metriques}
                             performanceCommercial={performanceCommercial}
                             statutChannels={statutChannels}
+                            webhookMetrics={webhookMetrics}
                             onRefresh={fetchData}
                         />
                     )
@@ -149,6 +155,8 @@ export default function AdminDashboard() {
                 return <QueueView onRefresh={fetchData} />;
             case 'dispatch':
                 return <DispatchView onRefresh={fetchData} />;
+            case 'observabilite':
+                return <ObservabiliteView metrics={webhookMetrics} onRefresh={fetchData} />;
             case 'canaux':
                 return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} onRefresh={fetchData} />;
             case 'automessages':

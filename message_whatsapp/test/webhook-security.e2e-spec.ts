@@ -27,7 +27,8 @@ describeMaybe('Webhook security (e2e)', () => {
   const tenantId = `e2e-tenant-${unique}`;
 
   beforeAll(async () => {
-    process.env.WEBHOOK_WHAPI_SECRET = 'e2e-whapi-secret';
+    process.env.WHAPI_WEBHOOK_SECRET_HEADER = 'x-whapi-signature';
+    process.env.WHAPI_WEBHOOK_SECRET_VALUE = 'e2e-whapi-secret';
     process.env.WHATSAPP_APP_SECRET = 'e2e-meta-secret';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -148,11 +149,17 @@ describeMaybe('Webhook security (e2e)', () => {
       ],
     };
 
+    const rawBody = Buffer.from(JSON.stringify(payload));
+    const digest = createHmac('sha256', 'bad-secret')
+      .update(rawBody)
+      .digest('hex');
+    const signature = `sha256=${digest}`;
+
     await request(app.getHttpServer())
       .post('/webhooks/whapi')
-      .set('x-whapi-secret', 'wrong-secret')
+      .set('x-whapi-signature', signature)
       .send(payload)
-      .expect(401);
+      .expect(403);
   });
 
   it('rejects unknown tenant mapping', async () => {
@@ -173,9 +180,15 @@ describeMaybe('Webhook security (e2e)', () => {
       ],
     };
 
+    const rawBody = Buffer.from(JSON.stringify(payload));
+    const digest = createHmac('sha256', 'e2e-whapi-secret')
+      .update(rawBody)
+      .digest('hex');
+    const signature = `sha256=${digest}`;
+
     await request(app.getHttpServer())
       .post('/webhooks/whapi')
-      .set('x-whapi-secret', 'e2e-whapi-secret')
+      .set('x-whapi-signature', signature)
       .send(payload)
       .expect(422);
   });
@@ -198,9 +211,15 @@ describeMaybe('Webhook security (e2e)', () => {
       ],
     };
 
+    const rawBody = Buffer.from(JSON.stringify(payload));
+    const digest = createHmac('sha256', 'e2e-whapi-secret')
+      .update(rawBody)
+      .digest('hex');
+    const signature = `sha256=${digest}`;
+
     await request(app.getHttpServer())
       .post('/webhooks/whapi')
-      .set('x-whapi-secret', 'e2e-whapi-secret')
+      .set('x-whapi-signature', signature)
       .send(payload)
       .expect((res) => {
         if (![200, 201].includes(res.status)) {

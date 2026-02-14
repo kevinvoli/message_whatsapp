@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Header } from '@nestjs/common';
 import { WebhookMetricsService } from './webhook-metrics.service';
 
 @Controller('metrics/webhook')
@@ -8,5 +8,11 @@ export class WebhookMetricsController {
   @Get()
   getSnapshot() {
     return this.metricsService.snapshot();
+  }
+
+  @Get('prometheus')
+  @Header('Content-Type', 'text/plain; version=0.0.4')
+  getPrometheus() {
+    return this.metricsService.renderPrometheus();
   }
 }

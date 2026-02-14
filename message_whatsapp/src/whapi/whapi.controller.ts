@@ -16,7 +16,6 @@ import { Request } from 'express';
 import { WhapiService } from './whapi.service';
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { MetaWebhookPayload } from './interface/whatsapp-whebhook.interface';
-import { metaToWhapi } from './utile/meta-to-whapi.service';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
@@ -41,13 +40,13 @@ export class WhapiController {
     const startedAt = Date.now();
     const provider = 'whapi';
     this.assertPayloadSize(request.rawBody);
-    this.assertWhapiSecret(headers);
+    this.assertWhapiSecret(headers, request.rawBody, payload);
     const tenantId = await this.resolveTenantOrReject('whapi', payload.channel_id);
     this.rateLimit('whapi', request, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
     const degraded = this.healthService.isDegraded(provider);
-    if (await this.whapiService.isReplayEvent(payload, 'whapi')) {
+    if (await this.whapiService.isReplayEvent(payload, 'whapi', tenantId)) {
       this.metricsService.recordDuplicate(provider, tenantId);
       this.healthService.record(provider, true, Date.now() - startedAt);
       this.metricsService.recordLatency(provider, Date.now() - startedAt);
@@ -58,7 +57,12 @@ export class WhapiController {
 
     try {
       if (degraded) {
-        const queued = this.enqueueDegradedWhapi(provider, eventType, payload);
+        const queued = this.enqueueDegradedWhapi(
+          provider,
+          eventType,
+          payload,
+          tenantId,
+        );
         if (!queued) {
           throw new HttpException(
             'Degraded queue overloaded',
@@ -75,10 +79,10 @@ export class WhapiController {
 
       switch (eventType) {
         case 'messages':
-          await this.whapiService.handleIncomingMessage(payload);
+          await this.whapiService.handleIncomingMessage(payload, tenantId);
           break;
         case 'statuses':
-          await this.whapiService.updateStatusMessage(payload);
+          await this.whapiService.updateStatusMessage(payload, tenantId);
           break;
         case 'events':
         case 'polls':
@@ -165,19 +169,13 @@ export class WhapiController {
     this.metricsService.recordReceived(provider, tenantId);
     const degraded = this.healthService.isDegraded(provider);
 
-    const transformedPayload = metaToWhapi(payload as MetaWebhookPayload);
-    if (!transformedPayload) {
+    if (!metaPayload) {
       this.healthService.record(provider, true, Date.now() - startedAt);
       this.metricsService.recordLatency(provider, Date.now() - startedAt);
       return { status: 'ignored' };
     }
 
-    if (
-      await this.whapiService.isReplayEvent(
-        transformedPayload as WhapiWebhookPayload,
-        'meta',
-      )
-    ) {
+    if (await this.whapiService.isReplayEvent(metaPayload as any, 'meta', tenantId)) {
       this.metricsService.recordDuplicate(provider, tenantId);
       this.healthService.record(provider, true, Date.now() - startedAt);
       this.metricsService.recordLatency(provider, Date.now() - startedAt);
@@ -186,11 +184,7 @@ export class WhapiController {
 
     try {
       if (degraded) {
-        const queued = this.enqueueDegradedWhapi(
-          provider,
-          'messages',
-          transformedPayload as WhapiWebhookPayload,
-        );
+        const queued = this.enqueueDegradedMeta(provider, tenantId, metaPayload);
         if (!queued) {
           throw new HttpException(
             'Degraded queue overloaded',
@@ -205,9 +199,7 @@ export class WhapiController {
         );
       }
 
-      await this.whapiService.handleIncomingMessage(
-        transformedPayload as WhapiWebhookPayload,
-      );
+      await this.whapiService.handleMetaWebhook(metaPayload, tenantId);
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -236,6 +228,8 @@ export class WhapiController {
 
   private assertWhapiSecret(
     headers: Record<string, string | string[] | undefined>,
+    rawBody: Buffer | undefined,
+    payload: unknown,
   ): void {
     const isProd = process.env.NODE_ENV === 'production';
     const configuredHeader =
@@ -251,9 +245,21 @@ export class WhapiController {
     // New mode: explicit configurable header + value (preferred).
     if (configuredHeader && configuredValue) {
       const provided = this.headerValue(headers[configuredHeader])?.trim();
-      if (!provided || provided !== configuredValue) {
+      if (!provided) {
         this.metricsService.recordSignatureInvalid('whapi');
-        throw new UnauthorizedException('Invalid webhook secret header');
+        throw new UnauthorizedException('Missing webhook signature');
+      }
+      const valid = this.verifyHmacSignature(
+        'whapi',
+        configuredValue,
+        rawBody,
+        payload,
+        provided,
+        isProd,
+      );
+      if (!valid) {
+        this.metricsService.recordSignatureInvalid('whapi');
+        throw new ForbiddenException('Invalid webhook signature');
       }
       return;
     }
@@ -292,30 +298,20 @@ export class WhapiController {
       return;
     }
 
-    if (!rawBody && isProd) {
-      this.metricsService.recordSignatureInvalid('meta');
-      throw new HttpException('Missing rawBody', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
     const signatureHeader = this.headerValue(headers['x-hub-signature-256']);
-    if (!signatureHeader?.startsWith('sha256=')) {
+    if (!signatureHeader) {
       this.metricsService.recordSignatureInvalid('meta');
       throw new UnauthorizedException('Missing signature');
     }
-
-    const payloadBuffer = rawBody ?? Buffer.from(JSON.stringify(payload));
-    const digest = createHmac('sha256', appSecret)
-      .update(payloadBuffer)
-      .digest('hex');
-    const expected = `sha256=${digest}`;
-
-    const expectedBuffer = Buffer.from(expected);
-    const receivedBuffer = Buffer.from(signatureHeader);
-    const isValid =
-      expectedBuffer.length === receivedBuffer.length &&
-      timingSafeEqual(expectedBuffer, receivedBuffer);
-
-    if (!isValid) {
+    const valid = this.verifyHmacSignature(
+      'meta',
+      appSecret,
+      rawBody,
+      payload,
+      signatureHeader,
+      isProd,
+    );
+    if (!valid) {
       this.metricsService.recordSignatureInvalid('meta');
       throw new ForbiddenException('Invalid webhook signature');
     }
@@ -328,6 +324,36 @@ export class WhapiController {
       return value[0];
     }
     return value;
+  }
+
+  private verifyHmacSignature(
+    provider: 'whapi' | 'meta',
+    secret: string,
+    rawBody: Buffer | undefined,
+    payload: unknown,
+    provided: string,
+    requireRawBody: boolean,
+  ): boolean {
+    if (requireRawBody && !rawBody) {
+      this.metricsService.recordSignatureInvalid(provider);
+      throw new HttpException('Missing rawBody', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const payloadBuffer = rawBody ?? Buffer.from(JSON.stringify(payload));
+    const digest = createHmac('sha256', secret)
+      .update(payloadBuffer)
+      .digest('hex');
+    const expected = `sha256=${digest}`;
+
+    const candidates = [expected, digest];
+    return candidates.some((candidate) => {
+      const expectedBuffer = Buffer.from(candidate);
+      const receivedBuffer = Buffer.from(provided);
+      return (
+        expectedBuffer.length === receivedBuffer.length &&
+        timingSafeEqual(expectedBuffer, receivedBuffer)
+      );
+    });
   }
 
   private rateLimit(
@@ -369,14 +395,15 @@ export class WhapiController {
     provider: 'whapi' | 'meta',
     eventType: string | undefined,
     payload: WhapiWebhookPayload,
+    tenantId: string,
   ): boolean {
     const handler = async () => {
       switch (eventType) {
         case 'messages':
-          await this.whapiService.handleIncomingMessage(payload);
+          await this.whapiService.handleIncomingMessage(payload, tenantId);
           break;
         case 'statuses':
-          await this.whapiService.updateStatusMessage(payload);
+          await this.whapiService.updateStatusMessage(payload, tenantId);
           break;
         case 'events':
         case 'polls':
@@ -394,6 +421,18 @@ export class WhapiController {
             HttpStatus.BAD_REQUEST,
           );
       }
+    };
+
+    return this.degradedQueue.enqueue(provider, { run: handler });
+  }
+
+  private enqueueDegradedMeta(
+    provider: 'whapi' | 'meta',
+    tenantId: string,
+    payload: MetaWebhookPayload,
+  ): boolean {
+    const handler = async () => {
+      await this.whapiService.handleMetaWebhook(payload, tenantId);
     };
 
     return this.degradedQueue.enqueue(provider, { run: handler });

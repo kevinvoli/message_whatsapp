@@ -1,0 +1,198 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "iteration": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum by (provider) (rate(webhook_received_total[5m]))",
+          "legendFormat": "received {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Received Rate (5m) by Provider",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum by (provider) (rate(webhook_duplicate_total[5m]))",
+          "legendFormat": "duplicates {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Duplicate Rate (5m) by Provider",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum by (provider) (rate(webhook_error_total[15m])) / sum by (provider) (rate(webhook_received_total[15m]))",
+          "legendFormat": "error_rate {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate (15m) by Provider",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "webhook_latency_p95_ms",
+          "legendFormat": "p95 {{provider}}",
+          "refId": "A"
+        },
+        {
+          "expr": "webhook_latency_p99_ms",
+          "legendFormat": "p99 {{provider}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Latency p95/p99 by Provider",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum by (provider) (rate(webhook_signature_invalid_total[5m]))",
+          "legendFormat": "invalid_signature {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Invalid Signatures (5m) by Provider",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum by (provider) (rate(tenant_resolution_failed_total[5m]))",
+          "legendFormat": "tenant_resolution_failed {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Tenant Resolution Failed (5m) by Provider",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "webhook",
+    "slo",
+    "provider"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Webhook SLO Dashboard (Per Provider)",
+  "uid": "webhook-slo-dashboard-provider",
+  "version": 1
+}

@@ -17,6 +17,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
+import { UnifiedMessage } from 'src/webhooks/normalization/unified-message';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -66,6 +67,33 @@ export class WhatsappMessageService {
       case 'buttons':
       case 'list':
         return '[Reponse interactive client]';
+      default:
+        return '[Message client]';
+    }
+  }
+
+  private resolveIncomingTextUnified(message: UnifiedMessage): string {
+    if (message.text) {
+      return message.text;
+    }
+    switch (message.type) {
+      case 'image':
+        return message.media?.caption ?? '[Photo client]';
+      case 'video':
+      case 'gif':
+      case 'short':
+        return message.media?.caption ?? '[Video client]';
+      case 'audio':
+      case 'voice':
+        return '[Message vocal client]';
+      case 'document':
+        return message.media?.fileName ?? '[Document client]';
+      case 'location':
+      case 'live_location':
+        return '[Localisation client]';
+      case 'interactive':
+      case 'button':
+        return message.interactive?.title ?? '[Reponse interactive client]';
       default:
         return '[Message client]';
     }
@@ -554,6 +582,120 @@ return messages;
 
   private buildTraceId(messageId?: string | null, chatId?: string): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+
+  async saveIncomingFromUnified(
+    message: UnifiedMessage,
+    chat: WhatsappChat,
+  ): Promise<WhatsappMessage> {
+    const traceId = this.buildTraceId(message.providerMessageId, message.chatId);
+    try {
+      this.logger.log(
+        `INCOMING_SAVE_REQUEST trace=${traceId} chat_id=${message.chatId}`,
+      );
+      const existingMessage = await this.messageRepository.findOne({
+        where: {
+          provider_message_id: message.providerMessageId,
+          provider: message.provider,
+          direction: MessageDirection.IN,
+        },
+      });
+      if (existingMessage) {
+        this.logger.log(
+          `INCOMING_DUPLICATE trace=${traceId} db_message_id=${existingMessage.id}`,
+        );
+        return existingMessage;
+      }
+
+      const channel = await this.channelService.findOne(message.channelId);
+      if (!channel) {
+        throw new Error(`Channel ${message.channelId} non trouve`);
+      }
+
+      const contact = await this.contactService.findOrCreate(
+        message.from,
+        message.chatId,
+        message.fromName ?? message.from,
+      );
+
+      if (message.direction === 'in') {
+        chat.last_msg_client_channel_id = channel.channel_id;
+        chat.channel_id = channel.channel_id;
+      }
+
+      await this.chatRepository.save(chat);
+
+      try {
+        const saved = await this.messageRepository.save(
+          this.messageRepository.create({
+            tenant_id: message.tenantId,
+            provider: message.provider,
+            provider_message_id: message.providerMessageId,
+            channel: channel,
+            chat: chat,
+            contact_id: contact?.id,
+            message_id: message.providerMessageId,
+            external_id: message.providerMessageId,
+            direction: MessageDirection.IN,
+            from_me: false,
+            from: message.from,
+            from_name: message.fromName ?? message.from,
+            text: this.resolveIncomingTextUnified(message),
+            type: message.type,
+            timestamp: new Date(message.timestamp * 1000),
+            status: WhatsappMessageStatus.SENT,
+            source: message.provider,
+            poste: chat.poste,
+          }),
+        );
+        this.logger.log(
+          `INCOMING_SAVED trace=${traceId} db_message_id=${saved.id}`,
+        );
+        return saved;
+      } catch (error) {
+        if (
+          error instanceof QueryFailedError &&
+          typeof (error as any).driverError?.code === 'string' &&
+          ['ER_DUP_ENTRY', '23505', 'SQLITE_CONSTRAINT'].includes(
+            (error as any).driverError.code,
+          )
+        ) {
+          const duplicated = await this.messageRepository.findOne({
+            where: {
+              provider_message_id: message.providerMessageId,
+              provider: message.provider,
+              direction: MessageDirection.IN,
+            },
+          });
+          if (duplicated) {
+            this.logger.log(
+              `INCOMING_DUPLICATE_RACE trace=${traceId} db_message_id=${duplicated.id}`,
+            );
+            return duplicated;
+          }
+        }
+        throw error;
+      }
+    } catch (error) {
+      this.logger.error(
+        `INCOMING_SAVE_FAILED trace=${traceId} error=${error.message}`,
+        error.stack,
+      );
+      throw new Error(`Impossible de sauvegarder le message: ${error.message}`);
+    }
+  }
+
+  async updateStatusFromUnified(status: {
+    providerMessageId: string;
+    recipientId: string;
+    status: string;
+    provider?: string;
+  }) {
+    return this.updateByStatus({
+      id: status.providerMessageId,
+      recipient_id: status.recipientId,
+      status: status.status,
+    });
   }
 }
 

@@ -1,0 +1,241 @@
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import {
+  ExtractedMedia,
+  WhapiRawMedia,
+} from 'src/whapi/interface/whapi-webhook.interface';
+import {
+  WhatsappMedia,
+  WhatsappMediaType,
+} from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { UnifiedMessage } from './normalization/unified-message';
+import { UnifiedStatus } from './normalization/unified-status';
+
+@Injectable()
+export class InboundMessageService {
+  private readonly logger = new Logger(InboundMessageService.name);
+
+  constructor(
+    private readonly dispatcherService: DispatcherService,
+    private readonly whatsappMessageService: WhatsappMessageService,
+    private readonly messageGateway: WhatsappMessageGateway,
+    @InjectRepository(WhatsappMedia)
+    private readonly mediaRepository: Repository<WhatsappMedia>,
+  ) {}
+
+  async handleMessages(messages: UnifiedMessage[]): Promise<void> {
+    if (!messages.length) return;
+
+    for (const message of messages) {
+      const traceId = this.buildMessageTraceId(
+        message.providerMessageId,
+        message.chatId,
+      );
+      this.logger.log(`INCOMING_RECEIVED trace=${traceId} type=${message.type}`);
+
+      if (message.direction !== 'in') {
+        continue;
+      }
+
+      const chatValidation = this.validateIncomingChatId(message.chatId);
+      if (!chatValidation.valid) {
+        this.logger.warn(
+          `INCOMING_IGNORED trace=${traceId} reason=${chatValidation.reason} chat_id=${message.chatId ?? 'unknown'}`,
+        );
+        continue;
+      }
+
+      try {
+        const conversation = await this.dispatcherService.assignConversation(
+          message.chatId,
+          message.fromName ?? 'Client',
+          traceId,
+        );
+
+        if (!conversation) {
+          this.logger.warn(
+            `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`,
+          );
+          continue;
+        }
+
+        const savedMessage =
+          await this.whatsappMessageService.saveIncomingFromUnified(
+            message,
+            conversation,
+          );
+
+        if (!savedMessage) {
+          throw new NotFoundException('Message non enregistre');
+        }
+        this.logger.log(
+          `INCOMING_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
+        );
+
+        const medias = this.extractMediaFromUnified(message);
+        for (const media of medias) {
+          await this.saveMedia(media, savedMessage, conversation, {
+            tenantId: message.tenantId,
+            provider: message.provider,
+            providerMediaId: message.media?.id,
+          });
+        }
+
+        const fullMessage = await this.whatsappMessageService.findOneWithMedias(
+          savedMessage.id,
+        );
+
+        if (!fullMessage) continue;
+
+        await this.messageGateway.notifyNewMessage(fullMessage, conversation);
+        this.logger.log(
+          `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
+        );
+      } catch (err) {
+        throw new HttpException(
+          {
+            status: 'error',
+            message: err.message || 'Webhook processing failed',
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+  }
+
+  async handleStatuses(statuses: UnifiedStatus[]): Promise<void> {
+    for (const status of statuses) {
+      await this.whatsappMessageService.updateStatusFromUnified(status);
+      this.logger.log(
+        `STATUS_UPDATE provider_message_id=${status.providerMessageId} status=${status.status}`,
+      );
+    }
+  }
+
+  private async saveMedia(
+    media: ExtractedMedia,
+    messageEntity,
+    chatEntity,
+    context?: { tenantId?: string; provider?: string; providerMediaId?: string },
+  ) {
+    const entity = new WhatsappMedia();
+
+    entity.media_type = media.type as WhatsappMediaType;
+    entity.tenant_id = context?.tenantId ?? null;
+    entity.provider = context?.provider ?? null;
+    entity.provider_media_id = context?.providerMediaId ?? null;
+    entity.media_id = media.media_id!;
+    entity.whapi_media_id = media.media_id!;
+    entity.mime_type = media.mime_type ?? '';
+    entity.file_name = media.file_name ?? null;
+    entity.file_size = media.file_size?.toString() ?? null;
+    entity.duration_seconds = media.seconds ?? null;
+    entity.caption = media.caption ?? null;
+
+    const raw = media.payload as WhapiRawMedia | undefined;
+    entity.sha256 = raw?.sha256 ?? null;
+    entity.url = raw?.link ?? null;
+
+    entity.chat = chatEntity;
+    entity.message = messageEntity;
+    entity.preview = null;
+    entity.view_once = '0';
+
+    await this.mediaRepository.save(entity);
+  }
+
+  private extractMediaFromUnified(message: UnifiedMessage): ExtractedMedia[] {
+    if (!message.media && !message.location) {
+      return [];
+    }
+
+    const mediaType =
+      message.type === 'interactive' || message.type === 'button'
+        ? 'interactive'
+        : message.type;
+    const normalizedType = ([
+      'image',
+      'video',
+      'audio',
+      'voice',
+      'document',
+      'gif',
+      'short',
+      'location',
+      'live_location',
+    ].includes(mediaType)
+      ? mediaType
+      : 'text') as ExtractedMedia['type'];
+
+    if (message.location) {
+      return [
+        {
+          type: 'location',
+          latitude: message.location.latitude,
+          longitude: message.location.longitude,
+        },
+      ];
+    }
+
+    if (message.media) {
+      return [
+        {
+          type: normalizedType,
+          media_id: message.media.id,
+          mime_type: message.media.mimeType,
+          caption: message.media.caption,
+          file_name: message.media.fileName,
+          file_size: message.media.fileSize,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  private validateIncomingChatId(
+    chatId: string | null | undefined,
+  ): { valid: boolean; reason?: string } {
+    if (!chatId || typeof chatId !== 'string') {
+      return { valid: false, reason: 'missing_chat_id' };
+    }
+
+    const trimmedChatId = chatId.trim();
+    if (!trimmedChatId.includes('@')) {
+      return { valid: false, reason: 'invalid_chat_id_format' };
+    }
+
+    if (trimmedChatId.endsWith('@g.us')) {
+      return { valid: false, reason: 'group_chat_not_supported' };
+    }
+
+    const phoneCandidate = trimmedChatId.split('@')[0] ?? '';
+    const normalizedPhone = phoneCandidate.replace(/[^\d]/g, '');
+    if (!normalizedPhone) {
+      return { valid: false, reason: 'missing_phone_in_chat_id' };
+    }
+
+    if (normalizedPhone.length < 8 || normalizedPhone.length > 20) {
+      return { valid: false, reason: 'phone_length_out_of_range' };
+    }
+
+    return { valid: true };
+  }
+
+  private buildMessageTraceId(
+    messageId?: string | null,
+    chatId?: string,
+  ): string {
+    return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+}

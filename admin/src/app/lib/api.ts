@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit } from './definitions'; // Added WhatsappChat, WhatsappMessage
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot } from './definitions'; // Added WhatsappChat, WhatsappMessage
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -533,4 +533,12 @@ export async function getOverviewMetriques() {
     }>(response);
     
     return result.data;
+}
+
+export async function getWebhookMetrics(): Promise<WebhookMetricsSnapshot> {
+    const response = await fetch(`${API_BASE_URL}/metrics/webhook`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<WebhookMetricsSnapshot>(response);
 }

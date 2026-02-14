@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route } from 'lucide-react'; // Import MessageSquareText, MessageSquare
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity } from 'lucide-react'; // Import MessageSquareText, MessageSquare
 
 export const navigationItems: NavigationItem[] = [
   { id: 'overview', name: 'Vue d\'ensemble', icon: Home, badge: null },
@@ -15,6 +15,7 @@ export const navigationItems: NavigationItem[] = [
   { id: 'messages', name: 'Messages', icon: MessageCircle, badge: '12' },
   { id: 'clients', name: 'Clients', icon: Briefcase, badge: null },
   { id: 'rapports', name: 'Rapports', icon: FileText, badge: null },
+  { id: 'observabilite', name: 'ObservabilitÃ©', icon: Activity, badge: 'SLO' },
 ];
 
 // export const commerciaux: Commercial[] = [

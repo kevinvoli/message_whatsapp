@@ -5,12 +5,13 @@ import {
   Zap, CheckCircle, AlertCircle, Mail,
   ArrowUpRight, BarChart3, RefreshCw
 } from 'lucide-react';
-import { MetriquesGlobales, PerformanceCommercial, StatutChannel } from '@/app/lib/definitions';
+import { MetriquesGlobales, PerformanceCommercial, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 
 interface OverviewViewProps {
   metriques: MetriquesGlobales;
   performanceCommercial: PerformanceCommercial[];
   statutChannels: StatutChannel[];
+  webhookMetrics?: WebhookMetricsSnapshot | null;
   onRefresh?: () => void;
 }
 
@@ -18,6 +19,7 @@ export default function OverviewView({
   metriques,
   performanceCommercial,
   statutChannels,
+  webhookMetrics,
   onRefresh,
 }: OverviewViewProps) {
   
@@ -40,6 +42,86 @@ export default function OverviewView({
     // TODO: Calculer la vraie variation par rapport à hier/semaine dernière
     return Math.floor(Math.random() * 30) - 10; // Simulation
   };
+
+  const parseLabels = (key: string) => {
+    const parts = key.split('|');
+    const metric = parts.shift() ?? key;
+    const labels: Record<string, string> = {};
+    parts.forEach((part) => {
+      const [k, v] = part.split('=');
+      if (k && v) {
+        labels[k] = v;
+      }
+    });
+    return { metric, labels };
+  };
+
+  const webhookSummary = React.useMemo(() => {
+    if (!webhookMetrics) return null;
+    const byProvider: Record<string, {
+      received: number;
+      duplicate: number;
+      error: number;
+      signature_invalid: number;
+      tenant_failed: number;
+    }> = {};
+    const tenantReceived: Record<string, number> = {};
+
+    Object.entries(webhookMetrics.counters ?? {}).forEach(([key, value]) => {
+      const { metric, labels } = parseLabels(key);
+      const provider = labels.provider ?? 'unknown';
+      const tenant = labels.tenant ?? 'unknown';
+
+      if (!byProvider[provider]) {
+        byProvider[provider] = {
+          received: 0,
+          duplicate: 0,
+          error: 0,
+          signature_invalid: 0,
+          tenant_failed: 0,
+        };
+      }
+
+      switch (metric) {
+        case 'webhook_received_total':
+          byProvider[provider].received += value;
+          tenantReceived[tenant] = (tenantReceived[tenant] ?? 0) + value;
+          break;
+        case 'webhook_duplicate_total':
+          byProvider[provider].duplicate += value;
+          break;
+        case 'webhook_error_total':
+          byProvider[provider].error += value;
+          break;
+        case 'webhook_signature_invalid_total':
+          byProvider[provider].signature_invalid += value;
+          break;
+        case 'tenant_resolution_failed_total':
+          byProvider[provider].tenant_failed += value;
+          break;
+        default:
+          break;
+      }
+    });
+
+    const providers = Object.keys(byProvider).map((provider) => ({
+      provider,
+      ...byProvider[provider],
+      latency: webhookMetrics.latency?.[provider] ?? { p95: 0, p99: 0 },
+    }));
+
+    const topTenants = Object.entries(tenantReceived)
+      .filter(([tenant]) => tenant !== 'unknown')
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    return {
+      providers,
+      topTenants,
+      generatedAt: webhookMetrics.generated_at,
+      windowMinutes: webhookMetrics.window_minutes,
+    };
+  }, [webhookMetrics]);
 
   return (
     <div className="space-y-6">
@@ -210,6 +292,78 @@ export default function OverviewView({
           <p className="text-xl font-bold text-gray-900">{metriques.chatsArchives}</p>
           <p className="text-xs text-gray-700 mt-1">{metriques.chatsFermes} fermés</p>
         </div>
+      </div>
+
+      {/* Webhook SLO */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Webhook SLO</h3>
+            {webhookSummary && (
+              <p className="text-xs text-gray-500 mt-1">
+                FenÃªtre {webhookSummary.windowMinutes} min â€¢ {new Date(webhookSummary.generatedAt).toLocaleString()}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {!webhookSummary && (
+          <div className="text-sm text-gray-500">MÃ©triques webhook indisponibles.</div>
+        )}
+
+        {webhookSummary && (
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="py-2">Provider</th>
+                      <th className="py-2">Received</th>
+                      <th className="py-2">Duplicates</th>
+                      <th className="py-2">Errors</th>
+                      <th className="py-2">Signatures</th>
+                      <th className="py-2">Tenant Fail</th>
+                      <th className="py-2">p95</th>
+                      <th className="py-2">p99</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {webhookSummary.providers.map((row) => (
+                      <tr key={row.provider} className="border-t">
+                        <td className="py-2 font-medium text-gray-900">{row.provider}</td>
+                        <td className="py-2">{row.received}</td>
+                        <td className="py-2">{row.duplicate}</td>
+                        <td className="py-2">{row.error}</td>
+                        <td className="py-2">{row.signature_invalid}</td>
+                        <td className="py-2">{row.tenant_failed}</td>
+                        <td className="py-2">{row.latency.p95} ms</td>
+                        <td className="py-2">{row.latency.p99} ms</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Top tenants</h4>
+              <div className="space-y-2">
+                {webhookSummary.topTenants.length === 0 && (
+                  <p className="text-xs text-gray-500">Aucun trafic tenant.</p>
+                )}
+                {webhookSummary.topTenants.map(([tenant, count]) => (
+                  <div
+                    key={tenant}
+                    className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
+                  >
+                    <span className="text-xs font-medium text-gray-700">{tenant}</span>
+                    <span className="text-xs font-semibold text-gray-900">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Graphiques et visualisations */}

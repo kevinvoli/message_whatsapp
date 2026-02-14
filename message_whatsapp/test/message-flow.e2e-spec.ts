@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { createHmac } from 'crypto';
 import * as cookieParser from 'cookie-parser';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -197,7 +198,12 @@ describeMaybe('Message flow (e2e)', () => {
       webhookReq = webhookReq.set('x-whapi-secret', webhookSecret);
     }
     if (webhookHeader && webhookValue) {
-      webhookReq = webhookReq.set(webhookHeader, webhookValue);
+      const rawBody = Buffer.from(JSON.stringify(payload));
+      const digest = createHmac('sha256', webhookValue)
+        .update(rawBody)
+        .digest('hex');
+      const signature = `sha256=${digest}`;
+      webhookReq = webhookReq.set(webhookHeader, signature);
     }
 
     await webhookReq.expect((res) => {

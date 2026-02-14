@@ -34,6 +34,12 @@ import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { WebhookMetricsController } from './webhook-metrics.controller';
+import { WebhookIdempotencyPurgeService } from './webhook-idempotency-purge.service';
+import { WhapiAdapter } from 'src/webhooks/adapters/whapi.adapter';
+import { MetaAdapter } from 'src/webhooks/adapters/meta.adapter';
+import { InboundMessageService } from 'src/webhooks/inbound-message.service';
+import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
+import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
 
 @Module({
   imports: [
@@ -72,6 +78,12 @@ import { WebhookMetricsController } from './webhook-metrics.controller';
     WebhookTrafficHealthService,
     WebhookDegradedQueueService,
     WebhookMetricsService,
+    WebhookIdempotencyPurgeService,
+    WhapiAdapter,
+    MetaAdapter,
+    InboundMessageService,
+    UnifiedIngressService,
+    WebhookIdempotencyService,
   ],
 })
 export class WhapiModule {}

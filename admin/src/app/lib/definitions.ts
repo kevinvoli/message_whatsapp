@@ -33,7 +33,8 @@ export type ViewMode =
   | 'automessages'
   | 'conversations'
   | 'queue'
-  | 'dispatch';
+  | 'dispatch'
+  | 'observabilite';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -404,6 +405,13 @@ export type OverviewViewProps = {
   statutChannels: StatutChannel[];
   performanceTemporelle?: PerformanceTemporelle[];
   alertes?: Alerte[];
+};
+
+export type WebhookMetricsSnapshot = {
+  counters: Record<string, number>;
+  latency: Record<string, { p95: number; p99: number }>;
+  generated_at: string;
+  window_minutes: number;
 };
 
 // ============================================
