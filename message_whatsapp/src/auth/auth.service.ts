@@ -49,7 +49,7 @@ export class AuthService {
       posteId: user.posteId,
     };
 
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' }); // Short-lived access token
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' }); // Short-lived access token
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' }); // Long-lived refresh token
 
     return { accessToken, refreshToken };
