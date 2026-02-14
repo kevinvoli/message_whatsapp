@@ -5,18 +5,21 @@ export const stats = {
   networkAccepted: 0,
   networkFailed: 0,
   timeout: 0,
+  statusCounts: {} as Record<string, number>,
 
   responses: [] as string[],
   failedMessages: [] as FailedMessage[],
 
   recordSuccess(res: any) {
-    this.responses.push(res.data?.status || 'unknown');
+    const status = res?.data?.status ?? 'unknown';
+    const code = String(res?.status ?? 'unknown');
+    this.responses.push(status);
+    this.statusCounts[code] = (this.statusCounts[code] ?? 0) + 1;
     this.networkAccepted++;
   },
 
   recordFailure(error: any, payload: any) {
     const errorType = this.detectErrorType(error);
-console.log("=====", error);
 
     const failed: FailedMessage = {
       chatId: payload?.messages?.[0]?.chat_id ?? 'unknown',
@@ -48,15 +51,16 @@ console.log("=====", error);
   },
 
   summary() {
-    const actuallyStored = this.responses.filter(s => s === 'ok').length;
+    const okResponses = this.responses.filter(s => s === 'ok' || s === 'EVENT_RECEIVED').length;
 
     return {
       total: this.sent,
       networkAccepted: this.networkAccepted,
       networkFailed: this.networkFailed,
       timeout: this.timeout,
-      actuallyStored,
-      failedToStore: this.networkAccepted - actuallyStored,
+      okResponses,
+      failedToStore: this.networkAccepted - okResponses,
+      statusCounts: this.statusCounts,
     };
   },
 };

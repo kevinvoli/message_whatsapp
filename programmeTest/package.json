@@ -6,12 +6,17 @@
   "type": "module",
   "scripts": {
     "test": "node --loader ts-node/esm index.ts",
+    "whapi": "cross-env PROVIDER=whapi node --loader ts-node/esm index.ts",
+    "meta": "cross-env PROVIDER=meta node --loader ts-node/esm index.ts",
+    "mix": "cross-env PROVIDER=mix node --loader ts-node/esm index.ts",
     "what": "node --loader ts-node/esm testWhats.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.13.4"
+    "axios": "^1.13.4",
+    "cross-env": "^7.0.3",
+    "mysql2": "^3.10.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
