@@ -90,7 +90,7 @@ export class WhatsappMessageGateway
 
     const posteId = commercial.poste.id;
     const tenantId = await this.resolveTenantIdForPoste(posteId);
-    if (!tenantId && process.env.NODE_ENV === 'production') {
+    if (!tenantId) {
       this.logger.warn(
         `Socket auth refused: tenant resolution failed (${client.id})`,
       );
@@ -99,15 +99,7 @@ export class WhatsappMessageGateway
     }
 
     this.connectedAgents.set(client.id, { commercialId, posteId, tenantId });
-    if (tenantId) {
-      await client.join(`tenant:${tenantId}`);
-    }
-    await client.join(`poste_${posteId}`);
-
-    const chats = await this.chatService.findByPosteId(posteId);
-    chats
-      .filter((c) => !tenantId || c.tenant_id === tenantId)
-      .forEach((c) => client.join(`chat_${c.chat_id}`));
+    await client.join(`tenant:${tenantId}`);
 
     await this.commercialService.updateStatus(commercialId, true);
     await this.posteService.setActive(posteId, true);
@@ -267,21 +259,15 @@ export class WhatsappMessageGateway
     }
 
     const chat = await this.chatService.findBychat_id(contact.chat_id);
-    const posteId = chat?.poste_id;
-    if (!posteId) {
-      return;
-    }
     const tenantId = chat?.tenant_id ?? null;
 
-    if (tenantId) {
-      this.server.to(`tenant:${tenantId}`).emit('contact:event', {
-        type,
-        payload,
-      });
+    if (!tenantId) {
+      this.logger.warn(
+        `Contact event skipped: missing tenant for chat ${contact.chat_id}`,
+      );
       return;
     }
-
-    this.server.to(`poste_${posteId}`).emit('contact:event', {
+    this.server.to(`tenant:${tenantId}`).emit('contact:event', {
       type,
       payload,
     });
@@ -346,7 +332,10 @@ export class WhatsappMessageGateway
       `Typing ${data.type === 'TYPING_START' ? 'start' : 'stop'} (${commercialId}) chat ${chatId}`,
     );
 
-    client.to(`poste_${agent.posteId}`).emit('chat:event', {
+    if (!agent.tenantId) {
+      return;
+    }
+    client.to(`tenant:${agent.tenantId}`).emit('chat:event', {
       type: data.type,
       payload: {
         chat_id: chatId,
@@ -391,15 +380,13 @@ export class WhatsappMessageGateway
       chat.chat_id,
     );
 
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(chat, lastMessage, 0),
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
+      );
       return;
     }
-
-    this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
       payload: this.mapConversation(chat, lastMessage, 0),
     });
@@ -470,17 +457,16 @@ export class WhatsappMessageGateway
       return;
     }
 
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'MESSAGE_ADD',
-        payload: { ...this.mapMessage(message), tempId: payload.tempId },
-      });
-    } else {
-      this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
-        type: 'MESSAGE_ADD',
-        payload: { ...this.mapMessage(message), tempId: payload.tempId },
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Message emit skipped: missing tenant for chat ${chat.chat_id}`,
+      );
+      return;
     }
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+      type: 'MESSAGE_ADD',
+      payload: { ...this.mapMessage(message), tempId: payload.tempId },
+    });
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
@@ -491,17 +477,16 @@ export class WhatsappMessageGateway
 
     // const unreadCount = chat.unread_count
 
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(chat, lastMessage, unreadCount),
-      });
-    } else {
-      this.server.to(`poste_${agent.posteId}`).emit('chat:event', {
-        type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(chat, lastMessage, unreadCount),
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
+      );
+      return;
     }
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, lastMessage, unreadCount),
+    });
   }
 
   // ======================================================
@@ -510,21 +495,20 @@ export class WhatsappMessageGateway
   async notifyNewMessage(message: WhatsappMessage, chat: WhatsappChat) {
     // Typing avant le message pour auto-message
     if (!message.from_me) {
-      this.emitTyping(chat.chat_id, true);
-      setTimeout(() => this.emitTyping(chat.chat_id, false), 2000);
+      void this.emitTyping(chat.chat_id, true);
+      setTimeout(() => void this.emitTyping(chat.chat_id, false), 2000);
     }
 
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'MESSAGE_ADD',
-        payload: this.mapMessage(message),
-      });
-    } else {
-      this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
-        type: 'MESSAGE_ADD',
-        payload: this.mapMessage(message),
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Inbound message skipped: missing tenant for chat ${chat.chat_id}`,
+      );
+      return;
     }
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+      type: 'MESSAGE_ADD',
+      payload: this.mapMessage(message),
+    });
     this.logger.log(
       `INCOMING_SOCKET_EMIT trace=${message.message_id ?? message.id} chat_id=${chat.chat_id}`,
     );
@@ -539,17 +523,16 @@ export class WhatsappMessageGateway
       `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
     );
     
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(chat, lastMessage, unreadCount),
-      });
-    } else {
-      this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
-        type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(chat, lastMessage, unreadCount),
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
+      );
+      return;
     }
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, lastMessage, unreadCount),
+    });
   }
 
   // ======================================================
@@ -559,7 +542,7 @@ export class WhatsappMessageGateway
     if (this.typingChats.has(chatId)) return; // déjà en typing
     this.typingChats.add(chatId);
 
-    this.emitTyping(chatId, true);
+    void this.emitTyping(chatId, true);
     const typingTime = Math.min(3000, text.length * 100);
 
     setTimeout(() => {
@@ -585,7 +568,7 @@ export class WhatsappMessageGateway
 
         await this.notifyNewMessage(message, chat);
       })().finally(() => {
-        this.emitTyping(chatId, false);
+        void this.emitTyping(chatId, false);
         this.typingChats.delete(chatId);
       });
     }, typingTime);
@@ -612,12 +595,16 @@ export class WhatsappMessageGateway
     return null;
   }
 
-  private emitTyping(chatId: string, isTyping: boolean) {
+  private async emitTyping(chatId: string, isTyping: boolean) {
     this.logger.debug(
       `Typing ${isTyping ? 'start' : 'stop'} (${chatId})`,
     );
-    
-    this.server.to(`chat_${chatId}`).emit('chat:event', {
+    const chat = await this.chatService.findBychat_id(chatId);
+    const tenantId = chat?.tenant_id ?? null;
+    if (!tenantId) {
+      return;
+    }
+    this.server.to(`tenant:${tenantId}`).emit('chat:event', {
       type: isTyping ? 'TYPING_START' : 'TYPING_STOP',
       payload: { chat_id: chatId },
     });
@@ -634,39 +621,30 @@ export class WhatsappMessageGateway
     oldPosteId: string,
     newPosteId: string,
   ): void {
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'CONVERSATION_ASSIGNED',
-        payload: this.mapConversation(chat),
-      });
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'CONVERSATION_REMOVED',
-        payload: { chat_id: chat.chat_id },
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Conversation reassigned skipped: missing tenant for chat ${chat.chat_id}`,
+      );
       return;
     }
-
-    this.server.to(`poste_${newPosteId}`).emit('chat:event', {
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
       type: 'CONVERSATION_ASSIGNED',
       payload: this.mapConversation(chat),
     });
-
-    this.server.to(`poste_${oldPosteId}`).emit('chat:event', {
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
       type: 'CONVERSATION_REMOVED',
       payload: { chat_id: chat.chat_id },
     });
   }
 
   public emitConversationReadonly(chat: WhatsappChat): void {
-    if (chat.tenant_id) {
-      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-        type: 'CONVERSATION_READONLY',
-        payload: { chat_id: chat.chat_id, read_only: chat.read_only },
-      });
+    if (!chat.tenant_id) {
+      this.logger.warn(
+        `Conversation readonly skipped: missing tenant for chat ${chat.chat_id}`,
+      );
       return;
     }
-
-    this.server.emit('chat:event', {
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
       type: 'CONVERSATION_READONLY',
       payload: { chat_id: chat.chat_id, read_only: chat.read_only },
     });

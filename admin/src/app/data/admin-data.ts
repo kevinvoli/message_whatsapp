@@ -1,5 +1,5 @@
-import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity } from 'lucide-react'; // Import MessageSquareText, MessageSquare
+import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, GoNoGoChecklistItem } from "@/app/lib/definitions";
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck } from 'lucide-react'; // Import MessageSquareText, MessageSquare
 
 export const navigationItems: NavigationItem[] = [
   { id: 'overview', name: 'Vue d\'ensemble', icon: Home, badge: null },
@@ -16,6 +16,45 @@ export const navigationItems: NavigationItem[] = [
   { id: 'clients', name: 'Clients', icon: Briefcase, badge: null },
   { id: 'rapports', name: 'Rapports', icon: FileText, badge: null },
   { id: 'observabilite', name: 'ObservabilitÃ©', icon: Activity, badge: 'SLO' },
+  { id: 'go_no_go', name: 'GO/NO-GO', icon: ShieldCheck, badge: 'OPS' },
+];
+
+export const goNoGoChecklist: GoNoGoChecklistItem[] = [
+  {
+    id: 'security-campaign',
+    title: 'Security campaign',
+    owner: 'Security',
+    status: 'pending',
+    detail: 'Signature, spoofing, replay, WS isolation',
+  },
+  {
+    id: 'load-test',
+    title: 'Load test 2000 msg/min',
+    owner: 'SRE',
+    status: 'pending',
+    detail: '30 min nominal + p95/p99 gates',
+  },
+  {
+    id: 'chaos-test',
+    title: 'Chaos test',
+    owner: 'SRE',
+    status: 'pending',
+    detail: 'DB slowdown + WS crash + retries',
+  },
+  {
+    id: 'shadow-mode',
+    title: 'Shadow mode legacy/unified',
+    owner: 'Backend',
+    status: 'pending',
+    detail: 'Diff report no critical gap',
+  },
+  {
+    id: 'rollout',
+    title: 'Progressive rollout plan',
+    owner: 'CTO',
+    status: 'pending',
+    detail: '5% -> 25% -> 50% -> 100%',
+  },
 ];
 
 // export const commerciaux: Commercial[] = [
@@ -292,3 +331,4 @@ export const navigationItems: NavigationItem[] = [
   //   { nom: 'Pack Entreprise C', ventes: 28, ca: 560000 },
   //   { nom: 'Solution Pro D', ventes: 20, ca: 300000 }
   // ];
+

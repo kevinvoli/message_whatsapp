@@ -12,6 +12,13 @@ Approver: CTO (ou Incident Commander en astreinte)
 - `FF_PROVIDER_META_ENABLED`
 - `FF_ENFORCE_TENANT_DB_RESOLUTION`
 
+## 2.1) Entrees techniques (verifiables)
+- Endpoint webhook: `/webhooks/whapi`, `/webhooks/whatsapp`
+- Headers signature:
+  - Whapi: `WHAPI_WEBHOOK_SECRET_HEADER` (ex: `x-whapi-signature`)
+  - Meta: `x-hub-signature-256`
+- Metriques: `/metrics/webhook` et `/metrics/webhook/prometheus`
+
 ## 3) Comment activer un flag
 1. Changer la valeur dans la source de config (env/secret manager/config service).
 2. Redemarrer les pods/process concernes si config non hot-reload.
@@ -30,12 +37,21 @@ Approver: CTO (ou Incident Commander en astreinte)
 - `FF_UNIFIED_WEBHOOK_ROUTER=false`
 2. `T+1 min`:
 - verifier taux erreur webhook descend.
+- confirmer status `200/201` sur `/webhooks/whapi`.
 3. `T+2 min`:
 - confirmer absence de nouveaux 5xx.
 4. `T+3 min`:
 - confirmer dedupe et persistance fonctionnent via legacy path.
 5. `T+5 min`:
 - incident passe en mode observation.
+
+## 5.1) Commandes type (exemple)
+```bash
+# Exemple: override env (adapter a votre infra)
+export FF_PROVIDER_META_ENABLED=false
+export FF_UNIFIED_WEBHOOK_ROUTER=false
+# Redemarrage process/pods si necessaire
+```
 
 ## 6) Qui decide le rollback
 - Decisionnaire primaire: Incident Commander (on-call senior).
@@ -50,6 +66,11 @@ Approver: CTO (ou Incident Commander en astreinte)
 3. `webhook_signature_invalid_total` coherent avec tests/attaques attendues
 4. `webhook_duplicates_total` stable
 5. aucun incident cross-tenant
+
+## Checklist evidence (5 min)
+- Logs: absence `http_5xx` > 1% sur 5 min
+- Metriques: `tenant_resolution_failed_total` stable
+- WS: aucun event cross-tenant detecte
 
 ## Checks fonctionnels
 1. message entrant visible dans le bon tenant
@@ -73,3 +94,13 @@ Approver: CTO (ou Incident Commander en astreinte)
 - impact client
 - decision GO/NO-GO.
 
+## 10) Shadow mode (legacy/unified)
+Objectif: garder legacy actif tout en executant unified en shadow sans persistence.
+
+Flags:
+- `FF_UNIFIED_WEBHOOK_ROUTER=false` (legacy actif)
+- `FF_SHADOW_UNIFIED=true` (unified en shadow)
+
+Verification:
+- logs `UNIFIED_SHADOW` presents
+- aucun impact sur flux legacy

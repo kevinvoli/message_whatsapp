@@ -10,8 +10,9 @@ import {
   Query,
   Req,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { WhapiService } from './whapi.service';
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
@@ -23,6 +24,8 @@ import { WebhookMetricsService } from './webhook-metrics.service';
 
 @Controller('webhooks')
 export class WhapiController {
+  private readonly auditLogger = new Logger('WebhookAudit');
+
   constructor(
     private readonly whapiService: WhapiService,
     private readonly rateLimitService: WebhookRateLimitService,
@@ -39,14 +42,32 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'whapi';
+    const requestId =
+      this.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
     this.assertWhapiSecret(headers, request.rawBody, payload);
+    this.assertWhapiPayload(payload);
     const tenantId = await this.resolveTenantOrReject('whapi', payload.channel_id);
+    const auditEventKey = this.buildAuditEventKey('whapi', payload);
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
+    );
     this.rateLimit('whapi', request, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
     const degraded = this.healthService.isDegraded(provider);
-    if (await this.whapiService.isReplayEvent(payload, 'whapi', tenantId)) {
+    const idempotency = await this.whapiService.isReplayEvent(
+      payload,
+      'whapi',
+      tenantId,
+    );
+    if (idempotency === 'conflict') {
+      throw new HttpException(
+        'Idempotency conflict',
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (idempotency === 'duplicate') {
       this.metricsService.recordDuplicate(provider, tenantId);
       this.healthService.record(provider, true, Date.now() - startedAt);
       this.metricsService.recordLatency(provider, Date.now() - startedAt);
@@ -154,16 +175,22 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'meta';
+    const requestId =
+      this.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
     this.assertMetaSignature(headers, request.rawBody, payload);
+    const metaPayload = this.assertMetaPayload(payload);
 
-    const metaPayload = payload as MetaWebhookPayload;
     const entry = metaPayload?.entry?.[0];
     const metaValue = entry?.changes?.[0]?.value;
     const wabaId = entry?.id;
     const phoneNumberId = metaValue?.metadata?.phone_number_id;
 
     const tenantId = await this.resolveTenantForMeta(wabaId, phoneNumberId);
+    const auditEventKey = this.buildAuditEventKey('meta', metaPayload);
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=meta tenant_id=${tenantId} event_key=${auditEventKey}`,
+    );
     this.rateLimit('meta', request, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
@@ -175,7 +202,18 @@ export class WhapiController {
       return { status: 'ignored' };
     }
 
-    if (await this.whapiService.isReplayEvent(metaPayload as any, 'meta', tenantId)) {
+    const idempotency = await this.whapiService.isReplayEvent(
+      metaPayload as any,
+      'meta',
+      tenantId,
+    );
+    if (idempotency === 'conflict') {
+      throw new HttpException(
+        'Idempotency conflict',
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (idempotency === 'duplicate') {
       this.metricsService.recordDuplicate(provider, tenantId);
       this.healthService.record(provider, true, Date.now() - startedAt);
       this.metricsService.recordLatency(provider, Date.now() - startedAt);
@@ -235,49 +273,38 @@ export class WhapiController {
     const configuredHeader =
       process.env.WHAPI_WEBHOOK_SECRET_HEADER?.trim().toLowerCase();
     const configuredValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE?.trim();
-    const legacySecret = process.env.WEBHOOK_WHAPI_SECRET?.trim();
+    const configuredPrevious =
+      process.env.WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS?.trim();
 
-    if (isProd && !configuredHeader && !configuredValue && !legacySecret) {
+    if (isProd && (!configuredHeader || !configuredValue)) {
       this.metricsService.recordSignatureInvalid('whapi');
       throw new UnauthorizedException('Webhook secret not configured');
     }
 
     // New mode: explicit configurable header + value (preferred).
-    if (configuredHeader && configuredValue) {
-      const provided = this.headerValue(headers[configuredHeader])?.trim();
-      if (!provided) {
-        this.metricsService.recordSignatureInvalid('whapi');
-        throw new UnauthorizedException('Missing webhook signature');
-      }
-      const valid = this.verifyHmacSignature(
-        'whapi',
-        configuredValue,
-        rawBody,
-        payload,
-        provided,
-        isProd,
-      );
-      if (!valid) {
-        this.metricsService.recordSignatureInvalid('whapi');
-        throw new ForbiddenException('Invalid webhook signature');
-      }
+    if (!configuredHeader || !configuredValue) {
       return;
     }
 
-    // Legacy compatibility mode.
-    if (!legacySecret) return;
-
-    const secretHeader = this.headerValue(headers['x-whapi-secret']);
-    const fallbackHeader = this.headerValue(headers['x-webhook-secret']);
-    const authHeader = this.headerValue(headers.authorization);
-    const bearerSecret = authHeader?.startsWith('Bearer ')
-      ? authHeader.slice('Bearer '.length).trim()
-      : null;
-
-    const provided = secretHeader || fallbackHeader || bearerSecret;
-    if (!provided || provided !== legacySecret) {
+    const provided = this.headerValue(headers[configuredHeader])?.trim();
+    if (!provided) {
       this.metricsService.recordSignatureInvalid('whapi');
-      throw new UnauthorizedException('Invalid webhook secret');
+      throw new UnauthorizedException('Missing webhook signature');
+    }
+    const secrets = [configuredValue, configuredPrevious].filter(
+      (value): value is string => Boolean(value),
+    );
+    const valid = this.verifyHmacSignature(
+      'whapi',
+      secrets,
+      rawBody,
+      payload,
+      provided,
+      isProd,
+    );
+    if (!valid) {
+      this.metricsService.recordSignatureInvalid('whapi');
+      throw new ForbiddenException('Invalid webhook signature');
     }
   }
 
@@ -287,8 +314,9 @@ export class WhapiController {
     payload: unknown,
   ): void {
     const isProd = process.env.NODE_ENV === 'production';
-    const appSecret = process.env.WHATSAPP_APP_SECRET;
-    if (!appSecret) {
+    const appSecret = process.env.WHATSAPP_APP_SECRET?.trim();
+    const previousSecret = process.env.WHATSAPP_APP_SECRET_PREVIOUS?.trim();
+    if (!appSecret && !previousSecret) {
       if (isProd) {
         this.metricsService.recordSignatureInvalid('meta');
         throw new UnauthorizedException(
@@ -303,9 +331,12 @@ export class WhapiController {
       this.metricsService.recordSignatureInvalid('meta');
       throw new UnauthorizedException('Missing signature');
     }
+    const secrets = [appSecret, previousSecret].filter(
+      (value): value is string => Boolean(value),
+    );
     const valid = this.verifyHmacSignature(
       'meta',
-      appSecret,
+      secrets,
       rawBody,
       payload,
       signatureHeader,
@@ -326,9 +357,95 @@ export class WhapiController {
     return value;
   }
 
+  private assertWhapiPayload(payload: WhapiWebhookPayload): void {
+    if (!payload || typeof payload !== 'object') {
+      throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
+    }
+    if (!payload.channel_id || typeof payload.channel_id !== 'string') {
+      throw new HttpException('Invalid channel_id', HttpStatus.BAD_REQUEST);
+    }
+    if (!payload.event || typeof payload.event.type !== 'string') {
+      throw new HttpException('Invalid event', HttpStatus.BAD_REQUEST);
+    }
+    const hasMessages = Array.isArray(payload.messages);
+    const hasStatuses = Array.isArray(payload.statuses);
+    if (!hasMessages && !hasStatuses) {
+      throw new HttpException('Missing messages/statuses', HttpStatus.BAD_REQUEST);
+    }
+    if (hasMessages) {
+      for (const message of payload.messages ?? []) {
+        if (!message?.id || typeof message.id !== 'string') {
+          throw new HttpException('Invalid message id', HttpStatus.BAD_REQUEST);
+        }
+        if (!message.chat_id || typeof message.chat_id !== 'string') {
+          throw new HttpException('Invalid chat_id', HttpStatus.BAD_REQUEST);
+        }
+        if (!message.type || typeof message.type !== 'string') {
+          throw new HttpException('Invalid message type', HttpStatus.BAD_REQUEST);
+        }
+      }
+    }
+    if (hasStatuses) {
+      for (const status of payload.statuses ?? []) {
+        if (!status?.id || typeof status.id !== 'string') {
+          throw new HttpException('Invalid status id', HttpStatus.BAD_REQUEST);
+        }
+        if (!status.recipient_id || typeof status.recipient_id !== 'string') {
+          throw new HttpException('Invalid recipient_id', HttpStatus.BAD_REQUEST);
+        }
+      }
+    }
+  }
+
+  private assertMetaPayload(payload: unknown): MetaWebhookPayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
+    }
+    const metaPayload = payload as MetaWebhookPayload;
+    if (metaPayload.object !== 'whatsapp_business_account') {
+      throw new HttpException('Invalid meta object', HttpStatus.BAD_REQUEST);
+    }
+    const entry = metaPayload.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+    const metadata = value?.metadata;
+    if (!entry?.id || typeof entry.id !== 'string') {
+      throw new HttpException('Invalid entry id', HttpStatus.BAD_REQUEST);
+    }
+    if (!metadata?.phone_number_id || typeof metadata.phone_number_id !== 'string') {
+      throw new HttpException('Invalid phone_number_id', HttpStatus.BAD_REQUEST);
+    }
+    const hasMessages = Array.isArray(value?.messages);
+    const hasStatuses = Array.isArray(value?.statuses);
+    if (!hasMessages && !hasStatuses) {
+      throw new HttpException('Missing messages/statuses', HttpStatus.BAD_REQUEST);
+    }
+    if (hasMessages) {
+      for (const message of value?.messages ?? []) {
+        if (!message?.id || typeof message.id !== 'string') {
+          throw new HttpException('Invalid message id', HttpStatus.BAD_REQUEST);
+        }
+        if (!message?.from || typeof message.from !== 'string') {
+          throw new HttpException('Invalid message from', HttpStatus.BAD_REQUEST);
+        }
+      }
+    }
+    if (hasStatuses) {
+      for (const status of value?.statuses ?? []) {
+        if (!status?.id || typeof status.id !== 'string') {
+          throw new HttpException('Invalid status id', HttpStatus.BAD_REQUEST);
+        }
+        if (!status?.recipient_id || typeof status.recipient_id !== 'string') {
+          throw new HttpException('Invalid recipient_id', HttpStatus.BAD_REQUEST);
+        }
+      }
+    }
+    return metaPayload;
+  }
+
   private verifyHmacSignature(
     provider: 'whapi' | 'meta',
-    secret: string,
+    secrets: string[],
     rawBody: Buffer | undefined,
     payload: unknown,
     provided: string,
@@ -340,20 +457,23 @@ export class WhapiController {
     }
 
     const payloadBuffer = rawBody ?? Buffer.from(JSON.stringify(payload));
-    const digest = createHmac('sha256', secret)
-      .update(payloadBuffer)
-      .digest('hex');
-    const expected = `sha256=${digest}`;
-
-    const candidates = [expected, digest];
-    return candidates.some((candidate) => {
-      const expectedBuffer = Buffer.from(candidate);
-      const receivedBuffer = Buffer.from(provided);
-      return (
-        expectedBuffer.length === receivedBuffer.length &&
-        timingSafeEqual(expectedBuffer, receivedBuffer)
-      );
-    });
+    const receivedBuffer = Buffer.from(provided);
+    for (const secret of secrets) {
+      const digest = createHmac('sha256', secret)
+        .update(payloadBuffer)
+        .digest('hex');
+      const candidates = [`sha256=${digest}`, digest];
+      for (const candidate of candidates) {
+        const expectedBuffer = Buffer.from(candidate);
+        if (
+          expectedBuffer.length === receivedBuffer.length &&
+          timingSafeEqual(expectedBuffer, receivedBuffer)
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private rateLimit(
@@ -493,5 +613,28 @@ export class WhapiController {
       'Unknown channel mapping',
       HttpStatus.UNPROCESSABLE_ENTITY,
     );
+  }
+
+  private buildAuditEventKey(
+    provider: 'whapi' | 'meta',
+    payload: WhapiWebhookPayload | MetaWebhookPayload,
+  ): string {
+    if (provider === 'whapi') {
+      const whapiPayload = payload as WhapiWebhookPayload;
+      const id =
+        whapiPayload.messages?.[0]?.id ??
+        whapiPayload.statuses?.[0]?.id ??
+        'unknown';
+      return `${provider}:${whapiPayload.channel_id}:${whapiPayload.event?.type ?? 'unknown'}:${id}`;
+    }
+    const metaPayload = payload as MetaWebhookPayload;
+    const entry = metaPayload.entry?.[0];
+    const value = entry?.changes?.[0]?.value;
+    const id =
+      value?.messages?.[0]?.id ??
+      value?.statuses?.[0]?.id ??
+      'unknown';
+    const channelId = value?.metadata?.phone_number_id ?? 'unknown';
+    return `${provider}:${channelId}:${entry?.changes?.[0]?.field ?? 'unknown'}:${id}`;
   }
 }

@@ -22,6 +22,12 @@ SELECT event_key, COUNT(*) c
 FROM webhook_event_log
 GROUP BY event_key
 HAVING c > 1;
+
+-- Unicite contractuelle channels (provider, external_id)
+SELECT provider, external_id, COUNT(*) c
+FROM whapi_channels
+GROUP BY provider, external_id
+HAVING c > 1;
 ```
 
 ## Post-backfill checks (bloquants)
@@ -67,6 +73,10 @@ GROUP BY tenant_id, provider, provider_message_id, direction
 HAVING c > 1;
 ```
 
+## Scripts SQL (fichiers)
+- `docs/sql-gates/pre-migration.sql`
+- `docs/sql-gates/post-backfill.sql`
+
 ## Post-backfill checks (channels uniques)
 ```sql
 -- Unicite contractuelle channels
@@ -74,4 +84,37 @@ SELECT provider, external_id, COUNT(*) c
 FROM whapi_channels
 GROUP BY provider, external_id
 HAVING c > 1;
+```
+
+## Sampling rapide (manuel)
+```sql
+-- Channels sans tenant (echantillon)
+SELECT id, channel_id, tenant_id
+FROM whapi_channels
+WHERE tenant_id IS NULL OR tenant_id = ''
+LIMIT 20;
+
+-- Chats orphelins tenant
+SELECT chat_id, channel_id, tenant_id
+FROM whatsapp_chat
+WHERE tenant_id IS NULL OR tenant_id = ''
+LIMIT 20;
+
+-- Messages orphelins tenant
+SELECT id, chat_id, tenant_id
+FROM whatsapp_message
+WHERE tenant_id IS NULL OR tenant_id = ''
+LIMIT 20;
+
+-- Medias orphelins tenant
+SELECT id, message_id, tenant_id
+FROM whatsapp_media
+WHERE tenant_id IS NULL OR tenant_id = ''
+LIMIT 20;
+
+-- Event log orphelin (best-effort)
+SELECT id, event_key, tenant_id
+FROM webhook_event_log
+WHERE tenant_id IS NULL OR tenant_id = ''
+LIMIT 20;
 ```

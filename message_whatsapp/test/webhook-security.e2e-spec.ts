@@ -12,6 +12,8 @@ import { CommunicationWhapiService } from './../src/communication_whapi/communic
 import { WhapiChannel } from './../src/channel/entities/channel.entity';
 import { ProviderChannel } from './../src/channel/entities/provider-channel.entity';
 import { WebhookEventLog } from './../src/whapi/entities/webhook-event.entity';
+import { WhatsappChat } from './../src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappMessage } from './../src/whatsapp_message/entities/whatsapp_message.entity';
 
 const shouldRun = process.env.E2E_RUN === 'true';
 const describeMaybe = shouldRun ? describe : describe.skip;
@@ -21,6 +23,8 @@ describeMaybe('Webhook security (e2e)', () => {
   let channelRepository: Repository<WhapiChannel>;
   let providerChannelRepository: Repository<ProviderChannel>;
   let webhookEventRepository: Repository<WebhookEventLog>;
+  let chatRepository: Repository<WhatsappChat>;
+  let messageRepository: Repository<WhatsappMessage>;
 
   const unique = `${Date.now()}`;
   const channelId = `e2e-sec-channel-${unique}`;
@@ -56,6 +60,12 @@ describeMaybe('Webhook security (e2e)', () => {
     );
     webhookEventRepository = moduleFixture.get<Repository<WebhookEventLog>>(
       getRepositoryToken(WebhookEventLog),
+    );
+    chatRepository = moduleFixture.get<Repository<WhatsappChat>>(
+      getRepositoryToken(WhatsappChat),
+    );
+    messageRepository = moduleFixture.get<Repository<WhatsappMessage>>(
+      getRepositoryToken(WhatsappMessage),
     );
 
     await channelRepository.save(
@@ -94,6 +104,12 @@ describeMaybe('Webhook security (e2e)', () => {
       } catch (error) {
         // ignore cleanup errors for missing table in test env
       }
+    }
+    if (messageRepository) {
+      await messageRepository.delete({ channel_id: channelId });
+    }
+    if (chatRepository) {
+      await chatRepository.delete({ channel_id: channelId });
     }
     if (providerChannelRepository) {
       await providerChannelRepository.delete({ external_id: channelId });

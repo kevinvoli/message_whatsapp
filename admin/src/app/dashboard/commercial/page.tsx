@@ -20,8 +20,10 @@ import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
 import DispatchView from '@/app/ui/DispatchView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
+import GoNoGoView from '@/app/ui/GoNoGoView';
 import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
+import { goNoGoChecklist } from '@/app/data/admin-data';
 import { Spinner } from '@/app/ui/Spinner';
 import { logger } from '@/app/lib/logger';
 
@@ -157,6 +159,8 @@ export default function AdminDashboard() {
                 return <DispatchView onRefresh={fetchData} />;
             case 'observabilite':
                 return <ObservabiliteView metrics={webhookMetrics} onRefresh={fetchData} />;
+            case 'go_no_go':
+                return <GoNoGoView metrics={webhookMetrics} checklist={goNoGoChecklist} onRefresh={fetchData} />;
             case 'canaux':
                 return <ChannelsView initialChannels={channels} onChannelUpdated={fetchData} onRefresh={fetchData} />;
             case 'automessages':

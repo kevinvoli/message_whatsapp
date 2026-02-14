@@ -9,6 +9,8 @@ import { WebhookMetricsService } from 'src/whapi/webhook-metrics.service';
 
 type ProviderId = 'whapi' | 'meta';
 
+export type IdempotencyResult = 'accepted' | 'duplicate' | 'conflict';
+
 @Injectable()
 export class WebhookIdempotencyService {
   private readonly logger = new Logger(WebhookIdempotencyService.name);
@@ -19,20 +21,21 @@ export class WebhookIdempotencyService {
     private readonly metricsService: WebhookMetricsService,
   ) {}
 
-  async isDuplicate(params: {
+  async check(params: {
     payload: unknown;
     provider: ProviderId;
     tenantId?: string | null;
-  }): Promise<boolean> {
+  }): Promise<IdempotencyResult> {
     const { payload, provider, tenantId } = params;
     const keys = this.buildIdempotencyKeys(payload, provider, tenantId ?? 'unknown');
     if (!keys.length) {
-      return false;
+      return 'accepted';
     }
 
     const eventType = this.resolveEventType(payload, provider);
     const payloadHash = this.hashPayload(payload);
     let insertedCount = 0;
+    let conflictDetected = false;
     for (const key of keys) {
       const inserted = await this.tryRegisterEventKey({
         eventKey: key,
@@ -43,12 +46,17 @@ export class WebhookIdempotencyService {
         direction: this.extractDirection(payload, provider),
         payloadHash,
       });
-      if (inserted) {
+      if (inserted === 'accepted') {
         insertedCount += 1;
+      } else if (inserted === 'conflict') {
+        conflictDetected = true;
       }
     }
 
-    return insertedCount === 0;
+    if (conflictDetected) {
+      return 'conflict';
+    }
+    return insertedCount === 0 ? 'duplicate' : 'accepted';
   }
 
   private buildIdempotencyKeys(
@@ -85,9 +93,10 @@ export class WebhookIdempotencyService {
         return keys;
       }
 
-      const minuteBucket = Math.floor(Date.now() / 60000);
+      const minuteBucket = this.resolveMinuteBucket(payload, provider);
+      const direction = this.extractDirection(payload, provider) ?? 'unknown';
       return [
-        `${tenantId}:${provider}:${this.hashPayload(whapiPayload)}:${eventType}:${minuteBucket}`,
+        `${tenantId}:${provider}:${this.hashPayload(whapiPayload)}:${eventType}:${direction}:${minuteBucket}`,
       ];
     }
 
@@ -114,9 +123,10 @@ export class WebhookIdempotencyService {
       return keys;
     }
 
-    const minuteBucket = Math.floor(Date.now() / 60000);
+    const minuteBucket = this.resolveMinuteBucket(payload, provider);
+    const direction = this.extractDirection(payload, provider) ?? 'unknown';
     return [
-      `${tenantId}:${provider}:${this.hashPayload(metaPayload)}:${eventType}:${minuteBucket}`,
+      `${tenantId}:${provider}:${this.hashPayload(metaPayload)}:${eventType}:${direction}:${minuteBucket}`,
     ];
   }
 
@@ -163,6 +173,31 @@ export class WebhookIdempotencyService {
     return null;
   }
 
+  private resolveMinuteBucket(payload: unknown, provider: ProviderId): number {
+    if (provider === 'whapi') {
+      const whapiPayload = payload as WhapiWebhookPayload;
+      const ts =
+        whapiPayload?.messages?.[0]?.timestamp ??
+        whapiPayload?.statuses?.[0]?.timestamp;
+      const parsed = typeof ts === 'string' ? Number.parseInt(ts, 10) : ts;
+      if (Number.isFinite(parsed)) {
+        return Math.floor((Number(parsed) * 1000) / 60000);
+      }
+    }
+
+    const metaPayload = payload as MetaWebhookPayload;
+    const value = metaPayload?.entry?.[0]?.changes?.[0]?.value;
+    const ts =
+      value?.messages?.[0]?.timestamp ??
+      value?.statuses?.[0]?.timestamp;
+    const parsed = typeof ts === 'string' ? Number.parseInt(ts, 10) : ts;
+    if (Number.isFinite(parsed)) {
+      return Math.floor((Number(parsed) * 1000) / 60000);
+    }
+
+    return Math.floor(Date.now() / 60000);
+  }
+
   private async tryRegisterEventKey(params: {
     eventKey: string;
     provider: string;
@@ -171,7 +206,7 @@ export class WebhookIdempotencyService {
     providerMessageId: string | null;
     direction: string | null;
     payloadHash: string;
-  }): Promise<boolean> {
+  }): Promise<IdempotencyResult> {
     try {
       await this.webhookEventRepository.save(
         this.webhookEventRepository.create({
@@ -184,7 +219,7 @@ export class WebhookIdempotencyService {
           payload_hash: params.payloadHash,
         }),
       );
-      return true;
+      return 'accepted';
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
@@ -193,8 +228,24 @@ export class WebhookIdempotencyService {
           (error as any).driverError.code,
         )
       ) {
-        this.metricsService.recordIdempotencyConflict(params.provider, params.tenantId);
-        return false;
+        const where =
+          params.tenantId == null
+            ? {
+                event_key: params.eventKey,
+                provider: params.provider,
+                tenant_id: undefined,
+              }
+            : {
+                event_key: params.eventKey,
+                provider: params.provider,
+                tenant_id: params.tenantId,
+              };
+        const existing = await this.webhookEventRepository.findOne({ where });
+        if (existing && existing.payload_hash && existing.payload_hash !== params.payloadHash) {
+          this.metricsService.recordIdempotencyConflict(params.provider, params.tenantId);
+          return 'conflict';
+        }
+        return 'duplicate';
       }
       if (
         error instanceof QueryFailedError &&
@@ -203,7 +254,7 @@ export class WebhookIdempotencyService {
         this.logger.warn(
           'Webhook idempotency table missing, continuing without dedupe',
         );
-        return true;
+        return 'accepted';
       }
       throw error;
     }

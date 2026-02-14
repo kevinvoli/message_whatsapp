@@ -58,7 +58,6 @@ npm run build --prefix admin
 - `JWT_SECRET`
 - `WHAPI_WEBHOOK_SECRET_HEADER`
 - `WHAPI_WEBHOOK_SECRET_VALUE`
-- `WEBHOOK_WHAPI_SECRET` (fallback legacy)
 - `MESSAGE_RESPONSE_TIMEOUT_HOURS`
 - `WHAPI_OUTBOUND_MAX_RETRIES`
 - `MYSQL_*`
@@ -89,4 +88,3 @@ npm run build --prefix admin
 - Messages entrants visibles en front/admin.
 - Reponses agent/admin livrees sans erreur.
 - E2E backend vert (`test:e2e`).
-

@@ -55,10 +55,13 @@ import { LoggingModule } from './logging/logging.module';
         LOG_LEVEL: Joi.string()
           .valid('error', 'warn', 'log', 'debug', 'verbose', 'info')
           .default('info'),
-        WEBHOOK_WHAPI_SECRET: Joi.string().optional(),
         WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().optional(),
         WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().optional(),
+        WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().optional(),
         WHATSAPP_APP_SECRET: Joi.string().optional(),
+        WHATSAPP_APP_SECRET_PREVIOUS: Joi.string().optional(),
+        FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
+        FF_SHADOW_UNIFIED: Joi.string().optional(),
         MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number().min(1).max(240).default(24),
         ADMIN_NAME: Joi.string().optional(),
         ADMIN_EMAIL: Joi.when('NODE_ENV', {

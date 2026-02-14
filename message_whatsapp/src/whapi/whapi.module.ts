@@ -40,6 +40,7 @@ import { MetaAdapter } from 'src/webhooks/adapters/meta.adapter';
 import { InboundMessageService } from 'src/webhooks/inbound-message.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
+import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idem
     WebhookIdempotencyPurgeService,
     WhapiAdapter,
     MetaAdapter,
+    ProviderAdapterRegistry,
     InboundMessageService,
     UnifiedIngressService,
     WebhookIdempotencyService,

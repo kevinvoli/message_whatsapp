@@ -34,7 +34,8 @@ export type ViewMode =
   | 'conversations'
   | 'queue'
   | 'dispatch'
-  | 'observabilite';
+  | 'observabilite'
+  | 'go_no_go';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -412,6 +413,25 @@ export type WebhookMetricsSnapshot = {
   latency: Record<string, { p95: number; p99: number }>;
   generated_at: string;
   window_minutes: number;
+};
+
+export type GoNoGoGateStatus = 'pass' | 'warn' | 'fail' | 'pending';
+
+export type GoNoGoGate = {
+  id: string;
+  title: string;
+  description?: string;
+  status: GoNoGoGateStatus;
+  detail?: string;
+};
+
+export type GoNoGoChecklistItem = {
+  id: string;
+  title: string;
+  owner: string;
+  status: GoNoGoGateStatus;
+  lastRun?: string;
+  detail?: string;
 };
 
 // ============================================

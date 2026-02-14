@@ -43,6 +43,11 @@ describeMaybe('Message flow (e2e)', () => {
   let posteId = '';
 
   beforeAll(async () => {
+    process.env.WHAPI_WEBHOOK_SECRET_HEADER =
+      process.env.WHAPI_WEBHOOK_SECRET_HEADER ?? 'x-whapi-signature';
+    process.env.WHAPI_WEBHOOK_SECRET_VALUE =
+      process.env.WHAPI_WEBHOOK_SECRET_VALUE ?? 'e2e-whapi-secret';
+
     if (!adminEmail || !adminPassword) {
       throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required for E2E.');
     }
@@ -184,7 +189,6 @@ describeMaybe('Message flow (e2e)', () => {
       ],
     };
 
-    const webhookSecret = process.env.WEBHOOK_WHAPI_SECRET;
     const webhookHeader = process.env.WHAPI_WEBHOOK_SECRET_HEADER;
     const webhookValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE;
 
@@ -194,9 +198,6 @@ describeMaybe('Message flow (e2e)', () => {
       .send(payload)
       .timeout(requestTimeout);
 
-    if (webhookSecret) {
-      webhookReq = webhookReq.set('x-whapi-secret', webhookSecret);
-    }
     if (webhookHeader && webhookValue) {
       const rawBody = Buffer.from(JSON.stringify(payload));
       const digest = createHmac('sha256', webhookValue)

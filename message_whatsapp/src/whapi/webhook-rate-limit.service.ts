@@ -7,7 +7,12 @@ type RateBucket = {
 
 @Injectable()
 export class WebhookRateLimitService {
-  private readonly globalBucket = this.createBucket(300);
+  private readonly globalLimit = this.getLimit('WEBHOOK_GLOBAL_RPS', 300);
+  private readonly providerLimit = this.getLimit('WEBHOOK_PROVIDER_RPS', 150);
+  private readonly ipLimit = this.getLimit('WEBHOOK_IP_RPS', 60);
+  private readonly tenantLimit = this.getLimit('WEBHOOK_TENANT_RPM', 1200);
+
+  private readonly globalBucket = this.createBucket(this.globalLimit);
   private readonly providerBuckets = new Map<string, RateBucket>();
   private readonly ipBuckets = new Map<string, RateBucket>();
   private readonly tenantBuckets = new Map<string, RateBucket>();
@@ -17,12 +22,12 @@ export class WebhookRateLimitService {
     ip: string | null,
     tenantId?: string | null,
   ): void {
-    if (!this.consume(this.globalBucket, 300)) {
+    if (!this.consume(this.globalBucket, this.globalLimit)) {
       throw new HttpException('Global rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const providerBucket = this.getBucket(this.providerBuckets, provider, 150);
-    if (!this.consume(providerBucket, 150)) {
+    const providerBucket = this.getBucket(this.providerBuckets, provider, this.providerLimit);
+    if (!this.consume(providerBucket, this.providerLimit)) {
       throw new HttpException(
         `Provider rate limit exceeded (${provider})`,
         HttpStatus.TOO_MANY_REQUESTS,
@@ -30,8 +35,8 @@ export class WebhookRateLimitService {
     }
 
     if (ip) {
-      const ipBucket = this.getBucket(this.ipBuckets, ip, 60);
-      if (!this.consume(ipBucket, 60)) {
+      const ipBucket = this.getBucket(this.ipBuckets, ip, this.ipLimit);
+      if (!this.consume(ipBucket, this.ipLimit)) {
         throw new HttpException(
           'IP rate limit exceeded',
           HttpStatus.TOO_MANY_REQUESTS,
@@ -40,8 +45,8 @@ export class WebhookRateLimitService {
     }
 
     if (tenantId) {
-      const tenantBucket = this.getBucket(this.tenantBuckets, tenantId, 1200);
-      if (!this.consume(tenantBucket, 1200, 60 * 1000)) {
+      const tenantBucket = this.getBucket(this.tenantBuckets, tenantId, this.tenantLimit);
+      if (!this.consume(tenantBucket, this.tenantLimit, 60 * 1000)) {
         throw new HttpException(
           'Tenant quota exceeded',
           HttpStatus.TOO_MANY_REQUESTS,
@@ -85,5 +90,14 @@ export class WebhookRateLimitService {
 
     bucket.tokens -= 1;
     return true;
+  }
+
+  private getLimit(envKey: string, fallback: number): number {
+    const raw = process.env[envKey];
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+    return fallback;
   }
 }
