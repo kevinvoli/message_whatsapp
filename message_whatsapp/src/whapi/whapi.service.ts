@@ -26,6 +26,8 @@ import {
   WhatsappMediaType,
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WebhookEventLog } from './entities/webhook-event.entity';
+import { ChannelService } from 'src/channel/channel.service';
+import { WebhookMetricsService } from './webhook-metrics.service';
 
 @Injectable()
 export class WhapiService {
@@ -47,8 +49,37 @@ export class WhapiService {
     @InjectRepository(WebhookEventLog)
     private readonly webhookEventRepository: Repository<WebhookEventLog>,
 
+    private readonly channelService: ChannelService,
+    private readonly metricsService: WebhookMetricsService,
     private readonly autoMessageOrchestratorServcie: AutoMessageOrchestrator,
   ) {}
+
+  async findChannelByExternalId(channelId: string) {
+    return this.channelService.findByChannelId(channelId);
+  }
+
+  async ensureTenantId(channel: { id: string; tenant_id?: string | null }) {
+    return this.channelService.ensureTenantId(channel as any);
+  }
+
+  async upsertProviderMapping(params: {
+    tenant_id: string;
+    provider: string;
+    external_id: string;
+    channel_id?: string | null;
+  }) {
+    await this.channelService.upsertProviderMapping(params);
+  }
+
+  async resolveTenantByProviderExternalId(
+    provider: string,
+    externalId: string,
+  ): Promise<string | null> {
+    return this.channelService.resolveTenantByProviderExternalId(
+      provider,
+      externalId,
+    );
+  }
 
   async isReplayEvent(
     payload: WhapiWebhookPayload,
@@ -348,6 +379,7 @@ export class WhapiService {
           (error as any).driverError.code,
         )
       ) {
+        this.metricsService.recordIdempotencyConflict(provider);
         return false;
       }
       if (

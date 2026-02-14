@@ -22,6 +22,7 @@ import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 
@@ -37,6 +38,7 @@ import { LoggingModule } from 'src/logging/logging.module';
       }),
       TypeOrmModule.forFeature([
         MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,WhapiChannel,
+        ProviderChannel,
         Contact
       ]),
       LoggingModule,

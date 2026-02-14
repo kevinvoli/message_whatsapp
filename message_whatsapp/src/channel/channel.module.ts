@@ -3,6 +3,7 @@ import { ChannelService } from './channel.service';
 import { ChannelController } from './channel.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhapiChannel } from './entities/channel.entity';
+import { ProviderChannel } from './entities/provider-channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { LoggingModule } from 'src/logging/logging.module';
@@ -12,7 +13,9 @@ import { LoggingModule } from 'src/logging/logging.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      WhapiChannel,WhatsappChat
+      WhapiChannel,
+      ProviderChannel,
+      WhatsappChat,
     ]),
     LoggingModule,
   ],

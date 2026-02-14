@@ -17,6 +17,7 @@ import { CommunicationWhapiModule } from 'src/communication_whapi/communication_
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactService } from 'src/contact/contact.service';
@@ -28,6 +29,11 @@ import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { WebhookEventLog } from './entities/webhook-event.entity';
 import { LoggingModule } from 'src/logging/logging.module';
+import { WebhookRateLimitService } from './webhook-rate-limit.service';
+import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
+import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
+import { WebhookMetricsService } from './webhook-metrics.service';
+import { WebhookMetricsController } from './webhook-metrics.controller';
 
 @Module({
   imports: [
@@ -37,6 +43,7 @@ import { LoggingModule } from 'src/logging/logging.module';
       WhatsappChat,
       QueuePosition,
       WhapiChannel,
+      ProviderChannel,
       Contact,
       WhatsappPoste,
       WhatsappMedia,
@@ -49,7 +56,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     CommunicationWhapiModule,
     LoggingModule,
   ],
-  controllers: [WhapiController],
+  controllers: [WhapiController, WebhookMetricsController],
   providers: [
     WhapiService,
     WhatsappMessageService,
@@ -60,7 +67,11 @@ import { LoggingModule } from 'src/logging/logging.module';
     ContactService,
     CommunicationWhapiService,
     AutoMessageOrchestrator,
-    MessageAutoService
+    MessageAutoService,
+    WebhookRateLimitService,
+    WebhookTrafficHealthService,
+    WebhookDegradedQueueService,
+    WebhookMetricsService,
   ],
 })
 export class WhapiModule {}

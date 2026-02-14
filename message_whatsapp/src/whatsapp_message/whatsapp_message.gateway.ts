@@ -33,6 +33,7 @@ type AuthPayload = {
   sub: string;
   email?: string;
   posteId?: string;
+  tenantId?: string;
 };
 
 const wsPort =
@@ -53,7 +54,7 @@ export class WhatsappMessageGateway
 
   private connectedAgents = new Map<
     string,
-    { commercialId: string; posteId: string }
+    { commercialId: string; posteId: string; tenantId: string | null }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
 
@@ -88,11 +89,25 @@ export class WhatsappMessageGateway
     if (!commercial?.poste) return;
 
     const posteId = commercial.poste.id;
-    this.connectedAgents.set(client.id, { commercialId, posteId });
+    const tenantId = await this.resolveTenantIdForPoste(posteId);
+    if (!tenantId && process.env.NODE_ENV === 'production') {
+      this.logger.warn(
+        `Socket auth refused: tenant resolution failed (${client.id})`,
+      );
+      client.disconnect();
+      return;
+    }
+
+    this.connectedAgents.set(client.id, { commercialId, posteId, tenantId });
+    if (tenantId) {
+      await client.join(`tenant:${tenantId}`);
+    }
     await client.join(`poste_${posteId}`);
 
     const chats = await this.chatService.findByPosteId(posteId);
-    chats.forEach((c) => client.join(`chat_${c.chat_id}`));
+    chats
+      .filter((c) => !tenantId || c.tenant_id === tenantId)
+      .forEach((c) => client.join(`chat_${c.chat_id}`));
 
     await this.commercialService.updateStatus(commercialId, true);
     await this.posteService.setActive(posteId, true);
@@ -126,6 +141,33 @@ export class WhatsappMessageGateway
       this.logger.warn(`Socket auth refused: invalid token (${client.id})`);
       return null;
     }
+  }
+
+  private async resolveTenantIdForPoste(
+    posteId: string,
+  ): Promise<string | null> {
+    const chats = await this.chatService.findByPosteId(posteId);
+    const tenantIds = new Set(
+      chats.map((chat) => chat.tenant_id).filter(Boolean) as string[],
+    );
+    if (tenantIds.size === 1) {
+      return Array.from(tenantIds)[0];
+    }
+    if (tenantIds.size > 1) {
+      this.logger.warn(
+        `Multiple tenant_ids detected for poste ${posteId}, refusing tenant scoping`,
+      );
+    }
+    return null;
+  }
+
+  private getTenantId(client: Socket): string | null {
+    return this.connectedAgents.get(client.id)?.tenantId ?? null;
+  }
+
+  private isTenantChat(chat: WhatsappChat, tenantId: string | null): boolean {
+    if (!tenantId) return true;
+    return chat.tenant_id === tenantId;
   }
 
   private extractAuthToken(client: Socket): string | null {
@@ -168,6 +210,9 @@ export class WhatsappMessageGateway
 
     let chats = await this.chatService.findByPosteId(agent.posteId);
     if (!chats) return;
+    if (agent.tenantId) {
+      chats = chats.filter((c) => c.tenant_id === agent.tenantId);
+    }
 
     // Calcul de filtrage côté back
     if (searchTerm) {
@@ -224,6 +269,15 @@ export class WhatsappMessageGateway
     const chat = await this.chatService.findBychat_id(contact.chat_id);
     const posteId = chat?.poste_id;
     if (!posteId) {
+      return;
+    }
+    const tenantId = chat?.tenant_id ?? null;
+
+    if (tenantId) {
+      this.server.to(`tenant:${tenantId}`).emit('contact:event', {
+        type,
+        payload,
+      });
       return;
     }
 
@@ -306,6 +360,11 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
+    const tenantId = this.getTenantId(client);
+    const chat = await this.chatService.findBychat_id(payload.chat_id);
+    if (!chat || !this.isTenantChat(chat, tenantId)) {
+      return;
+    }
     const messages = await this.messageService.findBychat_id(payload.chat_id);
     client.emit('chat:event', {
       type: 'MESSAGE_LIST',
@@ -321,14 +380,24 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
+    const tenantId = this.getTenantId(client);
     await this.chatService.markChatAsRead(payload.chat_id);
 
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;
+    if (!this.isTenantChat(chat, tenantId)) return;
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
     );
+
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, 0),
+      });
+      return;
+    }
 
     this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
@@ -346,6 +415,7 @@ export class WhatsappMessageGateway
 
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;
+    if (!this.isTenantChat(chat, agent.tenantId)) return;
     const resolvedChannelId = await this.resolveChannelIdForChat(chat);
     if (!resolvedChannelId) {
       this.logger.warn(
@@ -400,10 +470,17 @@ export class WhatsappMessageGateway
       return;
     }
 
-    this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
-      type: 'MESSAGE_ADD',
-      payload: { ...this.mapMessage(message), tempId: payload.tempId },
-    });
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'MESSAGE_ADD',
+        payload: { ...this.mapMessage(message), tempId: payload.tempId },
+      });
+    } else {
+      this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
+        type: 'MESSAGE_ADD',
+        payload: { ...this.mapMessage(message), tempId: payload.tempId },
+      });
+    }
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
@@ -414,10 +491,17 @@ export class WhatsappMessageGateway
 
     // const unreadCount = chat.unread_count
 
-    this.server.to(`poste_${agent.posteId}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
-    });
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, unreadCount),
+      });
+    } else {
+      this.server.to(`poste_${agent.posteId}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, unreadCount),
+      });
+    }
   }
 
   // ======================================================
@@ -430,10 +514,17 @@ export class WhatsappMessageGateway
       setTimeout(() => this.emitTyping(chat.chat_id, false), 2000);
     }
 
-    this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
-      type: 'MESSAGE_ADD',
-      payload: this.mapMessage(message),
-    });
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'MESSAGE_ADD',
+        payload: this.mapMessage(message),
+      });
+    } else {
+      this.server.to(`chat_${chat.chat_id}`).emit('chat:event', {
+        type: 'MESSAGE_ADD',
+        payload: this.mapMessage(message),
+      });
+    }
     this.logger.log(
       `INCOMING_SOCKET_EMIT trace=${message.message_id ?? message.id} chat_id=${chat.chat_id}`,
     );
@@ -448,10 +539,17 @@ export class WhatsappMessageGateway
       `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
     );
     
-    this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
-    });
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, unreadCount),
+      });
+    } else {
+      this.server.to(`poste_${chat.poste_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, unreadCount),
+      });
+    }
   }
 
   // ======================================================
@@ -536,7 +634,18 @@ export class WhatsappMessageGateway
     oldPosteId: string,
     newPosteId: string,
   ): void {
-    
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_ASSIGNED',
+        payload: this.mapConversation(chat),
+      });
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_REMOVED',
+        payload: { chat_id: chat.chat_id },
+      });
+      return;
+    }
+
     this.server.to(`poste_${newPosteId}`).emit('chat:event', {
       type: 'CONVERSATION_ASSIGNED',
       payload: this.mapConversation(chat),
@@ -549,6 +658,14 @@ export class WhatsappMessageGateway
   }
 
   public emitConversationReadonly(chat: WhatsappChat): void {
+    if (chat.tenant_id) {
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_READONLY',
+        payload: { chat_id: chat.chat_id, read_only: chat.read_only },
+      });
+      return;
+    }
+
     this.server.emit('chat:event', {
       type: 'CONVERSATION_READONLY',
       payload: { chat_id: chat.chat_id, read_only: chat.read_only },
@@ -564,10 +681,27 @@ export class WhatsappMessageGateway
 
   private async emitQueueUpdate(reason: string) {
     const queue = await this.queueService.getQueuePositions();
-    this.server.emit('queue:updated', {
-      timestamp: new Date().toISOString(),
-      reason,
-      data: queue,
+    const tenants = new Set(
+      Array.from(this.connectedAgents.values())
+        .map((agent) => agent.tenantId)
+        .filter(Boolean) as string[],
+    );
+
+    if (tenants.size === 0) {
+      this.server.emit('queue:updated', {
+        timestamp: new Date().toISOString(),
+        reason,
+        data: queue,
+      });
+      return;
+    }
+
+    tenants.forEach((tenantId) => {
+      this.server.to(`tenant:${tenantId}`).emit('queue:updated', {
+        timestamp: new Date().toISOString(),
+        reason,
+        data: queue,
+      });
     });
   }
 

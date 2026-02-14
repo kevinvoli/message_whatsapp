@@ -28,12 +28,27 @@ export type WhatsappMediaType =
 
 @Entity()
 @Index('UQ_whatsapp_media_media_id', ['media_id'], { unique: true })
+@Index('IDX_whatsapp_media_tenant_id', ['tenant_id'])
 export class WhatsappMedia {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
     comment: 'Primary key - Unique trajet identifier',
   })
   id: string;
+
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenant_id?: string | null;
+
+  @Column({ name: 'provider', type: 'varchar', length: 32, nullable: true })
+  provider?: string | null;
+
+  @Column({
+    name: 'provider_media_id',
+    type: 'varchar',
+    length: 191,
+    nullable: true,
+  })
+  provider_media_id?: string | null;
 
   @Column({ name: 'media_id', type: 'varchar', length: 100, nullable: false })
   media_id: string;

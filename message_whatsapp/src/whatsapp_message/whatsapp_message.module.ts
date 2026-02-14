@@ -17,6 +17,7 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -43,6 +44,7 @@ import { LoggingModule } from 'src/logging/logging.module';
       WhatsappCommercial,
       QueuePosition,
       WhapiChannel,
+      ProviderChannel,
       Contact,
       WhatsappPoste,
       MessageAuto

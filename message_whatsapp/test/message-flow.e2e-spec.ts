@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { WhatsappPoste } from './../src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { QueuePosition } from './../src/dispatcher/entities/queue-position.entity';
 import { WhapiChannel } from './../src/channel/entities/channel.entity';
+import { ProviderChannel } from './../src/channel/entities/provider-channel.entity';
 import { WhatsappChat } from './../src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from './../src/whatsapp_message/entities/whatsapp_message.entity';
 import { CommunicationWhapiService } from './../src/communication_whapi/communication_whapi.service';
@@ -21,6 +22,7 @@ describeMaybe('Message flow (e2e)', () => {
   let posteRepository: Repository<WhatsappPoste>;
   let queueRepository: Repository<QueuePosition>;
   let channelRepository: Repository<WhapiChannel>;
+  let providerChannelRepository: Repository<ProviderChannel>;
   let chatRepository: Repository<WhatsappChat>;
   let messageRepository: Repository<WhatsappMessage>;
 
@@ -30,6 +32,11 @@ describeMaybe('Message flow (e2e)', () => {
   const channelId = `e2e-channel-${unique}`;
   const chatId = `2250700${unique.slice(-6)}@s.whatsapp.net`;
   const clientPhone = chatId.split('@')[0];
+  const requestTimeout = { response: 20000, deadline: 25000 };
+  const logStep = (step: string) => {
+    // eslint-disable-next-line no-console
+    console.log(`[e2e][message-flow] ${step}`);
+  };
 
   let adminCookies: string[] = [];
   let posteId = '';
@@ -64,6 +71,9 @@ describeMaybe('Message flow (e2e)', () => {
     );
     channelRepository = moduleFixture.get<Repository<WhapiChannel>>(
       getRepositoryToken(WhapiChannel),
+    );
+    providerChannelRepository = moduleFixture.get<Repository<ProviderChannel>>(
+      getRepositoryToken(ProviderChannel),
     );
     chatRepository = moduleFixture.get<Repository<WhatsappChat>>(
       getRepositoryToken(WhatsappChat),
@@ -105,7 +115,7 @@ describeMaybe('Message flow (e2e)', () => {
       }),
     );
 
-    await channelRepository.save(
+    const savedChannel = await channelRepository.save(
       channelRepository.create({
         channel_id: channelId,
         token: `token-${unique}`,
@@ -119,19 +129,41 @@ describeMaybe('Message flow (e2e)', () => {
         core_version: '1',
       }),
     );
-  });
+
+    await providerChannelRepository.save(
+      providerChannelRepository.create({
+        tenant_id: savedChannel.id,
+        provider: 'whapi',
+        external_id: channelId,
+        channel_id: channelId,
+      }),
+    );
+  }, 30000);
 
   afterAll(async () => {
-    await messageRepository.delete({ chat_id: chatId });
-    await chatRepository.delete({ chat_id: chatId });
-    await queueRepository.delete({ poste_id: posteId });
-    await posteRepository.delete({ id: posteId });
-    await channelRepository.delete({ channel_id: channelId });
+    if (messageRepository) {
+      await messageRepository.delete({ chat_id: chatId });
+    }
+    if (chatRepository) {
+      await chatRepository.delete({ chat_id: chatId });
+    }
+    if (queueRepository) {
+      await queueRepository.delete({ poste_id: posteId });
+    }
+    if (posteRepository) {
+      await posteRepository.delete({ id: posteId });
+    }
+    if (providerChannelRepository) {
+      await providerChannelRepository.delete({ external_id: channelId });
+    }
+    if (channelRepository) {
+      await channelRepository.delete({ channel_id: channelId });
+    }
 
     if (app) {
       await app.close();
     }
-  });
+  }, 30000);
 
   it('processes incoming webhook then allows admin reply', async () => {
     const payload = {
@@ -155,9 +187,11 @@ describeMaybe('Message flow (e2e)', () => {
     const webhookHeader = process.env.WHAPI_WEBHOOK_SECRET_HEADER;
     const webhookValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE;
 
+    logStep('POST /webhooks/whapi');
     let webhookReq = request(app.getHttpServer())
       .post('/webhooks/whapi')
-      .send(payload);
+      .send(payload)
+      .timeout(requestTimeout);
 
     if (webhookSecret) {
       webhookReq = webhookReq.set('x-whapi-secret', webhookSecret);
@@ -172,18 +206,22 @@ describeMaybe('Message flow (e2e)', () => {
       }
     });
 
+    logStep('GET /chats');
     const chatsRes = await request(app.getHttpServer())
       .get('/chats')
       .set('Cookie', adminCookies)
+      .timeout(requestTimeout)
       .expect(200);
 
     const chat = (chatsRes.body as any[]).find((c) => c.chat_id === chatId);
     expect(chat).toBeDefined();
     expect(chat.channel_id).toBe(channelId);
 
+    logStep('GET /messages/:chatId (incoming)');
     const incomingMessagesRes = await request(app.getHttpServer())
       .get(`/messages/${chatId}`)
       .set('Cookie', adminCookies)
+      .timeout(requestTimeout)
       .expect(200);
 
     const incomingMessages = incomingMessagesRes.body as Array<{
@@ -194,9 +232,11 @@ describeMaybe('Message flow (e2e)', () => {
       incomingMessages.some((m) => m.direction === 'IN' && !!m.text),
     ).toBeTruthy();
 
+    logStep('POST /messages (admin reply)');
     await request(app.getHttpServer())
       .post('/messages')
       .set('Cookie', adminCookies)
+      .timeout(requestTimeout)
       .send({
         chat_id: chatId,
         text: 'Reponse admin e2e',
@@ -209,14 +249,15 @@ describeMaybe('Message flow (e2e)', () => {
         }
       });
 
+    logStep('GET /messages/:chatId (all)');
     const allMessagesRes = await request(app.getHttpServer())
       .get(`/messages/${chatId}`)
       .set('Cookie', adminCookies)
+      .timeout(requestTimeout)
       .expect(200);
 
     const allMessages = allMessagesRes.body as Array<{ direction: string }>;
     expect(allMessages.some((m) => m.direction === 'IN')).toBeTruthy();
     expect(allMessages.some((m) => m.direction === 'OUT')).toBeTruthy();
-  });
+  }, 30000);
 });
-

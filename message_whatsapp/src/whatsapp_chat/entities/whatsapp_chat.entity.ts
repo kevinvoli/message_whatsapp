@@ -23,13 +23,19 @@ export enum WhatsappChatStatus {
 }
 
 @Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
-@Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
+@Index('IDX_whatsapp_chat_tenant_id', ['tenant_id'])
+@Index('UQ_whatsapp_chat_tenant_chat_id', ['tenant_id', 'chat_id'], {
+  unique: true,
+})
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
     comment: 'Primary key - Unique trajet identifier',
   })
   id: string;
+
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenant_id?: string | null;
 
   @Column({
     name: 'poste_id',
@@ -93,7 +99,6 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
-    unique: true,
   })
   chat_id: string; // chat_id WHAPI
 

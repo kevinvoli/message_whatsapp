@@ -35,13 +35,32 @@ export enum WhatsappMessageStatus {
 }
 
 @Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
-@Index('UQ_whatsapp_message_message_id', ['message_id'], { unique: true })
+@Index('IDX_whatsapp_message_tenant_id', ['tenant_id'])
+@Index(
+  'UQ_whatsapp_message_tenant_provider_msg_direction',
+  ['tenant_id', 'provider', 'provider_message_id', 'direction'],
+  { unique: true },
+)
 export class WhatsappMessage {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
     comment: 'Primary key - Unique trajet identifier',
   })
   id: string;
+
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenant_id?: string | null;
+
+  @Column({ name: 'provider', type: 'varchar', length: 32, nullable: true })
+  provider?: string | null;
+
+  @Column({
+    name: 'provider_message_id',
+    type: 'varchar',
+    length: 191,
+    nullable: true,
+  })
+  provider_message_id?: string | null;
 
   @Column({
     name: 'message_id',

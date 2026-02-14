@@ -166,7 +166,7 @@ export class QueueService implements OnModuleInit {
       this.logger.debug(
         `Poste disponible: ${next.poste.name} (${next.poste.id})`,
       );
-      await this.moveToEnd(next.poste_id);
+      await this.moveToEndInternal(next.poste_id);
 
       return next.poste;
     });
@@ -179,16 +179,20 @@ export class QueueService implements OnModuleInit {
     });
   }
 
+  private async moveToEndInternal(poste_id: string): Promise<void> {
+    await this.removeFromQueueInternal(poste_id);
+    const saved = await this.addPosteToQueueInternal(poste_id);
+    if (saved) {
+      this.logQueueEvent('move_to_end', {
+        poste_id: poste_id,
+        new_position: saved.position,
+      });
+    }
+  }
+
   async moveToEnd(poste_id: string): Promise<void> {
     await this.queueLock.runExclusive(async () => {
-      await this.removeFromQueueInternal(poste_id);
-      const saved = await this.addPosteToQueueInternal(poste_id);
-      if (saved) {
-        this.logQueueEvent('move_to_end', {
-          poste_id: poste_id,
-          new_position: saved.position,
-        });
-      }
+      await this.moveToEndInternal(poste_id);
     });
   }
 

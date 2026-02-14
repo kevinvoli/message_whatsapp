@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
+import { ProviderChannel } from './entities/provider-channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 // import { WhapiUser } from './entities/whapi-user.entity';
@@ -15,6 +16,8 @@ export class ChannelService {
   constructor(
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
+    @InjectRepository(ProviderChannel)
+    private readonly providerChannelRepository: Repository<ProviderChannel>,
     // @InjectRepository(WhapiUser)
     // private readonly userRepository: Repository<WhapiUser>,
 
@@ -82,6 +85,60 @@ export class ChannelService {
     return this.channelRepository.findOne({
       where: { channel_id },
     });
+  }
+
+  async resolveTenantByProviderExternalId(
+    provider: string,
+    external_id: string,
+  ): Promise<string | null> {
+    const mapping = await this.providerChannelRepository.findOne({
+      where: { provider, external_id },
+    });
+    return mapping?.tenant_id ?? null;
+  }
+
+  async ensureTenantId(channel: WhapiChannel): Promise<string> {
+    if (channel.tenant_id) {
+      return channel.tenant_id;
+    }
+    const tenantId = channel.id;
+    await this.channelRepository.update({ id: channel.id }, { tenant_id: tenantId });
+    return tenantId;
+  }
+
+  async upsertProviderMapping(params: {
+    tenant_id: string;
+    provider: string;
+    external_id: string;
+    channel_id?: string | null;
+  }): Promise<void> {
+    const existing = await this.providerChannelRepository.findOne({
+      where: { provider: params.provider, external_id: params.external_id },
+    });
+
+    if (existing) {
+      if (existing.tenant_id !== params.tenant_id) {
+        this.logger.warn(
+          `Provider mapping conflict for ${params.provider}:${params.external_id} existing_tenant=${existing.tenant_id} new_tenant=${params.tenant_id}`,
+          ChannelService.name,
+        );
+        return;
+      }
+
+      if (params.channel_id && existing.channel_id !== params.channel_id) {
+        existing.channel_id = params.channel_id;
+        await this.providerChannelRepository.save(existing);
+      }
+      return;
+    }
+
+    const mapping = this.providerChannelRepository.create({
+      tenant_id: params.tenant_id,
+      provider: params.provider,
+      external_id: params.external_id,
+      channel_id: params.channel_id ?? null,
+    });
+    await this.providerChannelRepository.save(mapping);
   }
 
   async update(id: string, dto: UpdateChannelDto) {
