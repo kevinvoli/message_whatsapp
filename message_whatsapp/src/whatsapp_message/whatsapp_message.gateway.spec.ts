@@ -19,6 +19,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // channelService
     );
   };
 

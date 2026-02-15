@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -33,38 +33,31 @@ export class ChannelService {
     if (!channel) {
       return;
     }
-    const ifExisteChannel = await this.channelRepository.findOne({
+    const existingChannel = await this.channelRepository.findOne({
       where: {
         token: dto.token,
       },
     });
-    const newChannel = this.channelRepository.create(
-      {
-       start_at: channel.start_at,
-       token: dto.token,
-       channel_id: channel.channel_id,
-       uptime:channel.uptime,
-       version: channel.version,
-       ip: channel.ip,
-       device_id:channel.device_id,
-       is_business:channel.is_business,
-       api_version: channel.api_version,
-       core_version: channel.core_version
-      }
-    ) 
+
+    if (existingChannel) {
+      throw new ConflictException('Ce channel existe déjà');
+    }
+
+    const newChannel = this.channelRepository.create({
+      start_at: channel.start_at,
+      token: dto.token,
+      channel_id: channel.channel_id,
+      uptime: channel.uptime,
+      version: channel.version,
+      ip: channel.ip,
+      device_id: channel.device_id,
+      is_business: channel.is_business,
+      api_version: channel.api_version,
+      core_version: channel.core_version,
+    });
 
     const newSave = await this.channelRepository.save(newChannel);
     this.logger.debug(`Channel persisted: ${newSave.channel_id}`, ChannelService.name);
-    
-    if (ifExisteChannel) {
-      throw new NotFoundException('cette chaine a existe déja');
-    }
-    // const user = await this.userRepository.findOne()
-
-    if (!channel) {
-      throw new NotFoundException('Channel not found');
-    }
-
 
     return newSave;
   }

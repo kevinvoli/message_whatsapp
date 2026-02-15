@@ -1,10 +1,11 @@
 ﻿import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
 import { Mutex } from 'async-mutex';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
 export class QueueService implements OnModuleInit {
@@ -20,6 +21,9 @@ export class QueueService implements OnModuleInit {
 
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
+
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -147,28 +151,61 @@ export class QueueService implements OnModuleInit {
   }
 
   /**
-   * Gets the next commercial in the queue (round-robin) and moves them to the end.
+   * Gets the next commercial in the queue using least-loaded strategy.
+   * Among all postes in queue, picks the one with the fewest active chats.
+   * Falls back to first in queue (round-robin) if chat counts are equal.
    */
   async getNextInQueue(): Promise<WhatsappPoste | null> {
     return await this.queueLock.runExclusive(async () => {
-      const next = await this.queueRepository.findOne({
-        where: {},
+      const allPositions = await this.queueRepository.find({
         order: { position: 'ASC' },
         relations: ['poste'],
       });
 
-      if (!next || !next.poste) {
+      const candidates = allPositions.filter((qp) => qp.poste);
+      if (candidates.length === 0) {
         this.logger.warn(
           `Aucun poste disponible, message mis en attente (queue vide)`,
         );
         return null;
       }
-      this.logger.debug(
-        `Poste disponible: ${next.poste.name} (${next.poste.id})`,
-      );
-      await this.moveToEndInternal(next.poste_id);
 
-      return next.poste;
+      // Compter les chats actifs par poste
+      const posteIds = candidates.map((qp) => qp.poste_id);
+      const chatCounts = await this.chatRepository
+        .createQueryBuilder('chat')
+        .select('chat.poste_id', 'poste_id')
+        .addSelect('COUNT(*)', 'count')
+        .where('chat.poste_id IN (:...posteIds)', { posteIds })
+        .andWhere('chat.status IN (:...statuses)', {
+          statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+        })
+        .groupBy('chat.poste_id')
+        .getRawMany<{ poste_id: string; count: string }>();
+
+      const countMap = new Map<string, number>();
+      for (const row of chatCounts) {
+        countMap.set(row.poste_id, parseInt(row.count, 10));
+      }
+
+      // Choisir le poste avec le moins de chats (en respectant l'ordre de queue en cas d'egalite)
+      let best = candidates[0];
+      let bestCount = countMap.get(best.poste_id) ?? 0;
+
+      for (let i = 1; i < candidates.length; i++) {
+        const count = countMap.get(candidates[i].poste_id) ?? 0;
+        if (count < bestCount) {
+          best = candidates[i];
+          bestCount = count;
+        }
+      }
+
+      this.logger.debug(
+        `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs`,
+      );
+      await this.moveToEndInternal(best.poste_id);
+
+      return best.poste;
     });
   }
 
@@ -196,18 +233,60 @@ export class QueueService implements OnModuleInit {
     });
   }
 
-  async checkAndInitQueue(): Promise<void> {
-    const activeCount = await this.posteRepository.count({
+  /**
+   * Quand plus aucun agent n'est actif, remet tous les postes
+   * non-bloques dans la queue pour continuer a dispatcher en mode OFFLINE.
+   */
+  async fillQueueWithAllPostes(): Promise<void> {
+    await this.queueLock.runExclusive(async () => {
+      const postes = await this.posteRepository.find({
+        where: { is_queue_enabled: true },
+      });
+
+      for (const poste of postes) {
+        await this.addPosteToQueueInternal(poste.id);
+      }
+
+      this.logQueueEvent('fill_all_postes', {
+        count: postes.length,
+        reason: 'no_active_agents',
+      });
+    });
+  }
+
+  /**
+   * Quand un agent se connecte, retire de la queue tous les postes
+   * qui ne sont pas actuellement connectes (sauf lui-meme).
+   */
+  async purgeOfflinePostes(excludePosteId: string): Promise<void> {
+    await this.queueLock.runExclusive(async () => {
+      const queue = await this.queueRepository.find();
+      const offlinePostes = await this.posteRepository.find({
+        where: { is_active: false, is_queue_enabled: true },
+      });
+      const offlineIds = new Set(offlinePostes.map((p) => p.id));
+
+      for (const qp of queue) {
+        if (qp.poste_id !== excludePosteId && offlineIds.has(qp.poste_id)) {
+          await this.removeFromQueueInternal(qp.poste_id);
+        }
+      }
+
+      this.logQueueEvent('purge_offline', {
+        excluded: excludePosteId,
+        removed: offlinePostes.filter((p) => p.id !== excludePosteId).length,
+      });
+    });
+  }
+
+  /**
+   * Verifie s'il reste au moins un agent actif.
+   */
+  async hasActivePostes(): Promise<boolean> {
+    const count = await this.posteRepository.count({
       where: { is_active: true },
     });
-
-    if (activeCount > 0) return;
-
-    const postes = await this.posteRepository.find();
-
-    for (const poste of postes) {
-      await this.addPosteToQueue(poste.id);
-    }
+    return count > 0;
   }
 
   async syncQueueWithActivePostes(): Promise<void> {

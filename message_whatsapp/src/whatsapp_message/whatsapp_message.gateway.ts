@@ -28,6 +28,7 @@ import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
+import { ChannelService } from 'src/channel/channel.service';
 
 type AuthPayload = {
   sub: string;
@@ -71,7 +72,7 @@ export class WhatsappMessageGateway
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly contactService: ContactService,
     private readonly jwtService: JwtService,
-    
+    private readonly channelService: ChannelService,
   ) {}
 
   // ======================================================
@@ -105,8 +106,10 @@ export class WhatsappMessageGateway
     await this.posteService.setActive(posteId, true);
     const poste = await this.posteService.findOneById(posteId);
     if (poste.is_queue_enabled) {
+      // Retirer les postes offline de la queue (remplie pendant les heures hors-service)
+      // puis ajouter ce poste connecte
+      await this.queueService.purgeOfflinePostes(posteId);
       await this.queueService.addPosteToQueue(posteId);
-      await this.queueService.syncQueueWithActivePostes();
     } else {
       this.logger.warn(
         `Queue disabled for poste ${posteId}, skip enqueue on connect`,
@@ -139,18 +142,49 @@ export class WhatsappMessageGateway
     posteId: string,
   ): Promise<string | null> {
     const chats = await this.chatService.findByPosteId(posteId);
-    const tenantIds = new Set(
-      chats.map((chat) => chat.tenant_id).filter(Boolean) as string[],
-    );
-    if (tenantIds.size === 1) {
-      return Array.from(tenantIds)[0];
-    }
-    if (tenantIds.size > 1) {
+    const tenantIds = chats
+      .map((chat) => chat.tenant_id)
+      .filter(Boolean) as string[];
+
+    if (tenantIds.length === 0) {
+      // Nouveau poste sans chats : fallback sur le premier channel disponible
+      const channels = await this.channelService.findAll();
+      if (channels.length > 0) {
+        const channel = channels[0];
+        const tenantId = await this.channelService.ensureTenantId(channel);
+        this.logger.log(
+          `Tenant resolved from channel for new poste ${posteId}: ${tenantId}`,
+        );
+        return tenantId;
+      }
       this.logger.warn(
-        `Multiple tenant_ids detected for poste ${posteId}, refusing tenant scoping`,
+        `No tenant resolvable for poste ${posteId}: no chats and no channels`,
+      );
+      return null;
+    }
+
+    // Prendre le tenant le plus frequent
+    const frequency = new Map<string, number>();
+    for (const tid of tenantIds) {
+      frequency.set(tid, (frequency.get(tid) ?? 0) + 1);
+    }
+
+    let bestTenant = tenantIds[0];
+    let bestCount = 0;
+    for (const [tid, count] of frequency) {
+      if (count > bestCount) {
+        bestTenant = tid;
+        bestCount = count;
+      }
+    }
+
+    if (frequency.size > 1) {
+      this.logger.warn(
+        `Multiple tenant_ids for poste ${posteId}, using most frequent: ${bestTenant}`,
       );
     }
-    return null;
+
+    return bestTenant;
   }
 
   private getTenantId(client: Socket): string | null {
@@ -190,6 +224,15 @@ export class WhatsappMessageGateway
     await this.posteService.setActive(agent.posteId, false);
     await this.queueService.removeFromQueue(agent.posteId);
     this.jobRunner.stopAgentSlaMonitor(agent.posteId);
+
+    // Si plus aucun agent connecte, remplir la queue avec tous les postes
+    // non-bloques pour continuer a dispatcher en mode OFFLINE
+    const hasActive = await this.queueService.hasActivePostes();
+    if (!hasActive) {
+      this.logger.log('Dernier agent deconnecte, remplissage queue offline');
+      await this.queueService.fillQueueWithAllPostes();
+    }
+
     await this.emitQueueUpdate('agent_disconnected');
   }
 

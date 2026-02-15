@@ -57,6 +57,7 @@ describe('QueueService', () => {
       queueRepository as any,
       posteRepository as any,
       commercialRepository as any,
+      {} as any, // chatRepository
       dataSource as any,
     );
   });

@@ -5,6 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
+import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
@@ -13,6 +14,7 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 @Injectable()
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
+  private readonly dispatchLock = new Mutex();
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
@@ -38,11 +40,20 @@ export class DispatcherService {
     clientName: string,
     traceId?: string,
   ): Promise<WhatsappChat | null> {
+    return this.dispatchLock.runExclusive(() =>
+      this.assignConversationInternal(clientPhone, clientName, traceId),
+    );
+  }
+
+  private async assignConversationInternal(
+    clientPhone: string,
+    clientName: string,
+    traceId?: string,
+  ): Promise<WhatsappChat | null> {
     if (traceId) {
       this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
     }
-    // 🔎 Chercher la conversation existante
-    
+
     const conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
       relations: ['messages', 'poste'],

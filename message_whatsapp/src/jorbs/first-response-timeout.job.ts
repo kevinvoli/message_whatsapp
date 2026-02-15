@@ -31,10 +31,8 @@ export class FirstResponseTimeoutJob {
         : this.currentIntervalMinutes;
     const intervalMs = Math.max(1, resolvedMinutes) * 60 * 1000;
 
-    const interval = setInterval(() => {
-      // âœ… encapsulation propre de lâ€™async
+    const runCheck = () => {
       this.logger.debug(`SLA runner tick (${posteId})`);
-
       void (async () => {
         try {
           await this.dispatcher.jobRunnertcheque(posteId);
@@ -44,8 +42,12 @@ export class FirstResponseTimeoutJob {
           );
         }
       })();
-    }, intervalMs);
+    };
 
+    // Execution immediate au demarrage pour traiter les deadlines deja expirees
+    runCheck();
+
+    const interval = setInterval(runCheck, intervalMs);
     this.agentSlaIntervals.set(posteId, interval);
   }
   stopAgentSlaMonitor(agentId: string) {

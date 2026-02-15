@@ -1,39 +1,24 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
-import { LoginDto } from './dto/login.dto';
-import { SafeWhatsappCommercial } from 'src/whatsapp_commercial/dto/safe-whatsapp-commercial';
-import { AuthUser } from './types/auth-user.types';
+import { AuthUser } from './shared/base-auth-user.types';
+import { BaseAuthService, UserLookupService } from './shared/base-auth.service';
 
 @Injectable()
-export class AuthService {
+export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
   constructor(
-    private usersService: WhatsappCommercialService,
-    private jwtService: JwtService,
-  ) {}
-
-  private toSafeUser(user: WhatsappCommercial): SafeWhatsappCommercial {
-    const {
-      password,
-      passwordResetToken,
-      passwordResetExpires,
-      salt,
-      ...safe
-    } = user;
-
-    return safe;
+    private readonly usersService: WhatsappCommercialService,
+    jwtService: JwtService,
+  ) {
+    super(jwtService, { accessTokenExpiry: '7d', refreshTokenExpiry: '7d' });
   }
 
-  async validateUser(email: string, pass: string): Promise<AuthUser | null> {
-    const user = await this.usersService.findOneByEmailWithPassword(email);
+  protected getUserService(): UserLookupService<WhatsappCommercial> {
+    return this.usersService;
+  }
 
-    if (!user) return null;
-
-    const isValid = await user.validatePassword(pass);
-    if (!isValid) return null;
-
+  protected toAuthUser(user: WhatsappCommercial): AuthUser {
     return {
       id: user.id,
       email: user.email,
@@ -42,17 +27,11 @@ export class AuthService {
     };
   }
 
-  login(user: AuthUser): { accessToken: string; refreshToken: string } {
-    const payload = {
-      sub: user.id,
-      email: user.email,
+  protected override buildPayload(user: AuthUser): Record<string, unknown> {
+    return {
+      ...super.buildPayload(user),
       posteId: user.posteId,
     };
-
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' }); // Short-lived access token
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' }); // Long-lived refresh token
-
-    return { accessToken, refreshToken };
   }
 
   async getProfile(userId: string): Promise<AuthUser | null> {
