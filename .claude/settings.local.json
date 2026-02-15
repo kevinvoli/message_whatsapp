@@ -4,7 +4,18 @@
       "Bash(wc:*)",
       "Bash(npx tsc:*)",
       "Bash(npx jest --passWithNoTests)",
-      "Bash(npx jest --testPathPattern=\"dispatcher|queue\" --passWithNoTests)"
+      "Bash(npx jest --testPathPattern=\"dispatcher|queue\" --passWithNoTests)",
+      "WebFetch(domain:whapi.cloud)",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebSearch",
+      "WebFetch(domain:whapi.readme.io)",
+      "WebFetch(domain:engineering.teknasyon.com)",
+      "WebFetch(domain:support.whapi.cloud)",
+      "WebFetch(domain:gate.whapi.cloud)",
+      "WebFetch(domain:whatsapp.github.io)",
+      "WebFetch(domain:business.whatsapp.com)",
+      "WebFetch(domain:docs.360dialog.com)",
+      "Bash(find:*)"
     ]
   }
 }

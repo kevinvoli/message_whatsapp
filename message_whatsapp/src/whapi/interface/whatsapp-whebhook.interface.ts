@@ -139,6 +139,10 @@ export interface MetaStatus {
   status: 'sent' | 'delivered' | 'read' | 'failed';
   timestamp: string;
   recipient_id: string;
+  errors?: Array<{
+    code: number;
+    title: string;
+  }>;
 }
 
 

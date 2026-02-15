@@ -87,6 +87,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
     raw: MetaWebhookPayload,
   ): UnifiedStatus {
     const timestamp = Number.parseInt(status.timestamp, 10);
+    const firstError = status.errors?.[0];
     return {
       provider: context.provider,
       providerMessageId: status.id,
@@ -95,6 +96,8 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       recipientId: status.recipient_id,
       status: status.status,
       timestamp: Number.isFinite(timestamp) ? timestamp : Date.now() / 1000,
+      errorCode: firstError?.code,
+      errorTitle: firstError?.title,
       raw,
     };
   }

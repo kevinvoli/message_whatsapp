@@ -579,6 +579,51 @@ export class WhatsappMessageGateway
   }
 
   // ======================================================
+  // STATUS UPDATE (delivered / read / failed)
+  // ======================================================
+
+  async notifyStatusUpdate(data: {
+    providerMessageId: string;
+    status: string;
+    errorCode?: number;
+    errorTitle?: string;
+  }) {
+    const message = await this.messageService.findByExternalId(
+      data.providerMessageId,
+    );
+    if (!message?.chat) {
+      this.logger.warn(
+        `STATUS_UPDATE_SKIP no message found for external_id=${data.providerMessageId}`,
+      );
+      return;
+    }
+
+    const tenantId = message.chat.tenant_id;
+    if (!tenantId) {
+      this.logger.warn(
+        `STATUS_UPDATE_SKIP missing tenant for chat ${message.chat_id}`,
+      );
+      return;
+    }
+
+    this.server.to(`tenant:${tenantId}`).emit('chat:event', {
+      type: 'MESSAGE_STATUS_UPDATE',
+      payload: {
+        message_id: message.id,
+        external_id: data.providerMessageId,
+        chat_id: message.chat_id,
+        status: data.status,
+        error_code: data.errorCode,
+        error_title: data.errorTitle,
+      },
+    });
+
+    this.logger.log(
+      `STATUS_UPDATE_EMITTED external_id=${data.providerMessageId} status=${data.status}`,
+    );
+  }
+
+  // ======================================================
   // AUTO-MESSAGE avec Typing
   // ======================================================
   sendAutoMessageWithTyping(chatId: string, text: string) {

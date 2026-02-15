@@ -119,6 +119,14 @@ export class InboundMessageService {
       this.logger.log(
         `STATUS_UPDATE provider_message_id=${status.providerMessageId} status=${status.status}`,
       );
+
+      // P1: Broadcast au frontend via WebSocket
+      await this.messageGateway.notifyStatusUpdate({
+        providerMessageId: status.providerMessageId,
+        status: status.status,
+        errorCode: status.errorCode,
+        errorTitle: status.errorTitle,
+      });
     }
   }
 

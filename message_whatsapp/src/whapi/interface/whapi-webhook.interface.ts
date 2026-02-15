@@ -310,6 +310,12 @@ export interface WhapiMessage {
   context?: WhapiContext;
   action?: WhapiAction;
   event?: WhapiEventData;
+
+  reply?: {
+    type: string;
+    buttons_reply?: { id: string; title: string };
+    list_reply?: { id: string; title: string; description?: string };
+  };
 }
 
 /* =========================

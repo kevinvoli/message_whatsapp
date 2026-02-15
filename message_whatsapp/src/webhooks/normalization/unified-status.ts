@@ -8,5 +8,7 @@ export interface UnifiedStatus {
   recipientId: string;
   status: string;
   timestamp: number;
+  errorCode?: number;
+  errorTitle?: string;
   raw: unknown;
 }

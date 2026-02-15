@@ -182,7 +182,18 @@ export class WhapiController {
     const metaPayload = this.assertMetaPayload(payload);
 
     const entry = metaPayload?.entry?.[0];
-    const metaValue = entry?.changes?.[0]?.value;
+    const change = entry?.changes?.[0];
+    const field = change?.field;
+
+    // P3: Ignorer les webhooks Meta non-messages (account_update, etc.)
+    if (field !== 'messages') {
+      this.auditLogger.log(
+        `WEBHOOK_IGNORED provider=meta field=${field ?? 'unknown'}`,
+      );
+      return { status: 'ignored', reason: `unsupported_field:${field}` };
+    }
+
+    const metaValue = change?.value;
     const wabaId = entry?.id;
     const phoneNumberId = metaValue?.metadata?.phone_number_id;
 

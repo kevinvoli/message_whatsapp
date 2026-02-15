@@ -57,7 +57,7 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
             address: message.location.address,
           }
         : undefined,
-      interactive: undefined,
+      interactive: this.resolveInteractive(message),
       raw,
     };
   }
@@ -75,6 +75,11 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
       recipientId: status.recipient_id,
       status: status.status,
       timestamp: Number(status.timestamp),
+      errorCode: status.status === 'failed' ? status.code : undefined,
+      errorTitle:
+        status.status === 'failed' && status.code
+          ? `whapi_error_${status.code}`
+          : undefined,
       raw,
     };
   }
@@ -186,6 +191,34 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         sha256: message.sticker.sha256,
       };
     }
+    return undefined;
+  }
+
+  private resolveInteractive(
+    message: WhapiMessage,
+  ):
+    | { kind: 'button_reply' | 'list_reply' | 'unknown'; id?: string; title?: string; description?: string }
+    | undefined {
+    // Whapi reply format: { type: "reply", reply: { type: "buttons_reply", buttons_reply: { id, title } } }
+    if (message.reply) {
+      if (message.reply.type === 'buttons_reply' && message.reply.buttons_reply) {
+        return {
+          kind: 'button_reply',
+          id: message.reply.buttons_reply.id,
+          title: message.reply.buttons_reply.title,
+        };
+      }
+      if (message.reply.type === 'list_reply' && message.reply.list_reply) {
+        return {
+          kind: 'list_reply',
+          id: message.reply.list_reply.id,
+          title: message.reply.list_reply.title,
+          description: message.reply.list_reply.description,
+        };
+      }
+      return { kind: 'unknown' };
+    }
+
     return undefined;
   }
 }

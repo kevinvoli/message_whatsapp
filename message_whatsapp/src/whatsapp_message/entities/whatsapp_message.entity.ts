@@ -208,6 +208,12 @@ export class WhatsappMessage {
   @Column({ name: 'source', type: 'varchar', length: 100, nullable: false })
   source: string;
 
+  @Column({ name: 'error_code', type: 'int', nullable: true })
+  error_code?: number | null;
+
+  @Column({ name: 'error_title', type: 'varchar', length: 255, nullable: true })
+  error_title?: string | null;
+
   @Column({
     name: 'commercial_id',
     type: 'uuid',

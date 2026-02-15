@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, QueryFailedError, Repository } from 'typeorm';
 
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
@@ -31,6 +32,7 @@ export class WhatsappMessageService {
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly chatService: WhatsappChatService,
     private readonly communicationWhapiService: CommunicationWhapiService,
+    private readonly outboundRouter: OutboundRouterService,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly channelService: ChannelService,
@@ -134,18 +136,17 @@ export class WhatsappMessageService {
           );
         }
       }
-      // 1️⃣ Envoi réel vers WhatsApp
+      // 1️⃣ Envoi réel vers WhatsApp (routage Whapi / Meta)
       function extractPhoneNumber(chat_id: string): string {
         return chat_id.split('@')[0];
       }
-      const whapiResponse =
-        await this.communicationWhapiService.sendToWhapiChannel({
-          to: extractPhoneNumber(chat?.chat_id),
-          text: data.text,
-          channelId: data.channel_id,
-        });
+      const sendResponse = await this.outboundRouter.sendTextMessage({
+        to: extractPhoneNumber(chat?.chat_id),
+        text: data.text,
+        channelId: data.channel_id,
+      });
       this.logger.log(
-        `OUTBOUND_PROVIDER_OK trace=${traceId} external_id=${whapiResponse.message.id ?? 'unknown'}`,
+        `OUTBOUND_PROVIDER_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
       );
 
       const channel = await this.channelService.findOne(data.channel_id);
@@ -155,8 +156,10 @@ export class WhatsappMessageService {
 
       // 2️⃣ Création message DB
       const messageEntity = this.messageRepository.create({
-        message_id: whapiResponse.message.id ?? `agent_${Date.now()}`,
-        external_id: whapiResponse.message.id,
+        message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
+        external_id: sendResponse.providerMessageId,
+        provider: sendResponse.provider,
+        provider_message_id: sendResponse.providerMessageId,
         poste_id: data.poste_id,
         direction: MessageDirection.OUT,
         from_me: true,
@@ -284,6 +287,15 @@ export class WhatsappMessageService {
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
+  }
+
+  async findByExternalId(
+    externalId: string,
+  ): Promise<WhatsappMessage | null> {
+    return this.messageRepository.findOne({
+      where: { external_id: externalId },
+      relations: ['chat'],
+    });
   }
 
   async findBychat_id(
