@@ -161,6 +161,8 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
+    console.log("affichage des message ");
+    
     if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
       return challenge;
     }
@@ -173,6 +175,8 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
+    console.log("affichage du post:", payload);
+    
     const startedAt = Date.now();
     const provider = 'meta';
     const requestId =

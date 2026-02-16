@@ -1,16 +1,18 @@
 import React from 'react';
-import { 
-  MessageCircle, Users, Activity, TrendingUp, 
-  UserCheck, Clock, Archive, Target, 
+import {
+  MessageCircle, Users, Activity, TrendingUp,
+  UserCheck, Clock, Archive, Target,
   Zap, CheckCircle, AlertCircle, Mail,
   ArrowUpRight, BarChart3, RefreshCw
 } from 'lucide-react';
-import { MetriquesGlobales, PerformanceCommercial, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 
 interface OverviewViewProps {
   metriques: MetriquesGlobales;
   performanceCommercial: PerformanceCommercial[];
   statutChannels: StatutChannel[];
+  performanceTemporelle?: PerformanceTemporelle[];
   webhookMetrics?: WebhookMetricsSnapshot | null;
   onRefresh?: () => void;
 }
@@ -19,6 +21,7 @@ export default function OverviewView({
   metriques,
   performanceCommercial,
   statutChannels,
+  performanceTemporelle,
   webhookMetrics,
   onRefresh,
 }: OverviewViewProps) {
@@ -365,6 +368,34 @@ export default function OverviewView({
           </div>
         )}
       </div>
+
+      {/* Performance Temporelle - Courbe 7 jours */}
+      {performanceTemporelle && performanceTemporelle.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Activite sur 7 jours</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={performanceTemporelle}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis
+                dataKey="periode"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(val: string) => {
+                  const d = new Date(val);
+                  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+                }}
+              />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip
+                labelFormatter={(val) => new Date(String(val)).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              />
+              <Legend />
+              <Line type="monotone" dataKey="nb_messages" name="Total messages" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="messages_in" name="Entrants" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="messages_out" name="Sortants" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Graphiques et visualisations */}
       <div className="grid grid-cols-3 gap-6">

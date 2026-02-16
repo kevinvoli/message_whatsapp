@@ -1,7 +1,8 @@
-import { Settings, LogOut, Menu, X } from 'lucide-react';
-import { NavigationItem, ViewMode, WhatsappMessage } from '@/app/lib/definitions';
+import { useState } from 'react';
+import { Settings, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { NavigationGroup, ViewMode, WhatsappMessage } from '@/app/lib/definitions';
 import { useRouter } from 'next/navigation';
-import { logoutAdmin } from '@/app/lib/api'; // Import logoutAdmin
+import { logoutAdmin } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 
@@ -10,17 +11,34 @@ interface NavigationProps {
     setSidebarOpen: (open: boolean) => void;
     viewMode: string;
     setViewMode: (view: ViewMode) => void;
-    navigationItems: NavigationItem[];
+    navigationGroups: NavigationGroup[];
     message: WhatsappMessage[]
 }
 
-export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationItems, message }: NavigationProps) {
+export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationGroups, message }: NavigationProps) {
     const router = useRouter();
     const { addToast } = useToast();
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+        // Auto-expand the group containing the active view
+        const active = navigationGroups.find(g => g.items.some(i => i.id === viewMode));
+        return new Set(active ? [active.label] : [navigationGroups[0]?.label]);
+    });
+
+    const toggleGroup = (label: string) => {
+        setExpandedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(label)) {
+                next.delete(label);
+            } else {
+                next.add(label);
+            }
+            return next;
+        });
+    };
 
     const handleLogout = async () => {
         try {
-            await logoutAdmin(); // Call without token, relies on HTTP-only cookie
+            await logoutAdmin();
         } catch (error) {
             logger.error("Logout failed on backend", {
                 error: error instanceof Error ? error.message : String(error),
@@ -29,12 +47,8 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
                 type: 'error',
                 message: "La deconnexion a echoue. Merci de reessayer.",
             });
-            // Frontend doesn't store token, so no localStorage to clear for token itself.
-            // If there were other local storage items related to auth state, they'd be cleared here.
         }
-        // Since the actual token is in an HTTP-only cookie, we don't clear localStorage for 'jwt_token'.
-        // Any other client-side session state might be cleared here if applicable.
-        router.push('/login'); // Redirect to login page
+        router.push('/login');
     };
 
     return (
@@ -58,38 +72,77 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 p-4 overflow-y-auto">
-                <div className="space-y-2">
-                    {navigationItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = viewMode === item.id;
-                        
+            <nav className="flex-1 p-3 overflow-y-auto">
+                <div className="space-y-1">
+                    {navigationGroups.map((group) => {
+                        const GroupIcon = group.icon;
+                        const isExpanded = expandedGroups.has(group.label);
+                        const hasActiveItem = group.items.some(i => i.id === viewMode);
+
                         return (
-                            <button
-                                key={item.id}
-                                onClick={() => setViewMode(item.id)}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                                    isActive 
-                                        ? 'bg-blue-700 text-white shadow-lg' 
-                                        : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-                                }`}
-                            >
-                                <Icon className="w-5 h-5 flex-shrink-0" />
-                                {sidebarOpen && (
-                                    <>
-                                        <span className="flex-1 text-left text-sm font-medium">{item.name}</span>
-                                        {item.badge && (
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                                item.badge === 'NEW' 
-                                                    ? 'bg-green-500 text-white' 
-                                                    : 'bg-blue-600 text-white'
-                                            }`}>
-                                                {item.id === "messages" ? `${message.length}`:item.badge}
-                                            </span>
-                                        )}
-                                    </>
+                            <div key={group.label}>
+                                {/* Group header */}
+                                <button
+                                    onClick={() => {
+                                        if (sidebarOpen) {
+                                            toggleGroup(group.label);
+                                        } else {
+                                            // When collapsed, click goes to first item
+                                            setViewMode(group.items[0].id);
+                                        }
+                                    }}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-xs font-semibold uppercase tracking-wider ${
+                                        hasActiveItem
+                                            ? 'text-white bg-blue-700/50'
+                                            : 'text-blue-300 hover:text-white hover:bg-blue-800/50'
+                                    }`}
+                                >
+                                    <GroupIcon className="w-4 h-4 flex-shrink-0" />
+                                    {sidebarOpen && (
+                                        <>
+                                            <span className="flex-1 text-left">{group.label}</span>
+                                            {isExpanded
+                                                ? <ChevronDown className="w-3 h-3" />
+                                                : <ChevronRight className="w-3 h-3" />
+                                            }
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Group items */}
+                                {(sidebarOpen ? isExpanded : false) && (
+                                    <div className="ml-3 mt-1 space-y-0.5">
+                                        {group.items.map((item) => {
+                                            const Icon = item.icon;
+                                            const isActive = viewMode === item.id;
+
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    onClick={() => setViewMode(item.id)}
+                                                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+                                                        isActive
+                                                            ? 'bg-blue-700 text-white shadow-lg'
+                                                            : 'text-blue-200 hover:bg-blue-800 hover:text-white'
+                                                    }`}
+                                                >
+                                                    <Icon className="w-4 h-4 flex-shrink-0" />
+                                                    <span className="flex-1 text-left text-sm font-medium">{item.name}</span>
+                                                    {item.badge && (
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                            item.badge === 'NEW'
+                                                                ? 'bg-green-500 text-white'
+                                                                : 'bg-blue-600 text-white'
+                                                        }`}>
+                                                            {item.id === "messages" ? `${message.length}` : item.badge}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 )}
-                            </button>
+                            </div>
                         );
                     })}
                 </div>
@@ -111,15 +164,15 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
                 {sidebarOpen && (
                     <button className="w-full mt-3 flex items-center gap-2 px-3 py-2 text-sm text-blue-200 hover:bg-blue-700 rounded-lg transition-colors">
                         <Settings className="w-4 h-4" />
-                        Paramètres
+                        Parametres
                     </button>
                 )}
                 <button
-                    onClick={handleLogout} // Attach logout function here
+                    onClick={handleLogout}
                     className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-900 rounded-lg transition-colors"
                 >
                     <LogOut className="w-4 h-4" />
-                    {sidebarOpen && 'Déconnexion'}
+                    {sidebarOpen && 'Deconnexion'}
                 </button>
             </div>
         </div>

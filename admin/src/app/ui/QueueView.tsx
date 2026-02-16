@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import { QueuePosition, Poste } from "@/app/lib/definitions";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/api";
 import { logger } from "@/app/lib/logger";
 import { useToast } from "@/app/ui/ToastProvider";
+import { useRealtimePolling } from "@/app/hooks/useRealtimePolling";
 
 type ConnectionState =
   | "connecting"
@@ -87,14 +88,28 @@ const QueueView = ({ onRefresh }: { onRefresh?: () => void }) => {
   useEffect(() => {
     void (async () => {
       try {
+        setStatus("connecting");
         await Promise.all([refreshQueueFromRest(), refreshPostes()]);
+        setStatus("connected");
       } catch (err) {
         logger.error("QueueView initial load failed", {
           message: err instanceof Error ? err.message : String(err),
         });
+        setStatus("error");
       }
     })();
   }, []);
+
+  const pollCallback = useCallback(async () => {
+    try {
+      await refreshQueueFromRest();
+      setStatus("connected");
+    } catch {
+      setStatus("error");
+    }
+  }, []);
+
+  useRealtimePolling(pollCallback, { interval: 5000 });
 
 
   const handleReset = async () => {

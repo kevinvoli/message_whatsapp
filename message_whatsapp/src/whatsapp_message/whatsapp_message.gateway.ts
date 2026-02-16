@@ -56,7 +56,7 @@ export class WhatsappMessageGateway
 
   private connectedAgents = new Map<
     string,
-    { commercialId: string; posteId: string; tenantId: string | null }
+    { commercialId: string; posteId: string; tenantId: string | null; tenantIds: string[] }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
 
@@ -92,8 +92,8 @@ export class WhatsappMessageGateway
     if (!commercial?.poste) return;
 
     const posteId = commercial.poste.id;
-    const tenantId = await this.resolveTenantIdForPoste(posteId);
-    if (!tenantId) {
+    const tenantIds = await this.resolveTenantIdsForPoste(posteId);
+    if (tenantIds.length === 0) {
       this.logger.warn(
         `Socket auth refused: tenant resolution failed (${client.id})`,
       );
@@ -101,8 +101,14 @@ export class WhatsappMessageGateway
       return;
     }
 
-    this.connectedAgents.set(client.id, { commercialId, posteId, tenantId });
-    await client.join(`tenant:${tenantId}`);
+    const tenantId = tenantIds[0];
+    this.connectedAgents.set(client.id, { commercialId, posteId, tenantId, tenantIds });
+    for (const tid of tenantIds) {
+      await client.join(`tenant:${tid}`);
+    }
+    this.logger.log(
+      `Agent ${commercialId} joined ${tenantIds.length} tenant room(s): ${tenantIds.join(', ')}`,
+    );
 
     await this.commercialService.updateStatus(commercialId, true);
     await this.posteService.setActive(posteId, true);
@@ -140,13 +146,15 @@ export class WhatsappMessageGateway
     }
   }
 
-  private async resolveTenantIdForPoste(
+  private async resolveTenantIdsForPoste(
     posteId: string,
-  ): Promise<string | null> {
+  ): Promise<string[]> {
     const chats = await this.chatService.findByPosteId(posteId);
-    const tenantIds = chats
-      .map((chat) => chat.tenant_id)
-      .filter(Boolean) as string[];
+    const tenantIds = [
+      ...new Set(
+        chats.map((chat) => chat.tenant_id).filter(Boolean) as string[],
+      ),
+    ];
 
     if (tenantIds.length === 0) {
       // Nouveau poste sans chats : fallback sur le premier channel disponible
@@ -157,45 +165,33 @@ export class WhatsappMessageGateway
         this.logger.log(
           `Tenant resolved from channel for new poste ${posteId}: ${tenantId}`,
         );
-        return tenantId;
+        return tenantId ? [tenantId] : [];
       }
       this.logger.warn(
         `No tenant resolvable for poste ${posteId}: no chats and no channels`,
       );
-      return null;
+      return [];
     }
 
-    // Prendre le tenant le plus frequent
-    const frequency = new Map<string, number>();
-    for (const tid of tenantIds) {
-      frequency.set(tid, (frequency.get(tid) ?? 0) + 1);
-    }
-
-    let bestTenant = tenantIds[0];
-    let bestCount = 0;
-    for (const [tid, count] of frequency) {
-      if (count > bestCount) {
-        bestTenant = tid;
-        bestCount = count;
-      }
-    }
-
-    if (frequency.size > 1) {
-      this.logger.warn(
-        `Multiple tenant_ids for poste ${posteId}, using most frequent: ${bestTenant}`,
-      );
-    }
-
-    return bestTenant;
+    return tenantIds;
   }
 
   private getTenantId(client: Socket): string | null {
     return this.connectedAgents.get(client.id)?.tenantId ?? null;
   }
 
+  private getTenantIds(client: Socket): string[] {
+    return this.connectedAgents.get(client.id)?.tenantIds ?? [];
+  }
+
   private isTenantChat(chat: WhatsappChat, tenantId: string | null): boolean {
     if (!tenantId) return true;
     return chat.tenant_id === tenantId;
+  }
+
+  private isAllowedTenantChat(chat: WhatsappChat, tenantIds: string[]): boolean {
+    if (tenantIds.length === 0) return true;
+    return !!chat.tenant_id && tenantIds.includes(chat.tenant_id);
   }
 
   private extractAuthToken(client: Socket): string | null {
@@ -248,8 +244,9 @@ export class WhatsappMessageGateway
 
     let chats = await this.chatService.findByPosteId(agent.posteId);
     if (!chats) return;
-    if (agent.tenantId) {
-      chats = chats.filter((c) => c.tenant_id === agent.tenantId);
+    if (agent.tenantIds.length > 0) {
+      const tenantSet = new Set(agent.tenantIds);
+      chats = chats.filter((c) => c.tenant_id && tenantSet.has(c.tenant_id));
     }
 
     // Calcul de filtrage côté back
@@ -413,9 +410,9 @@ export class WhatsappMessageGateway
     if (!this.throttle.allow(client.id, 'messages:get')) {
       return this.emitRateLimited(client, 'messages:get');
     }
-    const tenantId = this.getTenantId(client);
+    const tenantIds = this.getTenantIds(client);
     const chat = await this.chatService.findBychat_id(payload.chat_id);
-    if (!chat || !this.isTenantChat(chat, tenantId)) {
+    if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) {
       return;
     }
     const messages = await this.messageService.findBychat_id(payload.chat_id);
@@ -436,12 +433,12 @@ export class WhatsappMessageGateway
     if (!this.throttle.allow(client.id, 'messages:read')) {
       return this.emitRateLimited(client, 'messages:read');
     }
-    const tenantId = this.getTenantId(client);
+    const tenantIds = this.getTenantIds(client);
     await this.chatService.markChatAsRead(payload.chat_id);
 
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;
-    if (!this.isTenantChat(chat, tenantId)) return;
+    if (!this.isAllowedTenantChat(chat, tenantIds)) return;
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
@@ -472,7 +469,7 @@ export class WhatsappMessageGateway
 
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;
-    if (!this.isTenantChat(chat, agent.tenantId)) return;
+    if (!this.isAllowedTenantChat(chat, agent.tenantIds)) return;
     const resolvedChannelId = await this.resolveChannelIdForChat(chat);
     if (!resolvedChannelId) {
       this.logger.warn(
@@ -776,7 +773,7 @@ export class WhatsappMessageGateway
     const queue = await this.queueService.getQueuePositions();
     const tenants = new Set(
       Array.from(this.connectedAgents.values())
-        .map((agent) => agent.tenantId)
+        .flatMap((agent) => agent.tenantIds)
         .filter(Boolean) as string[],
     );
 

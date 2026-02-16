@@ -1,23 +1,62 @@
-import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck } from 'lucide-react'; // Import MessageSquareText, MessageSquare
+import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server } from 'lucide-react';
 
-export const navigationItems: NavigationItem[] = [
-  { id: 'overview', name: 'Vue d\'ensemble', icon: Home, badge: null },
-  { id: 'commerciaux', name: 'Équipe', icon: Users, badge: '5' },
-  { id: 'postes', name: 'Postes', icon: Network, badge: null },
-  { id: 'queue', name: 'Queue', icon: ListOrdered, badge: null },
-  { id: 'dispatch', name: 'Dispatch', icon: Route, badge: null },
-  { id: 'canaux', name: 'Canaux', icon: Globe, badge: null },
-  { id: 'automessages', name: 'Messages auto', icon: MessageSquareText, badge: null }, // Nouveau: Messages auto
-  { id: 'conversations', name: 'Conversations', icon: MessageSquare, badge: null }, // Nouveau: Conversations
-  { id: 'performance', name: 'Performance', icon: TrendingUp, badge: null },
-  { id: 'analytics', name: 'Analytics', icon: BarChart3, badge: 'NEW' },
-  { id: 'messages', name: 'Messages', icon: MessageCircle, badge: '12' },
-  { id: 'clients', name: 'Clients', icon: Briefcase, badge: null },
-  { id: 'rapports', name: 'Rapports', icon: FileText, badge: null },
-  { id: 'observabilite', name: 'ObservabilitÃ©', icon: Activity, badge: 'SLO' },
-  { id: 'go_no_go', name: 'GO/NO-GO', icon: ShieldCheck, badge: 'OPS' },
+export const navigationGroups: NavigationGroup[] = [
+  {
+    label: 'Tableau de bord',
+    icon: LayoutDashboard,
+    items: [
+      { id: 'overview', name: 'Vue d\'ensemble', icon: Home, badge: null },
+    ],
+  },
+  {
+    label: 'Equipe & Postes',
+    icon: Users,
+    items: [
+      { id: 'commerciaux', name: 'Commerciaux', icon: Users, badge: null },
+      { id: 'postes', name: 'Postes', icon: Network, badge: null },
+      { id: 'performance', name: 'Performance', icon: TrendingUp, badge: null },
+    ],
+  },
+  {
+    label: 'Conversations',
+    icon: MessageSquare,
+    items: [
+      { id: 'conversations', name: 'Conversations', icon: MessageSquare, badge: null },
+      { id: 'messages', name: 'Messages', icon: MessageCircle, badge: null },
+      { id: 'automessages', name: 'Messages auto', icon: MessageSquareText, badge: null },
+    ],
+  },
+  {
+    label: 'Dispatch & Queue',
+    icon: Route,
+    items: [
+      { id: 'queue', name: 'Queue', icon: ListOrdered, badge: null },
+      { id: 'dispatch', name: 'Dispatch', icon: Route, badge: null },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    icon: Server,
+    items: [
+      { id: 'canaux', name: 'Canaux', icon: Globe, badge: null },
+      { id: 'observabilite', name: 'Observabilite', icon: Activity, badge: 'SLO' },
+      { id: 'go_no_go', name: 'GO/NO-GO', icon: ShieldCheck, badge: 'OPS' },
+    ],
+  },
+  {
+    label: 'Analytics',
+    icon: BarChart3,
+    items: [
+      { id: 'analytics', name: 'Analytics', icon: BarChart3, badge: 'NEW' },
+      { id: 'clients', name: 'Clients', icon: Briefcase, badge: null },
+      { id: 'rapports', name: 'Rapports', icon: FileText, badge: null },
+    ],
+  },
 ];
+
+// Flat list for backward compatibility
+export const navigationItems: NavigationItem[] = navigationGroups.flatMap(g => g.items);
 
 export const goNoGoChecklist: GoNoGoChecklistItem[] = [
   {

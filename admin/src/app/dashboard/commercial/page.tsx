@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    navigationItems
+    navigationItems,
+    navigationGroups
 } from '@/app/data/admin-data';
 import Navigation from '@/app/ui/Navigation';
 import Header from '@/app/ui/Header';
@@ -21,11 +22,12 @@ import QueueView from '@/app/ui/QueueView';
 import DispatchView from '@/app/ui/DispatchView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
 import GoNoGoView from '@/app/ui/GoNoGoView';
-import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { ViewMode, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { getPostes, getChannels, getMessageAuto, getClients, getChats, getMessages, getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
 import { goNoGoChecklist } from '@/app/data/admin-data';
 import { Spinner } from '@/app/ui/Spinner';
 import { logger } from '@/app/lib/logger';
+import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
 
 export default function AdminDashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('today');
@@ -37,6 +39,7 @@ export default function AdminDashboard() {
     const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[]>([]);
     const [statutChannels, setStatutChannels] = useState<StatutChannel[]>([]);
     const [webhookMetrics, setWebhookMetrics] = useState<WebhookMetricsSnapshot | null>(null);
+    const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
 
     // États existants
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
@@ -77,6 +80,7 @@ export default function AdminDashboard() {
             setMetriques(overviewData.metriques);
             setPerformanceCommercial(overviewData.performanceCommercial);
             setStatutChannels(overviewData.statutChannels);
+            setPerformanceTemporelle(overviewData.performanceTemporelle ?? []);
             setWebhookMetrics(webhookData);
 
             // Mettre à jour les états existants
@@ -138,6 +142,7 @@ export default function AdminDashboard() {
                             metriques={metriques}
                             performanceCommercial={performanceCommercial}
                             statutChannels={statutChannels}
+                            performanceTemporelle={performanceTemporelle}
                             webhookMetrics={webhookMetrics}
                             onRefresh={fetchData}
                         />
@@ -168,7 +173,7 @@ export default function AdminDashboard() {
             case 'conversations':
                 return <ConversationsView initialChats={chats} onChatUpdated={fetchData} onRefresh={fetchData} />;
             case 'performance':
-                return <PerformanceView onRefresh={fetchData} />;
+                return <PerformanceView commerciaux={performanceCommercial} performanceTemporelle={performanceTemporelle} onRefresh={fetchData} />;
             case 'analytics':
                 return <AnalyticsView onRefresh={fetchData} />;
             case 'messages':
@@ -189,7 +194,7 @@ export default function AdminDashboard() {
                 setSidebarOpen={setSidebarOpen}
                 viewMode={viewMode}
                 setViewMode={setViewMode}
-                navigationItems={navigationItems}
+                navigationGroups={navigationGroups}
                 message={messages}
             />
 

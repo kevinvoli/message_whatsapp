@@ -27,7 +27,11 @@
       "Bash(MODE=status PROVIDER=meta CONVERSATIONS=2 MESSAGES_PER_CONVERSATION=3 node:*)",
       "Bash(MODE=mix PROVIDER=mix CONVERSATIONS=3 MESSAGES_PER_CONVERSATION=5 node:*)",
       "Bash(PROVIDER=whapi CONVERSATIONS=1 MESSAGES_PER_CONVERSATION=2 node:*)",
-      "Bash(PROVIDER=meta CONVERSATIONS=1 MESSAGES_PER_CONVERSATION=2 node:*)"
+      "Bash(PROVIDER=meta CONVERSATIONS=1 MESSAGES_PER_CONVERSATION=2 node:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

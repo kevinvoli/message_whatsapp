@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw } from 'lucide-react';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin } from 'lucide-react';
 import { getMessagesForChat, sendMessage } from '@/app/lib/api'; // Import sendMessage
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
@@ -280,9 +280,13 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
                                     {chat.name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="ml-3 flex-1">
-                                    <p className="font-semibold text-slate-800 text-sm">{chat.name}</p>
+                                    <div className="flex items-center gap-1.5">
+                                        <p className="font-semibold text-slate-800 text-sm">{chat.name}</p>
+                                        {chat.read_only && (
+                                            <span title="Lecture seule"><Lock className="w-3 h-3 text-amber-600 flex-shrink-0" /></span>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-slate-500 truncate">
-                                        {/* Display last message text if available */}
                                         {chat.last_message
                                             ? resolveAdminMessageText(chat.last_message)
                                             : chat.messages && chat.messages.length > 0
@@ -487,9 +491,78 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
                                         <div className={`max-w-xs px-4 py-2 rounded-lg shadow ${
                                             msg.direction === 'OUT' ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-800'
                                         }`}>
+                                            {/* Media previews */}
+                                            {msg.medias && msg.medias.length > 0 && (
+                                                <div className="mb-2 space-y-1">
+                                                    {msg.medias.map((media, idx) => {
+                                                        const mediaType = media.type ?? media.mime_type?.split('/')[0] ?? '';
+                                                        if (mediaType === 'image' && media.url) {
+                                                            return (
+                                                                <a key={idx} href={media.url} target="_blank" rel="noopener noreferrer">
+                                                                    <img src={media.url} alt={media.caption ?? 'Image'} className="max-w-full rounded-md max-h-48 object-cover" />
+                                                                </a>
+                                                            );
+                                                        }
+                                                        if (mediaType === 'video') {
+                                                            return (
+                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                                                                    <Video className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs truncate">{media.file_name ?? 'Video'}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (mediaType === 'audio' || mediaType === 'voice') {
+                                                            return (
+                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                                                                    <Mic className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs">{media.seconds ? `${media.seconds}s` : 'Audio'}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (mediaType === 'document' || mediaType === 'application') {
+                                                            return (
+                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                                                                    <FileText className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs truncate">{media.file_name ?? 'Document'}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (mediaType === 'location') {
+                                                            return (
+                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                                                                    <MapPin className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs">
+                                                                        {media.latitude && media.longitude
+                                                                            ? `${media.latitude.toFixed(4)}, ${media.longitude.toFixed(4)}`
+                                                                            : 'Position'}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                                                                <Image className="w-4 h-4 flex-shrink-0" />
+                                                                <span className="text-xs truncate">{media.file_name ?? mediaType ?? 'Media'}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                             <p>{resolveAdminMessageText(msg)}</p>
                                             <span className="block text-right text-xs mt-1 opacity-75">
                                                 {new Date(msg.timestamp).toLocaleTimeString()}
+                                                {msg.status && (
+                                                    <span className={`ml-1.5 ${
+                                                        msg.status === 'READ' ? 'text-blue-300' :
+                                                        msg.status === 'DELIVERED' ? 'text-green-300' :
+                                                        msg.status === 'FAILED' ? 'text-red-400' : ''
+                                                    }`}>
+                                                        {msg.status === 'READ' ? '✓✓' :
+                                                         msg.status === 'DELIVERED' ? '✓✓' :
+                                                         msg.status === 'SENT' ? '✓' :
+                                                         msg.status === 'FAILED' ? '✗' : ''}
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                     </div>

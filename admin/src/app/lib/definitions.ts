@@ -44,6 +44,12 @@ export type NavigationItem = {
   badge: string | null;
 };
 
+export type NavigationGroup = {
+  label: string;
+  icon: React.ElementType;
+  items: NavigationItem[];
+};
+
 export type StatsGlobales = {
   commerciaux: number;
   canaux: number;
