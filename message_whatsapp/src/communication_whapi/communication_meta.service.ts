@@ -21,7 +21,7 @@ export class CommunicationMetaService {
     const to = this.validateRecipient(data.to);
     const body = this.validateBody(data.text);
     const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
-// console.log("l'url de l'envoie du message :", data);
+console.log("l'url de l'envoie du message :", url);
 
     let attempt = 0;
     while (attempt <= this.maxRetries) {
@@ -42,7 +42,7 @@ export class CommunicationMetaService {
             },
           },
         );
-// console.log("l'url de l'envoie du message :");
+console.log("l'url de l'envoie du message================== :", response);
 
         const messageId = response.data?.messages?.[0]?.id;
         if (!messageId) {
@@ -54,6 +54,8 @@ export class CommunicationMetaService {
 
         return { providerMessageId: messageId };
       } catch (error) {
+        console.log("erreur axios",error);
+        
         if (error instanceof WhapiOutboundError) throw error;
 
         const axiosError = error as AxiosError;
