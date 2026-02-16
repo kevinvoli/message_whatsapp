@@ -7,3 +7,7 @@
 
 # Log files
 *.log
+
+# Scratch files with potential secrets
+testWhat.js
+testWhats.ts

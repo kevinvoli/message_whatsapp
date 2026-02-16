@@ -14,6 +14,8 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { WhatsappChatModule } from 'src/whatsapp_chat/whatsapp_chat.module';
 import { CommunicationWhapiModule } from 'src/communication_whapi/communication_whapi.module';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
@@ -73,6 +75,8 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
     WhatsappPosteService,
     ContactService,
     CommunicationWhapiService,
+    CommunicationMetaService,
+    OutboundRouterService,
     AutoMessageOrchestrator,
     MessageAutoService,
     WebhookRateLimitService,

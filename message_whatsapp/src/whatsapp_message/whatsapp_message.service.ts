@@ -460,23 +460,29 @@ return messages;
     id: string;
     recipient_id: string;
     status: string;
+    errorCode?: number;
+    errorTitle?: string;
   }) {
     try {
-      const messages = await this.messageRepository.findOne({
+      const message = await this.messageRepository.findOne({
         where: { external_id: status.id, chat_id: status.recipient_id },
       });
 
-      if (!messages) {
+      if (!message) {
         this.logger.warn(`Message not found for status update: ${status.id}`);
         return null;
       }
-      // console.log('les info du status', messages);
-      messages.status = status.status as WhatsappMessageStatus;
 
-      // console.log('les info du status======', messages);
+      message.status = status.status as WhatsappMessageStatus;
 
-      const result = await this.messageRepository.save(messages);
-      // console.log('====== status======', result);
+      if (status.errorCode !== undefined) {
+        message.error_code = status.errorCode;
+      }
+      if (status.errorTitle !== undefined) {
+        message.error_title = status.errorTitle;
+      }
+
+      return await this.messageRepository.save(message);
     } catch (error) {
       throw new Error(`Failed to update message status: ${String(error)}`);
     }
@@ -702,11 +708,15 @@ return messages;
     recipientId: string;
     status: string;
     provider?: string;
+    errorCode?: number;
+    errorTitle?: string;
   }) {
     return this.updateByStatus({
       id: status.providerMessageId,
       recipient_id: status.recipientId,
       status: status.status,
+      errorCode: status.errorCode,
+      errorTitle: status.errorTitle,
     });
   }
 }

@@ -29,6 +29,7 @@ import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { ChannelService } from 'src/channel/channel.service';
+import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 
 type AuthPayload = {
   sub: string;
@@ -73,6 +74,7 @@ export class WhatsappMessageGateway
     private readonly contactService: ContactService,
     private readonly jwtService: JwtService,
     private readonly channelService: ChannelService,
+    private readonly throttle: SocketThrottleGuard,
   ) {}
 
   // ======================================================
@@ -216,6 +218,7 @@ export class WhatsappMessageGateway
   }
 
   async handleDisconnect(client: Socket) {
+    this.throttle.removeClient(client.id);
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
@@ -335,21 +338,33 @@ export class WhatsappMessageGateway
     );
   }
 
+  private emitRateLimited(client: Socket, event: string): void {
+    client.emit('chat:event', {
+      type: 'RATE_LIMITED',
+      payload: { event },
+    });
+  }
+
   @SubscribeMessage('conversations:get')
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload?: { search?: string },
   ) {
+    if (!this.throttle.allow(client.id, 'conversations:get')) {
+      return this.emitRateLimited(client, 'conversations:get');
+    }
     await this.sendConversationsToClient(client, payload?.search);
   }
 
    @SubscribeMessage('contacts:get')
   async handleGetContacts(
     @ConnectedSocket() client: Socket,
-    // @MessageBody() payload?: { search?: string },
   ) {
+    if (!this.throttle.allow(client.id, 'contacts:get')) {
+      return this.emitRateLimited(client, 'contacts:get');
+    }
     this.logger.debug(`Contacts list requested (${client.id})`);
-    await this.sendContactsToClient(client,);
+    await this.sendContactsToClient(client);
   }
 
   @SubscribeMessage('chat:event')
@@ -360,6 +375,9 @@ export class WhatsappMessageGateway
   ) {
     if (data.type !== 'TYPING_START' && data.type !== 'TYPING_STOP') {
       return;
+    }
+    if (!this.throttle.allow(client.id, 'chat:event')) {
+      return this.emitRateLimited(client, 'chat:event');
     }
 
     const agent = this.connectedAgents.get(client.id);
@@ -392,6 +410,9 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
+    if (!this.throttle.allow(client.id, 'messages:get')) {
+      return this.emitRateLimited(client, 'messages:get');
+    }
     const tenantId = this.getTenantId(client);
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat || !this.isTenantChat(chat, tenantId)) {
@@ -412,6 +433,9 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
+    if (!this.throttle.allow(client.id, 'messages:read')) {
+      return this.emitRateLimited(client, 'messages:read');
+    }
     const tenantId = this.getTenantId(client);
     await this.chatService.markChatAsRead(payload.chat_id);
 
@@ -440,6 +464,9 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; text: string; tempId: string },
   ) {
+    if (!this.throttle.allow(client.id, 'message:send')) {
+      return this.emitRateLimited(client, 'message:send');
+    }
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 

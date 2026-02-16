@@ -1,5 +1,5 @@
 ﻿# Détails du Projet - Backend & Panel Admin
-
+<!-- claude --resume cbfe99cd-923a-4ba8-a1e0-241966403fbf -->
 Ce document récapitule les routes et fonctionnalités du backend ainsi que le statut du panel admin.
 
 ## Backend

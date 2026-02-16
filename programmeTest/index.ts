@@ -3,13 +3,24 @@ import { createHmac } from 'crypto';
 import mysql from 'mysql2/promise';
 import { config } from './config.js';
 import { generateChatIds } from './generator.js';
-import { generateWebhookPayload, generateMetaWebhookPayload } from './webhook.js';
+import {
+  generateWhapiMessagePayload,
+  generateWhapiRandomMessagePayload,
+  generateWhapiStatusPayload,
+  generateMetaWebhookPayload,
+  generateMetaRandomMessagePayload,
+  generateMetaStatusWebhookPayload,
+} from './webhook.js';
 import { stats } from './stats-instance.js';
 import { WhapiWebhookPayload, MetaWebhookPayload } from './payload.js';
 
 type AnyPayload = WhapiWebhookPayload | MetaWebhookPayload;
 type Provider = 'whapi' | 'meta';
 type Envelope = { provider: Provider; payload: AnyPayload };
+
+// ============================================================
+// DB mapping
+// ============================================================
 
 async function resolveMapping() {
   if (!config.useDbMapping) {
@@ -61,23 +72,27 @@ async function resolveMapping() {
   }
 }
 
+// ============================================================
+// Send message
+// ============================================================
+
 export async function sendMessage(envelope: Envelope) {
   stats.sent++;
-
-  const messageId =
-    (envelope.payload as any)?.messages?.[0]?.id ??
-    (envelope.payload as any)?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.id ??
-    'unknown';
+  const startMs = Date.now();
 
   try {
-    const url = envelope.provider === 'meta' ? config.metaWebhookUrl : config.webhookUrl;
+    const url =
+      envelope.provider === 'meta'
+        ? config.metaWebhookUrl
+        : config.webhookUrl;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'User-Agent': 'StressTest/1.0',
+      'User-Agent': 'StressTest/2.0',
     };
 
     const rawBody = JSON.stringify(envelope.payload);
+
     if (envelope.provider === 'whapi') {
       if (!config.whapiSecretValue) {
         throw new Error('WHAPI_WEBHOOK_SECRET_VALUE missing');
@@ -101,6 +116,8 @@ export async function sendMessage(envelope: Envelope) {
       headers,
     });
 
+    stats.recordLatency(Date.now() - startMs);
+
     if (res.status >= 200 && res.status < 300) {
       stats.recordSuccess(res);
     } else {
@@ -109,12 +126,88 @@ export async function sendMessage(envelope: Envelope) {
       stats.recordFailure(error, envelope.payload);
     }
   } catch (err: any) {
+    stats.recordLatency(Date.now() - startMs);
     stats.recordFailure(err, envelope.payload);
   }
 }
 
+// ============================================================
+// Envelope builders per mode
+// ============================================================
+
+function pickProvider(): Provider {
+  if (config.provider === 'mix') {
+    return Math.random() < config.mixRatio ? 'whapi' : 'meta';
+  }
+  return config.provider === 'meta' ? 'meta' : 'whapi';
+}
+
+function buildMessageEnvelope(chatId: string): Envelope {
+  const provider = pickProvider();
+  const from = chatId.split('@')[0];
+  const name = `Bot ${Math.random().toString(36).slice(2)}`;
+
+  if (config.mode === 'mix') {
+    // Mix mode: random message types
+    if (provider === 'whapi') {
+      return { provider, payload: generateWhapiRandomMessagePayload(chatId) };
+    }
+    return { provider: 'meta', payload: generateMetaRandomMessagePayload(from, name) };
+  }
+
+  // Default: text messages
+  if (provider === 'whapi') {
+    return { provider, payload: generateWhapiMessagePayload(chatId) };
+  }
+  return {
+    provider: 'meta',
+    payload: generateMetaWebhookPayload({
+      from,
+      name,
+      messageId: `wamid.${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      body: `Message de test ${Math.random().toString(36).slice(2)}`,
+    }),
+  };
+}
+
+function buildStatusEnvelope(chatId: string): Envelope {
+  const provider = pickProvider();
+  const from = chatId.split('@')[0];
+
+  if (provider === 'whapi') {
+    return { provider, payload: generateWhapiStatusPayload(chatId) };
+  }
+  return {
+    provider: 'meta',
+    payload: generateMetaStatusWebhookPayload(from),
+  };
+}
+
+function buildEnvelope(chatId: string): Envelope {
+  switch (config.mode) {
+    case 'status':
+      return buildStatusEnvelope(chatId);
+    case 'mix':
+      // Mix alternates between messages and statuses
+      return Math.random() < 0.7
+        ? buildMessageEnvelope(chatId)
+        : buildStatusEnvelope(chatId);
+    default:
+      return buildMessageEnvelope(chatId);
+  }
+}
+
+// ============================================================
+// Main
+// ============================================================
+
 export async function runStressTest() {
-  console.warn('🔥 Demarrage stress test');
+  console.warn(
+    `\nDemarrage stress test | provider=${config.provider} mode=${config.mode} conversations=${config.conversationsCount} messages=${config.messagesPerConversation} parallel=${config.parallelRequests}`,
+  );
+  if (config.provider === 'mix') {
+    console.warn(`Mix ratio (whapi probability): ${config.mixRatio}`);
+  }
 
   const mapping = await resolveMapping();
   (config as any).channelId = mapping.channelId;
@@ -126,23 +219,7 @@ export async function runStressTest() {
 
   for (const chatId of chatIds) {
     for (let i = 0; i < config.messagesPerConversation; i++) {
-      const metaPayload = generateMetaWebhookPayload({
-        from: chatId.split('@')[0],
-        name: `Bot Stress ${Math.random().toString(36).slice(2)}`,
-        messageId: `meta-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        body: `Message de test ${Math.random().toString(36).slice(2)}`,
-      });
-      const whapiPayload = generateWebhookPayload(chatId);
-
-      if (config.provider === 'mix') {
-        const provider: Provider = i % 2 === 0 ? 'whapi' : 'meta';
-        const payload = provider === 'whapi' ? whapiPayload : metaPayload;
-        batch.push(sendMessage({ provider, payload }));
-      } else if (config.provider === 'meta') {
-        batch.push(sendMessage({ provider: 'meta', payload: metaPayload }));
-      } else {
-        batch.push(sendMessage({ provider: 'whapi', payload: whapiPayload }));
-      }
+      batch.push(sendMessage(buildEnvelope(chatId)));
 
       if (batch.length >= config.parallelRequests) {
         await Promise.all(batch);
@@ -153,18 +230,17 @@ export async function runStressTest() {
 
   if (batch.length) await Promise.all(batch);
 
-  console.log('✅ Stress test termine');
+  console.log('\nStress test termine');
   console.table(stats.summary());
 
   if (stats.failedMessages.length) {
-    console.log('❌ DETAIL DES ECHECS');
-
+    console.log('\nDETAIL DES ECHECS');
     console.table(
       stats.failedMessages.map((f, i) => ({
         '#': i + 1,
         type: f.errorType,
-        status: f.statusCode ?? '—',
-        message: f.errorMessage,
+        status: f.statusCode ?? '-',
+        message: f.errorMessage.slice(0, 80),
         chat_id: f.chatId,
       })),
     );

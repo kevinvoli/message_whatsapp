@@ -60,6 +60,7 @@ export class InboundMessageService {
           message.chatId,
           message.fromName ?? 'Client',
           traceId,
+          message.tenantId,
         );
 
         if (!conversation) {

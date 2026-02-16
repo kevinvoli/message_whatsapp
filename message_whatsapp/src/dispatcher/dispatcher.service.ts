@@ -39,9 +39,10 @@ export class DispatcherService {
     clientPhone: string,
     clientName: string,
     traceId?: string,
+    tenantId?: string,
   ): Promise<WhatsappChat | null> {
     return this.dispatchLock.runExclusive(() =>
-      this.assignConversationInternal(clientPhone, clientName, traceId),
+      this.assignConversationInternal(clientPhone, clientName, traceId, tenantId),
     );
   }
 
@@ -49,6 +50,7 @@ export class DispatcherService {
     clientPhone: string,
     clientName: string,
     traceId?: string,
+    tenantId?: string,
   ): Promise<WhatsappChat | null> {
     if (traceId) {
       this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
@@ -82,7 +84,10 @@ export class DispatcherService {
       this.logger.debug(
         `Conversation existante avec agent connecte (${conversation.chat_id})`,
       );
-      
+
+      if (tenantId && !conversation.tenant_id) {
+        conversation.tenant_id = tenantId;
+      }
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
       if (!conversation.first_response_deadline_at && !conversation.last_poste_message_at) {
@@ -122,6 +127,9 @@ export class DispatcherService {
       this.logger.log(
         `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${  'aucun'}) à (${nextAgent.name})`,
       );
+      if (tenantId && !conversation.tenant_id) {
+        conversation.tenant_id = tenantId;
+      }
       conversation.poste = nextAgent;
       conversation.poste_id = nextAgent.id;
       conversation.status = nextAgent.is_active
@@ -149,6 +157,7 @@ export class DispatcherService {
     const newChat = this.chatRepository.create({
       chat_id: clientPhone,
       name: clientName,
+      tenant_id: tenantId ?? null,
       type: 'private',
       contact_client:  clientPhone.split('@')[0],
       poste: nextAgent,

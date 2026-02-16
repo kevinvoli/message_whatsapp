@@ -15,7 +15,19 @@
       "WebFetch(domain:whatsapp.github.io)",
       "WebFetch(domain:business.whatsapp.com)",
       "WebFetch(domain:docs.360dialog.com)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(npm run start:dev:*)",
+      "Bash(PROVIDER=whapi CONVERSATIONS=2 MESSAGES_PER_CONVERSATION=3 node:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(mysql:*)",
+      "Bash(node -e:*)",
+      "Bash(PROVIDER=meta CONVERSATIONS=2 MESSAGES_PER_CONVERSATION=3 node:*)",
+      "Bash(MODE=status PROVIDER=whapi CONVERSATIONS=2 MESSAGES_PER_CONVERSATION=3 node:*)",
+      "Bash(MODE=status PROVIDER=meta CONVERSATIONS=2 MESSAGES_PER_CONVERSATION=3 node:*)",
+      "Bash(MODE=mix PROVIDER=mix CONVERSATIONS=3 MESSAGES_PER_CONVERSATION=5 node:*)",
+      "Bash(PROVIDER=whapi CONVERSATIONS=1 MESSAGES_PER_CONVERSATION=2 node:*)",
+      "Bash(PROVIDER=meta CONVERSATIONS=1 MESSAGES_PER_CONVERSATION=2 node:*)"
     ]
   }
 }

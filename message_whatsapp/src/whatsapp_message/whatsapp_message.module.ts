@@ -28,6 +28,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { LoggingModule } from 'src/logging/logging.module';
+import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 
 @Module({
   imports: [
@@ -68,7 +69,8 @@ import { LoggingModule } from 'src/logging/logging.module';
     ChannelService,
     ContactService,
     WhatsappPosteService,
-    MessageAutoService
+    MessageAutoService,
+    SocketThrottleGuard,
   ],
   exports: [WhatsappMessageGateway, WhatsappMessageService, FirstResponseTimeoutJob],
 })

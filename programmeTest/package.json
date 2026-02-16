@@ -9,7 +9,8 @@
     "whapi": "cross-env PROVIDER=whapi node --loader ts-node/esm index.ts",
     "meta": "cross-env PROVIDER=meta node --loader ts-node/esm index.ts",
     "mix": "cross-env PROVIDER=mix node --loader ts-node/esm index.ts",
-    "what": "node --loader ts-node/esm testWhats.ts"
+    "status": "cross-env MODE=status node --loader ts-node/esm index.ts",
+    "status:meta": "cross-env MODE=status PROVIDER=meta node --loader ts-node/esm index.ts"
   },
   "author": "",
   "license": "ISC",

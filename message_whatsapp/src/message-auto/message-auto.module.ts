@@ -16,6 +16,9 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
+import { SocketThrottleGuard } from 'src/whatsapp_message/guards/socket-throttle.guard';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
@@ -44,7 +47,7 @@ import { LoggingModule } from 'src/logging/logging.module';
       LoggingModule,
     ],
   controllers: [MessageAutoController],
-  providers: [MessageAutoService,WhatsappMessageGateway, WhatsappChatService, WhatsappMessageService,WhatsappCommercialService,WhatsappPosteService,QueueService,DispatcherService,FirstResponseTimeoutJob,WhatsappPosteService,CommunicationWhapiService,ChannelService,ContactService
+  providers: [MessageAutoService,WhatsappMessageGateway, WhatsappChatService, WhatsappMessageService,WhatsappCommercialService,WhatsappPosteService,QueueService,DispatcherService,FirstResponseTimeoutJob,WhatsappPosteService,CommunicationWhapiService,CommunicationMetaService,OutboundRouterService,SocketThrottleGuard,ChannelService,ContactService
   ],
 })
 export class MessageAutoModule {}
