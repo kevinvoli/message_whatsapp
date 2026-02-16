@@ -21,6 +21,7 @@ import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
+import { json } from 'stream/consumers';
 
 @Controller('webhooks')
 export class WhapiController {
@@ -67,14 +68,27 @@ export class WhapiController {
         HttpStatus.CONFLICT,
       );
     }
-    if (idempotency === 'duplicate') {
-      this.metricsService.recordDuplicate(provider, tenantId);
-      this.healthService.record(provider, true, Date.now() - startedAt);
-      this.metricsService.recordLatency(provider, Date.now() - startedAt);
-      return { status: 'duplicate_ignored' };
-    }
-
     const eventType = payload?.event?.type;
+    if (idempotency === 'duplicate') {
+      const replayedId = payload?.messages?.[0]?.id;
+      if (
+        eventType === 'messages' &&
+        replayedId &&
+        !(await this.whapiService.hasPersistedIncomingMessage(
+          'whapi',
+          replayedId,
+        ))
+      ) {
+        this.auditLogger.warn(
+          `WEBHOOK_DUPLICATE_REPROCESS provider=whapi tenant_id=${tenantId} provider_message_id=${replayedId}`,
+        );
+      } else {
+        this.metricsService.recordDuplicate(provider, tenantId);
+        this.healthService.record(provider, true, Date.now() - startedAt);
+        this.metricsService.recordLatency(provider, Date.now() - startedAt);
+        return { status: 'duplicate_ignored' };
+      }
+    }
 
     try {
       if (degraded) {
@@ -175,15 +189,24 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    console.log("affichage du post:", payload);
+    console.log("affichage du post:");
     
     const startedAt = Date.now();
     const provider = 'meta';
     const requestId =
       this.headerValue(headers['x-request-id']) ?? randomUUID();
+    // console.log("affichage du post:2",request);
+
     this.assertPayloadSize(request.rawBody);
+    console.log("affichage du post:3",request.rawBody);
+
     this.assertMetaSignature(headers, request.rawBody, payload);
+    console.log("affichage du post:4");
+
     const metaPayload = this.assertMetaPayload(payload);
+
+    console.log("affichage du post:", metaPayload?.entry[0]?.changes[0]);
+
 
     const entry = metaPayload?.entry?.[0];
     const change = entry?.changes?.[0];
@@ -229,10 +252,20 @@ export class WhapiController {
       );
     }
     if (idempotency === 'duplicate') {
-      this.metricsService.recordDuplicate(provider, tenantId);
-      this.healthService.record(provider, true, Date.now() - startedAt);
-      this.metricsService.recordLatency(provider, Date.now() - startedAt);
-      return { status: 'duplicate_ignored' };
+      const replayedId = metaValue?.messages?.[0]?.id;
+      if (
+        replayedId &&
+        !(await this.whapiService.hasPersistedIncomingMessage('meta', replayedId))
+      ) {
+        this.auditLogger.warn(
+          `WEBHOOK_DUPLICATE_REPROCESS provider=meta tenant_id=${tenantId} provider_message_id=${replayedId}`,
+        );
+      } else {
+        this.metricsService.recordDuplicate(provider, tenantId);
+        this.healthService.record(provider, true, Date.now() - startedAt);
+        this.metricsService.recordLatency(provider, Date.now() - startedAt);
+        return { status: 'duplicate_ignored' };
+      }
     }
 
     try {
@@ -331,7 +364,10 @@ export class WhapiController {
     const isProd = process.env.NODE_ENV === 'production';
     const appSecret = process.env.WHATSAPP_APP_SECRET?.trim();
     const previousSecret = process.env.WHATSAPP_APP_SECRET_PREVIOUS?.trim();
+    console.log("affichage du post:3.5",appSecret, previousSecret);
     if (!appSecret && !previousSecret) {
+    console.log("affichage du post:3.6",appSecret, previousSecret);
+
       if (isProd) {
         this.metricsService.recordSignatureInvalid('meta');
         throw new UnauthorizedException(
@@ -340,15 +376,23 @@ export class WhapiController {
       }
       return;
     }
+    console.log("affichage du post:3.7");
 
-    const signatureHeader = this.headerValue(headers['x-hub-signature-256']);
+    const signatureHeader = this.headerValue(
+      headers['x-hub-signature-256'],
+    )?.trim();
     if (!signatureHeader) {
       this.metricsService.recordSignatureInvalid('meta');
       throw new UnauthorizedException('Missing signature');
     }
+
+    console.log("affichage du post:3.8",JSON.stringify(payload),headers);
+
     const secrets = [appSecret, previousSecret].filter(
       (value): value is string => Boolean(value),
     );
+    console.log("affichage du post:3.71", secrets);
+
     const valid = this.verifyHmacSignature(
       'meta',
       secrets,
@@ -357,6 +401,9 @@ export class WhapiController {
       signatureHeader,
       isProd,
     );
+
+    console.log("affichage du post:3.9", valid);
+
     if (!valid) {
       this.metricsService.recordSignatureInvalid('meta');
       throw new ForbiddenException('Invalid webhook signature');
@@ -466,24 +513,31 @@ export class WhapiController {
     provided: string,
     requireRawBody: boolean,
   ): boolean {
+    console.log("affichage du post:1",provider);
+
     if (requireRawBody && !rawBody) {
       this.metricsService.recordSignatureInvalid(provider);
       throw new HttpException('Missing rawBody', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     const payloadBuffer = rawBody ?? Buffer.from(JSON.stringify(payload));
-    const receivedBuffer = Buffer.from(provided);
+    const normalizedProvided = provided.trim().toLowerCase();
+    const receivedBuffer = Buffer.from(normalizedProvided);
     for (const secret of secrets) {
       const digest = createHmac('sha256', secret)
         .update(payloadBuffer)
         .digest('hex');
       const candidates = [`sha256=${digest}`, digest];
       for (const candidate of candidates) {
-        const expectedBuffer = Buffer.from(candidate);
+        const expectedBuffer = Buffer.from(candidate.toLowerCase());
+    console.log("affichage du post:4.7",candidate, receivedBuffer);  
+
         if (
           expectedBuffer.length === receivedBuffer.length &&
           timingSafeEqual(expectedBuffer, receivedBuffer)
         ) {
+    console.log("affichage du post:10");
+
           return true;
         }
       }

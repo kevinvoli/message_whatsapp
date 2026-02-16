@@ -37,8 +37,7 @@ export class WhapiChannel {
   })
   channel_id: string;
 
-  @Index({ unique: true })
-  @Column()
+  @Column({ type: 'text' })
   token: string;
 
   @Column({ type: 'int' })

@@ -5,7 +5,7 @@ import { WhapiFailureKind, WhapiOutboundError } from './errors/whapi-outbound.er
 
 @Injectable()
 export class CommunicationMetaService {
-  private readonly META_API_VERSION = process.env.META_API_VERSION ?? 'v21.0';
+  private readonly META_API_VERSION = process.env.META_API_VERSION ?? 'v22.0';
   private readonly maxRetries = Number(
     process.env.META_OUTBOUND_MAX_RETRIES ?? 2,
   );
@@ -21,6 +21,7 @@ export class CommunicationMetaService {
     const to = this.validateRecipient(data.to);
     const body = this.validateBody(data.text);
     const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
+// console.log("l'url de l'envoie du message :", data);
 
     let attempt = 0;
     while (attempt <= this.maxRetries) {
@@ -41,6 +42,7 @@ export class CommunicationMetaService {
             },
           },
         );
+// console.log("l'url de l'envoie du message :");
 
         const messageId = response.data?.messages?.[0]?.id;
         if (!messageId) {
@@ -56,6 +58,22 @@ export class CommunicationMetaService {
 
         const axiosError = error as AxiosError;
         const statusCode = axiosError.response?.status;
+        const responseData = axiosError.response?.data as
+          | {
+              error?: {
+                message?: string;
+                type?: string;
+                code?: number;
+                error_subcode?: number;
+                fbtrace_id?: string;
+              };
+            }
+          | undefined;
+        const metaMessage =
+          responseData?.error?.message ?? axiosError.message ?? 'unknown_error';
+        const metaCode = responseData?.error?.code;
+        const metaSubcode = responseData?.error?.error_subcode;
+        const metaTraceId = responseData?.error?.fbtrace_id;
         const kind = this.classifyFailure(axiosError);
         const lastAttempt = attempt >= this.maxRetries;
 
@@ -71,12 +89,12 @@ export class CommunicationMetaService {
         }
 
         this.logger.error(
-          `Meta outbound failed (phone_number_id=${data.phoneNumberId}, kind=${kind}, status=${statusCode ?? 'unknown'})`,
+          `Meta outbound failed (phone_number_id=${data.phoneNumberId}, kind=${kind}, status=${statusCode ?? 'unknown'}, code=${metaCode ?? 'unknown'}, subcode=${metaSubcode ?? 'unknown'}, trace=${metaTraceId ?? 'unknown'}, message=${metaMessage})`,
           axiosError.stack,
           CommunicationMetaService.name,
         );
         throw new WhapiOutboundError(
-          'Meta outbound delivery failed',
+          `Meta outbound delivery failed: ${metaMessage}`,
           kind,
           statusCode,
         );

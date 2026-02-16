@@ -1,6 +1,23 @@
-import { IsString } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateChannelDto {
   @IsString()
-  token:string
+  token: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['whapi', 'meta'])
+  provider?: 'whapi' | 'meta';
+
+  @IsOptional()
+  @IsString()
+  channel_id?: string;
+
+  @IsOptional()
+  @IsString()
+  external_id?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  is_business?: boolean;
 }

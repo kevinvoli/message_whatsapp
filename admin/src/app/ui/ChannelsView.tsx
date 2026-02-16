@@ -14,13 +14,21 @@ interface ChannelsViewProps {
   onRefresh?: () => void;
 }
 
+type ChannelCreateInput = {
+  token: string;
+  provider?: 'whapi' | 'meta';
+  channel_id?: string;
+  external_id?: string;
+  is_business?: boolean;
+};
+
 export default function ChannelsView({
   initialChannels,
   onChannelUpdated,
   onRefresh,
 }: ChannelsViewProps) {
   const { items: channels, loading, clearStatus, create, update, remove } =
-    useCrudResource<Channel, { token: string }, Partial<Channel>>({
+    useCrudResource<Channel, ChannelCreateInput, Partial<Channel>>({
       initialItems: initialChannels,
       onRefresh: onChannelUpdated,
       createItem: createChannel,
@@ -32,10 +40,35 @@ export default function ChannelsView({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  const [formProvider, setFormProvider] = useState<'whapi' | 'meta'>('whapi');
+  const [formChannelId, setFormChannelId] = useState('');
+  const [formExternalId, setFormExternalId] = useState('');
   const [formToken, setFormToken] = useState('');
   const [formIsBusiness, setFormIsBusiness] = useState(false);
 
+  const buildPayload = (): ChannelCreateInput => {
+    if (formProvider === 'meta') {
+      const channelId = formChannelId.trim();
+      const externalId = formExternalId.trim() || channelId;
+      return {
+        token: formToken,
+        provider: 'meta',
+        channel_id: channelId,
+        external_id: externalId,
+        is_business: formIsBusiness,
+      };
+    }
+    return {
+      token: formToken,
+      provider: 'whapi',
+      is_business: formIsBusiness,
+    };
+  };
+
   const openAddModal = () => {
+    setFormProvider('whapi');
+    setFormChannelId('');
+    setFormExternalId('');
     setFormToken('');
     setFormIsBusiness(false);
     clearStatus();
@@ -44,6 +77,9 @@ export default function ChannelsView({
 
   const openEditModal = (channel: Channel) => {
     setCurrentChannel(channel);
+    setFormProvider(channel.provider === 'meta' ? 'meta' : 'whapi');
+    setFormChannelId(channel.channel_id ?? '');
+    setFormExternalId(channel.external_id ?? '');
     setFormToken(channel.token);
     setFormIsBusiness(channel.is_business);
     clearStatus();
@@ -63,7 +99,7 @@ export default function ChannelsView({
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await create({ token: formToken }, 'Canal ajoute.');
+    const result = await create(buildPayload(), 'Canal ajoute.');
     if (result.ok) closeAddModal();
   };
 
@@ -72,7 +108,7 @@ export default function ChannelsView({
     if (!currentChannel) return;
     const result = await update(
       currentChannel.id,
-      { token: formToken, is_business: formIsBusiness },
+      buildPayload(),
       'Canal mis a jour.',
     );
     if (result.ok) closeEditModal();
@@ -118,9 +154,21 @@ export default function ChannelsView({
           getRowKey={(channel) => channel.id}
           columns={[
             {
+              header: 'Provider',
+              render: (channel) => (
+                <span className="text-gray-700">{channel.provider ?? 'whapi'}</span>
+              ),
+            },
+            {
               header: 'Channel ID',
               render: (channel) => (
                 <span className="font-medium text-gray-900">{channel.channel_id}</span>
+              ),
+            },
+            {
+              header: 'External ID',
+              render: (channel) => (
+                <span className="text-gray-700">{channel.external_id ?? '-'}</span>
               ),
             },
             {
@@ -196,6 +244,49 @@ export default function ChannelsView({
         loadingLabel="Adding..."
       >
         <div className="mb-4">
+          <label htmlFor="provider" className="mb-2 block text-sm font-bold text-gray-700">
+            Provider
+          </label>
+          <select
+            id="provider"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formProvider}
+            onChange={(e) => setFormProvider(e.target.value as 'whapi' | 'meta')}
+          >
+            <option value="whapi">whapi</option>
+            <option value="meta">meta</option>
+          </select>
+        </div>
+        {formProvider === 'meta' && (
+          <>
+            <div className="mb-4">
+              <label htmlFor="channel-id" className="mb-2 block text-sm font-bold text-gray-700">
+                Phone Number ID (channel_id)
+              </label>
+              <input
+                type="text"
+                id="channel-id"
+                className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+                value={formChannelId}
+                onChange={(e) => setFormChannelId(e.target.value)}
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label htmlFor="external-id" className="mb-2 block text-sm font-bold text-gray-700">
+                External ID (optionnel)
+              </label>
+              <input
+                type="text"
+                id="external-id"
+                className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+                value={formExternalId}
+                onChange={(e) => setFormExternalId(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+        <div className="mb-4">
           <label htmlFor="token" className="mb-2 block text-sm font-bold text-gray-700">
             Token
           </label>
@@ -219,6 +310,49 @@ export default function ChannelsView({
         submitLabel="Sauvegarder"
         loadingLabel="Saving..."
       >
+        <div className="mb-4">
+          <label htmlFor="edit-provider" className="mb-2 block text-sm font-bold text-gray-700">
+            Provider
+          </label>
+          <select
+            id="edit-provider"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formProvider}
+            onChange={(e) => setFormProvider(e.target.value as 'whapi' | 'meta')}
+          >
+            <option value="whapi">whapi</option>
+            <option value="meta">meta</option>
+          </select>
+        </div>
+        {formProvider === 'meta' && (
+          <>
+            <div className="mb-4">
+              <label htmlFor="edit-channel-id" className="mb-2 block text-sm font-bold text-gray-700">
+                Phone Number ID (channel_id)
+              </label>
+              <input
+                type="text"
+                id="edit-channel-id"
+                className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+                value={formChannelId}
+                onChange={(e) => setFormChannelId(e.target.value)}
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label htmlFor="edit-external-id" className="mb-2 block text-sm font-bold text-gray-700">
+                External ID (optionnel)
+              </label>
+              <input
+                type="text"
+                id="edit-external-id"
+                className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+                value={formExternalId}
+                onChange={(e) => setFormExternalId(e.target.value)}
+              />
+            </div>
+          </>
+        )}
         <div className="mb-4">
           <label htmlFor="edit-token" className="mb-2 block text-sm font-bold text-gray-700">
             Token

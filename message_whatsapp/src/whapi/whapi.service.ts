@@ -60,6 +60,18 @@ export class WhapiService {
     });
   }
 
+  async hasPersistedIncomingMessage(
+    provider: 'whapi' | 'meta',
+    providerMessageId: string,
+  ): Promise<boolean> {
+    const existing =
+      await this.whatsappMessageService.findIncomingByProviderMessageId(
+        provider,
+        providerMessageId,
+      );
+    return Boolean(existing);
+  }
+
   // ======================================================
   // INCOMING MESSAGE
   // ======================================================

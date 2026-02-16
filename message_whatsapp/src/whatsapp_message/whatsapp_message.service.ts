@@ -298,6 +298,20 @@ export class WhatsappMessageService {
     });
   }
 
+  async findIncomingByProviderMessageId(
+    provider: 'whapi' | 'meta',
+    providerMessageId: string,
+  ): Promise<WhatsappMessage | null> {
+    return this.messageRepository.findOne({
+      where: {
+        provider,
+        provider_message_id: providerMessageId,
+        direction: MessageDirection.IN,
+      },
+      relations: ['chat'],
+    });
+  }
+
   async findBychat_id(
     chat_id: string,
     limit = 100,
@@ -720,4 +734,3 @@ return messages;
     });
   }
 }
-

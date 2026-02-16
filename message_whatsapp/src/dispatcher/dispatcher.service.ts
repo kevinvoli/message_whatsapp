@@ -113,8 +113,45 @@ export class DispatcherService {
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
       this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);
+      if (conversation) {
+        if (tenantId && !conversation.tenant_id) {
+          conversation.tenant_id = tenantId;
+        }
+        conversation.poste = null;
+        conversation.poste_id = null;
+        conversation.status = WhatsappChatStatus.EN_ATTENTE;
+        conversation.unread_count += 1;
+        conversation.last_activity_at = new Date();
+        conversation.assigned_at = null;
+        conversation.assigned_mode = null;
+        conversation.first_response_deadline_at = null;
+        conversation.last_client_message_at = new Date();
+        return this.chatRepository.save(conversation);
+      }
 
-      return null;
+      const waitingChat = this.chatRepository.create({
+        chat_id: clientPhone,
+        name: clientName,
+        tenant_id: tenantId ?? null,
+        type: 'private',
+        contact_client: clientPhone.split('@')[0],
+        poste: null,
+        poste_id: null,
+        status: WhatsappChatStatus.EN_ATTENTE,
+        unread_count: 1,
+        last_activity_at: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        assigned_at: null,
+        assigned_mode: null,
+        first_response_deadline_at: null,
+        last_client_message_at: new Date(),
+      });
+
+      this.logger.log(
+        `🆕 Creation conversation en attente (sans agent) pour ${clientPhone}`,
+      );
+      return this.chatRepository.save(waitingChat);
     }
 
     

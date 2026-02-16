@@ -8,8 +8,6 @@ import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { AppLogger } from 'src/logging/app-logger.service';
-// import { WhapiUser } from './entities/whapi-user.entity';
-// import { ChanneDatalDto } from './dto/channel-data.dto';
 
 @Injectable()
 export class ChannelService {
@@ -18,21 +16,13 @@ export class ChannelService {
     private readonly channelRepository: Repository<WhapiChannel>,
     @InjectRepository(ProviderChannel)
     private readonly providerChannelRepository: Repository<ProviderChannel>,
-    // @InjectRepository(WhapiUser)
-    // private readonly userRepository: Repository<WhapiUser>,
-
     private readonly connmunicationService: CommunicationWhapiService,
     private readonly logger: AppLogger,
   ) {}
 
   async create(dto: CreateChannelDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const channel =
-      await this.connmunicationService.getChannel(dto);
+    const provider = dto.provider ?? 'whapi';
 
-    if (!channel) {
-      return;
-    }
     const existingChannel = await this.channelRepository.findOne({
       where: {
         token: dto.token,
@@ -40,10 +30,63 @@ export class ChannelService {
     });
 
     if (existingChannel) {
-      throw new ConflictException('Ce channel existe déjà');
+      throw new ConflictException('Ce channel existe deja');
     }
 
-    const newChannel = this.channelRepository.create({
+    if (provider === 'meta') {
+      const channelId = dto.channel_id?.trim();
+      if (!channelId) {
+        throw new ConflictException(
+          'channel_id (phone_number_id Meta) requis pour provider=meta',
+        );
+      }
+
+      const externalId = dto.external_id?.trim() || channelId;
+      const nowEpoch = Math.floor(Date.now() / 1000);
+
+      const metaChannel = this.channelRepository.create({
+        provider: 'meta',
+        external_id: externalId,
+        start_at: nowEpoch,
+        token: dto.token,
+        channel_id: channelId,
+        uptime: 0,
+        version: 'meta',
+        ip: 'meta',
+        device_id: 0,
+        is_business: dto.is_business ?? true,
+        api_version: process.env.META_API_VERSION ?? 'v21.0',
+        core_version: 'meta-cloud-api',
+      });
+
+      const savedMeta = await this.channelRepository.save(metaChannel);
+      const tenantId = await this.ensureTenantId(savedMeta);
+      await this.upsertProviderMapping({
+        tenant_id: tenantId,
+        provider: 'meta',
+        external_id: externalId,
+        channel_id: channelId,
+      });
+
+      this.logger.debug(
+        `Meta channel persisted: ${savedMeta.channel_id}`,
+        ChannelService.name,
+      );
+
+      return this.channelRepository.findOne({
+        where: { id: savedMeta.id },
+      });
+    }
+
+    const channel = await this.connmunicationService.getChannel(dto);
+
+    if (!channel) {
+      return;
+    }
+
+    const whapiChannel = this.channelRepository.create({
+      provider: 'whapi',
+      external_id: channel.channel_id,
       start_at: channel.start_at,
       token: dto.token,
       channel_id: channel.channel_id,
@@ -56,10 +99,23 @@ export class ChannelService {
       core_version: channel.core_version,
     });
 
-    const newSave = await this.channelRepository.save(newChannel);
-    this.logger.debug(`Channel persisted: ${newSave.channel_id}`, ChannelService.name);
+    const savedWhapi = await this.channelRepository.save(whapiChannel);
+    const tenantId = await this.ensureTenantId(savedWhapi);
+    await this.upsertProviderMapping({
+      tenant_id: tenantId,
+      provider: 'whapi',
+      external_id: savedWhapi.channel_id,
+      channel_id: savedWhapi.channel_id,
+    });
 
-    return newSave;
+    this.logger.debug(
+      `Whapi channel persisted: ${savedWhapi.channel_id}`,
+      ChannelService.name,
+    );
+
+    return this.channelRepository.findOne({
+      where: { id: savedWhapi.id },
+    });
   }
 
   async findAll() {
@@ -68,7 +124,7 @@ export class ChannelService {
 
   async findOne(id: string) {
     const channel = await this.channelRepository.findOne({
-      where: { channel_id:id },
+      where: { channel_id: id },
     });
 
     return channel;

@@ -110,7 +110,13 @@ export async function getChannels(): Promise<Channel[]> {
     return handleResponse<Channel[]>(response);
 }
 
-export async function createChannel(channel: { token: string }): Promise<Channel> {
+export async function createChannel(channel: {
+    token: string;
+    provider?: 'whapi' | 'meta';
+    channel_id?: string;
+    external_id?: string;
+    is_business?: boolean;
+}): Promise<Channel> {
     const response = await fetch(`${API_BASE_URL}/channel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
