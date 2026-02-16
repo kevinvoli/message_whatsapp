@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, User } from 'lucide-react';
 import { PerformanceCommercial } from '@/app/lib/definitions';
 import { updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
@@ -24,6 +24,7 @@ export default function CommerciauxView({
   const [formName, setFormName] = useState('');
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
   const { addToast } = useToast();
 
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
@@ -362,9 +363,10 @@ export default function CommerciauxView({
                     {/* Actions */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <button 
+                        <button
+                          onClick={() => setSelectedDetail(commercial)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Voir les détails"
+                          title="Voir les details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -386,7 +388,113 @@ export default function CommerciauxView({
         </div>
       </div>
 
-      {/* Modal d'édition - À compléter selon vos besoins */}
+      {/* Detail commercial */}
+      {selectedDetail && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setSelectedDetail(null)}
+                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                    {selectedDetail.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${getStatusColor(selectedDetail.isConnected)} border-2 border-white rounded-full`}></div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{selectedDetail.name}</h3>
+                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {selectedDetail.email}</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedDetail.poste_name || 'Non assigne'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+              selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
+            </span>
+          </div>
+
+          <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageCircle className="w-4 h-4 text-blue-600" />
+                <span className="text-xs text-blue-700 font-medium">Messages envoyes</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-900">{selectedDetail.nbMessagesEnvoyes}</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageCircle className="w-4 h-4 text-green-600" />
+                <span className="text-xs text-green-700 font-medium">Messages recus</span>
+              </div>
+              <p className="text-2xl font-bold text-green-900">{selectedDetail.nbMessagesRecus}</p>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Target className="w-4 h-4 text-purple-600" />
+                <span className="text-xs text-purple-700 font-medium">Chats actifs</span>
+              </div>
+              <p className="text-2xl font-bold text-purple-900">{selectedDetail.nbChatsActifs}</p>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-orange-600" />
+                <span className="text-xs text-orange-700 font-medium">Taux reponse</span>
+              </div>
+              <p className="text-2xl font-bold text-orange-900">{selectedDetail.tauxReponse}%</p>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Performance</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Temps reponse moyen</span>
+                  <span className="font-semibold text-gray-900">{formatTemps(selectedDetail.tempsReponseMoyen)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Niveau performance</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(selectedDetail.tauxReponse)}`}>
+                    {getPerformanceText(selectedDetail.tauxReponse)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Total messages</span>
+                  <span className="font-semibold text-gray-900">{selectedDetail.nbMessagesEnvoyes + selectedDetail.nbMessagesRecus}</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Informations</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Derniere connexion</span>
+                  <span className="font-semibold text-gray-900">{formatDate(selectedDetail.lastConnectionAt)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Poste</span>
+                  <span className="font-semibold text-gray-900">{selectedDetail.poste_name || '-'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">ID</span>
+                  <span className="font-mono text-xs text-gray-500">{selectedDetail.id}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'edition */}
       {showEditModal && currentCommercial && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">

@@ -37,20 +37,20 @@
 
 ## Phase 2 - Temps reel et interactivite
 
-### T6 - Connecter Socket.IO pour queue et messages temps reel
-**Statut** : A FAIRE
-**Fichiers** : Nouveau `hooks/useSocket.ts`, `QueueView.tsx`, `ConversationsView.tsx`
-**Description** : socket.io-client est installe mais non utilise. Creer un hook useSocket qui connecte au gateway et ecoute les events : `queue:updated`, `new_message`, `status_update`, `typing`.
+### T6 - Connecter temps reel (polling) pour queue et messages
+**Statut** : FAIT
+**Fichiers** : Nouveau `hooks/useRealtimePolling.ts`, `QueueView.tsx`, `ConversationsView.tsx`, `page.tsx`
+**Description** : Hook useRealtimePolling cree. QueueView poll toutes les 5s, ConversationsView poll les messages toutes les 3s, dashboard principal poll metriques + chats toutes les 15s. Le gateway backend rejette les JWT admin, donc polling REST au lieu de Socket.IO direct.
 
 ### T7 - Implementer notifications temps reel
-**Statut** : A FAIRE
-**Fichiers** : `Header.tsx`, nouveau `hooks/useNotifications.ts`
-**Description** : L'icone cloche existe dans le Header. Connecter aux events Socket.IO pour afficher les notifications en temps reel (nouveau message, SLA violation, agent deconnecte).
+**Statut** : FAIT
+**Fichiers** : `Header.tsx`, nouveau `hooks/useNotifications.ts`, `page.tsx`
+**Description** : Hook useNotifications avec panneau dropdown dans Header. Detection auto de nouveaux messages/conversations via polling. Badge compteur non-lus, mark as read, clear all.
 
 ### T8 - Fiche commercial (deep dive par agent)
-**Statut** : A FAIRE
-**Fichiers** : Nouveau `CommercialDetailView.tsx`
-**Description** : Vue detaillee par agent : profil, metriques individuelles, conversations actives assignees, courbe activite 7j. Accessible depuis CommerciauxView en cliquant sur un agent.
+**Statut** : FAIT
+**Fichiers** : `CommerciauxView.tsx`
+**Description** : Vue detail inline dans CommerciauxView. Profil complet (avatar, email, poste), 4 KPI cards (messages envoyes/recus, chats actifs, taux reponse), section performance + informations. Accessible via bouton Eye.
 
 ---
 

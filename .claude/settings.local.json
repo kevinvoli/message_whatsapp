@@ -31,7 +31,8 @@
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
       "Bash(npm run:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

@@ -1,12 +1,13 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin } from 'lucide-react';
-import { getMessagesForChat, sendMessage } from '@/app/lib/api'; // Import sendMessage
+import { getMessagesForChat, sendMessage } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText } from '../lib/utils';
 import { useToast } from './ToastProvider';
+import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
 
 interface ConversationsViewProps {
     initialChats: WhatsappChat[];
@@ -238,6 +239,26 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
             setMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
         }
     };
+
+    // Silent polling for new messages in the selected chat
+    const pollMessages = useCallback(async () => {
+        if (!selectedChat) return;
+        try {
+            const fetched = await getMessagesForChat(selectedChat.chat_id);
+            setMessages(prev => {
+                // Only update if count changed to avoid unnecessary re-renders
+                if (fetched.length !== prev.length) return fetched;
+                const lastFetched = fetched[fetched.length - 1];
+                const lastCurrent = prev[prev.length - 1];
+                if (lastFetched?.id !== lastCurrent?.id) return fetched;
+                return prev;
+            });
+        } catch {
+            // Silent fail
+        }
+    }, [selectedChat]);
+
+    useRealtimePolling(pollMessages, { interval: 3000, enabled: !!selectedChat });
 
     return (
         <div className="h-full flex flex-col gap-3">
