@@ -1,19 +1,54 @@
-import React from 'react';
-import { MessageCircle, User, Phone, MoreVertical } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MessageCircle, User, Clock } from 'lucide-react';
 import { CallStatus, Conversation, ConversationStatus } from '@/types/chat';
 import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 import { useChatStore } from '@/store/chatStore';
 
-
 interface ChatHeaderProps {
     currentConv: Conversation;
     totalMessages: number;
 }
 
+function SlaCountdown({ deadline }: { deadline: Date }) {
+    const [remaining, setRemaining] = useState(() => deadline.getTime() - Date.now());
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setRemaining(deadline.getTime() - Date.now());
+        }, 1000);
+        return () => clearInterval(id);
+    }, [deadline]);
+
+    if (remaining <= 0) {
+        return (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">
+                <Clock className="w-3 h-3" />
+                SLA depasse
+            </span>
+        );
+    }
+
+    const totalSec = Math.floor(remaining / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    const label = min > 0 ? `${min}m ${sec.toString().padStart(2, '0')}s` : `${sec}s`;
+
+    let colorClass = 'bg-green-100 text-green-700';
+    if (min < 1) colorClass = 'bg-red-100 text-red-700';
+    else if (min < 5) colorClass = 'bg-orange-100 text-orange-700';
+
+    return (
+        <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${colorClass}`}>
+            <Clock className="w-3 h-3" />
+            {label}
+        </span>
+    );
+}
+
 export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderProps) {
-    const { updateConversation } = useChatStore();
+    const { updateConversation, changeConversationStatus } = useChatStore();
 
     const handleCallStatusChange = (
       _conversationId: string,
@@ -32,12 +67,13 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
       _conversationId: string,
       newStatus: ConversationStatus,
     ) => {
+      changeConversationStatus(currentConv.chat_id, newStatus);
       updateConversation({
         ...currentConv,
         status: newStatus,
       });
     };
-  
+
     return (
         <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -53,6 +89,9 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
                             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(currentConv?.status || 'nouveau')}`}>
                                 {currentConv?.status.replace('_', ' ')}
                             </span>
+                            {currentConv?.first_response_deadline_at && (
+                                <SlaCountdown deadline={new Date(currentConv.first_response_deadline_at)} />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -61,7 +100,7 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
                         <MessageCircle className="w-4 h-4" />
                         <span className="font-medium">{totalMessages} messages</span>
                     </div>
-                    <CallButton conversation={currentConv} 
+                    <CallButton conversation={currentConv}
                     onCallStatusChange={handleCallStatusChange} />
                     <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />
                 </div>

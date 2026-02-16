@@ -167,6 +167,80 @@ async sendTyping(chat_id: string, typing: boolean) {
     throw new WhapiOutboundError('Whapi outbound delivery failed', 'transient');
   }
 
+  async sendMediaToWhapiChannel(data: {
+    to: string;
+    channelId: string;
+    mediaBase64: string;
+    mimeType: string;
+    mediaType: 'image' | 'video' | 'audio' | 'document';
+    caption?: string;
+    fileName?: string;
+  }): Promise<WhapiSendMessageResponse> {
+    const to = this.validateWhapiRecipient(data.to);
+
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: data.channelId },
+    });
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+    const token = channel.token;
+
+    const url = `https://gate.whapi.cloud/messages/${data.mediaType}`;
+    const payload: Record<string, any> = {
+      to,
+      media: `data:${data.mimeType};base64,${data.mediaBase64}`,
+    };
+    if (data.caption) payload.caption = data.caption;
+    if (data.fileName) payload.filename = data.fileName;
+
+    let attempt = 0;
+    while (attempt <= this.maxRetries) {
+      try {
+        const response = await axios.post<WhapiSendMessageResponse>(
+          url,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+        return response.data;
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status;
+        const kind = this.classifyFailure(axiosError);
+        const lastAttempt = attempt >= this.maxRetries;
+
+        if (kind === 'transient' && !lastAttempt) {
+          const delayMs = 250 * Math.pow(2, attempt);
+          this.logger.warn(
+            `Whapi media transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) channel=${data.channelId} status=${statusCode ?? 'unknown'}`,
+            CommunicationWhapiService.name,
+          );
+          await this.delay(delayMs);
+          attempt += 1;
+          continue;
+        }
+
+        this.logger.error(
+          `Whapi media outbound failed (channel=${data.channelId}, kind=${kind}, status=${statusCode ?? 'unknown'})`,
+          axiosError.stack,
+          CommunicationWhapiService.name,
+        );
+        throw new WhapiOutboundError(
+          'Whapi media outbound delivery failed',
+          kind,
+          statusCode,
+        );
+      }
+    }
+
+    throw new WhapiOutboundError('Whapi media outbound delivery failed', 'transient');
+  }
+
   private validateWhapiRecipient(to: string): string {
     const candidate = typeof to === 'string' ? to.trim() : '';
     if (!candidate) {

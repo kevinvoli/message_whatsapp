@@ -28,6 +28,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { LoggingModule } from 'src/logging/logging.module';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Module({
    imports: [
@@ -42,7 +43,8 @@ import { LoggingModule } from 'src/logging/logging.module';
       TypeOrmModule.forFeature([
         MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,WhapiChannel,
         ProviderChannel,
-        Contact
+        Contact,
+        WhatsappMedia,
       ]),
       LoggingModule,
     ],

@@ -25,6 +25,8 @@ export interface UnifiedMedia {
   fileSize?: number;
   caption?: string;
   sha256?: string;
+  link?: string;
+  seconds?: number;
 }
 
 export interface UnifiedLocation {

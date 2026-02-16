@@ -63,6 +63,7 @@
         "@types/cron": "^2.4.3",
         "@types/express": "^5.0.0",
         "@types/jest": "^29.5.14",
+        "@types/multer": "^2.0.0",
         "@types/node": "^22.10.7",
         "@types/supertest": "^6.0.2",
         "eslint": "^9.18.0",
@@ -88,7 +89,7 @@
         ],
         "rootDir": "src",
         "moduleNameMapper": {
-            "^src/(.*)$": "\u003crootDir\u003e/$1"
+            "^src/(.*)$": "<rootDir>/$1"
         },
         "testRegex": ".*\\.spec\\.ts$",
         "transform": {

@@ -89,6 +89,23 @@ const WebSocketEvents = () => {
           }
 
           addMessage(message);
+
+          // Notification navigateur si onglet en arriere-plan et message entrant
+          if (
+            typeof document !== 'undefined' &&
+            document.hidden &&
+            !message.from_me
+          ) {
+            if (Notification.permission === 'granted') {
+              new Notification('Nouveau message', {
+                body: message.text || 'Media recu',
+                icon: '/favicon.ico',
+              });
+            } else if (Notification.permission !== 'denied') {
+              Notification.requestPermission();
+            }
+          }
+
           break;
         }
 
@@ -141,6 +158,28 @@ const WebSocketEvents = () => {
             break;
           }
           clearTyping(payload.chat_id);
+          break;
+        }
+
+        case 'MESSAGE_STATUS_UPDATE': {
+          const { chat_id, message_id, status } = data.payload as {
+            message_id: string;
+            external_id?: string;
+            chat_id: string;
+            status: string;
+            error_code?: number;
+            error_title?: string;
+          };
+          const frontStatus = status === 'failed' ? 'error' : status;
+          useChatStore
+            .getState()
+            .updateMessageStatus(chat_id, message_id, frontStatus as Message['status']);
+          break;
+        }
+
+        case 'RATE_LIMITED': {
+          const event = (data.payload as { event?: string }).event ?? 'unknown';
+          logger.warn('Rate limited by server', { event });
           break;
         }
 

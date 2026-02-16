@@ -29,6 +29,7 @@ import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Module({
   imports: [
@@ -50,7 +51,8 @@ import { SocketThrottleGuard } from './guards/socket-throttle.guard';
       ProviderChannel,
       Contact,
       WhatsappPoste,
-      MessageAuto
+      MessageAuto,
+      WhatsappMedia,
     ]),
     WhatsappChatModule,
     forwardRef(() => DispatcherModule),

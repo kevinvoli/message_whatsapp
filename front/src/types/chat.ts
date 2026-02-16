@@ -259,6 +259,9 @@ export interface Conversation {
   last_client_message_at?: Date | null;
   last_poste_message_at?: Date | null;
   
+  // SLA
+  first_response_deadline_at?: Date | null;
+
   // 🆕 Date de conversion/fermeture
   closed_at?: Date | null;
   converted_at?: Date | null;
@@ -403,6 +406,7 @@ interface RawMessageData {
     file_name?: string;
     file_size?: number;
     duration?: number;
+    seconds?: number;
     latitude?: number;
     longitude?: number;
   }>;
@@ -449,6 +453,7 @@ interface RawConversationData {
   last_client_message_at?: string | number | Date | null;
   last_poste_message_at?: string | number | Date | null;
   
+  first_response_deadline_at?: string | number | Date | null;
   closed_at?: string | number | Date | null;
   converted_at?: string | number | Date | null;
   closed_by?: string;
@@ -554,7 +559,7 @@ export const transformToMessage = (raw: RawMessageData): Message => {
           caption: m.caption,
           file_name: m.file_name,
           file_size: m.file_size,
-          duration: m.duration,
+          duration: m.duration ?? m.seconds,
           latitude: m.latitude,
           longitude: m.longitude,
         }))
@@ -683,6 +688,9 @@ export const transformToConversation = (
 
     auto_message_status: raw.auto_message_status ?? "scheduled",
 
+    first_response_deadline_at: raw.first_response_deadline_at
+      ? new Date(raw.first_response_deadline_at)
+      : null,
     closed_at: raw.closed_at ? new Date(raw.closed_at) : null,
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
     closed_by: raw.closed_by,

@@ -138,6 +138,8 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         fileSize?: number;
         caption?: string;
         sha256?: string;
+        link?: string;
+        seconds?: number;
       }
     | undefined {
     if (message.image) {
@@ -147,6 +149,7 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         fileSize: message.image.file_size,
         caption: message.image.caption,
         sha256: message.image.sha256,
+        link: message.image.link,
       };
     }
     if (message.video) {
@@ -156,6 +159,8 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         fileSize: message.video.file_size,
         caption: message.video.caption,
         sha256: message.video.sha256,
+        link: message.video.link,
+        seconds: message.video.seconds,
       };
     }
     if (message.audio) {
@@ -164,6 +169,8 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         mimeType: message.audio.mime_type,
         fileSize: message.audio.file_size,
         sha256: message.audio.sha256,
+        link: message.audio.link,
+        seconds: message.audio.seconds,
       };
     }
     if (message.voice) {
@@ -172,6 +179,8 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         mimeType: message.voice.mime_type,
         fileSize: message.voice.file_size,
         sha256: message.voice.sha256,
+        link: message.voice.link,
+        seconds: message.voice.seconds,
       };
     }
     if (message.document) {
@@ -181,6 +190,7 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         fileName: message.document.filename,
         fileSize: message.document.file_size,
         sha256: message.document.sha256,
+        link: message.document.link,
       };
     }
     if (message.sticker) {
@@ -189,6 +199,7 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
         mimeType: message.sticker.mime_type,
         fileSize: message.sticker.file_size,
         sha256: message.sticker.sha256,
+        link: message.sticker.link,
       };
     }
     return undefined;

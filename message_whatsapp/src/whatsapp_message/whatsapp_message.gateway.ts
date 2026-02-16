@@ -23,7 +23,7 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -365,14 +365,11 @@ export class WhatsappMessageGateway
   }
 
   @SubscribeMessage('chat:event')
-  handleChatEvent(
+  async handleChatEvent(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: { type: string; payload?: { chat_id?: string } },
+    data: { type: string; payload?: { chat_id?: string; status?: string } },
   ) {
-    if (data.type !== 'TYPING_START' && data.type !== 'TYPING_STOP') {
-      return;
-    }
     if (!this.throttle.allow(client.id, 'chat:event')) {
       return this.emitRateLimited(client, 'chat:event');
     }
@@ -382,6 +379,39 @@ export class WhatsappMessageGateway
 
     const chatId = data.payload?.chat_id;
     if (!chatId) return;
+
+    // --- CONVERSATION_STATUS_CHANGE ---
+    if (data.type === 'CONVERSATION_STATUS_CHANGE') {
+      const newStatus = data.payload?.status as WhatsappChatStatus;
+      if (!newStatus || !Object.values(WhatsappChatStatus).includes(newStatus)) {
+        this.logger.warn(`Invalid conversation status: ${data.payload?.status}`);
+        return;
+      }
+
+      const tenantIds = this.getTenantIds(client);
+      const chat = await this.chatService.findBychat_id(chatId);
+      if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) return;
+
+      await this.chatService.update(chatId, { status: newStatus });
+      this.logger.log(`Conversation status changed: ${chatId} → ${newStatus}`);
+
+      const updatedChat = await this.chatService.findBychat_id(chatId);
+      if (!updatedChat?.tenant_id) return;
+
+      const lastMessage = await this.messageService.findLastMessageBychat_id(chatId);
+      const unreadCount = await this.messageService.countUnreadMessages(chatId);
+
+      this.server.to(`tenant:${updatedChat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(updatedChat, lastMessage, unreadCount),
+      });
+      return;
+    }
+
+    // --- TYPING ---
+    if (data.type !== 'TYPING_START' && data.type !== 'TYPING_STOP') {
+      return;
+    }
 
     const commercialId = agent.commercialId;
     if (!commercialId) return;

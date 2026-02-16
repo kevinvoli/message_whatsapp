@@ -27,6 +27,7 @@ import { DispatcherController } from './dispatcher.controller';
 import { OfflineReinjectionJob } from 'src/jorbs/offline-reinjection.job';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
       ProviderChannel,
       Contact,
       WhatsappPoste,
+      WhatsappMedia,
     ]),
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,

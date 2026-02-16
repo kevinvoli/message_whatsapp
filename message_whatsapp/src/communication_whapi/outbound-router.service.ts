@@ -68,4 +68,72 @@ export class OutboundRouterService {
       provider: 'whapi',
     };
   }
+
+  async sendMediaMessage(data: {
+    to: string;
+    channelId: string;
+    mediaBuffer: Buffer;
+    mimeType: string;
+    fileName: string;
+    mediaType: 'image' | 'video' | 'audio' | 'document';
+    caption?: string;
+  }): Promise<OutboundSendResponse> {
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+
+    const provider = channel.provider ?? 'whapi';
+
+    if (provider === 'meta') {
+      if (!channel.external_id) {
+        throw new NotFoundException(
+          `Channel ${data.channelId} missing external_id (phone_number_id) for Meta`,
+        );
+      }
+
+      this.logger.log(
+        `OUTBOUND_MEDIA_ROUTE provider=meta channel=${data.channelId} type=${data.mediaType}`,
+        OutboundRouterService.name,
+      );
+
+      const result = await this.metaService.sendMediaMessage({
+        to: data.to,
+        phoneNumberId: channel.external_id,
+        accessToken: channel.token,
+        mediaBuffer: data.mediaBuffer,
+        mimeType: data.mimeType,
+        fileName: data.fileName,
+        mediaType: data.mediaType,
+        caption: data.caption,
+      });
+
+      return {
+        providerMessageId: result.providerMessageId,
+        provider: 'meta',
+      };
+    }
+
+    // Default: Whapi
+    this.logger.log(
+      `OUTBOUND_MEDIA_ROUTE provider=whapi channel=${data.channelId} type=${data.mediaType}`,
+      OutboundRouterService.name,
+    );
+
+    const mediaBase64 = data.mediaBuffer.toString('base64');
+    const result = await this.whapiService.sendMediaToWhapiChannel({
+      to: data.to,
+      channelId: data.channelId,
+      mediaBase64,
+      mimeType: data.mimeType,
+      mediaType: data.mediaType,
+      caption: data.caption,
+      fileName: data.fileName,
+    });
+
+    return {
+      providerMessageId: result.message.id,
+      provider: 'whapi',
+    };
+  }
 }

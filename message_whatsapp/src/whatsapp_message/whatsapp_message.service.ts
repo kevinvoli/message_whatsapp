@@ -19,6 +19,7 @@ import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 import { UnifiedMessage } from 'src/webhooks/normalization/unified-message';
+import { WhatsappMedia, WhatsappMediaType } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -40,6 +41,8 @@ export class WhatsappMessageService {
 
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappMedia)
+    private readonly mediaRepository: Repository<WhatsappMedia>,
   ) {}
 
   private resolveIncomingText(message: WhapiMessage): string {
@@ -218,6 +221,145 @@ export class WhatsappMessageService {
       // await this.messageRepository.save(failedMessage);
       throw error;
       // throw error;
+    }
+  }
+
+  async createAgentMediaMessage(data: {
+    chat_id: string;
+    poste_id: string;
+    timestamp: Date;
+    commercial_id?: string | null;
+    channel_id: string;
+    mediaBuffer: Buffer;
+    mimeType: string;
+    fileName: string;
+    mediaType: 'image' | 'video' | 'audio' | 'document';
+    caption?: string;
+  }): Promise<WhatsappMessage> {
+    const traceId = this.buildTraceId(undefined, data.chat_id);
+    let chat: WhatsappChat | null = null;
+    let commercial: WhatsappCommercial | null = null;
+    try {
+      this.logger.log(`OUTBOUND_MEDIA_REQUEST trace=${traceId} chat_id=${data.chat_id} type=${data.mediaType}`);
+      chat = await this.chatService.findBychat_id(data.chat_id);
+      if (!chat) throw new Error('Chat not found');
+      if (data.commercial_id) {
+        commercial = await this.commercialRepository.findOne({ where: { id: data.commercial_id } });
+      }
+
+      const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
+      if (lastMessage && !lastMessage.from_me) {
+        const now = new Date();
+        const lastMessageDate = new Date(lastMessage.timestamp);
+        const diff = now.getTime() - lastMessageDate.getTime();
+        const diffHours = Math.ceil(diff / (1000 * 60 * 60));
+        if (diffHours > this.getResponseTimeoutHours()) {
+          throw new Error(`Response timeout exceeded (${this.getResponseTimeoutHours()}h)`);
+        }
+      }
+
+      function extractPhoneNumber(chat_id: string): string {
+        return chat_id.split('@')[0];
+      }
+
+      // 1. Send media to WhatsApp
+      const sendResponse = await this.outboundRouter.sendMediaMessage({
+        to: extractPhoneNumber(chat.chat_id),
+        channelId: data.channel_id,
+        mediaBuffer: data.mediaBuffer,
+        mimeType: data.mimeType,
+        fileName: data.fileName,
+        mediaType: data.mediaType,
+        caption: data.caption,
+      });
+      this.logger.log(
+        `OUTBOUND_MEDIA_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
+      );
+
+      const channel = await this.channelService.findOne(data.channel_id);
+      if (!channel) {
+        throw new NotFoundException('Channel not found');
+      }
+
+      // 2. Create message entity
+      const messageEntity = this.messageRepository.create({
+        message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
+        external_id: sendResponse.providerMessageId,
+        provider: sendResponse.provider,
+        provider_message_id: sendResponse.providerMessageId,
+        poste_id: data.poste_id,
+        direction: MessageDirection.OUT,
+        from_me: true,
+        timestamp: data.timestamp,
+        status: WhatsappMessageStatus.SENT,
+        source: 'agent_web',
+        text: data.caption ?? '',
+        type: data.mediaType,
+        chat: chat,
+        poste: chat.poste ?? undefined,
+        from: extractPhoneNumber(chat.chat_id),
+        from_name: chat.name,
+        channel: channel,
+        commercial: commercial,
+        contact: null,
+      });
+
+      const savedMessage = await this.messageRepository.save(messageEntity);
+
+      // 3. Save file to disk for local serving
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const ext = data.fileName.includes('.') ? data.fileName.substring(data.fileName.lastIndexOf('.')) : '';
+      const localFileName = `${savedMessage.id}_${Date.now()}${ext}`;
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(path.join(uploadsDir, localFileName), data.mediaBuffer);
+
+      const serverPort = process.env.SERVER_PORT ?? '3002';
+      const serverHost = process.env.SERVER_HOST ?? `http://localhost:${serverPort}`;
+      const mediaUrl = `${serverHost}/uploads/${localFileName}`;
+
+      // 4. Create media entity
+      const mediaEntity = this.mediaRepository.create({
+        media_id: `agent_media_${Date.now()}`,
+        whapi_media_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
+        media_type: data.mediaType as WhatsappMediaType,
+        mime_type: data.mimeType,
+        file_name: data.fileName,
+        file_size: String(data.mediaBuffer.length),
+        url: mediaUrl,
+        view_once: '0',
+        message: savedMessage,
+        chat: chat,
+        channel: channel,
+        tenant_id: chat.tenant_id,
+        provider: sendResponse.provider,
+      });
+      await this.mediaRepository.save(mediaEntity);
+
+      this.logger.log(`OUTBOUND_MEDIA_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`);
+
+      await this.chatRepository.update(
+        { chat_id: chat.chat_id },
+        {
+          unread_count: 0,
+          last_poste_message_at: messageEntity.createdAt,
+          last_activity_at: new Date(),
+        },
+      );
+
+      // Reload with medias relation
+      const result = await this.messageRepository.findOne({
+        where: { id: savedMessage.id },
+        relations: ['chat', 'medias', 'channel', 'poste', 'commercial'],
+      });
+      return result!;
+    } catch (error) {
+      this.logger.error(
+        `OUTBOUND_MEDIA_FAILED trace=${traceId} chat_id=${data.chat_id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
     }
   }
 

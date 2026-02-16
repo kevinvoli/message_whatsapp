@@ -20,6 +20,8 @@ import {
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { UnifiedMessage } from './normalization/unified-message';
 import { UnifiedStatus } from './normalization/unified-status';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { ChannelService } from 'src/channel/channel.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -31,6 +33,8 @@ export class InboundMessageService {
     private readonly messageGateway: WhatsappMessageGateway,
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
+    private readonly metaService: CommunicationMetaService,
+    private readonly channelService: ChannelService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -89,6 +93,7 @@ export class InboundMessageService {
             tenantId: message.tenantId,
             provider: message.provider,
             providerMediaId: message.media?.id,
+            channelId: message.channelId,
           });
         }
 
@@ -135,7 +140,7 @@ export class InboundMessageService {
     media: ExtractedMedia,
     messageEntity,
     chatEntity,
-    context?: { tenantId?: string; provider?: string; providerMediaId?: string },
+    context?: { tenantId?: string; provider?: string; providerMediaId?: string; channelId?: string },
   ) {
     const entity = new WhatsappMedia();
 
@@ -153,7 +158,47 @@ export class InboundMessageService {
 
     const raw = media.payload as WhapiRawMedia | undefined;
     entity.sha256 = raw?.sha256 ?? null;
-    entity.url = raw?.link ?? null;
+
+    // Resolve media URL
+    let mediaUrl = raw?.link ?? null;
+
+    // For Meta provider: download media and store locally (Meta URLs are temporary ~5min)
+    if (!mediaUrl && context?.provider === 'meta' && context?.providerMediaId && context?.channelId) {
+      try {
+        const channels = await this.channelService.findAll();
+        const metaChannel = channels.find(
+          (ch) => ch.channel_id === context.channelId || ch.external_id === context.channelId,
+        );
+        if (metaChannel?.token) {
+          const downloaded = await this.metaService.downloadMedia(
+            context.providerMediaId,
+            metaChannel.token,
+          );
+          if (downloaded) {
+            const fs = await import('fs/promises');
+            const path = await import('path');
+            const ext = this.guessExtension(downloaded.mimeType);
+            const localFileName = `meta_${context.providerMediaId}_${Date.now()}${ext}`;
+            const uploadsDir = path.join(process.cwd(), 'uploads');
+            await fs.mkdir(uploadsDir, { recursive: true });
+            await fs.writeFile(path.join(uploadsDir, localFileName), downloaded.buffer);
+
+            const serverPort = process.env.SERVER_PORT ?? '3002';
+            const serverHost = process.env.SERVER_HOST ?? `http://localhost:${serverPort}`;
+            mediaUrl = `${serverHost}/uploads/${localFileName}`;
+
+            // Update file_size if not set
+            if (!entity.file_size) {
+              entity.file_size = String(downloaded.buffer.length);
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to download Meta media: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    entity.url = mediaUrl;
 
     entity.chat = chatEntity;
     entity.message = messageEntity;
@@ -205,6 +250,8 @@ export class InboundMessageService {
           caption: message.media.caption,
           file_name: message.media.fileName,
           file_size: message.media.fileSize,
+          seconds: message.media.seconds,
+          payload: { link: message.media.link } as WhapiRawMedia,
         },
       ];
     }
@@ -246,5 +293,25 @@ export class InboundMessageService {
     chatId?: string,
   ): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+
+  private guessExtension(mimeType: string): string {
+    const map: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+      'video/mp4': '.mp4',
+      'video/3gpp': '.3gp',
+      'audio/ogg': '.ogg',
+      'audio/mpeg': '.mp3',
+      'audio/aac': '.aac',
+      'audio/amr': '.amr',
+      'audio/opus': '.opus',
+      'application/pdf': '.pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    };
+    return map[mimeType] ?? '';
   }
 }

@@ -1,7 +1,7 @@
 // src/store/chatStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
-import { Conversation, Message } from "@/types/chat";
+import { Conversation, ConversationStatus, Message } from "@/types/chat";
 import { logger } from "@/lib/logger";
 
 interface ChatState {
@@ -20,6 +20,7 @@ interface ChatState {
   sendMessage: (text: string) => void;
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
+  changeConversationStatus: (chat_id: string, status: ConversationStatus) => void;
 
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[]) => void;
@@ -57,6 +58,7 @@ const initialState: Omit<
   | "reset"
   | "onTypingStart"
   | "onTypingStop"
+  | "changeConversationStatus"
 > = {
   socket: null,
   conversations: [],
@@ -173,6 +175,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket) return;
 
     socket.emit("chat:event", { type: "TYPING_STOP", payload: { chat_id } });
+  },
+
+  changeConversationStatus: (chat_id: string, status: ConversationStatus) => {
+    const { socket } = get();
+    if (!socket) return;
+
+    socket.emit("chat:event", {
+      type: "CONVERSATION_STATUS_CHANGE",
+      payload: { chat_id, status },
+    });
+
+    logger.debug("Conversation status change emitted", { chat_id, status });
   },
 
   setConversations: (conversations) => {
