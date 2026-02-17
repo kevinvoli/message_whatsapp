@@ -12,6 +12,7 @@ interface ChatState {
   selectedConversation: Conversation | null;
   isLoading: boolean;
   error: string | null;
+  messageIdCache: Record<string, Set<string>>;
 
   // Actions
   setSocket: (socket: Socket | null) => void;
@@ -67,6 +68,7 @@ const initialState: Omit<
   isLoading: false,
   error: null,
   typingStatus: {},
+  messageIdCache: {},
 };
 let typingTimeout: NodeJS.Timeout;
 
@@ -111,6 +113,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ),
         messages: [],
         isLoading: true,
+        messageIdCache: { ...state.messageIdCache, [chat_id]: new Set<string>() },
       };
     });
 
@@ -198,7 +201,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setMessages: (chat_id, messages) => {
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
-      return { messages: dedupeMessagesById(messages), isLoading: false };
+      const deduped = dedupeMessagesById(messages);
+      return {
+        messages: deduped,
+        isLoading: false,
+        messageIdCache: {
+          ...state.messageIdCache,
+          [chat_id]: new Set(deduped.map((m) => m.id)),
+        },
+      };
     });
   },
 
@@ -209,14 +220,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     set((state) => {
+      const existingIds = state.messageIdCache[message.chat_id];
+      if (existingIds?.has(message.id)) {
+        return state;
+      }
+
       const alreadyExists = state.messages.some((m) => m.id === message.id);
       const isActive = state.selectedConversation?.chat_id === message.chat_id;
+      const updatedMessages =
+        isActive && !alreadyExists
+          ? dedupeMessagesById([...state.messages, message])
+          : state.messages;
+      const nextCache = isActive
+        ? {
+            ...state.messageIdCache,
+            [message.chat_id]: new Set(updatedMessages.map((m) => m.id)),
+          }
+        : state.messageIdCache;
 
       return {
-        messages:
-          isActive && !alreadyExists
-            ? dedupeMessagesById([...state.messages, message])
-            : state.messages,
+        messages: updatedMessages,
         conversations: state.conversations.map((c) =>
           c.chat_id === message.chat_id
             ? {
@@ -226,6 +249,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }
             : c,
         ),
+        messageIdCache: nextCache,
       };
     });
   },

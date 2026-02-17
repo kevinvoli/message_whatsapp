@@ -59,6 +59,7 @@ export class WhatsappMessageGateway
     { commercialId: string; posteId: string; tenantId: string | null; tenantIds: string[] }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
+  private pendingAgentMessages = new Set<string>();
 
   constructor(
     private readonly messageService: WhatsappMessageService,
@@ -500,6 +501,16 @@ export class WhatsappMessageGateway
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;
     if (!this.isAllowedTenantChat(chat, agent.tenantIds)) return;
+
+    const normalizedText = (payload.text ?? '').trim();
+    const pendingKey = `${payload.chat_id}:${normalizedText}`;
+    if (this.pendingAgentMessages.has(pendingKey)) {
+      this.logger.warn(
+        `Duplicate send blocked (${payload.chat_id}) text="${normalizedText}"`,
+      );
+      return;
+    }
+
     const resolvedChannelId = await this.resolveChannelIdForChat(chat);
     if (!resolvedChannelId) {
       this.logger.warn(
@@ -517,73 +528,80 @@ export class WhatsappMessageGateway
       return;
     }
 
-    let message: WhatsappMessage;
+    this.pendingAgentMessages.add(pendingKey);
+
     try {
-      message = await this.messageService.createAgentMessage({
-        chat_id: payload.chat_id,
-        poste_id: agent.posteId,
-        text: payload.text,
-        channel_id: resolvedChannelId,
-        timestamp: new Date(),
-        commercial_id: agent.commercialId
-      });
-      this.logger.log(
-        `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,
-      );
-    } catch (error) {
-      const outboundCode =
-        error instanceof WhapiOutboundError
-          ? error.kind === 'transient'
-            ? 'WHAPI_TRANSIENT_ERROR'
-            : 'WHAPI_PERMANENT_ERROR'
-          : 'MESSAGE_SEND_FAILED';
-      const outboundMessage =
-        error instanceof Error ? error.message : 'Echec envoi message';
-      this.logger.warn(
-        `Message send failed for chat ${payload.chat_id}: ${outboundCode}`,
-      );
-      client.emit('chat:event', {
-        type: 'MESSAGE_SEND_ERROR',
-        payload: {
+      let message: WhatsappMessage;
+      try {
+        message = await this.messageService.createAgentMessage({
           chat_id: payload.chat_id,
-          tempId: payload.tempId,
-          code: outboundCode,
-          message: outboundMessage,
-        },
+          poste_id: agent.posteId,
+          text: payload.text,
+          channel_id: resolvedChannelId,
+          timestamp: new Date(),
+          commercial_id: agent.commercialId,
+        });
+        this.logger.log(
+          `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,
+        );
+      } catch (error) {
+        const outboundCode =
+          error instanceof WhapiOutboundError
+            ? error.kind === 'transient'
+              ? 'WHAPI_TRANSIENT_ERROR'
+              : 'WHAPI_PERMANENT_ERROR'
+            : 'MESSAGE_SEND_FAILED';
+        const outboundMessage =
+          error instanceof Error ? error.message : 'Echec envoi message';
+        this.logger.warn(
+          `Message send failed for chat ${payload.chat_id}: ${outboundCode}`,
+        );
+        client.emit('chat:event', {
+          type: 'MESSAGE_SEND_ERROR',
+          payload: {
+            chat_id: payload.chat_id,
+            tempId: payload.tempId,
+            code: outboundCode,
+            message: outboundMessage,
+          },
+        });
+        return;
+      }
+
+      if (!chat.tenant_id) {
+        this.logger.warn(
+          `Message emit skipped: missing tenant for chat ${chat.chat_id}`,
+        );
+        return;
+      }
+      chat.read_only = true;
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'MESSAGE_ADD',
+        payload: { ...this.mapMessage(message), tempId: payload.tempId },
       });
-      return;
-    }
 
-    if (!chat.tenant_id) {
-      this.logger.warn(
-        `Message emit skipped: missing tenant for chat ${chat.chat_id}`,
+      const lastMessage = await this.messageService.findLastMessageBychat_id(
+        chat.chat_id,
       );
-      return;
-    }
-    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-      type: 'MESSAGE_ADD',
-      payload: { ...this.mapMessage(message), tempId: payload.tempId },
-    });
-
-    const lastMessage = await this.messageService.findLastMessageBychat_id(
-      chat.chat_id,
-    );
-    const unreadCount = await this.messageService.countUnreadMessages(
-      chat.chat_id,
-    );
-
-    // const unreadCount = chat.unread_count
-
-    if (!chat.tenant_id) {
-      this.logger.warn(
-        `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
+      const unreadCount = await this.messageService.countUnreadMessages(
+        chat.chat_id,
       );
-      return;
+
+      // const unreadCount = chat.unread_count
+
+      if (!chat.tenant_id) {
+        this.logger.warn(
+          `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
+        );
+        return;
+      }
+      this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, unreadCount),
+      });
+    } finally {
+      this.pendingAgentMessages.delete(pendingKey);
     }
-    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
-    });
   }
 
   // ======================================================
@@ -602,6 +620,7 @@ export class WhatsappMessageGateway
       );
       return;
     }
+    chat.read_only = false;
     this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
       type: 'MESSAGE_ADD',
       payload: this.mapMessage(message),
@@ -832,8 +851,8 @@ export class WhatsappMessageGateway
     id: message.id,
     chat_id: message.chat.chat_id,
     from_me: message.from_me,
-    text: message.text ?? undefined,
-    timestamp:message.timestamp,
+    text: this.resolveMessageText(message) ?? undefined,
+    timestamp: message.timestamp ?? message.createdAt,
     status: message.status,
     from: message.from,
     from_name: message.from_name,
@@ -899,13 +918,50 @@ export class WhatsappMessageGateway
       last_message: lastMessage
         ? {
             id: lastMessage.id,
-            text: lastMessage.text ?? '',
-            timestamp: lastMessage.timestamp,
+            text: this.resolveMessageText(lastMessage) ?? '',
+            timestamp: lastMessage.timestamp ?? lastMessage.createdAt,
             from_me: lastMessage.from_me,
             status: lastMessage.status,
             type: lastMessage.type,
           }
         : null,
+      read_only: chat.read_only,
     };
+  }
+
+  private resolveMessageText(message: WhatsappMessage): string | null {
+    const rawText = typeof message.text === 'string' ? message.text.trim() : '';
+    if (rawText) return message.text ?? rawText;
+
+    const media = message.medias?.[0];
+    const type = message.type ?? media?.media_type ?? null;
+
+    if (media?.caption && media.caption.trim().length > 0) {
+      return media.caption;
+    }
+
+    switch (type) {
+      case 'image':
+        return '[Photo]';
+      case 'video':
+      case 'gif':
+      case 'short':
+        return '[Video]';
+      case 'audio':
+      case 'voice':
+        return '[Message vocal]';
+      case 'document':
+        return media?.file_name ?? '[Document]';
+      case 'location':
+      case 'live_location':
+        return '[Localisation]';
+      case 'interactive':
+      case 'buttons':
+      case 'button':
+      case 'list':
+        return '[Message interactif]';
+      default:
+        return media ? '[Media]' : null;
+    }
   }
 }

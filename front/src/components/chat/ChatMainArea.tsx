@@ -46,13 +46,14 @@ export default function ChatMainArea() {
             </>
           )}
 
-          <ChatInput
-            chat_id={selectedConversation?.chat_id}
-            onSendMessage={sendMessage}
-            onTypingStart={onTypingStart}
-            onTypingStop={onTypingStop}
-            isConnected={isWebSocketConnected}
-          />
+              <ChatInput
+                chat_id={selectedConversation?.chat_id}
+                onSendMessage={sendMessage}
+                onTypingStart={onTypingStart}
+                onTypingStop={onTypingStop}
+                isConnected={isWebSocketConnected}
+                disabled={!!selectedConversation?.readonly}
+              />
 
           {error && (
             <div className="bg-red-100 border-t border-red-200 p-2 text-center">

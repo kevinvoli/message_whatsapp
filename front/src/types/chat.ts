@@ -457,6 +457,7 @@ interface RawConversationData {
   closed_at?: string | number | Date | null;
   converted_at?: string | number | Date | null;
   closed_by?: string;
+  read_only?: boolean;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
 }
@@ -687,6 +688,7 @@ export const transformToConversation = (
     tags: raw.tags || [],
 
     auto_message_status: raw.auto_message_status ?? "scheduled",
+    readonly: raw.read_only ?? undefined,
 
     first_response_deadline_at: raw.first_response_deadline_at
       ? new Date(raw.first_response_deadline_at)

@@ -43,7 +43,8 @@ export const getStatusBadge = (
       actif: 'bg-yellow-100 text-yellow-800',
       attente: 'bg-gray-100 text-gray-800',
       'en attente': 'bg-gray-100 text-gray-800',
-      converti: 'bg-green-100 text-green-800'
+      converti: 'bg-green-100 text-green-800',
+      'fermÃ©': 'bg-red-100 text-red-800'
     };
     return styles[status as keyof typeof styles] || styles.nouveau;
   };

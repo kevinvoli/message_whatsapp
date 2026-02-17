@@ -89,6 +89,11 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
                             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(currentConv?.status || 'nouveau')}`}>
                                 {currentConv?.status.replace('_', ' ')}
                             </span>
+                            {currentConv?.readonly && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                                    Lecture seule
+                                </span>
+                            )}
                             {currentConv?.first_response_deadline_at && (
                                 <SlaCountdown deadline={new Date(currentConv.first_response_deadline_at)} />
                             )}

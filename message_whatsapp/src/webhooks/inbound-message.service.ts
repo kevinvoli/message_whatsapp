@@ -100,7 +100,8 @@ export class InboundMessageService {
         );
 
         if (!fullMessage) continue;
-
+        await this.chatService.update(conversation.chat_id, { read_only: false });
+        conversation.read_only = false;
         await this.messageGateway.notifyNewMessage(fullMessage, conversation);
         this.logger.log(
           `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,

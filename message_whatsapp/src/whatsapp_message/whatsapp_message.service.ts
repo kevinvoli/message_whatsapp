@@ -191,6 +191,7 @@ export class WhatsappMessageService {
           unread_count: 0,
           last_poste_message_at: messageEntity.createdAt,
           last_activity_at: new Date(),
+          read_only: true,
         },
       );
 
@@ -345,6 +346,7 @@ export class WhatsappMessageService {
           unread_count: 0,
           last_poste_message_at: messageEntity.createdAt,
           last_activity_at: new Date(),
+          read_only: true,
         },
       );
 
