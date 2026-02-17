@@ -844,7 +844,7 @@ export class WhatsappMessageGateway
       message.medias?.map((m) => ({
         id: m.media_id,
         type: m.media_type,
-        url: m.url,
+        url: this.resolveMediaUrl(message, m, m.url ?? null),
         mime_type: m.mime_type,
         caption: m.caption,
         file_name: m.file_name,
@@ -854,6 +854,26 @@ export class WhatsappMessageGateway
         longitude: m.longitude,
       })) ?? [],
   });
+
+  private resolveMediaUrl(
+    message: WhatsappMessage,
+    media: { provider_media_id?: string | null; media_id: string },
+    directUrl: string | null,
+  ): string | null {
+    if (message.provider !== 'meta') {
+      return directUrl ?? null;
+    }
+    const providerMediaId = media.provider_media_id ?? media.media_id;
+    if (!providerMediaId) return null;
+    const serverPort = process.env.SERVER_PORT ?? '3002';
+    const rawHost =
+      process.env.SERVER_PUBLIC_HOST ??
+      process.env.SERVER_HOST ??
+      `http://localhost:${serverPort}`;
+    const serverHost = rawHost.replace(/\/+$/, '');
+    const channelQuery = message.channel_id ? `?channelId=${encodeURIComponent(message.channel_id)}` : '';
+    return `${serverHost}/messages/media/meta/${providerMediaId}${channelQuery}`;
+  }
 
   private mapConversation(
     chat: WhatsappChat,
@@ -889,4 +909,3 @@ export class WhatsappMessageGateway
     };
   }
 }
-

@@ -189,7 +189,6 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    console.log("affichage du post:");
     
     const startedAt = Date.now();
     const provider = 'meta';
@@ -205,7 +204,7 @@ export class WhapiController {
 
     const metaPayload = this.assertMetaPayload(payload);
 
-    console.log("affichage du post:", metaPayload?.entry[0]?.changes[0]);
+    console.log("affichage du post:", metaPayload?.entry[0]?.changes[0]?.value?.messages?.[0]);
 
 
     const entry = metaPayload?.entry?.[0];
@@ -513,7 +512,7 @@ export class WhapiController {
     provided: string,
     requireRawBody: boolean,
   ): boolean {
-    console.log("affichage du post:1",provider);
+    // console.log("affichage du post:1",provider);
 
     if (requireRawBody && !rawBody) {
       this.metricsService.recordSignatureInvalid(provider);
@@ -530,13 +529,13 @@ export class WhapiController {
       const candidates = [`sha256=${digest}`, digest];
       for (const candidate of candidates) {
         const expectedBuffer = Buffer.from(candidate.toLowerCase());
-    console.log("affichage du post:4.7",candidate, receivedBuffer);  
+    // console.log("affichage du post:4.7",candidate, receivedBuffer);  
 
         if (
           expectedBuffer.length === receivedBuffer.length &&
           timingSafeEqual(expectedBuffer, receivedBuffer)
         ) {
-    console.log("affichage du post:10");
+    // console.log("affichage du post:10");
 
           return true;
         }

@@ -10,6 +10,9 @@ import {
   UploadedFile,
   BadRequestException,
   Req,
+  Query,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
@@ -18,6 +21,12 @@ import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { Repository } from 'typeorm';
+import { ChannelService } from 'src/channel/channel.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { Response } from 'express';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
 
@@ -34,6 +43,10 @@ export class WhatsappMessageController {
     private readonly messageService: WhatsappMessageService,
     private readonly gateway: WhatsappMessageGateway,
     private readonly chatService: WhatsappChatService,
+    @InjectRepository(WhatsappMedia)
+    private readonly mediaRepository: Repository<WhatsappMedia>,
+    private readonly channelService: ChannelService,
+    private readonly metaService: CommunicationMetaService,
   ) {}
 
   @Post()
@@ -109,6 +122,82 @@ export class WhatsappMessageController {
     await this.gateway.notifyNewMessage(message, chat);
 
     return { success: true, message_id: message.id };
+  }
+
+  @Get('media/meta/:providerMediaId')
+  async streamMetaMedia(
+    @Param('providerMediaId') providerMediaId: string,
+    @Query('channelId') channelId: string | undefined,
+    @Res() res: Response,
+  ) {
+    if (!providerMediaId) {
+      throw new BadRequestException('providerMediaId is required');
+    }
+
+    const media = await this.mediaRepository.findOne({
+      where: { provider_media_id: providerMediaId, provider: 'meta' },
+      relations: ['channel', 'message', 'message.channel', 'message.chat'],
+    });
+
+    const resolvedChannelId =
+      media?.channel?.channel_id ??
+      media?.message?.channel_id ??
+      media?.message?.chat?.last_msg_client_channel_id ??
+      channelId ??
+      null;
+
+    if (!resolvedChannelId) {
+      throw new NotFoundException('Channel not resolved for media');
+    }
+
+    const channel = await this.channelService.findByChannelId(resolvedChannelId);
+    if (!channel?.token) {
+      throw new NotFoundException('Channel token not found');
+    }
+
+    let mediaUrl = media?.url ?? null;
+
+    // Try direct URL from webhook if present
+    let downloaded =
+      mediaUrl && channel?.token
+        ? await this.metaService.downloadMediaByUrl(mediaUrl, channel.token)
+        : null;
+
+    // If direct URL is missing or expired, refresh via Meta API
+    if (!downloaded) {
+      const refreshedUrl = await this.metaService.getMediaUrl(
+        providerMediaId,
+        channel.token,
+        channel.channel_id,
+      );
+      if (refreshedUrl) {
+        if (media && refreshedUrl !== media.url) {
+          await this.mediaRepository.update(media.id, { url: refreshedUrl });
+        }
+        mediaUrl = refreshedUrl;
+        downloaded = await this.metaService.downloadMediaByUrl(
+          refreshedUrl,
+          channel.token,
+        );
+      }
+    }
+
+    // Final fallback: resolve URL then download (handles transient Meta API issues)
+    if (!downloaded) {
+      downloaded = await this.metaService.downloadMedia(
+        providerMediaId,
+        channel.token,
+        channel.channel_id,
+      );
+    }
+
+    if (!downloaded) {
+      throw new NotFoundException('Meta media not found');
+    }
+
+    res.setHeader('Content-Type', downloaded.mimeType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(downloaded.buffer);
   }
 
   @Get(':chat_id')

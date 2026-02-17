@@ -216,29 +216,57 @@ console.log("l'url de l'envoie du message================== :", response);
     throw new WhapiOutboundError('Meta media send failed', 'transient');
   }
 
-  async getMediaUrl(mediaId: string, accessToken: string): Promise<string | null> {
+  async getMediaUrl(
+    mediaId: string,
+    accessToken: string,
+    phoneNumberId?: string,
+  ): Promise<string | null> {
     try {
-      const url = `https://graph.facebook.com/${this.META_API_VERSION}/${mediaId}`;
+      const query = phoneNumberId ? `?phone_number_id=${encodeURIComponent(phoneNumberId)}` : '';
+      const url = `https://graph.facebook.com/${this.META_API_VERSION}/${mediaId}${query}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       return response.data?.url ?? null;
     } catch (error) {
+      const axiosError = error as AxiosError;
+      const statusCode = axiosError.response?.status;
+      const data = axiosError.response?.data as { error?: { message?: string; code?: number } } | undefined;
+      const reason = data?.error?.message ?? axiosError.message ?? 'unknown_error';
       this.logger.warn(
-        `Failed to get Meta media URL for mediaId=${mediaId}`,
+        `Failed to get Meta media URL for mediaId=${mediaId} status=${statusCode ?? 'unknown'} reason=${reason}`,
         CommunicationMetaService.name,
       );
       return null;
     }
   }
 
-  async downloadMedia(mediaId: string, accessToken: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  async downloadMedia(
+    mediaId: string,
+    accessToken: string,
+    phoneNumberId?: string,
+  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
     try {
       // Step 1: Get the temporary download URL
-      const mediaUrl = await this.getMediaUrl(mediaId, accessToken);
+      const mediaUrl = await this.getMediaUrl(mediaId, accessToken, phoneNumberId);
       if (!mediaUrl) return null;
 
       // Step 2: Download the actual file
+      return await this.downloadMediaByUrl(mediaUrl, accessToken);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to download Meta media for mediaId=${mediaId}`,
+        CommunicationMetaService.name,
+      );
+      return null;
+    }
+  }
+
+  async downloadMediaByUrl(
+    mediaUrl: string,
+    accessToken: string,
+  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    try {
       const response = await axios.get(mediaUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
         responseType: 'arraybuffer',
@@ -248,8 +276,10 @@ console.log("l'url de l'envoie du message================== :", response);
       const mimeType = response.headers['content-type'] ?? 'application/octet-stream';
       return { buffer, mimeType };
     } catch (error) {
+      const axiosError = error as AxiosError;
+      const statusCode = axiosError.response?.status;
       this.logger.warn(
-        `Failed to download Meta media for mediaId=${mediaId}`,
+        `Failed to download Meta media from url status=${statusCode ?? 'unknown'}`,
         CommunicationMetaService.name,
       );
       return null;

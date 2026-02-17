@@ -70,6 +70,7 @@ export interface MetaMedia {
   mime_type: string;
   sha256?: string;
   caption?: string;
+  url?: string;
 }
 
 export interface MetaAudioMessage extends MetaMessageBase {

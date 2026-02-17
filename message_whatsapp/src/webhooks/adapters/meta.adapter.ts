@@ -146,6 +146,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
         fileSize?: number;
         caption?: string;
         sha256?: string;
+        link?: string;
       }
     | undefined {
     if (message.type === 'image') {
@@ -154,6 +155,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
         mimeType: message.image.mime_type,
         caption: message.image.caption,
         sha256: message.image.sha256,
+        link: message.image.url,
       };
     }
     if (message.type === 'video') {
@@ -162,6 +164,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
         mimeType: message.video.mime_type,
         caption: message.video.caption,
         sha256: message.video.sha256,
+        link: message.video.url,
       };
     }
     if (message.type === 'audio') {
@@ -169,6 +172,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
         id: message.audio.id,
         mimeType: message.audio.mime_type,
         sha256: message.audio.sha256,
+        link: message.audio.url,
       };
     }
     if (message.type === 'document') {
@@ -177,6 +181,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
         mimeType: message.document.mime_type,
         fileName: message.document.filename,
         sha256: message.document.sha256,
+        link: message.document.url,
       };
     }
     return undefined;

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle } from 'lucide-react';
 import { Message } from '@/types/chat';
+import { MediaBubble } from '../helper/mediaBubble';
 
 interface ChatMessageProps {
   msg: Message;
@@ -88,48 +89,43 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
         >
           {/* Images */}
           {imageMedias.map((img, i) => (
-            <div key={`img-${messageId}-${i}`} className="mb-2">
-              <a href={img.url} target="_blank" rel="noopener noreferrer">
+            <MediaBubble key={`img-${messageId}-${i}`} fromMe={isFromMe}>
+              <a href={img.url} target="_blank" rel="noopener noreferrer" className="block">
                 <img
                   src={img.url}
                   alt={img.caption || 'image'}
-                  className="rounded-lg max-w-full max-h-80 object-cover cursor-pointer"
+                  className="max-w-full max-h-80 object-cover cursor-pointer"
                   loading="lazy"
                 />
               </a>
               {img.caption && (
-                <p className={`text-xs mt-1 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
+                <p className={`text-xs px-3 py-2 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
                   {img.caption}
                 </p>
               )}
-            </div>
+            </MediaBubble>
           ))}
 
           {/* Videos */}
           {videoMedias.map((vid, i) => (
-            <div key={`video-${messageId}-${i}`} className="mb-2">
+            <MediaBubble key={`video-${messageId}-${i}`} fromMe={isFromMe}>
               <video
                 controls
                 preload="metadata"
                 src={vid.url}
-                className="rounded-lg max-w-full max-h-80"
+                className="max-w-full max-h-80"
               />
               {vid.caption && (
-                <p className={`text-xs mt-1 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
+                <p className={`text-xs px-3 py-2 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
                   {vid.caption}
                 </p>
               )}
-            </div>
+            </MediaBubble>
           ))}
 
           {/* Audio / Voice */}
           {audioMedias.map((audio, i) => (
-            <div
-              key={`audio-${messageId}-${i}`}
-              className={`rounded-xl overflow-hidden border mb-2 ${
-                isFromMe ? 'bg-green-700/20 border-green-600/30' : 'bg-gray-100 border-gray-200'
-              }`}
-            >
+            <MediaBubble key={`audio-${messageId}-${i}`} fromMe={isFromMe}>
               <div className="flex items-center gap-2 px-3 py-2">
                 <audio
                   controls
@@ -144,59 +140,53 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
                   {formatDuration(audio.duration)}
                 </p>
               )}
-            </div>
+            </MediaBubble>
           ))}
 
           {/* Documents */}
           {documentMedias.map((doc, i) => (
-            <a
-              key={`doc-${messageId}-${i}`}
-              href={doc.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex items-center gap-3 rounded-lg border p-3 mb-2 transition-colors ${
-                isFromMe
-                  ? 'bg-green-700/20 border-green-500/30 hover:bg-green-700/30'
-                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              <div className={`p-2 rounded-lg ${isFromMe ? 'bg-green-500/30' : 'bg-gray-200'}`}>
-                <FileText className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-gray-600'}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium truncate ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
-                  {doc.file_name || doc.caption || 'Document'}
-                </p>
-                {(doc.file_size || doc.mime_type) && (
-                  <p className={`text-xs ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
-                    {[formatFileSize(doc.file_size), doc.mime_type?.split('/')[1]?.toUpperCase()]
-                      .filter(Boolean)
-                      .join(' - ')}
+            <MediaBubble key={`doc-${messageId}-${i}`} fromMe={isFromMe}>
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 transition-colors hover:opacity-90"
+              >
+                <div className={`p-2 rounded-lg ${isFromMe ? 'bg-green-500/30' : 'bg-gray-200'}`}>
+                  <FileText className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-gray-600'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
+                    {doc.file_name || doc.caption || 'Document'}
                   </p>
-                )}
-              </div>
-              <Download className={`w-4 h-4 flex-shrink-0 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`} />
-            </a>
+                  {(doc.file_size || doc.mime_type) && (
+                    <p className={`text-xs ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
+                      {[formatFileSize(doc.file_size), doc.mime_type?.split('/')[1]?.toUpperCase()]
+                        .filter(Boolean)
+                        .join(' - ')}
+                    </p>
+                  )}
+                </div>
+                <Download className={`w-4 h-4 flex-shrink-0 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`} />
+              </a>
+            </MediaBubble>
           ))}
 
           {/* Location */}
           {locationMedias.map((loc, i) => (
-            <a
-              key={`loc-${messageId}-${i}`}
-              href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex items-center gap-2 rounded-lg border p-3 mb-2 transition-colors ${
-                isFromMe
-                  ? 'bg-green-700/20 border-green-500/30 hover:bg-green-700/30'
-                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
-              <span className={`text-sm ${isFromMe ? 'text-white' : 'text-gray-700'}`}>
-                Position: {Number(loc.latitude).toFixed(4)}, {Number(loc.longitude).toFixed(4)}
-              </span>
-            </a>
+            <MediaBubble key={`loc-${messageId}-${i}`} fromMe={isFromMe}>
+              <a
+                href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 p-3 transition-colors hover:opacity-90"
+              >
+                <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
+                <span className={`text-sm ${isFromMe ? 'text-white' : 'text-gray-700'}`}>
+                  Position: {Number(loc.latitude).toFixed(4)}, {Number(loc.longitude).toFixed(4)}
+                </span>
+              </a>
+            </MediaBubble>
           ))}
 
           {/* Text */}
