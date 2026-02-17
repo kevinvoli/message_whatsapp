@@ -38,9 +38,7 @@ export interface MetaMessageBase {
   id: string;
   timestamp: string;
   type: MetaMessageType;
-  
 }
-
 
 export type MetaMessageType =
   | 'text'
@@ -51,7 +49,6 @@ export type MetaMessageType =
   | 'location'
   | 'interactive'
   | 'button';
-
 
 export interface MetaTextMessage extends MetaMessageBase {
   type: 'text';
@@ -89,7 +86,6 @@ export interface MetaDocumentMessage extends MetaMessageBase {
     filename?: string;
   };
 }
-
 
 export interface MetaLocationMessage extends MetaMessageBase {
   type: 'location';
@@ -145,5 +141,3 @@ export interface MetaStatus {
     title: string;
   }>;
 }
-
-

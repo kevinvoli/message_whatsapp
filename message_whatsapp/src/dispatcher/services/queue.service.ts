@@ -1,16 +1,24 @@
-﻿import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+﻿import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
 import { Mutex } from 'async-mutex';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
 export class QueueService implements OnModuleInit {
   private readonly logger = new Logger(QueueService.name);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   private readonly queueLock: Mutex = new Mutex();
   constructor(
     @InjectRepository(QueuePosition)
@@ -357,5 +365,3 @@ export class QueueService implements OnModuleInit {
     });
   }
 }
-
-

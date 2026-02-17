@@ -60,7 +60,7 @@ export class WhatsappMedia {
     nullable: true,
     // unique: true,
   })
-  message_content_id?: string |null;
+  message_content_id?: string | null;
 
   @Column({ name: 'media_type', type: 'varchar', length: 100, nullable: false })
   media_type: WhatsappMediaType;
@@ -93,7 +93,6 @@ export class WhatsappMedia {
 
   @Column({ name: 'height', type: 'varchar', length: 100, nullable: true })
   height?: string | null;
- 
 
   @Column({ name: 'caption', type: 'varchar', length: 255, nullable: true })
   caption?: string | null;
@@ -105,15 +104,27 @@ export class WhatsappMedia {
   view_once: string;
 
   // 🎵 AUDIO / 🎥 VIDEO / 🎙️ VOICE
-@Column({ name: 'duration_seconds', type: 'int', nullable: true })
-duration_seconds?: number |null;
+  @Column({ name: 'duration_seconds', type: 'int', nullable: true })
+  duration_seconds?: number | null;
 
-// 📍 LOCATION
-@Column({ name: 'latitude', type: 'decimal', precision: 10, scale: 7, nullable: true })
-latitude?: number | null;
+  // 📍 LOCATION
+  @Column({
+    name: 'latitude',
+    type: 'decimal',
+    precision: 10,
+    scale: 7,
+    nullable: true,
+  })
+  latitude?: number | null;
 
-@Column({ name: 'longitude', type: 'decimal', precision: 10, scale: 7, nullable: true })
-longitude?: number | null;
+  @Column({
+    name: 'longitude',
+    type: 'decimal',
+    precision: 10,
+    scale: 7,
+    nullable: true,
+  })
+  longitude?: number | null;
 
   // Relation avec le message
   @ManyToOne(() => WhatsappMessage, (message) => message.medias, {

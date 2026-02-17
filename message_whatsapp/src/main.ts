@@ -9,19 +9,23 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 
 async function bootstrap() {
-   EventEmitter.defaultMaxListeners = 0;
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  EventEmitter.defaultMaxListeners = 0;
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   // Serve uploaded media files
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/' });
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
   const appLogger = app.get(AppLogger);
   app.useLogger(appLogger);
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist:true,
-      forbidNonWhitelisted:true,
-      transform:true
-    })
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
   );
 
   // Use cookie-parser middleware
@@ -33,8 +37,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://178.16.130.155',
       'http://localhost:3006',
-      'http://localhost:3008'
-
+      'http://localhost:3008',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,

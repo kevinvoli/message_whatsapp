@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -151,7 +155,10 @@ export class ChannelService {
       return channel.tenant_id;
     }
     const tenantId = channel.id;
-    await this.channelRepository.update({ id: channel.id }, { tenant_id: tenantId });
+    await this.channelRepository.update(
+      { id: channel.id },
+      { tenant_id: tenantId },
+    );
     return tenantId;
   }
 

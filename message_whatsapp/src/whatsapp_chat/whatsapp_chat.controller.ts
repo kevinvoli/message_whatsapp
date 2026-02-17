@@ -1,5 +1,12 @@
-
-import { Controller, Get, Param, UseGuards, Query, Patch, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Query,
+  Patch,
+  Body,
+} from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
 
@@ -19,7 +26,7 @@ export class WhatsappChatController {
   }
 
   @Patch(':chat_id')
-  async update(@Param('chat_id') chat_id: string,@Body() data:any) {
-    return this.chatService.update(chat_id,data);
+  async update(@Param('chat_id') chat_id: string, @Body() data: any) {
+    return this.chatService.update(chat_id, data);
   }
 }

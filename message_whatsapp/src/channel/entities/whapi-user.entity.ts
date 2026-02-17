@@ -1,10 +1,9 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('whapi_user')
 export class WhapiUser {
   @PrimaryGeneratedColumn('uuid')
-    id: string;
+  id: string;
 
   @Column()
   name: string;

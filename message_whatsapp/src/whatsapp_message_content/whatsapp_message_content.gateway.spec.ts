@@ -9,13 +9,16 @@ describe('WhatsappMessageContentGateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappMessageContentGateway, WhatsappMessageContentService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
-    gateway = module.get<WhatsappMessageContentGateway>(WhatsappMessageContentGateway);
+    gateway = module.get<WhatsappMessageContentGateway>(
+      WhatsappMessageContentGateway,
+    );
   });
 
   it('should be defined', () => {
     expect(gateway).toBeDefined();
   });
 });
-

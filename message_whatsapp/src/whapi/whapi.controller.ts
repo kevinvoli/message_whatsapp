@@ -43,12 +43,14 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'whapi';
-    const requestId =
-      this.headerValue(headers['x-request-id']) ?? randomUUID();
+    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
     this.assertWhapiSecret(headers, request.rawBody, payload);
     this.assertWhapiPayload(payload);
-    const tenantId = await this.resolveTenantOrReject('whapi', payload.channel_id);
+    const tenantId = await this.resolveTenantOrReject(
+      'whapi',
+      payload.channel_id,
+    );
     const auditEventKey = this.buildAuditEventKey('whapi', payload);
     this.auditLogger.log(
       `WEBHOOK_ACCEPTED request_id=${requestId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
@@ -63,10 +65,7 @@ export class WhapiController {
       tenantId,
     );
     if (idempotency === 'conflict') {
-      throw new HttpException(
-        'Idempotency conflict',
-        HttpStatus.CONFLICT,
-      );
+      throw new HttpException('Idempotency conflict', HttpStatus.CONFLICT);
     }
     const eventType = payload?.event?.type;
     if (idempotency === 'duplicate') {
@@ -175,8 +174,8 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    console.log("affichage des message ");
-    
+    console.log('affichage des message ');
+
     if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
       return challenge;
     }
@@ -189,23 +188,16 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    
     const startedAt = Date.now();
     const provider = 'meta';
-    const requestId =
-      this.headerValue(headers['x-request-id']) ?? randomUUID();
+    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
     // console.log("affichage du post:2",request);
 
     this.assertPayloadSize(request.rawBody);
-    console.log("affichage du post:3",request.rawBody);
 
     this.assertMetaSignature(headers, request.rawBody, payload);
-    console.log("affichage du post:4");
 
     const metaPayload = this.assertMetaPayload(payload);
-
-    console.log("affichage du post:", metaPayload?.entry[0]?.changes[0]?.value?.messages?.[0]);
-
 
     const entry = metaPayload?.entry?.[0];
     const change = entry?.changes?.[0];
@@ -245,16 +237,16 @@ export class WhapiController {
       tenantId,
     );
     if (idempotency === 'conflict') {
-      throw new HttpException(
-        'Idempotency conflict',
-        HttpStatus.CONFLICT,
-      );
+      throw new HttpException('Idempotency conflict', HttpStatus.CONFLICT);
     }
     if (idempotency === 'duplicate') {
       const replayedId = metaValue?.messages?.[0]?.id;
       if (
         replayedId &&
-        !(await this.whapiService.hasPersistedIncomingMessage('meta', replayedId))
+        !(await this.whapiService.hasPersistedIncomingMessage(
+          'meta',
+          replayedId,
+        ))
       ) {
         this.auditLogger.warn(
           `WEBHOOK_DUPLICATE_REPROCESS provider=meta tenant_id=${tenantId} provider_message_id=${replayedId}`,
@@ -269,7 +261,11 @@ export class WhapiController {
 
     try {
       if (degraded) {
-        const queued = this.enqueueDegradedMeta(provider, tenantId, metaPayload);
+        const queued = this.enqueueDegradedMeta(
+          provider,
+          tenantId,
+          metaPayload,
+        );
         if (!queued) {
           throw new HttpException(
             'Degraded queue overloaded',
@@ -363,10 +359,7 @@ export class WhapiController {
     const isProd = process.env.NODE_ENV === 'production';
     const appSecret = process.env.WHATSAPP_APP_SECRET?.trim();
     const previousSecret = process.env.WHATSAPP_APP_SECRET_PREVIOUS?.trim();
-    console.log("affichage du post:3.5",appSecret, previousSecret);
     if (!appSecret && !previousSecret) {
-    console.log("affichage du post:3.6",appSecret, previousSecret);
-
       if (isProd) {
         this.metricsService.recordSignatureInvalid('meta');
         throw new UnauthorizedException(
@@ -375,7 +368,6 @@ export class WhapiController {
       }
       return;
     }
-    console.log("affichage du post:3.7");
 
     const signatureHeader = this.headerValue(
       headers['x-hub-signature-256'],
@@ -385,12 +377,9 @@ export class WhapiController {
       throw new UnauthorizedException('Missing signature');
     }
 
-    console.log("affichage du post:3.8",JSON.stringify(payload),headers);
-
     const secrets = [appSecret, previousSecret].filter(
       (value): value is string => Boolean(value),
     );
-    console.log("affichage du post:3.71", secrets);
 
     const valid = this.verifyHmacSignature(
       'meta',
@@ -400,8 +389,6 @@ export class WhapiController {
       signatureHeader,
       isProd,
     );
-
-    console.log("affichage du post:3.9", valid);
 
     if (!valid) {
       this.metricsService.recordSignatureInvalid('meta');
@@ -431,7 +418,10 @@ export class WhapiController {
     const hasMessages = Array.isArray(payload.messages);
     const hasStatuses = Array.isArray(payload.statuses);
     if (!hasMessages && !hasStatuses) {
-      throw new HttpException('Missing messages/statuses', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing messages/statuses',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     if (hasMessages) {
       for (const message of payload.messages ?? []) {
@@ -442,7 +432,10 @@ export class WhapiController {
           throw new HttpException('Invalid chat_id', HttpStatus.BAD_REQUEST);
         }
         if (!message.type || typeof message.type !== 'string') {
-          throw new HttpException('Invalid message type', HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            'Invalid message type',
+            HttpStatus.BAD_REQUEST,
+          );
         }
       }
     }
@@ -452,7 +445,10 @@ export class WhapiController {
           throw new HttpException('Invalid status id', HttpStatus.BAD_REQUEST);
         }
         if (!status.recipient_id || typeof status.recipient_id !== 'string') {
-          throw new HttpException('Invalid recipient_id', HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            'Invalid recipient_id',
+            HttpStatus.BAD_REQUEST,
+          );
         }
       }
     }
@@ -473,13 +469,22 @@ export class WhapiController {
     if (!entry?.id || typeof entry.id !== 'string') {
       throw new HttpException('Invalid entry id', HttpStatus.BAD_REQUEST);
     }
-    if (!metadata?.phone_number_id || typeof metadata.phone_number_id !== 'string') {
-      throw new HttpException('Invalid phone_number_id', HttpStatus.BAD_REQUEST);
+    if (
+      !metadata?.phone_number_id ||
+      typeof metadata.phone_number_id !== 'string'
+    ) {
+      throw new HttpException(
+        'Invalid phone_number_id',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     const hasMessages = Array.isArray(value?.messages);
     const hasStatuses = Array.isArray(value?.statuses);
     if (!hasMessages && !hasStatuses) {
-      throw new HttpException('Missing messages/statuses', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing messages/statuses',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     if (hasMessages) {
       for (const message of value?.messages ?? []) {
@@ -487,7 +492,10 @@ export class WhapiController {
           throw new HttpException('Invalid message id', HttpStatus.BAD_REQUEST);
         }
         if (!message?.from || typeof message.from !== 'string') {
-          throw new HttpException('Invalid message from', HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            'Invalid message from',
+            HttpStatus.BAD_REQUEST,
+          );
         }
       }
     }
@@ -497,7 +505,10 @@ export class WhapiController {
           throw new HttpException('Invalid status id', HttpStatus.BAD_REQUEST);
         }
         if (!status?.recipient_id || typeof status.recipient_id !== 'string') {
-          throw new HttpException('Invalid recipient_id', HttpStatus.BAD_REQUEST);
+          throw new HttpException(
+            'Invalid recipient_id',
+            HttpStatus.BAD_REQUEST,
+          );
         }
       }
     }
@@ -516,7 +527,10 @@ export class WhapiController {
 
     if (requireRawBody && !rawBody) {
       this.metricsService.recordSignatureInvalid(provider);
-      throw new HttpException('Missing rawBody', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Missing rawBody',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
 
     const payloadBuffer = rawBody ?? Buffer.from(JSON.stringify(payload));
@@ -529,13 +543,13 @@ export class WhapiController {
       const candidates = [`sha256=${digest}`, digest];
       for (const candidate of candidates) {
         const expectedBuffer = Buffer.from(candidate.toLowerCase());
-    // console.log("affichage du post:4.7",candidate, receivedBuffer);  
+        // console.log("affichage du post:4.7",candidate, receivedBuffer);
 
         if (
           expectedBuffer.length === receivedBuffer.length &&
           timingSafeEqual(expectedBuffer, receivedBuffer)
         ) {
-    // console.log("affichage du post:10");
+          // console.log("affichage du post:10");
 
           return true;
         }
@@ -632,7 +646,10 @@ export class WhapiController {
   ): Promise<string> {
     if (!externalId) {
       this.metricsService.recordTenantResolutionFailed(provider);
-      throw new HttpException('Missing channel mapping', HttpStatus.UNPROCESSABLE_ENTITY);
+      throw new HttpException(
+        'Missing channel mapping',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
     }
     const tenantId = await this.whapiService.resolveTenantByProviderExternalId(
       provider,
@@ -640,7 +657,10 @@ export class WhapiController {
     );
     if (!tenantId) {
       this.metricsService.recordTenantResolutionFailed(provider);
-      throw new HttpException('Unknown channel mapping', HttpStatus.UNPROCESSABLE_ENTITY);
+      throw new HttpException(
+        'Unknown channel mapping',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
     }
     return tenantId;
   }
@@ -661,9 +681,8 @@ export class WhapiController {
     }
 
     if (wabaId && phoneNumberId) {
-      const channel = await this.whapiService.findChannelByExternalId(
-        phoneNumberId,
-      );
+      const channel =
+        await this.whapiService.findChannelByExternalId(phoneNumberId);
       if (channel) {
         const tenantId = await this.whapiService.ensureTenantId(channel);
         await this.whapiService.upsertProviderMapping({
@@ -699,9 +718,7 @@ export class WhapiController {
     const entry = metaPayload.entry?.[0];
     const value = entry?.changes?.[0]?.value;
     const id =
-      value?.messages?.[0]?.id ??
-      value?.statuses?.[0]?.id ??
-      'unknown';
+      value?.messages?.[0]?.id ?? value?.statuses?.[0]?.id ?? 'unknown';
     const channelId = value?.metadata?.phone_number_id ?? 'unknown';
     return `${provider}:${channelId}:${entry?.changes?.[0]?.field ?? 'unknown'}:${id}`;
   }

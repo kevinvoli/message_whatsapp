@@ -8,7 +8,9 @@ describe('CommunicationWhapiService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [CommunicationWhapiService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     service = module.get<CommunicationWhapiService>(CommunicationWhapiService);
   });
@@ -17,4 +19,3 @@ describe('CommunicationWhapiService', () => {
     expect(service).toBeDefined();
   });
 });
-

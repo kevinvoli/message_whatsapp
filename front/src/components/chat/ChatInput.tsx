@@ -112,6 +112,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleSubmit = () => {
     if (message.trim() && !disabled && isConnected) {
+      logger.debug("333333333333333333333333333333333333333333333333333333333")
       onSendMessage(message.trim());
       setMessage('');
 

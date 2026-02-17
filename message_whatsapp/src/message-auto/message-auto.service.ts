@@ -1,4 +1,9 @@
-import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MessageAuto } from './entities/message-auto.entity';
 import { Repository } from 'typeorm';
@@ -117,7 +122,7 @@ export class MessageAutoService {
       timestamp: new Date(
         chat?.last_client_message_at
           ? chat.last_client_message_at.getTime() + 1000
-          : Date.now()
+          : Date.now(),
       ),
       channel_id: chat.last_msg_client_channel_id,
     });
@@ -166,4 +171,3 @@ export class MessageAutoService {
 }
 
 // "Bonjour Madame #name#,  J'espère que vous allez bien ? Je suis votre conseillère de GICOP, comment puis-je vous aider ?"
-

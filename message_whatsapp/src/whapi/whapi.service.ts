@@ -175,7 +175,9 @@ export class WhapiService {
     }
   }
 
-  private async updateStatusMessageLegacy(statuses: WhapiStatus[]): Promise<void> {
+  private async updateStatusMessageLegacy(
+    statuses: WhapiStatus[],
+  ): Promise<void> {
     for (const status of statuses) {
       await this.whatsappMessageService.updateByStatus({
         id: status.id,
@@ -209,6 +211,4 @@ export class WhapiService {
     const phone = (trimmed.split('@')[0] ?? '').replace(/[^\d]/g, '');
     return phone.length >= 8 && phone.length <= 20;
   }
-
 }
-

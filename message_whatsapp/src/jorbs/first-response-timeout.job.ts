@@ -37,9 +37,7 @@ export class FirstResponseTimeoutJob {
         try {
           await this.dispatcher.jobRunnertcheque(posteId);
         } catch (error) {
-          this.logger.warn(
-            `SLA runner error (${posteId}): ${String(error)}`,
-          );
+          this.logger.warn(`SLA runner error (${posteId}): ${String(error)}`);
         }
       })();
     };
@@ -76,9 +74,7 @@ export class FirstResponseTimeoutJob {
           try {
             await this.dispatcher.jobRunnertcheque(posteId);
           } catch (error) {
-            this.logger.warn(
-              `SLA runner error (${posteId}): ${String(error)}`,
-            );
+            this.logger.warn(`SLA runner error (${posteId}): ${String(error)}`);
           }
         })();
       }, intervalMs);
@@ -87,15 +83,15 @@ export class FirstResponseTimeoutJob {
   }
 
   testAutoMessage(chatId: string, position: number) {
-  if (this.autoMessageIntervals.has(chatId)) return;
+    if (this.autoMessageIntervals.has(chatId)) return;
 
-  // Marquer que le message a Ã©tÃ© envoyÃ© pour ne pas rÃ©exÃ©cuter
-  // this.autoMessageIntervals.set(chatId, true)
+    // Marquer que le message a Ã©tÃ© envoyÃ© pour ne pas rÃ©exÃ©cuter
+    // this.autoMessageIntervals.set(chatId, true)
 
-  // console.log('Envoi dâ€™un seul message', chatId);
+    // console.log('Envoi dâ€™un seul message', chatId);
 
-  // void this.messageAutoService.sendAutoMessage(chatId, position);
-}
+    // void this.messageAutoService.sendAutoMessage(chatId, position);
+  }
   // testAutoMessage(chatId: string, position: number) {
   //   if (this.autoMessageIntervals.has(chatId)) return;
   //   const interval = setInterval(() => {
@@ -120,4 +116,3 @@ export class FirstResponseTimeoutJob {
   //   console.log('ðŸ›‘ auto message arrÃªtÃ©', chatId);
   // }
 }
-

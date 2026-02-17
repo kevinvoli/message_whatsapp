@@ -1,4 +1,11 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { AutoMessageChannel } from '../entities/message-auto.entity';
 
 export class CreateMessageAutoDto {

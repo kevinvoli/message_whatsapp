@@ -6,9 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
-        WhatsappChatLabel,WhatsappChat
-      ])],
+  imports: [TypeOrmModule.forFeature([WhatsappChatLabel, WhatsappChat])],
   providers: [WhatsappChatLabelGateway, WhatsappChatLabelService],
 })
 export class WhatsappChatLabelModule {}

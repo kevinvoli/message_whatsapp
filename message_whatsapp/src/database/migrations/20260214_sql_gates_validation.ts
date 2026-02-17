@@ -43,7 +43,21 @@ export class SqlGatesValidation1739560000010 implements MigrationInterface {
     ) => {
       try {
         const rows = await queryRunner.query(sql);
-        const value = Array.isArray(rows) && rows.length > 0 ? Number(rows[0]?.c ?? rows[0]?.count ?? rows[0]?.value ?? rows[0]?.channels_without_tenant ?? rows[0]?.chats_without_tenant ?? rows[0]?.messages_without_tenant ?? rows[0]?.medias_without_tenant ?? rows[0]?.eventlog_without_tenant ?? rows[0]?.c ?? 0) : 0;
+        const value =
+          Array.isArray(rows) && rows.length > 0
+            ? Number(
+                rows[0]?.c ??
+                  rows[0]?.count ??
+                  rows[0]?.value ??
+                  rows[0]?.channels_without_tenant ??
+                  rows[0]?.chats_without_tenant ??
+                  rows[0]?.messages_without_tenant ??
+                  rows[0]?.medias_without_tenant ??
+                  rows[0]?.eventlog_without_tenant ??
+                  rows[0]?.c ??
+                  0,
+              )
+            : 0;
         const status: GateResult['status'] =
           failIfPositive && value > 0 ? 'FAIL' : 'PASS';
         await pushResult({ name, value, status });
@@ -113,6 +127,8 @@ export class SqlGatesValidation1739560000010 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP TABLE IF EXISTS `migration_sql_gate_results`');
+    await queryRunner.query(
+      'DROP TABLE IF EXISTS `migration_sql_gate_results`',
+    );
   }
 }

@@ -9,13 +9,16 @@ describe('WhatsappLastMessageGateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappLastMessageGateway, WhatsappLastMessageService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
-    gateway = module.get<WhatsappLastMessageGateway>(WhatsappLastMessageGateway);
+    gateway = module.get<WhatsappLastMessageGateway>(
+      WhatsappLastMessageGateway,
+    );
   });
 
   it('should be defined', () => {
     expect(gateway).toBeDefined();
   });
 });
-

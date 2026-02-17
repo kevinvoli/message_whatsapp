@@ -31,9 +31,11 @@ export class WebhookIdempotencyPurgeService {
         );
       }
     } catch (error) {
-      const code = (error as any)?.driverError?.code;
+      const code = error?.driverError?.code;
       if (code === 'ER_NO_SUCH_TABLE') {
-        this.logger.warn('Idempotency purge skipped: webhook_event_log missing');
+        this.logger.warn(
+          'Idempotency purge skipped: webhook_event_log missing',
+        );
         return;
       }
       this.logger.error('Idempotency purge failed', error as Error);

@@ -136,8 +136,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: (text: string) => {
+console.log("4444444444444444444444444444444444444444444444444444444");
+
     const { socket, selectedConversation } = get();
     if (!socket || !selectedConversation) return;
+console.log("555555555555555555555555555555555555555555555555555555");
 
     const tempId = crypto.randomUUID();
     const tempMessage: Message = {
@@ -158,7 +161,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chat_id: selectedConversation.chat_id,
       temp_id: tempMessage.id,
     });
-
+console.log("666666666666666666666666666666666666666666666666666666", tempMessage);
     socket.emit("message:send", {
       chat_id: selectedConversation.chat_id,
       text,

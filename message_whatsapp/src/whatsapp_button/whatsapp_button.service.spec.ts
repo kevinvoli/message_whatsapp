@@ -8,7 +8,9 @@ describe('WhatsappButtonService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappButtonService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     service = module.get<WhatsappButtonService>(WhatsappButtonService);
   });
@@ -17,4 +19,3 @@ describe('WhatsappButtonService', () => {
     expect(service).toBeDefined();
   });
 });
-

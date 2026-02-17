@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { LessThan, Repository } from 'typeorm';
 

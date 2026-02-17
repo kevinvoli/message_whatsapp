@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddPendingMessagePayload1739440000001
-  implements MigrationInterface
-{
+export class AddPendingMessagePayload1739440000001 implements MigrationInterface {
   name = 'AddPendingMessagePayload1739440000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

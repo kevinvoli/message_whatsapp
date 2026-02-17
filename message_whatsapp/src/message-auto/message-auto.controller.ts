@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { CreateMessageAutoDto } from './dto/create-message-auto.dto';
 import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
@@ -25,7 +34,10 @@ export class MessageAutoController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateMessageAutoDto: UpdateMessageAutoDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateMessageAutoDto: UpdateMessageAutoDto,
+  ) {
     return this.messageAutoService.update(id, updateMessageAutoDto);
   }
 

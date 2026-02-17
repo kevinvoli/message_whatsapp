@@ -14,11 +14,15 @@ export class WebhookMetricsService {
   private readonly latencyWindowMs = 15 * 60 * 1000;
 
   recordReceived(provider: string, tenantId?: string | null): void {
-    this.inc(`webhook_received_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`);
+    this.inc(
+      `webhook_received_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`,
+    );
   }
 
   recordDuplicate(provider: string, tenantId?: string | null): void {
-    this.inc(`webhook_duplicate_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`);
+    this.inc(
+      `webhook_duplicate_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`,
+    );
   }
 
   recordSignatureInvalid(provider: string): void {
@@ -30,7 +34,9 @@ export class WebhookMetricsService {
   }
 
   recordIdempotencyConflict(provider: string, tenantId?: string | null): void {
-    this.inc(`idempotency_insert_conflict_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`);
+    this.inc(
+      `idempotency_insert_conflict_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`,
+    );
   }
 
   recordIdempotencyPurge(total: number): void {
@@ -44,8 +50,14 @@ export class WebhookMetricsService {
     }
   }
 
-  recordError(provider: string, tenantId: string | null, errorClass: string): void {
-    this.inc(`webhook_error_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}|class=${errorClass}`);
+  recordError(
+    provider: string,
+    tenantId: string | null,
+    errorClass: string,
+  ): void {
+    this.inc(
+      `webhook_error_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}|class=${errorClass}`,
+    );
   }
 
   recordLatency(provider: string, ms: number): void {
@@ -123,7 +135,10 @@ export class WebhookMetricsService {
     this.counters.set(key, (this.counters.get(key) ?? 0) + 1);
   }
 
-  private parseKey(key: string): { metric: string; labels: Record<string, string> } {
+  private parseKey(key: string): {
+    metric: string;
+    labels: Record<string, string>;
+  } {
     const parts = key.split('|');
     const metric = parts.shift() ?? key;
     const labels: Record<string, string> = {};

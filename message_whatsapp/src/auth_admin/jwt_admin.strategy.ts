@@ -9,11 +9,9 @@ export class JwtAdminStrategy extends PassportStrategy(Strategy, 'jwt-admin') {
   constructor(private configService: ConfigService) {
     super({
       jwtFromRequest: (req) => {
-
         let token = null;
         if (req && req.cookies) {
           token = req.cookies['AuthenticationAdmin'];
-
         }
         // console.log("ma requete de guard", token);
 

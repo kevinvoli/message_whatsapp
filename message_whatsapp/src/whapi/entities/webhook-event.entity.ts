@@ -7,11 +7,11 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'webhook_event_log', engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
-@Index('UQ_webhook_event_log_tenant_provider_event_key', [
-  'tenant_id',
-  'provider',
-  'event_key',
-], { unique: true })
+@Index(
+  'UQ_webhook_event_log_tenant_provider_event_key',
+  ['tenant_id', 'provider', 'event_key'],
+  { unique: true },
+)
 @Index('IDX_webhook_event_log_tenant_id', ['tenant_id'])
 export class WebhookEventLog {
   @PrimaryGeneratedColumn('uuid')

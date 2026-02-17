@@ -52,9 +52,7 @@ export class WebhookTrafficHealthService {
     const errors = list.filter((s) => !s.ok).length;
     const errorRate = errors / list.length;
 
-    const latencies = list
-      .map((s) => s.latencyMs)
-      .sort((a, b) => a - b);
+    const latencies = list.map((s) => s.latencyMs).sort((a, b) => a - b);
     const p95Index = Math.floor(0.95 * (latencies.length - 1));
     const p95 = latencies[p95Index] ?? 0;
 

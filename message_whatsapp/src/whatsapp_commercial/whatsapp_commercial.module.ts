@@ -10,9 +10,17 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WhatsappCommercial,QueuePosition,WhatsappPoste,WhatsappMessage,WhatsappChat])],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappCommercial,
+      QueuePosition,
+      WhatsappPoste,
+      WhatsappMessage,
+      WhatsappChat,
+    ]),
+  ],
   controllers: [WhatsappCommercialController],
-  providers: [WhatsappCommercialService,QueueService,],
+  providers: [WhatsappCommercialService, QueueService],
   exports: [WhatsappCommercialService],
 })
 export class WhatsappCommercialModule {}

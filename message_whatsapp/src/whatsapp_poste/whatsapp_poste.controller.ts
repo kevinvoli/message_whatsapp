@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { WhatsappPosteService } from './whatsapp_poste.service';
 import { CreateWhatsappPosteDto } from './dto/create-whatsapp_poste.dto';
 import { UpdateWhatsappPosteDto } from './dto/update-whatsapp_poste.dto';
@@ -15,13 +24,15 @@ export class WhatsappPosteController {
   }
 
   @Get()
-  async  findAll() {
+  async findAll() {
     return await this.whatsappPosteService.findAll();
   }
 
-
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateWhatsappPosteDto: UpdateWhatsappPosteDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateWhatsappPosteDto: UpdateWhatsappPosteDto,
+  ) {
     return this.whatsappPosteService.update(id, updateWhatsappPosteDto);
   }
 

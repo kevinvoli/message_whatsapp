@@ -96,7 +96,10 @@ describeMaybe('Auth/Chat/Admin (e2e)', () => {
       .catch(async () => {
         return request(app.getHttpServer())
           .post('/auth/login')
-          .send({ email: commercialPayload.email, password: commercialPassword })
+          .send({
+            email: commercialPayload.email,
+            password: commercialPassword,
+          })
           .expect(200);
       });
 
@@ -115,11 +118,13 @@ describeMaybe('Auth/Chat/Admin (e2e)', () => {
   });
 
   it('rejects /chats without auth', async () => {
-    await request(app.getHttpServer()).get('/chats').expect((res) => {
-      if (![401, 403].includes(res.status)) {
-        throw new Error(`Expected 401/403, got ${res.status}`);
-      }
-    });
+    await request(app.getHttpServer())
+      .get('/chats')
+      .expect((res) => {
+        if (![401, 403].includes(res.status)) {
+          throw new Error(`Expected 401/403, got ${res.status}`);
+        }
+      });
   });
 
   it('allows /chats for admin', async () => {

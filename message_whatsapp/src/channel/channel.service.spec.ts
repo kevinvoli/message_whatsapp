@@ -8,7 +8,9 @@ describe('ChannelService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [ChannelService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     service = module.get<ChannelService>(ChannelService);
   });
@@ -17,4 +19,3 @@ describe('ChannelService', () => {
     expect(service).toBeDefined();
   });
 });
-

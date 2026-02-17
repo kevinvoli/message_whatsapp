@@ -25,7 +25,9 @@ class FakeRepo {
     return entity;
   }
 
-  async findOne(options: { where: { event_key: string; provider: string; tenant_id?: string | null } }) {
+  async findOne(options: {
+    where: { event_key: string; provider: string; tenant_id?: string | null };
+  }) {
     const key = `${options.where.tenant_id ?? 'null'}|${options.where.provider}|${options.where.event_key}`;
     const payload = this.payloads.get(key);
     if (!payload) return null;

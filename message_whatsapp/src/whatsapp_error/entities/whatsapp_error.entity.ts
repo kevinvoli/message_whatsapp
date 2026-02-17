@@ -17,7 +17,13 @@ export class WhatsappError {
   })
   id: string;
 
-  @Column({ name: 'error_id', type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({
+    name: 'error_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
   error_id: string;
 
   @Column({ name: 'code', type: 'int', nullable: false })

@@ -31,25 +31,47 @@ import { LoggingModule } from 'src/logging/logging.module';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Module({
-   imports: [
-      ConfigModule,
-      JwtModule.registerAsync({
-        imports: [ConfigModule],
-        useFactory: async (configService: ConfigService) => ({
-          secret: configService.get<string>('JWT_SECRET'),
-        }),
-        inject: [ConfigService],
+  imports: [
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
       }),
-      TypeOrmModule.forFeature([
-        MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,WhapiChannel,
-        ProviderChannel,
-        Contact,
-        WhatsappMedia,
-      ]),
-      LoggingModule,
-    ],
+      inject: [ConfigService],
+    }),
+    TypeOrmModule.forFeature([
+      MessageAuto,
+      WhatsappMessage,
+      WhatsappChat,
+      WhatsappCommercial,
+      WhatsappPoste,
+      QueuePosition,
+      WhapiChannel,
+      ProviderChannel,
+      Contact,
+      WhatsappMedia,
+    ]),
+    LoggingModule,
+  ],
   controllers: [MessageAutoController],
-  providers: [MessageAutoService,WhatsappMessageGateway, WhatsappChatService, WhatsappMessageService,WhatsappCommercialService,WhatsappPosteService,QueueService,DispatcherService,FirstResponseTimeoutJob,WhatsappPosteService,CommunicationWhapiService,CommunicationMetaService,OutboundRouterService,SocketThrottleGuard,ChannelService,ContactService
+  providers: [
+    MessageAutoService,
+    WhatsappMessageGateway,
+    WhatsappChatService,
+    WhatsappMessageService,
+    WhatsappCommercialService,
+    WhatsappPosteService,
+    QueueService,
+    DispatcherService,
+    FirstResponseTimeoutJob,
+    WhatsappPosteService,
+    CommunicationWhapiService,
+    CommunicationMetaService,
+    OutboundRouterService,
+    SocketThrottleGuard,
+    ChannelService,
+    ContactService,
   ],
 })
 export class MessageAutoModule {}

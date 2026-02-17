@@ -10,4 +10,3 @@ export class WhapiOutboundError extends Error {
     this.name = 'WhapiOutboundError';
   }
 }
-

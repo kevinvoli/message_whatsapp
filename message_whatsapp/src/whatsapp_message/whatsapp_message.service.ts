@@ -19,7 +19,10 @@ import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 import { UnifiedMessage } from 'src/webhooks/normalization/unified-message';
-import { WhatsappMedia, WhatsappMediaType } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import {
+  WhatsappMedia,
+  WhatsappMediaType,
+} from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -103,32 +106,33 @@ export class WhatsappMessageService {
         return '[Message client]';
     }
   }
-  
 
   async createAgentMessage(data: {
     chat_id: string;
     text: string;
     poste_id: string;
     timestamp: Date;
-    commercial_id?:string| null;
+    commercial_id?: string | null;
     channel_id: string;
   }): Promise<WhatsappMessage> {
     const traceId = this.buildTraceId(undefined, data.chat_id);
     let chat: WhatsappChat | null = null;
-    let commercial:WhatsappCommercial | null=null;
+    let commercial: WhatsappCommercial | null = null;
     try {
-      this.logger.log(`OUTBOUND_REQUEST trace=${traceId} chat_id=${data.chat_id}`);
+      this.logger.log(
+        `OUTBOUND_REQUEST trace=${traceId} chat_id=${data.chat_id}`,
+      );
       chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
       if (data.commercial_id) {
-         commercial = await this.commercialRepository.findOne({where:{id: data.commercial_id}});
+        commercial = await this.commercialRepository.findOne({
+          where: { id: data.commercial_id },
+        });
       }
-   
 
       const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
 
       if (lastMessage && !lastMessage.from_me) {
-
         const now = new Date();
         const lastMessageDate = new Date(lastMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
@@ -175,11 +179,9 @@ export class WhatsappMessageService {
         from: extractPhoneNumber(chat?.chat_id),
         from_name: chat.name,
         channel: channel,
-        commercial: commercial ,
+        commercial: commercial,
         contact: null,
       });
-
-      
 
       const mes = await this.messageRepository.save(messageEntity);
       this.logger.log(
@@ -205,7 +207,6 @@ export class WhatsappMessageService {
         error instanceof Error ? error.stack : undefined,
       );
 
-      
       // 🧠 fallback : message en échec mais sauvegardé
       // const failedMessage = this.messageRepository.create({
       //   message_id: `failed_${Date.now()}`,
@@ -241,11 +242,15 @@ export class WhatsappMessageService {
     let chat: WhatsappChat | null = null;
     let commercial: WhatsappCommercial | null = null;
     try {
-      this.logger.log(`OUTBOUND_MEDIA_REQUEST trace=${traceId} chat_id=${data.chat_id} type=${data.mediaType}`);
+      this.logger.log(
+        `OUTBOUND_MEDIA_REQUEST trace=${traceId} chat_id=${data.chat_id} type=${data.mediaType}`,
+      );
       chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
       if (data.commercial_id) {
-        commercial = await this.commercialRepository.findOne({ where: { id: data.commercial_id } });
+        commercial = await this.commercialRepository.findOne({
+          where: { id: data.commercial_id },
+        });
       }
 
       const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
@@ -255,7 +260,9 @@ export class WhatsappMessageService {
         const diff = now.getTime() - lastMessageDate.getTime();
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
         if (diffHours > this.getResponseTimeoutHours()) {
-          throw new Error(`Response timeout exceeded (${this.getResponseTimeoutHours()}h)`);
+          throw new Error(
+            `Response timeout exceeded (${this.getResponseTimeoutHours()}h)`,
+          );
         }
       }
 
@@ -310,14 +317,20 @@ export class WhatsappMessageService {
       // 3. Save file to disk for local serving
       const fs = await import('fs/promises');
       const path = await import('path');
-      const ext = data.fileName.includes('.') ? data.fileName.substring(data.fileName.lastIndexOf('.')) : '';
+      const ext = data.fileName.includes('.')
+        ? data.fileName.substring(data.fileName.lastIndexOf('.'))
+        : '';
       const localFileName = `${savedMessage.id}_${Date.now()}${ext}`;
       const uploadsDir = path.join(process.cwd(), 'uploads');
       await fs.mkdir(uploadsDir, { recursive: true });
-      await fs.writeFile(path.join(uploadsDir, localFileName), data.mediaBuffer);
+      await fs.writeFile(
+        path.join(uploadsDir, localFileName),
+        data.mediaBuffer,
+      );
 
       const serverPort = process.env.SERVER_PORT ?? '3002';
-      const serverHost = process.env.SERVER_HOST ?? `http://localhost:${serverPort}`;
+      const serverHost =
+        process.env.SERVER_HOST ?? `http://localhost:${serverPort}`;
       const mediaUrl = `${serverHost}/uploads/${localFileName}`;
 
       // 4. Create media entity
@@ -338,7 +351,9 @@ export class WhatsappMessageService {
       });
       await this.mediaRepository.save(mediaEntity);
 
-      this.logger.log(`OUTBOUND_MEDIA_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`);
+      this.logger.log(
+        `OUTBOUND_MEDIA_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
+      );
 
       await this.chatRepository.update(
         { chat_id: chat.chat_id },
@@ -409,20 +424,15 @@ export class WhatsappMessageService {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
   }
 
-  async typingStart(chat_id:string){
-    await this.communicationWhapiService.sendTyping(chat_id,true)
+  async typingStart(chat_id: string) {
+    await this.communicationWhapiService.sendTyping(chat_id, true);
   }
-
-
-
 
   async findLastMessageBychat_id(
     chat_id: string,
   ): Promise<WhatsappMessage | null> {
-
     try {
-
-      const message= await this.messageRepository.findOne({
+      const message = await this.messageRepository.findOne({
         where: { chat_id: chat_id },
         order: { timestamp: 'DESC' },
         relations: ['medias'],
@@ -433,9 +443,7 @@ export class WhatsappMessageService {
     }
   }
 
-  async findByExternalId(
-    externalId: string,
-  ): Promise<WhatsappMessage | null> {
+  async findByExternalId(externalId: string): Promise<WhatsappMessage | null> {
     return this.messageRepository.findOne({
       where: { external_id: externalId },
       relations: ['chat'],
@@ -462,9 +470,7 @@ export class WhatsappMessageService {
     offset = 0,
   ): Promise<WhatsappMessage[]> {
     try {
-
-
-        // 2️⃣ Récupérer les messages
+      // 2️⃣ Récupérer les messages
       // const meverifss = await this.messageRepository.find({
       //   where: { chat_id: chat_id },
       //   relations: ['chat', 'poste','medias'],
@@ -489,13 +495,13 @@ export class WhatsappMessageService {
       // 2️⃣ Récupérer les messages
       const mess = await this.messageRepository.find({
         where: { chat_id: chat_id },
-        relations: ['chat', 'poste','medias'],
+        relations: ['chat', 'poste', 'medias'],
         order: { createdAt: 'ASC' },
         take: limit,
         skip: offset,
       });
       // console.log("message mise a joure ",mess);
-      
+
       return mess;
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
@@ -572,7 +578,10 @@ export class WhatsappMessageService {
 
       return this.messageRepository.save(messageEntity);
     } catch (error) {
-      this.logger.error('Error creating internal message', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Error creating internal message',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error(`Failed to create message: ${error}`);
     }
   }
@@ -580,37 +589,37 @@ export class WhatsappMessageService {
   async findAllByChatId(chat_id: string) {
     const messages = await this.messageRepository.find({
       where: { chat_id: chat_id },
-      relations:{
-        medias:true,
-        poste:true,
-        chat:true
-      }
+      relations: {
+        medias: true,
+        poste: true,
+        chat: true,
+      },
     });
     return messages;
   }
 
-    async findAll() {
+  async findAll() {
     const messages = await this.messageRepository.find({
-      relations:{
-        medias:true,
-        poste:true,
-        chat:true,
-        contact:true
-      }
+      relations: {
+        medias: true,
+        poste: true,
+        chat: true,
+        contact: true,
+      },
     });
-return messages;
+    return messages;
   }
 
   async findByAllByMessageId(id: string) {
     try {
-      const message  = await this.messageRepository.findOne({
-        where:{id:id}
-      })
+      const message = await this.messageRepository.findOne({
+        where: { id: id },
+      });
       if (message) {
-        throw new NotFoundException("message non trouver")
+        throw new NotFoundException('message non trouver');
       }
     } catch (err) {
-      throw new Error(err)
+      throw new Error(err);
     }
   }
 
@@ -646,7 +655,10 @@ return messages;
     }
   }
 
-  async saveIncomingFromWhapi(message: WhapiMessage, chat: WhatsappChat):Promise<WhatsappMessage> {
+  async saveIncomingFromWhapi(
+    message: WhapiMessage,
+    chat: WhatsappChat,
+  ): Promise<WhatsappMessage> {
     const traceId = this.buildTraceId(message.id, message.chat_id);
     try {
       this.logger.log(
@@ -663,7 +675,7 @@ return messages;
       }
 
       const channel = await this.channelService.findOne(message.channel_id);
-      if (!channel ) {
+      if (!channel) {
         // Utilisez une exception métier appropriée
         throw new Error(`Channel ${message.channel_id} non trouvé`);
       }
@@ -674,12 +686,11 @@ return messages;
         message.from_name ?? message.from,
       );
 
-
       if (!message.from_me) {
         chat.last_msg_client_channel_id = channel.channel_id;
         chat.channel_id = channel.channel_id;
       }
-      
+
       await this.chatRepository.save(chat);
 
       try {
@@ -745,16 +756,16 @@ return messages;
   }
 
   async findOneWithMedias(id: string) {
-  return await this.messageRepository.findOne({
-    where: { id },
-    relations: {
-      medias: true,
-      chat:true,
-      poste:true,
-      contact:true
-    },
-  });
-}
+    return await this.messageRepository.findOne({
+      where: { id },
+      relations: {
+        medias: true,
+        chat: true,
+        poste: true,
+        contact: true,
+      },
+    });
+  }
 
   private buildTraceId(messageId?: string | null, chatId?: string): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
@@ -764,7 +775,10 @@ return messages;
     message: UnifiedMessage,
     chat: WhatsappChat,
   ): Promise<WhatsappMessage> {
-    const traceId = this.buildTraceId(message.providerMessageId, message.chatId);
+    const traceId = this.buildTraceId(
+      message.providerMessageId,
+      message.chatId,
+    );
     try {
       this.logger.log(
         `INCOMING_SAVE_REQUEST trace=${traceId} chat_id=${message.chatId}`,

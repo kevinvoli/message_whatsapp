@@ -23,10 +23,17 @@ export class WebhookRateLimitService {
     tenantId?: string | null,
   ): void {
     if (!this.consume(this.globalBucket, this.globalLimit)) {
-      throw new HttpException('Global rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Global rate limit exceeded',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
-    const providerBucket = this.getBucket(this.providerBuckets, provider, this.providerLimit);
+    const providerBucket = this.getBucket(
+      this.providerBuckets,
+      provider,
+      this.providerLimit,
+    );
     if (!this.consume(providerBucket, this.providerLimit)) {
       throw new HttpException(
         `Provider rate limit exceeded (${provider})`,
@@ -45,7 +52,11 @@ export class WebhookRateLimitService {
     }
 
     if (tenantId) {
-      const tenantBucket = this.getBucket(this.tenantBuckets, tenantId, this.tenantLimit);
+      const tenantBucket = this.getBucket(
+        this.tenantBuckets,
+        tenantId,
+        this.tenantLimit,
+      );
       if (!this.consume(tenantBucket, this.tenantLimit, 60 * 1000)) {
         throw new HttpException(
           'Tenant quota exceeded',

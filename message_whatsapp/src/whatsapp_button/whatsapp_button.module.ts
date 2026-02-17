@@ -5,9 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappButton } from './entities/whatsapp_button.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-      WhatsappButton,
-    ])],
+  imports: [TypeOrmModule.forFeature([WhatsappButton])],
   providers: [WhatsappButtonGateway, WhatsappButtonService],
 })
 export class WhatsappButtonModule {}

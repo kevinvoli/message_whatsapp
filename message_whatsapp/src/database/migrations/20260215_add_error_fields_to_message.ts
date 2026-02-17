@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddErrorFieldsToMessage1739580000001
-  implements MigrationInterface
-{
+export class AddErrorFieldsToMessage1739580000001 implements MigrationInterface {
   name = 'AddErrorFieldsToMessage1739580000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

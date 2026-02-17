@@ -12,7 +12,6 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 
 // Importer vos entités
 
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([

@@ -1,4 +1,3 @@
-
 import {
   Controller,
   Get,
@@ -83,12 +82,12 @@ export class WhatsappMessageController {
 
     // Resolve channel
     const channelId =
-      chat.last_msg_client_channel_id ??
-      chat.channel_id ??
-      null;
+      chat.last_msg_client_channel_id ?? chat.channel_id ?? null;
 
     if (!channelId) {
-      const lastMessage = await this.messageService.findLastMessageBychat_id(chat.chat_id);
+      const lastMessage = await this.messageService.findLastMessageBychat_id(
+        chat.chat_id,
+      );
       if (!lastMessage?.channel_id) {
         throw new BadRequestException('Cannot resolve channel for this chat');
       }
@@ -96,7 +95,8 @@ export class WhatsappMessageController {
 
     const resolvedChannelId =
       channelId ??
-      (await this.messageService.findLastMessageBychat_id(chat.chat_id))?.channel_id;
+      (await this.messageService.findLastMessageBychat_id(chat.chat_id))
+        ?.channel_id;
 
     if (!resolvedChannelId) {
       throw new BadRequestException('Cannot resolve channel for this chat');
@@ -150,7 +150,8 @@ export class WhatsappMessageController {
       throw new NotFoundException('Channel not resolved for media');
     }
 
-    const channel = await this.channelService.findByChannelId(resolvedChannelId);
+    const channel =
+      await this.channelService.findByChannelId(resolvedChannelId);
     if (!channel?.token) {
       throw new NotFoundException('Channel token not found');
     }

@@ -27,7 +27,8 @@ export abstract class BaseAuthService<
   protected abstract toAuthUser(entity: TEntity): TUser;
 
   async validate(email: string, password: string): Promise<TUser | null> {
-    const entity = await this.getUserService().findOneByEmailWithPassword(email);
+    const entity =
+      await this.getUserService().findOneByEmailWithPassword(email);
     if (!entity) return null;
 
     const isValid = await entity.validatePassword(password);

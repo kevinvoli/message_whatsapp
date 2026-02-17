@@ -10,13 +10,16 @@ describe('CommunicationWhapiController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CommunicationWhapiController],
       providers: [CommunicationWhapiService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
-    controller = module.get<CommunicationWhapiController>(CommunicationWhapiController);
+    controller = module.get<CommunicationWhapiController>(
+      CommunicationWhapiController,
+    );
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
 });
-

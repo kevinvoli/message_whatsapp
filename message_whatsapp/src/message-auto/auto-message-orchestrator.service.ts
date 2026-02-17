@@ -38,14 +38,19 @@ export class AutoMessageOrchestrator {
     // if (lastAuto && lastAuto >= lastClient) {
     //   return;
     // }
-    this.logger.debug(`Poste ID ${chat.poste_id}`, AutoMessageOrchestrator.name);
+    this.logger.debug(
+      `Poste ID ${chat.poste_id}`,
+      AutoMessageOrchestrator.name,
+    );
 
     // 🔐 Verrou mémoire (anti double webhook)
     if (this.locks.has(chatId)) {
       return;
     }
-    this.logger.debug(`Lock check step ${chat.auto_message_step}`, AutoMessageOrchestrator.name);
-
+    this.logger.debug(
+      `Lock check step ${chat.auto_message_step}`,
+      AutoMessageOrchestrator.name,
+    );
 
     // ❌ Stop si déjà terminé
     if (chat.auto_message_step >= 3) {
@@ -70,7 +75,10 @@ export class AutoMessageOrchestrator {
 
     // ⏱️ Délai humain random (20–45s)
     const delay = Math.floor(Math.random() * (45 - 20 + 1) + 20) * 10;
-    this.logger.debug(`Scheduling auto message after ${delay}ms`, AutoMessageOrchestrator.name);
+    this.logger.debug(
+      `Scheduling auto message after ${delay}ms`,
+      AutoMessageOrchestrator.name,
+    );
 
     const timeout = setTimeout(() => {
       void this.executeAutoMessage(chatId)
@@ -93,7 +101,10 @@ export class AutoMessageOrchestrator {
   private async executeAutoMessage(chatId: string) {
     const freshChat = await this.chatService.findBychat_id(chatId);
     if (!freshChat) return;
-    this.logger.debug(`Rechecking chat ${chatId}`, AutoMessageOrchestrator.name);
+    this.logger.debug(
+      `Rechecking chat ${chatId}`,
+      AutoMessageOrchestrator.name,
+    );
 
     // 🔐 Recheck DB (double sécurité)
     const lastClient = freshChat.last_client_message_at;
@@ -110,7 +121,10 @@ export class AutoMessageOrchestrator {
     // }
 
     const nextStep = freshChat.auto_message_step + 1;
-    this.logger.debug(`Next auto message step ${nextStep}`, AutoMessageOrchestrator.name);
+    this.logger.debug(
+      `Next auto message step ${nextStep}`,
+      AutoMessageOrchestrator.name,
+    );
 
     // 🚀 Envoi réel
     await this.messageAutoService.sendAutoMessage(chatId, nextStep);

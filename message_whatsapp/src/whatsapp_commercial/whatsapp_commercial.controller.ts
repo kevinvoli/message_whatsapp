@@ -1,20 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Logger,
+} from '@nestjs/common';
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
-
 
 @Controller('users')
 @UseGuards(AdminGuard) // Use AdminGuard
 export class WhatsappCommercialController {
   private readonly logger = new Logger(WhatsappCommercialController.name);
 
-  constructor(private readonly whatsappCommercialService: WhatsappCommercialService) {}
+  constructor(
+    private readonly whatsappCommercialService: WhatsappCommercialService,
+  ) {}
 
   @Post()
-  async create(@Body() createWhatsappCommercialDto: CreateWhatsappCommercialDto) {
-    return await this.whatsappCommercialService.create(createWhatsappCommercialDto);
+  async create(
+    @Body() createWhatsappCommercialDto: CreateWhatsappCommercialDto,
+  ) {
+    return await this.whatsappCommercialService.create(
+      createWhatsappCommercialDto,
+    );
   }
 
   @Get()
@@ -28,11 +43,17 @@ export class WhatsappCommercialController {
     return await this.whatsappCommercialService.findOne(id);
   }
 
- @Patch(':id')
- async update(@Param('id') id: string, @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto) {
-  this.logger.debug(`Update user ${id}`);
-  
-    return await this.whatsappCommercialService.update(id, updateWhatsappCommercialDto);
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto,
+  ) {
+    this.logger.debug(`Update user ${id}`);
+
+    return await this.whatsappCommercialService.update(
+      id,
+      updateWhatsappCommercialDto,
+    );
   }
 
   @Delete(':id')

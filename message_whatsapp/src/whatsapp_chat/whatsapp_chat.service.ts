@@ -44,7 +44,6 @@ export class WhatsappChatService {
         return existingChat;
       }
 
-
       const poste = await this.posteService.findOneById(posteId);
       if (!poste) {
         throw new Error('Commercial not found');
@@ -65,7 +64,7 @@ export class WhatsappChatService {
         read_only: false,
         not_spam: true,
         poste: poste,
-      
+
         contact_client: from,
         last_activity_at: new Date(),
         createdAt: new Date(),
@@ -86,7 +85,7 @@ export class WhatsappChatService {
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chat_id: string): Promise<void> {
-    const chat =  await this.chatRepository.update(
+    const chat = await this.chatRepository.update(
       { chat_id: chat_id },
       {
         unread_count: 0,
@@ -218,7 +217,6 @@ export class WhatsappChatService {
   }
 
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
-    
     await this.chatRepository.update({ chat_id }, data);
   }
 
@@ -230,4 +228,3 @@ export class WhatsappChatService {
     await this.update(id, { read_only: false });
   }
 }
-

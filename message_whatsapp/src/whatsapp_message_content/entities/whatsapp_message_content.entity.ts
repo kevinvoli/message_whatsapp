@@ -14,7 +14,11 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_message_content_message_content_id', ['message_content_id'], { unique: true })
+@Index(
+  'UQ_whatsapp_message_content_message_content_id',
+  ['message_content_id'],
+  { unique: true },
+)
 export class WhatsappMessageContent {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
@@ -40,7 +44,6 @@ export class WhatsappMessageContent {
 
   @OneToMany(() => WhatsappContact, (message) => message.messageContent)
   contact: WhatsappContact[];
-
 
   @Column({
     name: 'content_type',

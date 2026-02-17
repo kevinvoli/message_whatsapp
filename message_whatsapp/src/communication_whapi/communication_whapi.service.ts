@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import { CreateChannelDto } from 'src/channel/dto/create-channel.dto';
 import { ChanneDatalDto } from 'src/channel/dto/channel-data.dto';
@@ -8,13 +12,18 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhapiSendMessageResponse } from './dto/whapi-send-message-response.dto';
 import { AppLogger } from 'src/logging/app-logger.service';
-import { WhapiFailureKind, WhapiOutboundError } from './errors/whapi-outbound.error';
+import {
+  WhapiFailureKind,
+  WhapiOutboundError,
+} from './errors/whapi-outbound.error';
 
 @Injectable()
 export class CommunicationWhapiService {
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
   private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN;
-  private readonly maxRetries = Number(process.env.WHAPI_OUTBOUND_MAX_RETRIES ?? 2);
+  private readonly maxRetries = Number(
+    process.env.WHAPI_OUTBOUND_MAX_RETRIES ?? 2,
+  );
 
   constructor(
     @InjectRepository(WhapiChannel)
@@ -53,52 +62,51 @@ export class CommunicationWhapiService {
   //   };
   // }
 
-async sendTyping(chat_id: string, typing: boolean) {
-  try {
-    const chat = await this.chatRepository.findOne({
-      where: { chat_id },
-      relations: { poste: true },
-    });
-    if (!chat) return;
+  async sendTyping(chat_id: string, typing: boolean) {
+    try {
+      const chat = await this.chatRepository.findOne({
+        where: { chat_id },
+        relations: { poste: true },
+      });
+      if (!chat) return;
 
-    const channel = await this.channelRepository.findOne({
-      where: { channel_id: chat.last_msg_client_channel_id },
-    });
-    if (!channel) return;
+      const channel = await this.channelRepository.findOne({
+        where: { channel_id: chat.last_msg_client_channel_id },
+      });
+      if (!channel) return;
 
-    const token = channel.token;
+      const token = channel.token;
 
-    // PAS de messageId ici !
-    await axios.post(
-       `https://gate.whapi.cloud/messages/presence`,
-      // `${this.WHAPI_URL}`,
-      {
-        messaging_product: "whatsapp",
-        to: chat.contact_client,
-        type: "typing",
-        typing: typing ? "on" : "off", 
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      // PAS de messageId ici !
+      await axios.post(
+        `https://gate.whapi.cloud/messages/presence`,
+        // `${this.WHAPI_URL}`,
+        {
+          messaging_product: 'whatsapp',
+          to: chat.contact_client,
+          type: 'typing',
+          typing: typing ? 'on' : 'off',
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
-    this.logger.log(
-      `Typing sent to Whapi for ${chat.contact_client}`,
-      CommunicationWhapiService.name,
-    );
-  } catch (err) {
-    this.logger.error(
-      'Whapi typing error',
-      err instanceof Error ? err.stack : undefined,
-      CommunicationWhapiService.name,
-    );
+      this.logger.log(
+        `Typing sent to Whapi for ${chat.contact_client}`,
+        CommunicationWhapiService.name,
+      );
+    } catch (err) {
+      this.logger.error(
+        'Whapi typing error',
+        err instanceof Error ? err.stack : undefined,
+        CommunicationWhapiService.name,
+      );
+    }
   }
-}
-
 
   async sendToWhapiChannel(data: {
     text: string;
@@ -238,7 +246,10 @@ async sendTyping(chat_id: string, typing: boolean) {
       }
     }
 
-    throw new WhapiOutboundError('Whapi media outbound delivery failed', 'transient');
+    throw new WhapiOutboundError(
+      'Whapi media outbound delivery failed',
+      'transient',
+    );
   }
 
   private validateWhapiRecipient(to: string): string {

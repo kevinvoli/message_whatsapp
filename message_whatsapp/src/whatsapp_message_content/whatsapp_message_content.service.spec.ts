@@ -8,13 +8,16 @@ describe('WhatsappMessageContentService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappMessageContentService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
-    service = module.get<WhatsappMessageContentService>(WhatsappMessageContentService);
+    service = module.get<WhatsappMessageContentService>(
+      WhatsappMessageContentService,
+    );
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 });
-

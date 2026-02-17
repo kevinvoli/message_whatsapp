@@ -38,7 +38,12 @@ import { LoggingModule } from './logging/logging.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhatsappCommercial, WhapiChannel, WhatsappChat, Admin]),
+    TypeOrmModule.forFeature([
+      WhatsappCommercial,
+      WhapiChannel,
+      WhatsappChat,
+      Admin,
+    ]),
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
@@ -51,7 +56,9 @@ import { LoggingModule } from './logging/logging.module';
         MYSQL_PASSWORD: Joi.string().allow('').required(),
         MYSQL_DATABASE: Joi.string().required(),
         SERVER_PORT: Joi.number().required(),
-        TYPEORM_SYNCHRONIZE: Joi.string().valid('true', 'false').default('false'),
+        TYPEORM_SYNCHRONIZE: Joi.string()
+          .valid('true', 'false')
+          .default('false'),
         LOG_LEVEL: Joi.string()
           .valid('error', 'warn', 'log', 'debug', 'verbose', 'info')
           .default('info'),
@@ -62,7 +69,10 @@ import { LoggingModule } from './logging/logging.module';
         WHATSAPP_APP_SECRET_PREVIOUS: Joi.string().allow('').optional(),
         FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
         FF_SHADOW_UNIFIED: Joi.string().optional(),
-        MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number().min(1).max(240).default(24),
+        MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number()
+          .min(1)
+          .max(240)
+          .default(24),
         ADMIN_NAME: Joi.string().optional(),
         ADMIN_EMAIL: Joi.when('NODE_ENV', {
           is: 'production',
@@ -100,8 +110,8 @@ import { LoggingModule } from './logging/logging.module';
     MessageAutoModule,
     MetriquesModule,
     LoggingModule,
-    ],
-    controllers: [AppController],
-    providers: [AppService, TasksService],
+  ],
+  controllers: [AppController],
+  providers: [AppService, TasksService],
 })
 export class AppModule {}

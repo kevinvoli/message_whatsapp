@@ -12,7 +12,9 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Index('UQ_whatsapp_chat_label_chat_label_id', ['chat_label_id'], { unique: true })
+@Index('UQ_whatsapp_chat_label_chat_label_id', ['chat_label_id'], {
+  unique: true,
+})
 export class WhatsappChatLabel {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

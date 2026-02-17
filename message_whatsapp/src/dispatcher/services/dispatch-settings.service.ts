@@ -185,10 +185,8 @@ export class DispatchSettingsService implements OnModuleInit {
       settings.read_only_check_interval_minutes,
       () => this.readOnlyJob.enforce24h(),
     );
-    this.registerCron(
-      'offline-reinject',
-      settings.offline_reinject_cron,
-      () => this.offlineJob.offlineReinject(),
+    this.registerCron('offline-reinject', settings.offline_reinject_cron, () =>
+      this.offlineJob.offlineReinject(),
     );
     await this.firstResponseJob.refreshSlaIntervals(
       settings.no_reply_reinject_interval_minutes,
@@ -259,7 +257,7 @@ export class DispatchSettingsService implements OnModuleInit {
 
     try {
       // Will throw if expression invalid
-      // eslint-disable-next-line no-new
+
       new CronJob(trimmed, () => undefined);
     } catch (error) {
       throw new Error(`Invalid cron expression: ${expression}`);

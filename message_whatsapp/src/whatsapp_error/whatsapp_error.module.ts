@@ -5,9 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappError } from './entities/whatsapp_error.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappError
-        ])],
+  imports: [TypeOrmModule.forFeature([WhatsappError])],
   providers: [WhatsappErrorGateway, WhatsappErrorService],
 })
 export class WhatsappErrorModule {}

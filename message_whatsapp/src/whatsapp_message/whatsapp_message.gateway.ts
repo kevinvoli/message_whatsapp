@@ -23,7 +23,10 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -39,9 +42,7 @@ type AuthPayload = {
 };
 
 const wsPort =
-  process.env.NODE_ENV === 'test'
-    ? 0
-    : Number(process.env.WS_PORT ?? 3001);
+  process.env.NODE_ENV === 'test' ? 0 : Number(process.env.WS_PORT ?? 3001);
 
 @WebSocketGateway(wsPort, {
   cors: { origin: '*', credentials: true },
@@ -56,14 +57,22 @@ export class WhatsappMessageGateway
 
   private connectedAgents = new Map<
     string,
-    { commercialId: string; posteId: string; tenantId: string | null; tenantIds: string[] }
+    {
+      commercialId: string;
+      posteId: string;
+      tenantId: string | null;
+      tenantIds: string[];
+    }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
-  private pendingAgentMessages = new Set<string>();
+  private pendingAgentMessages = new Map<string, NodeJS.Timeout | null>();
+  private readonly pendingCooldownMs = 1500; // bloquer les contenus identiques pendant 1,5s
+  private recentTempIds = new Map<string, NodeJS.Timeout>();
+  private readonly tempIdRetentionMs = 10000;
 
   constructor(
     private readonly messageService: WhatsappMessageService,
-    private readonly chatService: WhatsappChatService,    
+    private readonly chatService: WhatsappChatService,
     private readonly commercialService: WhatsappCommercialService,
     private readonly posteService: WhatsappPosteService,
     private readonly queueService: QueueService,
@@ -103,7 +112,12 @@ export class WhatsappMessageGateway
     }
 
     const tenantId = tenantIds[0];
-    this.connectedAgents.set(client.id, { commercialId, posteId, tenantId, tenantIds });
+    this.connectedAgents.set(client.id, {
+      commercialId,
+      posteId,
+      tenantId,
+      tenantIds,
+    });
     for (const tid of tenantIds) {
       await client.join(`tenant:${tid}`);
     }
@@ -147,9 +161,7 @@ export class WhatsappMessageGateway
     }
   }
 
-  private async resolveTenantIdsForPoste(
-    posteId: string,
-  ): Promise<string[]> {
+  private async resolveTenantIdsForPoste(posteId: string): Promise<string[]> {
     const chats = await this.chatService.findByPosteId(posteId);
     const tenantIds = [
       ...new Set(
@@ -190,7 +202,10 @@ export class WhatsappMessageGateway
     return chat.tenant_id === tenantId;
   }
 
-  private isAllowedTenantChat(chat: WhatsappChat, tenantIds: string[]): boolean {
+  private isAllowedTenantChat(
+    chat: WhatsappChat,
+    tenantIds: string[],
+  ): boolean {
     if (tenantIds.length === 0) return true;
     return !!chat.tenant_id && tenantIds.includes(chat.tenant_id);
   }
@@ -268,7 +283,7 @@ export class WhatsappMessageGateway
         const unreadCount = await this.messageService.countUnreadMessages(
           chat.chat_id,
         );
-        
+
         return this.mapConversation(chat, lastMessage, unreadCount);
       }),
     );
@@ -285,7 +300,6 @@ export class WhatsappMessageGateway
 
     const contacts = await this.contactService.findAllByPosteId(agent.posteId);
     // console.log("la liste des contact ", contacts);
-    
 
     client.emit('contact:event', {
       type: 'CONTACT_LIST',
@@ -354,10 +368,8 @@ export class WhatsappMessageGateway
     await this.sendConversationsToClient(client, payload?.search);
   }
 
-   @SubscribeMessage('contacts:get')
-  async handleGetContacts(
-    @ConnectedSocket() client: Socket,
-  ) {
+  @SubscribeMessage('contacts:get')
+  async handleGetContacts(@ConnectedSocket() client: Socket) {
     if (!this.throttle.allow(client.id, 'contacts:get')) {
       return this.emitRateLimited(client, 'contacts:get');
     }
@@ -384,8 +396,13 @@ export class WhatsappMessageGateway
     // --- CONVERSATION_STATUS_CHANGE ---
     if (data.type === 'CONVERSATION_STATUS_CHANGE') {
       const newStatus = data.payload?.status as WhatsappChatStatus;
-      if (!newStatus || !Object.values(WhatsappChatStatus).includes(newStatus)) {
-        this.logger.warn(`Invalid conversation status: ${data.payload?.status}`);
+      if (
+        !newStatus ||
+        !Object.values(WhatsappChatStatus).includes(newStatus)
+      ) {
+        this.logger.warn(
+          `Invalid conversation status: ${data.payload?.status}`,
+        );
         return;
       }
 
@@ -399,7 +416,8 @@ export class WhatsappMessageGateway
       const updatedChat = await this.chatService.findBychat_id(chatId);
       if (!updatedChat?.tenant_id) return;
 
-      const lastMessage = await this.messageService.findLastMessageBychat_id(chatId);
+      const lastMessage =
+        await this.messageService.findLastMessageBychat_id(chatId);
       const unreadCount = await this.messageService.countUnreadMessages(chatId);
 
       this.server.to(`tenant:${updatedChat.tenant_id}`).emit('chat:event', {
@@ -492,15 +510,30 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; text: string; tempId: string },
   ) {
+      console.log(
+      'envoie du message pas le commercial:',
+      payload,
+      'client id:',
+      client.id,
+    );
     if (!this.throttle.allow(client.id, 'message:send')) {
       return this.emitRateLimited(client, 'message:send');
     }
+  
+
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    const chat = await this.chatService.findBychat_id(payload.chat_id);
-    if (!chat) return;
-    if (!this.isAllowedTenantChat(chat, agent.tenantIds)) return;
+    if (payload.tempId && this.recentTempIds.has(payload.tempId)) {
+      this.logger.warn(
+        `Duplicate tempId ignored (${payload.chat_id}) tempId=${payload.tempId}`,
+      );
+      return;
+    }
+
+    if (payload.tempId) {
+      this.markTempId(payload.tempId);
+    }
 
     const normalizedText = (payload.text ?? '').trim();
     const pendingKey = `${payload.chat_id}:${normalizedText}`;
@@ -510,27 +543,36 @@ export class WhatsappMessageGateway
       );
       return;
     }
+    this.markPendingKey(pendingKey);
 
-    const resolvedChannelId = await this.resolveChannelIdForChat(chat);
-    if (!resolvedChannelId) {
-      this.logger.warn(
-        `Message send refused: channel not resolved for chat ${chat.chat_id}`,
-      );
-      client.emit('chat:event', {
-        type: 'MESSAGE_SEND_ERROR',
-        payload: {
-          chat_id: payload.chat_id,
-          tempId: payload.tempId,
-          code: 'CHANNEL_NOT_FOUND',
-          message: 'Impossible de determiner le channel de la conversation',
-        },
-      });
-      return;
-    }
-
-    this.pendingAgentMessages.add(pendingKey);
+    let sendSucceeded = false;
 
     try {
+      const chat = await this.chatService.findBychat_id(payload.chat_id);
+      if (!chat) {
+        return;
+      }
+      if (!this.isAllowedTenantChat(chat, agent.tenantIds)) {
+        return;
+      }
+
+      const resolvedChannelId = await this.resolveChannelIdForChat(chat);
+      if (!resolvedChannelId) {
+        this.logger.warn(
+          `Message send refused: channel not resolved for chat ${chat.chat_id}`,
+        );
+        client.emit('chat:event', {
+          type: 'MESSAGE_SEND_ERROR',
+          payload: {
+            chat_id: payload.chat_id,
+            tempId: payload.tempId,
+            code: 'CHANNEL_NOT_FOUND',
+            message: 'Impossible de determiner le channel de la conversation',
+          },
+        });
+        return;
+      }
+
       let message: WhatsappMessage;
       try {
         message = await this.messageService.createAgentMessage({
@@ -568,6 +610,8 @@ export class WhatsappMessageGateway
         return;
       }
 
+      sendSucceeded = true;
+
       if (!chat.tenant_id) {
         this.logger.warn(
           `Message emit skipped: missing tenant for chat ${chat.chat_id}`,
@@ -575,6 +619,8 @@ export class WhatsappMessageGateway
         return;
       }
       chat.read_only = true;
+      console.log("1111111111111111111111111111111111111111111111111111111111111111111111");
+      
       this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
         type: 'MESSAGE_ADD',
         payload: { ...this.mapMessage(message), tempId: payload.tempId },
@@ -587,8 +633,6 @@ export class WhatsappMessageGateway
         chat.chat_id,
       );
 
-      // const unreadCount = chat.unread_count
-
       if (!chat.tenant_id) {
         this.logger.warn(
           `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
@@ -600,7 +644,11 @@ export class WhatsappMessageGateway
         payload: this.mapConversation(chat, lastMessage, unreadCount),
       });
     } finally {
-      this.pendingAgentMessages.delete(pendingKey);
+      if (sendSucceeded) {
+        this.schedulePendingRelease(pendingKey);
+      } else {
+        this.releasePendingKey(pendingKey);
+      }
     }
   }
 
@@ -638,7 +686,7 @@ export class WhatsappMessageGateway
     this.logger.debug(
       `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
     );
-    
+
     if (!chat.tenant_id) {
       this.logger.warn(
         `Conversation upsert skipped: missing tenant for chat ${chat.chat_id}`,
@@ -757,9 +805,7 @@ export class WhatsappMessageGateway
   }
 
   private async emitTyping(chatId: string, isTyping: boolean) {
-    this.logger.debug(
-      `Typing ${isTyping ? 'start' : 'stop'} (${chatId})`,
-    );
+    this.logger.debug(`Typing ${isTyping ? 'start' : 'stop'} (${chatId})`);
     const chat = await this.chatService.findBychat_id(chatId);
     const tenantId = chat?.tenant_id ?? null;
     if (!tenantId) {
@@ -823,7 +869,7 @@ export class WhatsappMessageGateway
     const tenants = new Set(
       Array.from(this.connectedAgents.values())
         .flatMap((agent) => agent.tenantIds)
-        .filter(Boolean) as string[],
+        .filter(Boolean),
     );
 
     if (tenants.size === 0) {
@@ -842,6 +888,46 @@ export class WhatsappMessageGateway
         data: queue,
       });
     });
+  }
+
+  private markPendingKey(key: string) {
+    this.clearPendingKeyTimeout(key);
+    this.pendingAgentMessages.set(key, null);
+  }
+
+  private schedulePendingRelease(key: string) {
+    this.clearPendingKeyTimeout(key);
+    const timeout = setTimeout(() => {
+      this.pendingAgentMessages.delete(key);
+    }, this.pendingCooldownMs);
+    this.pendingAgentMessages.set(key, timeout);
+  }
+
+  private releasePendingKey(key: string) {
+    this.clearPendingKeyTimeout(key);
+    this.pendingAgentMessages.delete(key);
+  }
+
+  private clearPendingKeyTimeout(key: string) {
+    const timeout = this.pendingAgentMessages.get(key);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+
+  private markTempId(tempId: string) {
+    this.clearTempIdTimeout(tempId);
+    const timeout = setTimeout(() => {
+      this.recentTempIds.delete(tempId);
+    }, this.tempIdRetentionMs);
+    this.recentTempIds.set(tempId, timeout);
+  }
+
+  private clearTempIdTimeout(tempId: string) {
+    const timeout = this.recentTempIds.get(tempId);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
   }
 
   // ======================================================
@@ -890,7 +976,9 @@ export class WhatsappMessageGateway
       process.env.SERVER_HOST ??
       `http://localhost:${serverPort}`;
     const serverHost = rawHost.replace(/\/+$/, '');
-    const channelQuery = message.channel_id ? `?channelId=${encodeURIComponent(message.channel_id)}` : '';
+    const channelQuery = message.channel_id
+      ? `?channelId=${encodeURIComponent(message.channel_id)}`
+      : '';
     return `${serverHost}/messages/media/meta/${providerMediaId}${channelQuery}`;
   }
 
@@ -908,7 +996,7 @@ export class WhatsappMessageGateway
       poste_id: chat.poste_id,
       status: chat.status,
       unreadCount: unreadCount ?? chat.unread_count ?? 0,
-      createdAt:chat.createdAt,
+      createdAt: chat.createdAt,
       auto_message_status: chat.auto_message_status,
       last_activity_at: chat.last_activity_at,
       last_client_message_at: chat.last_client_message_at || null,

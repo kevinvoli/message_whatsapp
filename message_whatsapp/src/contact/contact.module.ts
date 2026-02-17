@@ -6,12 +6,10 @@ import { Contact } from './entities/contact.entity';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 
 @Module({
-   imports: [
-      TypeOrmModule.forFeature([
-        Contact
-      ]),
-      forwardRef(() => WhatsappMessageModule),
-    ],
+  imports: [
+    TypeOrmModule.forFeature([Contact]),
+    forwardRef(() => WhatsappMessageModule),
+  ],
   controllers: [ContactController],
   providers: [ContactService],
 })

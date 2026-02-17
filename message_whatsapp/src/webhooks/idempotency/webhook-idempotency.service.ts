@@ -27,7 +27,11 @@ export class WebhookIdempotencyService {
     tenantId?: string | null;
   }): Promise<IdempotencyResult> {
     const { payload, provider, tenantId } = params;
-    const keys = this.buildIdempotencyKeys(payload, provider, tenantId ?? 'unknown');
+    const keys = this.buildIdempotencyKeys(
+      payload,
+      provider,
+      tenantId ?? 'unknown',
+    );
     if (!keys.length) {
       return 'accepted';
     }
@@ -73,7 +77,8 @@ export class WebhookIdempotencyService {
           ?.map((message) => message?.id)
           .filter((id): id is string => Boolean(id))
           .map((id) => {
-            const direction = whapiPayload.messages?.find((m) => m.id === id)?.from_me
+            const direction = whapiPayload.messages?.find((m) => m.id === id)
+              ?.from_me
               ? 'out'
               : 'in';
             return `${id}:${eventType}:${direction}`;
@@ -82,9 +87,7 @@ export class WebhookIdempotencyService {
       const statusIds =
         whapiPayload?.statuses
           ?.map((status) =>
-            status?.id
-              ? `${status.id}:${eventType}:out`
-              : null,
+            status?.id ? `${status.id}:${eventType}:out` : null,
           )
           .filter((value): value is string => Boolean(value)) ?? [];
 
@@ -108,14 +111,15 @@ export class WebhookIdempotencyService {
     const messageIds =
       value?.messages
         ?.map((message) => message?.id)
-        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+        .filter(
+          (id: unknown): id is string =>
+            typeof id === 'string' && id.length > 0,
+        )
         .map((id: string) => `${id}:${eventType}:in`) ?? [];
 
     const statusIds =
       value?.statuses
-        ?.map((status) =>
-            status?.id ? `${status.id}:${eventType}:out` : null,
-        )
+        ?.map((status) => (status?.id ? `${status.id}:${eventType}:out` : null))
         .filter((value: unknown): value is string => Boolean(value)) ?? [];
 
     const keys = [...messageIds, ...statusIds];
@@ -130,7 +134,10 @@ export class WebhookIdempotencyService {
     ];
   }
 
-  private resolveEventType(payload: unknown, provider: ProviderId): string | null {
+  private resolveEventType(
+    payload: unknown,
+    provider: ProviderId,
+  ): string | null {
     if (provider === 'whapi') {
       return (payload as WhapiWebhookPayload)?.event?.type ?? null;
     }
@@ -151,7 +158,10 @@ export class WebhookIdempotencyService {
     return value?.messages?.[0]?.id ?? null;
   }
 
-  private extractDirection(payload: unknown, provider: ProviderId): string | null {
+  private extractDirection(
+    payload: unknown,
+    provider: ProviderId,
+  ): string | null {
     if (provider === 'whapi') {
       const whapiPayload = payload as WhapiWebhookPayload;
       if (whapiPayload?.messages?.length) {
@@ -188,8 +198,7 @@ export class WebhookIdempotencyService {
     const metaPayload = payload as MetaWebhookPayload;
     const value = metaPayload?.entry?.[0]?.changes?.[0]?.value;
     const ts =
-      value?.messages?.[0]?.timestamp ??
-      value?.statuses?.[0]?.timestamp;
+      value?.messages?.[0]?.timestamp ?? value?.statuses?.[0]?.timestamp;
     const parsed = typeof ts === 'string' ? Number.parseInt(ts, 10) : ts;
     if (Number.isFinite(parsed)) {
       return Math.floor((Number(parsed) * 1000) / 60000);
@@ -241,8 +250,15 @@ export class WebhookIdempotencyService {
                 tenant_id: params.tenantId,
               };
         const existing = await this.webhookEventRepository.findOne({ where });
-        if (existing && existing.payload_hash && existing.payload_hash !== params.payloadHash) {
-          this.metricsService.recordIdempotencyConflict(params.provider, params.tenantId);
+        if (
+          existing &&
+          existing.payload_hash &&
+          existing.payload_hash !== params.payloadHash
+        ) {
+          this.metricsService.recordIdempotencyConflict(
+            params.provider,
+            params.tenantId,
+          );
           return 'conflict';
         }
         return 'duplicate';

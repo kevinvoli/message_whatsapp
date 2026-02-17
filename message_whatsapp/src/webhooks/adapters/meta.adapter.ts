@@ -187,7 +187,9 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
     return undefined;
   }
 
-  private resolveLocation(message: MetaMessage):
+  private resolveLocation(
+    message: MetaMessage,
+  ):
     | { latitude: number; longitude: number; name?: string; address?: string }
     | undefined {
     if (message.type !== 'location') {
@@ -202,7 +204,12 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
   }
 
   private resolveInteractive(message: MetaMessage):
-    | { kind: 'button_reply' | 'list_reply' | 'unknown'; id?: string; title?: string; description?: string }
+    | {
+        kind: 'button_reply' | 'list_reply' | 'unknown';
+        id?: string;
+        title?: string;
+        description?: string;
+      }
     | undefined {
     if (message.type === 'interactive') {
       if (message.interactive.type === 'button_reply') {

@@ -1,11 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { CommunicationWhapiService } from './communication_whapi.service';
 import { CreateCommunicationWhapiDto } from './dto/create-communication_whapi.dto';
 import { UpdateCommunicationWhapiDto } from './dto/update-communication_whapi.dto';
 
 @Controller('communication-whapi')
 export class CommunicationWhapiController {
-  constructor(private readonly communicationWhapiService: CommunicationWhapiService) {}
+  constructor(
+    private readonly communicationWhapiService: CommunicationWhapiService,
+  ) {}
 
   // @Post()
   // create(@Body() createCommunicationWhapiDto: CreateCommunicationWhapiDto) {

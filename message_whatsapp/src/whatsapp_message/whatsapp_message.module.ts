@@ -74,6 +74,10 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
     MessageAutoService,
     SocketThrottleGuard,
   ],
-  exports: [WhatsappMessageGateway, WhatsappMessageService, FirstResponseTimeoutJob],
+  exports: [
+    WhatsappMessageGateway,
+    WhatsappMessageService,
+    FirstResponseTimeoutJob,
+  ],
 })
 export class WhatsappMessageModule {}

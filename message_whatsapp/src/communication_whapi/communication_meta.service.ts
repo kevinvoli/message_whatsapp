@@ -2,7 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
-import { WhapiFailureKind, WhapiOutboundError } from './errors/whapi-outbound.error';
+import {
+  WhapiFailureKind,
+  WhapiOutboundError,
+} from './errors/whapi-outbound.error';
 
 @Injectable()
 export class CommunicationMetaService {
@@ -22,7 +25,6 @@ export class CommunicationMetaService {
     const to = this.validateRecipient(data.to);
     const body = this.validateBody(data.text);
     const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
-console.log("l'url de l'envoie du message :", url);
 
     let attempt = 0;
     while (attempt <= this.maxRetries) {
@@ -43,7 +45,6 @@ console.log("l'url de l'envoie du message :", url);
             },
           },
         );
-console.log("l'url de l'envoie du message================== :", response);
 
         const messageId = response.data?.messages?.[0]?.id;
         if (!messageId) {
@@ -55,8 +56,8 @@ console.log("l'url de l'envoie du message================== :", response);
 
         return { providerMessageId: messageId };
       } catch (error) {
-        console.log("erreur axios",error);
-        
+        console.log('erreur axios');
+
         if (error instanceof WhapiOutboundError) throw error;
 
         const axiosError = error as AxiosError;
@@ -139,7 +140,10 @@ console.log("l'url de l'envoie du message================== :", response);
       });
       mediaId = uploadResponse.data?.id;
       if (!mediaId) {
-        throw new WhapiOutboundError('Meta media upload: missing media id', 'permanent');
+        throw new WhapiOutboundError(
+          'Meta media upload: missing media id',
+          'permanent',
+        );
       }
       this.logger.log(
         `Meta media uploaded: media_id=${mediaId}`,
@@ -153,7 +157,11 @@ console.log("l'url de l'envoie du message================== :", response);
         axiosError.stack,
         CommunicationMetaService.name,
       );
-      throw new WhapiOutboundError('Meta media upload failed', 'permanent', axiosError.response?.status);
+      throw new WhapiOutboundError(
+        'Meta media upload failed',
+        'permanent',
+        axiosError.response?.status,
+      );
     }
 
     // Step 2: Send message with media
@@ -183,7 +191,10 @@ console.log("l'url de l'envoie du message================== :", response);
 
         const messageId = response.data?.messages?.[0]?.id;
         if (!messageId) {
-          throw new WhapiOutboundError('Meta response missing message id', 'permanent');
+          throw new WhapiOutboundError(
+            'Meta response missing message id',
+            'permanent',
+          );
         }
         return { providerMessageId: messageId };
       } catch (error) {
@@ -209,7 +220,11 @@ console.log("l'url de l'envoie du message================== :", response);
           axiosError.stack,
           CommunicationMetaService.name,
         );
-        throw new WhapiOutboundError('Meta media send failed', kind, statusCode);
+        throw new WhapiOutboundError(
+          'Meta media send failed',
+          kind,
+          statusCode,
+        );
       }
     }
 
@@ -222,7 +237,9 @@ console.log("l'url de l'envoie du message================== :", response);
     phoneNumberId?: string,
   ): Promise<string | null> {
     try {
-      const query = phoneNumberId ? `?phone_number_id=${encodeURIComponent(phoneNumberId)}` : '';
+      const query = phoneNumberId
+        ? `?phone_number_id=${encodeURIComponent(phoneNumberId)}`
+        : '';
       const url = `https://graph.facebook.com/${this.META_API_VERSION}/${mediaId}${query}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -231,8 +248,11 @@ console.log("l'url de l'envoie du message================== :", response);
     } catch (error) {
       const axiosError = error as AxiosError;
       const statusCode = axiosError.response?.status;
-      const data = axiosError.response?.data as { error?: { message?: string; code?: number } } | undefined;
-      const reason = data?.error?.message ?? axiosError.message ?? 'unknown_error';
+      const data = axiosError.response?.data as
+        | { error?: { message?: string; code?: number } }
+        | undefined;
+      const reason =
+        data?.error?.message ?? axiosError.message ?? 'unknown_error';
       this.logger.warn(
         `Failed to get Meta media URL for mediaId=${mediaId} status=${statusCode ?? 'unknown'} reason=${reason}`,
         CommunicationMetaService.name,
@@ -248,7 +268,11 @@ console.log("l'url de l'envoie du message================== :", response);
   ): Promise<{ buffer: Buffer; mimeType: string } | null> {
     try {
       // Step 1: Get the temporary download URL
-      const mediaUrl = await this.getMediaUrl(mediaId, accessToken, phoneNumberId);
+      const mediaUrl = await this.getMediaUrl(
+        mediaId,
+        accessToken,
+        phoneNumberId,
+      );
       if (!mediaUrl) return null;
 
       // Step 2: Download the actual file
@@ -273,7 +297,8 @@ console.log("l'url de l'envoie du message================== :", response);
       });
 
       const buffer = Buffer.from(response.data);
-      const mimeType = response.headers['content-type'] ?? 'application/octet-stream';
+      const mimeType =
+        response.headers['content-type'] ?? 'application/octet-stream';
       return { buffer, mimeType };
     } catch (error) {
       const axiosError = error as AxiosError;

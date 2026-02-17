@@ -5,11 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappPoste } from './entities/whatsapp_poste.entity';
 
 @Module({
-  imports: [
-        TypeOrmModule.forFeature([
-          WhatsappPoste
-        ]),
-      ],
+  imports: [TypeOrmModule.forFeature([WhatsappPoste])],
   controllers: [WhatsappPosteController],
   providers: [WhatsappPosteService],
 })

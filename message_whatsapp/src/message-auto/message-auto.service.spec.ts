@@ -8,7 +8,9 @@ describe('MessageAutoService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [MessageAutoService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     service = module.get<MessageAutoService>(MessageAutoService);
   });
@@ -17,4 +19,3 @@ describe('MessageAutoService', () => {
     expect(service).toBeDefined();
   });
 });
-

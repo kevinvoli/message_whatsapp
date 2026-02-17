@@ -43,7 +43,7 @@ export class BackfillTenantId1739560000002 implements MigrationInterface {
     if (await queryRunner.hasTable('webhook_event_log')) {
       try {
         await queryRunner.query(
-          "UPDATE `webhook_event_log` w " +
+          'UPDATE `webhook_event_log` w ' +
             'JOIN `whapi_channels` ch ' +
             "ON ch.`channel_id` = SUBSTRING_INDEX(SUBSTRING_INDEX(w.`event_key`, ':', 2), ':', -1) " +
             'SET w.`tenant_id` = ch.`tenant_id` ' +
@@ -67,9 +67,7 @@ export class BackfillTenantId1739560000002 implements MigrationInterface {
       await queryRunner.query('UPDATE `channels` SET `tenant_id` = NULL');
     }
     await queryRunner.query('UPDATE `whatsapp_media` SET `tenant_id` = NULL');
-    await queryRunner.query(
-      'UPDATE `whatsapp_message` SET `tenant_id` = NULL',
-    );
+    await queryRunner.query('UPDATE `whatsapp_message` SET `tenant_id` = NULL');
     await queryRunner.query('UPDATE `whatsapp_chat` SET `tenant_id` = NULL');
     await queryRunner.query('UPDATE `whapi_channels` SET `tenant_id` = NULL');
   }

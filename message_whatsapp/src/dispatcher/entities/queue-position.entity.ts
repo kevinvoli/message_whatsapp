@@ -1,9 +1,17 @@
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('queue_positions')
 export class QueuePosition {
-   @PrimaryGeneratedColumn('uuid', {
+  @PrimaryGeneratedColumn('uuid', {
     name: 'id',
     comment: 'Primary key - Unique trajet identifier',
   })

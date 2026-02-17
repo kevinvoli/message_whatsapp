@@ -35,7 +35,6 @@ describeMaybe('Message flow (e2e)', () => {
   const clientPhone = chatId.split('@')[0];
   const requestTimeout = { response: 20000, deadline: 25000 };
   const logStep = (step: string) => {
-    // eslint-disable-next-line no-console
     console.log(`[e2e][message-flow] ${step}`);
   };
 

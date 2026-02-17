@@ -216,7 +216,11 @@ export class AddMultitenantColumns1739560000001 implements MigrationInterface {
         'webhook_event_log',
         'direction',
       );
-      await this.dropColumnIfExists(queryRunner, 'webhook_event_log', 'tenant_id');
+      await this.dropColumnIfExists(
+        queryRunner,
+        'webhook_event_log',
+        'tenant_id',
+      );
     }
 
     await this.dropIndexIfExists(
@@ -224,7 +228,11 @@ export class AddMultitenantColumns1739560000001 implements MigrationInterface {
       'whatsapp_media',
       'IDX_whatsapp_media_tenant_id',
     );
-    await this.dropColumnIfExists(queryRunner, 'whatsapp_media', 'provider_media_id');
+    await this.dropColumnIfExists(
+      queryRunner,
+      'whatsapp_media',
+      'provider_media_id',
+    );
     await this.dropColumnIfExists(queryRunner, 'whatsapp_media', 'provider');
     await this.dropColumnIfExists(queryRunner, 'whatsapp_media', 'tenant_id');
 
@@ -238,7 +246,11 @@ export class AddMultitenantColumns1739560000001 implements MigrationInterface {
       'whatsapp_message',
       'IDX_whatsapp_message_tenant_id',
     );
-    await this.dropColumnIfExists(queryRunner, 'whatsapp_message', 'provider_message_id');
+    await this.dropColumnIfExists(
+      queryRunner,
+      'whatsapp_message',
+      'provider_message_id',
+    );
     await this.dropColumnIfExists(queryRunner, 'whatsapp_message', 'provider');
     await this.dropColumnIfExists(queryRunner, 'whatsapp_message', 'tenant_id');
 

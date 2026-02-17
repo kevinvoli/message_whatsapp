@@ -10,7 +10,9 @@ describe('MetriquesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MetriquesController],
       providers: [MetriquesService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     controller = module.get<MetriquesController>(MetriquesController);
   });
@@ -19,4 +21,3 @@ describe('MetriquesController', () => {
     expect(controller).toBeDefined();
   });
 });
-

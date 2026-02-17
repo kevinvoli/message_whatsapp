@@ -10,7 +10,6 @@ import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 
-
 @Injectable()
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
@@ -19,9 +18,7 @@ export class DispatcherService {
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
 
-
     private readonly queueService: QueueService,
-
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
@@ -42,7 +39,12 @@ export class DispatcherService {
     tenantId?: string,
   ): Promise<WhatsappChat | null> {
     return this.dispatchLock.runExclusive(() =>
-      this.assignConversationInternal(clientPhone, clientName, traceId, tenantId),
+      this.assignConversationInternal(
+        clientPhone,
+        clientName,
+        traceId,
+        tenantId,
+      ),
     );
   }
 
@@ -94,7 +96,10 @@ export class DispatcherService {
       }
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
-      if (!conversation.first_response_deadline_at && !conversation.last_poste_message_at) {
+      if (
+        !conversation.first_response_deadline_at &&
+        !conversation.last_poste_message_at
+      ) {
         conversation.first_response_deadline_at = new Date(
           Date.now() + 5 * 60 * 1000,
         );
@@ -158,7 +163,6 @@ export class DispatcherService {
       return this.chatRepository.save(waitingChat);
     }
 
-    
     /**
      * Cas 3️⃣ : conversation existante mais poste absent ou réassignation
      */
@@ -166,7 +170,7 @@ export class DispatcherService {
 
     if (conversation) {
       this.logger.log(
-        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${  'aucun'}) à (${nextAgent.name})`,
+        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${'aucun'}) à (${nextAgent.name})`,
       );
       if (tenantId && !conversation.tenant_id) {
         conversation.tenant_id = tenantId;
@@ -181,9 +185,9 @@ export class DispatcherService {
       conversation.assigned_at = new Date();
       conversation.assigned_mode = nextAgent.is_active ? 'ONLINE' : 'OFFLINE';
       conversation.first_response_deadline_at = new Date(
-        Date.now() + 5 * 60* 1000,
+        Date.now() + 5 * 60 * 1000,
       );
-     
+
       conversation.last_client_message_at = new Date();
       return this.chatRepository.save(conversation);
     }
@@ -200,7 +204,7 @@ export class DispatcherService {
       name: clientName,
       tenant_id: tenantId ?? null,
       type: 'private',
-      contact_client:  clientPhone.split('@')[0],
+      contact_client: clientPhone.split('@')[0],
       poste: nextAgent,
       poste_id: nextAgent.id,
       status: nextAgent.is_active
@@ -212,20 +216,15 @@ export class DispatcherService {
       updatedAt: new Date(),
       assigned_at: new Date(),
       assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
-      first_response_deadline_at:  new Date(
-        Date.now() + 5 * 60* 1000,
-      ),
-     
+      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+
       last_client_message_at: new Date(),
     });
 
-    this.logger.debug(
-      `Nouvelle conversation creee (${newChat.chat_id})`,
-    );
+    this.logger.debug(`Nouvelle conversation creee (${newChat.chat_id})`);
 
     return this.chatRepository.save(newChat);
   }
-
 
   async reinjectConversation(chat: WhatsappChat) {
     if (chat.read_only) {
@@ -268,9 +267,7 @@ export class DispatcherService {
         ? WhatsappChatStatus.ACTIF
         : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
-      first_response_deadline_at:  new Date(
-        Date.now() + 5 * 60* 1000,
-      )
+      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
     });
 
     const updatedChat = await this.chatRepository.findOne({

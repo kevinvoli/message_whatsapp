@@ -8,11 +8,9 @@ import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
   imports: [
-      TypeOrmModule.forFeature([
-       WhapiChannel,WhatsappChat
-      ]),
-      LoggingModule,
-    ],
+    TypeOrmModule.forFeature([WhapiChannel, WhatsappChat]),
+    LoggingModule,
+  ],
   controllers: [CommunicationWhapiController],
   providers: [CommunicationWhapiService],
 })

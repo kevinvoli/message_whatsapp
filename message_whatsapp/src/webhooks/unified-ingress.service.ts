@@ -16,7 +16,8 @@ export class UnifiedIngressService {
     payload: WhapiWebhookPayload,
     tenantId: string,
   ): Promise<void> {
-    const whapiAdapter = this.adapterRegistry.getAdapter<WhapiWebhookPayload>('whapi');
+    const whapiAdapter =
+      this.adapterRegistry.getAdapter<WhapiWebhookPayload>('whapi');
     const unifiedMessages = whapiAdapter.normalizeMessages(payload, {
       provider: 'whapi',
       tenantId,
@@ -77,7 +78,8 @@ export class UnifiedIngressService {
     const metaValue = entry?.changes?.[0]?.value;
     const channelId = metaValue?.metadata?.phone_number_id ?? 'unknown';
 
-    const metaAdapter = this.adapterRegistry.getAdapter<MetaWebhookPayload>('meta');
+    const metaAdapter =
+      this.adapterRegistry.getAdapter<MetaWebhookPayload>('meta');
     const unifiedMessages = metaAdapter.normalizeMessages(payload, {
       provider: 'meta',
       tenantId,

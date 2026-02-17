@@ -1,4 +1,10 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { CallStatus, Priority } from '../entities/contact.entity';
 
 export class CreateContactDto {

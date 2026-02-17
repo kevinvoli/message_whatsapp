@@ -7,9 +7,9 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Module({
-   imports: [TypeOrmModule.forFeature([
-          WhatsappMedia,WhatsappMessage,WhatsappChat
-        ])],
-  providers: [WhatsappMediaGateway, WhatsappMediaService,WhatsappMediaService],
+  imports: [
+    TypeOrmModule.forFeature([WhatsappMedia, WhatsappMessage, WhatsappChat]),
+  ],
+  providers: [WhatsappMediaGateway, WhatsappMediaService, WhatsappMediaService],
 })
 export class WhatsappMediaModule {}

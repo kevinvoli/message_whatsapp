@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class RemovePendingMessages1739440000004
-  implements MigrationInterface
-{
+export class RemovePendingMessages1739440000004 implements MigrationInterface {
   name = 'RemovePendingMessages1739440000004';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

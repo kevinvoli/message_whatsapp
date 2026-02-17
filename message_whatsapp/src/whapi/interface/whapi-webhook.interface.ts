@@ -270,7 +270,7 @@ export interface WhapiMessage {
   type: WhapiMessageType;
   subtype?: string;
 
-  channel_id:string;
+  channel_id: string;
   chat_id: string;
   chat_name?: string;
 
@@ -343,7 +343,7 @@ export interface WhapiWebhookPayload {
 
   messages?: WhapiMessage[];
   statuses?: WhapiStatus[];
-   events?: WhapiEventData[];          // anciennement event_datas
+  events?: WhapiEventData[]; // anciennement event_datas
   polls?: WhapiPoll[];
   interactives?: WhapiInteractive[];
   contacts?: WhapiContact[];
@@ -356,7 +356,6 @@ export interface WhapiWebhookPayload {
   catalogs?: WhapiCatalog[];
   // invites?: WhapiInvite[];
 }
-
 
 export interface ExtractedMedia {
   type: WhapiMessageType;

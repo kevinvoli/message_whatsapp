@@ -184,6 +184,8 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
+        console.log("une foi ici 11111111111111111111111111");
+        
         e.preventDefault();
         // Removed: if (!messageInput.trim() || !selectedChat || !token) { return; }
         if (!messageInput.trim() || !selectedChat) { // Keep checks for messageInput and selectedChat
@@ -220,6 +222,8 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
                 throw new Error("Impossible d'envoyer: channel_id manquant pour cette conversation.");
             }
 
+            console.log("222222222222222222222222222222222222222222222222222");
+            
             const sentMessage = await sendMessage(
                 selectedChat.chat_id,
                 currentMessageText,

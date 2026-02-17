@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { IsNull, Repository } from 'typeorm';
 
 @Injectable()
@@ -12,7 +15,6 @@ export class OfflineReinjectionJob {
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
   ) {}
-
 
   async offlineReinject() {
     this.logger.debug('Offline reinjection cron started');
@@ -33,6 +35,4 @@ export class OfflineReinjectionJob {
       await this.dispatcher.reinjectConversation(chat);
     }
   }
-
-
 }

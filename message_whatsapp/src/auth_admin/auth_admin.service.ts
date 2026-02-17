@@ -3,7 +3,10 @@ import { JwtService } from '@nestjs/jwt';
 import { AdminService } from '../admin/admin.service';
 import { Admin } from '../admin/entities/admin.entity';
 import { AuthAdminUser } from '../auth/shared/base-auth-user.types';
-import { BaseAuthService, UserLookupService } from '../auth/shared/base-auth.service';
+import {
+  BaseAuthService,
+  UserLookupService,
+} from '../auth/shared/base-auth.service';
 
 @Injectable()
 export class AuthAdminService extends BaseAuthService<AuthAdminUser, Admin> {

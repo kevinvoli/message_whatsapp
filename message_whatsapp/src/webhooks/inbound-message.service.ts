@@ -21,6 +21,7 @@ import {
 import { UnifiedMessage } from './normalization/unified-message';
 import { UnifiedStatus } from './normalization/unified-status';
 import { ChannelService } from 'src/channel/channel.service';
+import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -30,6 +31,7 @@ export class InboundMessageService {
     private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly messageGateway: WhatsappMessageGateway,
+    private readonly chatService: WhatsappChatService,
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly channelService: ChannelService,
@@ -43,7 +45,9 @@ export class InboundMessageService {
         message.providerMessageId,
         message.chatId,
       );
-      this.logger.log(`INCOMING_RECEIVED trace=${traceId} type=${message.type}`);
+      this.logger.log(
+        `INCOMING_RECEIVED trace=${traceId} type=${message.type}`,
+      );
 
       if (message.direction !== 'in') {
         continue;
@@ -100,7 +104,9 @@ export class InboundMessageService {
         );
 
         if (!fullMessage) continue;
-        await this.chatService.update(conversation.chat_id, { read_only: false });
+        await this.chatService.update(conversation.chat_id, {
+          read_only: false,
+        });
         conversation.read_only = false;
         await this.messageGateway.notifyNewMessage(fullMessage, conversation);
         this.logger.log(
@@ -139,7 +145,12 @@ export class InboundMessageService {
     media: ExtractedMedia,
     messageEntity,
     chatEntity,
-    context?: { tenantId?: string; provider?: string; providerMediaId?: string; channelId?: string },
+    context?: {
+      tenantId?: string;
+      provider?: string;
+      providerMediaId?: string;
+      channelId?: string;
+    },
   ) {
     const entity = new WhatsappMedia();
 
@@ -160,7 +171,9 @@ export class InboundMessageService {
 
     // Attach channel when possible (helps later media resolution)
     if (context?.channelId) {
-      const resolvedChannel = await this.channelService.findByChannelId(context.channelId);
+      const resolvedChannel = await this.channelService.findByChannelId(
+        context.channelId,
+      );
       if (resolvedChannel) {
         entity.channel = resolvedChannel;
       }
@@ -172,7 +185,9 @@ export class InboundMessageService {
     // Meta provider: no local storage. Use proxy endpoint for streaming.
     if (!mediaUrl && context?.provider === 'meta' && context?.providerMediaId) {
       const serverHost = this.resolveServerHost();
-      const channelQuery = context.channelId ? `?channelId=${encodeURIComponent(context.channelId)}` : '';
+      const channelQuery = context.channelId
+        ? `?channelId=${encodeURIComponent(context.channelId)}`
+        : '';
       mediaUrl = `${serverHost}/messages/media/meta/${context.providerMediaId}${channelQuery}`;
     }
 
@@ -195,19 +210,21 @@ export class InboundMessageService {
       message.type === 'interactive' || message.type === 'button'
         ? 'interactive'
         : message.type;
-    const normalizedType = ([
-      'image',
-      'video',
-      'audio',
-      'voice',
-      'document',
-      'gif',
-      'short',
-      'location',
-      'live_location',
-    ].includes(mediaType)
-      ? mediaType
-      : 'text') as ExtractedMedia['type'];
+    const normalizedType = (
+      [
+        'image',
+        'video',
+        'audio',
+        'voice',
+        'document',
+        'gif',
+        'short',
+        'location',
+        'live_location',
+      ].includes(mediaType)
+        ? mediaType
+        : 'text'
+    ) as ExtractedMedia['type'];
 
     if (message.location) {
       return [
@@ -237,9 +254,10 @@ export class InboundMessageService {
     return [];
   }
 
-  private validateIncomingChatId(
-    chatId: string | null | undefined,
-  ): { valid: boolean; reason?: string } {
+  private validateIncomingChatId(chatId: string | null | undefined): {
+    valid: boolean;
+    reason?: string;
+  } {
     if (!chatId || typeof chatId !== 'string') {
       return { valid: false, reason: 'missing_chat_id' };
     }

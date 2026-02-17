@@ -8,7 +8,12 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
-import { ChargePosteDto, MetriquesGlobalesDto, PerformanceCommercialDto, StatutChannelDto } from './dto/create-metrique.dto';
+import {
+  ChargePosteDto,
+  MetriquesGlobalesDto,
+  PerformanceCommercialDto,
+  StatutChannelDto,
+} from './dto/create-metrique.dto';
 import { QueueMetricsDto } from './dto/create-metrique.dto';
 
 // Importer vos entitÃ©s existantes
@@ -19,22 +24,21 @@ export class MetriquesService {
   constructor(
     @InjectRepository(WhatsappMessage)
     private messageRepository: Repository<WhatsappMessage>,
-    
+
     @InjectRepository(WhatsappChat)
     private chatRepository: Repository<WhatsappChat>,
-    
+
     @InjectRepository(WhatsappCommercial)
     private commercialRepository: Repository<WhatsappCommercial>,
-    
+
     @InjectRepository(Contact)
     private contactRepository: Repository<Contact>,
-    
+
     @InjectRepository(WhatsappPoste)
     private posteRepository: Repository<WhatsappPoste>,
-    
+
     @InjectRepository(WhapiChannel)
     private channelRepository: Repository<WhapiChannel>,
-    
 
     @InjectRepository(QueuePosition)
     private queueRepository: Repository<QueuePosition>,
@@ -95,8 +99,10 @@ export class MetriquesService {
       .groupBy('message.direction')
       .getRawMany();
 
-    const messagesEntrants = messagesParDirection.find(m => m.direction === 'IN')?.count || 0;
-    const messagesSortants = messagesParDirection.find(m => m.direction === 'OUT')?.count || 0;
+    const messagesEntrants =
+      messagesParDirection.find((m) => m.direction === 'IN')?.count || 0;
+    const messagesSortants =
+      messagesParDirection.find((m) => m.direction === 'OUT')?.count || 0;
 
     // Messages aujourd'hui
     const messagesAujourdhui = await this.messageRepository.count({
@@ -107,9 +113,10 @@ export class MetriquesService {
     });
 
     // Taux de rÃ©ponse
-    const tauxReponse = messagesEntrants > 0 
-      ? Math.round((messagesSortants / messagesEntrants) * 100) 
-      : 0;
+    const tauxReponse =
+      messagesEntrants > 0
+        ? Math.round((messagesSortants / messagesEntrants) * 100)
+        : 0;
 
     // Temps de rÃ©ponse moyen
     const tempsReponse = await this.messageRepository
@@ -118,12 +125,17 @@ export class MetriquesService {
         'whatsapp_message',
         'msg_in',
         'msg_out.chat_id = msg_in.chat_id AND msg_in.direction = :dirIn AND msg_out.direction = :dirOut AND msg_out.timestamp > msg_in.timestamp',
-        { dirIn: 'IN', dirOut: 'OUT' }
+        { dirIn: 'IN', dirOut: 'OUT' },
       )
-      .select('AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))', 'avg_seconds')
+      .select(
+        'AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))',
+        'avg_seconds',
+      )
       .where('msg_out.deletedAt IS NULL')
       .andWhere('msg_in.deletedAt IS NULL')
-      .andWhere('TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600')
+      .andWhere(
+        'TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600',
+      )
       .getRawOne();
 
     const tempsReponseMoyen = parseInt(tempsReponse?.avg_seconds) || 0;
@@ -155,9 +167,15 @@ export class MetriquesService {
       .groupBy('chat.status')
       .getRawMany();
 
-    const chatsActifs = parseInt(chatsParStatut.find(c => c.status === 'actif')?.count || 0);
-    const chatsEnAttente = parseInt(chatsParStatut.find(c => c.status === 'en attente')?.count || 0);
-    const chatsFermes = parseInt(chatsParStatut.find(c => c.status === 'fermÃ©')?.count || 0);
+    const chatsActifs = parseInt(
+      chatsParStatut.find((c) => c.status === 'actif')?.count || 0,
+    );
+    const chatsEnAttente = parseInt(
+      chatsParStatut.find((c) => c.status === 'en attente')?.count || 0,
+    );
+    const chatsFermes = parseInt(
+      chatsParStatut.find((c) => c.status === 'fermÃ©')?.count || 0,
+    );
 
     // Chats non lus
     const chatsNonLus = await this.chatRepository.count({
@@ -183,14 +201,16 @@ export class MetriquesService {
       },
     });
 
-    const tauxAssignation = totalChats > 0 
-      ? Math.round((chatsAssignes / totalChats) * 100) 
-      : 0;
+    const tauxAssignation =
+      totalChats > 0 ? Math.round((chatsAssignes / totalChats) * 100) : 0;
 
     // Temps premiÃ¨re rÃ©ponse
     const tempsPremiereReponse = await this.chatRepository
       .createQueryBuilder('chat')
-      .select('AVG(TIMESTAMPDIFF(SECOND, chat.last_client_message_at, chat.first_response_deadline_at))', 'avg_seconds')
+      .select(
+        'AVG(TIMESTAMPDIFF(SECOND, chat.last_client_message_at, chat.first_response_deadline_at))',
+        'avg_seconds',
+      )
       .where('chat.first_response_deadline_at IS NOT NULL')
       .andWhere('chat.last_client_message_at IS NOT NULL')
       .andWhere('chat.deletedAt IS NULL')
@@ -227,7 +247,9 @@ export class MetriquesService {
     const commerciauxActifs = await this.commercialRepository
       .createQueryBuilder('commercial')
       .innerJoin('commercial.poste', 'poste')
-      .innerJoin('poste.chats', 'chat', 'chat.status = :status', { status: 'actif' })
+      .innerJoin('poste.chats', 'chat', 'chat.status = :status', {
+        status: 'actif',
+      })
       .where('commercial.deleted_at IS NULL')
       .andWhere('chat.deletedAt IS NULL')
       .select('COUNT(DISTINCT commercial.id)', 'count')
@@ -299,14 +321,20 @@ export class MetriquesService {
       .addSelect('poste.name', 'poste_name')
       .addSelect('poste.code', 'poste_code')
       .addSelect('COUNT(chat.id)', 'nb_chats')
-      .addSelect('SUM(CASE WHEN chat.status = "actif" THEN 1 ELSE 0 END)', 'nb_chats_actifs')
-      .addSelect('SUM(CASE WHEN chat.status = "en attente" THEN 1 ELSE 0 END)', 'nb_chats_attente')
+      .addSelect(
+        'SUM(CASE WHEN chat.status = "actif" THEN 1 ELSE 0 END)',
+        'nb_chats_actifs',
+      )
+      .addSelect(
+        'SUM(CASE WHEN chat.status = "en attente" THEN 1 ELSE 0 END)',
+        'nb_chats_attente',
+      )
       .where('poste.is_active = 1')
       .groupBy('poste.id, poste.name, poste.code')
       .orderBy('nb_chats', 'DESC')
       .getRawMany();
 
-    return chargePostes.map(cp => ({
+    return chargePostes.map((cp) => ({
       poste_id: cp.poste_id,
       poste_name: cp.poste_name,
       poste_code: cp.poste_code,
@@ -333,7 +361,7 @@ export class MetriquesService {
       channelsActifs,
     };
   }
-/**
+  /**
    * Performance dÃ©taillÃ©e par commercial
    */
   async getPerformanceCommerciaux(): Promise<PerformanceCommercialDto[]> {
@@ -358,7 +386,9 @@ export class MetriquesService {
         'COUNT(CASE WHEN message.direction = "IN" THEN 1 END) as nbMessagesRecus',
       ])
       .where('commercial.deleted_at IS NULL')
-      .groupBy('commercial.id, commercial.name, commercial.email, commercial.isConnected, commercial.lastConnectionAt, poste.name, poste.id')
+      .groupBy(
+        'commercial.id, commercial.name, commercial.email, commercial.isConnected, commercial.lastConnectionAt, poste.name, poste.id',
+      )
       .getRawMany();
 
     // Calculer le taux de rÃ©ponse et temps moyen pour chaque commercial
@@ -366,22 +396,30 @@ export class MetriquesService {
       performance.map(async (perf) => {
         const nbMessagesRecus = parseInt(perf.nbMessagesRecus) || 0;
         const nbMessagesEnvoyes = parseInt(perf.nbMessagesEnvoyes) || 0;
-        
-        const tauxReponse = nbMessagesRecus > 0 
-          ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100) 
-          : 0;
+
+        const tauxReponse =
+          nbMessagesRecus > 0
+            ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100)
+            : 0;
 
         // Temps de rÃ©ponse moyen pour ce commercial
         const tempsReponse = await this.messageRepository
           .createQueryBuilder('msg_out')
-          .innerJoin('whatsapp_message', 'msg_in', 
-            'msg_out.chat_id = msg_in.chat_id AND msg_in.direction = "IN" AND msg_out.direction = "OUT" AND msg_out.timestamp > msg_in.timestamp'
+          .innerJoin(
+            'whatsapp_message',
+            'msg_in',
+            'msg_out.chat_id = msg_in.chat_id AND msg_in.direction = "IN" AND msg_out.direction = "OUT" AND msg_out.timestamp > msg_in.timestamp',
           )
           .where('msg_out.poste_id = :posteId', { posteId: perf.poste_id })
           .andWhere('msg_out.deletedAt IS NULL')
           .andWhere('msg_in.deletedAt IS NULL')
-          .andWhere('TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600')
-          .select('AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))', 'avg')
+          .andWhere(
+            'TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600',
+          )
+          .select(
+            'AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))',
+            'avg',
+          )
           .getRawOne();
 
         return {
@@ -398,10 +436,12 @@ export class MetriquesService {
           tauxReponse,
           tempsReponseMoyen: parseInt(tempsReponse?.avg) || 0,
         };
-      })
+      }),
     );
 
-    return performanceAvecCalculs.sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);
+    return performanceAvecCalculs.sort(
+      (a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes,
+    );
   }
 
   /**
@@ -413,8 +453,16 @@ export class MetriquesService {
 
     const channels = await this.channelRepository
       .createQueryBuilder('channel')
-      .leftJoin('channel.chats', 'chat', 'chat.deletedAt IS NULL AND chat.status = "actif"')
-      .leftJoin('channel.messages', 'message', 'message.deletedAt IS NULL AND DATE(message.createdAt) = CURDATE()')
+      .leftJoin(
+        'channel.chats',
+        'chat',
+        'chat.deletedAt IS NULL AND chat.status = "actif"',
+      )
+      .leftJoin(
+        'channel.messages',
+        'message',
+        'message.deletedAt IS NULL AND DATE(message.createdAt) = CURDATE()',
+      )
       .select([
         'channel.id as id',
         'channel.channel_id as channel_id',
@@ -427,11 +475,13 @@ export class MetriquesService {
         'COUNT(DISTINCT chat.id) as nb_chats_actifs',
         'COUNT(DISTINCT message.id) as nb_messages',
       ])
-      .groupBy('channel.id, channel.channel_id, channel.is_business, channel.uptime, channel.version, channel.api_version, channel.core_version, channel.ip')
+      .groupBy(
+        'channel.id, channel.channel_id, channel.is_business, channel.uptime, channel.version, channel.api_version, channel.core_version, channel.ip',
+      )
       .orderBy('nb_messages', 'DESC')
       .getRawMany();
 
-    return channels.map(ch => ({
+    return channels.map((ch) => ({
       id: ch.id,
       channel_id: ch.channel_id,
       is_business: Boolean(ch.is_business),
@@ -453,16 +503,24 @@ export class MetriquesService {
       .createQueryBuilder('message')
       .select('DATE(message.createdAt)', 'date')
       .addSelect('COUNT(*)', 'nb_messages')
-      .addSelect('SUM(CASE WHEN message.direction = "IN" THEN 1 ELSE 0 END)', 'messages_in')
-      .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
+      .addSelect(
+        'SUM(CASE WHEN message.direction = "IN" THEN 1 ELSE 0 END)',
+        'messages_in',
+      )
+      .addSelect(
+        'SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)',
+        'messages_out',
+      )
       .addSelect('COUNT(DISTINCT message.chat_id)', 'nb_conversations')
-      .where('message.createdAt >= DATE_SUB(CURDATE(), INTERVAL :jours DAY)', { jours })
+      .where('message.createdAt >= DATE_SUB(CURDATE(), INTERVAL :jours DAY)', {
+        jours,
+      })
       .andWhere('message.deletedAt IS NULL')
       .groupBy('DATE(message.createdAt)')
       .orderBy('date', 'ASC')
       .getRawMany();
 
-    return performance.map(p => ({
+    return performance.map((p) => ({
       periode: p.date,
       nb_messages: parseInt(p.nb_messages),
       messages_in: parseInt(p.messages_in),
@@ -512,6 +570,3 @@ export class MetriquesService {
     };
   }
 }
-
-
-

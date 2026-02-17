@@ -10,7 +10,9 @@ describe('WhatsappPosteController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WhatsappPosteController],
       providers: [WhatsappPosteService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     controller = module.get<WhatsappPosteController>(WhatsappPosteController);
   });
@@ -19,4 +21,3 @@ describe('WhatsappPosteController', () => {
     expect(controller).toBeDefined();
   });
 });
-

@@ -8,6 +8,9 @@ export type AdapterContext = {
 };
 
 export interface ProviderAdapter<Payload> {
-  normalizeMessages(payload: Payload, context: AdapterContext): UnifiedMessage[];
+  normalizeMessages(
+    payload: Payload,
+    context: AdapterContext,
+  ): UnifiedMessage[];
   normalizeStatuses(payload: Payload, context: AdapterContext): UnifiedStatus[];
 }

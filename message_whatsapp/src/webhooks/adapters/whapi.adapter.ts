@@ -205,14 +205,20 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
     return undefined;
   }
 
-  private resolveInteractive(
-    message: WhapiMessage,
-  ):
-    | { kind: 'button_reply' | 'list_reply' | 'unknown'; id?: string; title?: string; description?: string }
+  private resolveInteractive(message: WhapiMessage):
+    | {
+        kind: 'button_reply' | 'list_reply' | 'unknown';
+        id?: string;
+        title?: string;
+        description?: string;
+      }
     | undefined {
     // Whapi reply format: { type: "reply", reply: { type: "buttons_reply", buttons_reply: { id, title } } }
     if (message.reply) {
-      if (message.reply.type === 'buttons_reply' && message.reply.buttons_reply) {
+      if (
+        message.reply.type === 'buttons_reply' &&
+        message.reply.buttons_reply
+      ) {
         return {
           kind: 'button_reply',
           id: message.reply.buttons_reply.id,

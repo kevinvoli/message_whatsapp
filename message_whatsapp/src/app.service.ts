@@ -21,13 +21,14 @@ export class AppService {
   }
 
   async getStats() {
-    const [commerciaux, totalCanaux, totalConversations, commerciauxActifs] = await Promise.all([
-      this.commercialRepo.count(), // Use count() for total number
-      this.channelRepo.count(),
-      this.chatRepo.count(),
-      this.commercialRepo.count({ where: { isConnected: true } }),
-    ]);
-    
+    const [commerciaux, totalCanaux, totalConversations, commerciauxActifs] =
+      await Promise.all([
+        this.commercialRepo.count(), // Use count() for total number
+        this.channelRepo.count(),
+        this.chatRepo.count(),
+        this.commercialRepo.count({ where: { isConnected: true } }),
+      ]);
+
     return {
       commerciaux: commerciaux,
       canaux: totalCanaux,

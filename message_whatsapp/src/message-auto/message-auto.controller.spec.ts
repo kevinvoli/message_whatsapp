@@ -10,7 +10,9 @@ describe('MessageAutoController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MessageAutoController],
       providers: [MessageAutoService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     controller = module.get<MessageAutoController>(MessageAutoController);
   });
@@ -19,4 +21,3 @@ describe('MessageAutoController', () => {
     expect(controller).toBeDefined();
   });
 });
-

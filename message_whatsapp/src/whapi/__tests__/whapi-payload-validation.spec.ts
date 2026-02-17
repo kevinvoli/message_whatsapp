@@ -6,7 +6,11 @@ const buildController = () =>
   new WhapiController(
     {} as any,
     { assertRateLimits: jest.fn() } as any,
-    { isDegraded: jest.fn(), isCircuitOpen: jest.fn(), record: jest.fn() } as any,
+    {
+      isDegraded: jest.fn(),
+      isCircuitOpen: jest.fn(),
+      record: jest.fn(),
+    } as any,
     { enqueue: jest.fn() } as any,
     new WebhookMetricsService(),
   );

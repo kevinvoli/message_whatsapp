@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class AddDispatchSettingsAudit1739440000003
-  implements MigrationInterface
-{
+export class AddDispatchSettingsAudit1739440000003 implements MigrationInterface {
   name = 'AddDispatchSettingsAudit1739440000003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

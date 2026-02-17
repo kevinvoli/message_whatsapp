@@ -6,7 +6,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  
 } from 'typeorm';
 
 export enum AutoMessageChannel {
@@ -19,27 +18,26 @@ export enum AutoMessageChannel {
 export class MessageAuto {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-  
+
   @Column({ type: 'text', nullable: false })
   body: string;
 
-  @Column({ type: 'int', default: 0 ,nullable:true})
-  delai?: number |null;
- 
+  @Column({ type: 'int', default: 0, nullable: true })
+  delai?: number | null;
+
   @Column({
     type: 'enum',
     enum: AutoMessageChannel,
     default: AutoMessageChannel.WHATSAPP,
-    nullable:true
+    nullable: true,
   })
-  canal?: AutoMessageChannel| null;
+  canal?: AutoMessageChannel | null;
 
-  @Column({ type: 'int' ,nullable:false })
-  position: number ;
- 
+  @Column({ type: 'int', nullable: false })
+  position: number;
+
   @Column({ type: 'boolean', default: true })
   actif: boolean;
-
 
   @Column({
     type: 'longtext',

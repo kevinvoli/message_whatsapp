@@ -9,7 +9,9 @@ describe('WhatsappChatGateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappChatGateway, WhatsappChatService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     gateway = module.get<WhatsappChatGateway>(WhatsappChatGateway);
   });
@@ -18,4 +20,3 @@ describe('WhatsappChatGateway', () => {
     expect(gateway).toBeDefined();
   });
 });
-

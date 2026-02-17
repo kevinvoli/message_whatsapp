@@ -128,4 +128,3 @@ describe('WhatsappMessageGateway protocol events', () => {
     });
   });
 });
-

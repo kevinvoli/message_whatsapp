@@ -1,6 +1,12 @@
 export class CreateMetriqueDto {}
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, IsBoolean, IsOptional, IsArray } from 'class-validator';
+import {
+  IsNumber,
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 
 /**
  * DTO pour la charge d'un poste
@@ -48,7 +54,7 @@ export class MetriquesGlobalesDto {
   @IsNumber()
   messagesSortants: number;
 
-  @ApiProperty({ description: 'Messages créés aujourd\'hui' })
+  @ApiProperty({ description: "Messages créés aujourd'hui" })
   @IsNumber()
   messagesAujourdhui: number;
 
@@ -103,7 +109,7 @@ export class MetriquesGlobalesDto {
   @IsNumber()
   totalContacts: number;
 
-  @ApiProperty({ description: 'Nouveaux contacts aujourd\'hui' })
+  @ApiProperty({ description: "Nouveaux contacts aujourd'hui" })
   @IsNumber()
   nouveauxContactsAujourdhui: number;
 
@@ -135,12 +141,13 @@ export class MetriquesGlobalesDto {
 
   // ========== MÉTRIQUES PERFORMANCE ==========
   @ApiProperty({ description: 'Messages en attente de traitement' })
-
   @ApiProperty({ description: 'Pourcentage de chats assignés' })
   @IsNumber()
   tauxAssignation: number;
 
-  @ApiProperty({ description: 'Temps moyen avant première réponse en secondes' })
+  @ApiProperty({
+    description: 'Temps moyen avant première réponse en secondes',
+  })
   @IsNumber()
   tempsPremiereReponse: number;
 }
@@ -224,7 +231,7 @@ export class StatutChannelDto {
   @IsString()
   version: string;
 
-  @ApiProperty({ description: 'Version de l\'API' })
+  @ApiProperty({ description: "Version de l'API" })
   @IsString()
   api_version: string;
 
@@ -240,7 +247,7 @@ export class StatutChannelDto {
   @IsNumber()
   nb_chats_actifs: number;
 
-  @ApiProperty({ description: 'Nombre de messages aujourd\'hui' })
+  @ApiProperty({ description: "Nombre de messages aujourd'hui" })
   @IsNumber()
   nb_messages: number;
 }
@@ -265,7 +272,10 @@ export class PerformanceTemporelleDto {
   @IsNumber()
   messages_out: number;
 
-  @ApiProperty({ description: 'Nombre de conversations uniques', required: false })
+  @ApiProperty({
+    description: 'Nombre de conversations uniques',
+    required: false,
+  })
   @IsOptional()
   @IsNumber()
   nb_conversations?: number;
@@ -295,5 +305,4 @@ export class QueueMetricsDto {
   @ApiProperty({ description: 'Churn 24h (positions mises a jour)' })
   @IsNumber()
   churn_24h: number;
-
 }

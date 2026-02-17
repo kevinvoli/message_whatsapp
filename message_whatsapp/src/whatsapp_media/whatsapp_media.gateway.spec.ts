@@ -9,7 +9,9 @@ describe('WhatsappMediaGateway', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappMediaGateway, WhatsappMediaService],
-    }).useMocker(createMocker).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     gateway = module.get<WhatsappMediaGateway>(WhatsappMediaGateway);
   });
@@ -18,4 +20,3 @@ describe('WhatsappMediaGateway', () => {
     expect(gateway).toBeDefined();
   });
 });
-

@@ -9,18 +9,13 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 // import { WhapiUser } from './entities/whapi-user.entity';
 
-
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      WhapiChannel,
-      ProviderChannel,
-      WhatsappChat,
-    ]),
+    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat]),
     LoggingModule,
   ],
   controllers: [ChannelController],
-  providers: [ChannelService,CommunicationWhapiService],
+  providers: [ChannelService, CommunicationWhapiService],
   exports: [ChannelService],
 })
 export class ChannelModule {}

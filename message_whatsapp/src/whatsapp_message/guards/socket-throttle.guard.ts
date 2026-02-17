@@ -62,9 +62,7 @@ export class SocketThrottleGuard {
       return true;
     }
 
-    this.logger.warn(
-      `RATE_LIMITED client=${clientId} event=${event}`,
-    );
+    this.logger.warn(`RATE_LIMITED client=${clientId} event=${event}`);
     return false;
   }
 

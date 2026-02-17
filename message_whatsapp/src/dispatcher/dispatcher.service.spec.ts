@@ -1,7 +1,10 @@
 ﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DispatcherService } from './dispatcher.service';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';

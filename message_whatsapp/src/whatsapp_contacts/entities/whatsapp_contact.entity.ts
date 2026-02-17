@@ -8,7 +8,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-  Index
+  Index,
 } from 'typeorm';
 
 @Entity()
@@ -28,7 +28,7 @@ export class WhatsappContact {
     type: 'varchar',
     length: 100,
     nullable: false,
-    unique: true
+    unique: true,
   })
   message_content_id: string;
 

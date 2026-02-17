@@ -26,7 +26,7 @@ export class WhatsappPoste {
     unique: true,
   })
   code: string;
- 
+
   @Column({ default: true })
   is_active: boolean;
 
@@ -48,9 +48,9 @@ export class WhatsappPoste {
   @OneToMany(() => WhatsappMessage, (message) => message.poste)
   messages: WhatsappMessage[];
 
-   @OneToMany(() => WhatsappCommercial, (commercial) => commercial.poste)
+  @OneToMany(() => WhatsappCommercial, (commercial) => commercial.poste)
   commercial: WhatsappCommercial[];
- 
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',

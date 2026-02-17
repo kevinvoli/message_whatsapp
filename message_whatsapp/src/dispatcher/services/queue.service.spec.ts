@@ -95,4 +95,3 @@ describe('QueueService', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });
-

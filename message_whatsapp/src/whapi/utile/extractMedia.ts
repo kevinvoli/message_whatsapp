@@ -1,8 +1,10 @@
-import { ExtractedMedia, WhapiMessage } from "../interface/whapi-webhook.interface";
+import {
+  ExtractedMedia,
+  WhapiMessage,
+} from '../interface/whapi-webhook.interface';
 
 export function extractMedia(message: WhapiMessage): ExtractedMedia {
   switch (message.type) {
-
     case 'text':
       return {
         type: 'text',
@@ -21,7 +23,6 @@ export function extractMedia(message: WhapiMessage): ExtractedMedia {
     case 'video':
     case 'gif':
     case 'short': {
-
       const media = message.video ?? message.gif ?? message.short;
       return {
         type: message.type,

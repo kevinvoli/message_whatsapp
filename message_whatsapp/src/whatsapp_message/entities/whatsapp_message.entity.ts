@@ -225,7 +225,7 @@ export class WhatsappMessage {
     nullable: true,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({  name: 'commercial_id',referencedColumnName:'id' })
+  @JoinColumn({ name: 'commercial_id', referencedColumnName: 'id' })
   commercial?: WhatsappCommercial | null;
 
   @CreateDateColumn({

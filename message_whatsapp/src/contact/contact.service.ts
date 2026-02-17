@@ -8,7 +8,7 @@ import { Contact } from './entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
-export class ContactService{
+export class ContactService {
   constructor(
     @InjectRepository(Contact)
     private readonly repo: Repository<Contact>,
@@ -51,11 +51,14 @@ export class ContactService{
   }
 
   async findAll() {
-    const contact= await this.repo.find({ order: { createdAt: 'DESC' },relations:{
-      messages:true,
-    } });
+    const contact = await this.repo.find({
+      order: { createdAt: 'DESC' },
+      relations: {
+        messages: true,
+      },
+    });
 
-    return contact
+    return contact;
   }
 
   async findAllByPosteId(posteId: string) {
@@ -72,9 +75,12 @@ export class ContactService{
   }
 
   async findOne(id: string) {
-    const contact = await this.repo.findOne({ where: { id },relations:{
-      messages:true
-    } });
+    const contact = await this.repo.findOne({
+      where: { id },
+      relations: {
+        messages: true,
+      },
+    });
     if (!contact) throw new NotFoundException('Contact introuvable');
     return contact;
   }

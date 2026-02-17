@@ -14,11 +14,23 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
-    WhatsappChat,WhatsappChatLabel,   WhatsappCommercial, QueuePosition,
-    WhatsappPoste,WhatsappMessage
-      ])],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappChat,
+      WhatsappChatLabel,
+      WhatsappCommercial,
+      QueuePosition,
+      WhatsappPoste,
+      WhatsappMessage,
+    ]),
+  ],
   controllers: [WhatsappChatController],
-  providers: [WhatsappChatGateway, WhatsappChatService, WhatsappPosteService ,WhatsappCommercialService,QueueService],
+  providers: [
+    WhatsappChatGateway,
+    WhatsappChatService,
+    WhatsappPosteService,
+    WhatsappCommercialService,
+    QueueService,
+  ],
 })
 export class WhatsappChatModule {}
