@@ -4,6 +4,7 @@ import { PerformanceCommercial } from '@/app/lib/definitions';
 import { updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
+import { formatRelativeDate } from '@/app/lib/dateUtils';
 
 interface CommerciauxViewProps {
   commerciaux: PerformanceCommercial[];
@@ -60,14 +61,7 @@ export default function CommerciauxView({
   // Formater la date
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Jamais';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 60) return `Il y a ${diffMins}min`;
-    if (diffMins < 1440) return `Il y a ${Math.floor(diffMins / 60)}h`;
-    return `Il y a ${Math.floor(diffMins / 1440)}j`;
+    return formatRelativeDate(dateString);
   };
 
   const handleDeleteCommercial = async (id: string) => {
@@ -122,7 +116,6 @@ export default function CommerciauxView({
 
   const handleCloseAddModal = () => {
     setShowAddModal(false);
-    setOperationError(null);
   };
 
   const handleOpenEditModal = (commercial: PerformanceCommercial) => {
@@ -135,7 +128,6 @@ export default function CommerciauxView({
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setCurrentCommercial(null);
-    setOperationError(null);
   };
 
   // Filtrer les commerciaux par recherche

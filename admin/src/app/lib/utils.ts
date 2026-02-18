@@ -42,32 +42,6 @@ export const formatTemps = (seconds: number): string => {
 };
 
 /**
- * Formate une date en format relatif (il y a X min/heures/jours)
- */
-export const formatDateRelative = (dateString: string | null): string => {
-  if (!dateString) return 'Jamais';
-  
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  
-  if (diffMins < 1) return 'À l\'instant';
-  if (diffMins < 60) return `Il y a ${diffMins}min`;
-  
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `Il y a ${diffHours}h`;
-  
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `Il y a ${diffDays}j`;
-  
-  const diffWeeks = Math.floor(diffDays / 7);
-  if (diffWeeks < 4) return `Il y a ${diffWeeks}sem`;
-  
-  return date.toLocaleDateString('fr-FR');
-};
-
-/**
  * Formate un nombre avec des séparateurs de milliers
  */
 export const formatNumber = (num: number): string => {

@@ -28,10 +28,9 @@ const initialState: Omit<
   | "selectContact"
   | "loadContacts"
   | "setContacts"
-  | "updateContactStatus"
+  | "upsertContact"
+  | "removeContact"
   | "reset"
- 
-
 > = {
   contacts: [],
   selectedContact: null,

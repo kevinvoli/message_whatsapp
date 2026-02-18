@@ -267,8 +267,8 @@ export interface Conversation {
   converted_at?: Date | null;
   closed_by?: string;
 
-  createdAt: string | number | Date;
-  updatedAt: string | number | Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 
@@ -697,8 +697,8 @@ export const transformToConversation = (
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
     closed_by: raw.closed_by,
 
-    createdAt: raw.created_at ?? raw.createdAt ?? Date.now(),
-    updatedAt: raw.updated_at ?? raw.updatedAt ?? Date.now(),
+    createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
+    updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),
   };
 };
 /**

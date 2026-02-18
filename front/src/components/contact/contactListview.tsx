@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { Contact, CallStatus, ContactFilters } from '@/types/chat';
+import { formatRelativeDate } from '@/lib/dateUtils';
 
 interface ContactsListViewProps {
   contacts: Contact[];
@@ -144,22 +145,7 @@ export const ContactsListView: React.FC<ContactsListViewProps> = ({
     }
   };
 
-  const formatDate = (date: Date | undefined) => {
-    if (!date) return 'Jamais';
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) return "Aujourd'hui";
-    if (days === 1) return 'Hier';
-    if (days < 7) return `Il y a ${days} jours`;
-    if (days < 30) return `Il y a ${Math.floor(days / 7)} semaines`;
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (date: Date | undefined) => formatRelativeDate(date);
 
   const getCallStatusBadge = (status: CallStatus) => {
     const badges = {

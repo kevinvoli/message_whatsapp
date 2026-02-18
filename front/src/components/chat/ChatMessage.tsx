@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MediaBubble } from '../helper/mediaBubble';
+import { formatTime } from '@/lib/dateUtils';
 
 interface ChatMessageProps {
   msg: Message;
@@ -30,16 +31,6 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
       currentAudioRef.current.pause();
     }
     currentAudioRef.current = audioEl;
-  };
-
-  const formatTime = (date: Date) => {
-    try {
-      const d = new Date(date);
-      if (Number.isNaN(d.getTime())) return '--:--';
-      return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return '--:--';
-    }
   };
 
   const renderStatusIcon = (status?: string) => {

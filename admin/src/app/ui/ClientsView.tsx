@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Edit, MessageCircle, Trash2, UserPlus, RefreshCw } from 'lucide-react';
+import { formatDateShort } from '@/app/lib/dateUtils';
 import { Client } from '@/app/lib/definitions';
 import { createClient, deleteClient, updateClient } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -178,7 +179,7 @@ export default function ClientsView({
               header: 'Cree le',
               render: (client) => (
                 <span className="text-sm text-gray-500">
-                  {new Date(client.createdAt).toLocaleDateString()}
+                  {formatDateShort(client.createdAt)}
                 </span>
               ),
             },

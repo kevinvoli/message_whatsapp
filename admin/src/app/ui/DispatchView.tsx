@@ -5,12 +5,7 @@ import { Clock, ListChecks, RefreshCw } from 'lucide-react';
 import { DispatchSettings, DispatchSettingsAudit, DispatchSnapshot } from '@/app/lib/definitions';
 import { getDispatchSettings, getDispatchSettingsAudit, getDispatchSnapshot, resetDispatchSettings, updateDispatchSettings } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
-
-const formatDate = (value?: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
-};
+import { formatDate } from '@/app/lib/dateUtils';
 
 const ageSeconds = (value?: string | null) => {
   if (!value) return 0;

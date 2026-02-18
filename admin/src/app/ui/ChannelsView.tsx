@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
+import { formatDateShort } from '@/app/lib/dateUtils';
 import { Channel } from '@/app/lib/definitions';
 import { createChannel, deleteChannel, updateChannel } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -205,7 +206,7 @@ export default function ChannelsView({
               header: 'Cree le',
               render: (channel) => (
                 <span className="text-sm text-gray-500">
-                  {new Date(channel.createdAt).toLocaleDateString()}
+                  {formatDateShort(channel.createdAt)}
                 </span>
               ),
             },

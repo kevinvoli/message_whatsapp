@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
+import { formatDateShort } from '@/app/lib/dateUtils';
 import {
   blockPosteFromQueue,
   createPoste,
@@ -290,7 +291,7 @@ export default function PostesView({
               header: 'Cree le',
               render: (poste) => (
                 <span className="text-sm text-gray-500">
-                  {new Date(poste.created_at || poste.createdAt || Date.now()).toLocaleDateString()}
+                  {formatDateShort(poste.created_at || poste.createdAt)}
                 </span>
               ),
             },

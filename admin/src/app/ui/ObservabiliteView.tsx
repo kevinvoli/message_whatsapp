@@ -3,6 +3,7 @@
 import React from 'react';
 import { WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { formatDate } from '@/app/lib/dateUtils';
 
 type Props = {
   metrics: WebhookMetricsSnapshot | null;
@@ -63,7 +64,7 @@ export default function ObservabiliteView({ metrics, onRefresh }: Props) {
           <h2 className="text-xl font-semibold text-gray-900">Observabilité Webhook</h2>
           {metrics && (
             <p className="text-xs text-gray-500 mt-1">
-              Fenêtre {metrics.window_minutes} min • {new Date(metrics.generated_at).toLocaleString()}
+              Fenêtre {metrics.window_minutes} min • {formatDate(metrics.generated_at)}
             </p>
           )}
         </div>

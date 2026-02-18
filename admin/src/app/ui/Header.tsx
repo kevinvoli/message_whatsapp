@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download, Bell, Check, Trash2, MessageCircle, ListOrdered, AlertTriangle, Info } from 'lucide-react';
 import { NavigationItem } from '@/app/lib/definitions';
 import { Notification } from '@/app/hooks/useNotifications';
+import { formatRelativeDate } from '@/app/lib/dateUtils';
 
 interface HeaderProps {
     selectedPeriod: string;
@@ -24,15 +25,7 @@ const notificationIcon = (type: Notification['type']) => {
     }
 };
 
-const formatTimeAgo = (date: Date) => {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 60) return 'A l\'instant';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `Il y a ${minutes}min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `Il y a ${hours}h`;
-    return `Il y a ${Math.floor(hours / 24)}j`;
-};
+const formatTimeAgo = (date: Date) => formatRelativeDate(date);
 
 export default function Header({
     selectedPeriod,

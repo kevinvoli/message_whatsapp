@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Clock, Check, CheckCheck } from 'lucide-react';
 import { Conversation, Message } from '@/types/chat';
-import { MediaBubble } from '../helper/mediaBubble';
 import ChatMessage from './ChatMessage';
+import { formatDateLong } from '@/lib/dateUtils';
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -32,23 +31,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
   // console.log("le message a afficher coté chate", messages);
 
 
-  const formatTime = (date: Date) => {
-    try {
-      // Vérifie si la date est valide avant de la formater
-      const d = new Date(date);
-      if (isNaN(d.getTime())) {
-        return '--:--';
-      }
-      return d.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '--:--';
-    }
-  };
-
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -72,7 +54,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
  <div className="max-w-4xl mx-auto space-y-3">
       <div className="text-center mb-6">
         <div className="inline-block bg-white px-4 py-2 rounded-full shadow-sm">
-          <p className="text-xs text-gray-500">Début de la conversation - {currentConv?.createdAt?.toString()}</p>
+          <p className="text-xs text-gray-500">Début de la conversation - {formatDateLong(currentConv?.createdAt)}</p>
         </div>
       </div>
       {messages.map((msg, index) => {

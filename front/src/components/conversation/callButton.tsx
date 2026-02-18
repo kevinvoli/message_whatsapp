@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Phone, PhoneCall, PhoneMissed, Clock, Check } from 'lucide-react';
 import { CallStatus, Conversation } from '@/types/chat';
+import { formatRelativeDate } from '@/lib/dateUtils';
 
 interface CallButtonProps {
   conversation: Conversation;
@@ -54,21 +55,6 @@ export const CallButton: React.FC<CallButtonProps> = ({
     return 'bg-gray-500 hover:bg-gray-600';
   };
 
-  const formatLastCallDate = (date: Date | null | undefined) => {
-    if (!date) return null;
-    const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) return "Aujourd'hui";
-    if (days === 1) return 'Hier';
-    if (days < 7) return `Il y a ${days} jours`;
-    return new Date(date).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-    });
-  };
-
   return (
     <>
       <button
@@ -76,7 +62,7 @@ export const CallButton: React.FC<CallButtonProps> = ({
         className={`p-2 rounded-lg text-white transition-colors ${getCallButtonColor()}`}
         title={
           conversation.last_call_date
-            ? `Dernier appel: ${formatLastCallDate(conversation.last_call_date)}`
+            ? `Dernier appel: ${formatRelativeDate(conversation.last_call_date)}`
             : 'Marquer comme appelé'
         }
       >
@@ -98,7 +84,7 @@ export const CallButton: React.FC<CallButtonProps> = ({
               </p>
               {conversation.last_call_date && (
                 <p className="text-xs text-gray-500 mt-2">
-                  Dernier appel: {formatLastCallDate(conversation.last_call_date)}
+                  Dernier appel: {formatRelativeDate(conversation.last_call_date)}
                 </p>
               )}
             </div>

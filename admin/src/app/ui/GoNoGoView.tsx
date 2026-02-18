@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertCircle, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
 import { GoNoGoChecklistItem, GoNoGoGate, GoNoGoGateStatus, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { formatDate } from '@/app/lib/dateUtils';
 
 type Props = {
   metrics: WebhookMetricsSnapshot | null;
@@ -163,7 +164,7 @@ export default function GoNoGoView({ metrics, checklist, onRefresh }: Props) {
         </div>
         {metrics && (
           <p className="text-xs mt-1">
-            Window {metrics.window_minutes} min • {new Date(metrics.generated_at).toLocaleString()}
+            Window {metrics.window_minutes} min • {formatDate(metrics.generated_at)}
           </p>
         )}
         {onRefresh && (

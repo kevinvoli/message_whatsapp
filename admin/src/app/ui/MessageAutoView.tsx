@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
+import { formatDateShort } from '@/app/lib/dateUtils';
 import { MessageAuto } from '@/app/lib/definitions';
 import { createMessageAuto, deleteMessageAuto, updateMessageAuto } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -197,7 +198,7 @@ export default function MessageAutoView({
               header: 'Cree le',
               render: (msg) => (
                 <span className="text-sm text-gray-500">
-                  {new Date(msg.created_at || msg.createdAt || Date.now()).toLocaleDateString()}
+                  {formatDateShort(msg.created_at || msg.createdAt)}
                 </span>
               ),
             },

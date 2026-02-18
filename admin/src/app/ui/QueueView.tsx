@@ -13,6 +13,7 @@ import {
 import { logger } from "@/app/lib/logger";
 import { useToast } from "@/app/ui/ToastProvider";
 import { useRealtimePolling } from "@/app/hooks/useRealtimePolling";
+import { formatDate } from "@/app/lib/dateUtils";
 
 type ConnectionState =
   | "connecting"
@@ -20,12 +21,6 @@ type ConnectionState =
   | "reconnecting"
   | "disconnected"
   | "error";
-
-const formatDate = (value?: string) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
-};
 
 const normalizeQueue = (
   payload: unknown,

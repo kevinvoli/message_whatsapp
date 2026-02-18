@@ -3,6 +3,7 @@ import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers } from 'luc
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { getStatusBadge } from '@/lib/utils';
+import { formatConversationTime } from '@/lib/dateUtils';
 
 type PlaceholderMeta = {
   label: string;
@@ -87,24 +88,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation, isSelected, isTyping, onClick }) => {
 
 
-  // console.log("conversation item==",conversation.lastMessage);
-
-  const formatTime = (date: Date) => {
-    // console.log("formatage de la date",date);
-
-    const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
-
-    if (diff < 86400000) {
-      return new Date(date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    } else if (diff < 604800000) {
-      return new Date(date).toLocaleDateString('fr-FR', { weekday: 'short' });
-    } else {
-      return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    }
-  };
-  // console.log("formatage de la date",formatTime(conversation.lastMessage?.timestamp?));
-
   return (
     <div
       onClick={onClick}
@@ -124,7 +107,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-gray-800 truncate">{conversation.clientName}</h3>
             <span className="text-xs text-gray-500">
-              {conversation.lastMessage ? formatTime(conversation.lastMessage.timestamp) : "NA"}
+              {conversation.lastMessage ? formatConversationTime(conversation.lastMessage.timestamp) : "NA"}
             </span>
           </div>
           <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>

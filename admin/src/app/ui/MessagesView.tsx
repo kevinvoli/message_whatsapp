@@ -3,6 +3,7 @@ import UnderDevelopmentView from './UnderDevelopmentView';
 import { WhatsappMessage } from '../lib/definitions';
 import { Edit, Eye, Search, RefreshCw } from 'lucide-react';
 import { getPerformanceBadge, resolveAdminMessageText } from '../lib/utils';
+import { formatDateShort } from '@/app/lib/dateUtils';
 import { Spinner } from './Spinner';
 
 
@@ -73,7 +74,7 @@ export default function MessagesView({
                                     <td className="px-6 py-4 text-gray-700">{messae.direction}</td>
                                     <td className="px-6 py-4 text-gray-700">{messae.poste?.name}</td>
                                     <td className="px-6 py-4 text-gray-700">{messae.commercial ? messae.commercial.name : "A/N"}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">{new Date(messae.timestamp).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{formatDateShort(messae.timestamp)}</td>
                                 </tr>
                             ))}
                         </tbody>

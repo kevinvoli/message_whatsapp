@@ -8,6 +8,7 @@ import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
+import { formatDate, formatTime } from '@/app/lib/dateUtils';
 
 interface ConversationsViewProps {
     initialChats: WhatsappChat[];
@@ -65,7 +66,7 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
       chat.unread_count ?? chat.unreadCount ?? 0;
 
     const formatDateTime = (value?: string | null) =>
-      value ? new Date(value).toLocaleString('fr-FR') : '—';
+      value ? formatDate(value) : '—';
 
     const formatBool = (value?: boolean) => (value ? 'Oui' : 'Non');
 
@@ -575,7 +576,7 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
                                             )}
                                             <p>{resolveAdminMessageText(msg)}</p>
                                             <span className="block text-right text-xs mt-1 opacity-75">
-                                                {new Date(msg.timestamp).toLocaleTimeString()}
+                                                {formatTime(msg.timestamp)}
                                                 {msg.status && (
                                                     <span className={`ml-1.5 ${
                                                         msg.status === 'READ' ? 'text-blue-300' :
