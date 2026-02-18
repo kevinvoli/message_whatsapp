@@ -1,6 +1,7 @@
 import React from 'react';
 import { Target, Star, Users, Calendar } from 'lucide-react';
 import { Conversation, getPriorityColor } from '@/types/chat';
+import { formatDate } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger';
 
 interface ClientInfoBannerProps {
@@ -30,7 +31,10 @@ logger.debug("Client info banner rendered", {
             </div>
             <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4 text-green-600" />
-                <span>Dernier contact: <strong>{currentConv?.lastMessage?.timestamp.toDateString()} </strong></span>
+                <span>
+                  Dernière activité:{' '}
+                  <strong>{currentConv?.last_activity_at ? formatDate(currentConv.last_activity_at) : '-'} </strong>
+                </span>
             </div>
         </div>
     );

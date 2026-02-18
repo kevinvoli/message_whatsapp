@@ -484,6 +484,7 @@ export class WhatsappMessageGateway
     }
     const tenantIds = this.getTenantIds(client);
     await this.chatService.markChatAsRead(payload.chat_id);
+    await this.messageService.markIncomingMessagesAsRead(payload.chat_id);
 
     const chat = await this.chatService.findBychat_id(payload.chat_id);
     if (!chat) return;

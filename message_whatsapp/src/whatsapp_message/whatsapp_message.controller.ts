@@ -130,14 +130,16 @@ export class WhatsappMessageController {
     @Query('channelId') channelId: string | undefined,
     @Res() res: Response,
   ) {
+
     if (!providerMediaId) {
       throw new BadRequestException('providerMediaId is required');
     }
 
     const media = await this.mediaRepository.findOne({
       where: { provider_media_id: providerMediaId, provider: 'meta' },
-      relations: ['channel', 'message', 'message.channel', 'message.chat'],
+      // relations: ['channel', 'message', 'message.channel', 'message.chat'],
     });
+
 
     const resolvedChannelId =
       media?.channel?.channel_id ??
@@ -158,11 +160,14 @@ export class WhatsappMessageController {
 
     let mediaUrl = media?.url ?? null;
 
+
+
     // Try direct URL from webhook if present
     let downloaded =
       mediaUrl && channel?.token
         ? await this.metaService.downloadMediaByUrl(mediaUrl, channel.token)
         : null;
+
 
     // If direct URL is missing or expired, refresh via Meta API
     if (!downloaded) {
@@ -171,6 +176,8 @@ export class WhatsappMessageController {
         channel.token,
         channel.channel_id,
       );
+
+
       if (refreshedUrl) {
         if (media && refreshedUrl !== media.url) {
           await this.mediaRepository.update(media.id, { url: refreshedUrl });
@@ -180,6 +187,7 @@ export class WhatsappMessageController {
           refreshedUrl,
           channel.token,
         );
+
       }
     }
 
@@ -191,6 +199,7 @@ export class WhatsappMessageController {
         channel.channel_id,
       );
     }
+
 
     if (!downloaded) {
       throw new NotFoundException('Meta media not found');

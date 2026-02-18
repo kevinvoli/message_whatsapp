@@ -53,7 +53,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const messageText = msg.text && msg.text.trim().length > 0 ? msg.text : null;
   const hasMedia = Array.isArray(msg.medias) && msg.medias.length > 0;
   const isFromMe = msg.from_me;
-  const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
+  const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : null;
   const messageId = msg.id || `msg-fallback-${index}`;
 
   const audioMedias = msg.medias?.filter((m) => m.type === 'audio' || m.type === 'voice') ?? [];

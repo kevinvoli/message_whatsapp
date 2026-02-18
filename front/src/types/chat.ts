@@ -258,6 +258,7 @@ export interface Conversation {
   // Timestamps backend
   last_client_message_at?: Date | null;
   last_poste_message_at?: Date | null;
+  last_activity_at?: Date | null;
   
   // SLA
   first_response_deadline_at?: Date | null;
@@ -452,6 +453,7 @@ interface RawConversationData {
 
   last_client_message_at?: string | number | Date | null;
   last_poste_message_at?: string | number | Date | null;
+  last_activity_at?: string | number | Date | null;
   
   first_response_deadline_at?: string | number | Date | null;
   closed_at?: string | number | Date | null;
@@ -539,7 +541,11 @@ export const transformToMessage = (raw: RawMessageData): Message => {
     text: normalizedText,
     chat_id: raw.chat_id,
 
-    timestamp: new Date(raw.timestamp || raw.createdAt || Date.now()),
+    timestamp: raw.timestamp
+      ? new Date(raw.timestamp)
+      : raw.createdAt
+        ? new Date(raw.createdAt)
+        : new Date(0),
     //,
     // timestamp: raw.timestamp,
     from: raw.from,
@@ -681,6 +687,9 @@ export const transformToConversation = (
       : null,
     last_poste_message_at: raw.last_poste_message_at
       ? new Date(raw.last_poste_message_at)
+      : null,
+    last_activity_at: raw.last_activity_at
+      ? new Date(raw.last_activity_at)
       : null,
 
     source: sourceChannel,

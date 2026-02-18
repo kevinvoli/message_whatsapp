@@ -14,6 +14,8 @@ export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappMessage)
+    private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly posteService: WhatsappPosteService,
   ) {}
 
@@ -21,7 +23,7 @@ export class WhatsappChatService {
   async findByPosteId(poste_id: string): Promise<WhatsappChat[]> {
     const chats = await this.chatRepository.find({
       where: { poste_id: poste_id },
-      order: { updatedAt: 'DESC' },
+      order: { last_activity_at: 'DESC' },
       relations: ['poste', 'messages', 'channel'],
     });
 
@@ -85,16 +87,13 @@ export class WhatsappChatService {
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chat_id: string): Promise<void> {
-    const chat = await this.chatRepository.update(
-      { chat_id: chat_id },
-      {
-        unread_count: 0,
-        last_activity_at: new Date(),
-      },
+    // SQL brut pour éviter que @UpdateDateColumn ne mette updatedAt à NOW()
+    await this.chatRepository.query(
+      `UPDATE whatsapp_chat SET unread_count = 0 WHERE chat_id = ?`,
+      [chat_id],
     );
 
     this.logger.debug(`Chat marked as read (${chat_id})`);
-    // return chat;
   }
 
   /* =======================
@@ -174,7 +173,7 @@ export class WhatsappChatService {
           .limit(1)
           .getQuery()})`,
       )
-      .orderBy('chat.updatedAt', 'DESC')
+      .orderBy('chat.last_activity_at', 'DESC')
       .getMany();
   }
 

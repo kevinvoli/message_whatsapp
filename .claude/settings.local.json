@@ -32,7 +32,8 @@
       "Bash(taskkill:*)",
       "Bash(npm run:*)",
       "Bash(npm install:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

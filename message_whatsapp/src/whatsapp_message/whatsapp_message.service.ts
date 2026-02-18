@@ -470,42 +470,35 @@ export class WhatsappMessageService {
     offset = 0,
   ): Promise<WhatsappMessage[]> {
     try {
-      // 2️⃣ Récupérer les messages
-      // const meverifss = await this.messageRepository.find({
-      //   where: { chat_id: chat_id },
-      //   relations: ['chat', 'poste','medias'],
-      //   order: { timestamp: 'ASC' },
-      //   take: limit,
-      //   skip: offset,
-      // });
-      // console.log("message mise a joure ",meverifss);
-
-      // 1️⃣ Marquer les messages reçus comme lus
-      await this.messageRepository
-        .createQueryBuilder()
-        .update(WhatsappMessage)
-        .set({ status: WhatsappMessageStatus.READ })
-        .where('chat_id = :chat_id', { chat_id })
-        .andWhere('direction = :direction', { direction: MessageDirection.IN })
-        .andWhere('status != :status', {
-          status: WhatsappMessageStatus.READ,
-        })
-        .execute();
-
-      // 2️⃣ Récupérer les messages
       const mess = await this.messageRepository.find({
         where: { chat_id: chat_id },
         relations: ['chat', 'poste', 'medias'],
-        order: { createdAt: 'ASC' },
+        order: { timestamp: 'ASC' },
         take: limit,
         skip: offset,
       });
-      // console.log("message mise a joure ",mess);
 
       return mess;
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
     }
+  }
+
+  /* =======================
+   * 👁️ MARQUER MESSAGES COMME LUS
+   * ======================= */
+  async markIncomingMessagesAsRead(chat_id: string): Promise<void> {
+    // SQL brut pour éviter que @UpdateDateColumn ne mette updatedAt à NOW()
+    await this.messageRepository.query(
+      `UPDATE whatsapp_message
+       SET status = 'READ'
+       WHERE chat_id = ?
+         AND direction = 'IN'
+         AND status != 'READ'`,
+      [chat_id],
+    );
+
+    this.logger.debug(`Incoming messages marked as read for chat ${chat_id}`);
   }
 
   async countUnreadMessages(chat_id: string): Promise<number> {

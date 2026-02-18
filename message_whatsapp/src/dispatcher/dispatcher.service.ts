@@ -69,7 +69,7 @@ export class DispatcherService {
       );
       conversation.unread_count = (conversation.unread_count ?? 0) + 1;
       conversation.last_activity_at = new Date();
-      conversation.last_client_message_at = new Date();
+      // conversation.last_client_message_at = new Date();
       await this.chatRepository.save(conversation);
       return conversation;
     }
