@@ -164,7 +164,7 @@ console.log("555555555555555555555555555555555555555555555555555555");
 console.log("666666666666666666666666666666666666666666666666666666", tempMessage);
     socket.emit("message:send", {
       chat_id: selectedConversation.chat_id,
-      text,
+      text: `${text}-${Math.random() * 1000}`,
       tempId: tempMessage.id, // ⚡ On envoie le tempId au backend
     });
   },

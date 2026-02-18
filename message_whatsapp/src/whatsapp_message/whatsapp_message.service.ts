@@ -669,7 +669,7 @@ export class WhatsappMessageService {
       });
       if (existingMessage) {
         this.logger.log(
-          `INCOMING_DUPLICATE trace=${traceId} db_message_id=${existingMessage.id}`,
+          `INCOMING_DUPLICATE trace=${traceId} db_message_id=${existingMessage.id} direction=${existingMessage.direction}`,
         );
         return existingMessage;
       }
@@ -783,11 +783,12 @@ export class WhatsappMessageService {
       this.logger.log(
         `INCOMING_SAVE_REQUEST trace=${traceId} chat_id=${message.chatId}`,
       );
+      this.logger.debug(
+        `INCOMING_PROBE trace=${traceId} provider=${message.provider} providerMessageId=${message.providerMessageId} direction=${message.direction}`,
+      );
       const existingMessage = await this.messageRepository.findOne({
         where: {
           provider_message_id: message.providerMessageId,
-          provider: message.provider,
-          direction: MessageDirection.IN,
         },
       });
       if (existingMessage) {
