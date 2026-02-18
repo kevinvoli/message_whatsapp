@@ -8,6 +8,7 @@ import ConversationFilters from './ConversationFilters';
 import ConversationList from './ConversationList';
 import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
+import { ContactSidebarPanel } from '@/components/contacts/ContactSidebarPanel';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -103,65 +104,23 @@ const Sidebar: React.FC<SidebarProps> = ({
       />
 
       {viewMode === 'conversations' ? (
-        <><ConversationFilters
-          conversations={conversations}
-          totalUnread={totalUnread}
-          filterStatus={filterStatus}
-          setFilterStatus={setFilterStatus} />
+        <>
+          <ConversationFilters
+            conversations={conversations}
+            totalUnread={totalUnread}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+          />
           <ConversationList
             filteredConversations={conversations}
             selectedConversation={selectedConversation}
-            onSelectConversation={onSelectConversation} selectedConv={''} />
+            onSelectConversation={onSelectConversation}
+            selectedConv={''}
+          />
         </>
-      )
-        : (
-          filteredContacts?.map((contact) => (
-            <div
-              key={contact.id}
-              className="p-4 bg-white border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                  {contact.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">
-                    {contact.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 truncate">
-                    {contact.contact}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${contact.call_status === 'appelé'
-                        ? 'bg-green-100 text-green-800'
-                        : contact.call_status === 'à_appeler'
-                          ? 'bg-blue-100 text-blue-800'
-                          : contact.call_status === 'rappeler'
-                            ? 'bg-orange-100 text-orange-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                    >
-                      {contact.call_status.replace('_', ' ')}
-                    </span>
-                    {contact.priority && (
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${contact.priority === 'haute'
-                          ? 'bg-red-100 text-red-800'
-                          : contact.priority === 'moyenne'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                          }`}
-                      >
-                        {contact.priority}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          )))}
+      ) : (
+        <ContactSidebarPanel searchQuery={searchQuery} />
+      )}
     </div>
 
   );
