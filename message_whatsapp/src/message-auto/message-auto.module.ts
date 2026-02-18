@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { MessageAutoController } from './message-auto.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -6,8 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { MessageAuto } from './entities/message-auto.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { QueueService } from 'src/dispatcher/services/queue.service';
@@ -52,20 +51,18 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
       Contact,
       WhatsappMedia,
     ]),
+    forwardRef(() => WhatsappMessageModule),
     LoggingModule,
   ],
   controllers: [MessageAutoController],
   providers: [
     MessageAutoService,
-    WhatsappMessageGateway,
     WhatsappChatService,
-    WhatsappMessageService,
     WhatsappCommercialService,
     WhatsappPosteService,
     QueueService,
     DispatcherService,
     FirstResponseTimeoutJob,
-    WhatsappPosteService,
     CommunicationWhapiService,
     CommunicationMetaService,
     OutboundRouterService,
