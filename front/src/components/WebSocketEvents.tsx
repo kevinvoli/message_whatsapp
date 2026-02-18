@@ -19,20 +19,8 @@ const WebSocketEvents = () => {
   const { socket } = useSocket();
   const { user } = useAuth();
 
-  const {
-    setSocket,
-    setConversations,
-    setMessages,
-    addMessage,
-    updateConversation,
-    removeConversationBychat_id,
-    addConversation,
-    setTyping,
-    clearTyping,
-    loadConversations,
-  } = useChatStore();
-
-  const { setContacts, upsertContact, removeContact } = useContactStore();
+  const setSocket = useChatStore((s) => s.setSocket);
+  const loadConversations = useChatStore((s) => s.loadConversations);
 
   useEffect(() => {
     if (!socket || !user) {
@@ -55,40 +43,41 @@ const WebSocketEvents = () => {
       chatId: string,
       patch: Partial<Conversation>,
     ) => {
-      const existingConversation = useChatStore
-        .getState()
-        .conversations.find((c) => c.chat_id === chatId);
+      const state = useChatStore.getState();
+      const existingConversation = state.conversations.find(
+        (c) => c.chat_id === chatId,
+      );
 
       if (!existingConversation) {
         return;
       }
 
-      updateConversation({
+      state.updateConversation({
         ...existingConversation,
         ...patch,
       });
     };
 
     const handleChatEvent = (data: { type: string; payload: any }) => {
+      const chatState = useChatStore.getState();
+
       switch (data.type) {
         case 'MESSAGE_ADD': {
           const message: Message = transformToMessage(data.payload);
           const tempId = (data.payload as { tempId?: string }).tempId;
 
           if (tempId) {
-            const idx = useChatStore
-              .getState()
-              .messages.findIndex((m) => m.id === tempId);
+            const idx = chatState.messages.findIndex((m) => m.id === tempId);
 
             if (idx > -1) {
-              const updatedMessages = [...useChatStore.getState().messages];
+              const updatedMessages = [...chatState.messages];
               updatedMessages[idx] = message;
-              useChatStore.getState().setMessages(message.chat_id, updatedMessages);
+              chatState.setMessages(message.chat_id, updatedMessages);
               break;
             }
           }
 
-          addMessage(message);
+          chatState.addMessage(message);
 
           // Notification navigateur si onglet en arriere-plan et message entrant
           if (
@@ -111,29 +100,29 @@ const WebSocketEvents = () => {
 
         case 'CONVERSATION_UPSERT': {
           const conversation: Conversation = transformToConversation(data.payload);
-          updateConversation(conversation);
+          chatState.updateConversation(conversation);
           break;
         }
 
         case 'MESSAGE_LIST': {
           const messages: Message[] = data.payload.messages.map(transformToMessage);
-          setMessages(data.payload.chat_id, messages);
+          chatState.setMessages(data.payload.chat_id, messages);
           break;
         }
 
         case 'CONVERSATION_REMOVED':
-          removeConversationBychat_id(data.payload.chat_id);
+          chatState.removeConversationBychat_id(data.payload.chat_id);
           break;
 
         case 'CONVERSATION_ASSIGNED': {
           const conversation: Conversation = transformToConversation(data.payload);
-          addConversation(conversation);
+          chatState.addConversation(conversation);
           break;
         }
 
         case 'CONVERSATION_LIST': {
           const conversations: Conversation[] = data.payload.map(transformToConversation);
-          setConversations(conversations);
+          chatState.setConversations(conversations);
           break;
         }
 
@@ -148,7 +137,7 @@ const WebSocketEvents = () => {
           if (payload.commercial_id && payload.commercial_id === user.id) {
             break;
           }
-          setTyping(payload.chat_id);
+          chatState.setTyping(payload.chat_id);
           break;
         }
 
@@ -157,7 +146,7 @@ const WebSocketEvents = () => {
           if (payload.commercial_id && payload.commercial_id === user.id) {
             break;
           }
-          clearTyping(payload.chat_id);
+          chatState.clearTyping(payload.chat_id);
           break;
         }
 
@@ -171,9 +160,7 @@ const WebSocketEvents = () => {
             error_title?: string;
           };
           const frontStatus = status === 'failed' ? 'error' : status;
-          useChatStore
-            .getState()
-            .updateMessageStatus(chat_id, message_id, frontStatus as Message['status']);
+          chatState.updateMessageStatus(chat_id, message_id, frontStatus as Message['status']);
           break;
         }
 
@@ -186,14 +173,13 @@ const WebSocketEvents = () => {
         case 'MESSAGE_SEND_ERROR': {
           const tempId = (data.payload as { tempId?: string }).tempId;
           if (tempId) {
-            const current = useChatStore.getState().messages;
+            const current = chatState.messages;
             const next = current.map((msg) =>
               msg.id === tempId ? { ...msg, status: 'error' as const } : msg,
             );
-            const selectedChatId =
-              useChatStore.getState().selectedConversation?.chat_id;
+            const selectedChatId = chatState.selectedConversation?.chat_id;
             if (selectedChatId) {
-              useChatStore.getState().setMessages(selectedChatId, next);
+              chatState.setMessages(selectedChatId, next);
             }
           }
           logger.warn('Message send error received', {
@@ -209,28 +195,30 @@ const WebSocketEvents = () => {
     };
 
     const handleContactEvent = (data: { type: string; payload: any }) => {
+      const contactState = useContactStore.getState();
+
       switch (data.type) {
         case 'CONTACT_LIST': {
           const contacts: Contact[] = data.payload.map(transformToContact);
-          setContacts(contacts);
+          contactState.setContacts(contacts);
           break;
         }
         case 'CONTACT_UPSERT': {
           const contact: Contact = transformToContact(data.payload);
-          upsertContact(contact);
+          contactState.upsertContact(contact);
           break;
         }
         case 'CONTACT_REMOVED': {
           const contactId =
             data.payload?.contact_id ?? data.payload?.id ?? data.payload;
           if (typeof contactId === 'string') {
-            removeContact(contactId);
+            contactState.removeContact(contactId);
           }
           break;
         }
         case 'CONTACT_CALL_STATUS_UPDATED': {
           const contact: Contact = transformToContact(data.payload);
-          upsertContact(contact);
+          contactState.upsertContact(contact);
           break;
         }
         default:
@@ -249,7 +237,6 @@ const WebSocketEvents = () => {
     socket.on('contact:event', handleContactEvent);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
-    socket.on('reconnect', refreshAfterConnect);
 
     if (socket.connected) {
       refreshAfterConnect();
@@ -260,26 +247,9 @@ const WebSocketEvents = () => {
       socket.off('contact:event', handleContactEvent);
       socket.off('error', handleSocketError);
       socket.off('connect', refreshAfterConnect);
-      socket.off('reconnect', refreshAfterConnect);
       setSocket(null);
     };
-  }, [
-    socket,
-    user,
-    setSocket,
-    setConversations,
-    setMessages,
-    addMessage,
-    updateConversation,
-    removeConversationBychat_id,
-    addConversation,
-    setTyping,
-    clearTyping,
-    loadConversations,
-    setContacts,
-    upsertContact,
-    removeContact,
-  ]);
+  }, [socket, user, setSocket, loadConversations]);
 
   return null;
 };

@@ -71,6 +71,7 @@ const initialState: Omit<
   messageIdCache: {},
 };
 let typingTimeout: NodeJS.Timeout;
+let isSending = false;
 
 const dedupeMessagesById = (messages: Message[]): Message[] => {
   const map = new Map<string, Message>();
@@ -92,8 +93,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket) return;
 
     set({ isLoading: true });
-    // console.log("novelle conversation");
-
     socket?.emit("conversations:get");
   },
 
@@ -136,13 +135,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: (text: string) => {
-console.log("4444444444444444444444444444444444444444444444444444444");
+    if (isSending) return;
 
     const { socket, selectedConversation } = get();
     if (!socket || !selectedConversation) return;
-console.log("555555555555555555555555555555555555555555555555555555");
 
-    const tempId = crypto.randomUUID();
+    isSending = true;
+
     const tempMessage: Message = {
       id: crypto.randomUUID(),
       chat_id: selectedConversation.chat_id,
@@ -161,12 +160,15 @@ console.log("555555555555555555555555555555555555555555555555555555");
       chat_id: selectedConversation.chat_id,
       temp_id: tempMessage.id,
     });
-console.log("666666666666666666666666666666666666666666666666666666", tempMessage);
+
     socket.emit("message:send", {
       chat_id: selectedConversation.chat_id,
-      text: `${text}-${Math.random() * 1000}`,
-      tempId: tempMessage.id, // ⚡ On envoie le tempId au backend
+      text,
+      tempId: tempMessage.id,
     });
+
+    // Libère le lock après un court délai pour éviter les double-clics
+    setTimeout(() => { isSending = false; }, 500);
   },
 
   onTypingStart: (chat_id: string) => {
@@ -196,8 +198,6 @@ console.log("666666666666666666666666666666666666666666666666666666", tempMessag
   },
 
   setConversations: (conversations) => {
-    // console.log("=======track1 setConversations=======", conversations);
-
     set({ conversations, isLoading: false });
   },
 

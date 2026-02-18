@@ -515,7 +515,6 @@ export class WhatsappMessageGateway
       payload,
       'client id:',
       client.id,
-      Math.random() * 1000,
     );
     if (!this.throttle.allow(client.id, 'message:send')) {
       return this.emitRateLimited(client, 'message:send');
