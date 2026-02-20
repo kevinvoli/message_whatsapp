@@ -31,6 +31,7 @@ import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { WebhookEventLog } from './entities/webhook-event.entity';
 import { LoggingModule } from 'src/logging/logging.module';
+import { CallLogModule } from 'src/call-log/call_log.module';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
@@ -64,6 +65,7 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
     WhatsappChatModule,
     CommunicationWhapiModule,
     LoggingModule,
+    CallLogModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

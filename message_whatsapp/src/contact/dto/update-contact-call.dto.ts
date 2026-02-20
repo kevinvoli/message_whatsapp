@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { CallStatus } from '../entities/contact.entity';
 
 export class UpdateContactCallDto {
@@ -8,4 +8,14 @@ export class UpdateContactCallDto {
   @IsOptional()
   @IsString()
   call_notes?: string;
+
+  /** Résultat de l'appel (ticket F-04) */
+  @IsOptional()
+  @IsString()
+  outcome?: string;
+
+  /** Durée en secondes (ticket F-04) */
+  @IsOptional()
+  @IsInt()
+  duration_sec?: number;
 }

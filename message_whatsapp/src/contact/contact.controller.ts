@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ContactService } from './contact.service';
@@ -56,9 +57,15 @@ export class ContactController {
   async updateCallStatus(
     @Param('id') id: string,
     @Body() dto: UpdateContactCallDto,
+    @Request() req: { user: { userId: string } },
   ) {
-    const contact = await this.service.updateCallStatus(id, dto);
+    const { contact, callLog } = await this.service.updateCallStatus(
+      id,
+      dto,
+      req.user.userId,
+    );
     await this.gateway.emitContactCallStatusUpdated(contact);
+    await this.gateway.emitCallLogNew(contact, callLog);
     return contact;
   }
 

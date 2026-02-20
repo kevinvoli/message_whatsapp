@@ -1,7 +1,7 @@
 ﻿// src/store/chatStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
-import { Contact  } from "@/types/chat";
+import { Contact, CallLog } from "@/types/chat";
 import { logger } from "@/lib/logger";
 
 interface ContactState {
@@ -10,6 +10,8 @@ interface ContactState {
   isLoading: boolean;
   error: string | null;
   contacts: Contact[];
+  /** Historique des appels indexé par contact_id (F-02) */
+  callLogs: Record<string, CallLog[]>;
   // Actions
   setSocket: (socket: Socket | null) => void;
   // Setters for WebSocket events
@@ -19,6 +21,10 @@ interface ContactState {
   removeContact: (contact_id: string) => void;
   // updateContactStatus: (contact: Contact) => void;
   loadContacts: () => void;
+  /** Stocke la liste complète des logs d'un contact (F-02) */
+  setCallLogs: (contact_id: string, logs: CallLog[]) => void;
+  /** Ajoute un nouveau log en tête de liste (F-02) */
+  addCallLog: (log: CallLog) => void;
   reset: () => void;
 }
 
@@ -30,6 +36,8 @@ const initialState: Omit<
   | "setContacts"
   | "upsertContact"
   | "removeContact"
+  | "setCallLogs"
+  | "addCallLog"
   | "reset"
 > = {
   contacts: [],
@@ -37,6 +45,7 @@ const initialState: Omit<
   isLoading: false,
   error: null,
   socket: null,
+  callLogs: {},
 };
 
 
@@ -74,7 +83,11 @@ export const useContactStore = create<ContactState>((set, get) => ({
       };
     });
 
-    // Charge les messages + declenche le READ cote backend
+    // Charge l'historique des appels (F-02)
+    const { socket } = get();
+    if (socket) {
+      socket.emit('call_logs:get', { contact_id });
+    }
   },
 
   setContacts: (contacts) => {
@@ -148,6 +161,24 @@ export const useContactStore = create<ContactState>((set, get) => ({
   //   });
   // },
   
+  setCallLogs: (contact_id, logs) => {
+    set((state) => ({
+      callLogs: { ...state.callLogs, [contact_id]: logs },
+    }));
+  },
+
+  addCallLog: (log) => {
+    set((state) => {
+      const existing = state.callLogs[log.contact_id] ?? [];
+      return {
+        callLogs: {
+          ...state.callLogs,
+          [log.contact_id]: [log, ...existing],
+        },
+      };
+    });
+  },
+
   reset: () => set({ ...initialState }),
 }));
 

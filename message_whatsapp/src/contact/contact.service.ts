@@ -6,12 +6,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact } from './entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { CallLogService } from 'src/call-log/call_log.service';
+import { CallLog } from 'src/call-log/entities/call_log.entity';
 
 @Injectable()
 export class ContactService {
   constructor(
     @InjectRepository(Contact)
     private readonly repo: Repository<Contact>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
+    private readonly callLogService: CallLogService,
   ) {}
 
   async create(dto: CreateContactDto) {
@@ -91,13 +97,37 @@ export class ContactService {
     return this.repo.save(contact);
   }
 
-  async updateCallStatus(id: string, dto: UpdateContactCallDto) {
+  async updateCallStatus(
+    id: string,
+    dto: UpdateContactCallDto,
+    commercial_id: string,
+  ): Promise<{ contact: Contact; callLog: CallLog }> {
     const contact = await this.findOne(id);
     contact.call_status = dto.call_status;
     contact.call_notes = dto.call_notes ?? contact.call_notes;
     contact.last_call_date = new Date();
     contact.call_count = (contact.call_count ?? 0) + 1;
-    return this.repo.save(contact);
+    const savedContact = await this.repo.save(contact);
+
+    // Lookup du nom du commercial pour dénormalisation
+    const commercial = await this.commercialRepo.findOne({
+      where: { id: commercial_id },
+      select: ['name'],
+    });
+    const commercial_name = commercial?.name ?? 'Inconnu';
+
+    const callLog = await this.callLogService.create({
+      contact_id: id,
+      commercial_id,
+      commercial_name,
+      call_status: dto.call_status,
+      notes: dto.call_notes,
+      outcome: dto.outcome as any,
+      duration_sec: dto.duration_sec,
+      called_at: new Date(),
+    });
+
+    return { contact: savedContact, callLog };
   }
 
   async remove(id: string) {

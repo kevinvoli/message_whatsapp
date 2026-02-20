@@ -13,6 +13,7 @@ import {
   transformToContact,
   transformToConversation,
   transformToMessage,
+  transformToCallLog,
 } from '@/types/chat';
 
 const WebSocketEvents = () => {
@@ -219,6 +220,16 @@ const WebSocketEvents = () => {
         case 'CONTACT_CALL_STATUS_UPDATED': {
           const contact: Contact = transformToContact(data.payload);
           contactState.upsertContact(contact);
+          break;
+        }
+        case 'CALL_LOG_LIST': {
+          const { contact_id, call_logs } = data.payload as { contact_id: string; call_logs: any[] };
+          contactState.setCallLogs(contact_id, call_logs.map(transformToCallLog));
+          break;
+        }
+        case 'CALL_LOG_NEW': {
+          const { call_log } = data.payload as { contact_id: string; call_log: any };
+          contactState.addCallLog(transformToCallLog(call_log));
           break;
         }
         default:

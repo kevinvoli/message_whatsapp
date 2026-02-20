@@ -132,7 +132,7 @@ const WhatsAppPage = () => {
         contacts={contacts}
 
       />
-      {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView />}
+      {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />}
 
       
     </div>

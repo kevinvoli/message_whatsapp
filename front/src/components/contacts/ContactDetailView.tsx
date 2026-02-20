@@ -17,10 +17,13 @@ import { useChatStore } from '@/store/chatStore';
 import { CallStatus, getCallStatusColor, getCallStatusLabel } from '@/types/chat';
 import { formatDate, formatDateShort, formatTime, formatRelativeDate } from '@/lib/dateUtils';
 import { ContactTimeline } from './ContactTimeline';
+import { CallLogHistory } from './CallLogHistory';
 import { updateContactCallStatus } from '@/lib/contactApi';
 import { logger } from '@/lib/logger';
 
 // ─── Modal modification ───────────────────────────────────────────────────────
+
+type CallOutcomeValue = 'répondu' | 'messagerie' | 'pas_de_réponse' | 'occupé';
 
 interface EditModalProps {
   name: string;
@@ -28,31 +31,48 @@ interface EditModalProps {
   currentStatus: CallStatus;
   currentNotes: string;
   onClose: () => void;
-  onConfirm: (status: CallStatus, notes: string) => void;
+  onConfirm: (status: CallStatus, notes: string, outcome?: CallOutcomeValue, durationSec?: number) => void;
 }
 
 function EditModal({ name, phone, currentStatus, currentNotes, onClose, onConfirm }: EditModalProps) {
-  const [status, setStatus] = useState<CallStatus>(currentStatus);
-  const [notes,  setNotes]  = useState(currentNotes);
+  const [status,      setStatus]      = useState<CallStatus>(currentStatus);
+  const [notes,       setNotes]       = useState(currentNotes);
+  const [outcome,     setOutcome]     = useState<CallOutcomeValue | ''>('');
+  const [durationMin, setDurationMin] = useState('');
+  const [durationSec, setDurationSec] = useState('');
 
-  const opts: { value: CallStatus; label: string; icon: React.ReactNode }[] = [
-    { value: 'appelé',        label: 'Appelé',        icon: <PhoneCall  className="w-4 h-4" /> },
-    { value: 'rappeler',      label: 'À rappeler',    icon: <Clock      className="w-4 h-4" /> },
+  const statusOpts: { value: CallStatus; label: string; icon: React.ReactNode }[] = [
+    { value: 'appelé',        label: 'Appelé',        icon: <PhoneCall   className="w-4 h-4" /> },
+    { value: 'rappeler',      label: 'À rappeler',    icon: <Clock       className="w-4 h-4" /> },
     { value: 'non_joignable', label: 'Non joignable', icon: <PhoneMissed className="w-4 h-4" /> },
-    { value: 'à_appeler',     label: 'À appeler',     icon: <Phone      className="w-4 h-4" /> },
+    { value: 'à_appeler',     label: 'À appeler',     icon: <Phone       className="w-4 h-4" /> },
   ];
+
+  const outcomeOpts: { value: CallOutcomeValue; label: string }[] = [
+    { value: 'répondu',        label: 'Répondu' },
+    { value: 'messagerie',     label: 'Messagerie' },
+    { value: 'pas_de_réponse', label: 'Pas de réponse' },
+    { value: 'occupé',         label: 'Occupé' },
+  ];
+
+  function handleConfirm() {
+    const totalSec =
+      (parseInt(durationMin || '0', 10) * 60) + parseInt(durationSec || '0', 10);
+    onConfirm(status, notes, outcome || undefined, totalSec > 0 ? totalSec : undefined);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-1">Modifier le contact</h3>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[90vh]">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Marquer l&apos;appel</h3>
         <p className="text-sm text-gray-500 mb-5">{name} · {phone}</p>
 
+        {/* Statut d'appel */}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Statut d&apos;appel
         </p>
         <div className="grid grid-cols-2 gap-2 mb-5">
-          {opts.map((opt) => (
+          {statusOpts.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setStatus(opt.value)}
@@ -68,6 +88,57 @@ function EditModal({ name, phone, currentStatus, currentNotes, onClose, onConfir
           ))}
         </div>
 
+        {/* Résultat */}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Résultat de l&apos;appel
+        </p>
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {outcomeOpts.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setOutcome(outcome === opt.value ? '' : opt.value)}
+              className={`p-2.5 rounded-xl border text-sm font-medium transition-all ${
+                outcome === opt.value
+                  ? 'border-green-500 bg-green-50 text-green-800'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Durée */}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Durée (optionnel)
+        </p>
+        <div className="flex gap-2 mb-5">
+          <div className="flex-1 relative">
+            <input
+              type="number"
+              min="0"
+              value={durationMin}
+              onChange={(e) => setDurationMin(e.target.value)}
+              placeholder="0"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 pr-10"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">min</span>
+          </div>
+          <div className="flex-1 relative">
+            <input
+              type="number"
+              min="0"
+              max="59"
+              value={durationSec}
+              onChange={(e) => setDurationSec(e.target.value)}
+              placeholder="0"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 pr-10"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">sec</span>
+          </div>
+        </div>
+
+        {/* Notes */}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notes</p>
         <textarea
           value={notes}
@@ -81,7 +152,7 @@ function EditModal({ name, phone, currentStatus, currentNotes, onClose, onConfir
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">
             Annuler
           </button>
-          <button onClick={() => onConfirm(status, notes)} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
+          <button onClick={handleConfirm} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
             Confirmer
           </button>
         </div>
@@ -92,7 +163,11 @@ function EditModal({ name, phone, currentStatus, currentNotes, onClose, onConfir
 
 // ─── Vue détail (fidèle au mockup) ───────────────────────────────────────────
 
-export function ContactDetailView() {
+interface ContactDetailViewProps {
+  onSwitchToConversations?: () => void;
+}
+
+export function ContactDetailView({ onSwitchToConversations }: ContactDetailViewProps) {
   const router = useRouter();
   const { selectedContact, upsertContact, contacts: allContacts } = useContactStore();
   const { selectConversation } = useChatStore();
@@ -156,10 +231,15 @@ export function ContactDetailView() {
       .slice(0, 4);
   }, [selectedContact, allContacts]);
 
-  async function handleConfirmEdit(status: CallStatus, notes: string) {
+  async function handleConfirmEdit(
+    status: CallStatus,
+    notes: string,
+    outcome?: string,
+    durationSec?: number,
+  ) {
     if (!selectedContact) return;
     try {
-      await updateContactCallStatus(selectedContact.id, status, notes);
+      await updateContactCallStatus(selectedContact.id, status, notes, outcome, durationSec);
       upsertContact({
         ...selectedContact,
         call_status:    status,
@@ -179,7 +259,11 @@ export function ContactDetailView() {
   function handleViewConversation() {
     if (!selectedContact?.chat_id) return;
     selectConversation(selectedContact.chat_id);
-    router.push('/whatsapp');
+    if (onSwitchToConversations) {
+      onSwitchToConversations();
+    } else {
+      router.push('/whatsapp');
+    }
   }
 
   // ── État vide ──
@@ -341,6 +425,9 @@ export function ContactDetailView() {
           </div>
         )}
       </div>
+
+      {/* ── Historique des appels (F-03) ── */}
+      <CallLogHistory />
 
       {/* ── 3. Score d'engagement ── */}
       {(() => {
@@ -528,7 +615,9 @@ export function ContactDetailView() {
           currentStatus={c.call_status}
           currentNotes={c.call_notes ?? ''}
           onClose={() => setShowEditModal(false)}
-          onConfirm={handleConfirmEdit}
+          onConfirm={(status, notes, outcome, durationSec) =>
+            handleConfirmEdit(status, notes, outcome, durationSec)
+          }
         />
       )}
     </div>

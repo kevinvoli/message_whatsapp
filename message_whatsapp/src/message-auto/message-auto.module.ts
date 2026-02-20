@@ -28,6 +28,7 @@ import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { CallLogModule } from 'src/call-log/call_log.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
     ]),
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
+    CallLogModule,
   ],
   controllers: [MessageAutoController],
   providers: [

@@ -195,6 +195,37 @@ export interface CallHistory {
   updated_at: Date;
 }
 
+export type CallOutcome = "répondu" | "messagerie" | "pas_de_réponse" | "occupé";
+
+/** Entrée d'historique d'appel (ticket F-01) */
+export interface CallLog {
+  id: string;
+  contact_id: string;
+  commercial_id: string;
+  commercial_name: string;
+  called_at: Date;
+  call_status: CallStatus;
+  outcome?: CallOutcome;
+  duration_sec?: number;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const transformToCallLog = (raw: Record<string, any>): CallLog => ({
+  id: raw.id,
+  contact_id: raw.contact_id,
+  commercial_id: raw.commercial_id,
+  commercial_name: raw.commercial_name ?? '',
+  called_at: new Date(raw.called_at),
+  call_status: raw.call_status as CallStatus,
+  outcome: raw.outcome as CallOutcome | undefined,
+  duration_sec: raw.duration_sec ?? undefined,
+  notes: raw.notes ?? undefined,
+  createdAt: new Date(raw.createdAt),
+  updatedAt: new Date(raw.updatedAt),
+});
+
 export interface Contact {
   id: string;
   name: string;

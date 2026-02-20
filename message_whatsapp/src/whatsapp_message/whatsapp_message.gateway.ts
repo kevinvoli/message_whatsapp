@@ -33,6 +33,8 @@ import { Contact } from 'src/contact/entities/contact.entity';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { ChannelService } from 'src/channel/channel.service';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
+import { CallLogService } from 'src/call-log/call_log.service';
+import { CallLog } from 'src/call-log/entities/call_log.entity';
 
 type AuthPayload = {
   sub: string;
@@ -85,6 +87,7 @@ export class WhatsappMessageGateway
     private readonly jwtService: JwtService,
     private readonly channelService: ChannelService,
     private readonly throttle: SocketThrottleGuard,
+    private readonly callLogService: CallLogService,
   ) {}
 
   // ======================================================
@@ -350,6 +353,14 @@ export class WhatsappMessageGateway
     );
   }
 
+  /** Émet un nouveau CallLog en temps réel sur la room tenant du contact (B-05) */
+  public async emitCallLogNew(contact: Contact, callLog: CallLog): Promise<void> {
+    await this.emitContactEventForChat(contact, 'CALL_LOG_NEW', {
+      contact_id: contact.id,
+      call_log: callLog,
+    });
+  }
+
   private emitRateLimited(client: Socket, event: string): void {
     client.emit('chat:event', {
       type: 'RATE_LIMITED',
@@ -375,6 +386,22 @@ export class WhatsappMessageGateway
     }
     this.logger.debug(`Contacts list requested (${client.id})`);
     await this.sendContactsToClient(client);
+  }
+
+  /** Renvoie l'historique des appels d'un contact au client demandeur (B-05) */
+  @SubscribeMessage('call_logs:get')
+  async handleGetCallLogs(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { contact_id: string },
+  ) {
+    if (!this.throttle.allow(client.id, 'call_logs:get')) {
+      return this.emitRateLimited(client, 'call_logs:get');
+    }
+    const logs = await this.callLogService.findByContactId(payload.contact_id);
+    client.emit('contact:event', {
+      type: 'CALL_LOG_LIST',
+      payload: { contact_id: payload.contact_id, call_logs: logs },
+    });
   }
 
   @SubscribeMessage('chat:event')
