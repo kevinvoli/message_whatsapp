@@ -314,34 +314,33 @@ export class WhatsappMessageService {
 
       const savedMessage = await this.messageRepository.save(messageEntity);
 
-      // 3. Save file to disk for local serving
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const ext = data.fileName.includes('.')
-        ? data.fileName.substring(data.fileName.lastIndexOf('.'))
-        : '';
-      const localFileName = `${savedMessage.id}_${Date.now()}${ext}`;
-      const uploadsDir = path.join(process.cwd(), 'uploads');
-      await fs.mkdir(uploadsDir, { recursive: true });
-      await fs.writeFile(
-        path.join(uploadsDir, localFileName),
-        data.mediaBuffer,
-      );
-
+      // 3. Résoudre l'URL depuis le provider (pas de stockage local)
       const serverPort = process.env.SERVER_PORT ?? '3002';
-      const serverHost =
-        process.env.SERVER_HOST ?? `http://localhost:${serverPort}`;
-      const mediaUrl = `${serverHost}/uploads/${localFileName}`;
+      const rawHost =
+        process.env.SERVER_PUBLIC_HOST ??
+        process.env.SERVER_HOST ??
+        `http://localhost:${serverPort}`;
+      const serverHost = rawHost.replace(/\/+$/, '');
+
+      let resolvedMediaUrl: string | null = null;
+      if (sendResponse.provider === 'meta' && sendResponse.providerMediaId) {
+        const channelQuery = `?channelId=${encodeURIComponent(channel.channel_id)}`;
+        resolvedMediaUrl = `${serverHost}/messages/media/meta/${sendResponse.providerMediaId}${channelQuery}`;
+      } else if (sendResponse.provider === 'whapi' && sendResponse.mediaUrl) {
+        resolvedMediaUrl = sendResponse.mediaUrl;
+      }
 
       // 4. Create media entity
       const mediaEntity = this.mediaRepository.create({
         media_id: `agent_media_${Date.now()}`,
-        whapi_media_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
+        provider_media_id: sendResponse.providerMediaId ?? null,
+        whapi_media_id: sendResponse.providerMediaId ?? sendResponse.providerMessageId ?? `agent_${Date.now()}`,
         media_type: data.mediaType as WhatsappMediaType,
         mime_type: data.mimeType,
         file_name: data.fileName,
         file_size: String(data.mediaBuffer.length),
-        url: mediaUrl,
+        url: resolvedMediaUrl,
+        caption: data.caption ?? null,
         view_once: '0',
         message: savedMessage,
         chat: chat,

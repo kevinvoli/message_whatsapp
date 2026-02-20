@@ -1,3 +1,12 @@
+interface WhapiMediaPayload {
+  id: string;
+  link?: string;
+  mime_type?: string;
+  file_size?: number;
+  file_name?: string;
+  caption?: string;
+}
+
 export interface WhapiSendMessageResponse {
   sent: boolean;
   message: {
@@ -13,5 +22,11 @@ export interface WhapiSendMessageResponse {
     text?: {
       body: string;
     };
+    image?: WhapiMediaPayload;
+    video?: WhapiMediaPayload;
+    audio?: WhapiMediaPayload;
+    voice?: WhapiMediaPayload;
+    document?: WhapiMediaPayload;
+    gif?: WhapiMediaPayload;
   };
 }

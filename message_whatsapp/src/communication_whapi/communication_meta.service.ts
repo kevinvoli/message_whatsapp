@@ -56,8 +56,6 @@ export class CommunicationMetaService {
 
         return { providerMessageId: messageId };
       } catch (error) {
-        console.log('erreur axios');
-
         if (error instanceof WhapiOutboundError) throw error;
 
         const axiosError = error as AxiosError;
@@ -117,7 +115,7 @@ export class CommunicationMetaService {
     fileName: string;
     mediaType: 'image' | 'video' | 'audio' | 'document';
     caption?: string;
-  }): Promise<{ providerMessageId: string }> {
+  }): Promise<{ providerMessageId: string; providerMediaId: string }> {
     const to = this.validateRecipient(data.to);
 
     // Step 1: Upload media to Meta
@@ -196,7 +194,7 @@ export class CommunicationMetaService {
             'permanent',
           );
         }
-        return { providerMessageId: messageId };
+        return { providerMessageId: messageId, providerMediaId: mediaId };
       } catch (error) {
         if (error instanceof WhapiOutboundError) throw error;
         const axiosError = error as AxiosError;

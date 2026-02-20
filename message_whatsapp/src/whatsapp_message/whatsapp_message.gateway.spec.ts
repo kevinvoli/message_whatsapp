@@ -21,6 +21,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any,
       {} as any, // channelService
       { allow: () => true, removeClient: () => {} } as any, // throttle
+      {} as any, // callLogService
     );
   };
 

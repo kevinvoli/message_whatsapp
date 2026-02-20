@@ -111,6 +111,8 @@ export class OutboundRouterService {
       return {
         providerMessageId: result.providerMessageId,
         provider: 'meta',
+        providerMediaId: result.providerMediaId,
+        mediaUrl: null,
       };
     }
 
@@ -131,9 +133,15 @@ export class OutboundRouterService {
       fileName: data.fileName,
     });
 
+    const whapiMedia = result.message[data.mediaType as keyof typeof result.message] as
+      | { id?: string; link?: string }
+      | undefined;
+
     return {
       providerMessageId: result.message.id,
       provider: 'whapi',
+      providerMediaId: whapiMedia?.id ?? null,
+      mediaUrl: whapiMedia?.link ?? null,
     };
   }
 }
