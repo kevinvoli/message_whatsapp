@@ -869,6 +869,27 @@ export class WhatsappMessageGateway
     });
   }
 
+  public async emitConversationUpsertByChatId(
+    chatId: string,
+  ): Promise<void> {
+    const chat = await this.chatService.findBychat_id(chatId);
+    if (!chat?.tenant_id) {
+      this.logger.warn(
+        `Conversation upsert skipped: missing tenant for chat ${chatId}`,
+      );
+      return;
+    }
+    const lastMessage =
+      await this.messageService.findLastMessageBychat_id(chatId);
+    const unreadCount =
+      await this.messageService.countUnreadMessages(chatId);
+
+    this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, lastMessage, unreadCount),
+    });
+  }
+
   public emitConversationReadonly(chat: WhatsappChat): void {
     if (!chat.tenant_id) {
       this.logger.warn(

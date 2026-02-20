@@ -115,7 +115,11 @@ export class DispatcherService {
       this.logger.log(
         `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.name ?? 'NON ASSIGNE'}`,
       );
-      return this.chatRepository.save(conversation);
+      const saved = await this.chatRepository.save(conversation);
+      await this.messageGateway.emitConversationUpsertByChatId(
+        saved.chat_id,
+      );
+      return saved;
     }
 
     const nextAgent = await this.queueService.getNextInQueue();
@@ -189,7 +193,11 @@ export class DispatcherService {
       );
 
       conversation.last_client_message_at = new Date();
-      return this.chatRepository.save(conversation);
+      const saved = await this.chatRepository.save(conversation);
+      await this.messageGateway.emitConversationUpsertByChatId(
+        saved.chat_id,
+      );
+      return saved;
     }
 
     /**
@@ -223,7 +231,9 @@ export class DispatcherService {
 
     this.logger.debug(`Nouvelle conversation creee (${newChat.chat_id})`);
 
-    return this.chatRepository.save(newChat);
+    const saved = await this.chatRepository.save(newChat);
+    await this.messageGateway.emitConversationUpsertByChatId(saved.chat_id);
+    return saved;
   }
 
   async reinjectConversation(chat: WhatsappChat) {
