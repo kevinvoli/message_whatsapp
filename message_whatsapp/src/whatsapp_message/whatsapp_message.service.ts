@@ -270,6 +270,8 @@ export class WhatsappMessageService {
         return chat_id.split('@')[0];
       }
 
+      console.log("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      
       // 1. Send media to WhatsApp
       const sendResponse = await this.outboundRouter.sendMediaMessage({
         to: extractPhoneNumber(chat.chat_id),

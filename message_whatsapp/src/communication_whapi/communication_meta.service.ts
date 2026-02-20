@@ -116,8 +116,12 @@ export class CommunicationMetaService {
     mediaType: 'image' | 'video' | 'audio' | 'document';
     caption?: string;
   }): Promise<{ providerMessageId: string; providerMediaId: string }> {
+
     const to = this.validateRecipient(data.to);
+
+
     this.validateMetaMimeType(data.mimeType, data.mediaType);
+
 
     // Step 1: Upload media to Meta
     const uploadUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/media`;
@@ -355,6 +359,7 @@ export class CommunicationMetaService {
       'audio/amr',
       'audio/ogg',
       'audio/opus',
+      'audio/webm'
     ],
     document: [
       'text/plain',
@@ -372,6 +377,9 @@ export class CommunicationMetaService {
     mimeType: string,
     mediaType: 'image' | 'video' | 'audio' | 'document',
   ): void {
+
+console.log("ssssssssssssssssssssssssssssssssssssssssssssssssssssssss",mediaType,mimeType);
+
     const allowed = CommunicationMetaService.META_SUPPORTED_MIMES[mediaType];
     if (!allowed) return;
     // Normaliser : "audio/ogg; codecs=opus" → "audio/ogg"

@@ -78,10 +78,14 @@ export class OutboundRouterService {
     mediaType: 'image' | 'video' | 'audio' | 'document';
     caption?: string;
   }): Promise<OutboundSendResponse> {
+
+    
     const channel = await this.channelService.findOne(data.channelId);
     if (!channel) {
       throw new NotFoundException(`Channel ${data.channelId} introuvable`);
     }
+
+
 
     const provider = channel.provider ?? 'whapi';
 
@@ -96,6 +100,8 @@ export class OutboundRouterService {
         `OUTBOUND_MEDIA_ROUTE provider=meta channel=${data.channelId} type=${data.mediaType}`,
         OutboundRouterService.name,
       );
+
+    console.log("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
 
       const result = await this.metaService.sendMediaMessage({
         to: data.to,

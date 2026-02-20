@@ -289,7 +289,7 @@ export class DispatcherService {
       return;
     }
     // 🔥 EVENT CENTRAL
-    this.messageGateway.emitConversationReassigned(
+    await this.messageGateway.emitConversationReassigned(
       updatedChat,
       oldPoste,
       nextPoste.id,

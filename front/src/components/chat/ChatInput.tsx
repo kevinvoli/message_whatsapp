@@ -168,7 +168,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const preferredMime = 'audio/ogg;codecs=opus';
+      const mimeType = MediaRecorder.isTypeSupported(preferredMime)
+        ? preferredMime
+        : 'audio/ogg';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -178,11 +182,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
         if (blob.size > 0 && chat_id) {
           setIsUploading(true);
           try {
-            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.webm`);
+            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.ogg`);
             logger.debug('Voice message uploaded', { chat_id });
           } catch (err) {
             logger.error('Voice upload failed', { error: err instanceof Error ? err.message : String(err) });
