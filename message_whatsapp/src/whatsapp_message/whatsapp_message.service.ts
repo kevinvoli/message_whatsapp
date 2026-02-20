@@ -130,16 +130,16 @@ export class WhatsappMessageService {
         });
       }
 
-      const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
+      const lastInboundMessage = await this.findLastInboundMessageBychat_id(data.chat_id);
 
-      if (lastMessage && !lastMessage.from_me) {
+      if (lastInboundMessage) {
         const now = new Date();
-        const lastMessageDate = new Date(lastMessage.timestamp);
+        const lastMessageDate = new Date(lastInboundMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
         if (diffHours > this.getResponseTimeoutHours()) {
           throw new Error(
-            `Response timeout exceeded (${this.getResponseTimeoutHours()}h)`,
+            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse WhatsApp (${this.getResponseTimeoutHours()}h) est expirée`,
           );
         }
       }
@@ -253,15 +253,15 @@ export class WhatsappMessageService {
         });
       }
 
-      const lastMessage = await this.findLastMessageBychat_id(data.chat_id);
-      if (lastMessage && !lastMessage.from_me) {
+      const lastInboundMessage = await this.findLastInboundMessageBychat_id(data.chat_id);
+      if (lastInboundMessage) {
         const now = new Date();
-        const lastMessageDate = new Date(lastMessage.timestamp);
+        const lastMessageDate = new Date(lastInboundMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
         if (diffHours > this.getResponseTimeoutHours()) {
           throw new Error(
-            `Response timeout exceeded (${this.getResponseTimeoutHours()}h)`,
+            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse WhatsApp (${this.getResponseTimeoutHours()}h) est expirée`,
           );
         }
       }
@@ -441,6 +441,15 @@ export class WhatsappMessageService {
     } catch (error) {
       throw new NotFoundException(new Error(error));
     }
+  }
+
+  async findLastInboundMessageBychat_id(
+    chat_id: string,
+  ): Promise<WhatsappMessage | null> {
+    return this.messageRepository.findOne({
+      where: { chat_id, direction: MessageDirection.IN },
+      order: { timestamp: 'DESC' },
+    });
   }
 
   async findByExternalId(externalId: string): Promise<WhatsappMessage | null> {

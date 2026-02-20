@@ -538,12 +538,6 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; text: string; tempId: string },
   ) {
-      console.log(
-      'envoie du message pas le commercial:',
-      payload,
-      'client id:',
-      client.id,
-    );
     if (!this.throttle.allow(client.id, 'message:send')) {
       return this.emitRateLimited(client, 'message:send');
     }
@@ -615,12 +609,17 @@ export class WhatsappMessageGateway
           `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,
         );
       } catch (error) {
+        const isTimeoutError =
+          error instanceof Error &&
+          error.message.startsWith('RESPONSE_TIMEOUT_EXCEEDED');
         const outboundCode =
           error instanceof WhapiOutboundError
             ? error.kind === 'transient'
               ? 'WHAPI_TRANSIENT_ERROR'
               : 'WHAPI_PERMANENT_ERROR'
-            : 'MESSAGE_SEND_FAILED';
+            : isTimeoutError
+              ? 'RESPONSE_TIMEOUT_EXCEEDED'
+              : 'MESSAGE_SEND_FAILED';
         const outboundMessage =
           error instanceof Error ? error.message : 'Echec envoi message';
         this.logger.warn(
@@ -647,8 +646,6 @@ export class WhatsappMessageGateway
         return;
       }
       chat.read_only = true;
-      console.log("1111111111111111111111111111111111111111111111111111111111111111111111");
-      
       this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
         type: 'MESSAGE_ADD',
         payload: { ...this.mapMessage(message), tempId: payload.tempId },
