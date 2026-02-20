@@ -133,15 +133,25 @@ export class OutboundRouterService {
       fileName: data.fileName,
     });
 
-    const whapiMedia = result.message[data.mediaType as keyof typeof result.message] as
-      | { id?: string; link?: string }
-      | undefined;
+    const messageId = result.message.id;
+
+    // Le send response Whapi ne contient pas le lien CDN.
+    // On le récupère via GET /messages/{id} (requiert Auto-Download activé dans le dashboard).
+    const mediaInfo = await this.whapiService.getMessageMediaLink(
+      messageId,
+      data.channelId,
+    );
+
+    this.logger.log(
+      `OUTBOUND_MEDIA_WHAPI_LINK messageId=${messageId} link=${mediaInfo.link ?? 'null'} mediaId=${mediaInfo.mediaId ?? 'null'}`,
+      OutboundRouterService.name,
+    );
 
     return {
-      providerMessageId: result.message.id,
+      providerMessageId: messageId,
       provider: 'whapi',
-      providerMediaId: whapiMedia?.id ?? null,
-      mediaUrl: whapiMedia?.link ?? null,
+      providerMediaId: mediaInfo.mediaId ?? null,
+      mediaUrl: mediaInfo.link ?? null,
     };
   }
 }

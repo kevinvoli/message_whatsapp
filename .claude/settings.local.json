@@ -33,7 +33,12 @@
       "Bash(npm run:*)",
       "Bash(npm install:*)",
       "Bash(git checkout:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:www.chatarchitect.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.postman.com)"
     ]
   }
 }

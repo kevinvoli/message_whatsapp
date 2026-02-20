@@ -8,11 +8,13 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  UnprocessableEntityException,
   Req,
   Query,
   Res,
   NotFoundException,
 } from '@nestjs/common';
+import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { WhatsappMessageService } from './whatsapp_message.service';
@@ -105,18 +107,29 @@ export class WhatsappMessageController {
     const mediaType = detectMediaType(file.mimetype);
     const user = req.user;
 
-    const message = await this.messageService.createAgentMediaMessage({
-      chat_id: body.chat_id,
-      poste_id: user?.posteId,
-      timestamp: new Date(),
-      commercial_id: user?.userId,
-      channel_id: resolvedChannelId,
-      mediaBuffer: file.buffer,
-      mimeType: file.mimetype,
-      fileName: file.originalname,
-      mediaType,
-      caption: body.caption,
-    });
+    let message;
+    try {
+      message = await this.messageService.createAgentMediaMessage({
+        chat_id: body.chat_id,
+        poste_id: user?.posteId,
+        timestamp: new Date(),
+        commercial_id: user?.userId,
+        channel_id: resolvedChannelId,
+        mediaBuffer: file.buffer,
+        mimeType: file.mimetype,
+        fileName: file.originalname,
+        mediaType,
+        caption: body.caption,
+      });
+    } catch (error) {
+      if (error instanceof WhapiOutboundError) {
+        if (error.statusCode === 415) {
+          throw new UnprocessableEntityException(error.message);
+        }
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
 
     // Notify via WebSocket
     await this.gateway.notifyNewMessage(message, chat);

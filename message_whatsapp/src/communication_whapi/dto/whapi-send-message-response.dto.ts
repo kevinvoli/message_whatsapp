@@ -1,12 +1,8 @@
-interface WhapiMediaPayload {
-  id: string;
-  link?: string;
-  mime_type?: string;
-  file_size?: number;
-  file_name?: string;
-  caption?: string;
-}
-
+/**
+ * Réponse de l'API Whapi lors de l'envoi d'un message (POST /messages/{type}).
+ * Note : le send response NE contient PAS le champ `link` (URL CDN).
+ * Pour obtenir le lien CDN, il faut appeler GET /messages/{id} après l'envoi.
+ */
 export interface WhapiSendMessageResponse {
   sent: boolean;
   message: {
@@ -22,11 +18,5 @@ export interface WhapiSendMessageResponse {
     text?: {
       body: string;
     };
-    image?: WhapiMediaPayload;
-    video?: WhapiMediaPayload;
-    audio?: WhapiMediaPayload;
-    voice?: WhapiMediaPayload;
-    document?: WhapiMediaPayload;
-    gif?: WhapiMediaPayload;
   };
 }

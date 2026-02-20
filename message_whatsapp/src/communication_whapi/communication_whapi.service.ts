@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhapiSendMessageResponse } from './dto/whapi-send-message-response.dto';
+import { WhapiMediaBase } from 'src/whapi/interface/whapi-webhook.interface';
 import { AppLogger } from 'src/logging/app-logger.service';
 import {
   WhapiFailureKind,
@@ -292,6 +293,64 @@ export class CommunicationWhapiService {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Récupère le lien CDN et l'ID du média d'un message Whapi envoyé.
+   * Whapi ne retourne PAS le lien dans le send response.
+   * Il faut appeler GET /messages/{id} après l'envoi (nécessite Auto-Download activé
+   * dans le dashboard Whapi).
+   * Le lien CDN (Wasabi S3) est valide 30 jours et accessible sans authentification.
+   */
+  async getMessageMediaLink(
+    messageId: string,
+    channelId: string,
+  ): Promise<{ link: string | null; mediaId: string | null }> {
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+    });
+    if (!channel?.token) {
+      return { link: null, mediaId: null };
+    }
+
+    try {
+      const response = await axios.get(
+        `https://gate.whapi.cloud/messages/${encodeURIComponent(messageId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${channel.token}`,
+            Accept: 'application/json',
+          },
+        },
+      );
+
+      const msg = response.data as Record<string, any>;
+      const mediaTypes = [
+        'image', 'video', 'audio', 'voice', 'document', 'gif',
+      ] as const;
+      for (const type of mediaTypes) {
+        const media = msg[type] as (WhapiMediaBase & { id?: string }) | undefined;
+        if (media) {
+          return {
+            link: media.link ?? null,
+            mediaId: media.id ?? null,
+          };
+        }
+      }
+
+      this.logger.warn(
+        `No media sub-object found in Whapi GET /messages/${messageId}`,
+        CommunicationWhapiService.name,
+      );
+      return { link: null, mediaId: null };
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      this.logger.warn(
+        `Failed to retrieve Whapi media link for messageId=${messageId} status=${axiosError.response?.status ?? 'unknown'}`,
+        CommunicationWhapiService.name,
+      );
+      return { link: null, mediaId: null };
+    }
   }
 
   generateWhapiMessageId(): string {

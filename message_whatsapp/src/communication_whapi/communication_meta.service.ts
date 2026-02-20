@@ -117,6 +117,7 @@ export class CommunicationMetaService {
     caption?: string;
   }): Promise<{ providerMessageId: string; providerMediaId: string }> {
     const to = this.validateRecipient(data.to);
+    this.validateMetaMimeType(data.mimeType, data.mediaType);
 
     // Step 1: Upload media to Meta
     const uploadUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/media`;
@@ -150,22 +151,37 @@ export class CommunicationMetaService {
     } catch (error) {
       if (error instanceof WhapiOutboundError) throw error;
       const axiosError = error as AxiosError;
+      const uploadStatus = axiosError.response?.status;
+      const uploadData = axiosError.response?.data as
+        | { error?: { message?: string; code?: number; fbtrace_id?: string } }
+        | undefined;
+      const uploadMessage =
+        uploadData?.error?.message ?? axiosError.message ?? 'unknown_error';
+      const uploadCode = uploadData?.error?.code;
+      const uploadTrace = uploadData?.error?.fbtrace_id;
       this.logger.error(
-        `Meta media upload failed (status=${axiosError.response?.status ?? 'unknown'})`,
+        `Meta media upload failed (phone_number_id=${data.phoneNumberId}, mime_type=${data.mimeType}, status=${uploadStatus ?? 'unknown'}, code=${uploadCode ?? 'unknown'}, trace=${uploadTrace ?? 'unknown'}, message=${uploadMessage})`,
         axiosError.stack,
         CommunicationMetaService.name,
       );
       throw new WhapiOutboundError(
-        'Meta media upload failed',
+        `Meta media upload failed: ${uploadMessage}`,
         'permanent',
-        axiosError.response?.status,
+        uploadStatus,
       );
     }
 
     // Step 2: Send message with media
     const sendUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
     const mediaPayload: Record<string, any> = { id: mediaId };
-    if (data.caption) mediaPayload.caption = data.caption;
+    // Caption supportée uniquement pour image, video et document (pas audio)
+    if (data.caption && data.mediaType !== 'audio') {
+      mediaPayload.caption = data.caption;
+    }
+    // filename obligatoire pour document (Meta exige ce champ)
+    if (data.mediaType === 'document' && data.fileName) {
+      mediaPayload.filename = data.fileName;
+    }
 
     let attempt = 0;
     while (attempt <= this.maxRetries) {
@@ -199,13 +215,29 @@ export class CommunicationMetaService {
         if (error instanceof WhapiOutboundError) throw error;
         const axiosError = error as AxiosError;
         const statusCode = axiosError.response?.status;
+        const responseData = axiosError.response?.data as
+          | {
+              error?: {
+                message?: string;
+                type?: string;
+                code?: number;
+                error_subcode?: number;
+                fbtrace_id?: string;
+              };
+            }
+          | undefined;
+        const metaMessage =
+          responseData?.error?.message ?? axiosError.message ?? 'unknown_error';
+        const metaCode = responseData?.error?.code;
+        const metaSubcode = responseData?.error?.error_subcode;
+        const metaTraceId = responseData?.error?.fbtrace_id;
         const kind = this.classifyFailure(axiosError);
         const lastAttempt = attempt >= this.maxRetries;
 
         if (kind === 'transient' && !lastAttempt) {
           const delayMs = 250 * Math.pow(2, attempt);
           this.logger.warn(
-            `Meta media send transient error, retrying (${attempt + 1}/${this.maxRetries + 1})`,
+            `Meta media send transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) status=${statusCode ?? 'unknown'}`,
             CommunicationMetaService.name,
           );
           await this.delay(delayMs);
@@ -214,12 +246,12 @@ export class CommunicationMetaService {
         }
 
         this.logger.error(
-          `Meta media send failed (kind=${kind}, status=${statusCode ?? 'unknown'})`,
+          `Meta media send failed (phone_number_id=${data.phoneNumberId}, media_id=${mediaId}, mime_type=${data.mimeType}, media_type=${data.mediaType}, kind=${kind}, status=${statusCode ?? 'unknown'}, code=${metaCode ?? 'unknown'}, subcode=${metaSubcode ?? 'unknown'}, trace=${metaTraceId ?? 'unknown'}, message=${metaMessage})`,
           axiosError.stack,
           CommunicationMetaService.name,
         );
         throw new WhapiOutboundError(
-          'Meta media send failed',
+          `Meta media send failed: ${metaMessage}`,
           kind,
           statusCode,
         );
@@ -306,6 +338,50 @@ export class CommunicationMetaService {
         CommunicationMetaService.name,
       );
       return null;
+    }
+  }
+
+  /**
+   * Formats MIME supportés par l'API WhatsApp Cloud Meta.
+   * Ref : https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media
+   */
+  private static readonly META_SUPPORTED_MIMES: Record<string, string[]> = {
+    image: ['image/jpeg', 'image/png', 'image/webp'],
+    video: ['video/mp4', 'video/3gpp'],
+    audio: [
+      'audio/aac',
+      'audio/mp4',
+      'audio/mpeg',
+      'audio/amr',
+      'audio/ogg',
+      'audio/opus',
+    ],
+    document: [
+      'text/plain',
+      'application/pdf',
+      'application/vnd.ms-powerpoint',
+      'application/msword',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
+  };
+
+  private validateMetaMimeType(
+    mimeType: string,
+    mediaType: 'image' | 'video' | 'audio' | 'document',
+  ): void {
+    const allowed = CommunicationMetaService.META_SUPPORTED_MIMES[mediaType];
+    if (!allowed) return;
+    // Normaliser : "audio/ogg; codecs=opus" → "audio/ogg"
+    const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
+    if (!allowed.includes(normalizedMime)) {
+      throw new WhapiOutboundError(
+        `Format non supporté par Meta pour le type "${mediaType}": ${mimeType}. Formats acceptés: ${allowed.join(', ')}`,
+        'permanent',
+        415,
+      );
     }
   }
 
