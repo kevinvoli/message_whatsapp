@@ -168,10 +168,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferredMime = 'audio/ogg;codecs=opus';
-      const mimeType = MediaRecorder.isTypeSupported(preferredMime)
-        ? preferredMime
-        : 'audio/ogg';
+      const supportedMimeTypes = [
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/opus',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+      ];
+      const mimeType = supportedMimeTypes.find((type) =>
+        MediaRecorder.isTypeSupported(type),
+      );
+      if (!mimeType) {
+        logger.error('No supported audio mime type for recording');
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -186,7 +197,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
         if (blob.size > 0 && chat_id) {
           setIsUploading(true);
           try {
-            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.ogg`);
+            const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
+            const extension = normalizedMime === 'audio/webm'
+              ? 'webm'
+              : normalizedMime === 'audio/opus'
+                ? 'opus'
+                : 'ogg';
+            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.${extension}`);
             logger.debug('Voice message uploaded', { chat_id });
           } catch (err) {
             logger.error('Voice upload failed', { error: err instanceof Error ? err.message : String(err) });

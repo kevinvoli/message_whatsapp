@@ -54,7 +54,7 @@ export const config = {
   metaSecretValue: env.WHATSAPP_APP_SECRET ?? '',
 
   // Channel IDs
-  channelId: env.WHAPI_CHANNEL_ID ?? 'e2e-shadow-channel',
+  channelId: env.WHAPI_CHANNEL_ID ?? 'BATMAN-P8CHE',
   metaPhoneNumberId: env.META_PHONE_NUMBER_ID ?? 'e2e-shadow-channel',
   metaWabaId: env.META_WABA_ID ?? 'waba-test',
 

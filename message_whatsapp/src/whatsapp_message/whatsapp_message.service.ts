@@ -5,7 +5,7 @@ import {
   WhatsappMessageStatus,
 } from './entities/whatsapp_message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, In, QueryFailedError, Repository } from 'typeorm';
 
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
@@ -273,6 +273,7 @@ export class WhatsappMessageService {
       console.log("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       
       // 1. Send media to WhatsApp
+
       const sendResponse = await this.outboundRouter.sendMediaMessage({
         to: extractPhoneNumber(chat.chat_id),
         channelId: data.channel_id,
@@ -283,7 +284,7 @@ export class WhatsappMessageService {
         caption: data.caption,
       });
       this.logger.log(
-        `OUTBOUND_MEDIA_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
+        `OUTBOUND_MEDIA_OK trace=${traceId} provider=${sendResponse.provider} media=${data.mediaType} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
       );
 
       const channel = await this.channelService.findOne(data.channel_id);
@@ -634,12 +635,28 @@ export class WhatsappMessageService {
     errorTitle?: string;
   }) {
     try {
+      const candidateConditions: FindOptionsWhere<WhatsappMessage>[] = [];
+
+      if (status.recipient_id) {
+        candidateConditions.push(
+          { external_id: status.id, chat_id: status.recipient_id },
+          { provider_message_id: status.id, chat_id: status.recipient_id },
+        );
+      } else {
+        candidateConditions.push(
+          { external_id: status.id },
+          { provider_message_id: status.id },
+        );
+      }
+
       const message = await this.messageRepository.findOne({
-        where: { external_id: status.id, chat_id: status.recipient_id },
+        where: candidateConditions,
       });
 
       if (!message) {
-        this.logger.warn(`Message not found for status update: ${status.id}`);
+        this.logger.warn(
+          `Message not found for status update: ${status.id} recipient=${status.recipient_id}`,
+        );
         return null;
       }
 
@@ -654,6 +671,10 @@ export class WhatsappMessageService {
 
       return await this.messageRepository.save(message);
     } catch (error) {
+      this.logger.error(
+        `Failed to update message status: ${status.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error(`Failed to update message status: ${String(error)}`);
     }
   }

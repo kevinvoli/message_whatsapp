@@ -111,6 +111,8 @@ export async function sendMessage(envelope: Envelope) {
       headers['x-hub-signature-256'] = `sha256=${digest}`;
     }
 
+    console.log("envelope:", envelope.payload);
+    
     const res = await axios.post(url, envelope.payload, {
       validateStatus: () => true,
       headers,

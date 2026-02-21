@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
+import { spawn } from 'child_process';
 import { AppLogger } from 'src/logging/app-logger.service';
 import {
   WhapiFailureKind,
@@ -116,22 +117,39 @@ export class CommunicationMetaService {
     mediaType: 'image' | 'video' | 'audio' | 'document';
     caption?: string;
   }): Promise<{ providerMessageId: string; providerMediaId: string }> {
-
     const to = this.validateRecipient(data.to);
+    let mediaBuffer = data.mediaBuffer;
+    let mimeType = data.mimeType;
+    let fileName = data.fileName;
 
+    const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
+    if (data.mediaType === 'audio' && normalizedMime === 'audio/webm') {
+      try {
+        mediaBuffer = await this.transcodeWebmToOgg(mediaBuffer);
+        mimeType = 'audio/ogg';
+        fileName = fileName.replace(/\.[^.]+$/, '') + '.ogg';
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'unknown_transcode_error';
+        throw new WhapiOutboundError(
+          `Meta audio transcode failed: ${reason}`,
+          'permanent',
+          415,
+        );
+      }
+    }
 
-    this.validateMetaMimeType(data.mimeType, data.mediaType);
-
+    this.validateMetaMimeType(mimeType, data.mediaType);
 
     // Step 1: Upload media to Meta
     const uploadUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/media`;
     const form = new FormData();
-    form.append('file', data.mediaBuffer, {
-      filename: data.fileName,
-      contentType: data.mimeType,
+    form.append('file', mediaBuffer, {
+      filename: fileName,
+      contentType: mimeType,
     });
     form.append('messaging_product', 'whatsapp');
-    form.append('type', data.mimeType);
+    form.append('type', mimeType);
 
     let mediaId: string;
     try {
@@ -164,7 +182,7 @@ export class CommunicationMetaService {
       const uploadCode = uploadData?.error?.code;
       const uploadTrace = uploadData?.error?.fbtrace_id;
       this.logger.error(
-        `Meta media upload failed (phone_number_id=${data.phoneNumberId}, mime_type=${data.mimeType}, status=${uploadStatus ?? 'unknown'}, code=${uploadCode ?? 'unknown'}, trace=${uploadTrace ?? 'unknown'}, message=${uploadMessage})`,
+        `Meta media upload failed (phone_number_id=${data.phoneNumberId}, mime_type=${mimeType}, status=${uploadStatus ?? 'unknown'}, code=${uploadCode ?? 'unknown'}, trace=${uploadTrace ?? 'unknown'}, message=${uploadMessage})`,
         axiosError.stack,
         CommunicationMetaService.name,
       );
@@ -250,10 +268,10 @@ export class CommunicationMetaService {
         }
 
         this.logger.error(
-          `Meta media send failed (phone_number_id=${data.phoneNumberId}, media_id=${mediaId}, mime_type=${data.mimeType}, media_type=${data.mediaType}, kind=${kind}, status=${statusCode ?? 'unknown'}, code=${metaCode ?? 'unknown'}, subcode=${metaSubcode ?? 'unknown'}, trace=${metaTraceId ?? 'unknown'}, message=${metaMessage})`,
-          axiosError.stack,
-          CommunicationMetaService.name,
-        );
+        `Meta media send failed (phone_number_id=${data.phoneNumberId}, media_id=${mediaId}, mime_type=${mimeType}, media_type=${data.mediaType}, kind=${kind}, status=${statusCode ?? 'unknown'}, code=${metaCode ?? 'unknown'}, subcode=${metaSubcode ?? 'unknown'}, trace=${metaTraceId ?? 'unknown'}, message=${metaMessage})`,
+        axiosError.stack,
+        CommunicationMetaService.name,
+      );
         throw new WhapiOutboundError(
           `Meta media send failed: ${metaMessage}`,
           kind,
@@ -359,7 +377,6 @@ export class CommunicationMetaService {
       'audio/amr',
       'audio/ogg',
       'audio/opus',
-      'audio/webm'
     ],
     document: [
       'text/plain',
@@ -391,6 +408,47 @@ console.log("ssssssssssssssssssssssssssssssssssssssssssssssssssssssss",mediaType
         415,
       );
     }
+  }
+
+  private async transcodeWebmToOgg(input: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', [
+        '-i',
+        'pipe:0',
+        '-f',
+        'ogg',
+        '-acodec',
+        'libopus',
+        '-vn',
+        'pipe:1',
+      ]);
+
+      const chunks: Buffer[] = [];
+      let stderr = '';
+
+      ffmpeg.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+      ffmpeg.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+
+      ffmpeg.on('error', (err) => {
+        reject(err);
+      });
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0 && chunks.length > 0) {
+          resolve(Buffer.concat(chunks));
+        } else {
+          reject(
+            new Error(
+              stderr || `ffmpeg exited with code ${code ?? 'unknown'}`,
+            ),
+          );
+        }
+      });
+
+      ffmpeg.stdin.end(input);
+    });
   }
 
   private validateRecipient(to: string): string {
