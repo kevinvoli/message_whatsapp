@@ -92,9 +92,6 @@ export default function PostesView({
         name: formName,
         code: formCode,
         is_active: formIsActive,
-        chats: [],
-        messages: [],
-        commercial: [],
       },
       'Poste ajoute.',
     );

@@ -2,6 +2,7 @@
 
 import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot } from './definitions'; // Added WhatsappChat, WhatsappMessage
 import { logger } from './logger';
+import data from '@emoji-mart/data';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -61,7 +62,7 @@ export async function getPostes(): Promise<Poste[]> {
     return handleResponse<Poste[]>(response);
 }
 
-export async function createPoste(poste: Omit<Poste, 'id' | 'created_at' | 'updated_at'>): Promise<Poste> {
+export async function createPoste(poste: Omit<Poste, 'id' | 'created_at' | 'updated_at' | 'messages' | 'commercial' | 'chats'>): Promise<Poste> {
     const response = await fetch(`${API_BASE_URL}/poste`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -260,10 +261,12 @@ export async function getDispatchSettings(): Promise<DispatchSettings> {
 export async function updateDispatchSettings(
   payload: Partial<DispatchSettings>,
 ): Promise<DispatchSettings> {
+    const { id, created_at, updated_at, ...cleanPayload } = payload as DispatchSettings;
+  
     const response = await fetch(`${API_BASE_URL}/queue/dispatch/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(cleanPayload),
         credentials: 'include',
     });
     return handleResponse<DispatchSettings>(response);

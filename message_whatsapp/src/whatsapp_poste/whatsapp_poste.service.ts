@@ -157,11 +157,6 @@ export class WhatsappPosteService {
   async setActive(posteId: string, isActive: boolean): Promise<WhatsappPoste> {
     try {
       const poste = await this.findOneById(posteId);
-      if (poste.is_queue_enabled === false && isActive) {
-        throw new BadRequestException(
-          "Ce poste est bloque dans la file. Debloquez-le avant de l'activer.",
-        );
-      }
       poste.is_active = isActive;
       return await this.posteRepository.save(poste);
     } catch (error) {

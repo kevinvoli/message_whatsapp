@@ -43,13 +43,13 @@ export class WhatsappPoste {
   name: string; //(Service client)
 
   @OneToMany(() => WhatsappChat, (chat) => chat.poste)
-  chats: WhatsappChat[];
+  chats?: WhatsappChat[] | null;
 
   @OneToMany(() => WhatsappMessage, (message) => message.poste)
-  messages: WhatsappMessage[];
+  messages?: WhatsappMessage[] | null;
 
   @OneToMany(() => WhatsappCommercial, (commercial) => commercial.poste)
-  commercial: WhatsappCommercial[];
+  commercial?: WhatsappCommercial[] | null;
 
   @CreateDateColumn({
     name: 'created_at',

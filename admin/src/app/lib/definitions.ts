@@ -93,9 +93,9 @@ export type Poste = {
   updated_at?: string;
   createdAt?: string;
   updatedAt?: string;
-  chats?: WhatsappChat[];
-  messages?: WhatsappMessage[];
-  commercial?: Commercial[];
+  chats?: WhatsappChat[] | null;
+  messages?: WhatsappMessage[] | null;
+  commercial?: Commercial[] | null;
 };
 
 export type Channel = {

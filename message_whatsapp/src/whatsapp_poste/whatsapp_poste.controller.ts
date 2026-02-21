@@ -20,6 +20,8 @@ export class WhatsappPosteController {
 
   @Post()
   create(@Body() createWhatsappPosteDto: CreateWhatsappPosteDto) {
+    console.log("enregistrement de poste:", createWhatsappPosteDto);
+    
     return this.whatsappPosteService.create(createWhatsappPosteDto);
   }
 
