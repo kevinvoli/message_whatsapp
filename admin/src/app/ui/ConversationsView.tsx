@@ -2,22 +2,24 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search } from 'lucide-react';
-import { getMessagesForChat, sendMessage } from '@/app/lib/api';
+import { getMessagesForChat, sendMessage, getChats } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
 import { formatDate, formatTime } from '@/app/lib/dateUtils';
+import { Pagination } from './Pagination';
 
 interface ConversationsViewProps {
-    initialChats: WhatsappChat[];
-    onChatUpdated: () => void;
     onRefresh?: () => void;
 }
 
-export default function ConversationsView({ initialChats, onChatUpdated, onRefresh }: ConversationsViewProps) {
-    const [chats, setChats] = useState<WhatsappChat[]>(initialChats);
+export default function ConversationsView({ onRefresh }: ConversationsViewProps) {
+    const [chats, setChats] = useState<WhatsappChat[]>([]);
+    const [total, setTotal] = useState(0);
+    const [limit, setLimit] = useState(50);
+    const [offset, setOffset] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedChat, setSelectedChat] = useState<WhatsappChat | null>(null);
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
@@ -30,20 +32,18 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Removed: const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-
-    useEffect(() => {
-        setChats(initialChats);
-        // If a chat was previously selected, try to re-select it to refresh its data
-        if (selectedChat) {
-            const updatedSelectedChat = initialChats.find(chat => chat.id === selectedChat.id);
-            if (updatedSelectedChat) {
-                setSelectedChat(updatedSelectedChat);
-            } else {
-                setSelectedChat(null); // Chat might have been deleted
-            }
+    const loadChats = useCallback(async (l: number, o: number) => {
+        setLoadingChats(true);
+        try {
+            const result = await getChats(l, o);
+            setChats(result.data);
+            setTotal(result.total);
+        } finally {
+            setLoadingChats(false);
         }
-    }, [initialChats]);
+    }, []);
+
+    useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
 
     useEffect(() => {
         if (selectedChat) {
@@ -235,7 +235,7 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
 
             // Replace optimistic update with actual message from backend
             setMessages(prev => prev.map(msg => msg.id === newMessage.id ? sentMessage : msg));
-            onChatUpdated(); // Refresh parent data to update last message etc.
+            void loadChats(limit, offset);
         } catch (err) {
             addToast({
                 type: 'error',
@@ -360,6 +360,11 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
                         ))
                     )}
                 </div>
+                <Pagination
+                    total={total} limit={limit} offset={offset}
+                    onPageChange={(o) => setOffset(o)}
+                    onLimitChange={(l) => { setLimit(l); setOffset(0); }}
+                />
             </div>
 
             {/* Right Panel: Message Area */}

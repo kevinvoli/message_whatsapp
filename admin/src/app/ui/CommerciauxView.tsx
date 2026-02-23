@@ -1,7 +1,7 @@
-﻿import React, { useState } from 'react';
-import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, User } from 'lucide-react';
-import { Commercial, PerformanceCommercial, Poste } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api';
+﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin } from 'lucide-react';
+import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
+import { createCommercial, deleteCommercial, getOverviewMetriques, getPostes, updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
@@ -9,20 +9,18 @@ import { useCrudResource } from '../hooks/useCrudResource';
 import { EntityFormModal } from './crud/EntityFormModal';
 
 interface CommerciauxViewProps {
-  commerciaux: PerformanceCommercial[];
-  postes: Poste[];
-  onCommercialUpdate: () => void;
   onRefresh?: () => void;
 }
 
-export default function CommerciauxView({
-  commerciaux,
-  postes,
-  onCommercialUpdate,
-  onRefresh,
-}: CommerciauxViewProps) {
+export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
+  const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
+  const [postes, setPostes] = useState<Poste[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
+
   const {
-    loading,
+    loading: crudLoading,
     clearStatus,
     create,
     update,
@@ -32,13 +30,35 @@ export default function CommerciauxView({
     { name: string; email: string; password: string; poste_id?: string | null },
     { name?: string; email?: string; password?: string; poste_id?: string | null; is_active?: boolean }
   >({
-    initialItems: commerciaux,
-    onRefresh: onCommercialUpdate,
+    initialItems: [],
+    onRefresh: () => refreshRef.current(),
     createItem: createCommercial,
     updateItem: updateCommercial,
     deleteItem: deleteCommercial,
     getId: (item) => item.id,
   });
+
+  const loading = crudLoading || dataLoading;
+
+  const fetchData = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const [overview, postesData] = await Promise.all([
+        getOverviewMetriques(),
+        getPostes(),
+      ]);
+      setCommerciaux(overview.performanceCommercial);
+      setPostes(postesData);
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  refreshRef.current = fetchData;
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -52,6 +72,7 @@ export default function CommerciauxView({
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
   const { addToast } = useToast();
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
+
   // Fonction pour obtenir la couleur du statut
   const getStatusColor = (isConnected: boolean) => {
     return isConnected ? 'bg-green-500' : 'bg-gray-400';
@@ -115,9 +136,17 @@ export default function CommerciauxView({
       addToast({ type: 'error', message: "L'ID du commercial est manquant." });
       return;
     }
+    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null } = {
+      name: formName,
+      email: formEmail,
+      poste_id: formPosteId,
+    };
+    if (formPassword) {
+      payload.password = formPassword;
+    }
     const result = await update(
       currentCommercial.id.toString(),
-      { name: formName, is_active: formIsActive },
+      payload,
       'Commercial mis à jour.',
     );
     if (result.ok) {
@@ -177,17 +206,15 @@ export default function CommerciauxView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Rafraîchir"
-            aria-label="Rafraîchir"
-            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => void fetchData()}
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
       {/* Statistiques globales */}
       <div className="grid grid-cols-4 gap-4">
@@ -602,8 +629,8 @@ export default function CommerciauxView({
           />
         </div>
         <div className="mb-4">
-          <label htmlFor="edit-code" className="mb-2 block text-sm font-bold text-gray-700">
-            Code
+          <label htmlFor="edit-email" className="mb-2 block text-sm font-bold text-gray-700">
+            Email
           </label>
           <input
             type="text"
@@ -614,17 +641,35 @@ export default function CommerciauxView({
             required
           />
         </div>
-        <div className="mb-4 flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="edit-is_active"
-            className="leading-tight"
-            checked={formIsActive}
-            onChange={(e) => setFormIsActive(e.target.checked)}
-          />
-          <label htmlFor="edit-is_active" className="text-sm font-bold text-gray-700">
-            Actif
+        <div className="mb-4">
+          <label htmlFor="edit-password" className="mb-2 block text-sm font-bold text-gray-700">
+            Nouveau mot de passe <span className="font-normal text-gray-500">(laisser vide pour ne pas modifier)</span>
           </label>
+          <input
+            type="password"
+            id="edit-password"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formPassword}
+            onChange={(e) => setFormPassword(e.target.value)}
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-postId" className="mb-2 block text-sm font-bold text-gray-700">
+            Poste
+          </label>
+          <select
+            id="edit-postId"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={formPosteId ?? ''}
+            onChange={(e) => setFormPosteId(e.target.value || null)}
+          >
+            <option value="">— Aucun poste —</option>
+            {postes.map((poste) => (
+              <option key={poste.id} value={poste.id}>
+                {poste.name}
+              </option>
+            ))}
+          </select>
         </div>
       </EntityFormModal>
     </div>

@@ -1,13 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
 import { GoNoGoChecklistItem, GoNoGoGate, GoNoGoGateStatus, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { formatDate } from '@/app/lib/dateUtils';
+import { getWebhookMetrics } from '@/app/lib/api';
+import { goNoGoChecklist } from '@/app/data/admin-data';
 
 type Props = {
-  metrics: WebhookMetricsSnapshot | null;
-  checklist: GoNoGoChecklistItem[];
   onRefresh?: () => void;
 };
 
@@ -146,7 +146,19 @@ const overallStatus = (gates: GoNoGoGate[], checklist: GoNoGoChecklistItem[]): G
   return 'pass';
 };
 
-export default function GoNoGoView({ metrics, checklist, onRefresh }: Props) {
+export default function GoNoGoView({ onRefresh }: Props) {
+  const [metrics, setMetrics] = useState<WebhookMetricsSnapshot | null>(null);
+  const checklist = goNoGoChecklist;
+
+  const fetchData = useCallback(async () => {
+    const data = await getWebhookMetrics();
+    setMetrics(data);
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+
   const gates = buildSloGates(metrics);
   const global = overallStatus(gates, checklist);
   const globalConfig = statusConfig[global];
@@ -167,15 +179,13 @@ export default function GoNoGoView({ metrics, checklist, onRefresh }: Props) {
             Window {metrics.window_minutes} min • {formatDate(metrics.generated_at)}
           </p>
         )}
-        {onRefresh && (
           <button
             type="button"
-            onClick={onRefresh}
+            onClick={() => void fetchData()}
             className="mt-3 px-3 py-1 text-xs rounded-full border border-current"
           >
             Refresh
           </button>
-        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">

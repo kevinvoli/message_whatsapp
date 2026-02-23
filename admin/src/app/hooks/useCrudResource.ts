@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useToast } from '@/app/ui/ToastProvider';
 
 type CrudConfig<TItem, TCreate, TUpdate> = {
@@ -25,10 +25,6 @@ export function useCrudResource<TItem, TCreate, TUpdate>(
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const { addToast } = useToast();
-
-  useEffect(() => {
-    setItems(config.initialItems);
-  }, [config.initialItems]);
 
   const clearStatus = () => {
     setError(null);

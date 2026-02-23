@@ -225,14 +225,38 @@ export class QueueService implements OnModuleInit {
   }
 
   private async moveToEndInternal(poste_id: string): Promise<void> {
-    await this.removeFromQueueInternal(poste_id);
-    const saved = await this.addPosteToQueueInternal(poste_id);
-    if (saved) {
-      this.logQueueEvent('move_to_end', {
-        poste_id: poste_id,
-        new_position: saved.position,
-      });
-    }
+    const current = await this.queueRepository.findOne({
+      where: { poste_id },
+    });
+    if (!current) return;
+
+    const removedPosition = current.position;
+
+    // Compacter les positions des postes qui étaient après celui-ci
+    await this.queueRepository
+      .createQueryBuilder()
+      .update(QueuePosition)
+      .set({ position: () => 'position - 1' })
+      .where('position > :removedPosition', { removedPosition })
+      .andWhere('poste_id != :poste_id', { poste_id })
+      .execute();
+
+    // Calculer la nouvelle position de fin (après compactage)
+    const maxResult = await this.queueRepository
+      .createQueryBuilder('qp')
+      .select('MAX(qp.position)', 'max')
+      .where('qp.poste_id != :poste_id', { poste_id })
+      .getRawOne<{ max: number | null }>();
+
+    const newPosition = (maxResult?.max ?? 0) + 1;
+
+    // UPDATE au lieu de DELETE+INSERT → pas de risque de perte du poste
+    await this.queueRepository.update({ poste_id }, { position: newPosition });
+
+    this.logQueueEvent('move_to_end', {
+      poste_id,
+      new_position: newPosition,
+    });
   }
 
   async moveToEnd(poste_id: string): Promise<void> {
@@ -242,21 +266,28 @@ export class QueueService implements OnModuleInit {
   }
 
   /**
-   * Quand plus aucun agent n'est actif, remet tous les postes
-   * non-bloques dans la queue pour continuer a dispatcher en mode OFFLINE.
+   * Quand plus aucun agent n'est actif, remet dans la queue tous les postes
+   * non-bloques ET ayant au moins un commercial, pour continuer a dispatcher
+   * en mode OFFLINE. Un poste sans commercial n'a personne pour repondre :
+   * l'ajouter serait inutile et tromperait le dispatcher.
    */
   async fillQueueWithAllPostes(): Promise<void> {
     await this.queueLock.runExclusive(async () => {
       const postes = await this.posteRepository.find({
         where: { is_queue_enabled: true },
+        relations: ['commercial'],
       });
 
-      for (const poste of postes) {
+      const postesWithCommercial = postes.filter(
+        (p) => (p.commercial?.length ?? 0) > 0,
+      );
+
+      for (const poste of postesWithCommercial) {
         await this.addPosteToQueueInternal(poste.id);
       }
 
       this.logQueueEvent('fill_all_postes', {
-        count: postes.length,
+        count: postesWithCommercial.length,
         reason: 'no_active_agents',
       });
     });

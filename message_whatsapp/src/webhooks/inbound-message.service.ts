@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Mutex } from 'async-mutex';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -26,6 +27,16 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 @Injectable()
 export class InboundMessageService {
   private readonly logger = new Logger(InboundMessageService.name);
+  private readonly chatMutexes = new Map<string, Mutex>();
+
+  private getChatMutex(chatId: string): Mutex {
+    let mutex = this.chatMutexes.get(chatId);
+    if (!mutex) {
+      mutex = new Mutex();
+      this.chatMutexes.set(chatId, mutex);
+    }
+    return mutex;
+  }
 
   constructor(
     private readonly dispatcherService: DispatcherService,
@@ -62,56 +73,57 @@ export class InboundMessageService {
       }
 
       try {
-        const conversation = await this.dispatcherService.assignConversation(
-          message.chatId,
-          message.fromName ?? 'Client',
-          traceId,
-          message.tenantId,
-        );
-
-        if (!conversation) {
-          this.logger.warn(
-            `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`,
-          );
-          continue;
-        }
-
-        const savedMessage =
-          await this.whatsappMessageService.saveIncomingFromUnified(
-            message,
-            conversation,
+        await this.getChatMutex(message.chatId).runExclusive(async () => {
+          const conversation = await this.dispatcherService.assignConversation(
+            message.chatId,
+            message.fromName ?? 'Client',
+            traceId,
+            message.tenantId,
           );
 
-        if (!savedMessage) {
-          throw new NotFoundException('Message non enregistre');
-        }
-        this.logger.log(
-          `INCOMING_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
-        );
+          if (!conversation) {
+            this.logger.warn(
+              `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`,
+            );
+            return;
+          }
 
-        const medias = this.extractMediaFromUnified(message);
-        for (const media of medias) {
-          await this.saveMedia(media, savedMessage, conversation, {
-            tenantId: message.tenantId,
-            provider: message.provider,
-            providerMediaId: message.media?.id,
-            channelId: message.channelId,
+          const savedMessage =
+            await this.whatsappMessageService.saveIncomingFromUnified(
+              message,
+              conversation,
+            );
+
+          if (!savedMessage) {
+            throw new NotFoundException('Message non enregistre');
+          }
+          this.logger.log(
+            `INCOMING_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
+          );
+
+          const medias = this.extractMediaFromUnified(message);
+          for (const media of medias) {
+            await this.saveMedia(media, savedMessage, conversation, {
+              tenantId: message.tenantId,
+              provider: message.provider,
+              providerMediaId: message.media?.id,
+              channelId: message.channelId,
+            });
+          }
+
+          const fullMessage =
+            await this.whatsappMessageService.findOneWithMedias(savedMessage.id);
+
+          if (!fullMessage) return;
+          await this.chatService.update(conversation.chat_id, {
+            read_only: false,
           });
-        }
-
-        const fullMessage = await this.whatsappMessageService.findOneWithMedias(
-          savedMessage.id,
-        );
-
-        if (!fullMessage) continue;
-        await this.chatService.update(conversation.chat_id, {
-          read_only: false,
+          conversation.read_only = false;
+          await this.messageGateway.notifyNewMessage(fullMessage, conversation);
+          this.logger.log(
+            `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
+          );
         });
-        conversation.read_only = false;
-        await this.messageGateway.notifyNewMessage(fullMessage, conversation);
-        this.logger.log(
-          `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
-        );
       } catch (err) {
         throw new HttpException(
           {

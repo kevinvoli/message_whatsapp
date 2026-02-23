@@ -1,18 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, MessageCircle, Clock, TrendingUp,
   ArrowUpRight, ArrowDownRight, RefreshCw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
+import { getOverviewMetriques } from '@/app/lib/api';
+import { Spinner } from './Spinner';
 
 interface PerformanceViewProps {
-  commerciaux: PerformanceCommercial[];
-  performanceTemporelle?: PerformanceTemporelle[];
   onRefresh?: () => void;
 }
 
-export default function PerformanceView({ commerciaux, performanceTemporelle, onRefresh }: PerformanceViewProps) {
+export default function PerformanceView({ onRefresh }: PerformanceViewProps) {
+  const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
+  const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getOverviewMetriques();
+      setCommerciaux(data.performanceCommercial);
+      setPerformanceTemporelle(data.performanceTemporelle ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+  }
+
   const sorted = [...commerciaux].sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);
 
   const totalMessages = commerciaux.reduce((s, c) => s + c.nbMessagesEnvoyes + c.nbMessagesRecus, 0);
@@ -40,17 +63,15 @@ export default function PerformanceView({ commerciaux, performanceTemporelle, on
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Rafraichir"
-            aria-label="Rafraichir"
-            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => void fetchData()}
+          title="Rafraichir"
+          aria-label="Rafraichir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
       {/* KPI cards */}

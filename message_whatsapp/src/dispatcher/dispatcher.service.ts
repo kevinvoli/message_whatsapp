@@ -232,7 +232,7 @@ export class DispatcherService {
     this.logger.debug(`Nouvelle conversation creee (${newChat.chat_id})`);
 
     const saved = await this.chatRepository.save(newChat);
-    await this.messageGateway.emitConversationUpsertByChatId(saved.chat_id);
+    await this.messageGateway.emitConversationAssigned(saved.chat_id);
     return saved;
   }
 
@@ -249,6 +249,7 @@ export class DispatcherService {
       assigned_mode: null,
       assigned_at: null,
       first_response_deadline_at: null,
+      status: WhatsappChatStatus.EN_ATTENTE,
     });
 
     // Relancer le dispatcher SANS faux message
@@ -267,7 +268,15 @@ export class DispatcherService {
       return;
     }
     const nextPoste = await this.queueService.getNextInQueue();
-    if (!nextPoste) return;
+    if (!nextPoste) {
+      // Aucun agent disponible : notifier l'ancien poste que la conversation
+      // passe en attente, sinon elle reste visible comme fantôme sur son interface.
+      this.logger.warn(
+        `⏳ Aucun agent disponible pour réinjecter (${chat.chat_id}), passage EN_ATTENTE`,
+      );
+      await this.messageGateway.emitConversationRemoved(chat.chat_id, oldPoste);
+      return;
+    }
 
     await this.chatRepository.update(chat.id, {
       poste: nextPoste,

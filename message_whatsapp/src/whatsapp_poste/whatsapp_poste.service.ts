@@ -62,7 +62,7 @@ export class WhatsappPosteService {
     try {
       const poste = await this.posteRepository.find({
         order: { created_at: 'DESC' },
-        relations: ['commercial', 'messages', 'chats'],
+        relations: ['commercial'],
       });
 
       return poste;

@@ -198,7 +198,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setConversations: (conversations) => {
-    set({ conversations, isLoading: false });
+    set((state) => {
+      const selectedChatId = state.selectedConversation?.chat_id;
+      const normalized = selectedChatId
+        ? conversations.map((c) =>
+            c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c,
+          )
+        : conversations;
+      return { conversations: normalized, isLoading: false };
+    });
   },
 
   setMessages: (chat_id, messages) => {
@@ -248,7 +256,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ? {
                 ...c,
                 lastMessage: message,
-                unreadCount: isActive ? 0 : (c.unreadCount ?? 0) + 1,
+                unreadCount: isActive
+                  ? 0
+                  : message.from_me
+                    ? (c.unreadCount ?? 0)
+                    : (c.unreadCount ?? 0) + 1,
               }
             : c,
         ),
@@ -276,13 +288,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       };
 
       // 🔁 Liste des conversations
-      const newConversations = conversationExists
-        ? state.conversations.map((c) =>
-            c.chat_id === updatedConversation.chat_id
-              ? conversationWithUnread
-              : c,
-          )
-        : [conversationWithUnread, ...state.conversations];
+      // IMPORTANT: on ne re-ajoute PAS une conversation absente via UPSERT
+      // (évite la réapparition après CONVERSATION_REMOVED).
+      // Les nouvelles conversations arrivent exclusivement via CONVERSATION_ASSIGNED.
+      if (!conversationExists) {
+        if (isSelected) {
+          return { selectedConversation: conversationWithUnread };
+        }
+        return state;
+      }
+
+      const newConversations = state.conversations.map((c) =>
+        c.chat_id === updatedConversation.chat_id ? conversationWithUnread : c,
+      );
 
       const newState: Partial<ChatState> = {
         conversations: newConversations,

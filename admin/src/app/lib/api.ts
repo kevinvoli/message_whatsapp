@@ -46,12 +46,12 @@ export async function getCommerciaux(): Promise<Commercial[]> {
     return handleResponse<Commercial[]>(response);
 }
 
-export async function getMessages(): Promise<WhatsappMessage[]> {
-    const response = await fetch(`${API_BASE_URL}/messages`, {
+export async function getMessages(limit = 50, offset = 0): Promise<{ data: WhatsappMessage[]; total: number }> {
+    const response = await fetch(`${API_BASE_URL}/messages?limit=${limit}&offset=${offset}`, {
         method: 'GET',
         credentials: 'include',
     });
-    return handleResponse<WhatsappMessage[]>(response);
+    return handleResponse<{ data: WhatsappMessage[]; total: number }>(response);
 }
 
 export async function getPostes(): Promise<Poste[]> {
@@ -201,12 +201,12 @@ export async function deleteMessageAuto(id: string): Promise<{ message: string }
     return handleResponse<{ message: string }>(response);
 }
 
-export async function getClients(): Promise<Client[]> {
-    const response = await fetch(`${API_BASE_URL}/contact`, {
+export async function getClients(limit = 50, offset = 0): Promise<{ data: Client[]; total: number }> {
+    const response = await fetch(`${API_BASE_URL}/contact?limit=${limit}&offset=${offset}`, {
         method: 'GET',
         credentials: 'include',
     });
-    return handleResponse<Client[]>(response);
+    return handleResponse<{ data: Client[]; total: number }>(response);
 }
 
 export async function createClient(client: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<Client> {
@@ -237,12 +237,12 @@ export async function deleteClient(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
-export async function getChats(): Promise<WhatsappChat[]> {
-    const response = await fetch(`${API_BASE_URL}/chats`, {
+export async function getChats(limit = 50, offset = 0): Promise<{ data: WhatsappChat[]; total: number }> {
+    const response = await fetch(`${API_BASE_URL}/chats?limit=${limit}&offset=${offset}`, {
         method: 'GET',
         credentials: 'include',
     });
-    const chats = await handleResponse<Array<Partial<WhatsappChat> & {
+    const result = await handleResponse<{ data: Array<Partial<WhatsappChat> & {
       unreadCount?: number;
       unread_count?: number;
       channel_id?: string;
@@ -250,8 +250,8 @@ export async function getChats(): Promise<WhatsappChat[]> {
       client_phone?: string;
       contact_client?: string;
       status?: string;
-    }>>(response);
-    return chats.map(normalizeWhatsappChat);
+    }>; total: number }>(response);
+    return { data: result.data.map(normalizeWhatsappChat), total: result.total };
 }
 
 export async function getQueue(): Promise<QueuePosition[]> {

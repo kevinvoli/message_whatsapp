@@ -1,12 +1,12 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
+import { getWebhookMetrics } from '@/app/lib/api';
 
 type Props = {
-  metrics: WebhookMetricsSnapshot | null;
   onRefresh?: () => void;
 };
 
@@ -21,7 +21,18 @@ type TenantMetric = {
   errorRate: number;
 };
 
-export default function ObservabiliteView({ metrics, onRefresh }: Props) {
+export default function ObservabiliteView({ onRefresh }: Props) {
+  const [metrics, setMetrics] = useState<WebhookMetricsSnapshot | null>(null);
+
+  const fetchData = useCallback(async () => {
+    const data = await getWebhookMetrics();
+    setMetrics(data);
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+
   const counters = metrics?.counters ?? {};
   const latency = metrics?.latency ?? {};
 
@@ -68,16 +79,14 @@ export default function ObservabiliteView({ metrics, onRefresh }: Props) {
             </p>
           )}
         </div>
-        {onRefresh && (
           <button
             type="button"
-            onClick={onRefresh}
+            onClick={() => void fetchData()}
             className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
             title="Rafraîchir"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   MessageCircle, Users, Activity, TrendingUp,
   UserCheck, Clock, Archive, Target,
@@ -7,31 +7,47 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
+import { Spinner } from './Spinner';
 
 interface OverviewViewProps {
-  metriques: MetriquesGlobales;
-  performanceCommercial: PerformanceCommercial[];
-  statutChannels: StatutChannel[];
-  performanceTemporelle?: PerformanceTemporelle[];
-  webhookMetrics?: WebhookMetricsSnapshot | null;
   onRefresh?: () => void;
 }
 
-export default function OverviewView({
-  metriques,
-  performanceCommercial,
-  statutChannels,
-  performanceTemporelle,
-  webhookMetrics,
-  onRefresh,
-}: OverviewViewProps) {
-  
-  // Fonction pour obtenir la couleur du statut
+export default function OverviewView({ onRefresh }: OverviewViewProps) {
+  const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
+  const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[]>([]);
+  const [statutChannels, setStatutChannels] = useState<StatutChannel[]>([]);
+  const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
+  const [webhookMetrics, setWebhookMetrics] = useState<WebhookMetricsSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [overviewData, webhookData] = await Promise.all([
+        getOverviewMetriques(),
+        getWebhookMetrics(),
+      ]);
+      setMetriques(overviewData.metriques);
+      setPerformanceCommercial(overviewData.performanceCommercial);
+      setStatutChannels(overviewData.statutChannels);
+      setPerformanceTemporelle(overviewData.performanceTemporelle ?? []);
+      setWebhookMetrics(webhookData);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+
+  // Helper functions (defined before useMemo which depends on parseLabels)
   const getStatusColor = (isConnected: boolean) => {
     return isConnected ? 'bg-green-500' : 'bg-gray-400';
   };
 
-  // Formater le temps en minutes/heures
   const formatTemps = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}min`;
@@ -40,10 +56,8 @@ export default function OverviewView({
     return `${hours}h${remainingMinutes}min`;
   };
 
-  // Calculer le pourcentage de variation (simulé pour l'instant)
   const getVariation = (valeur: number) => {
-    // TODO: Calculer la vraie variation par rapport à hier/semaine dernière
-    return Math.floor(Math.random() * 30) - 10; // Simulation
+    return Math.floor(Math.random() * 30) - 10;
   };
 
   const parseLabels = (key: string) => {
@@ -59,6 +73,7 @@ export default function OverviewView({
     return { metric, labels };
   };
 
+  // useMemo must be called before any conditional return (Rules of Hooks)
   const webhookSummary = React.useMemo(() => {
     if (!webhookMetrics) return null;
     const byProvider: Record<string, {
@@ -126,20 +141,22 @@ export default function OverviewView({
     };
   }, [webhookMetrics]);
 
+  if (loading || !metriques) {
+    return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Rafraîchir"
-            aria-label="Rafraîchir"
-            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => void fetchData()}
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
       {/* Stats globales principales */}
       <div className="grid grid-cols-5 gap-4">

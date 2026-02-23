@@ -602,16 +602,18 @@ export class WhatsappMessageService {
     return messages;
   }
 
-  async findAll() {
-    const messages = await this.messageRepository.find({
+  async findAll(limit = 50, offset = 0): Promise<{ data: unknown[]; total: number }> {
+    const [messages, total] = await this.messageRepository.findAndCount({
       relations: {
-        medias: true,
         poste: true,
         chat: true,
         contact: true,
       },
+      order: { timestamp: 'DESC' },
+      take: limit,
+      skip: offset,
     });
-    return messages;
+    return { data: messages, total };
   }
 
   async findByAllByMessageId(id: string) {
@@ -840,40 +842,47 @@ export class WhatsappMessageService {
 
       await this.chatRepository.save(chat);
 
+      const buildMessageEntity = (chatRef: WhatsappChat) =>
+        this.messageRepository.create({
+          tenant_id: message.tenantId,
+          provider: message.provider,
+          provider_message_id: message.providerMessageId,
+          channel: channel,
+          chat: chatRef,
+          contact_id: contact?.id,
+          message_id: message.providerMessageId,
+          external_id: message.providerMessageId,
+          direction: MessageDirection.IN,
+          from_me: false,
+          from: message.from,
+          from_name: message.fromName ?? message.from,
+          text: this.resolveIncomingTextUnified(message),
+          type: message.type,
+          timestamp: new Date(message.timestamp * 1000),
+          status: WhatsappMessageStatus.SENT,
+          source: message.provider,
+          poste: chatRef.poste,
+        });
+
       try {
         const saved = await this.messageRepository.save(
-          this.messageRepository.create({
-            tenant_id: message.tenantId,
-            provider: message.provider,
-            provider_message_id: message.providerMessageId,
-            channel: channel,
-            chat: chat,
-            contact_id: contact?.id,
-            message_id: message.providerMessageId,
-            external_id: message.providerMessageId,
-            direction: MessageDirection.IN,
-            from_me: false,
-            from: message.from,
-            from_name: message.fromName ?? message.from,
-            text: this.resolveIncomingTextUnified(message),
-            type: message.type,
-            timestamp: new Date(message.timestamp * 1000),
-            status: WhatsappMessageStatus.SENT,
-            source: message.provider,
-            poste: chat.poste,
-          }),
+          buildMessageEntity(chat),
         );
         this.logger.log(
           `INCOMING_SAVED trace=${traceId} db_message_id=${saved.id}`,
         );
         return saved;
       } catch (error) {
-        if (
+        const errorCode =
           error instanceof QueryFailedError &&
-          typeof (error as any).driverError?.code === 'string' &&
-          ['ER_DUP_ENTRY', '23505', 'SQLITE_CONSTRAINT'].includes(
-            (error as any).driverError.code,
-          )
+          typeof (error as any).driverError?.code === 'string'
+            ? (error as any).driverError.code
+            : null;
+
+        // ER_DUP_ENTRY: message already saved (concurrent insert)
+        if (
+          errorCode &&
+          ['ER_DUP_ENTRY', '23505', 'SQLITE_CONSTRAINT'].includes(errorCode)
         ) {
           const duplicated = await this.messageRepository.findOne({
             where: {
@@ -889,6 +898,27 @@ export class WhatsappMessageService {
             return duplicated;
           }
         }
+
+        // ER_NO_REFERENCED_ROW_2: stale FK reference — reload fresh chat and retry once
+        if (errorCode === 'ER_NO_REFERENCED_ROW_2') {
+          this.logger.warn(
+            `INCOMING_FK_VIOLATION trace=${traceId} chat_id=${message.chatId} — reloading fresh chat and retrying`,
+          );
+          const freshChat = await this.chatRepository.findOne({
+            where: { chat_id: message.chatId },
+            relations: ['poste'],
+          });
+          if (freshChat) {
+            const saved = await this.messageRepository.save(
+              buildMessageEntity(freshChat),
+            );
+            this.logger.log(
+              `INCOMING_SAVED_RETRY trace=${traceId} db_message_id=${saved.id}`,
+            );
+            return saved;
+          }
+        }
+
         throw error;
       }
     } catch (error) {

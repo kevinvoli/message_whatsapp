@@ -176,80 +176,109 @@ export class WhatsappCommercialService {
   }
 
   async getCommercialsDashboard(): Promise<CommercialDashboardDto[]> {
+    // Charger les commerciaux avec leur poste uniquement (sans chats ni messages)
     const users = await this.whatsappCommercialRepository.find({
-      relations: ['poste', 'poste.chats'],
+      relations: [‘poste’],
     });
 
-    const dashboard: CommercialDashboardDto[] = [];
+    const posteIds = users.map((u) => u.poste?.id).filter(Boolean) as string[];
 
-    for (const user of users) {
-      // Récupérer tous les messages OUT et IN pour ce commercial
-      //      if (!user.poste) {
-      //   continue; // ou throw si c’est une incohérence métier
-      // }
+    // Une seule requête agrégée pour compter les messages par poste
+    const msgCounts: { poste_id: string; sent: string; received: string }[] =
+      posteIds.length > 0
+        ? await this.messageRepository
+            .createQueryBuilder(‘m’)
+            .select(‘m.poste_id’, ‘poste_id’)
+            .addSelect(
+              `SUM(CASE WHEN m.from_me = 1 THEN 1 ELSE 0 END)`,
+              ‘sent’,
+            )
+            .addSelect(
+              `SUM(CASE WHEN m.from_me = 0 THEN 1 ELSE 0 END)`,
+              ‘received’,
+            )
+            .where(‘m.poste_id IN (:...posteIds)’, { posteIds })
+            .groupBy(‘m.poste_id’)
+            .getRawMany()
+        : [];
+
+    const msgMap = new Map(
+      msgCounts.map((r) => [
+        r.poste_id,
+        { sent: parseInt(r.sent, 10), received: parseInt(r.received, 10) },
+      ]),
+    );
+
+    // Une seule requête agrégée pour les stats de chats par poste
+    const chatStats: {
+      poste_id: string;
+      actif: string;
+      en_attente: string;
+      today: string;
+    }[] =
+      posteIds.length > 0
+        ? await this.chatRepository
+            .createQueryBuilder(‘c’)
+            .select(‘c.poste_id’, ‘poste_id’)
+            .addSelect(
+              `SUM(CASE WHEN c.status = ‘${WhatsappChatStatus.ACTIF}’ THEN 1 ELSE 0 END)`,
+              ‘actif’,
+            )
+            .addSelect(
+              `SUM(CASE WHEN c.status = ‘${WhatsappChatStatus.EN_ATTENTE}’ THEN 1 ELSE 0 END)`,
+              ‘en_attente’,
+            )
+            .addSelect(
+              `SUM(CASE WHEN DATE(c.createdAt) = CURDATE() THEN 1 ELSE 0 END)`,
+              ‘today’,
+            )
+            .where(‘c.poste_id IN (:...posteIds)’, { posteIds })
+            .groupBy(‘c.poste_id’)
+            .getRawMany()
+        : [];
+
+    const chatMap = new Map(
+      chatStats.map((r) => [
+        r.poste_id,
+        {
+          actif: parseInt(r.actif, 10),
+          en_attente: parseInt(r.en_attente, 10),
+          today: parseInt(r.today, 10),
+        },
+      ]),
+    );
+
+    return users.map((user) => {
       const posteId = user.poste?.id;
-      const messagesEnvoyes = await this.messageRepository.count({
-        where: { poste_id: posteId, from_me: true },
-      });
-      this.logger.debug(`Messages envoyes pour ${user.id}: ${messagesEnvoyes}`);
+      const msg = posteId ? (msgMap.get(posteId) ?? { sent: 0, received: 0 }) : { sent: 0, received: 0 };
+      const chat = posteId ? (chatMap.get(posteId) ?? { actif: 0, en_attente: 0, today: 0 }) : { actif: 0, en_attente: 0, today: 0 };
 
-      const messagesRecus = await this.messageRepository.count({
-        where: { poste_id: posteId, from_me: false },
-      });
+      const productivite = msg.sent + chat.actif * 2 - msg.received * 0.5;
 
-      const chats = user.poste?.chats || [];
-
-      this.logger.debug(`Messages recus pour ${user.id}: ${messagesRecus}`);
-
-      // Chats actifs / en attente
-
-      const conversationsActives = chats.filter(
-        (c) => c.status === WhatsappChatStatus.ACTIF,
-      ).length;
-      const conversationsEnAttente = chats.filter(
-        (c) => c.status === WhatsappChatStatus.EN_ATTENTE,
-      ).length;
-
-      // Contacts créés aujourd'hui
-      const today = new Date();
-      const nouveauxContacts = chats.filter((c) => {
-        const createdAt = new Date(c.createdAt);
-        return (
-          createdAt.getDate() === today.getDate() &&
-          createdAt.getMonth() === today.getMonth() &&
-          createdAt.getFullYear() === today.getFullYear()
-        );
-      }).length;
-
-      // Productivité = simple exemple : messagesEnvoyes + chatsActifs*2 - messagesRecus*0.5
-      const productivite =
-        messagesEnvoyes + conversationsActives * 2 - messagesRecus * 0.5;
-
-      dashboard.push({
+      return {
         id: user.id,
         name: user.name,
         avatar: user.name.charAt(0).toUpperCase(),
-        status: user.isConnected ? 'online' : 'offline',
+        status: user.isConnected ? ‘online’ : ‘offline’,
         email: user.email,
-        region: user.poste?.name || 'N/A',
+        region: user.poste?.name || ‘N/A’,
         dernierLogin: user.lastConnectionAt
-          ? new Date(user.lastConnectionAt).toLocaleString('fr-FR', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
+          ? new Date(user.lastConnectionAt).toLocaleString(‘fr-FR’, {
+              day: ‘2-digit’,
+              month: ‘short’,
+              year: ‘numeric’,
+              hour: ‘2-digit’,
+              minute: ‘2-digit’,
             })
-          : 'N/A',
-        messagesEnvoyes,
-        messagesRecus,
-        conversationsActives,
-        conversationsEnAttente,
-        nouveauxContacts,
+          : ‘N/A’,
+        messagesEnvoyes: msg.sent,
+        messagesRecus: msg.received,
+        conversationsActives: chat.actif,
+        conversationsEnAttente: chat.en_attente,
+        nouveauxContacts: chat.today,
         productivite,
-      });
-    }
-    return dashboard;
+      };
+    });
   }
 
   async findOne(id: string): Promise<SafeWhatsappCommercial> {
@@ -291,6 +320,7 @@ export class WhatsappCommercialService {
   ): Promise<SafeWhatsappCommercial> {
     const user = await this.whatsappCommercialRepository.findOne({
       where: { id },
+      relations: ['poste'],
     });
 
     if (!user) {
@@ -312,9 +342,32 @@ export class WhatsappCommercialService {
       user.email = updateWhatsappCommercialDto.email;
     }
 
-    // Mettre à jour le nom si fourni
     if (updateWhatsappCommercialDto.name !== undefined) {
       user.name = updateWhatsappCommercialDto.name;
+    }
+
+    if (updateWhatsappCommercialDto.password) {
+      user.salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(
+        updateWhatsappCommercialDto.password,
+        user.salt,
+      );
+    }
+
+    if (updateWhatsappCommercialDto.poste_id !== undefined) {
+      if (updateWhatsappCommercialDto.poste_id === null) {
+        user.poste = null;
+      } else {
+        const poste = await this.postelRepository.findOne({
+          where: { id: updateWhatsappCommercialDto.poste_id },
+        });
+        if (!poste) {
+          throw new NotFoundException(
+            `Poste with ID "${updateWhatsappCommercialDto.poste_id}" not found`,
+          );
+        }
+        user.poste = poste;
+      }
     }
 
     const updatedUser = await this.whatsappCommercialRepository.save(user);

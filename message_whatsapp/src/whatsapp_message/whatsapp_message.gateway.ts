@@ -240,15 +240,31 @@ export class WhatsappMessageGateway
 
     this.connectedAgents.delete(client.id);
     await this.commercialService.updateStatus(agent.commercialId, false);
-    await this.posteService.setActive(agent.posteId, false);
-    await this.queueService.removeFromQueue(agent.posteId);
-    this.jobRunner.stopAgentSlaMonitor(agent.posteId);
 
-    // Si plus aucun agent connecte, remplir la queue avec tous les postes
-    // non-bloques pour continuer a dispatcher en mode OFFLINE
-    const hasActive = await this.queueService.hasActivePostes();
-    if (!hasActive) {
-      this.logger.log('Dernier agent deconnecte, remplissage queue offline');
+    // Verifier si un autre commercial du MEME poste est encore connecte.
+    // Si oui : le poste reste actif et dans la queue — on ne touche a rien.
+    // Si non : c'etait le dernier socket du poste → on le desactive et on le retire.
+    const isPosteStillActive = Array.from(this.connectedAgents.values()).some(
+      (a) => a.posteId === agent.posteId,
+    );
+
+    if (!isPosteStillActive) {
+      await this.posteService.setActive(agent.posteId, false);
+      await this.queueService.removeFromQueue(agent.posteId);
+      this.jobRunner.stopAgentSlaMonitor(agent.posteId);
+    }
+
+    // Si la queue est vide apres la deconnexion, remplir avec tous les postes
+    // non-bloques ayant au moins un commercial (mode OFFLINE).
+    // On verifie la queue plutot que connectedAgents.size car un commercial
+    // connecte sur un poste BLOQUE occupe connectedAgents sans etre dans la queue.
+    // Dans ce cas connectedAgents.size > 0 alors que la queue est bien vide.
+    const queueIsEmpty =
+      (await this.queueService.getQueuePositions()).length === 0;
+    if (queueIsEmpty) {
+      this.logger.log(
+        'Queue vide apres deconnexion, remplissage mode offline',
+      );
       await this.queueService.fillQueueWithAllPostes();
     }
 
@@ -859,6 +875,30 @@ export class WhatsappMessageGateway
 
     this.logger.log(
       `CONVERSATION_REMOVED → poste:${oldPosteId} | CONVERSATION_ASSIGNED → poste:${newPosteId}`,
+    );
+  }
+
+  public emitConversationRemoved(chatId: string, posteId: string): void {
+    this.server.to(`poste:${posteId}`).emit('chat:event', {
+      type: 'CONVERSATION_REMOVED',
+      payload: { chat_id: chatId },
+    });
+    this.logger.log(
+      `CONVERSATION_REMOVED emitted for chat ${chatId} → poste:${posteId} (no agent available)`,
+    );
+  }
+
+  public async emitConversationAssigned(chatId: string): Promise<void> {
+    const chat = await this.chatService.findBychat_id(chatId);
+    if (!chat?.poste_id) return;
+    const lastMessage = await this.messageService.findLastMessageBychat_id(chatId);
+    const unreadCount = await this.messageService.countUnreadMessages(chatId);
+    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
+      type: 'CONVERSATION_ASSIGNED',
+      payload: this.mapConversation(chat, lastMessage, unreadCount),
+    });
+    this.logger.log(
+      `CONVERSATION_ASSIGNED emitted for new chat ${chatId} → poste:${chat.poste_id}`,
     );
   }
 

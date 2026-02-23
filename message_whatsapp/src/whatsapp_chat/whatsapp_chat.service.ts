@@ -132,13 +132,12 @@ export class WhatsappChatService {
     );
   }
 
-  async findAll(chat_id?: string) {
+  async findAll(chat_id?: string, limit = 50, offset = 0): Promise<{ data: WhatsappChat[]; total: number }> {
     if (chat_id) {
-      return this.chatRepository
+      const data = await this.chatRepository
         .createQueryBuilder('chat')
         .leftJoinAndSelect('chat.poste', 'poste')
         .leftJoinAndSelect('chat.channel', 'channel')
-        .leftJoinAndSelect('chat.messages', 'messages')
         .leftJoinAndMapOne(
           'chat.contact',
           Contact,
@@ -147,8 +146,9 @@ export class WhatsappChatService {
         )
         .where('chat.chat_id = :chat_id', { chat_id })
         .getMany();
+      return { data, total: data.length };
     }
-    return this.chatRepository
+    const [data, total] = await this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
@@ -174,7 +174,10 @@ export class WhatsappChatService {
           .getQuery()})`,
       )
       .orderBy('chat.last_activity_at', 'DESC')
-      .getMany();
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
+    return { data, total };
   }
 
   async findBychat_id(chat_id: string): Promise<WhatsappChat | null> {
@@ -182,7 +185,6 @@ export class WhatsappChatService {
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
-      .leftJoinAndSelect('chat.messages', 'messages')
       .leftJoinAndMapOne(
         'chat.contact',
         Contact,

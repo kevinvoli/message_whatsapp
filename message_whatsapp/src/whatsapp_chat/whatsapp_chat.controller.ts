@@ -16,8 +16,16 @@ export class WhatsappChatController {
   constructor(private readonly chatService: WhatsappChatService) {}
 
   @Get()
-  async findAll(@Query('chat_id') chat_id?: string) {
-    return this.chatService.findAll(chat_id);
+  async findAll(
+    @Query('chat_id') chat_id?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.chatService.findAll(
+      chat_id,
+      limit ? Math.min(parseInt(limit, 10), 200) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
   }
 
   @Get(':chat_id')

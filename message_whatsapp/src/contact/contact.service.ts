@@ -56,15 +56,13 @@ export class ContactService {
     return shouldSave ? this.repo.save(contact) : contact;
   }
 
-  async findAll() {
-    const contact = await this.repo.find({
+  async findAll(limit = 50, offset = 0): Promise<{ data: unknown[]; total: number }> {
+    const [contacts, total] = await this.repo.findAndCount({
       order: { createdAt: 'DESC' },
-      relations: {
-        messages: true,
-      },
+      take: limit,
+      skip: offset,
     });
-
-    return contact;
+    return { data: contacts, total };
   }
 
   async findAllByPosteId(posteId: string) {

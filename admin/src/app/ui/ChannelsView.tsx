@@ -1,17 +1,15 @@
 ﻿"use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import { Channel } from '@/app/lib/definitions';
-import { createChannel, deleteChannel, updateChannel } from '@/app/lib/api';
+import { createChannel, deleteChannel, getChannels, updateChannel } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 
 interface ChannelsViewProps {
-  initialChannels: Channel[];
-  onChannelUpdated: () => Promise<void> | void;
   onRefresh?: () => void;
 }
 
@@ -23,20 +21,29 @@ type ChannelCreateInput = {
   is_business?: boolean;
 };
 
-export default function ChannelsView({
-  initialChannels,
-  onChannelUpdated,
-  onRefresh,
-}: ChannelsViewProps) {
-  const { items: channels, loading, clearStatus, create, update, remove } =
+export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
+
+  const { items: channels, setItems, loading, clearStatus, create, update, remove } =
     useCrudResource<Channel, ChannelCreateInput, Partial<Channel>>({
-      initialItems: initialChannels,
-      onRefresh: onChannelUpdated,
+      initialItems: [],
+      onRefresh: () => refreshRef.current(),
       createItem: createChannel,
       updateItem: updateChannel,
       deleteItem: deleteChannel,
       getId: (item) => item.id,
     });
+
+  const fetchData = useCallback(async () => {
+    const data = await getChannels();
+    setItems(data);
+  }, [setItems]);
+
+  refreshRef.current = fetchData;
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -123,17 +130,15 @@ export default function ChannelsView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Rafraîchir"
-            aria-label="Rafraîchir"
-            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => void fetchData()}
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Canaux WHAPI</h2>

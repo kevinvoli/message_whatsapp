@@ -1,12 +1,13 @@
 ﻿"use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import {
   blockPosteFromQueue,
   createPoste,
   deletePoste,
+  getPostes,
   unblockPosteFromQueue,
   updatePoste,
 } from '@/app/lib/api';
@@ -17,18 +18,15 @@ import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 import { useToast } from '@/app/ui/ToastProvider';
 
 interface PostesViewProps {
-  initialPostes: Poste[];
-  onPosteUpdated: () => Promise<void> | void;
   onRefresh?: () => void;
 }
 
-export default function PostesView({
-  initialPostes,
-  onPosteUpdated,
-  onRefresh,
-}: PostesViewProps) {
+export default function PostesView({ onRefresh }: PostesViewProps) {
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
+
   const {
     items: postes,
+    setItems,
     loading,
     clearStatus,
     create,
@@ -39,13 +37,24 @@ export default function PostesView({
     { name: string; code: string; is_active: boolean },
     Partial<Poste>
   >({
-    initialItems: initialPostes,
-    onRefresh: onPosteUpdated,
+    initialItems: [],
+    onRefresh: () => refreshRef.current(),
     createItem: createPoste,
     updateItem: updatePoste,
     deleteItem: deletePoste,
     getId: (item) => item.id,
   });
+
+  const fetchData = useCallback(async () => {
+    const data = await getPostes();
+    setItems(data);
+  }, [setItems]);
+
+  refreshRef.current = fetchData;
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -146,7 +155,7 @@ export default function PostesView({
           message: 'Poste debloque et autorise dans la file.',
         });
       }
-      await onPosteUpdated();
+      await fetchData();
     } catch (err) {
       addToast({
         type: 'error',
@@ -160,17 +169,15 @@ export default function PostesView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Rafraîchir"
-            aria-label="Rafraîchir"
-            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => void fetchData()}
+          title="Rafraîchir"
+          aria-label="Rafraîchir"
+          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Postes</h2>

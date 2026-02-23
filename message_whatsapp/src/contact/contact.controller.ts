@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -34,8 +35,14 @@ export class ContactController {
 
   @Get()
   @UseGuards(AdminGuard)
-  findAll() {
-    return this.service.findAll();
+  findAll(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.findAll(
+      limit ? Math.min(parseInt(limit, 10), 200) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
   }
 
   @Get(':id')

@@ -231,7 +231,13 @@ export class WhatsappMessageController {
 
   @Get()
   @UseGuards(AdminGuard)
-  async findAll() {
-    return await this.messageService.findAll();
+  async findAll(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return await this.messageService.findAll(
+      limit ? Math.min(parseInt(limit, 10), 200) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
   }
 }
