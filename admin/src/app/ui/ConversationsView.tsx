@@ -1,7 +1,7 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search } from 'lucide-react';
 import { getMessagesForChat, sendMessage } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
@@ -18,6 +18,7 @@ interface ConversationsViewProps {
 
 export default function ConversationsView({ initialChats, onChatUpdated, onRefresh }: ConversationsViewProps) {
     const [chats, setChats] = useState<WhatsappChat[]>(initialChats);
+    const [searchTerm, setSearchTerm] = useState('');
     const [selectedChat, setSelectedChat] = useState<WhatsappChat | null>(null);
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
     const [messageInput, setMessageInput] = useState('');
@@ -265,6 +266,21 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
 
     useRealtimePolling(pollMessages, { interval: 3000, enabled: !!selectedChat });
 
+    const filteredChats = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return chats;
+        return chats.filter((chat) => {
+            const name = (chat.name ?? '').toLowerCase();
+            const phone = (chat.contact_client ?? chat.client_phone ?? '').toLowerCase();
+            const lastMsg = chat.last_message
+                ? resolveAdminMessageText(chat.last_message).toLowerCase()
+                : chat.messages && chat.messages.length > 0
+                ? resolveAdminMessageText(chat.messages[chat.messages.length - 1]).toLowerCase()
+                : '';
+            return name.includes(term) || phone.includes(term) || lastMsg.includes(term);
+        });
+    }, [chats, searchTerm]);
+
     return (
         <div className="h-full flex flex-col gap-3">
             <div className="flex items-center justify-end">
@@ -283,18 +299,30 @@ export default function ConversationsView({ initialChats, onChatUpdated, onRefre
             <div className="flex h-full bg-slate-100 rounded-lg shadow-sm overflow-hidden">
             {/* Left Panel: Chat List */}
             <div className="w-1/3 border-r border-gray-200 bg-white flex flex-col">
-                <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+                <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10 space-y-3">
                     <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
                         <MessageSquare className="w-5 h-5" /> Conversations
                     </h3>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="Nom, numéro, message..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400"
+                        />
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {loadingChats ? (
                         <div className="flex justify-center items-center py-4"><Spinner /></div>
-                    ) : chats.length === 0 ? (
-                        <p className="text-center text-gray-500 py-4">Aucune conversation trouvée.</p>
+                    ) : filteredChats.length === 0 ? (
+                        <p className="text-center text-gray-500 py-4">
+                            {searchTerm ? 'Aucune conversation trouvée.' : 'Aucune conversation.'}
+                        </p>
                     ) : (
-                        chats.map(chat => (
+                        filteredChats.map(chat => (
                             <div
                                 key={chat.id}
                                 className={`flex items-center p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors ${

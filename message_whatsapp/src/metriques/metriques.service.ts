@@ -381,10 +381,28 @@ export class MetriquesService {
         'commercial.lastConnectionAt as lastConnectionAt',
         'poste.name as poste_name',
         'poste.id as poste_id',
-        'COUNT(DISTINCT CASE WHEN chat.status = "actif" THEN chat.id END) as nbChatsActifs',
-        'COUNT(CASE WHEN message.direction = "OUT" THEN 1 END) as nbMessagesEnvoyes',
         'COUNT(CASE WHEN message.direction = "IN" THEN 1 END) as nbMessagesRecus',
       ])
+      .addSelect(
+        (sub) =>
+          sub
+            .select('COUNT(*)')
+            .from(WhatsappChat, 'c')
+            .where('c.poste_id = poste.id')
+            .andWhere("c.status = 'actif'")
+            .andWhere('c.deletedAt IS NULL'),
+        'nbChatsActifs',
+      )
+      .addSelect(
+        (sub) =>
+          sub
+            .select('COUNT(*)')
+            .from(WhatsappMessage, 'msg')
+            .where('msg.commercial_id = commercial.id')
+            .andWhere("msg.direction = 'OUT'")
+            .andWhere('msg.deletedAt IS NULL'),
+        'nbMessagesEnvoyes',
+      )
       .where('commercial.deleted_at IS NULL')
       .groupBy(
         'commercial.id, commercial.name, commercial.email, commercial.isConnected, commercial.lastConnectionAt, poste.name, poste.id',

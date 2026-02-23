@@ -36,7 +36,7 @@ export default function PostesView({
     remove,
   } = useCrudResource<
     Poste,
-    { name: string; code: string; is_active: boolean; chats: []; messages: []; commercial: [] },
+    { name: string; code: string; is_active: boolean },
     Partial<Poste>
   >({
     initialItems: initialPostes,

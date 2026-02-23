@@ -1,35 +1,57 @@
 ﻿import React, { useState } from 'react';
 import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, User } from 'lucide-react';
-import { PerformanceCommercial } from '@/app/lib/definitions';
-import { updateCommercial } from '@/app/lib/api';
+import { Commercial, PerformanceCommercial, Poste } from '@/app/lib/definitions';
+import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
+import { useCrudResource } from '../hooks/useCrudResource';
+import { EntityFormModal } from './crud/EntityFormModal';
 
 interface CommerciauxViewProps {
   commerciaux: PerformanceCommercial[];
+  postes: Poste[];
   onCommercialUpdate: () => void;
   onRefresh?: () => void;
 }
 
-export default function CommerciauxView({ 
-  commerciaux, 
+export default function CommerciauxView({
+  commerciaux,
+  postes,
   onCommercialUpdate,
   onRefresh,
 }: CommerciauxViewProps) {
+  const {
+    loading,
+    clearStatus,
+    create,
+    update,
+    remove,
+  } = useCrudResource<
+    PerformanceCommercial,
+    { name: string; email: string; password: string; poste_id?: string | null },
+    { name?: string; email?: string; password?: string; poste_id?: string | null; is_active?: boolean }
+  >({
+    initialItems: commerciaux,
+    onRefresh: onCommercialUpdate,
+    createItem: createCommercial,
+    updateItem: updateCommercial,
+    deleteItem: deleteCommercial,
+    getId: (item) => item.id,
+  });
 
-  const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [formIsActive, setFormIsActive] = useState(true);
   const [formName, setFormName] = useState('');
+  const [formPosteId, setFormPosteId] = useState<string | null>(null);
+  const [formPassword, setFormPassword] = useState<string>('');
+  const [formEmail, setFormEmail] = useState('');
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
   const { addToast } = useToast();
-
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
-
   // Fonction pour obtenir la couleur du statut
   const getStatusColor = (isConnected: boolean) => {
     return isConnected ? 'bg-green-500' : 'bg-gray-400';
@@ -64,23 +86,27 @@ export default function CommerciauxView({
     return formatRelativeDate(dateString);
   };
 
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = await create(
+      {
+        name: formName,
+        email: formEmail,
+        password: formPassword,
+        poste_id: formPosteId,
+      },
+      'Commercial ajouté.',
+    );
+    if (result.ok) {
+      closeAddModal();
+    }
+  };
+
   const handleDeleteCommercial = async (id: string) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce commercial ?')) {
       return;
     }
-    setLoading(true);
-    try {
-      // await deleteCommercial(id);
-      onCommercialUpdate();
-      addToast({ type: 'success', message: 'Commercial supprimé.' });
-    } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : "Échec de la suppression du commercial.",
-      });
-    } finally {
-      setLoading(false);
-    }
+    await remove(id, 'Commercial supprimé.');
   };
 
   const handleUpdateCommercial = async (e: React.FormEvent) => {
@@ -89,49 +115,50 @@ export default function CommerciauxView({
       addToast({ type: 'error', message: "L'ID du commercial est manquant." });
       return;
     }
-    setLoading(true);
-    try {
-      await updateCommercial(currentCommercial.id.toString(), {
-        name: formName, 
-        is_active: formIsActive 
-      });
-      onCommercialUpdate();
+    const result = await update(
+      currentCommercial.id.toString(),
+      { name: formName, is_active: formIsActive },
+      'Commercial mis à jour.',
+    );
+    if (result.ok) {
       handleCloseEditModal();
-      addToast({ type: 'success', message: 'Commercial mis a jour.' });
-    } catch (err) {
-      addToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : "Échec de la mise à jour du commercial.",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleOpenAddModal = () => {
     setFormName('');
+    setFormEmail('');
+    setFormPassword('');
+    setFormPosteId(null);
     setFormIsActive(true);
+    clearStatus();
     setShowAddModal(true);
   };
 
-  const handleCloseAddModal = () => {
+  const closeAddModal = () => {
     setShowAddModal(false);
+    clearStatus();
   };
 
   const handleOpenEditModal = (commercial: PerformanceCommercial) => {
     setCurrentCommercial(commercial);
     setFormName(commercial.name);
+    setFormEmail(commercial.email);
+    setFormPassword('');
+    setFormPosteId(commercial?.poste_id || null);
     setFormIsActive(true);
     setShowEditModal(true);
+    clearStatus();
   };
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setCurrentCommercial(null);
+    clearStatus()
   };
 
   // Filtrer les commerciaux par recherche
-  const commerciauxFiltres = commerciaux.filter(commercial => 
+  const commerciauxFiltres = commerciaux.filter(commercial =>
     commercial.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     commercial.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     commercial.poste_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -142,7 +169,7 @@ export default function CommerciauxView({
     total: commerciaux.length,
     connectes: commerciaux.filter(c => c.isConnected).length,
     actifs: commerciaux.filter(c => c.nbChatsActifs > 0).length,
-    tauxReponseGlobal: commerciaux.length > 0 
+    tauxReponseGlobal: commerciaux.length > 0
       ? Math.round(commerciaux.reduce((sum, c) => sum + c.tauxReponse, 0) / commerciaux.length)
       : 0,
   };
@@ -226,7 +253,7 @@ export default function CommerciauxView({
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button 
+          <button
             onClick={handleOpenAddModal}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
@@ -281,11 +308,10 @@ export default function CommerciauxView({
 
                     {/* Statut */}
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        commercial.isConnected 
-                          ? 'bg-green-100 text-green-800' 
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.isConnected
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
-                      }`}>
+                        }`}>
                         {commercial.isConnected ? 'En ligne' : 'Hors ligne'}
                       </span>
                     </td>
@@ -324,9 +350,8 @@ export default function CommerciauxView({
                     {/* Taux de réponse */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          getPerformanceBadge(commercial.tauxReponse)
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(commercial.tauxReponse)
+                          }`}>
                           {commercial.tauxReponse}%
                         </span>
                         <span className="text-xs text-gray-500">
@@ -407,9 +432,8 @@ export default function CommerciauxView({
                 </div>
               </div>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-              selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-            }`}>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+              }`}>
               {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
             </span>
           </div>
@@ -487,47 +511,122 @@ export default function CommerciauxView({
       )}
 
       {/* Modal d'edition */}
-      {showEditModal && currentCommercial && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Modifier le commercial
-            </h3>
-            <form onSubmit={handleUpdateCommercial}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom
-                </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseEditModal}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                  disabled={loading}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  disabled={loading}
-                >
-                  {loading ? 'Enregistrement...' : 'Enregistrer'}
-                </button>
-              </div>
-            </form>
-          </div>
+      <EntityFormModal
+        isOpen={showAddModal}
+        title="Ajouter un commercial"
+        onClose={closeAddModal}
+        onSubmit={handleAdd}
+        loading={loading}
+        submitLabel="Ajouter"
+        loadingLabel="Adding..."
+      >
+        <div className="mb-4">
+          <label htmlFor="name" className="mb-2 block text-sm font-bold text-gray-700">
+            Nom
+          </label>
+          <input
+            type="text"
+            id="name"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
+            required
+          />
         </div>
-      )}
+        <div className="mb-4">
+          <label htmlFor="code" className="mb-2 block text-sm font-bold text-gray-700">
+            email
+          </label>
+          <input
+            type="text"
+            id="email"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formEmail}
+            onChange={(e) => setFormEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="password" className="mb-2 block text-sm font-bold text-gray-700">
+            Mot de passe
+          </label>
+          <input
+            type="password"
+            id="password"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formPassword}
+            onChange={(e) => setFormPassword(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="postId" className="mb-2 block text-sm font-bold text-gray-700">
+            Poste
+          </label>
+          <select
+            id="postId"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={formPosteId ?? ''}
+            onChange={(e) => setFormPosteId(e.target.value || null)}
+          >
+            <option value="">— Aucun poste —</option>
+            {postes.map((poste) => (
+              <option key={poste.id} value={poste.id}>
+                {poste.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </EntityFormModal>
+
+      <EntityFormModal
+        isOpen={showEditModal && !!currentCommercial}
+        title="Modifier le commercial"
+        onClose={handleCloseEditModal}
+        onSubmit={handleUpdateCommercial}
+        loading={loading}
+        submitLabel="Sauvegarder"
+        loadingLabel="Saving..."
+      >
+        <div className="mb-4">
+          <label htmlFor="edit-name" className="mb-2 block text-sm font-bold text-gray-700">
+            Nom
+          </label>
+          <input
+            type="text"
+            id="edit-name"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-code" className="mb-2 block text-sm font-bold text-gray-700">
+            Code
+          </label>
+          <input
+            type="text"
+            id="edit-email"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formEmail}
+            onChange={(e) => setFormEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="edit-is_active"
+            className="leading-tight"
+            checked={formIsActive}
+            onChange={(e) => setFormIsActive(e.target.checked)}
+          />
+          <label htmlFor="edit-is_active" className="text-sm font-bold text-gray-700">
+            Actif
+          </label>
+        </div>
+      </EntityFormModal>
     </div>
   );
 }

@@ -152,6 +152,7 @@ export default function AdminDashboard() {
                 return (
                     <CommerciauxView
                         commerciaux={performanceCommercial}
+                        postes={postes}
                         onCommercialUpdate={fetchData}
                         onRefresh={fetchData}
                     />

@@ -29,7 +29,7 @@ export function EntityFormModal({
   return (
     <div className="fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-gray-600 bg-opacity-50">
       <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
-        <h3 className="mb-4 text-lg font-semibold">{title}</h3>
+        <h3 className="mb-4 text-lg font-semibold text-gray-900">{title}</h3>
         <form onSubmit={onSubmit}>
           {children}
           <div className="mt-6 flex justify-end gap-2">

@@ -38,7 +38,9 @@
       "Bash(git commit:*)",
       "WebFetch(domain:www.chatarchitect.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:www.postman.com)"
+      "WebFetch(domain:www.postman.com)",
+      "Bash(head:*)",
+      "Bash(grep:*)"
     ]
   }
 }
