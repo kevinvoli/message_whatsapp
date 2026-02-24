@@ -238,7 +238,7 @@ export class MetriquesService {
 
     const commerciauxConnectes = await this.commercialRepository.count({
       where: {
-        deleted_at: IsNull(),
+        deletedAt: IsNull(),
         isConnected: true,
       },
     });

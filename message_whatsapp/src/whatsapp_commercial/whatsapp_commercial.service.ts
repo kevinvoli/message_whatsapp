@@ -178,7 +178,7 @@ export class WhatsappCommercialService {
   async getCommercialsDashboard(): Promise<CommercialDashboardDto[]> {
     // Charger les commerciaux avec leur poste uniquement (sans chats ni messages)
     const users = await this.whatsappCommercialRepository.find({
-      relations: [‘poste’],
+      relations: ['poste'],
     });
 
     const posteIds = users.map((u) => u.poste?.id).filter(Boolean) as string[];
@@ -187,18 +187,18 @@ export class WhatsappCommercialService {
     const msgCounts: { poste_id: string; sent: string; received: string }[] =
       posteIds.length > 0
         ? await this.messageRepository
-            .createQueryBuilder(‘m’)
-            .select(‘m.poste_id’, ‘poste_id’)
+            .createQueryBuilder('m')
+            .select('m.poste_id', 'poste_id')
             .addSelect(
               `SUM(CASE WHEN m.from_me = 1 THEN 1 ELSE 0 END)`,
-              ‘sent’,
+              'sent',
             )
             .addSelect(
               `SUM(CASE WHEN m.from_me = 0 THEN 1 ELSE 0 END)`,
-              ‘received’,
+              'received',
             )
-            .where(‘m.poste_id IN (:...posteIds)’, { posteIds })
-            .groupBy(‘m.poste_id’)
+            .where('m.poste_id IN (:...posteIds)', { posteIds })
+            .groupBy('m.poste_id')
             .getRawMany()
         : [];
 
@@ -218,22 +218,22 @@ export class WhatsappCommercialService {
     }[] =
       posteIds.length > 0
         ? await this.chatRepository
-            .createQueryBuilder(‘c’)
-            .select(‘c.poste_id’, ‘poste_id’)
+            .createQueryBuilder('c')
+            .select('c.poste_id', 'poste_id')
             .addSelect(
-              `SUM(CASE WHEN c.status = ‘${WhatsappChatStatus.ACTIF}’ THEN 1 ELSE 0 END)`,
-              ‘actif’,
+              `SUM(CASE WHEN c.status = '${WhatsappChatStatus.ACTIF}' THEN 1 ELSE 0 END)`,
+              'actif',
             )
             .addSelect(
-              `SUM(CASE WHEN c.status = ‘${WhatsappChatStatus.EN_ATTENTE}’ THEN 1 ELSE 0 END)`,
-              ‘en_attente’,
+              `SUM(CASE WHEN c.status = '${WhatsappChatStatus.EN_ATTENTE}' THEN 1 ELSE 0 END)`,
+              'en_attente',
             )
             .addSelect(
               `SUM(CASE WHEN DATE(c.createdAt) = CURDATE() THEN 1 ELSE 0 END)`,
-              ‘today’,
+              'today',
             )
-            .where(‘c.poste_id IN (:...posteIds)’, { posteIds })
-            .groupBy(‘c.poste_id’)
+            .where('c.poste_id IN (:...posteIds)', { posteIds })
+            .groupBy('c.poste_id')
             .getRawMany()
         : [];
 
@@ -259,18 +259,18 @@ export class WhatsappCommercialService {
         id: user.id,
         name: user.name,
         avatar: user.name.charAt(0).toUpperCase(),
-        status: user.isConnected ? ‘online’ : ‘offline’,
+        status: user.isConnected ? 'online' : 'offline',
         email: user.email,
-        region: user.poste?.name || ‘N/A’,
+        region: user.poste?.name || 'N/A',
         dernierLogin: user.lastConnectionAt
-          ? new Date(user.lastConnectionAt).toLocaleString(‘fr-FR’, {
-              day: ‘2-digit’,
-              month: ‘short’,
-              year: ‘numeric’,
-              hour: ‘2-digit’,
-              minute: ‘2-digit’,
+          ? new Date(user.lastConnectionAt).toLocaleString('fr-FR', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
             })
-          : ‘N/A’,
+          : 'N/A',
         messagesEnvoyes: msg.sent,
         messagesRecus: msg.received,
         conversationsActives: chat.actif,
