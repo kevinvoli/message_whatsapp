@@ -223,6 +223,13 @@ export class WhatsappMessageController {
     return res.send(downloaded.buffer);
   }
 
+  @Get(':chat_id/count')
+  @UseGuards(AdminGuard)
+  async countByChatId(@Param('chat_id') chat_id: string) {
+    const count = await this.messageService.countBychat_id(chat_id);
+    return { count };
+  }
+
   @Get(':chat_id')
   @UseGuards(AdminGuard)
   async findByChatId(@Param('chat_id') chat_id: string) {

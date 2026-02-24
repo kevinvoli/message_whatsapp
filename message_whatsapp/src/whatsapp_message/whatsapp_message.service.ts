@@ -512,6 +512,10 @@ export class WhatsappMessageService {
     this.logger.debug(`Incoming messages marked as read for chat ${chat_id}`);
   }
 
+  async countBychat_id(chat_id: string): Promise<number> {
+    return this.messageRepository.count({ where: { chat_id } });
+  }
+
   async countUnreadMessages(chat_id: string): Promise<number> {
     try {
       const count = await this.messageRepository.count({

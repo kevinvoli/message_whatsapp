@@ -14,7 +14,7 @@ export class AuthAdminService extends BaseAuthService<AuthAdminUser, Admin> {
     private readonly adminService: AdminService,
     jwtService: JwtService,
   ) {
-    super(jwtService, { accessTokenExpiry: '15m', refreshTokenExpiry: '7d' });
+    super(jwtService, { accessTokenExpiry: '24h', refreshTokenExpiry: '7d' });
   }
 
   protected getUserService(): UserLookupService<Admin> {

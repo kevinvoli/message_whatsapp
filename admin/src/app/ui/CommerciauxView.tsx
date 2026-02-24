@@ -1,7 +1,7 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, getOverviewMetriques, getPostes, updateCommercial } from '@/app/lib/api';
+import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
@@ -39,20 +39,24 @@ export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
   });
 
   const loading = crudLoading || dataLoading;
+  const { addToast } = useToast();
 
   const fetchData = useCallback(async () => {
     setDataLoading(true);
     try {
-      const [overview, postesData] = await Promise.all([
-        getOverviewMetriques(),
+      const [commerciauxData, postesData] = await Promise.all([
+        getPerformanceCommerciaux(),
         getPostes(),
       ]);
-      setCommerciaux(overview.performanceCommercial);
+      setCommerciaux(commerciauxData);
       setPostes(postesData);
+    } catch (err) {
+      logger.error('Erreur chargement commerciaux', { error: err instanceof Error ? err.message : String(err) });
+      addToast({ type: 'error', message: 'Impossible de charger les commerciaux.' });
     } finally {
       setDataLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   refreshRef.current = fetchData;
 
@@ -70,7 +74,6 @@ export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
-  const { addToast } = useToast();
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
 
   // Fonction pour obtenir la couleur du statut
@@ -308,7 +311,19 @@ export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {commerciauxFiltres.length === 0 ? (
+              {dataLoading ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-sm">Chargement des commerciaux...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : commerciauxFiltres.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}

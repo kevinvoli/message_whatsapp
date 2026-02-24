@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search } from 'lucide-react';
-import { getMessagesForChat, sendMessage, getChats } from '@/app/lib/api';
+import { getMessagesForChat, getMessageCount, sendMessage, getChats } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText } from '../lib/utils';
@@ -23,6 +23,7 @@ export default function ConversationsView({ onRefresh }: ConversationsViewProps)
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedChat, setSelectedChat] = useState<WhatsappChat | null>(null);
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
+    const messageCountRef = useRef<number>(0);
     const [messageInput, setMessageInput] = useState('');
     const [loadingChats, setLoadingChats] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
@@ -47,9 +48,11 @@ export default function ConversationsView({ onRefresh }: ConversationsViewProps)
 
     useEffect(() => {
         if (selectedChat) {
+            messageCountRef.current = 0;
             fetchMessages(selectedChat.chat_id);
             setActiveTab('conversation');
         } else {
+            messageCountRef.current = 0;
             setMessages([]);
         }
     }, [selectedChat]);
@@ -172,7 +175,8 @@ export default function ConversationsView({ onRefresh }: ConversationsViewProps)
             loadingToastRef.current = true;
         }
         try {
-            const fetchedMessages = await getMessagesForChat(chatId); // Removed token parameter
+            const fetchedMessages = await getMessagesForChat(chatId);
+            messageCountRef.current = fetchedMessages.length;
             setMessages(fetchedMessages);
         } catch (err) {
             addToast({
@@ -246,19 +250,17 @@ export default function ConversationsView({ onRefresh }: ConversationsViewProps)
         }
     };
 
-    // Silent polling for new messages in the selected chat
+    // Silent polling : on vérifie d'abord le count (requête légère),
+    // et on charge les messages complets seulement si le count a changé.
     const pollMessages = useCallback(async () => {
         if (!selectedChat) return;
         try {
-            const fetched = await getMessagesForChat(selectedChat.chat_id);
-            setMessages(prev => {
-                // Only update if count changed to avoid unnecessary re-renders
-                if (fetched.length !== prev.length) return fetched;
-                const lastFetched = fetched[fetched.length - 1];
-                const lastCurrent = prev[prev.length - 1];
-                if (lastFetched?.id !== lastCurrent?.id) return fetched;
-                return prev;
-            });
+            const count = await getMessageCount(selectedChat.chat_id);
+            if (count !== messageCountRef.current) {
+                const fetched = await getMessagesForChat(selectedChat.chat_id);
+                messageCountRef.current = fetched.length;
+                setMessages(fetched);
+            }
         } catch {
             // Silent fail
         }

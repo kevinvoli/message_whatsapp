@@ -2,13 +2,16 @@
 
 import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot } from './definitions'; // Added WhatsappChat, WhatsappMessage
 import { logger } from './logger';
-import data from '@emoji-mart/data';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
 // Fonction pour gérer les erreurs de fetch
 async function handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
+        // Token expiré ou invalide → redirection immédiate vers la page de connexion
+        if (response.status === 401 && typeof window !== 'undefined') {
+            window.location.replace('/login');
+        }
         let errorMessage: string;
         try {
             // Attempt to parse JSON only if the response has content-type: application/json
@@ -358,6 +361,15 @@ export async function getMessagesForChat(chat_id: string): Promise<WhatsappMessa
         credentials: 'include',
     });
     return handleResponse<WhatsappMessage[]>(response);
+}
+
+export async function getMessageCount(chat_id: string): Promise<number> {
+    const response = await fetch(`${API_BASE_URL}/messages/${chat_id}/count`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    const result = await handleResponse<{ count: number }>(response);
+    return result.count;
 }
 
 function normalizeWhatsappChat(

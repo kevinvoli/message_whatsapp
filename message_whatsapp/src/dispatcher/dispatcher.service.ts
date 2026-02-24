@@ -243,6 +243,25 @@ export class DispatcherService {
       );
       return;
     }
+
+    // Si le poste actuel est le seul dans la queue, un redispatch lui
+    // renverrait la conversation immédiatement — sans aucun bénéfice.
+    // On renouvelle simplement la deadline pour éviter que le job ne
+    // se déclenche en boucle, et on attend qu'un autre poste se connecte.
+    if (chat.poste_id) {
+      const alternatives =
+        await this.queueService.countQueuedPostesExcluding(chat.poste_id);
+      if (alternatives === 0) {
+        this.logger.debug(
+          `Redispatch ignoré (${chat.chat_id}): le poste (${chat.poste_id}) est le seul dans la queue`,
+        );
+        await this.chatRepository.update(chat.id, {
+          first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+        });
+        return;
+      }
+    }
+
     await this.chatRepository.update(chat.id, {
       poste: null,
       poste_id: null,

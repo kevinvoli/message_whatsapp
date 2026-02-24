@@ -5,7 +5,7 @@
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import { QueuePosition } from '../entities/queue-position.entity';
 import { Mutex } from 'async-mutex';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
@@ -354,6 +354,16 @@ export class QueueService implements OnModuleInit {
         active_count: activePostes.length,
         queue_count: queue.length,
       });
+    });
+  }
+
+  /**
+   * Retourne le nombre de postes dans la queue différents du poste exclu.
+   * Utilisé pour savoir s'il existe une alternative avant de redispatcher.
+   */
+  async countQueuedPostesExcluding(excludePosteId: string): Promise<number> {
+    return this.queueRepository.count({
+      where: { poste_id: Not(excludePosteId) },
     });
   }
 
