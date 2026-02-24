@@ -26,11 +26,11 @@ export class Admin {
   @Column({ type: 'varchar', length: 255, select: false, nullable: true })
   salt: string;
 
-  @CreateDateColumn({ type: 'timestamp' })
-  created_at: Date;
+  @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
+  createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamp' })
-  updated_at: Date;
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
+  updatedAt: Date;
 
   @BeforeInsert()
   private async hashPassword() {

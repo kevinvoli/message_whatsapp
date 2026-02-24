@@ -38,7 +38,7 @@ export class DispatchSettingsService implements OnModuleInit {
   async getSettings(): Promise<DispatchSettings> {
     const existing = await this.settingsRepository.findOne({
       where: {},
-      order: { created_at: 'ASC' },
+      order: { createdAt: 'ASC' },
     });
     if (existing) {
       return existing;
@@ -102,7 +102,7 @@ export class DispatchSettingsService implements OnModuleInit {
     const skip = Math.max(0, offset);
     const qb = this.auditRepository
       .createQueryBuilder('audit')
-      .orderBy('audit.created_at', 'DESC')
+      .orderBy('audit.createdAt', 'DESC')
       .skip(skip)
       .take(take);
 
@@ -118,10 +118,10 @@ export class DispatchSettingsService implements OnModuleInit {
       });
     }
     if (from) {
-      qb.andWhere('audit.created_at >= :from', { from });
+      qb.andWhere('audit.createdAt >= :from', { from });
     }
     if (to) {
-      qb.andWhere('audit.created_at <= :to', { to });
+      qb.andWhere('audit.createdAt <= :to', { to });
     }
 
     return qb.getMany();
@@ -141,7 +141,7 @@ export class DispatchSettingsService implements OnModuleInit {
 
     const qb = this.auditRepository
       .createQueryBuilder('audit')
-      .orderBy('audit.created_at', 'DESC')
+      .orderBy('audit.createdAt', 'DESC')
       .skip(skip)
       .take(take);
 
@@ -157,10 +157,10 @@ export class DispatchSettingsService implements OnModuleInit {
       });
     }
     if (from) {
-      qb.andWhere('audit.created_at >= :from', { from });
+      qb.andWhere('audit.createdAt >= :from', { from });
     }
     if (to) {
-      qb.andWhere('audit.created_at <= :to', { to });
+      qb.andWhere('audit.createdAt <= :to', { to });
     }
 
     const [data, total] = await qb.getManyAndCount();
@@ -170,7 +170,7 @@ export class DispatchSettingsService implements OnModuleInit {
   private async ensureDefaults(): Promise<DispatchSettings> {
     const existing = await this.settingsRepository.findOne({
       where: {},
-      order: { created_at: 'ASC' },
+      order: { createdAt: 'ASC' },
     });
     if (existing) return existing;
 

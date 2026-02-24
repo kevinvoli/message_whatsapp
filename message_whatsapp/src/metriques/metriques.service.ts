@@ -233,7 +233,7 @@ export class MetriquesService {
    */
   private async getMetriquesCommerciaux() {
     const commerciauxTotal = await this.commercialRepository.count({
-      where: { deleted_at: IsNull() },
+      where: { deletedAt: IsNull() },
     });
 
     const commerciauxConnectes = await this.commercialRepository.count({
@@ -250,7 +250,7 @@ export class MetriquesService {
       .innerJoin('poste.chats', 'chat', 'chat.status = :status', {
         status: 'actif',
       })
-      .where('commercial.deleted_at IS NULL')
+      .where('commercial.deletedAt IS NULL')
       .andWhere('chat.deletedAt IS NULL')
       .select('COUNT(DISTINCT commercial.id)', 'count')
       .getRawOne();
@@ -403,7 +403,7 @@ export class MetriquesService {
             .andWhere('msg.deletedAt IS NULL'),
         'nbMessagesEnvoyes',
       )
-      .where('commercial.deleted_at IS NULL')
+      .where('commercial.deletedAt IS NULL')
       .groupBy(
         'commercial.id, commercial.name, commercial.email, commercial.isConnected, commercial.lastConnectionAt, poste.name, poste.id',
       )

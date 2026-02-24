@@ -204,7 +204,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
               header: 'Cree le',
               render: (msg) => (
                 <span className="text-sm text-gray-500">
-                  {formatDateShort(msg.created_at || msg.createdAt)}
+                  {formatDateShort(msg.createdAt)}
                 </span>
               ),
             },

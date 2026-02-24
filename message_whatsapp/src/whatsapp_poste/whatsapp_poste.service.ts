@@ -61,7 +61,7 @@ export class WhatsappPosteService {
   async findAll(): Promise<WhatsappPoste[]> {
     try {
       const poste = await this.posteRepository.find({
-        order: { created_at: 'DESC' },
+        order: { createdAt: 'DESC' },
         relations: ['commercial'],
       });
 

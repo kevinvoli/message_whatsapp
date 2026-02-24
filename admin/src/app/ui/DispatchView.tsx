@@ -338,7 +338,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                   return (
                     <tr key={entry.id}>
                       <td className="px-4 py-2 text-gray-500">
-                        {formatDate(entry.created_at)}
+                        {formatDate(entry.createdAt)}
                       </td>
                       <td className="px-4 py-2 text-xs text-gray-600">
                         {payload?.before && payload?.after ? (

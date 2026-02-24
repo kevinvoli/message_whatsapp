@@ -62,7 +62,7 @@ export async function getPostes(): Promise<Poste[]> {
     return handleResponse<Poste[]>(response);
 }
 
-export async function createPoste(poste: Omit<Poste, 'id' | 'created_at' | 'updated_at' | 'messages' | 'commercial' | 'chats'>): Promise<Poste> {
+export async function createPoste(poste: Omit<Poste, 'id' | 'createdAt' | 'updatedAt' | 'messages' | 'commercial' | 'chats'>): Promise<Poste> {
     const response = await fetch(`${API_BASE_URL}/poste`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -173,7 +173,7 @@ export async function getMessageAuto(): Promise<MessageAuto[]> {
     return handleResponse<MessageAuto[]>(response);
 }
 
-export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'created_at' | 'updated_at' | 'conditions' >): Promise<MessageAuto> {
+export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'createdAt' | 'updatedAt' | 'conditions' >): Promise<MessageAuto> {
     const response = await fetch(`${API_BASE_URL}/message-auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -281,7 +281,7 @@ export async function getDispatchSettings(): Promise<DispatchSettings> {
 export async function updateDispatchSettings(
   payload: Partial<DispatchSettings>,
 ): Promise<DispatchSettings> {
-    const { id, created_at, updated_at, ...cleanPayload } = payload as DispatchSettings;
+    const { id, ...cleanPayload } = payload as DispatchSettings & { id?: string };
   
     const response = await fetch(`${API_BASE_URL}/queue/dispatch/settings`, {
         method: 'POST',

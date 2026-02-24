@@ -17,5 +17,5 @@ export class DispatchSettingsAudit {
   payload: string;
 
   @CreateDateColumn({ name: 'created_at' })
-  created_at: Date;
+  createdAt: Date;
 }

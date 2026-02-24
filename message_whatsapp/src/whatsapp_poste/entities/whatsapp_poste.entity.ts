@@ -56,7 +56,7 @@ export class WhatsappPoste {
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP',
   })
-  created_at: Date;
+  createdAt: Date;
 
   @UpdateDateColumn({
     name: 'updated_at',
@@ -64,5 +64,5 @@ export class WhatsappPoste {
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })
-  updated_at: Date;
+  updatedAt: Date;
 }

@@ -89,8 +89,6 @@ export type Poste = {
   code: string;
   is_active: boolean;
   is_queue_enabled?: boolean;
-  created_at?: string;
-  updated_at?: string;
   createdAt?: string;
   updatedAt?: string;
   chats?: WhatsappChat[] | null;
@@ -124,8 +122,6 @@ export type MessageAuto = {
   canal?: 'whatsapp' | 'sms' | 'email' | null;
   position: number;
   actif: boolean;
-  created_at?: string;
-  updated_at?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -267,7 +263,7 @@ export type DispatchSettingsAudit = {
   id: string;
   settings_id: string;
   payload: string;
-  created_at: string;
+  createdAt: string;
 };
 
 // ============================================

@@ -34,8 +34,8 @@ export class DispatchSettings {
   offline_reinject_cron: string;
 
   @CreateDateColumn({ name: 'created_at' })
-  created_at: Date;
+  createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updated_at: Date;
+  updatedAt: Date;
 }

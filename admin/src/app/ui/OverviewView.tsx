@@ -9,6 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
 import { Spinner } from './Spinner';
+import { formatDate } from '@/app/lib/dateUtils';
 
 interface OverviewViewProps {
   onRefresh?: () => void;
@@ -321,14 +322,14 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
             <h3 className="text-lg font-semibold text-gray-900">Webhook SLO</h3>
             {webhookSummary && (
               <p className="text-xs text-gray-500 mt-1">
-                FenÃªtre {webhookSummary.windowMinutes} min â€¢ {new Date(webhookSummary.generatedAt).toLocaleString()}
+                Fenêtre {webhookSummary.windowMinutes} min • {formatDate(webhookSummary.generatedAt)}
               </p>
             )}
           </div>
         </div>
 
         {!webhookSummary && (
-          <div className="text-sm text-gray-500">MÃ©triques webhook indisponibles.</div>
+          <div className="text-sm text-gray-500">Métriques webhook indisponibles.</div>
         )}
 
         {webhookSummary && (

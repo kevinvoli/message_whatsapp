@@ -295,7 +295,7 @@ export default function PostesView({ onRefresh }: PostesViewProps) {
               header: 'Cree le',
               render: (poste) => (
                 <span className="text-sm text-gray-500">
-                  {formatDateShort(poste.created_at || poste.createdAt)}
+                  {formatDateShort(poste.createdAt)}
                 </span>
               ),
             },
