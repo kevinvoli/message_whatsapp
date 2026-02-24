@@ -5,6 +5,7 @@ import LoginForm from '@/components/auth/loginForm';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 export default function LoginPage() {
   const { login, user, initialized, isLoading, error } = useAuth();
@@ -16,7 +17,9 @@ export default function LoginPage() {
       // La redirection se fera automatiquement via l'effet ci-dessous
     } catch (err) {
       // L'erreur est déjà gérée dans le contexte
-      console.error('Login error:', err);
+      logger.error('Login error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 

@@ -31,7 +31,6 @@
 //   })
 //   poste_id: string; //(Service client)
 
-  
 //   @Column({
 //     name: 'description',
 //     type: 'varchar',
@@ -41,7 +40,6 @@
 //   })
 //   description: string;
 
-
 //   @Column({
 //     name: 'description',
 //     type: 'varchar',
@@ -50,7 +48,7 @@
 //     unique: true,
 //   })
 //   is_active: boolean;
-  
+
 //   @CreateDateColumn({
 //     name: 'created_at',
 //     type: 'timestamp',

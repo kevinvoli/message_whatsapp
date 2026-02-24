@@ -1,7 +1,5 @@
-
-
 export class WhapiUser {
-    id: string;
+  id: string;
 
   name: string;
 
@@ -18,12 +16,11 @@ export class WhapiStatus {
   text: string;
 }
 
-
 export class WhapiChannel {
   id: string;
 
   channel_id: string;
- 
+
   token: string;
 
   start_at: number;
@@ -43,8 +40,6 @@ export class WhapiChannel {
   is_business: boolean;
 
   api_version: string;
-  
+
   core_version: string;
 }
-
-

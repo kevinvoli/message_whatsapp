@@ -1,6 +1,7 @@
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessageContent } from 'src/whatsapp_message_content/entities/whatsapp_message_content.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
@@ -33,14 +34,33 @@ export enum WhatsappMessageStatus {
   DELETED = 'deleted',
 }
 
-@Entity()
-@Index('UQ_whatsapp_message_message_id', ['message_id'], { unique: true })
+@Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
+@Index('IDX_whatsapp_message_tenant_id', ['tenant_id'])
+@Index(
+  'UQ_whatsapp_message_tenant_provider_msg_direction',
+  ['tenant_id', 'provider', 'provider_message_id', 'direction'],
+  { unique: true },
+)
 export class WhatsappMessage {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
     comment: 'Primary key - Unique trajet identifier',
   })
   id: string;
+
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenant_id?: string | null;
+
+  @Column({ name: 'provider', type: 'varchar', length: 32, nullable: true })
+  provider?: string | null;
+
+  @Column({
+    name: 'provider_message_id',
+    type: 'varchar',
+    length: 191,
+    nullable: true,
+  })
+  provider_message_id?: string | null;
 
   @Column({
     name: 'message_id',
@@ -74,7 +94,7 @@ export class WhatsappMessage {
   })
   channel_id: string;
 
-   @Column({
+  @Column({
     name: 'type',
     type: 'varchar',
     length: 100,
@@ -83,7 +103,7 @@ export class WhatsappMessage {
   })
   type: string;
 
-   @Column({
+  @Column({
     name: 'poste_id',
     type: 'varchar',
     length: 100,
@@ -111,7 +131,6 @@ export class WhatsappMessage {
     referencedColumnName: 'chat_id',
   })
   chat: WhatsappChat;
- 
 
   @ManyToOne(() => WhatsappPoste, (data) => data.messages, {
     nullable: true,
@@ -129,10 +148,8 @@ export class WhatsappMessage {
   )
   messageCnntent: WhatsappMessageContent[];
 
-
-
-  @Column({ name: 'contact_id', type: 'uuid',nullable:true })
-  contact_id: string |null;
+  @Column({ name: 'contact_id', type: 'uuid', nullable: true })
+  contact_id: string | null;
 
   @ManyToOne(() => Contact, (contact) => contact.messages, {
     nullable: true,
@@ -141,7 +158,7 @@ export class WhatsappMessage {
   @JoinColumn({ name: 'contact_id' })
   contact: Contact | null;
 
-   @OneToMany(() => WhatsappMedia, (media) => media.message)
+  @OneToMany(() => WhatsappMedia, (media) => media.message)
   medias: WhatsappMedia[];
 
   @Column({
@@ -191,8 +208,25 @@ export class WhatsappMessage {
   @Column({ name: 'source', type: 'varchar', length: 100, nullable: false })
   source: string;
 
-    @Column({ name: 'commercial_id', type: 'varchar', length: 100, nullable: false })
+  @Column({ name: 'error_code', type: 'int', nullable: true })
+  error_code?: number | null;
+
+  @Column({ name: 'error_title', type: 'varchar', length: 255, nullable: true })
+  error_title?: string | null;
+
+  @Column({
+    name: 'commercial_id',
+    type: 'uuid',
+    nullable: true,
+  })
   commercial_id?: string | null;
+
+  @ManyToOne(() => WhatsappCommercial, (commercial) => commercial.messages, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'commercial_id', referencedColumnName: 'id' })
+  commercial?: WhatsappCommercial | null;
 
   @CreateDateColumn({
     name: 'createdAt',
@@ -217,12 +251,12 @@ export class WhatsappMessage {
     nullable: true,
     comment: 'Timestamp when the trajet was deleted',
   })
-  deletedAt: Date | null;
+  deletedAt?: Date | null;
 
-  @BeforeInsert()
-  clearContactForAgentMessage() {
-    if (this.from_me) {
-      this.contact = null;
-    }
-  }
+  // @BeforeInsert()
+  // clearContactForAgentMessage() {
+  //   if (this.from_me) {
+  //     this.contact = null;
+  //   }
+  // }
 }

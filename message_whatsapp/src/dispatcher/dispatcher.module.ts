@@ -2,49 +2,70 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DispatcherService } from './dispatcher.service';
 import { QueueService } from './services/queue.service';
-import { PendingMessage } from './entities/pending-message.entity';
 import { QueuePosition } from './entities/queue-position.entity';
+import { DispatchSettings } from './entities/dispatch-settings.entity';
+import { DispatchSettingsAudit } from './entities/dispatch-settings-audit.entity';
 import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
+import { LoggingModule } from 'src/logging/logging.module';
+import { DispatcherController } from './dispatcher.controller';
+import { OfflineReinjectionJob } from 'src/jorbs/offline-reinjection.job';
+import { DispatchSettingsService } from './services/dispatch-settings.service';
+import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { CallLogModule } from 'src/call-log/call_log.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      PendingMessage,
       QueuePosition,
+      DispatchSettings,
+      DispatchSettingsAudit,
       WhatsappMessage,
       WhatsappChat,
       WhatsappCommercial,
       WhapiChannel,
+      ProviderChannel,
       Contact,
       WhatsappPoste,
+      WhatsappMedia,
     ]),
     forwardRef(() => WhatsappMessageModule),
+    LoggingModule,
+    CallLogModule,
   ],
-  controllers: [],
+  controllers: [DispatcherController],
   providers: [
     DispatcherService,
     QueueService,
     WhatsappMessageService,
     WhatsappChatService,
     CommunicationWhapiService,
+    CommunicationMetaService,
+    OutboundRouterService,
     WhatsappCommercialService,
     ChannelService,
     ContactService,
     WhatsappPosteService,
+    OfflineReinjectionJob,
+    ReadOnlyEnforcementJob,
+    DispatchSettingsService,
   ],
-  exports: [DispatcherService, QueueService],
+  exports: [DispatcherService, QueueService, DispatchSettingsService],
 })
 export class DispatcherModule {}

@@ -12,7 +12,6 @@ import { WhatsappMediaModule } from './whatsapp_media/whatsapp_media.module';
 import { WhatsappButtonModule } from './whatsapp_button/whatsapp_button.module';
 import { WhatsappLastMessageModule } from './whatsapp_last_message/whatsapp_last_message.module';
 import { WhapiModule } from './whapi/whapi.module';
-// import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
 
@@ -22,26 +21,73 @@ import { CommunicationWhapiModule } from './communication_whapi/communication_wh
 import { AuthModule } from './auth/auth.module';
 import { JorbsModule } from './jorbs/jorbs.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { TasksService } from './jorbs/tasks.service';
 import { ChannelModule } from './channel/channel.module';
 import { ContactModule } from './contact/contact.module';
 import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
 import { MessageAutoModule } from './message-auto/message-auto.module';
+import { AdminModule } from './admin/admin.module';
+import { Admin } from './admin/entities/admin.entity';
+import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity'; // Added import
+import { WhapiChannel } from './channel/entities/channel.entity'; // Added import
+import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity'; // Added import
+import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added import
+import { MetriquesModule } from './metriques/metriques.module';
+import { LoggingModule } from './logging/logging.module';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([
+      WhatsappCommercial,
+      WhapiChannel,
+      WhatsappChat,
+      Admin,
+    ]),
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
         MYSQL_HOST: Joi.string().required(),
         MYSQL_PORT: Joi.number().required(),
         MYSQL_USER: Joi.string().required(),
         MYSQL_PASSWORD: Joi.string().allow('').required(),
         MYSQL_DATABASE: Joi.string().required(),
         SERVER_PORT: Joi.number().required(),
-      }),
+        TYPEORM_SYNCHRONIZE: Joi.string()
+          .valid('true', 'false')
+          .default('false'),
+        LOG_LEVEL: Joi.string()
+          .valid('error', 'warn', 'log', 'debug', 'verbose', 'info')
+          .default('info'),
+        WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().allow('').optional(),
+        WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().allow('').optional(),
+        WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
+        WHATSAPP_APP_SECRET: Joi.string().allow('').optional(),
+        WHATSAPP_APP_SECRET_PREVIOUS: Joi.string().allow('').optional(),
+        FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
+        FF_SHADOW_UNIFIED: Joi.string().optional(),
+        MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number()
+          .min(1)
+          .max(240)
+          .default(24),
+        ADMIN_NAME: Joi.string().optional(),
+        ADMIN_EMAIL: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().email().required(),
+          otherwise: Joi.string().email().optional(),
+        }),
+        ADMIN_PASSWORD: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().min(12).required(),
+          otherwise: Joi.string().min(8).optional(),
+        }),
+      }).and('WHAPI_WEBHOOK_SECRET_HEADER', 'WHAPI_WEBHOOK_SECRET_VALUE'),
     }),
     DatabaseModule,
+    AdminModule, // Import AdminModule
     WhatsappErrorModule,
     WhatsappChatModule,
     WhatsappChatLabelModule,
@@ -56,11 +102,14 @@ import { MessageAutoModule } from './message-auto/message-auto.module';
     DispatcherModule,
     CommunicationWhapiModule,
     AuthModule,
+    AuthAdminModule,
     JorbsModule,
     ChannelModule,
     ContactModule,
     WhatsappPosteModule,
     MessageAutoModule,
+    MetriquesModule,
+    LoggingModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

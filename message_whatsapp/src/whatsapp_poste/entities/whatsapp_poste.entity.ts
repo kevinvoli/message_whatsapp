@@ -26,9 +26,12 @@ export class WhatsappPoste {
     unique: true,
   })
   code: string;
- 
+
   @Column({ default: true })
   is_active: boolean;
+
+  @Column({ default: true })
+  is_queue_enabled: boolean;
 
   @Column({
     name: 'name',
@@ -40,20 +43,20 @@ export class WhatsappPoste {
   name: string; //(Service client)
 
   @OneToMany(() => WhatsappChat, (chat) => chat.poste)
-  chats: WhatsappChat[];
+  chats?: WhatsappChat[] | null;
 
   @OneToMany(() => WhatsappMessage, (message) => message.poste)
-  messages: WhatsappMessage[];
+  messages?: WhatsappMessage[] | null;
 
-   @OneToMany(() => WhatsappCommercial, (message) => message.poste)
-  commercial: WhatsappCommercial[];
- 
+  @OneToMany(() => WhatsappCommercial, (commercial) => commercial.poste)
+  commercial?: WhatsappCommercial[] | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP',
   })
-  created_at: Date;
+  createdAt: Date;
 
   @UpdateDateColumn({
     name: 'updated_at',
@@ -61,5 +64,5 @@ export class WhatsappPoste {
     default: () => 'CURRENT_TIMESTAMP',
     onUpdate: 'CURRENT_TIMESTAMP',
   })
-  updated_at: Date;
+  updatedAt: Date;
 }

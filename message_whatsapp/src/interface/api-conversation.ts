@@ -1,9 +1,9 @@
-import { ApiMedia } from "./api-media";
-import { ApiMessage } from "./api-message";
+import { ApiMedia } from './api-media';
+import { ApiMessage } from './api-message';
 
 export interface ApiConversation {
-  id: string;           // WhatsappChat.id
-  chat_id: string;      // WhatsappChat.chat_id
+  id: string; // WhatsappChat.id
+  chat_id: string; // WhatsappChat.chat_id
 
   poste_id?: string | null;
   poste?: {
@@ -15,11 +15,11 @@ export interface ApiConversation {
   name: string;
   client_phone: string;
 
-  status: "actif" | "en attente" | "fermé";
+  status: 'actif' | 'en attente' | 'fermé';
 
   unread_count: number;
 
-  last_message?: ApiMessage | "[Media]" | null;
+  last_message?: ApiMessage | '[Media]' | null;
   messages?: ApiMessage[];
   medias?: ApiMedia[];
 

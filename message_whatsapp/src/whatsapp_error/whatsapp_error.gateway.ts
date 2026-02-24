@@ -1,8 +1,11 @@
 import { WhatsappErrorService } from './whatsapp_error.service';
 import { CreateWhatsappErrorDto } from './dto/create-whatsapp_error.dto';
 import { UpdateWhatsappErrorDto } from './dto/update-whatsapp_error.dto';
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
-
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 
 @WebSocketGateway({
   cors: { origin: '*' },

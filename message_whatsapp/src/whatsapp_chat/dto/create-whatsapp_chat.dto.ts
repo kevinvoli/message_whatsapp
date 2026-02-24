@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsEnum, IsBoolean, IsNumber, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  IsNumber,
+  IsDateString,
+} from 'class-validator';
 import { WhatsappChatStatus } from '../entities/whatsapp_chat.entity';
 
 export class CreateWhatsappChatDto {

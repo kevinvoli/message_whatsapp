@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { WhatsappPosteService } from './whatsapp_poste.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('WhatsappPosteService', () => {
   let service: WhatsappPosteService;
@@ -7,7 +8,9 @@ describe('WhatsappPosteService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [WhatsappPosteService],
-    }).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     service = module.get<WhatsappPosteService>(WhatsappPosteService);
   });

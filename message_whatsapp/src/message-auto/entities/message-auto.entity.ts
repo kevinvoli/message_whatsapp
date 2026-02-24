@@ -6,7 +6,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  
 } from 'typeorm';
 
 export enum AutoMessageChannel {
@@ -15,43 +14,49 @@ export enum AutoMessageChannel {
   EMAIL = 'email',
 }
 
-@Entity('messages_predefinis')
+@Entity({ name: 'messages_predefinis', engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
 export class MessageAuto {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-  
+
   @Column({ type: 'text', nullable: false })
   body: string;
 
-  @Column({ type: 'int', default: 0 ,nullable:true})
-  delai?: number |null;
- 
+  @Column({ type: 'int', default: 0, nullable: true })
+  delai?: number | null;
+
   @Column({
     type: 'enum',
     enum: AutoMessageChannel,
     default: AutoMessageChannel.WHATSAPP,
-    nullable:true
+    nullable: true,
   })
-  canal?: AutoMessageChannel| null;
+  canal?: AutoMessageChannel | null;
 
-  @Column({ type: 'int' ,nullable:false })
-  position: number ;
- 
+  @Column({ type: 'int', nullable: false })
+  position: number;
+
   @Column({ type: 'boolean', default: true })
   actif: boolean;
 
-
-  @Column({ type: 'json', nullable: true })
+  @Column({
+    type: 'longtext',
+    nullable: true,
+    transformer: {
+      to: (value) => (value ? JSON.stringify(value) : null),
+      from: (value) => (value ? JSON.parse(value) : null),
+    },
+  })
   conditions?: {
     poste_id?: string;
     channel_id?: string;
     client_type?: string;
     [key: string]: any;
-  }| null;
+  } | null;
 
-  @CreateDateColumn()
-  created_at: Date;
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
 
-  @UpdateDateColumn()
-  updated_at: Date;
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }

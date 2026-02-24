@@ -1,0 +1,64 @@
+groups:
+  - name: webhook-slo
+    rules:
+      - alert: WebhookErrorRateHigh
+        expr: |
+          sum by (provider, tenant) (rate(webhook_error_total[15m]))
+          /
+          sum by (provider, tenant) (rate(webhook_received_total[15m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook error rate > 1% ({{ $labels.provider }}/{{ $labels.tenant }})"
+          description: "Error rate > 1% over 15m window."
+
+      - alert: WebhookErrorRateCritical
+        expr: |
+          sum by (provider, tenant) (rate(webhook_error_total[15m]))
+          /
+          sum by (provider, tenant) (rate(webhook_received_total[15m]))
+          > 0.03
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Webhook error rate > 3% ({{ $labels.provider }}/{{ $labels.tenant }})"
+          description: "Critical error rate > 3% over 15m window."
+
+      - alert: WebhookLatencyP95High
+        expr: webhook_latency_p95_ms > 400
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook p95 latency > 400ms ({{ $labels.provider }})"
+          description: "p95 latency over SLO."
+
+      - alert: WebhookLatencyP99High
+        expr: webhook_latency_p99_ms > 900
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook p99 latency > 900ms ({{ $labels.provider }})"
+          description: "p99 latency over SLO."
+
+      - alert: WebhookSignatureInvalidSpike
+        expr: sum by (provider) (rate(webhook_signature_invalid_total[5m])) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Invalid signature spike ({{ $labels.provider }})"
+          description: "Invalid signatures rate > 1/sec."
+
+      - alert: TenantResolutionFailed
+        expr: sum by (provider) (rate(tenant_resolution_failed_total[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tenant resolution failures ({{ $labels.provider }})"
+          description: "Tenant resolution should be 0 in steady state."

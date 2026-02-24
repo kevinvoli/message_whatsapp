@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { WhapiController } from './whapi.controller';
 import { WhapiService } from './whapi.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('WhapiController', () => {
   let controller: WhapiController;
@@ -9,7 +10,9 @@ describe('WhapiController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WhapiController],
       providers: [WhapiService],
-    }).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     controller = module.get<WhapiController>(WhapiController);
   });

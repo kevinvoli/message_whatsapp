@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
+import { WhatsappChatController } from './whatsapp_chat.controller';
 import { WhatsappChatGateway } from './whatsapp_chat.gateway';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
@@ -10,12 +11,26 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { QueueService } from 'src/dispatcher/services/queue.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
-    WhatsappChat,WhatsappChatLabel,   WhatsappCommercial, QueuePosition,
-    WhatsappPoste
-      ])],
-  providers: [WhatsappChatGateway, WhatsappChatService, WhatsappPosteService ,WhatsappCommercialService,QueueService],
+  imports: [
+    TypeOrmModule.forFeature([
+      WhatsappChat,
+      WhatsappChatLabel,
+      WhatsappCommercial,
+      QueuePosition,
+      WhatsappPoste,
+      WhatsappMessage,
+    ]),
+  ],
+  controllers: [WhatsappChatController],
+  providers: [
+    WhatsappChatGateway,
+    WhatsappChatService,
+    WhatsappPosteService,
+    WhatsappCommercialService,
+    QueueService,
+  ],
 })
 export class WhatsappChatModule {}

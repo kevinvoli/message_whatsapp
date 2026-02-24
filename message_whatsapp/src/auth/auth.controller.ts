@@ -1,24 +1,70 @@
-
-import { Controller, Post, Body, UseGuards, Request, Get, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Get,
+  UnauthorizedException,
+  Res,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto } from './shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-async login(@Body() loginDto: LoginDto) {
-  const user = await this.authService.validateUser(
-    loginDto.email,
-    loginDto.password,
-  );
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = await this.authService.validate(
+      loginDto.email,
+      loginDto.password,
+    );
 
-  if (!user) {
-    throw new UnauthorizedException('Invalid credentials');
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const { accessToken, refreshToken } = this.authService.login(user);
+
+    res.cookie('Authentication', accessToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    res.cookie('Refresh', refreshToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    return { user };
   }
 
-  return this.authService.login(user);
-}
+  @UseGuards(AuthGuard('jwt'))
+  @Get('profile')
+  async getProfile(@Request() req) {
+    const user = await this.authService.getProfile(req.user.userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
+
+  @Post('logout')
+  @UseGuards(AuthGuard('jwt'))
+  async logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('Authentication');
+    res.clearCookie('Refresh');
+    return { message: 'Successfully logged out' };
+  }
 }

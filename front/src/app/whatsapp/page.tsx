@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -10,26 +10,40 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useRouter } from 'next/navigation';
-import { Conversation } from '@/types/chat';
+import { CallStatus, Conversation, ViewMode } from '@/types/chat';
+import { useStatsStore } from '@/store/stats.store';
+import ChatMainArea from '@/components/chat/ChatMainArea';
+import { useContactStore } from '@/store/contactStore';
+import { ContactDetailView } from '@/components/contacts/ContactDetailView';
+import { logger } from '@/lib/logger';
 
 const WhatsAppPage = () => {
-  const { user, initialized, logout } = useAuth();
+  const { user, initialized } = useAuth();
   const router = useRouter();
+  const { contacts, setContacts } = useContactStore();
   const {
     conversations,
     selectedConversation,
-    messages,
-    isLoading,
-    error,
     selectConversation,
-    sendMessage,
-    onTypingStart,
-    onTypingStop,
-    loadConversations,
+
+    // messages,
+    // isLoading,
+    // error,
+    // sendMessage,
+    // onTypingStart,
+    // onTypingStop,
+    // loadConversations,
+
   } = useChatStore();
+  
   const { isConnected: isWebSocketConnected } = useSocket();
+  const { stats } = useStatsStore();
 
+  const [showStats, setShowStats] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
 
+   const [viewMode, setViewMode] = useState<ViewMode>('conversations');
+    const [searchQuery, setSearchQuery] = useState('');
 
   // Protection de route
   useEffect(() => {
@@ -40,21 +54,51 @@ const WhatsAppPage = () => {
 
   // Gérer la sélection d'une conversation
   const handleSelectConversation = useCallback((conversation: Conversation) => {
-    console.log("🎯 Sélection de la conversation:", conversation.clientName);
+    logger.debug('Conversation selected', {
+      chat_id: conversation.chat_id,
+    });
     selectConversation(conversation.chat_id);
   }, [selectConversation]);
 
   // Envoyer un message
-  const handleSendMessage = useCallback(async (text: string) => {
 
-    if (!selectedConversation) {
-      console.error('❌ Impossible d\'envoyer: aucune conversation sélectionnée');
-      return;
-    }
-    console.log("conversation selectionne", selectedConversation);
+  
+  const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
+  const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
-    sendMessage(text);
-  }, [selectedConversation, sendMessage]);
+  const filteredConversations = conversations.filter(conv => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'unread') return conv.unreadCount > 0;
+    if (filterStatus === 'nouveau') return conv.status === 'nouveau';
+    if (filterStatus === 'urgent') return conv.priority === 'haute';
+    return true;
+  });
+
+  const filteredSercheConversation = conversations.filter((conv) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            conv.clientName.toLowerCase().includes(query) ||
+            conv.clientPhone.includes(query) ||
+            conv.lastMessage?.text.toLowerCase().includes(query)
+        );
+    });
+
+    // Filtrage des contacts basé sur la recherche
+    const filteredContacts = contacts.filter((contact) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+            contact.name.toLowerCase().includes(query) ||
+            contact.contact.includes(query) ||
+            contact.call_notes?.toLowerCase().includes(query)
+        );
+    });
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode);
+        setSearchQuery(''); // Réinitialiser la recherche lors du changement de vue
+    };
 
   if (!initialized || !user) {
     return (
@@ -66,62 +110,31 @@ const WhatsAppPage = () => {
 
   return (
     <div className="flex h-screen bg-gray-100">
+
       <Sidebar
         commercial={user}
-        conversations={conversations}
+        conversations={filteredConversations}
         searchTerm=""
         selectedConversation={selectedConversation}
         isConnected={isWebSocketConnected}
-        onSearchChange={() => { }}
         onSelectConversation={handleSelectConversation}
-        onLogout={logout}
+
+        setFilterStatus={setFilterStatus}
+        stats={stats}
+        filterStatus={filterStatus}
+        totalUnread={totalUnread}
+        setShowStats={setShowStats}
+        showStats={showStats}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        contacts={contacts}
+
       />
+      {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />}
 
-      <div className="flex-1 flex flex-col">
-        {selectedConversation ? (
-          <>
-            <ChatHeader conversation={selectedConversation} />
-
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                  <p className="text-gray-500">Chargement...</p>
-                </div>
-              </div>
-            ) : (
-              <ChatMessages messages={messages} />
-            )}
-
-            <ChatInput
-              chat_id={selectedConversation.chat_id}
-              onSendMessage={sendMessage}
-              onTypingStart={onTypingStart}
-              onTypingStop={onTypingStop}
-              isConnected={isWebSocketConnected}
-            />
-
-
-            {/* Affiche une erreur s'il y en a une */}*
-            {error && (
-              <div className="bg-red-100 border-t border-red-200 p-2 text-center">
-                <p className="text-red-700 text-sm">{error}</p>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <div className="text-center">
-              <Phone className="w-20 h-20 mx-auto mb-4 opacity-50" />
-              <p className="text-xl font-semibold">
-                {conversations.length === 0
-                  ? 'Aucune conversation disponible'
-                  : 'Sélectionnez une conversation'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      
     </div>
   );
 };

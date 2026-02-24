@@ -1,244 +1,268 @@
-// src/components/WebSocketEvents.tsx
 'use client';
 
 import { useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthProvider';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useChatStore } from '@/store/chatStore';
-import { useAuth } from '@/contexts/AuthProvider';
-import { Conversation, Message, transformToConversation, transformToMessage } from '@/types/chat';
-
+import { useContactStore } from '@/store/contactStore';
+import { logger } from '@/lib/logger';
+import {
+  Contact,
+  Conversation,
+  Message,
+  transformToContact,
+  transformToConversation,
+  transformToMessage,
+  transformToCallLog,
+} from '@/types/chat';
 
 const WebSocketEvents = () => {
   const { socket } = useSocket();
-  const {
-    setSocket,
-    setConversations,
-    setMessages,
-    addMessage,
-    updateConversation,
-    removeConversationBychat_id,
-    addConversation,
-    loadConversations,
-
-    updateMessageStatus,
-    setTyping,
-    clearTyping,
-  } = useChatStore();
   const { user } = useAuth();
 
+  const setSocket = useChatStore((s) => s.setSocket);
+  const loadConversations = useChatStore((s) => s.loadConversations);
+
   useEffect(() => {
-    if (socket && user) {
-      // Injecte le socket dans le store pour un accès global
-      setSocket(socket);
-
-      // Charge les conversations initiales une fois la connexion établie
-      loadConversations();
-
-      // --- Définition des handlers ---
-
-      const handleConversationAssigned = (data: { conversation: any }) => {
-        console.log("================================bien recu==============================", data);
-
-        const conversation = transformToConversation(data.conversation);
-        addConversation(conversation);
-      };
-
-      const handleConversationRemoved = (data: { chat_id: string }) => {
-        removeConversationBychat_id(data.chat_id);
-      };
-
-      const handleConversationsList = (rawConversations: any[]) => {
-        console.log('Received raw conversations list:', rawConversations);
-        const conversations = rawConversations.map(transformToConversation);
-        setConversations(conversations);
-      };
-
-      const handleChatEvent = (data: { type: string; payload: any }) => {
-        // console.log("message reçu de event:",data.type, data);
-
-        switch (data.type) {
-          case 'MESSAGE_ADD': {
-
-            console.log("messate+++===============");
-
-            const message: Message = transformToMessage(data.payload);
-            const tempId = (data.payload as any).tempId;
-
-            console.log("messate+++===============", tempId);
-
-            // Si tempId existe, on peut remplacer le message temporaire
-            if (tempId) {
-              const idx = useChatStore.getState().messages.findIndex((m) => m.id === tempId);
-              console.log("messate tmp.id===============", idx);
-
-              if (idx > -1) {
-                const updatedMessages = [...useChatStore.getState().messages];
-                updatedMessages[idx] = message;
-                useChatStore.getState().setMessages(message.chat_id, updatedMessages);
-                break;
-              }
-            }
-
-            // Sinon, on ajoute normalement
-            addMessage(message);
-            break;
-          }
-
-          case 'CONVERSATION_UPSERT': {
-            const conversation: Conversation = transformToConversation(data.payload);
-            console.log("======conversation update,", conversation);
-
-            updateConversation(conversation);
-            break;
-          }
-
-          case 'MESSAGE_LIST': {
-            const messages: Message[] = data.payload.messages.map(transformToMessage);
-            setMessages(data.payload.chat_id, messages);
-            break;
-          }
-
-          case 'CONVERSATION_REMOVED':
-            removeConversationBychat_id(data.payload.chat_id);
-            break;
-
-          case 'AUTO_MESSAGE_STATUS':
-            updateConversation({
-              chat_id: data.payload.chat_id,
-              auto_message_status: data.payload.status,
-            });
-            break;
-
-          case 'CONVERSATION_LIST': {
-            const conversations: Conversation[] = data.payload.map(transformToConversation);
-            setConversations(conversations);
-            break;
-          }
-
-          case 'CONVERSATION_REASSIGNED': {
-            const conversation: Conversation = transformToConversation(data.payload);
-            updateConversation(conversation);
-            break;
-          }
-
-          case 'CONVERSATION_READONLY': {
-            const conversation: Conversation = transformToConversation(data.payload);
-            updateConversation({ ...conversation, readonly: true });
-            break;
-          }
-
-          default:
-            console.warn('Unhandled chat event type:', data.type, data.payload);
-        }
-      };
-
-
-      const handleMessagesList = (data: { chat_id: string, messages: any[] }) => {
-        console.log(`Received raw messages for chat ${data.chat_id}:`, data.messages);
-        const messages = data.messages.map(transformToMessage);
-        setMessages(data.chat_id, messages);
-      };
-
-      const handleNewMessage = (rawMessage: any) => {
-        console.log('Received raw new message:ccccccccccccccccccccccccccccccccccccccccccccccccccccccc', rawMessage);
-        const message = transformToMessage(rawMessage);
-        addMessage(message);
-      };
-
-      const handleConversationUpdated = (rawConversation: any) => {
-        console.log('Received raw conversation update=======:', rawConversation);
-        const conversation = transformToConversation(rawConversation);
-        updateConversation(conversation);
-      };
-
-      const handleError = (error: { message: string, details?: string }) => {
-        console.error('Socket error received:', error.message, error.details || '');
-      };
-
-      const handleMessageStatusUpdate = (data: {
-        conversationId: string;
-        messageId: string;
-        status: string;
-      }) => {
-        console.log(`Received status update for message ${data.messageId}: ${data.status}`);
-        const allowedStatuses = ["sending", "sent", "delivered", "read", "error"] as const;
-
-        if (allowedStatuses.includes(data.status as any)) {
-          updateMessageStatus(
-            data.conversationId,
-            data.messageId,
-            data.status as typeof allowedStatuses[number]
-          );
-        } else {
-          console.warn(`Received unknown status: ${data.status}`);
-        }
-      };
-
-      const handleTypingStart = (data: { chat_id: string,commercial_id:string }) => {
-        console.log(`Typing started in chat date: ${data}`,data);
-          if (data.commercial_id === user.id) return; 
-        setTyping(data.chat_id);
-      };
-
-      const handleTypingStop = (data: { chat_id: string,commercial_id:string }) => {
-        console.log(`Typing stopped in chat ${data}`);
-        if (data.commercial_id === user.id) return;
-        clearTyping(data.chat_id);
-      };
-
-      const handleConversationReassigned = (data: {
-        chat_id: string;
-        oldPosteId: string;
-        newPosteId: string;
-      }) => {
-        console.log('Conversation reassigned:', data);
-        // Ici tu peux mettre à jour le store pour refléter le changement d'agent
-        updateConversation({
-          chat_id: data.chat_id,
-          status: 'actif',
-        });
-      };
-
-      const handleConversationReadonly = (data: { chat_id: string }) => {
-        console.log('Conversation readonly:', data);
-        // Tu peux ajouter un flag dans le store pour bloquer l’édition côté UI
-        updateConversation({
-          chat_id: data.chat_id,
-          readonly: true,
-        });
-      };
-
-
-      // --- Enregistrement des listeners ---
-      socket.on('chat:event', handleChatEvent);
-      socket.on('conversations:list', handleConversationsList);
-      socket.on('messages:list', handleMessagesList);
-      socket.on('message:new', handleNewMessage);
-      socket.on('conversation:updated', handleConversationUpdated);
-      socket.on('message:status:update', handleMessageStatusUpdate);
-      socket.on('typing:start', handleTypingStart);
-      socket.on('typing:stop', handleTypingStop);
-      socket.on('error', handleError);
-      // socket.on('conversation:assigned', handleConversationAssigned);
-      socket.on('conversation:removed', handleConversationRemoved);
-      socket.on('conversation:reassigned', handleConversationReassigned);
-      socket.on('conversation:readonly', handleConversationReadonly);
-      // --- Nettoyage ---
-      return () => {
-        socket.off('chat:event', handleChatEvent);
-        socket.off('conversations:list', handleConversationsList);
-        socket.off('messages:list', handleMessagesList);
-        socket.off('conversation:reassigned', handleConversationReassigned);
-        socket.off('conversation:readonly', handleConversationReadonly);
-        socket.off('message:new', handleNewMessage);
-        socket.off('conversation:updated', handleConversationUpdated);
-        socket.off('error', handleError);
-        setSocket(null);
-      };
+    if (!socket || !user) {
+      return;
     }
-  }, [socket, user, setSocket, loadConversations, setConversations, setMessages, addMessage, updateConversation, addConversation, removeConversationBychat_id, updateMessageStatus, setTyping, clearTyping]);
 
-  return null; // Ce composant ne rend rien
+    setSocket(socket);
+
+    const refreshAfterConnect = () => {
+      loadConversations();
+      socket.emit('contacts:get');
+
+      const selectedChatId = useChatStore.getState().selectedConversation?.chat_id;
+      if (selectedChatId) {
+        socket.emit('messages:get', { chat_id: selectedChatId });
+      }
+    };
+
+    const upsertConversationPatch = (
+      chatId: string,
+      patch: Partial<Conversation>,
+    ) => {
+      const state = useChatStore.getState();
+      const existingConversation = state.conversations.find(
+        (c) => c.chat_id === chatId,
+      );
+
+      if (!existingConversation) {
+        return;
+      }
+
+      state.updateConversation({
+        ...existingConversation,
+        ...patch,
+      });
+    };
+
+    const handleChatEvent = (data: { type: string; payload: any }) => {
+      const chatState = useChatStore.getState();
+
+      switch (data.type) {
+        case 'MESSAGE_ADD': {
+          const message: Message = transformToMessage(data.payload);
+          const tempId = (data.payload as { tempId?: string }).tempId;
+
+          if (tempId) {
+            const idx = chatState.messages.findIndex((m) => m.id === tempId);
+
+            if (idx > -1) {
+              const updatedMessages = [...chatState.messages];
+              updatedMessages[idx] = message;
+              chatState.setMessages(message.chat_id, updatedMessages);
+              break;
+            }
+          }
+
+          chatState.addMessage(message);
+
+          // Notification navigateur si onglet en arriere-plan et message entrant
+          if (
+            typeof document !== 'undefined' &&
+            document.hidden &&
+            !message.from_me
+          ) {
+            if (Notification.permission === 'granted') {
+              new Notification('Nouveau message', {
+                body: message.text || 'Media recu',
+                icon: '/favicon.ico',
+              });
+            } else if (Notification.permission !== 'denied') {
+              Notification.requestPermission();
+            }
+          }
+
+          break;
+        }
+
+        case 'CONVERSATION_UPSERT': {
+          const conversation: Conversation = transformToConversation(data.payload);
+          chatState.updateConversation(conversation);
+          break;
+        }
+
+        case 'MESSAGE_LIST': {
+          const messages: Message[] = data.payload.messages.map(transformToMessage);
+          chatState.setMessages(data.payload.chat_id, messages);
+          break;
+        }
+
+        case 'CONVERSATION_REMOVED':
+          chatState.removeConversationBychat_id(data.payload.chat_id);
+          break;
+
+        case 'CONVERSATION_ASSIGNED': {
+          const conversation: Conversation = transformToConversation(data.payload);
+          chatState.addConversation(conversation);
+          break;
+        }
+
+        case 'CONVERSATION_LIST': {
+          const conversations: Conversation[] = data.payload.map(transformToConversation);
+          chatState.setConversations(conversations);
+          break;
+        }
+
+        case 'CONVERSATION_READONLY':
+          upsertConversationPatch(data.payload.chat_id, {
+            readonly: true,
+          });
+          break;
+
+        case 'TYPING_START': {
+          const payload = data.payload as { chat_id: string; commercial_id?: string };
+          if (payload.commercial_id && payload.commercial_id === user.id) {
+            break;
+          }
+          chatState.setTyping(payload.chat_id);
+          break;
+        }
+
+        case 'TYPING_STOP': {
+          const payload = data.payload as { chat_id: string; commercial_id?: string };
+          if (payload.commercial_id && payload.commercial_id === user.id) {
+            break;
+          }
+          chatState.clearTyping(payload.chat_id);
+          break;
+        }
+
+        case 'MESSAGE_STATUS_UPDATE': {
+          const { chat_id, message_id, status } = data.payload as {
+            message_id: string;
+            external_id?: string;
+            chat_id: string;
+            status: string;
+            error_code?: number;
+            error_title?: string;
+          };
+          const frontStatus = status === 'failed' ? 'error' : status;
+          chatState.updateMessageStatus(chat_id, message_id, frontStatus as Message['status']);
+          break;
+        }
+
+        case 'RATE_LIMITED': {
+          const event = (data.payload as { event?: string }).event ?? 'unknown';
+          logger.warn('Rate limited by server', { event });
+          break;
+        }
+
+        case 'MESSAGE_SEND_ERROR': {
+          const tempId = (data.payload as { tempId?: string }).tempId;
+          if (tempId) {
+            const current = chatState.messages;
+            const next = current.map((msg) =>
+              msg.id === tempId ? { ...msg, status: 'error' as const } : msg,
+            );
+            const selectedChatId = chatState.selectedConversation?.chat_id;
+            if (selectedChatId) {
+              chatState.setMessages(selectedChatId, next);
+            }
+          }
+          logger.warn('Message send error received', {
+            code: data.payload?.code,
+            message: data.payload?.message,
+          });
+          break;
+        }
+
+        default:
+          logger.warn('Unhandled chat event type', { type: data.type });
+      }
+    };
+
+    const handleContactEvent = (data: { type: string; payload: any }) => {
+      const contactState = useContactStore.getState();
+
+      switch (data.type) {
+        case 'CONTACT_LIST': {
+          const contacts: Contact[] = data.payload.map(transformToContact);
+          contactState.setContacts(contacts);
+          break;
+        }
+        case 'CONTACT_UPSERT': {
+          const contact: Contact = transformToContact(data.payload);
+          contactState.upsertContact(contact);
+          break;
+        }
+        case 'CONTACT_REMOVED': {
+          const contactId =
+            data.payload?.contact_id ?? data.payload?.id ?? data.payload;
+          if (typeof contactId === 'string') {
+            contactState.removeContact(contactId);
+          }
+          break;
+        }
+        case 'CONTACT_CALL_STATUS_UPDATED': {
+          const contact: Contact = transformToContact(data.payload);
+          contactState.upsertContact(contact);
+          break;
+        }
+        case 'CALL_LOG_LIST': {
+          const { contact_id, call_logs } = data.payload as { contact_id: string; call_logs: any[] };
+          contactState.setCallLogs(contact_id, call_logs.map(transformToCallLog));
+          break;
+        }
+        case 'CALL_LOG_NEW': {
+          const { call_log } = data.payload as { contact_id: string; call_log: any };
+          contactState.addCallLog(transformToCallLog(call_log));
+          break;
+        }
+        default:
+          logger.warn('Unhandled contact event type', { type: data.type });
+      }
+    };
+
+    const handleSocketError = (error: { message: string; details?: string }) => {
+      logger.error('Socket error received', {
+        message: error.message,
+        details: error.details,
+      });
+    };
+
+    socket.on('chat:event', handleChatEvent);
+    socket.on('contact:event', handleContactEvent);
+    socket.on('error', handleSocketError);
+    socket.on('connect', refreshAfterConnect);
+
+    if (socket.connected) {
+      refreshAfterConnect();
+    }
+
+    return () => {
+      socket.off('chat:event', handleChatEvent);
+      socket.off('contact:event', handleContactEvent);
+      socket.off('error', handleSocketError);
+      socket.off('connect', refreshAfterConnect);
+      setSocket(null);
+    };
+  }, [socket, user, setSocket, loadConversations]);
+
+  return null;
 };
 
 export default WebSocketEvents;

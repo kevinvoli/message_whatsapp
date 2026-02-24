@@ -1,6 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('AppController', () => {
   let appController: AppController;
@@ -9,7 +10,9 @@ describe('AppController', () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [AppService],
-    }).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     appController = app.get<AppController>(AppController);
   });

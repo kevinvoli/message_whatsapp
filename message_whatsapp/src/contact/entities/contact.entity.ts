@@ -9,6 +9,18 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+export enum CallStatus {
+  À_APPeler = 'à_appeler',
+  Appelé = 'appelé',
+  Rappeler = 'rappeler',
+  Non_Joignable = 'non_joignable',
+}
+export enum Priority {
+  Haute = 'haute',
+  Moyenne = 'moyenne',
+  Basse = 'basse',
+}
+
 @Entity()
 export class Contact {
   @PrimaryGeneratedColumn('uuid', {
@@ -20,7 +32,6 @@ export class Contact {
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
-
   @Column({ name: 'contact', type: 'varchar', length: 100, nullable: false })
   phone: string;
 
@@ -28,9 +39,57 @@ export class Contact {
     name: 'chat_id',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
   })
   chat_id?: string;
+
+  // Informations d'appel
+  @Column({
+    name: 'call_status',
+    type: 'enum',
+    enum: CallStatus,
+    default: CallStatus.À_APPeler,
+  })
+  call_status: CallStatus;
+
+  @Column({ name: 'last_call_date', type: 'timestamp', nullable: true })
+  last_call_date?: Date;
+
+  @Column({
+    name: 'last_call_outcome',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  last_call_outcome?: string;
+
+  @Column({ name: 'next_call_date', type: 'timestamp', nullable: true })
+  next_call_date?: Date;
+  @Column({ name: 'call_count', type: 'int', default: 0 })
+  call_count: number;
+
+  @Column({ name: 'call_notes', type: 'text', nullable: true })
+  call_notes?: string;
+
+  // Statistiques
+  @Column({ name: 'total_messages', type: 'int', default: 0 })
+  total_messages?: number;
+
+  @Column({ name: 'last_message_date', type: 'timestamp', nullable: true })
+  last_message_date?: Date;
+  @Column({
+    name: 'conversion_status',
+    type: 'enum',
+    enum: ['nouveau', 'prospect', 'client', 'perdu'],
+    default: 'nouveau',
+  })
+  conversion_status?: 'nouveau' | 'prospect' | 'client' | 'perdu';
+
+  // Métadonnées
+  @Column({ name: 'source', type: 'varchar', length: 100, nullable: true })
+  source?: string;
+  @Column({ name: 'priority', type: 'enum', enum: Priority, nullable: true })
+  priority?: Priority;
 
   @OneToMany(() => WhatsappMessage, (message) => message.contact)
   messages: WhatsappMessage[];

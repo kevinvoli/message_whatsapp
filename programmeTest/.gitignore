@@ -1,0 +1,13 @@
+# Dependencies
+/node_modules
+/dist
+
+# Environment variables
+.env
+
+# Log files
+*.log
+
+# Scratch files with potential secrets
+testWhat.js
+testWhats.ts

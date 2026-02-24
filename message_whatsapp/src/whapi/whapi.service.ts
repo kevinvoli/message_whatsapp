@@ -1,195 +1,214 @@
-import {
-  Injectable,
-  Logger,
-  Inject,
-  forwardRef,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  ExtractedMedia,
-  WhapiMessage,
-  WhapiRawMedia,
-  WhapiWebhookPayload,
-} from './interface/whapi-webhook.interface';
-import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
+import { ChannelService } from 'src/channel/channel.service';
+import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
+import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { AutoMessageOrchestrator } from '../message-auto/auto-message-orchestrator.service';
-import {
-  WhatsappMedia,
-  WhatsappMediaType,
-} from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { WhapiStatus } from './interface/whapi-webhook.interface';
 
 @Injectable()
 export class WhapiService {
   private readonly logger = new Logger(WhapiService.name);
 
   constructor(
+    private readonly channelService: ChannelService,
+    private readonly unifiedIngressService: UnifiedIngressService,
+    private readonly idempotencyService: WebhookIdempotencyService,
     private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
-
-    @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
-
-    @InjectRepository(WhatsappChat)
-    private readonly chatRepository: Repository<WhatsappChat>,
-
-    @InjectRepository(WhatsappMedia)
-    private readonly mediaRepository: Repository<WhatsappMedia>,
-
-    private readonly autoMessageOrchestratorServcie: AutoMessageOrchestrator,
   ) {}
+
+  async findChannelByExternalId(channelId: string) {
+    return this.channelService.findByChannelId(channelId);
+  }
+
+  async ensureTenantId(channel: { id: string; tenant_id?: string | null }) {
+    return this.channelService.ensureTenantId(channel as any);
+  }
+
+  async upsertProviderMapping(params: {
+    tenant_id: string;
+    provider: string;
+    external_id: string;
+    channel_id?: string | null;
+  }) {
+    await this.channelService.upsertProviderMapping(params);
+  }
+
+  async resolveTenantByProviderExternalId(
+    provider: string,
+    externalId: string,
+  ): Promise<string | null> {
+    return this.channelService.resolveTenantByProviderExternalId(
+      provider,
+      externalId,
+    );
+  }
+
+  async isReplayEvent(
+    payload: unknown,
+    provider: 'whapi' | 'meta',
+    tenantId?: string | null,
+  ): Promise<'accepted' | 'duplicate' | 'conflict'> {
+    return this.idempotencyService.check({
+      payload,
+      provider,
+      tenantId,
+    });
+  }
+
+  async hasPersistedIncomingMessage(
+    provider: 'whapi' | 'meta',
+    providerMessageId: string,
+  ): Promise<boolean> {
+    const existing =
+      await this.whatsappMessageService.findIncomingByProviderMessageId(
+        provider,
+        providerMessageId,
+      );
+    return Boolean(existing);
+  }
 
   // ======================================================
   // INCOMING MESSAGE
   // ======================================================
-  async handleIncomingMessage(payload: WhapiWebhookPayload): Promise<void> {
+  async handleIncomingMessage(
+    payload: WhapiWebhookPayload,
+    tenantId?: string,
+  ): Promise<void> {
     if (!payload?.messages?.length) return;
-
-    const message = payload.messages[0];
-    message.channel_id = payload.channel_id;
-
-    // 🔒 ignore self messages
-    if (message.from_me) return;
-
-    const chatPhone = message.chat_id.split('@')[0];
-    if (chatPhone.length >= 14) return;
-
-    try {
-      // 1️⃣ Dispatcher → attribution conversation
-      const conversation = await this.dispatcherService.assignConversation(
-        message.chat_id,
-        message.from_name ?? 'Client',     
+    if (!tenantId) {
+      throw new HttpException(
+        'Missing tenant id',
+        HttpStatus.UNPROCESSABLE_ENTITY,
       );
-
-      if (!conversation) {
-        this.logger.warn(
-          `⏳ Aucun agent disponible (${message.chat_id})`,
-        );
-        return;
-      }
-
-      // 2️⃣ Sauvegarde message
-      const savedMessage =
-        await this.whatsappMessageService.saveIncomingFromWhapi(
-          message,
-          conversation,
-        );
-
-      if (!savedMessage) {
-        throw new NotFoundException('Message non enregistré');
-      }
-
-
- await this.autoMessageOrchestratorServcie.handleClientMessage(conversation);
-      // 3️⃣ Sauvegarde médias
-      const medias = this.extractMedia(message);
-      for (const media of medias) {
-        await this.saveMedia(media, savedMessage, conversation);
-      }
-
-
-      const fullMessage =
-  await this.whatsappMessageService.findOneWithMedias(savedMessage.id);
-
-  if (!fullMessage) return;
-      
-      // 4️⃣ NOTIFIER LE GATEWAY (POINT UNIQUE)
-      await this.messageGateway.notifyNewMessage(
-    fullMessage, conversation);
-
-         
-    
-    } catch (error) {
-      this.logger.error(error);
     }
-  }
-
-  // ======================================================
-  // MEDIA
-  // ======================================================
-  private async saveMedia(
-    media: ExtractedMedia,
-    messageEntity,
-    chatEntity,
-  ) {
-    const entity = new WhatsappMedia();
-
-    entity.media_type = media.type as WhatsappMediaType;
-    entity.media_id = media.media_id!;
-    entity.whapi_media_id = media.media_id!;
-    entity.mime_type = media.mime_type ?? '';
-    entity.file_name = media.file_name ?? null;
-    entity.file_size = media.file_size?.toString() ?? null;
-    entity.duration_seconds = media.seconds ?? null;
-    entity.caption = media.caption ?? null;
-
-    const raw = media.payload as WhapiRawMedia | undefined;
-    entity.sha256 = raw?.sha256 ?? null;
-    entity.url = raw?.link ?? null;
-
-    entity.chat = chatEntity;
-    entity.message = messageEntity;
-    entity.preview = null;
-    entity.view_once = '0';
-
-    await this.mediaRepository.save(entity);
-  }
-
-  // ======================================================
-  // EXTRACTION MEDIA
-  // ======================================================
-  private extractMedia(message: WhapiMessage): ExtractedMedia[] {
-    const medias: ExtractedMedia[] = [];
-
-    if (message.image)
-      medias.push({ type: 'image', media_id: message.image.id, mime_type: message.image.mime_type, caption: message.image.caption, payload: message.image });
-
-    if (message.video)
-      medias.push({ type: 'video', media_id: message.video.id, mime_type: message.video.mime_type, caption: message.video.caption, seconds: message.video.seconds, payload: message.video });
-
-    if (message.audio)
-      medias.push({ type: 'audio', media_id: message.audio.id, mime_type: message.audio.mime_type, seconds: message.audio.seconds, payload: message.audio });
-
-    if (message.voice)
-      medias.push({ type: 'voice', media_id: message.voice.id, mime_type: message.voice.mime_type ?? 'audio/ogg', seconds: message.voice.seconds, payload: message.voice });
-
-    if (message.document)
-      medias.push({ type: 'document', media_id: message.document.id, mime_type: message.document.mime_type, file_name: message.document.filename, file_size: message.document.file_size, payload: message.document });
-
-    if (message.location)
-      medias.push({ type: 'location', latitude: message.location.latitude, longitude: message.location.longitude });
-
-    return medias;
-  }
-
-  // ======================================================
-  // TEXT FALLBACK
-  // ======================================================
-  private extractMessageContent(message: WhapiMessage): string {
-    switch (message.type) {
-      case 'text': return message.text?.body ?? '';
-      case 'image': return message.image?.caption ?? '[Image]';
-      case 'video': return message.video?.caption ?? '[Vidéo]';
-      case 'audio':
-      case 'voice': return '[Audio]';
-      case 'document': return message.document?.filename ?? '[Document]';
-      default: return '[Message]';
+    if (this.isUnifiedRouterEnabled()) {
+      await this.unifiedIngressService.ingestWhapi(payload, tenantId);
+    } else {
+      await this.handleIncomingMessageLegacy(payload, tenantId);
+      if (this.isShadowUnifiedEnabled()) {
+        await this.unifiedIngressService.ingestWhapiShadow(payload, tenantId);
+      }
     }
   }
 
   // ======================================================
   // STATUS UPDATE
   // ======================================================
-  async updateStatusMessage(payload: WhapiWebhookPayload): Promise<void> {
+  async updateStatusMessage(
+    payload: WhapiWebhookPayload,
+    tenantId?: string,
+  ): Promise<void> {
     if (!payload?.statuses?.length) return;
-
-    for (const status of payload.statuses) {
-      await this.whatsappMessageService.updateByStatus(status);
-      this.logger.log(`📌 Status | ${status.id} → ${status.status}`);
+    if (!tenantId) {
+      throw new HttpException(
+        'Missing tenant id',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
     }
+    if (this.isUnifiedRouterEnabled()) {
+      await this.unifiedIngressService.ingestWhapi(payload, tenantId);
+    } else {
+      await this.updateStatusMessageLegacy(payload.statuses ?? []);
+      if (this.isShadowUnifiedEnabled()) {
+        await this.unifiedIngressService.ingestWhapiShadow(payload, tenantId);
+      }
+    }
+  }
+
+  async handleMetaWebhook(payload: unknown, tenantId: string): Promise<void> {
+    await this.unifiedIngressService.ingestMeta(payload as any, tenantId);
+  }
+
+  private async handleIncomingMessageLegacy(
+    payload: WhapiWebhookPayload,
+    tenantId: string,
+  ): Promise<void> {
+    const messages = payload.messages ?? [];
+    for (const message of messages) {
+      if (message.from_me) {
+        continue;
+      }
+      const chatId = message.chat_id;
+      if (!this.isValidLegacyChatId(chatId)) {
+        this.logger.warn(
+          `LEGACY_IGNORED reason=invalid_chat_id chat_id=${chatId ?? 'unknown'}`,
+        );
+        continue;
+      }
+      const traceId = message.id ?? `chat:${chatId}:${Date.now()}`;
+      try {
+        const conversation = await this.dispatcherService.assignConversation(
+          chatId,
+          message.from_name ?? message.from ?? 'Client',
+          traceId,
+        );
+        if (!conversation) {
+          this.logger.warn(
+            `LEGACY_NO_AGENT trace=${traceId} chat_id=${chatId}`,
+          );
+          continue;
+        }
+        const saved = await this.whatsappMessageService.saveIncomingFromWhapi(
+          message,
+          conversation,
+        );
+        const full = await this.whatsappMessageService.findOneWithMedias(
+          saved.id,
+        );
+        if (full) {
+          await this.messageGateway.notifyNewMessage(full, conversation);
+        }
+        this.logger.log(
+          `LEGACY_PERSISTED trace=${traceId} tenant_id=${tenantId} message_id=${saved.id}`,
+        );
+      } catch (error: any) {
+        this.logger.error(
+          `LEGACY_PROCESSING_FAILED trace=${traceId} error=${error?.message ?? 'unknown'}`,
+        );
+        throw error;
+      }
+    }
+  }
+
+  private async updateStatusMessageLegacy(
+    statuses: WhapiStatus[],
+  ): Promise<void> {
+    for (const status of statuses) {
+      await this.whatsappMessageService.updateByStatus({
+        id: status.id,
+        recipient_id: status.recipient_id,
+        status: status.status,
+      });
+    }
+  }
+
+  private isUnifiedRouterEnabled(): boolean {
+    return this.readFlag('FF_UNIFIED_WEBHOOK_ROUTER', true);
+  }
+
+  private isShadowUnifiedEnabled(): boolean {
+    return this.readFlag('FF_SHADOW_UNIFIED', false);
+  }
+
+  private readFlag(name: string, defaultValue: boolean): boolean {
+    const raw = process.env[name];
+    if (raw == null || raw === '') {
+      return defaultValue;
+    }
+    return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
+  }
+
+  private isValidLegacyChatId(chatId?: string | null): boolean {
+    if (!chatId || typeof chatId !== 'string') return false;
+    const trimmed = chatId.trim();
+    if (!trimmed.includes('@')) return false;
+    if (trimmed.endsWith('@g.us')) return false;
+    const phone = (trimmed.split('@')[0] ?? '').replace(/[^\d]/g, '');
+    return phone.length >= 8 && phone.length <= 20;
   }
 }

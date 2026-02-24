@@ -1,15 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 
 @Injectable()
 export class WhatsappChatService {
+  private readonly logger = new Logger(WhatsappChatService.name);
+
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappMessage)
+    private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly posteService: WhatsappPosteService,
   ) {}
 
@@ -17,8 +23,8 @@ export class WhatsappChatService {
   async findByPosteId(poste_id: string): Promise<WhatsappChat[]> {
     const chats = await this.chatRepository.find({
       where: { poste_id: poste_id },
-      order: { updatedAt: 'DESC' },
-      relations: ['poste', 'messages'],
+      order: { last_activity_at: 'DESC' },
+      relations: ['poste', 'messages', 'channel'],
     });
 
     return chats;
@@ -33,6 +39,7 @@ export class WhatsappChatService {
     try {
       const existingChat = await this.chatRepository.findOne({
         where: { chat_id: chat_id },
+        relations: ['poste', 'messages', 'channel'],
       });
 
       if (existingChat) {
@@ -59,6 +66,7 @@ export class WhatsappChatService {
         read_only: false,
         not_spam: true,
         poste: poste,
+
         contact_client: from,
         last_activity_at: new Date(),
         createdAt: new Date(),
@@ -67,7 +75,10 @@ export class WhatsappChatService {
 
       return this.chatRepository.save(newChat);
     } catch (error) {
-      console.error('Error finding or creating chat:', error);
+      this.logger.error(
+        'Error finding or creating chat',
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new Error(`Failed to find or create chat: ${String(error)}`);
     }
   }
@@ -76,13 +87,13 @@ export class WhatsappChatService {
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chat_id: string): Promise<void> {
-    await this.chatRepository.update(
-      { chat_id: chat_id },
-      {
-        unread_count: 0,
-        last_activity_at: new Date(),
-      },
+    // SQL brut pour éviter que @UpdateDateColumn ne mette updatedAt à NOW()
+    await this.chatRepository.query(
+      `UPDATE whatsapp_chat SET unread_count = 0 WHERE chat_id = ?`,
+      [chat_id],
     );
+
+    this.logger.debug(`Chat marked as read (${chat_id})`);
   }
 
   /* =======================
@@ -121,28 +132,85 @@ export class WhatsappChatService {
     );
   }
 
-  async findAll(chat_id?: string) {
+  async findAll(chat_id?: string, limit = 50, offset = 0): Promise<{ data: WhatsappChat[]; total: number }> {
     if (chat_id) {
-      return this.chatRepository.find({
-        where: { chat_id: chat_id },
-        relations: ['poste', 'messages'],
-      });
+      const data = await this.chatRepository
+        .createQueryBuilder('chat')
+        .leftJoinAndSelect('chat.poste', 'poste')
+        .leftJoinAndSelect('chat.channel', 'channel')
+        .leftJoinAndMapOne(
+          'chat.contact',
+          Contact,
+          'contact',
+          'contact.chat_id = chat.chat_id',
+        )
+        .where('chat.chat_id = :chat_id', { chat_id })
+        .getMany();
+      return { data, total: data.length };
     }
-    return this.chatRepository.find();
+    const [data, total] = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .leftJoinAndMapOne(
+        'chat.last_message',
+        WhatsappMessage,
+        'last_message',
+        `last_message.id = (${this.chatRepository
+          .createQueryBuilder()
+          .subQuery()
+          .select('m.id')
+          .from(WhatsappMessage, 'm')
+          .where('m.chat_id = chat.chat_id')
+          .andWhere('m.deletedAt IS NULL')
+          .orderBy('m.timestamp', 'DESC')
+          .limit(1)
+          .getQuery()})`,
+      )
+      .orderBy('chat.last_activity_at', 'DESC')
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
+    return { data, total };
   }
 
   async findBychat_id(chat_id: string): Promise<WhatsappChat | null> {
-    return this.chatRepository.findOne({
-      where: { chat_id: chat_id },
-      relations: ['poste', 'messages'],
-    });
+    const chat = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .where('chat.chat_id = :chat_id', { chat_id })
+      .getOne();
+    return chat ?? null;
   }
 
   async findOne(id: string): Promise<WhatsappChat | null> {
-    return this.chatRepository.findOne({
-      where: { id },
-      relations: ['poste', 'messages'],
-    });
+    const chat = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.messages', 'messages')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .where('chat.id = :id', { id })
+      .getOne();
+    return chat ?? null;
   }
 
   remove(id: string) {
@@ -154,10 +222,10 @@ export class WhatsappChatService {
   }
 
   async lockConversation(id: string) {
-    await this.update(id, { readonly: true });
+    await this.update(id, { read_only: true });
   }
 
   async unlockConversation(id: string) {
-    await this.update(id, { readonly: false });
+    await this.update(id, { read_only: false });
   }
 }

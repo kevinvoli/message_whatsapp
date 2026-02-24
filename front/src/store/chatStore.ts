@@ -1,7 +1,8 @@
 // src/store/chatStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
-import { Conversation, Message } from "@/types/chat";
+import { Conversation, ConversationStatus, Message } from "@/types/chat";
+import { logger } from "@/lib/logger";
 
 interface ChatState {
   typingStatus: Record<string, boolean>;
@@ -11,6 +12,7 @@ interface ChatState {
   selectedConversation: Conversation | null;
   isLoading: boolean;
   error: string | null;
+  messageIdCache: Record<string, Set<string>>;
 
   // Actions
   setSocket: (socket: Socket | null) => void;
@@ -19,6 +21,7 @@ interface ChatState {
   sendMessage: (text: string) => void;
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
+  changeConversationStatus: (chat_id: string, status: ConversationStatus) => void;
 
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[]) => void;
@@ -56,6 +59,7 @@ const initialState: Omit<
   | "reset"
   | "onTypingStart"
   | "onTypingStop"
+  | "changeConversationStatus"
 > = {
   socket: null,
   conversations: [],
@@ -64,8 +68,20 @@ const initialState: Omit<
   isLoading: false,
   error: null,
   typingStatus: {},
+  messageIdCache: {},
 };
 let typingTimeout: NodeJS.Timeout;
+let isSending = false;
+
+const dedupeMessagesById = (messages: Message[]): Message[] => {
+  const map = new Map<string, Message>();
+  for (const message of messages) {
+    map.set(message.id, message);
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+  );
+};
 
 export const useChatStore = create<ChatState>((set, get) => ({
   ...initialState,
@@ -77,11 +93,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket) return;
 
     set({ isLoading: true });
-    console.log("novelle conversation");
-
     socket?.emit("conversations:get");
   },
 
+  
   selectConversation: (chat_id: string) => {
     set((state) => {
       const conversation = state.conversations.find(
@@ -97,6 +112,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ),
         messages: [],
         isLoading: true,
+        messageIdCache: { ...state.messageIdCache, [chat_id]: new Set<string>() },
       };
     });
 
@@ -119,10 +135,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: (text: string) => {
+    if (isSending) return;
+
     const { socket, selectedConversation } = get();
     if (!socket || !selectedConversation) return;
 
-    const tempId = crypto.randomUUID();
+    isSending = true;
+
     const tempMessage: Message = {
       id: crypto.randomUUID(),
       chat_id: selectedConversation.chat_id,
@@ -137,19 +156,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [...state.messages, tempMessage],
     }));
 
-    console.log("id temporaire==============", tempMessage);
+    logger.debug("Temporary message created", {
+      chat_id: selectedConversation.chat_id,
+      temp_id: tempMessage.id,
+    });
 
     socket.emit("message:send", {
       chat_id: selectedConversation.chat_id,
       text,
-      tempId: tempMessage.id, // ⚡ On envoie le tempId au backend
+      tempId: tempMessage.id,
     });
+
+    // Libère le lock après un court délai pour éviter les double-clics
+    setTimeout(() => { isSending = false; }, 500);
   },
 
   onTypingStart: (chat_id: string) => {
     const { socket } = get();
     if (!socket) return;
-    socket.emit("typing:start", { chat_id });
+    socket.emit("chat:event", { type: "TYPING_START", payload: { chat_id } });
   },
 
   onTypingStop: (chat_id) => {
@@ -157,39 +182,89 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (!socket) return;
 
-    socket.emit("typing:stop", { chat_id });
+    socket.emit("chat:event", { type: "TYPING_STOP", payload: { chat_id } });
+  },
+
+  changeConversationStatus: (chat_id: string, status: ConversationStatus) => {
+    const { socket } = get();
+    if (!socket) return;
+
+    socket.emit("chat:event", {
+      type: "CONVERSATION_STATUS_CHANGE",
+      payload: { chat_id, status },
+    });
+
+    logger.debug("Conversation status change emitted", { chat_id, status });
   },
 
   setConversations: (conversations) => {
-    // console.log("=======track1 setConversations=======", conversations);
-
-    set({ conversations, isLoading: false });
+    set((state) => {
+      const selectedChatId = state.selectedConversation?.chat_id;
+      const normalized = selectedChatId
+        ? conversations.map((c) =>
+            c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c,
+          )
+        : conversations;
+      return { conversations: normalized, isLoading: false };
+    });
   },
 
   setMessages: (chat_id, messages) => {
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
-      return { messages, isLoading: false };
+      const deduped = dedupeMessagesById(messages);
+      return {
+        messages: deduped,
+        isLoading: false,
+        messageIdCache: {
+          ...state.messageIdCache,
+          [chat_id]: new Set(deduped.map((m) => m.id)),
+        },
+      };
     });
   },
 
   addMessage: (message) => {
-    console.log("dans le add message", message);
+    logger.debug("Message added to store", {
+      chat_id: message.chat_id,
+      message_id: message.id,
+    });
 
     set((state) => {
+      const existingIds = state.messageIdCache[message.chat_id];
+      if (existingIds?.has(message.id)) {
+        return state;
+      }
+
+      const alreadyExists = state.messages.some((m) => m.id === message.id);
       const isActive = state.selectedConversation?.chat_id === message.chat_id;
+      const updatedMessages =
+        isActive && !alreadyExists
+          ? dedupeMessagesById([...state.messages, message])
+          : state.messages;
+      const nextCache = isActive
+        ? {
+            ...state.messageIdCache,
+            [message.chat_id]: new Set(updatedMessages.map((m) => m.id)),
+          }
+        : state.messageIdCache;
 
       return {
-        messages: isActive ? [...state.messages, message] : state.messages,
+        messages: updatedMessages,
         conversations: state.conversations.map((c) =>
           c.chat_id === message.chat_id
             ? {
                 ...c,
                 lastMessage: message,
-                unreadCount: isActive ? 0 : (c.unreadCount ?? 0) + 1,
+                unreadCount: isActive
+                  ? 0
+                  : message.from_me
+                    ? (c.unreadCount ?? 0)
+                    : (c.unreadCount ?? 0) + 1,
               }
             : c,
         ),
+        messageIdCache: nextCache,
       };
     });
   },
@@ -198,8 +273,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const isSelected =
         state.selectedConversation?.chat_id === updatedConversation.chat_id;
-      const isOutgoing = updatedConversation.lastMessage?.from_me === true;
-      console.log("est ce que c'est faux====", updatedConversation);
+      logger.debug("Conversation update received", {
+        chat_id: updatedConversation.chat_id,
+      });
 
       const conversationExists = state.conversations.some(
         (c) => c.chat_id === updatedConversation.chat_id,
@@ -208,24 +284,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // 🔥 Mise à jour du compteur unread
       const conversationWithUnread: Conversation = {
         ...updatedConversation,
-        unreadCount:
-          isSelected || isOutgoing
-            ? 0
-            : conversationExists
-              ? (state.conversations.find(
-                  (c) => c.chat_id === updatedConversation.chat_id,
-                )?.unreadCount ?? 0) + 1
-              : (updatedConversation.unreadCount ?? 1),
+        unreadCount: isSelected ? 0 : (updatedConversation.unreadCount ?? 0),
       };
 
       // 🔁 Liste des conversations
-      const newConversations = conversationExists
-        ? state.conversations.map((c) =>
-            c.chat_id === updatedConversation.chat_id
-              ? conversationWithUnread
-              : c,
-          )
-        : [conversationWithUnread, ...state.conversations];
+      // IMPORTANT: on ne re-ajoute PAS une conversation absente via UPSERT
+      // (évite la réapparition après CONVERSATION_REMOVED).
+      // Les nouvelles conversations arrivent exclusivement via CONVERSATION_ASSIGNED.
+      if (!conversationExists) {
+        if (isSelected) {
+          return { selectedConversation: conversationWithUnread };
+        }
+        return state;
+      }
+
+      const newConversations = state.conversations.map((c) =>
+        c.chat_id === updatedConversation.chat_id ? conversationWithUnread : c,
+      );
 
       const newState: Partial<ChatState> = {
         conversations: newConversations,
@@ -248,7 +323,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const localOnly = state.messages.filter(
             (m) => !newIds.has(m.id) && m.status === "sending",
           );
-          newState.messages = [...updatedConversation.messages, ...localOnly];
+          newState.messages = dedupeMessagesById([
+            ...updatedConversation.messages,
+            ...localOnly,
+          ]);
         } else if (
           // Fallback : si pas de messages[] mais un lastMessage, on l'ajoute
           updatedConversation.lastMessage &&
@@ -256,10 +334,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             (m) => m.id === updatedConversation.lastMessage?.id,
           )
         ) {
-          newState.messages = [
+          newState.messages = dedupeMessagesById([
             ...state.messages,
             updatedConversation.lastMessage,
-          ];
+          ]);
         }
       }
 

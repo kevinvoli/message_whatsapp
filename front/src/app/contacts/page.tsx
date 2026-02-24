@@ -1,0 +1,500 @@
+'use client';
+
+// Données chargées depuis le backend via WebSocket (useContactStore)
+
+import React, { useMemo, useState } from 'react';
+import {
+  Phone,
+  PhoneCall,
+  Clock,
+  Tag,
+  MessageSquare,
+  PhoneMissed,
+  User,
+  RefreshCw,
+  Archive,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useContactStore } from '@/store/contactStore';
+import { useChatStore } from '@/store/chatStore';
+import {
+  Contact,
+  CallStatus,
+  ContactFilters,
+  getCallStatusColor,
+  getCallStatusLabel,
+} from '@/types/chat';
+import { formatDate, formatDateShort, formatTime } from '@/lib/dateUtils';
+import { ContactFilters as ContactFiltersPanel } from '@/components/contacts/ContactFilters';
+import { ContactCard } from '@/components/contacts/ContactCard';
+import { ContactTimeline } from '@/components/contacts/ContactTimeline';
+import { updateContactCallStatus } from '@/lib/contactApi';
+import { logger } from '@/lib/logger';
+
+// ─── Badges ──────────────────────────────────────────────────────────────────
+
+function CallStatusBadge({ status }: { status: CallStatus }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${getCallStatusColor(status)}`}>
+      {getCallStatusLabel(status)}
+    </span>
+  );
+}
+
+function ConversionBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const map: Record<string, string> = {
+    nouveau:  'bg-blue-50 text-blue-700',
+    prospect: 'bg-indigo-50 text-indigo-700',
+    client:   'bg-emerald-50 text-emerald-700',
+    perdu:    'bg-red-50 text-red-700',
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${map[status] ?? 'bg-gray-100 text-gray-700'}`}>
+      {status}
+    </span>
+  );
+}
+
+// ─── Modal modification statut + notes ───────────────────────────────────────
+
+interface EditModalProps {
+  contact: Contact;
+  onClose: () => void;
+  onConfirm: (status: CallStatus, notes: string) => void;
+}
+
+function EditModal({ contact, onClose, onConfirm }: EditModalProps) {
+  const [status, setStatus] = useState<CallStatus>(contact.call_status);
+  const [notes,  setNotes]  = useState(contact.call_notes ?? '');
+
+  const opts: { value: CallStatus; label: string; icon: React.ReactNode }[] = [
+    { value: 'appelé',        label: 'Appelé',         icon: <PhoneCall className="w-4 h-4" /> },
+    { value: 'rappeler',      label: 'À rappeler',     icon: <Clock className="w-4 h-4" />     },
+    { value: 'non_joignable', label: 'Non joignable',  icon: <PhoneMissed className="w-4 h-4" /> },
+    { value: 'à_appeler',     label: 'À appeler',      icon: <Phone className="w-4 h-4" />     },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Modifier le contact</h3>
+        <p className="text-sm text-gray-500 mb-5">{contact.name} · {contact.contact}</p>
+
+        <div className="mb-5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Statut d&apos;appel
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {opts.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setStatus(opt.value)}
+                className={`flex items-center gap-2 p-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                  status === opt.value
+                    ? 'border-blue-500 bg-blue-50 text-blue-800'
+                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {opt.icon}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Notes
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Ajouter des notes sur ce contact…"
+            rows={3}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={() => onConfirm(status, notes)}
+            className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fiche détail ─────────────────────────────────────────────────────────────
+
+interface ContactDetailsProps {
+  contact: Contact;
+  onEditClick: () => void;
+  onViewConversation: () => void;
+  onArchive: () => void;
+}
+
+function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }: ContactDetailsProps) {
+  const initial = contact.name.charAt(0).toUpperCase();
+
+  // Log messages : les 5 derniers triés par date desc
+  const recentMessages = useMemo(
+    () =>
+      [...(contact.messages ?? [])]
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        .slice(0, 5),
+    [contact.messages],
+  );
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Carte principale */}
+      <div className="bg-white rounded-[18px] p-5" style={{ boxShadow: '0 12px 40px rgba(15,23,42,0.08)' }}>
+        {/* En-tête contact */}
+        <div className="flex items-start justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-2xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)' }}
+            >
+              {initial}
+            </div>
+            <div>
+              <p className="text-xl font-bold text-gray-900 leading-tight">{contact.name}</p>
+              <p className="text-sm text-gray-500 mt-0.5">{contact.contact}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <CallStatusBadge status={contact.call_status} />
+            <ConversionBadge status={contact.conversion_status} />
+          </div>
+        </div>
+
+        {/* Timeline pills */}
+        <ContactTimeline contact={contact} />
+
+        {/* Actions */}
+        <div className="flex gap-3 mt-5">
+          <button
+            onClick={onEditClick}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            <Phone className="w-4 h-4" />
+            Appeler le contact
+          </button>
+          <button
+            onClick={onViewConversation}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Voir la conversation
+          </button>
+          <button
+            onClick={onArchive}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
+          >
+            <Archive className="w-4 h-4" />
+            Archiver
+          </button>
+        </div>
+      </div>
+
+      {/* Informations — 2 colonnes comme dans le mockup */}
+      <div
+        className="bg-white rounded-[18px] p-5 border border-gray-100"
+        style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 18 }}
+      >
+        {/* Colonne gauche */}
+        <div className="flex flex-col gap-4 text-sm">
+          <div>
+            <p className="font-semibold text-gray-800">Conversion</p>
+            <p className="text-gray-500 mt-0.5">{contact.conversion_status ?? '—'}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Source</p>
+            <p className="text-gray-500 mt-0.5">{contact.source ?? '—'}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Chat ID</p>
+            <p className="text-gray-500 mt-0.5 font-mono text-xs truncate">{contact.chat_id}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Statut actif</p>
+            <p className={`mt-0.5 font-medium ${contact.is_active ? 'text-emerald-600' : 'text-red-600'}`}>
+              {contact.is_active ? 'Oui' : 'Non'}
+            </p>
+          </div>
+          {contact.call_notes && (
+            <div>
+              <p className="font-semibold text-gray-800">Notes</p>
+              <p className="text-gray-500 mt-0.5 text-xs whitespace-pre-wrap">{contact.call_notes}</p>
+            </div>
+          )}
+          {contact.tags && contact.tags.length > 0 && (
+            <div>
+              <p className="font-semibold text-gray-800 mb-1">Tags</p>
+              <div className="flex flex-wrap gap-1">
+                {contact.tags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">
+                    <Tag className="w-2.5 h-2.5" />
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Colonne droite */}
+        <div className="flex flex-col gap-4 text-sm">
+          <div>
+            <p className="font-semibold text-gray-800">Dernière mise à jour</p>
+            <p className="text-gray-500 mt-0.5">{formatDate(contact.updatedAt)}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Total messages</p>
+            <p className="text-gray-500 mt-0.5">{contact.total_messages ?? 0}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Appels</p>
+            <p className="text-gray-500 mt-0.5">{contact.call_count}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Statut</p>
+            <p className="text-gray-500 mt-0.5 capitalize">{contact.call_status.replace('_', ' ')}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Priorité</p>
+            <p className="text-gray-500 mt-0.5 capitalize">{contact.priority ?? 'moyenne'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Historique */}
+      <div className="bg-white rounded-[18px] p-5 border border-gray-100">
+        <h3 className="text-base font-bold text-gray-900 mb-3">Historique</h3>
+
+        {recentMessages.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Aucun message enregistré</p>
+        ) : (
+          <div className="flex flex-col divide-y divide-gray-100">
+            {recentMessages.map((msg) => (
+              <div key={msg.id} className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-gray-700">
+                  {msg.from_me ? '💬 Message sortant' : '📩 Message entrant'}
+                  {msg.text ? ` — ${msg.text.slice(0, 40)}${msg.text.length > 40 ? '…' : ''}` : ' [Media]'}
+                </span>
+                <span className="text-xs text-gray-400 flex-shrink-0 ml-4">
+                  {formatTime(msg.timestamp)} · {formatDateShort(msg.timestamp)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
+
+export default function ContactsPage() {
+  const router = useRouter();
+
+  // Données provenant du backend via WebSocket (useContactStore)
+  const { contacts, selectedContact, isLoading, loadContacts, selectContact, upsertContact } =
+    useContactStore();
+  const { selectConversation } = useChatStore();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<ContactFilters>({
+    call_status:        [],
+    priority:           [],
+    conversion_status:  [],
+    sort_by:            'last_call',
+    sort_order:         'desc',
+  });
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  // Filtrage + tri
+  const filteredContacts = useMemo(() => {
+    let result = [...contacts];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.contact.includes(q) ||
+          c.call_notes?.toLowerCase().includes(q),
+      );
+    }
+    if (filters.call_status?.length)
+      result = result.filter((c) => filters.call_status!.includes(c.call_status));
+    if (filters.priority?.length)
+      result = result.filter((c) => filters.priority!.includes(c.priority ?? 'moyenne'));
+    if (filters.conversion_status?.length)
+      result = result.filter((c) =>
+        filters.conversion_status!.includes(c.conversion_status ?? ''),
+      );
+
+    const pOrder: Record<string, number> = { haute: 0, moyenne: 1, basse: 2 };
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (filters.sort_by) {
+        case 'name':       cmp = a.name.localeCompare(b.name); break;
+        case 'last_call':  cmp = (b.last_call_date?.getTime() ?? 0) - (a.last_call_date?.getTime() ?? 0); break;
+        case 'next_call':  cmp = (a.next_call_date?.getTime() ?? Infinity) - (b.next_call_date?.getTime() ?? Infinity); break;
+        case 'priority':   cmp = (pOrder[a.priority ?? 'moyenne'] ?? 1) - (pOrder[b.priority ?? 'moyenne'] ?? 1); break;
+        case 'created_at': cmp = b.createdAt.getTime() - a.createdAt.getTime(); break;
+      }
+      return filters.sort_order === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [contacts, searchQuery, filters]);
+
+  function handleViewConversation() {
+    if (!selectedContact?.chat_id) return;
+    selectConversation(selectedContact.chat_id);
+    router.push('/whatsapp');
+  }
+
+  async function handleConfirmEdit(status: CallStatus, notes: string) {
+    if (!selectedContact) return;
+    try {
+      await updateContactCallStatus(selectedContact.id, status, notes);
+      upsertContact({
+        ...selectedContact,
+        call_status:    status,
+        call_notes:     notes,
+        last_call_date: new Date(),
+        call_count:     (selectedContact.call_count ?? 0) + 1,
+      });
+    } catch (error) {
+      logger.error('Failed to update contact call status', {
+        contact_id: selectedContact.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    setShowEditModal(false);
+  }
+
+  function handleArchive() {
+    // TODO: émettre socket pour archiver le contact
+  }
+
+  // Spinner si chargement initial
+  if (isLoading && contacts.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Chargement des contacts…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-full bg-gray-100 p-7">
+      <div className="grid gap-6 h-full" style={{ gridTemplateColumns: '280px 1fr' }}>
+
+        {/* ── Volet gauche sticky ── */}
+        <div className="sticky top-5 self-start flex flex-col gap-4">
+          {/* Filtres */}
+          <div
+            className="bg-white rounded-[18px] p-5"
+            style={{ boxShadow: '0 12px 40px rgba(15,23,42,0.08)' }}
+          >
+            <ContactFiltersPanel
+              contacts={contacts}
+              filters={filters}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onFiltersChange={setFilters}
+            />
+          </div>
+
+          {/* Contacts rapides */}
+          <div
+            className="bg-white rounded-[18px] p-5"
+            style={{ boxShadow: '0 12px 40px rgba(15,23,42,0.08)' }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-gray-900">Contacts rapides</h2>
+              <button
+                onClick={loadContacts}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Actualiser"
+              >
+                <RefreshCw className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+
+            {filteredContacts.length === 0 ? (
+              <div className="text-center py-6">
+                <User className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-xs text-gray-400">Aucun contact trouvé</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1 max-h-[420px] overflow-y-auto pr-0.5">
+                {filteredContacts.map((contact) => (
+                  <ContactCard
+                    key={contact.id}
+                    contact={contact}
+                    isSelected={selectedContact?.id === contact.id}
+                    onClick={() => selectContact(contact.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Colonne principale ── */}
+        <div>
+          {selectedContact ? (
+            <ContactDetails
+              contact={selectedContact}
+              onEditClick={() => setShowEditModal(true)}
+              onViewConversation={handleViewConversation}
+              onArchive={handleArchive}
+            />
+          ) : (
+            <div
+              className="bg-white rounded-[18px] h-64 flex items-center justify-center"
+              style={{ boxShadow: '0 12px 40px rgba(15,23,42,0.08)' }}
+            >
+              <div className="text-center">
+                <User className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">
+                  Sélectionnez un contact pour afficher ses détails
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal modification */}
+      {showEditModal && selectedContact && (
+        <EditModal
+          contact={selectedContact}
+          onClose={() => setShowEditModal(false)}
+          onConfirm={handleConfirmEdit}
+        />
+      )}
+    </div>
+  );
+}

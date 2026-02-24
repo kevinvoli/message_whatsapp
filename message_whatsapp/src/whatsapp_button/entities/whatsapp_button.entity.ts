@@ -17,14 +17,21 @@ export class WhatsappButton {
   })
   id: string;
 
-  @Column({ name: 'button_id', type: 'varchar', length: 100, nullable: false, unique: true })
+  @Column({
+    name: 'button_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+    unique: true,
+  })
   button_id: string;
   @Column({
-    name: 'interactive_content_id', type: 'varchar', length: 100, nullable: false,
+    name: 'interactive_content_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
   })
   interactive_content_id: string;
-
-
 
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string;
@@ -43,8 +50,6 @@ export class WhatsappButton {
     nullable: false,
   })
   phone_number: string;
-
-
 
   @CreateDateColumn({
     name: 'createdAt',

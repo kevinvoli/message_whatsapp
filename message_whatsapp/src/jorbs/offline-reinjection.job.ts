@@ -1,51 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import {  IsNull, Repository } from 'typeorm';
-import { Cron } from '@nestjs/schedule';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { IsNull, Repository } from 'typeorm';
 
 @Injectable()
-export class FirstResponseTimeoutJob {
+export class OfflineReinjectionJob {
+  private readonly logger = new Logger(OfflineReinjectionJob.name);
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
-    private readonly gateway: WhatsappMessageGateway,
   ) {}
 
+  async offlineReinject() {
+    this.logger.debug('Offline reinjection cron started');
 
-@Cron('0 9 * * *')
- async offlineReinject() {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-console.log("===================chaque matin===============");
+    const chats = await this.chatRepo.find({
+      where: {
+        status: WhatsappChatStatus.ACTIF,
+        last_poste_message_at: IsNull(),
+      },
+      relations: ['poste'],
+    });
 
-  const chats = await this.chatRepo.find({
-    where: {
-      status: WhatsappChatStatus.ACTIF,
-      last_poste_message_at: IsNull(),
-    },
-    relations: ['poste'],
-  });
+    for (const chat of chats) {
+      const poste = chat.poste;
+      if (!poste) continue;
+      if (poste.is_active) continue;
 
-  console.log("tcher de chaque journe a 9h",startOfDay);
-  
-  for (const chat of chats) {
-    const poste = chat.poste;
-    if (!poste) continue;
-
-    // const neverConnectedToday =
-    //   !poste.lastConnectionAt ||
-    //   poste.lastConnectionAt < startOfDay;
-
-    // if (neverConnectedToday) {
-    //   await this.dispatcher.reinjectConversation(chat);
-    //   // this.gateway.emitConversationReassigned(chat.chat_id);
-    // }
+      await this.dispatcher.reinjectConversation(chat);
+    }
   }
-}
-
-
 }

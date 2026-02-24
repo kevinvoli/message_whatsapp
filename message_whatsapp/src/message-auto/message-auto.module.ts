@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { MessageAutoController } from './message-auto.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { MessageAuto } from './entities/message-auto.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { QueueService } from 'src/dispatcher/services/queue.service';
@@ -14,24 +15,62 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
+import { SocketThrottleGuard } from 'src/whatsapp_message/guards/socket-throttle.guard';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
-import { PendingMessage } from 'src/dispatcher/entities/pending-message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
+import { LoggingModule } from 'src/logging/logging.module';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { CallLogModule } from 'src/call-log/call_log.module';
 
 @Module({
-   imports: [
-      TypeOrmModule.forFeature([
-        MessageAuto,WhatsappMessage,WhatsappChat, WhatsappCommercial,WhatsappPoste,QueuePosition,PendingMessage,WhapiChannel,
-        Contact
-      ]),
-    ],
+  imports: [
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+      }),
+      inject: [ConfigService],
+    }),
+    TypeOrmModule.forFeature([
+      MessageAuto,
+      WhatsappMessage,
+      WhatsappChat,
+      WhatsappCommercial,
+      WhatsappPoste,
+      QueuePosition,
+      WhapiChannel,
+      ProviderChannel,
+      Contact,
+      WhatsappMedia,
+    ]),
+    forwardRef(() => WhatsappMessageModule),
+    LoggingModule,
+    CallLogModule,
+  ],
   controllers: [MessageAutoController],
-  providers: [MessageAutoService,WhatsappMessageGateway, WhatsappChatService, WhatsappMessageService,WhatsappCommercialService,WhatsappPosteService,QueueService,DispatcherService,FirstResponseTimeoutJob,WhatsappPosteService,CommunicationWhapiService,ChannelService,ContactService
+  providers: [
+    MessageAutoService,
+    WhatsappChatService,
+    WhatsappCommercialService,
+    WhatsappPosteService,
+    QueueService,
+    DispatcherService,
+    FirstResponseTimeoutJob,
+    CommunicationWhapiService,
+    CommunicationMetaService,
+    OutboundRouterService,
+    SocketThrottleGuard,
+    ChannelService,
+    ContactService,
   ],
 })
 export class MessageAutoModule {}

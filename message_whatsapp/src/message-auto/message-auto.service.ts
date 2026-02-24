@@ -1,10 +1,18 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MessageAuto } from './entities/message-auto.entity';
 import { Repository } from 'typeorm';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { CreateMessageAutoDto } from './dto/create-message-auto.dto';
+import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
+import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
 export class MessageAutoService {
@@ -16,7 +24,38 @@ export class MessageAutoService {
     private readonly messageService: WhatsappMessageService,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly gateway: WhatsappMessageGateway,
+    private readonly logger: AppLogger,
   ) {}
+
+  async create(dto: CreateMessageAutoDto): Promise<MessageAuto> {
+    const message = this.autoMessageRepo.create(dto);
+    return await this.autoMessageRepo.save(message);
+  }
+
+  async findAll(): Promise<MessageAuto[]> {
+    return await this.autoMessageRepo.find({ order: { position: 'ASC' } });
+  }
+
+  async findOne(id: string): Promise<MessageAuto> {
+    const message = await this.autoMessageRepo.findOne({ where: { id } });
+    if (!message) {
+      throw new NotFoundException(`Auto message with ID ${id} not found`);
+    }
+    return message;
+  }
+
+  async update(id: string, dto: UpdateMessageAutoDto): Promise<MessageAuto> {
+    const message = await this.findOne(id);
+    Object.assign(message, dto);
+    return await this.autoMessageRepo.save(message);
+  }
+
+  async remove(id: string): Promise<void> {
+    const result = await this.autoMessageRepo.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Auto message with ID ${id} not found`);
+    }
+  }
 
   /**
    * 1️⃣ Récupère un message auto actif par position
@@ -40,8 +79,6 @@ export class MessageAutoService {
    * 2️⃣ Lance l’envoi d’un message auto
    */
   async sendAutoMessage(chatId: string, position: number): Promise<void> {
-    // console.log("message automatique",chatId,position);
-
     const chat = await this.chatService.findBychat_id(chatId);
 
     if (!chat) return;
@@ -58,19 +95,17 @@ export class MessageAutoService {
       );
     }
 
-    console.log(
-      '====affichage des temple aleatoire====',
-      chat.auto_message_step,
+    this.logger.debug(
+      `Auto message step ${chat.auto_message_step} for ${chat.chat_id}`,
+      MessageAutoService.name,
     );
 
     const template = await this.getAutoMessageByPosition(position);
 
     if (!template) return;
-    // console.log("affichage des temple aleatoire",template);
-
     // Marquer la conversation comme bloquée
     await this.chatService.update(chatId, {
-      readonly: true,
+      read_only: true,
       auto_message_status: 'sending',
     });
 
@@ -96,7 +131,7 @@ export class MessageAutoService {
 
     // Débloquer après envoi
     await this.chatService.update(chatId, {
-      readonly: false,
+      read_only: false,
       auto_message_status: 'sent',
       auto_message_id: template.id,
     });
@@ -108,7 +143,6 @@ export class MessageAutoService {
     numero?: string;
   }): string {
     const safeName = this.normalizeClientName(data.name);
-    // console.log("safeName",safeName);
 
     return data.message
       .replace(/#name#/gi, safeName)

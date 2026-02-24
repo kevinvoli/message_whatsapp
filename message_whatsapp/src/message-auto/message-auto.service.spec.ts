@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { MessageAutoService } from './message-auto.service';
+import { createMocker } from 'src/test-utils/nest-mocker';
 
 describe('MessageAutoService', () => {
   let service: MessageAutoService;
@@ -7,7 +8,9 @@ describe('MessageAutoService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [MessageAutoService],
-    }).compile();
+    })
+      .useMocker(createMocker)
+      .compile();
 
     service = module.get<MessageAutoService>(MessageAutoService);
   });

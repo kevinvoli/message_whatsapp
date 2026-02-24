@@ -1,10 +1,20 @@
-import { Controller, Get, Post, Body,  Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
-
+import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 
 @Controller('channel')
+@UseGuards(AdminGuard) // Use AdminGuard
 export class ChannelController {
   constructor(private readonly communicationWhapiService: ChannelService) {}
 
@@ -23,13 +33,19 @@ export class ChannelController {
     return this.communicationWhapiService.findOne(id);
   }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateCommunicationWhapiDto: UpdateChannelDto) {
-  //   return this.communicationWhapiService.update(id, updateCommunicationWhapiDto);
-  // }
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() updateCommunicationWhapiDto: UpdateChannelDto,
+  ) {
+    return this.communicationWhapiService.update(
+      id,
+      updateCommunicationWhapiDto,
+    );
+  }
 
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.communicationWhapiService.remove(id);
-  // }
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.communicationWhapiService.remove(id);
+  }
 }

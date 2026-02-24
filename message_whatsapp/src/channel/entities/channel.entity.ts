@@ -11,11 +11,23 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('whapi_channels')
-@Index('UQ_whapi_channel_id', ['channel_id'], {unique:true})
+@Entity({ name: 'whapi_channels', engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
+@Index('UQ_whapi_channel_id', ['channel_id'], { unique: true })
+@Index('UQ_whapi_channels_provider_external_id', ['provider', 'external_id'], {
+  unique: true,
+})
 export class WhapiChannel {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenant_id?: string | null;
+
+  @Column({ name: 'provider', type: 'varchar', length: 32, nullable: true })
+  provider?: string | null;
+
+  @Column({ name: 'external_id', type: 'varchar', length: 191, nullable: true })
+  external_id?: string | null;
 
   @Column({
     name: 'channel_id',
@@ -23,10 +35,9 @@ export class WhapiChannel {
     length: 100,
     nullable: true,
   })
-  channel_id: string
+  channel_id: string;
 
-  @Index({ unique: true })
-  @Column()
+  @Column({ type: 'text' })
   token: string;
 
   @Column({ type: 'int' })
@@ -43,6 +54,9 @@ export class WhapiChannel {
 
   @OneToMany(() => WhatsappMessage, (message) => message.channel)
   messages: WhatsappMessage[];
+
+  @OneToMany(() => WhatsappChat, (chat) => chat.channel)
+  chats: WhatsappChat[];
 
   @OneToMany(() => WhatsappMedia, (media) => media.chat)
   medias: WhatsappMedia[];

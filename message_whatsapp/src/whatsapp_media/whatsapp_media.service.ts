@@ -24,18 +24,32 @@ export class WhatsappMediaService {
   // CREATE MEDIA
   // -------------------------
   async create(createDto: CreateWhatsappMediaDto): Promise<WhatsappMedia> {
-    const { chat_id, message_id, type, media_id, url, mime_type, caption, file_name, file_size, duration_seconds } = createDto;
+    const {
+      chat_id,
+      message_id,
+      type,
+      media_id,
+      url,
+      mime_type,
+      caption,
+      file_name,
+      file_size,
+      duration_seconds,
+    } = createDto;
 
     const chat = await this.chatRepository.findOne({ where: { chat_id } });
     if (!chat) throw new NotFoundException(`Chat ${chat_id} not found`);
 
-    const message = await this.messageRepository.findOne({ where: { id: message_id } });
-    if (!message) throw new NotFoundException(`Message ${message_id} not found`);
+    const message = await this.messageRepository.findOne({
+      where: { id: message_id },
+    });
+    if (!message)
+      throw new NotFoundException(`Message ${message_id} not found`);
 
     const media = this.mediaRepository.create({
       chat,
       message,
-      media_type: type ,
+      media_type: type,
       media_id,
       url,
       mime_type,
@@ -61,7 +75,10 @@ export class WhatsappMediaService {
   // FIND ONE MEDIA
   // -------------------------
   async findOne(id: string): Promise<WhatsappMedia> {
-    const media = await this.mediaRepository.findOne({ where: { id }, relations: ['chat', 'message'] });
+    const media = await this.mediaRepository.findOne({
+      where: { id },
+      relations: ['chat', 'message'],
+    });
     if (!media) throw new NotFoundException(`Media ${id} not found`);
     return media;
   }
@@ -70,8 +87,11 @@ export class WhatsappMediaService {
   // FIND MEDIAS BY MESSAGE
   // -------------------------
   async findByMessage(message_id: string): Promise<WhatsappMedia[]> {
-    const message = await this.messageRepository.findOne({ where: { id: message_id } });
-    if (!message) throw new NotFoundException(`Message ${message_id} not found`);
+    const message = await this.messageRepository.findOne({
+      where: { id: message_id },
+    });
+    if (!message)
+      throw new NotFoundException(`Message ${message_id} not found`);
 
     return await this.mediaRepository.find({
       where: { message: { id: message_id } },
@@ -81,7 +101,10 @@ export class WhatsappMediaService {
   // -------------------------
   // UPDATE MEDIA
   // -------------------------
-  async update(id: string, updateDto: UpdateWhatsappMediaDto): Promise<WhatsappMedia> {
+  async update(
+    id: string,
+    updateDto: UpdateWhatsappMediaDto,
+  ): Promise<WhatsappMedia> {
     const media = await this.findOne(id);
     Object.assign(media, updateDto);
     return await this.mediaRepository.save(media);
@@ -95,7 +118,7 @@ export class WhatsappMediaService {
     await this.mediaRepository.remove(media);
   }
 
-   async removeByMessage(message_id: string) {
+  async removeByMessage(message_id: string) {
     const medias = await this.findByMessage(message_id);
     await this.mediaRepository.remove(medias);
     return { deletedCount: medias.length };

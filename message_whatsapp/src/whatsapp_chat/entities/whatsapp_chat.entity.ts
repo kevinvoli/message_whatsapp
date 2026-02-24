@@ -1,3 +1,4 @@
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_chat_label.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -21,14 +22,20 @@ export enum WhatsappChatStatus {
   FERME = 'fermé',
 }
 
-@Entity()
-@Index('UQ_whatsapp_chat_chat_id', ['chat_id'], { unique: true })
+@Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
+@Index('IDX_whatsapp_chat_tenant_id', ['tenant_id'])
+@Index('UQ_whatsapp_chat_tenant_chat_id', ['tenant_id', 'chat_id'], {
+  unique: true,
+})
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
     comment: 'Primary key - Unique trajet identifier',
   })
   id: string;
+
+  @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
+  tenant_id?: string | null;
 
   @Column({
     name: 'poste_id',
@@ -45,6 +52,19 @@ export class WhatsappChat {
     nullable: true,
   })
   last_msg_client_channel_id?: string;
+
+  @Column({
+    name: 'channel_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  channel_id?: string;
+
+  @ManyToOne(() => WhapiChannel, (channel) => channel.chats)
+  @JoinColumn({ name: 'channel_id', referencedColumnName: 'channel_id' })
+  channel: WhapiChannel;
+
   // pour les regle du dispatch
   @Column({ type: 'timestamp', nullable: true })
   assigned_at: Date | null;
@@ -79,7 +99,6 @@ export class WhatsappChat {
     type: 'varchar',
     length: 100,
     nullable: false,
-    unique: true,
   })
   chat_id: string; // chat_id WHAPI
 
@@ -183,14 +202,6 @@ export class WhatsappChat {
   current_auto_message_id?: string | null;
 
   @Column({
-    name: 'readonly',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
-  readonly: boolean;
-
-  @Column({
     name: 'auto_message_status',
     type: 'varchar',
     length: 100,
@@ -200,10 +211,6 @@ export class WhatsappChat {
 
   @Column({ type: 'int', default: 0 })
   auto_message_step: number;
-  // 0 = aucun envoyé
-  // 1 = message 1 envoyé
-  // 2 = message 2 envoyé
-  // 3 = message 3 envoyé (STOP)
 
   @Column({ type: 'boolean', default: false })
   waiting_client_reply: boolean;
