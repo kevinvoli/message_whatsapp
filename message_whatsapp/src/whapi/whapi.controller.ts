@@ -42,6 +42,8 @@ export class WhapiController {
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     
+    console.log('arrive a bon port',payload);
+    
     const startedAt = Date.now();
     const provider = 'whapi';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();

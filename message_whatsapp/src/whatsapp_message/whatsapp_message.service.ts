@@ -326,11 +326,13 @@ export class WhatsappMessageService {
       const serverHost = rawHost.replace(/\/+$/, '');
 
       let resolvedMediaUrl: string | null = null;
+      const channelQuery = `?channelId=${encodeURIComponent(channel.channel_id)}`;
       if (sendResponse.provider === 'meta' && sendResponse.providerMediaId) {
-        const channelQuery = `?channelId=${encodeURIComponent(channel.channel_id)}`;
         resolvedMediaUrl = `${serverHost}/messages/media/meta/${sendResponse.providerMediaId}${channelQuery}`;
-      } else if (sendResponse.provider === 'whapi' && sendResponse.mediaUrl) {
-        resolvedMediaUrl = sendResponse.mediaUrl;
+      } else if (sendResponse.provider === 'whapi') {
+        // Proxy interne : évite la dépendance à l'Auto-Download Whapi et les
+        // race conditions (CDN pas encore disponible au moment de l'envoi).
+        resolvedMediaUrl = `${serverHost}/messages/media/whapi/${sendResponse.providerMessageId}${channelQuery}`;
       }
 
       // 4. Create media entity

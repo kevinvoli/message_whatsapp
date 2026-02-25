@@ -353,6 +353,42 @@ export class CommunicationWhapiService {
     }
   }
 
+  /**
+   * Télécharge le binaire d'un média Whapi à partir de l'ID du message envoyé.
+   * Récupère d'abord l'URL CDN via GET /messages/{id}, puis télécharge le contenu.
+   */
+  async downloadMedia(
+    messageId: string,
+    channelId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    const { link } = await this.getMessageMediaLink(messageId, channelId);
+    if (!link) {
+      this.logger.warn(
+        `downloadMedia: aucun lien CDN pour messageId=${messageId}`,
+        CommunicationWhapiService.name,
+      );
+      return null;
+    }
+
+    try {
+      const response = await axios.get<ArrayBuffer>(link, {
+        responseType: 'arraybuffer',
+      });
+      const mimeType =
+        (response.headers['content-type'] as string | undefined)?.split(
+          ';',
+        )[0] ?? 'application/octet-stream';
+      return { buffer: Buffer.from(response.data), mimeType };
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      this.logger.warn(
+        `downloadMedia: échec téléchargement CDN messageId=${messageId} status=${axiosError.response?.status ?? 'unknown'}`,
+        CommunicationWhapiService.name,
+      );
+      return null;
+    }
+  }
+
   generateWhapiMessageId(): string {
     const part = (len: number) =>
       Math.random()

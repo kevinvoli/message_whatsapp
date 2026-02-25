@@ -27,6 +27,7 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { Repository } from 'typeorm';
 import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { Response } from 'express';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
@@ -48,6 +49,7 @@ export class WhatsappMessageController {
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly channelService: ChannelService,
     private readonly metaService: CommunicationMetaService,
+    private readonly whapiService: CommunicationWhapiService,
   ) {}
 
   @Post()
@@ -216,6 +218,45 @@ export class WhatsappMessageController {
 
     if (!downloaded) {
       throw new NotFoundException('Meta media not found');
+    }
+
+    res.setHeader('Content-Type', downloaded.mimeType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(downloaded.buffer);
+  }
+
+  @Get('media/whapi/:messageId')
+  async streamWhapiMedia(
+    @Param('messageId') messageId: string,
+    @Query('channelId') channelId: string | undefined,
+    @Res() res: Response,
+  ) {
+    if (!messageId) {
+      throw new BadRequestException('messageId is required');
+    }
+
+    // Résolution du channelId depuis la DB si absent du query string
+    const resolvedChannelId =
+      channelId ??
+      (
+        await this.mediaRepository.findOne({
+          where: { whapi_media_id: messageId, provider: 'whapi' },
+          relations: ['message'],
+        })
+      )?.message?.channel_id ??
+      null;
+
+    if (!resolvedChannelId) {
+      throw new NotFoundException('Channel non résolu pour ce média Whapi');
+    }
+
+    const downloaded = await this.whapiService.downloadMedia(
+      messageId,
+      resolvedChannelId,
+    );
+
+    if (!downloaded) {
+      throw new NotFoundException('Média Whapi introuvable');
     }
 
     res.setHeader('Content-Type', downloaded.mimeType);
