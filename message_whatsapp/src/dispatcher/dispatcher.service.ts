@@ -60,7 +60,7 @@ export class DispatcherService {
 
     const conversation = await this.chatRepository.findOne({
       where: { chat_id: clientPhone },
-      relations: ['messages', 'poste'],
+      relations: ['messages', 'poste', 'channel'],
     });
 
     if (conversation?.read_only) {

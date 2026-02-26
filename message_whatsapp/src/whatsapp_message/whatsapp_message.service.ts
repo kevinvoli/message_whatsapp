@@ -110,7 +110,7 @@ export class WhatsappMessageService {
   async createAgentMessage(data: {
     chat_id: string;
     text: string;
-    poste_id: string;
+    poste_id: string | null;
     timestamp: Date;
     commercial_id?: string | null;
     channel_id: string;
@@ -388,7 +388,7 @@ export class WhatsappMessageService {
     data: {
       chat_id: string;
       text: string;
-      poste_id: string;
+      poste_id: string | null;
       timestamp: Date;
       commercial_id?: string | null;
       channel_id: string;

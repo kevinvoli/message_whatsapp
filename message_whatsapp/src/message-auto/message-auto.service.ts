@@ -83,12 +83,6 @@ export class MessageAutoService {
 
     if (!chat) return;
 
-    if (!chat.poste?.id) {
-      throw new Error(
-        `Impossible d'envoyer un message auto : poste manquant pour le chat ${chatId}`,
-      );
-    }
-
     if (!chat.last_msg_client_channel_id) {
       throw new Error(
         `Impossible d'envoyer un message auto : channel manquant pour le chat ${chatId}`,
@@ -102,39 +96,55 @@ export class MessageAutoService {
 
     const template = await this.getAutoMessageByPosition(position);
 
-    if (!template) return;
-    // Marquer la conversation comme bloquée
+    if (!template) {
+      this.logger.debug(
+        `No active template at position ${position} — skipping auto message for ${chatId}`,
+        MessageAutoService.name,
+      );
+      return;
+    }
+
+    // Marquer la conversation comme "en cours d'envoi"
     await this.chatService.update(chatId, {
       read_only: true,
       auto_message_status: 'sending',
     });
 
-    const mes = this.formatMessageAuto({
-      message: template.body,
-      name: chat.name,
-      numero: chat.contact_client,
-    });
+    try {
+      const mes = this.formatMessageAuto({
+        message: template.body,
+        name: chat.name,
+        numero: chat.contact_client,
+      });
 
-    const message = await this.messageService.createAgentMessage({
-      chat_id: chat.chat_id,
-      poste_id: chat.poste.id,
-      text: mes,
-      timestamp: new Date(
-        chat?.last_client_message_at
-          ? chat.last_client_message_at.getTime() + 1000
-          : Date.now(),
-      ),
-      channel_id: chat.last_msg_client_channel_id,
-    });
+      const message = await this.messageService.createAgentMessage({
+        chat_id: chat.chat_id,
+        poste_id: chat.poste?.id ?? null,
+        text: mes,
+        timestamp: new Date(
+          chat?.last_client_message_at
+            ? chat.last_client_message_at.getTime() + 1000
+            : Date.now(),
+        ),
+        channel_id: chat.last_msg_client_channel_id,
+      });
 
-    await this.gateway.notifyNewMessage(message, chat);
+      await this.gateway.notifyNewMessage(message, chat);
 
-    // Débloquer après envoi
-    await this.chatService.update(chatId, {
-      read_only: false,
-      auto_message_status: 'sent',
-      auto_message_id: template.id,
-    });
+      // Débloquer après envoi
+      await this.chatService.update(chatId, {
+        read_only: false,
+        auto_message_status: 'sent',
+        auto_message_id: template.id,
+      });
+    } catch (err) {
+      // Toujours débloquer la conversation même en cas d'erreur
+      await this.chatService.update(chatId, {
+        read_only: false,
+        auto_message_status: 'failed',
+      });
+      throw err;
+    }
   }
 
   private formatMessageAuto(data: {

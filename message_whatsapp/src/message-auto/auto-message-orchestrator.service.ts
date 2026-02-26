@@ -106,9 +106,11 @@ export class AutoMessageOrchestrator {
     const timeout = setTimeout(() => {
       void this.executeAutoMessage(chatId)
         .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          const stack = err instanceof Error ? err.stack : undefined;
           this.logger.error(
-            'AutoMessage execution failed',
-            err instanceof Error ? err.stack : undefined,
+            `AutoMessage execution failed for ${chatId}: ${msg}`,
+            stack,
             AutoMessageOrchestrator.name,
           );
         })

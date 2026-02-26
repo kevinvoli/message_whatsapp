@@ -187,10 +187,12 @@ export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'c
 }
 
 export async function updateMessageAuto(id: string, messageAuto: Partial<MessageAuto>): Promise<MessageAuto> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, createdAt, updatedAt, ...cleanPayload } = messageAuto as MessageAuto;
     const response = await fetch(`${API_BASE_URL}/message-auto/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messageAuto),
+        body: JSON.stringify(cleanPayload),
         credentials: 'include',
     });
     return handleResponse<MessageAuto>(response);
@@ -323,7 +325,8 @@ export async function getDispatchSettings(): Promise<DispatchSettings> {
 export async function updateDispatchSettings(
   payload: Partial<DispatchSettings>,
 ): Promise<DispatchSettings> {
-    const { id, ...cleanPayload } = payload as DispatchSettings & { id?: string };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, createdAt, updatedAt, ...cleanPayload } = payload as DispatchSettings & { id?: string; createdAt?: unknown; updatedAt?: unknown };
   
     const response = await fetch(`${API_BASE_URL}/queue/dispatch/settings`, {
         method: 'POST',
