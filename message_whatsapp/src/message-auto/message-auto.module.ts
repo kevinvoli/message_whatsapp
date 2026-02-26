@@ -29,6 +29,8 @@ import { Contact } from 'src/contact/entities/contact.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
+import { AutoMessageScopeConfig } from './entities/auto-message-scope-config.entity';
+import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
     }),
     TypeOrmModule.forFeature([
       MessageAuto,
+      AutoMessageScopeConfig,
       WhatsappMessage,
       WhatsappChat,
       WhatsappCommercial,
@@ -59,6 +62,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
   controllers: [MessageAutoController],
   providers: [
     MessageAutoService,
+    AutoMessageScopeConfigService,
     WhatsappChatService,
     WhatsappCommercialService,
     WhatsappPosteService,

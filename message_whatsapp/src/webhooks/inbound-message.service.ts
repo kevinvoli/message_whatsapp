@@ -23,6 +23,7 @@ import { UnifiedMessage } from './normalization/unified-message';
 import { UnifiedStatus } from './normalization/unified-status';
 import { ChannelService } from 'src/channel/channel.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
+import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -46,6 +47,7 @@ export class InboundMessageService {
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly channelService: ChannelService,
+    private readonly autoMessageOrchestrator: AutoMessageOrchestrator,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -123,6 +125,14 @@ export class InboundMessageService {
           this.logger.log(
             `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
           );
+
+          // 🤖 Messages automatiques : déclenché uniquement si l'agent
+          // n'a jamais répondu sur ce chat (last_poste_message_at = null).
+          // Fire-and-forget : le setTimeout interne est non-bloquant.
+          if (!conversation.last_poste_message_at) {
+            conversation.last_client_message_at = savedMessage.timestamp ?? new Date();
+            void this.autoMessageOrchestrator.handleClientMessage(conversation);
+          }
         });
       } catch (err) {
         throw new HttpException(

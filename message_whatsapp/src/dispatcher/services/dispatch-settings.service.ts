@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -13,6 +13,10 @@ const DEFAULTS = {
   no_reply_reinject_interval_minutes: 5,
   read_only_check_interval_minutes: 10,
   offline_reinject_cron: '0 9 * * *',
+  auto_message_enabled: false,
+  auto_message_delay_min_seconds: 20,
+  auto_message_delay_max_seconds: 45,
+  auto_message_max_steps: 3,
 };
 
 @Injectable()
@@ -51,9 +55,20 @@ export class DispatchSettingsService implements OnModuleInit {
   ): Promise<DispatchSettings> {
     const settings = await this.getSettings();
     const before = { ...settings };
+
     if (patch.offline_reinject_cron) {
       this.assertValidCron(patch.offline_reinject_cron);
     }
+
+    // Validation croisée : delay_min doit être strictement inférieur à delay_max
+    const finalMin = patch.auto_message_delay_min_seconds ?? settings.auto_message_delay_min_seconds;
+    const finalMax = patch.auto_message_delay_max_seconds ?? settings.auto_message_delay_max_seconds;
+    if (finalMin >= finalMax) {
+      throw new BadRequestException(
+        `auto_message_delay_min_seconds (${finalMin}) doit être inférieur à auto_message_delay_max_seconds (${finalMax})`,
+      );
+    }
+
     Object.assign(settings, patch);
     const saved = await this.settingsRepository.save(settings);
     await this.auditRepository.save(

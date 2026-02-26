@@ -27,8 +27,10 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
+import { AutoMessageScopeConfigService } from 'src/message-auto/auto-message-scope-config.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
+import { AutoMessageScopeConfig } from 'src/message-auto/entities/auto-message-scope-config.entity';
 import { WebhookEventLog } from './entities/webhook-event.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { CallLogModule } from 'src/call-log/call_log.module';
@@ -58,6 +60,7 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
       WhatsappPoste,
       WhatsappMedia,
       MessageAuto,
+      AutoMessageScopeConfig,
       WebhookEventLog,
     ]),
     DispatcherModule,
@@ -80,6 +83,7 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
     CommunicationMetaService,
     OutboundRouterService,
     AutoMessageOrchestrator,
+    AutoMessageScopeConfigService,
     MessageAutoService,
     WebhookRateLimitService,
     WebhookTrafficHealthService,

@@ -196,56 +196,150 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
           </div>
         </div>
         {settings && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Reinject sans reponse (min)
-              </label>
-              <input
-                type="number"
-                min={1}
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
-                value={settings.no_reply_reinject_interval_minutes}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    no_reply_reinject_interval_minutes: Number(e.target.value),
-                  })
-                }
-              />
+          <div className="mt-4 space-y-6">
+            {/* Cron settings */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Reinject sans reponse (min)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                  value={settings.no_reply_reinject_interval_minutes}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      no_reply_reinject_interval_minutes: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Read-only check (min)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                  value={settings.read_only_check_interval_minutes}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      read_only_check_interval_minutes: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Offline reinject cron
+                </label>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                  value={settings.offline_reinject_cron}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      offline_reinject_cron: e.target.value,
+                    })
+                  }
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Read-only check (min)
-              </label>
-              <input
-                type="number"
-                min={1}
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
-                value={settings.read_only_check_interval_minutes}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    read_only_check_interval_minutes: Number(e.target.value),
-                  })
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Offline reinject cron
-              </label>
-              <input
-                type="text"
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
-                value={settings.offline_reinject_cron}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    offline_reinject_cron: e.target.value,
-                  })
-                }
-              />
+
+            {/* Messages automatiques */}
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Messages automatiques
+              </p>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Activer les messages auto</p>
+                  <p className="text-xs text-gray-500">
+                    Active ou desactive l&apos;envoi de messages auto pour toutes les conversations.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.auto_message_enabled}
+                  onClick={() =>
+                    setSettings({
+                      ...settings,
+                      auto_message_enabled: !settings.auto_message_enabled,
+                    })
+                  }
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                    settings.auto_message_enabled ? 'bg-emerald-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                      settings.auto_message_enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Delai min (s)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={3600}
+                    className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value={settings.auto_message_delay_min_seconds}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        auto_message_delay_min_seconds: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Delai max (s)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={3600}
+                    className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value={settings.auto_message_delay_max_seconds}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        auto_message_delay_max_seconds: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Etapes max
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                    value={settings.auto_message_max_steps}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        auto_message_max_steps: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot } from './definitions'; // Added WhatsappChat, WhatsappMessage
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -202,6 +202,45 @@ export async function deleteMessageAuto(id: string): Promise<{ message: string }
         credentials: 'include',
     });
     return handleResponse<{ message: string }>(response);
+}
+
+export async function getScopeConfigs(): Promise<AutoMessageScopeConfig[]> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/scope-config`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<AutoMessageScopeConfig[]>(response);
+}
+
+export async function getScopeConfigsByType(type: AutoMessageScopeType): Promise<AutoMessageScopeConfig[]> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/scope-config/type/${type}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<AutoMessageScopeConfig[]>(response);
+}
+
+export async function upsertScopeConfig(payload: {
+    scope_type: AutoMessageScopeType;
+    scope_id: string;
+    label?: string;
+    enabled: boolean;
+}): Promise<AutoMessageScopeConfig> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/scope-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<AutoMessageScopeConfig>(response);
+}
+
+export async function deleteScopeConfig(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/scope-config/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return handleResponse<void>(response);
 }
 
 export async function getClients(limit = 50, offset = 0): Promise<{ data: Client[]; total: number }> {

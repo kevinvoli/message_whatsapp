@@ -64,7 +64,7 @@ export class MessageAutoService {
     position: number,
   ): Promise<MessageAuto | null> {
     const messages = await this.autoMessageRepo.find({
-      where: { position },
+      where: { position, actif: true },
     });
 
     if (!messages.length) return null;

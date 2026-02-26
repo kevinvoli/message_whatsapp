@@ -254,9 +254,26 @@ export type DispatchSnapshot = {
 };
 
 export type DispatchSettings = {
+  id?: string;
   no_reply_reinject_interval_minutes: number;
   read_only_check_interval_minutes: number;
   offline_reinject_cron: string;
+  auto_message_enabled: boolean;
+  auto_message_delay_min_seconds: number;
+  auto_message_delay_max_seconds: number;
+  auto_message_max_steps: number;
+};
+
+export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';
+
+export type AutoMessageScopeConfig = {
+  id: string;
+  scope_type: AutoMessageScopeType;
+  scope_id: string;
+  label?: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type DispatchSettingsAudit = {

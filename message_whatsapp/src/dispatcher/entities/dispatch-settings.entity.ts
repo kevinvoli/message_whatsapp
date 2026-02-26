@@ -33,6 +33,22 @@ export class DispatchSettings {
   })
   offline_reinject_cron: string;
 
+  /** Activation globale des messages automatiques (false par défaut = sécurité) */
+  @Column({ name: 'auto_message_enabled', type: 'boolean', default: false })
+  auto_message_enabled: boolean;
+
+  /** Délai minimum en secondes avant l'envoi d'un message auto */
+  @Column({ name: 'auto_message_delay_min_seconds', type: 'int', default: 20 })
+  auto_message_delay_min_seconds: number;
+
+  /** Délai maximum en secondes avant l'envoi d'un message auto */
+  @Column({ name: 'auto_message_delay_max_seconds', type: 'int', default: 45 })
+  auto_message_delay_max_seconds: number;
+
+  /** Nombre max d'étapes de la séquence auto (au-delà : chat → read_only) */
+  @Column({ name: 'auto_message_max_steps', type: 'int', default: 3 })
+  auto_message_max_steps: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

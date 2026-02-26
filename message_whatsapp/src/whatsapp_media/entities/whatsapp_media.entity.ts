@@ -141,6 +141,7 @@ export class WhatsappMedia {
   // Optionnel : lien direct avec le channel
   @ManyToOne(() => WhapiChannel, (channel) => channel.medias, {
     nullable: true,
+    onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'channel_id' })
   channel?: WhapiChannel | null;

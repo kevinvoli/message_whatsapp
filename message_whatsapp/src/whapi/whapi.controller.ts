@@ -58,6 +58,8 @@ export class WhapiController {
       payload.channel_id,
     );
     const auditEventKey = this.buildAuditEventKey('whapi', payload);
+    console.log("entré comfirme", payload.channel_id);
+    
     this.auditLogger.log(
       `WEBHOOK_ACCEPTED request_id=${requestId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
     );

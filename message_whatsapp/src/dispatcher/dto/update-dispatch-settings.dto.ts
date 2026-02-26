@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class UpdateDispatchSettingsDto {
   @IsOptional()
@@ -14,4 +14,26 @@ export class UpdateDispatchSettingsDto {
   @IsOptional()
   @IsString()
   offline_reinject_cron?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  auto_message_enabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3600)
+  auto_message_delay_min_seconds?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3600)
+  auto_message_delay_max_seconds?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  auto_message_max_steps?: number;
 }
