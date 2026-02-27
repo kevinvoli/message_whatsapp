@@ -150,13 +150,26 @@ jobs:
             cd /var/www/whatsapp
 
             # Authentification au registre GitHub pour puller les images privées
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.SSH_USER }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
             # Pull les nouvelles images
             docker compose pull
 
             # Redémarre les containers mis à jour (volumes préservés)
             docker compose up -d --remove-orphans
+
+            # Attendre que le backend soit prêt
+            echo "Attente du backend..."
+            for i in $(seq 1 30); do
+              if docker exec whatsapp-back wget -qO- http://localhost:3002/ > /dev/null 2>&1; then
+                echo "Backend prêt."
+                break
+              fi
+              sleep 3
+            done
+
+            # Lancer les migrations
+            docker exec whatsapp-back npm run migration:run:prod
 
             # Nettoyage des anciennes images
             docker image prune -f
