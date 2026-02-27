@@ -1,40 +1,161 @@
-
-name: CI/CD MonoRepo
+name: CI/CD — Build & Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
+env:
+  REGISTRY: ghcr.io
+
+# ──────────────────────────────────────────────────────────────────────
+# JOBS
+# ──────────────────────────────────────────────────────────────────────
 jobs:
-  deploy:
+
+  # ────────────────────────────────────────────────────────────────────
+  # 1. DÉTECTION DES CHANGEMENTS
+  #    Chaque service est rebuild uniquement si son dossier a changé
+  # ────────────────────────────────────────────────────────────────────
+  changes:
+    name: Detect changed services
     runs-on: ubuntu-latest
-
+    outputs:
+      backend:  ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      admin:    ${{ steps.filter.outputs.admin }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Login GHCR
-        run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'message_whatsapp/**'
+            frontend:
+              - 'front/**'
+            admin:
+              - 'admin/**'
 
-      - name: Build & Push BACK
-        run: |
-          docker build -t ghcr.io/${{ github.repository }}/back ./back
-          docker push ghcr.io/${{ github.repository }}/back
+  # ────────────────────────────────────────────────────────────────────
+  # 2a. BUILD BACKEND
+  # ────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build — Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build & Push FRONT
-        run: |
-          docker build -t ghcr.io/${{ github.repository }}/front ./front
-          docker push ghcr.io/${{ github.repository }}/front
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy on server
+      - name: Build & Push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./message_whatsapp
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/back:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/back:${{ github.sha }}
+
+  # ────────────────────────────────────────────────────────────────────
+  # 2b. BUILD FRONTEND
+  # ────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: Build — Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./front
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/front:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/front:${{ github.sha }}
+
+  # ────────────────────────────────────────────────────────────────────
+  # 2c. BUILD ADMIN
+  # ────────────────────────────────────────────────────────────────────
+  build-admin:
+    name: Build — Admin
+    needs: changes
+    if: needs.changes.outputs.admin == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push admin image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./admin
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/admin:latest
+            ${{ env.REGISTRY }}/${{ github.repository }}/admin:${{ github.sha }}
+
+  # ────────────────────────────────────────────────────────────────────
+  # 3. DÉPLOIEMENT SUR LE SERVEUR
+  #    Se déclenche dès que tous les builds sont terminés (ou skippés)
+  #    Ne tourne pas si un build a échoué
+  # ────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to server
+    needs: [build-backend, build-frontend, build-admin]
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.SSH_HOST }}
+          host:     ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          key:      ${{ secrets.SSH_KEY }}
           script: |
-            cd /var/www/app
-            docker pull ghcr.io/${{ github.repository }}/back
-            docker pull ghcr.io/${{ github.repository }}/front
-            docker compose up -d
+            cd /var/www/whatsapp
+
+            # Pull uniquement les images mises à jour
+            docker compose pull
+
+            # Redémarre seulement les containers dont l'image a changé
+            # Les volumes sont préservés automatiquement
+            docker compose up -d --remove-orphans
+
+            # Nettoyage des anciennes images (libère de l'espace disque)
+            docker image prune -f

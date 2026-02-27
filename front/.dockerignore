@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+*.md
+.env
+.env.*
+!.env.example
+coverage
+dockerfile.yml
+Dockerfile
+.eslintrc*
+eslint.config*
+tsconfig.tsbuildinfo

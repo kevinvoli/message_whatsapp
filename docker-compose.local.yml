@@ -1,15 +1,14 @@
 version: "3.8"
 
 # ──────────────────────────────────────────────────────────────
-# VOLUMES persistants — les données survivent aux mises à jour
+# COMPOSE LOCAL — build depuis les Dockerfiles
+# Usage : docker compose -f docker-compose.local.yml up --build
 # ──────────────────────────────────────────────────────────────
-volumes:
-  backend_uploads:   # fichiers médias WhatsApp
-  backend_logs:      # logs applicatifs NestJS
 
-# ──────────────────────────────────────────────────────────────
-# RÉSEAU interne entre les containers
-# ──────────────────────────────────────────────────────────────
+volumes:
+  backend_uploads:
+  backend_logs:
+
 networks:
   whatsapp-net:
     driver: bridge
@@ -20,10 +19,16 @@ services:
   # BACKEND — NestJS (port 3002)
   # ────────────────────────────────
   backend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/back:${IMAGE_TAG:-latest}
+    build:
+      context: ./message_whatsapp
+    image: whatsapp-back:local
     container_name: whatsapp-back
     restart: unless-stopped
     env_file: ./message_whatsapp/.env
+    environment:
+      # Remplace localhost par host.docker.internal pour atteindre
+      # le MySQL installé sur la machine host
+      MYSQL_HOST: host.docker.internal
     ports:
       - "3002:3002"
     volumes:
@@ -31,7 +36,6 @@ services:
       - backend_logs:/app/logs
     networks:
       - whatsapp-net
-    # Accès à MySQL installé directement sur le serveur host
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -45,10 +49,14 @@ services:
   # FRONTEND — Next.js agents (port 3000)
   # ────────────────────────────────
   frontend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/front:${IMAGE_TAG:-latest}
+    build:
+      context: ./front
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3002
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:3002
+    image: whatsapp-front:local
     container_name: whatsapp-front
     restart: unless-stopped
-    env_file: ./front/.env
     ports:
       - "3000:3000"
     networks:
@@ -56,21 +64,18 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
   # ────────────────────────────────
   # ADMIN — Next.js panel (port 3001)
   # ────────────────────────────────
   admin:
-    image: ghcr.io/${GITHUB_REPOSITORY}/admin:${IMAGE_TAG:-latest}
+    build:
+      context: ./admin
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3002
+    image: whatsapp-admin:local
     container_name: whatsapp-admin
     restart: unless-stopped
-    env_file: ./admin/.env
     ports:
       - "3001:3000"
     networks:
@@ -78,16 +83,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
   # ────────────────────────────────
-  # PHPMYADMIN — Interface DB (port 8080)
-  # Se connecte au MySQL installé sur le serveur host
+  # PHPMYADMIN — Interface DB (port 8000)
   # ────────────────────────────────
   phpmyadmin:
     image: phpmyadmin:latest
@@ -96,9 +94,9 @@ services:
     ports:
       - "8000:80"
     environment:
-      PMA_HOST: host.docker.internal   # MySQL sur le serveur host
-      PMA_PORT: ${MYSQL_PORT:-3306}
-      PMA_ARBITRARY: 0                 # désactive la saisie manuelle du host
+      PMA_HOST: host.docker.internal
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 0
       UPLOAD_LIMIT: 50M
     networks:
       - whatsapp-net
