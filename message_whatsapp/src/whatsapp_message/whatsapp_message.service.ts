@@ -486,7 +486,7 @@ export class WhatsappMessageService {
       const mess = await this.messageRepository.find({
         where: { chat_id: chat_id },
         relations: ['chat', 'poste', 'medias'],
-        order: { timestamp: 'ASC' },
+        order: { timestamp: 'ASC', createdAt: 'ASC' },
         take: limit,
         skip: offset,
       });
@@ -501,10 +501,15 @@ export class WhatsappMessageService {
    * 👁️ MARQUER MESSAGES COMME LUS
    * ======================= */
   async markIncomingMessagesAsRead(chat_id: string): Promise<void> {
-    // SQL brut pour éviter que @UpdateDateColumn ne mette updatedAt à NOW()
+    // Ancrage explicite de `timestamp` et updatedAt pour bloquer ON UPDATE CURRENT_TIMESTAMP
+    // côté MySQL (le moteur applique ON UPDATE même sur les raw queries).
+    // Sans cet ancrage, MySQL ≤ 5.6 mettrait `timestamp` à NOW() (premier TIMESTAMP NOT NULL
+    // sans DEFAULT explicite), ce qui corrompt l'ordre chronologique des messages.
     await this.messageRepository.query(
       `UPDATE whatsapp_message
-       SET status = 'READ'
+       SET status    = 'READ',
+           updatedAt = updatedAt,
+           \`timestamp\` = \`timestamp\`
        WHERE chat_id = ?
          AND direction = 'IN'
          AND status != 'READ'`,

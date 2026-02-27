@@ -80,6 +80,14 @@ const WebSocketEvents = () => {
 
           chatState.addMessage(message);
 
+          // Marquer comme lu immédiatement si message entrant dans la conv active
+          if (
+            !message.from_me &&
+            chatState.selectedConversation?.chat_id === message.chat_id
+          ) {
+            socket.emit('messages:read', { chat_id: message.chat_id });
+          }
+
           // Notification navigateur si onglet en arriere-plan et message entrant
           if (
             typeof document !== 'undefined' &&

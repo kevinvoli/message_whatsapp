@@ -87,9 +87,9 @@ export class WhatsappChatService {
    * 👁️ CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chat_id: string): Promise<void> {
-    // SQL brut pour éviter que @UpdateDateColumn ne mette updatedAt à NOW()
+    // Ancrage explicite de updatedAt pour bloquer ON UPDATE CURRENT_TIMESTAMP côté MySQL.
     await this.chatRepository.query(
-      `UPDATE whatsapp_chat SET unread_count = 0 WHERE chat_id = ?`,
+      `UPDATE whatsapp_chat SET unread_count = 0, updatedAt = updatedAt WHERE chat_id = ?`,
       [chat_id],
     );
 
