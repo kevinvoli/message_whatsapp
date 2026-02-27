@@ -38,6 +38,8 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://localhost:3003',
       'http://178.16.130.155',
+      'http://178.16.130.155:3000',
+      'http://178.16.130.155:3001',
       'http://localhost:3006',
       'http://localhost:3008',
     ],
