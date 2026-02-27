@@ -34,16 +34,7 @@ async function bootstrap() {
 
   // Enable CORS for the frontend application
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3003',
-      'http://178.16.130.155',
-      'http://178.16.130.155:3000',
-      'http://178.16.130.155:3001',
-      'http://localhost:3006',
-      'http://localhost:3008',
-      '*',
-    ],
+    origin:"*",
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
