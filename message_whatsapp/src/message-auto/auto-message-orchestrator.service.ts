@@ -63,6 +63,7 @@ export class AutoMessageOrchestrator {
       }
       return;
     }
+    
 
     // 🔍 Activation par scope (poste / canal / provider)
     const scopeEnabled = await this.scopeConfigService.isEnabledFor(
@@ -70,7 +71,7 @@ export class AutoMessageOrchestrator {
       chat.last_msg_client_channel_id,
       chat.channel?.provider ?? null,
     );
-    
+
 
     if (!scopeEnabled) {
       this.logger.debug(
