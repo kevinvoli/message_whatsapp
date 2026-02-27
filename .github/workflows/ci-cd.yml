@@ -155,21 +155,16 @@ jobs:
             # Pull les nouvelles images
             docker compose pull
 
-            # Redémarre les containers mis à jour (volumes préservés)
+            # Lancer les migrations AVANT de démarrer les containers
+            BACK_IMAGE=$(docker compose config | grep 'image:.*back' | awk '{print $2}' | head -1)
+            docker run --rm \
+              --env-file ./message_whatsapp/.env \
+              --add-host host.docker.internal:host-gateway \
+              "$BACK_IMAGE" \
+              npm run migration:run:prod
+
+            # Redémarre les containers (DB déjà à jour)
             docker compose up -d --remove-orphans
-
-            # Attendre que le backend soit prêt
-            echo "Attente du backend..."
-            for i in $(seq 1 30); do
-              if docker exec whatsapp-back wget -qO- http://localhost:3002/ > /dev/null 2>&1; then
-                echo "Backend prêt."
-                break
-              fi
-              sleep 3
-            done
-
-            # Lancer les migrations
-            docker exec whatsapp-back npm run migration:run:prod
 
             # Nettoyage des anciennes images
             docker image prune -f
