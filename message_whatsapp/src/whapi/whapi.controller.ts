@@ -42,8 +42,6 @@ export class WhapiController {
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     
-    console.log('arrive a bon port',payload);
-    
     const startedAt = Date.now();
     const provider = 'whapi';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
@@ -58,8 +56,6 @@ export class WhapiController {
       payload.channel_id,
     );
     const auditEventKey = this.buildAuditEventKey('whapi', payload);
-    console.log("entré comfirme", payload.channel_id);
-    
     this.auditLogger.log(
       `WEBHOOK_ACCEPTED request_id=${requestId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
     );
@@ -144,8 +140,6 @@ export class WhapiController {
           );
       }
     } catch (err) {
-      console.log("erreur whapippppppppppppppppppppppppppppppppppp", err);
-      
       if (err instanceof HttpException) {
         this.healthService.record(
           provider,
@@ -185,8 +179,6 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    console.log('affichage des message ');
-
     if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
       return challenge;
     }

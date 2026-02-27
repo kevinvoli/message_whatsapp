@@ -394,9 +394,6 @@ export class CommunicationMetaService {
     mimeType: string,
     mediaType: 'image' | 'video' | 'audio' | 'document',
   ): void {
-
-console.log("ssssssssssssssssssssssssssssssssssssssssssssssssssssssss",mediaType,mimeType);
-
     const allowed = CommunicationMetaService.META_SUPPORTED_MIMES[mediaType];
     if (!allowed) return;
     // Normaliser : "audio/ogg; codecs=opus" → "audio/ogg"

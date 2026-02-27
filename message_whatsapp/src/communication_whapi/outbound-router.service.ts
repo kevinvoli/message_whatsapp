@@ -101,8 +101,6 @@ export class OutboundRouterService {
         OutboundRouterService.name,
       );
 
-    console.log("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
-
       const result = await this.metaService.sendMediaMessage({
         to: data.to,
         phoneNumberId: channel.external_id,
