@@ -117,10 +117,28 @@ export class InboundMessageService {
             await this.whatsappMessageService.findOneWithMedias(savedMessage.id);
 
           if (!fullMessage) return;
+
+          // Persiste last_client_message_at en DB (pas uniquement en mémoire) pour que
+          // executeAutoMessage() puisse recharger la bonne valeur et passer le guard
+          // `lastAuto >= lastClient` aux étapes 2, 3, …
+          const clientMessageAt = savedMessage.timestamp ?? new Date();
+
+          // Réouverture après réponse agent : repart de zéro sur la séquence auto
+          const isReopenedCycle = !!conversation.last_poste_message_at;
           await this.chatService.update(conversation.chat_id, {
             read_only: false,
+            last_client_message_at: clientMessageAt,
+            waiting_client_reply: false,
+            ...(isReopenedCycle
+              ? { auto_message_step: 0, last_auto_message_sent_at: null }
+              : {}),
           });
           conversation.read_only = false;
+          conversation.last_client_message_at = clientMessageAt;
+          if (isReopenedCycle) {
+            conversation.auto_message_step = 0;
+          }
+
           await this.messageGateway.notifyNewMessage(fullMessage, conversation);
           this.logger.log(
             `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
@@ -130,7 +148,6 @@ export class InboundMessageService {
           // n'a jamais répondu sur ce chat (last_poste_message_at = null).
           // Fire-and-forget : le setTimeout interne est non-bloquant.
           if (!conversation.last_poste_message_at) {
-            conversation.last_client_message_at = savedMessage.timestamp ?? new Date();
             void this.autoMessageOrchestrator.handleClientMessage(conversation);
           }
         });

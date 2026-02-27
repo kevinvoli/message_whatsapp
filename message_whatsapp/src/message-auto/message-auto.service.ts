@@ -119,7 +119,7 @@ export class MessageAutoService {
 
       const message = await this.messageService.createAgentMessage({
         chat_id: chat.chat_id,
-        poste_id: chat.poste?.id ?? null,
+        poste_id: null, // ne pas mettre à jour last_poste_message_at (réservé aux vrais agents)
         text: mes,
         timestamp: new Date(
           chat?.last_client_message_at

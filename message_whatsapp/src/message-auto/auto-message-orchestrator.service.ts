@@ -82,49 +82,61 @@ export class AutoMessageOrchestrator {
     // 🔒 Lock immédiat avant le setTimeout
     this.locks.add(chatId);
 
-    // ⏱️ Calcul du délai :
-    //   - Si le prochain message a un delai explicite (> 0) → on l'utilise
-    //   - Sinon → délai aléatoire entre les bornes configurées dans les settings
-    const nextStep = chat.auto_message_step + 1;
-    const nextMessage = await this.messageAutoService.getAutoMessageByPosition(nextStep);
+    // ⏱️ Calcul du délai — dans un try/catch pour libérer le lock si erreur DB
+    try {
+      const nextStep = chat.auto_message_step + 1;
+      const nextMessage = await this.messageAutoService.getAutoMessageByPosition(nextStep);
 
-    const delaySeconds =
-      nextMessage?.delai && nextMessage.delai > 0
-        ? nextMessage.delai
-        : this.randomBetween(
-            settings.auto_message_delay_min_seconds,
-            settings.auto_message_delay_max_seconds,
-          );
+      const delaySeconds =
+        nextMessage?.delai && nextMessage.delai > 0
+          ? nextMessage.delai
+          : this.randomBetween(
+              settings.auto_message_delay_min_seconds,
+              settings.auto_message_delay_max_seconds,
+            );
 
-    const delayMs = delaySeconds * 1000;
+      const delayMs = delaySeconds * 1000;
 
-    this.logger.debug(
-      `Scheduling step ${nextStep} after ${delaySeconds}s for ${chatId}`,
-      AutoMessageOrchestrator.name,
-    );
+      this.logger.debug(
+        `Scheduling step ${nextStep} after ${delaySeconds}s for ${chatId}`,
+        AutoMessageOrchestrator.name,
+      );
 
-    const timeout = setTimeout(() => {
-      void this.executeAutoMessage(chatId)
-        .catch((err) => {
-          const msg = err instanceof Error ? err.message : String(err);
-          const stack = err instanceof Error ? err.stack : undefined;
-          this.logger.error(
-            `AutoMessage execution failed for ${chatId}: ${msg}`,
-            stack,
-            AutoMessageOrchestrator.name,
-          );
-        })
-        .finally(() => {
-          this.locks.delete(chatId);
-          this.pendingTimeouts.delete(chatId);
-        });
-    }, delayMs);
+      const timeout = setTimeout(() => {
+        void this.executeAutoMessage(chatId)
+          .catch((err) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            const stack = err instanceof Error ? err.stack : undefined;
+            this.logger.error(
+              `AutoMessage execution failed for ${chatId}: ${msg}`,
+              stack,
+              AutoMessageOrchestrator.name,
+            );
+          })
+          .finally(() => {
+            this.locks.delete(chatId);
+            this.pendingTimeouts.delete(chatId);
+          });
+      }, delayMs);
 
-    this.pendingTimeouts.set(chatId, timeout);
+      this.pendingTimeouts.set(chatId, timeout);
+    } catch (err) {
+      // Libérer le lock immédiatement si le scheduling échoue
+      this.locks.delete(chatId);
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(
+        `AutoMessage scheduling failed for ${chatId}: ${msg}`,
+        stack,
+        AutoMessageOrchestrator.name,
+      );
+    }
   }
 
   private async executeAutoMessage(chatId: string): Promise<void> {
+
     const freshChat = await this.chatService.findBychat_id(chatId);
+
     if (!freshChat) return;
 
     this.logger.debug(

@@ -191,7 +191,9 @@ export class WhatsappMessageService {
         { chat_id: chat.chat_id },
         {
           unread_count: 0,
-          last_poste_message_at: messageEntity.createdAt,
+          // N'actualise last_poste_message_at que pour les vrais agents humains.
+          // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
+          ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),
           last_activity_at: new Date(),
           read_only: true,
         },
@@ -270,8 +272,6 @@ export class WhatsappMessageService {
         return chat_id.split('@')[0];
       }
 
-      console.log("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      
       // 1. Send media to WhatsApp
 
       const sendResponse = await this.outboundRouter.sendMediaMessage({

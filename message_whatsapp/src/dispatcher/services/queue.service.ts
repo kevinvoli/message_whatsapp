@@ -38,6 +38,7 @@ export class QueueService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.resetQueueState();
+    await this.fillQueueWithAllPostes();
   }
 
   private logQueueEvent(
