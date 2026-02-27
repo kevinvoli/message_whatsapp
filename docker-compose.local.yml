@@ -26,11 +26,11 @@ services:
     restart: unless-stopped
     env_file: ./message_whatsapp/.env
     environment:
-      # Remplace localhost par host.docker.internal pour atteindre
-      # le MySQL installé sur la machine host
       MYSQL_HOST: host.docker.internal
+      WS_PORT: 3005
     ports:
       - "3002:3002"
+      - "3005:3005"
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
@@ -39,11 +39,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3002/"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   # ────────────────────────────────
   # FRONTEND — Next.js agents (port 3000)
@@ -53,17 +53,16 @@ services:
       context: ./front
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3002
-        NEXT_PUBLIC_SOCKET_URL: http://localhost:3002
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:3005
     image: whatsapp-front:local
     container_name: whatsapp-front
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3003:3000"
     networks:
       - whatsapp-net
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
 
   # ────────────────────────────────
   # ADMIN — Next.js panel (port 3001)
@@ -81,24 +80,5 @@ services:
     networks:
       - whatsapp-net
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
 
-  # ────────────────────────────────
-  # PHPMYADMIN — Interface DB (port 8000)
-  # ────────────────────────────────
-  phpmyadmin:
-    image: phpmyadmin:latest
-    container_name: whatsapp-phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8000:80"
-    environment:
-      PMA_HOST: host.docker.internal
-      PMA_PORT: 3306
-      PMA_ARBITRARY: 0
-      UPLOAD_LIMIT: 50M
-    networks:
-      - whatsapp-net
-    extra_hosts:
-      - "host.docker.internal:host-gateway"

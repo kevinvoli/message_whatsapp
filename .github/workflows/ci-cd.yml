@@ -7,15 +7,11 @@ on:
 env:
   REGISTRY: ghcr.io
 
-# ──────────────────────────────────────────────────────────────────────
-# JOBS
-# ──────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   # 1. DÉTECTION DES CHANGEMENTS
-  #    Chaque service est rebuild uniquement si son dossier a changé
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   changes:
     name: Detect changed services
     runs-on: ubuntu-latest
@@ -37,9 +33,9 @@ jobs:
             admin:
               - 'admin/**'
 
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   # 2a. BUILD BACKEND
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   build-backend:
     name: Build — Backend
     needs: changes
@@ -64,12 +60,12 @@ jobs:
           context: ./message_whatsapp
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/back:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/back:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/back:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/back:${{ github.sha }}
 
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   # 2b. BUILD FRONTEND
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   build-frontend:
     name: Build — Frontend
     needs: changes
@@ -93,13 +89,16 @@ jobs:
         with:
           context: ./front
           push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_SOCKET_URL=${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/front:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/front:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/front:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/front:${{ github.sha }}
 
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   # 2c. BUILD ADMIN
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   build-admin:
     name: Build — Admin
     needs: changes
@@ -123,15 +122,15 @@ jobs:
         with:
           context: ./admin
           push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/admin:latest
-            ${{ env.REGISTRY }}/${{ github.repository }}/admin:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/admin:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/admin:${{ github.sha }}
 
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   # 3. DÉPLOIEMENT SUR LE SERVEUR
-  #    Se déclenche dès que tous les builds sont terminés (ou skippés)
-  #    Ne tourne pas si un build a échoué
-  # ────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────
   deploy:
     name: Deploy to server
     needs: [build-backend, build-frontend, build-admin]
@@ -150,12 +149,14 @@ jobs:
           script: |
             cd /var/www/whatsapp
 
-            # Pull uniquement les images mises à jour
+            # Authentification au registre GitHub pour puller les images privées
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.SSH_USER }} --password-stdin
+
+            # Pull les nouvelles images
             docker compose pull
 
-            # Redémarre seulement les containers dont l'image a changé
-            # Les volumes sont préservés automatiquement
+            # Redémarre les containers mis à jour (volumes préservés)
             docker compose up -d --remove-orphans
 
-            # Nettoyage des anciennes images (libère de l'espace disque)
+            # Nettoyage des anciennes images
             docker image prune -f

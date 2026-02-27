@@ -26,6 +26,7 @@ services:
     env_file: ./message_whatsapp/.env
     ports:
       - "3002:3002"
+      - "3005:3005"
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
@@ -85,22 +86,3 @@ services:
       retries: 3
       start_period: 30s
 
-  # ────────────────────────────────
-  # PHPMYADMIN — Interface DB (port 8080)
-  # Se connecte au MySQL installé sur le serveur host
-  # ────────────────────────────────
-  phpmyadmin:
-    image: phpmyadmin:latest
-    container_name: whatsapp-phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8000:80"
-    environment:
-      PMA_HOST: host.docker.internal   # MySQL sur le serveur host
-      PMA_PORT: ${MYSQL_PORT:-3306}
-      PMA_ARBITRARY: 0                 # désactive la saisie manuelle du host
-      UPLOAD_LIMIT: 50M
-    networks:
-      - whatsapp-net
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
