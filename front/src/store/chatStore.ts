@@ -4,6 +4,18 @@ import { Socket } from "socket.io-client";
 import { Conversation, ConversationStatus, Message } from "@/types/chat";
 import { logger } from "@/lib/logger";
 
+// crypto.randomUUID() n'est disponible qu'en contexte sécurisé (HTTPS/localhost)
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 interface ChatState {
   typingStatus: Record<string, boolean>;
   socket: Socket | null;
@@ -143,7 +155,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     isSending = true;
 
     const tempMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       chat_id: selectedConversation.chat_id,
       text,
       status: "sending",
