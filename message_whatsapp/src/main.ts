@@ -33,8 +33,22 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Enable CORS for the frontend application
+  // CORS_ORIGINS = liste d'origines séparées par des virgules
+  // ex: http://148.230.112.175:3000,http://148.230.112.175:3001
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin:"*",
+    origin: (origin, callback) => {
+      // Autoriser les requêtes sans origin (ex: Postman, server-to-server)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin "${origin}" non autorisée`));
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
