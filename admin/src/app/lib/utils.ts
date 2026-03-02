@@ -1,6 +1,20 @@
 // admin/src/app/lib/utils.ts
 
 /**
+ * Résout une URL de média :
+ * - Chemin relatif (/messages/media/...) → préfixe NEXT_PUBLIC_API_URL
+ * - URL absolue (Whapi CDN, Meta CDN) → retournée telle quelle
+ */
+export function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('/')) {
+    const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
+    return `${base}${url}`;
+  }
+  return url;
+}
+
+/**
  * Obtient la couleur du statut de connexion
  */
 export const getStatusColor = (isConnected: boolean): string => {

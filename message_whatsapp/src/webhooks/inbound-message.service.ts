@@ -222,12 +222,12 @@ export class InboundMessageService {
     let mediaUrl = raw?.link ?? null;
 
     // Meta provider: no local storage. Use proxy endpoint for streaming.
+    // Chemin relatif : le frontend préfixe avec NEXT_PUBLIC_API_URL
     if (!mediaUrl && context?.provider === 'meta' && context?.providerMediaId) {
-      const serverHost = this.resolveServerHost();
       const channelQuery = context.channelId
         ? `?channelId=${encodeURIComponent(context.channelId)}`
         : '';
-      mediaUrl = `${serverHost}/messages/media/meta/${context.providerMediaId}${channelQuery}`;
+      mediaUrl = `/messages/media/meta/${context.providerMediaId}${channelQuery}`;
     }
 
     entity.url = mediaUrl;
@@ -330,12 +330,4 @@ export class InboundMessageService {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
   }
 
-  private resolveServerHost(): string {
-    const serverPort = process.env.SERVER_PORT ?? '3002';
-    const rawHost =
-      process.env.SERVER_PUBLIC_HOST ??
-      process.env.SERVER_HOST ??
-      `http://localhost:${serverPort}`;
-    return rawHost.replace(/\/+$/, '');
-  }
 }

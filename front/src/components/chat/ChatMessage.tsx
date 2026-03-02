@@ -3,6 +3,7 @@ import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle
 import { Message } from '@/types/chat';
 import { MediaBubble } from '../helper/mediaBubble';
 import { formatTime } from '@/lib/dateUtils';
+import { resolveMediaUrl } from '@/lib/utils';
 
 interface ChatMessageProps {
   msg: Message;
@@ -79,66 +80,77 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
           }`}
         >
           {/* Images */}
-          {imageMedias.map((img, i) => (
-            <MediaBubble key={`img-${messageId}-${i}`} fromMe={isFromMe}>
-              <a href={img.url} target="_blank" rel="noopener noreferrer" className="block">
-                <img
-                  src={img.url}
-                  alt={img.caption || 'image'}
-                  className="max-w-full max-h-80 object-cover cursor-pointer"
-                  loading="lazy"
-                />
-              </a>
-              {img.caption && (
-                <p className={`text-xs px-3 py-2 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
-                  {img.caption}
-                </p>
-              )}
-            </MediaBubble>
-          ))}
+          {imageMedias.map((img, i) => {
+            const src = resolveMediaUrl(img.url);
+            return (
+              <MediaBubble key={`img-${messageId}-${i}`} fromMe={isFromMe}>
+                <a href={src ?? undefined} target="_blank" rel="noopener noreferrer" className="block">
+                  <img
+                    src={src ?? undefined}
+                    alt={img.caption || 'image'}
+                    className="max-w-full max-h-80 object-cover cursor-pointer"
+                    loading="lazy"
+                  />
+                </a>
+                {img.caption && (
+                  <p className={`text-xs px-3 py-2 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
+                    {img.caption}
+                  </p>
+                )}
+              </MediaBubble>
+            );
+          })}
 
           {/* Videos */}
-          {videoMedias.map((vid, i) => (
-            <MediaBubble key={`video-${messageId}-${i}`} fromMe={isFromMe}>
-              <video
-                controls
-                preload="metadata"
-                src={vid.url}
-                className="max-w-full max-h-80"
-              />
-              {vid.caption && (
-                <p className={`text-xs px-3 py-2 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
-                  {vid.caption}
-                </p>
-              )}
-            </MediaBubble>
-          ))}
-
-          {/* Audio / Voice */}
-          {audioMedias.map((audio, i) => (
-            <MediaBubble key={`audio-${messageId}-${i}`} fromMe={isFromMe}>
-              <div className="flex items-center gap-2 px-3 py-2">
-                <audio
+          {videoMedias.map((vid, i) => {
+            const src = resolveMediaUrl(vid.url);
+            return (
+              <MediaBubble key={`video-${messageId}-${i}`} fromMe={isFromMe}>
+                <video
                   controls
                   preload="metadata"
-                  src={audio.url}
-                  className="w-full h-8"
-                  onPlay={(e) => handlePlay(e.currentTarget)}
+                  src={src ?? undefined}
+                  className="max-w-full max-h-80"
                 />
-              </div>
-              {audio.duration && audio.duration > 0 && (
-                <p className={`text-xs px-3 pb-1 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
-                  {formatDuration(audio.duration)}
-                </p>
-              )}
-            </MediaBubble>
-          ))}
+                {vid.caption && (
+                  <p className={`text-xs px-3 py-2 ${isFromMe ? 'text-green-100' : 'text-gray-500'}`}>
+                    {vid.caption}
+                  </p>
+                )}
+              </MediaBubble>
+            );
+          })}
+
+          {/* Audio / Voice */}
+          {audioMedias.map((audio, i) => {
+            const src = resolveMediaUrl(audio.url);
+            return (
+              <MediaBubble key={`audio-${messageId}-${i}`} fromMe={isFromMe}>
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <audio
+                    controls
+                    preload="metadata"
+                    src={src ?? undefined}
+                    className="w-full h-8"
+                    onPlay={(e) => handlePlay(e.currentTarget)}
+                  />
+                </div>
+                {audio.duration && audio.duration > 0 && (
+                  <p className={`text-xs px-3 pb-1 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
+                    {formatDuration(audio.duration)}
+                  </p>
+                )}
+              </MediaBubble>
+            );
+          })}
 
           {/* Documents */}
-          {documentMedias.map((doc, i) => (
-            <MediaBubble key={`doc-${messageId}-${i}`} fromMe={isFromMe}>
+          {documentMedias.map((doc, i) => {
+            const src = resolveMediaUrl(doc.url);
+            return (
+              <MediaBubble key={`doc-${messageId}-${i}`} fromMe={isFromMe}>
               <a
-                href={doc.url}
+                href={src ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 p-3 transition-colors hover:opacity-90"
@@ -161,7 +173,8 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
                 <Download className={`w-4 h-4 flex-shrink-0 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`} />
               </a>
             </MediaBubble>
-          ))}
+            );
+          })}
 
           {/* Location */}
           {locationMedias.map((loc, i) => (

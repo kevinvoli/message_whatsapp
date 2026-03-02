@@ -5,7 +5,7 @@ import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Act
 import { getMessagesForChat, getMessageCount, sendMessage, getChats } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
-import { resolveAdminMessageText } from '../lib/utils';
+import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
 import { formatDate, formatTime } from '@/app/lib/dateUtils';
@@ -557,10 +557,11 @@ export default function ConversationsView({ onRefresh }: ConversationsViewProps)
                                                 <div className="mb-2 space-y-1">
                                                     {msg.medias.map((media, idx) => {
                                                         const mediaType = media.type ?? media.mime_type?.split('/')[0] ?? '';
-                                                        if (mediaType === 'image' && media.url) {
+                                                        const mediaSrc = resolveMediaUrl(media.url);
+                                                        if (mediaType === 'image' && mediaSrc) {
                                                             return (
-                                                                <a key={idx} href={media.url} target="_blank" rel="noopener noreferrer">
-                                                                    <img src={media.url} alt={media.caption ?? 'Image'} className="max-w-full rounded-md max-h-48 object-cover" />
+                                                                <a key={idx} href={mediaSrc} target="_blank" rel="noopener noreferrer">
+                                                                    <img src={mediaSrc} alt={media.caption ?? 'Image'} className="max-w-full rounded-md max-h-48 object-cover" />
                                                                 </a>
                                                             );
                                                         }

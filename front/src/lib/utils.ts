@@ -1,6 +1,20 @@
 // lib/utils.ts
 import { Message } from '@/types/chat';
 
+/**
+ * Résout une URL de média :
+ * - Chemin relatif (/messages/media/...) → préfixe NEXT_PUBLIC_API_URL
+ * - URL absolue (Whapi CDN, Meta CDN) → retournée telle quelle
+ */
+export function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('/')) {
+    const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
+    return `${base}${url}`;
+  }
+  return url;
+}
+
 // Définit le type pour les données brutes d'un message reçues (par ex. d'une API)
 interface RawMessageData {
   id?: string | number;

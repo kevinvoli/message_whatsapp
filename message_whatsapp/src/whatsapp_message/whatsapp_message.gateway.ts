@@ -1039,21 +1039,32 @@ export class WhatsappMessageGateway
     media: { provider_media_id?: string | null; media_id: string },
     directUrl: string | null,
   ): string | null {
-    if (message.provider !== 'meta') {
-      return directUrl ?? null;
-    }
-    const providerMediaId = media.provider_media_id ?? media.media_id;
-    if (!providerMediaId) return null;
-    const serverPort = process.env.SERVER_PORT ?? '3002';
-    const rawHost =
-      process.env.SERVER_PUBLIC_HOST ??
-      process.env.SERVER_HOST ??
-      `http://localhost:${serverPort}`;
-    const serverHost = rawHost.replace(/\/+$/, '');
     const channelQuery = message.channel_id
       ? `?channelId=${encodeURIComponent(message.channel_id)}`
       : '';
-    return `${serverHost}/messages/media/meta/${providerMediaId}${channelQuery}`;
+
+    if (message.provider === 'meta') {
+      const providerMediaId = media.provider_media_id ?? media.media_id;
+      if (!providerMediaId) return null;
+      // Chemin relatif : le frontend préfixe avec NEXT_PUBLIC_API_URL
+      return `/messages/media/meta/${providerMediaId}${channelQuery}`;
+    }
+
+    if (directUrl) {
+      // Si l'URL stockée est déjà relative, la retourner telle quelle
+      if (directUrl.startsWith('/')) return directUrl;
+      // Si c'est une ancienne URL absolue vers notre proxy, extraire le chemin
+      try {
+        const parsed = new URL(directUrl);
+        if (parsed.pathname.startsWith('/messages/media/')) {
+          return `${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // URL invalide → tomber sur le return directUrl ci-dessous
+      }
+    }
+
+    return directUrl ?? null;
   }
 
   private mapConversation(

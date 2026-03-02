@@ -317,22 +317,15 @@ export class WhatsappMessageService {
 
       const savedMessage = await this.messageRepository.save(messageEntity);
 
-      // 3. Résoudre l'URL depuis le provider (pas de stockage local)
-      const serverPort = process.env.SERVER_PORT ?? '3002';
-      const rawHost =
-        process.env.SERVER_PUBLIC_HOST ??
-        process.env.SERVER_HOST ??
-        `http://localhost:${serverPort}`;
-      const serverHost = rawHost.replace(/\/+$/, '');
-
+      // 3. Résoudre l'URL depuis le provider (chemins relatifs — le frontend préfixe avec NEXT_PUBLIC_API_URL)
       let resolvedMediaUrl: string | null = null;
       const channelQuery = `?channelId=${encodeURIComponent(channel.channel_id)}`;
       if (sendResponse.provider === 'meta' && sendResponse.providerMediaId) {
-        resolvedMediaUrl = `${serverHost}/messages/media/meta/${sendResponse.providerMediaId}${channelQuery}`;
+        resolvedMediaUrl = `/messages/media/meta/${sendResponse.providerMediaId}${channelQuery}`;
       } else if (sendResponse.provider === 'whapi') {
         // Proxy interne : évite la dépendance à l'Auto-Download Whapi et les
         // race conditions (CDN pas encore disponible au moment de l'envoi).
-        resolvedMediaUrl = `${serverHost}/messages/media/whapi/${sendResponse.providerMessageId}${channelQuery}`;
+        resolvedMediaUrl = `/messages/media/whapi/${sendResponse.providerMessageId}${channelQuery}`;
       }
 
       // 4. Create media entity
