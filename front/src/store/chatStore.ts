@@ -16,6 +16,7 @@ function generateUUID(): string {
   });
 }
 
+
 interface ChatState {
   typingStatus: Record<string, boolean>;
   socket: Socket | null;
@@ -361,14 +362,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       conversations: [
         newConversation,
-        ...state.conversations.filter((c) => c.id !== newConversation.id),
+        ...state.conversations.filter((c) => c.chat_id !== newConversation.chat_id),
       ],
-    }));
-  },
-
-  removeConversation: (conversationId: string) => {
-    set((state) => ({
-      conversations: state.conversations.filter((c) => c.id !== conversationId),
     }));
   },
 
