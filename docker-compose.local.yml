@@ -58,11 +58,18 @@ services:
     container_name: whatsapp-front
     restart: unless-stopped
     ports:
-      - "3003:3000"
+      - "3000:3000"
     networks:
       - whatsapp-net
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # ────────────────────────────────
   # ADMIN — Next.js panel (port 3001)
@@ -80,5 +87,11 @@ services:
     networks:
       - whatsapp-net
     depends_on:
-      - backend
-
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
