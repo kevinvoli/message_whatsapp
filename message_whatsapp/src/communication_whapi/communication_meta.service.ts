@@ -22,6 +22,8 @@ export class CommunicationMetaService {
     to: string;
     phoneNumberId: string;
     accessToken: string;
+    /** Meta wamid du message à citer (champ `context.message_id` dans l'API Meta) */
+    quotedMessageId?: string;
   }): Promise<{ providerMessageId: string }> {
     const to = this.validateRecipient(data.to);
     const body = this.validateBody(data.text);
@@ -30,15 +32,19 @@ export class CommunicationMetaService {
     let attempt = 0;
     while (attempt <= this.maxRetries) {
       try {
+        const payload: Record<string, any> = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to,
+          type: 'text',
+          text: { preview_url: false, body },
+        };
+        if (data.quotedMessageId) {
+          payload.context = { message_id: data.quotedMessageId };
+        }
         const response = await axios.post(
           url,
-          {
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to,
-            type: 'text',
-            text: { preview_url: false, body },
-          },
+          payload,
           {
             headers: {
               Authorization: `Bearer ${data.accessToken}`,

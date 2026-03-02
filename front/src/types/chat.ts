@@ -159,6 +159,14 @@ export interface Message {
     latitude?: number;
     longitude?: number;
   }>;
+
+  // 💬 Message cité (reply)
+  quotedMessage?: {
+    id: string;
+    text?: string;
+    from_name?: string;
+    from_me?: boolean;
+  };
 }
 
 export interface Poste {
@@ -442,6 +450,14 @@ interface RawMessageData {
     latitude?: number;
     longitude?: number;
   }>;
+
+  // 💬 Message cité (reply)
+  quotedMessage?: {
+    id: string;
+    text?: string;
+    from_name?: string;
+    from_me?: boolean;
+  };
 }
 
 interface RawConversationData {
@@ -602,6 +618,15 @@ export const transformToMessage = (raw: RawMessageData): Message => {
           longitude: m.longitude,
         }))
       : [],
+
+    quotedMessage: raw.quotedMessage
+      ? {
+          id: raw.quotedMessage.id,
+          text: raw.quotedMessage.text,
+          from_name: raw.quotedMessage.from_name,
+          from_me: raw.quotedMessage.from_me,
+        }
+      : undefined,
   };
 };
 

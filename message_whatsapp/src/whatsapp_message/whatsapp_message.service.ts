@@ -114,6 +114,8 @@ export class WhatsappMessageService {
     timestamp: Date;
     commercial_id?: string | null;
     channel_id: string;
+    /** DB UUID du message à citer (fonctionnalité reply) */
+    quotedMessageId?: string;
   }): Promise<WhatsappMessage> {
     const traceId = this.buildTraceId(undefined, data.chat_id);
     let chat: WhatsappChat | null = null;
@@ -147,10 +149,20 @@ export class WhatsappMessageService {
       function extractPhoneNumber(chat_id: string): string {
         return chat_id.split('@')[0];
       }
+
+      // Charger le message quoté pour récupérer son provider_message_id
+      let quotedMsg: WhatsappMessage | null = null;
+      if (data.quotedMessageId) {
+        quotedMsg = await this.messageRepository.findOne({
+          where: { id: data.quotedMessageId },
+        });
+      }
+
       const sendResponse = await this.outboundRouter.sendTextMessage({
         to: extractPhoneNumber(chat?.chat_id),
         text: data.text,
         channelId: data.channel_id,
+        quotedProviderMessageId: quotedMsg?.provider_message_id ?? quotedMsg?.message_id ?? undefined,
       });
       this.logger.log(
         `OUTBOUND_PROVIDER_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
@@ -181,6 +193,7 @@ export class WhatsappMessageService {
         channel: channel,
         commercial: commercial,
         contact: null,
+        quotedMessage: quotedMsg ?? undefined,
       });
 
       const mes = await this.messageRepository.save(messageEntity);
@@ -478,7 +491,7 @@ export class WhatsappMessageService {
     try {
       const mess = await this.messageRepository.find({
         where: { chat_id: chat_id },
-        relations: ['chat', 'poste', 'medias'],
+        relations: ['chat', 'poste', 'medias', 'quotedMessage'],
         order: { timestamp: 'ASC', createdAt: 'ASC' },
         take: limit,
         skip: offset,
@@ -793,6 +806,7 @@ export class WhatsappMessageService {
         chat: true,
         poste: true,
         contact: true,
+        quotedMessage: true,
       },
     });
   }
@@ -853,6 +867,14 @@ export class WhatsappMessageService {
         chat.channel_id = channel.channel_id;
       }
 
+      // Résoudre le message quoté (si le client répond à un de nos messages)
+      let quotedMsg: WhatsappMessage | null = null;
+      if (message.quotedProviderMessageId) {
+        quotedMsg = await this.messageRepository.findOne({
+          where: { provider_message_id: message.quotedProviderMessageId },
+        });
+      }
+
       const buildMessageEntity = (chatRef: WhatsappChat) =>
         this.messageRepository.create({
           tenant_id: message.tenantId,
@@ -873,6 +895,7 @@ export class WhatsappMessageService {
           status: WhatsappMessageStatus.SENT,
           source: message.provider,
           poste: chatRef.poste,
+          quotedMessage: quotedMsg ?? undefined,
         });
 
       try {

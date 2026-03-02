@@ -18,6 +18,8 @@ export class OutboundRouterService {
     text: string;
     to: string;
     channelId: string;
+    /** Provider message ID du message à citer (reply feature) */
+    quotedProviderMessageId?: string;
   }): Promise<OutboundSendResponse> {
     const channel = await this.channelService.findOne(data.channelId);
     if (!channel) {
@@ -43,6 +45,7 @@ export class OutboundRouterService {
         to: data.to,
         phoneNumberId: channel.external_id,
         accessToken: channel.token,
+        quotedMessageId: data.quotedProviderMessageId,
       });
 
       return {
@@ -61,6 +64,7 @@ export class OutboundRouterService {
       text: data.text,
       to: data.to,
       channelId: data.channelId,
+      quotedId: data.quotedProviderMessageId,
     });
 
     return {

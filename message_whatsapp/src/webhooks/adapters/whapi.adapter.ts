@@ -58,6 +58,7 @@ export class WhapiAdapter implements ProviderAdapter<WhapiWebhookPayload> {
           }
         : undefined,
       interactive: this.resolveInteractive(message),
+      quotedProviderMessageId: message.context?.quoted_id ?? undefined,
       raw,
     };
   }

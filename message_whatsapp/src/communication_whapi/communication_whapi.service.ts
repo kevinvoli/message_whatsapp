@@ -113,6 +113,8 @@ export class CommunicationWhapiService {
     text: string;
     to: string;
     channelId: string;
+    /** Whapi message ID du message à citer (champ `quoted` dans l'API Whapi) */
+    quotedId?: string;
   }): Promise<WhapiSendMessageResponse> {
     const to = this.validateWhapiRecipient(data.to);
     const body = this.validateWhapiBody(data.text);
@@ -128,12 +130,13 @@ export class CommunicationWhapiService {
     let attempt = 0;
     while (attempt <= this.maxRetries) {
       try {
+        const payload: Record<string, any> = { to, body };
+        if (data.quotedId) {
+          payload.quoted = data.quotedId;
+        }
         const response = await axios.post<WhapiSendMessageResponse>(
           this.WHAPI_URL,
-          {
-            to,
-            body,
-          },
+          payload,
           {
             headers: {
               Authorization: `Bearer ${token}`,

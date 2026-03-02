@@ -228,6 +228,13 @@ export class WhatsappMessage {
   @JoinColumn({ name: 'commercial_id', referencedColumnName: 'id' })
   commercial?: WhatsappCommercial | null;
 
+  @Column({ name: 'quoted_message_id', type: 'char', length: 36, nullable: true })
+  quoted_message_id: string | null;
+
+  @ManyToOne(() => WhatsappMessage, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'quoted_message_id' })
+  quotedMessage?: WhatsappMessage | null;
+
   @CreateDateColumn({
     name: 'createdAt',
     type: 'timestamp',

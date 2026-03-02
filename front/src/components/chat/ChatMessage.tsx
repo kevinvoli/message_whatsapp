@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
-import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle, Reply } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MediaBubble } from '../helper/mediaBubble';
 import { formatTime } from '@/lib/dateUtils';
 import { resolveMediaUrl } from '@/lib/utils';
+import { useChatStore } from '@/store/chatStore';
 
 interface ChatMessageProps {
   msg: Message;
@@ -26,6 +27,8 @@ function formatDuration(seconds?: number): string {
 
 export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const setReplyTo = useChatStore((s) => s.setReplyTo);
 
   const handlePlay = (audioEl: HTMLAudioElement) => {
     if (currentAudioRef.current && currentAudioRef.current !== audioEl) {
@@ -64,12 +67,27 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const locationMedias = msg.medias?.filter((m) => m.type === 'location') ?? [];
 
   return (
-    <div className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-md ${isFromMe ? '' : 'flex items-start gap-2'}`}>
+    <div
+      className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className={`relative max-w-md ${isFromMe ? '' : 'flex items-start gap-2'}`}>
         {!isFromMe && (
           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
             <User className="w-5 h-5 text-green-600" />
           </div>
+        )}
+
+        {/* Bouton Reply au hover */}
+        {isHovered && (
+          <button
+            onClick={() => setReplyTo(msg)}
+            className={`absolute top-1 ${isFromMe ? '-left-8' : '-right-8'} p-1 text-gray-400 hover:text-green-600 transition-colors`}
+            title="Répondre"
+          >
+            <Reply className="w-4 h-4" />
+          </button>
         )}
 
         <div
@@ -79,6 +97,23 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
               : 'bg-white text-gray-900 rounded-bl-none shadow-sm'
           }`}
         >
+          {/* Bloc citation si ce message est une réponse */}
+          {msg.quotedMessage && (
+            <div
+              className={`mb-2 pl-2 border-l-2 rounded text-xs ${
+                isFromMe
+                  ? 'border-green-300 bg-green-500/30 text-green-100'
+                  : 'border-green-500 bg-gray-50 text-gray-600'
+              } px-2 py-1`}
+            >
+              <p className="font-semibold mb-0.5">
+                {msg.quotedMessage.from_me ? 'Moi' : (msg.quotedMessage.from_name || 'Client')}
+              </p>
+              <p className="truncate">
+                {msg.quotedMessage.text || '[Média]'}
+              </p>
+            </div>
+          )}
           {/* Images */}
           {imageMedias.map((img, i) => {
             const src = resolveMediaUrl(img.url);
@@ -215,3 +250,4 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
     </div>
   );
 }
+

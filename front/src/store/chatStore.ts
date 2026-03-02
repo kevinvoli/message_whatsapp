@@ -26,12 +26,15 @@ interface ChatState {
   isLoading: boolean;
   error: string | null;
   messageIdCache: Record<string, Set<string>>;
+  replyToMessage: Message | null;
 
   // Actions
   setSocket: (socket: Socket | null) => void;
   loadConversations: () => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
+  setReplyTo: (message: Message) => void;
+  clearReplyTo: () => void;
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
   changeConversationStatus: (chat_id: string, status: ConversationStatus) => void;
@@ -60,6 +63,8 @@ const initialState: Omit<
   | "loadConversations"
   | "selectConversation"
   | "sendMessage"
+  | "setReplyTo"
+  | "clearReplyTo"
   | "setConversations"
   | "setMessages"
   | "addMessage"
@@ -82,6 +87,7 @@ const initialState: Omit<
   error: null,
   typingStatus: {},
   messageIdCache: {},
+  replyToMessage: null,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -126,6 +132,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messages: [],
         isLoading: true,
         messageIdCache: { ...state.messageIdCache, [chat_id]: new Set<string>() },
+        replyToMessage: null,
       };
     });
 
@@ -150,7 +157,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: (text: string) => {
     if (isSending) return;
 
-    const { socket, selectedConversation } = get();
+    const { socket, selectedConversation, replyToMessage } = get();
     if (!socket || !selectedConversation) return;
 
     isSending = true;
@@ -163,10 +170,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       from_me: true,
       timestamp: new Date(),
       from: "",
+      quotedMessage: replyToMessage
+        ? {
+            id: replyToMessage.id,
+            text: replyToMessage.text,
+            from_name: replyToMessage.from_name,
+            from_me: replyToMessage.from_me,
+          }
+        : undefined,
     };
 
     set((state) => ({
       messages: [...state.messages, tempMessage],
+      replyToMessage: null,
     }));
 
     logger.debug("Temporary message created", {
@@ -178,11 +194,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chat_id: selectedConversation.chat_id,
       text,
       tempId: tempMessage.id,
+      quotedMessageId: replyToMessage?.id,
     });
 
     // Libère le lock après un court délai pour éviter les double-clics
     setTimeout(() => { isSending = false; }, 500);
   },
+
+  setReplyTo: (message: Message) => set({ replyToMessage: message }),
+
+  clearReplyTo: () => set({ replyToMessage: null }),
 
   onTypingStart: (chat_id: string) => {
     const { socket } = get();

@@ -58,5 +58,7 @@ export interface UnifiedMessage {
   media?: UnifiedMedia;
   location?: UnifiedLocation;
   interactive?: UnifiedInteractive;
+  /** Provider message ID of the quoted message (Whapi: context.quoted_id) */
+  quotedProviderMessageId?: string;
   raw: unknown;
 }

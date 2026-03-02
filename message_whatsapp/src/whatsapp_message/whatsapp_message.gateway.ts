@@ -550,7 +550,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('message:send')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chat_id: string; text: string; tempId: string },
+    @MessageBody() payload: { chat_id: string; text: string; tempId: string; quotedMessageId?: string },
   ) {
     if (!this.throttle.allow(client.id, 'message:send')) {
       return this.emitRateLimited(client, 'message:send');
@@ -618,6 +618,7 @@ export class WhatsappMessageGateway
           channel_id: resolvedChannelId,
           timestamp: new Date(),
           commercial_id: agent.commercialId,
+          quotedMessageId: payload.quotedMessageId,
         });
         this.logger.log(
           `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,
@@ -1032,6 +1033,14 @@ export class WhatsappMessageGateway
         latitude: m.latitude,
         longitude: m.longitude,
       })) ?? [],
+    quotedMessage: message.quotedMessage
+      ? {
+          id: message.quotedMessage.id,
+          text: this.resolveMessageText(message.quotedMessage) ?? undefined,
+          from_name: message.quotedMessage.from_name,
+          from_me: message.quotedMessage.from_me,
+        }
+      : undefined,
   });
 
   private resolveMediaUrl(

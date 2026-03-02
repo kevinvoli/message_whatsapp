@@ -92,6 +92,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const isTyping = useRef(false);
   const storeMessages = useChatStore((s) => s.messages);
   const avgResponseTime = useMemo(() => computeAvgResponseTime(storeMessages), [storeMessages]);
+  const replyToMessage = useChatStore((s) => s.replyToMessage);
+  const clearReplyTo = useChatStore((s) => s.clearReplyTo);
 
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
@@ -260,6 +262,28 @@ const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <div className="bg-white border-t border-gray-200 p-3">
       <div className="max-w-4xl mx-auto">
+        {/* Bannière "En réponse à..." */}
+        {replyToMessage && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-gray-50 border-l-4 border-green-500 rounded-r-lg">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-green-600">
+                {replyToMessage.from_me ? 'Moi' : (replyToMessage.from_name || 'Client')}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {replyToMessage.text || '[Média]'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearReplyTo}
+              className="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0"
+              title="Annuler la réponse"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
         </div>
 
