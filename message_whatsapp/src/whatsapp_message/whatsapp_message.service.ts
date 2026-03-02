@@ -840,11 +840,18 @@ export class WhatsappMessageService {
       );
 
       if (message.direction === 'in') {
+        // Utiliser update() ciblé pour éviter que TypeORM n'écrase channel_id
+        // via la relation chargée (chat.channel = ancien WhapiChannel) lors du save().
+        await this.chatRepository.update(
+          { id: chat.id },
+          {
+            last_msg_client_channel_id: channel.channel_id,
+            channel_id: channel.channel_id,
+          },
+        );
         chat.last_msg_client_channel_id = channel.channel_id;
         chat.channel_id = channel.channel_id;
       }
-
-      await this.chatRepository.save(chat);
 
       const buildMessageEntity = (chatRef: WhatsappChat) =>
         this.messageRepository.create({
