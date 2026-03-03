@@ -150,9 +150,6 @@ jobs:
             set -e
             cd /var/www/whatsapp
 
-            # Authentification au registre GitHub pour puller les images privées
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
-
             # Pull les nouvelles images
             docker compose pull
 
