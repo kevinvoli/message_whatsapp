@@ -46,7 +46,8 @@
       "Bash(powershell:*)",
       "Bash(set:*)",
       "Bash(docker compose:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(do grep:*)"
     ]
   }
 }
