@@ -16,9 +16,10 @@ jobs:
     name: Detect changed services
     runs-on: ubuntu-latest
     outputs:
-      backend:  ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      admin:    ${{ steps.filter.outputs.admin }}
+      backend:    ${{ steps.filter.outputs.backend }}
+      frontend:   ${{ steps.filter.outputs.frontend }}
+      admin:      ${{ steps.filter.outputs.admin }}
+      migrations: ${{ steps.filter.outputs.migrations }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +33,8 @@ jobs:
               - 'front/**'
             admin:
               - 'admin/**'
+            migrations:
+              - 'message_whatsapp/src/database/migrations/**'
 
   # ──────────────────────────────────────────────
   # 2a. BUILD BACKEND
@@ -133,7 +136,7 @@ jobs:
   # ──────────────────────────────────────────────
   deploy:
     name: Deploy to server
-    needs: [build-backend, build-frontend, build-admin]
+    needs: [changes, build-backend, build-frontend, build-admin]
     if: |
       always() &&
       !contains(needs.*.result, 'failure') &&
@@ -156,12 +159,17 @@ jobs:
             docker compose pull
 
             # Lancer les migrations AVANT de démarrer les containers
-            # github.repository est toujours en minuscules (compatible GHCR)
-            docker run --rm \
-              --env-file ./message_whatsapp/.env \
-              --add-host host.docker.internal:host-gateway \
-              ghcr.io/${{ github.repository }}/back:latest \
-              npm run migration:run:prod
+            # (uniquement si de nouveaux fichiers de migration ont été détectés)
+            if [ "${{ needs.changes.outputs.migrations }}" = "true" ]; then
+              echo "Nouvelles migrations détectées — exécution..."
+              docker run --rm \
+                --env-file ./message_whatsapp/.env \
+                --add-host host.docker.internal:host-gateway \
+                ghcr.io/${{ github.repository }}/back:latest \
+                npm run migration:run:prod
+            else
+              echo "Aucune nouvelle migration — étape ignorée."
+            fi
 
             # Redémarre les containers (DB déjà à jour)
             docker compose up -d --remove-orphans
