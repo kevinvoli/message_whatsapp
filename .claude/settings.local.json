@@ -45,7 +45,8 @@
       "Bash(docker ps:*)",
       "Bash(powershell:*)",
       "Bash(set:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(ls:*)"
     ]
   }
 }
