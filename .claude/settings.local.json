@@ -41,7 +41,11 @@
       "WebFetch(domain:www.postman.com)",
       "Bash(head:*)",
       "Bash(grep:*)",
-      "Bash(cd /c/Users/gbamb/Desktop/projet/whatsapp/message_whatsapp && npx typeorm migration:run -d src/database/data-source.ts 2>&1)"
+      "Bash(cd /c/Users/gbamb/Desktop/projet/whatsapp/message_whatsapp && npx typeorm migration:run -d src/database/data-source.ts 2>&1)",
+      "Bash(docker ps:*)",
+      "Bash(powershell:*)",
+      "Bash(set:*)",
+      "Bash(docker compose:*)"
     ]
   }
 }
