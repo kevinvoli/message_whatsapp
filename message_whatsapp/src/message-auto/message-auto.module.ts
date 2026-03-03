@@ -31,6 +31,7 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { AutoMessageScopeConfig } from './entities/auto-message-scope-config.entity';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { AutoMessageScopeConfigService } from './auto-message-scope-config.servi
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
     CallLogModule,
+    JorbsModule,
   ],
   controllers: [MessageAutoController],
   providers: [

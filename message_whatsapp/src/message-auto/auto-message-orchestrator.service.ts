@@ -3,7 +3,7 @@ import { MessageAutoService } from './message-auto.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
-import { DispatchSettingsService } from 'src/dispatcher/services/dispatch-settings.service';
+import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class AutoMessageOrchestrator {
   constructor(
     private readonly messageAutoService: MessageAutoService,
     private readonly chatService: WhatsappChatService,
-    private readonly dispatchSettingsService: DispatchSettingsService,
+    private readonly cronConfigService: CronConfigService,
     private readonly scopeConfigService: AutoMessageScopeConfigService,
     private readonly logger: AppLogger,
   ) {}
@@ -42,9 +42,9 @@ export class AutoMessageOrchestrator {
     }
 
     // ⚙️ Activation globale
-    const settings = await this.dispatchSettingsService.getSettings();
+    const autoConfig = await this.cronConfigService.findByKey('auto-message');
 
-    if (!settings.auto_message_enabled) {
+    if (!autoConfig.enabled) {
       this.logger.debug(
         `Auto messages disabled globally`,
         AutoMessageOrchestrator.name,
@@ -52,10 +52,12 @@ export class AutoMessageOrchestrator {
       return;
     }
 
+    const maxSteps = autoConfig.maxSteps ?? 3;
+
     // ⚙️ Nombre max d'étapes atteint
-    if (chat.auto_message_step >= settings.auto_message_max_steps) {
+    if (chat.auto_message_step >= maxSteps) {
       this.logger.debug(
-        `Max steps reached (${chat.auto_message_step}/${settings.auto_message_max_steps}) for ${chatId}`,
+        `Max steps reached (${chat.auto_message_step}/${maxSteps}) for ${chatId}`,
         AutoMessageOrchestrator.name,
       );
       if (!chat.read_only) {
@@ -93,8 +95,8 @@ export class AutoMessageOrchestrator {
         nextMessage?.delai && nextMessage.delai > 0
           ? nextMessage.delai
           : this.randomBetween(
-              settings.auto_message_delay_min_seconds,
-              settings.auto_message_delay_max_seconds,
+              autoConfig.delayMinSeconds ?? 20,
+              autoConfig.delayMaxSeconds ?? 45,
             );
 
       const delayMs = delaySeconds * 1000;

@@ -34,6 +34,7 @@ import { AutoMessageScopeConfig } from 'src/message-auto/entities/auto-message-s
 import { WebhookEventLog } from './entities/webhook-event.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { CallLogModule } from 'src/call-log/call_log.module';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
@@ -69,6 +70,7 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
     CommunicationWhapiModule,
     LoggingModule,
     CallLogModule,
+    JorbsModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

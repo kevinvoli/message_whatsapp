@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -624,4 +624,43 @@ export async function getWebhookMetrics(): Promise<WebhookMetricsSnapshot> {
         credentials: 'include',
     });
     return handleResponse<WebhookMetricsSnapshot>(response);
+}
+
+// ─── Cron Config ──────────────────────────────────────────────────────────────
+
+export async function getCronConfigs(): Promise<CronConfig[]> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<CronConfig[]>(response);
+}
+
+export async function updateCronConfig(
+    key: string,
+    payload: UpdateCronConfigPayload,
+): Promise<CronConfig> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs/${key}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<CronConfig>(response);
+}
+
+export async function resetCronConfig(key: string): Promise<CronConfig> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs/${key}/reset`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<CronConfig>(response);
+}
+
+export async function runCronNow(key: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs/${key}/run`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<void>(response);
 }

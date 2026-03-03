@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Clock, ListChecks, RefreshCw, Timer, Bot, History } from 'lucide-react';
+import { Clock, ListChecks, RefreshCw, Bot, History } from 'lucide-react';
 import { DispatchSettings, DispatchSettingsAudit, DispatchSnapshot } from '@/app/lib/definitions';
 import {
   getDispatchSettings,
   getDispatchSettingsAudit,
   getDispatchSnapshot,
-  resetDispatchSettings,
   updateDispatchSettings,
 } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -15,11 +14,10 @@ import { formatDate } from '@/app/lib/dateUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'queue' | 'crons' | 'automessages' | 'historique';
+type Tab = 'queue' | 'automessages' | 'historique';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'queue',        label: 'File d\'attente',  icon: ListChecks },
-  { id: 'crons',        label: 'Crons',            icon: Timer      },
   { id: 'automessages', label: 'Messages auto',    icon: Bot        },
   { id: 'historique',   label: 'Historique',       icon: History    },
 ];
@@ -76,7 +74,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [auditTo, setAuditTo] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [savingCrons, setSavingCrons] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
 
   const { addToast } = useToast();
@@ -127,51 +124,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     void refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Sauvegarde Crons ───────────────────────────────────────────────────────
-
-  const handleSaveCrons = async () => {
-    if (!settings) return;
-    try {
-      setSavingCrons(true);
-      const saved = await updateDispatchSettings({
-        no_reply_reinject_interval_minutes: settings.no_reply_reinject_interval_minutes,
-        read_only_check_interval_minutes: settings.read_only_check_interval_minutes,
-        offline_reinject_cron: settings.offline_reinject_cron,
-      });
-      setSettings(saved);
-      const auditData = await loadAudit({ offset: 0 });
-      setAudit(auditData);
-      setAuditOffset(0);
-      addToast({ type: 'success', message: 'Parametres cron sauvegardes.' });
-    } catch (error) {
-      addToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Erreur sauvegarde crons.',
-      });
-    } finally {
-      setSavingCrons(false);
-    }
-  };
-
-  const handleResetSettings = async () => {
-    try {
-      setSavingCrons(true);
-      const saved = await resetDispatchSettings();
-      setSettings(saved);
-      const auditData = await loadAudit({ offset: 0 });
-      setAudit(auditData);
-      setAuditOffset(0);
-      addToast({ type: 'success', message: 'Parametres dispatch reinitialises.' });
-    } catch (error) {
-      addToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Erreur reset parametres.',
-      });
-    } finally {
-      setSavingCrons(false);
-    }
-  };
 
   // ── Sauvegarde Messages auto ───────────────────────────────────────────────
 
@@ -307,83 +259,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
               <p className="px-4 py-10 text-center text-sm text-gray-500">
                 Aucune conversation en attente.
               </p>
-            )}
-          </div>
-        )}
-
-        {/* ── Onglet : Crons ── */}
-        {activeTab === 'crons' && (
-          <div className="p-5">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Parametres des crons dispatch</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Ces intervalles pilotent les taches de reinjection et de verification en temps reel.
-                </p>
-              </div>
-              <SettingsActions
-                saving={savingCrons}
-                hasSettings={!!settings}
-                onSave={handleSaveCrons}
-                onReset={handleResetSettings}
-              />
-            </div>
-
-            {settings ? (
-              <div className="grid gap-5 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Reinject sans reponse (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    value={settings.no_reply_reinject_interval_minutes}
-                    onChange={(e) =>
-                      setSettings({ ...settings, no_reply_reinject_interval_minutes: Number(e.target.value) })
-                    }
-                  />
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Delai avant de remettre en file une conv sans reponse.
-                  </p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Read-only check (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                    value={settings.read_only_check_interval_minutes}
-                    onChange={(e) =>
-                      setSettings({ ...settings, read_only_check_interval_minutes: Number(e.target.value) })
-                    }
-                  />
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Frequence de verification des chats en lecture seule.
-                  </p>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Offline reinject (expression cron)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 font-mono text-sm focus:border-slate-400 focus:outline-none"
-                    value={settings.offline_reinject_cron}
-                    onChange={(e) =>
-                      setSettings({ ...settings, offline_reinject_cron: e.target.value })
-                    }
-                  />
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Format cron standard — ex: <code>0 */5 * * * *</code> = toutes les 5 min.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">Chargement...</p>
             )}
           </div>
         )}

@@ -34,6 +34,7 @@ export type ViewMode =
   | 'conversations'
   | 'queue'
   | 'dispatch'
+  | 'crons'
   | 'observabilite'
   | 'go_no_go';
 
@@ -476,6 +477,40 @@ export type FiltreMetriques = {
   posteIds?: string[];
   channelIds?: string[];
   statutChats?: StatutChat[];
+};
+
+// ============================================
+// CRON CONFIG
+// ============================================
+
+export type CronScheduleType = 'interval' | 'cron' | 'event';
+
+export type CronConfig = {
+  id: string;
+  key: string;
+  label: string;
+  description: string | null;
+  enabled: boolean;
+  scheduleType: CronScheduleType;
+  intervalMinutes: number | null;
+  cronExpression: string | null;
+  ttlDays: number | null;
+  delayMinSeconds: number | null;
+  delayMaxSeconds: number | null;
+  maxSteps: number | null;
+  lastRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateCronConfigPayload = {
+  enabled?: boolean;
+  intervalMinutes?: number;
+  cronExpression?: string;
+  ttlDays?: number;
+  delayMinSeconds?: number;
+  delayMaxSeconds?: number;
+  maxSteps?: number;
 };
 
 // ============================================

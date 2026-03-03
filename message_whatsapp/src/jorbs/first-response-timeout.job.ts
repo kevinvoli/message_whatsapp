@@ -1,12 +1,13 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { Repository } from 'typeorm';
+import { CronConfigService } from './cron-config.service';
 
 @Injectable()
-export class FirstResponseTimeoutJob {
+export class FirstResponseTimeoutJob implements OnModuleInit {
   private readonly logger = new Logger(FirstResponseTimeoutJob.name);
   // âœ… DÃ‰CLARATION OBLIGATOIRE
   private readonly agentSlaIntervals = new Map<string, NodeJS.Timeout>();
@@ -19,7 +20,24 @@ export class FirstResponseTimeoutJob {
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
     private readonly messageAutoService: MessageAutoService,
+    private readonly cronConfigService: CronConfigService,
   ) {}
+
+  onModuleInit(): void {
+    this.cronConfigService.registerHandler('sla-checker', async () => {
+      await this.runAllPostes();
+    });
+  }
+
+  private async runAllPostes(): Promise<void> {
+    for (const posteId of this.activePostes) {
+      try {
+        await this.dispatcher.jobRunnertcheque(posteId);
+      } catch (error) {
+        this.logger.warn(`SLA runner error (${posteId}): ${String(error)}`);
+      }
+    }
+  }
 
   async startAgentSlaMonitor(posteId: string, intervalMinutes?: number) {
     if (this.agentSlaIntervals.has(posteId)) return;

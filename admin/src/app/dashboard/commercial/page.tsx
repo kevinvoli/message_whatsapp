@@ -20,6 +20,7 @@ import MessageAutoView from '@/app/ui/MessageAutoView';
 import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
 import DispatchView from '@/app/ui/DispatchView';
+import CronConfigView from '@/app/ui/CronConfigView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
 import GoNoGoView from '@/app/ui/GoNoGoView';
 import { ViewMode } from '@/app/lib/definitions';
@@ -41,6 +42,8 @@ export default function AdminDashboard() {
                 return <QueueView onRefresh={() => {}} />;
             case 'dispatch':
                 return <DispatchView onRefresh={() => {}} />;
+            case 'crons':
+                return <CronConfigView />;
             case 'observabilite':
                 return <ObservabiliteView />;
             case 'go_no_go':

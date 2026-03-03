@@ -31,6 +31,7 @@ import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
     forwardRef(() => DispatcherModule),
     LoggingModule,
     CallLogModule,
+    JorbsModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

@@ -1,23 +1,29 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { WebhookEventLog } from './entities/webhook-event.entity';
 import { WebhookMetricsService } from './webhook-metrics.service';
+import { CronConfigService } from 'src/jorbs/cron-config.service';
 
 @Injectable()
-export class WebhookIdempotencyPurgeService {
+export class WebhookIdempotencyPurgeService implements OnModuleInit {
   private readonly logger = new Logger(WebhookIdempotencyPurgeService.name);
 
   constructor(
     @InjectRepository(WebhookEventLog)
     private readonly webhookEventRepository: Repository<WebhookEventLog>,
     private readonly metricsService: WebhookMetricsService,
+    private readonly cronConfigService: CronConfigService,
   ) {}
 
-  @Cron('0 3 * * *')
+  onModuleInit(): void {
+    this.cronConfigService.registerHandler('webhook-purge', () =>
+      this.purgeOldEvents(),
+    );
+  }
+
   async purgeOldEvents(): Promise<void> {
-    const ttlDays = this.getTtlDays();
+    const ttlDays = await this.getTtlDays();
     const cutoff = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
 
     try {
@@ -42,12 +48,13 @@ export class WebhookIdempotencyPurgeService {
     }
   }
 
-  private getTtlDays(): number {
+  private async getTtlDays(): Promise<number> {
+    try {
+      const config = await this.cronConfigService.findByKey('webhook-purge');
+      if (config.ttlDays && config.ttlDays > 0) return config.ttlDays;
+    } catch {}
     const raw = process.env.WEBHOOK_IDEMPOTENCY_TTL_DAYS;
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-    return 14;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 14;
   }
 }

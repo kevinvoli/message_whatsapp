@@ -5,6 +5,8 @@ import { QueueService } from './services/queue.service';
 import { QueuePosition } from './entities/queue-position.entity';
 import { DispatchSettings } from './entities/dispatch-settings.entity';
 import { DispatchSettingsAudit } from './entities/dispatch-settings-audit.entity';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
+import { CronConfig } from 'src/jorbs/entities/cron-config.entity';
 import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -36,6 +38,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
       QueuePosition,
       DispatchSettings,
       DispatchSettingsAudit,
+      CronConfig,
       WhatsappMessage,
       WhatsappChat,
       WhatsappCommercial,
@@ -48,6 +51,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
     CallLogModule,
+    JorbsModule,
   ],
   controllers: [DispatcherController],
   providers: [
