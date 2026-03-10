@@ -11,7 +11,6 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { QueueService } from 'src/dispatcher/services/queue.service';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
-import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
@@ -70,7 +69,6 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
     WhatsappPosteService,
     QueueService,
     DispatcherService,
-    FirstResponseTimeoutJob,
     CommunicationWhapiService,
     CommunicationMetaService,
     OutboundRouterService,

@@ -662,5 +662,5 @@ export async function runCronNow(key: string): Promise<void> {
         method: 'POST',
         credentials: 'include',
     });
-    return handleResponse<void>(response);
+    await handleResponse<{ ok: boolean; ranAt: string }>(response);
 }

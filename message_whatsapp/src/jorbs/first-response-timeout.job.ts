@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
@@ -9,11 +9,6 @@ import { CronConfigService } from './cron-config.service';
 @Injectable()
 export class FirstResponseTimeoutJob implements OnModuleInit {
   private readonly logger = new Logger(FirstResponseTimeoutJob.name);
-  // âœ… DÃ‰CLARATION OBLIGATOIRE
-  private readonly agentSlaIntervals = new Map<string, NodeJS.Timeout>();
-  private readonly activePostes = new Set<string>();
-  private readonly autoMessageIntervals = new Map<string, NodeJS.Timeout>();
-  private currentIntervalMinutes = 5;
 
   constructor(
     @InjectRepository(WhatsappChat)
@@ -24,113 +19,24 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.cronConfigService.registerHandler('sla-checker', async () => {
-      await this.runAllPostes();
-    });
+    // Le handler utilise jobRunnerAllPostes() — indépendant de l'état socket
+    this.cronConfigService.registerHandler('sla-checker', () =>
+      this.dispatcher.jobRunnerAllPostes(),
+    );
   }
 
-  private async runAllPostes(): Promise<void> {
-    for (const posteId of this.activePostes) {
-      try {
-        await this.dispatcher.jobRunnertcheque(posteId);
-      } catch (error) {
-        this.logger.warn(`SLA runner error (${posteId}): ${String(error)}`);
-      }
+  /** Appelé par la gateway à la connexion d'un agent : check immédiat pour ce poste. */
+  async startAgentSlaMonitor(posteId: string): Promise<void> {
+    this.logger.debug(`SLA immediate check on agent connect (poste ${posteId})`);
+    try {
+      await this.dispatcher.jobRunnertcheque(posteId);
+    } catch (error) {
+      this.logger.warn(`SLA immediate check error (${posteId}): ${String(error)}`);
     }
   }
 
-  async startAgentSlaMonitor(posteId: string, intervalMinutes?: number) {
-    if (this.agentSlaIntervals.has(posteId)) return;
-    this.activePostes.add(posteId);
-
-    const resolvedMinutes =
-      typeof intervalMinutes === 'number'
-        ? intervalMinutes
-        : this.currentIntervalMinutes;
-    const intervalMs = Math.max(1, resolvedMinutes) * 60 * 1000;
-
-    const runCheck = () => {
-      this.logger.debug(`SLA runner tick (${posteId})`);
-      void (async () => {
-        try {
-          await this.dispatcher.jobRunnertcheque(posteId);
-        } catch (error) {
-          this.logger.warn(`SLA runner error (${posteId}): ${String(error)}`);
-        }
-      })();
-    };
-
-    // Execution immediate au demarrage pour traiter les deadlines deja expirees
-    runCheck();
-
-    const interval = setInterval(runCheck, intervalMs);
-    this.agentSlaIntervals.set(posteId, interval);
+  /** Appelé par la gateway à la déconnexion d'un agent (hook de nettoyage si besoin). */
+  stopAgentSlaMonitor(posteId: string): void {
+    this.logger.debug(`Agent disconnected, SLA monitor stopped (poste ${posteId})`);
   }
-  stopAgentSlaMonitor(agentId: string) {
-    const interval = this.agentSlaIntervals.get(agentId);
-
-    if (interval) {
-      clearInterval(interval);
-      this.agentSlaIntervals.delete(agentId);
-    }
-    this.activePostes.delete(agentId);
-  }
-
-  async refreshSlaIntervals(intervalMinutes: number): Promise<void> {
-    this.currentIntervalMinutes = intervalMinutes;
-    const intervalMs = Math.max(1, intervalMinutes) * 60 * 1000;
-
-    for (const posteId of this.activePostes) {
-      const existing = this.agentSlaIntervals.get(posteId);
-      if (existing) {
-        clearInterval(existing);
-        this.agentSlaIntervals.delete(posteId);
-      }
-      const interval = setInterval(() => {
-        this.logger.debug(`SLA runner tick (${posteId})`);
-        void (async () => {
-          try {
-            await this.dispatcher.jobRunnertcheque(posteId);
-          } catch (error) {
-            this.logger.warn(`SLA runner error (${posteId}): ${String(error)}`);
-          }
-        })();
-      }, intervalMs);
-      this.agentSlaIntervals.set(posteId, interval);
-    }
-  }
-
-  testAutoMessage(chatId: string, position: number) {
-    if (this.autoMessageIntervals.has(chatId)) return;
-
-    // Marquer que le message a Ã©tÃ© envoyÃ© pour ne pas rÃ©exÃ©cuter
-    // this.autoMessageIntervals.set(chatId, true)
-
-    // console.log('Envoi dâ€™un seul message', chatId);
-
-    // void this.messageAutoService.sendAutoMessage(chatId, position);
-  }
-  // testAutoMessage(chatId: string, position: number) {
-  //   if (this.autoMessageIntervals.has(chatId)) return;
-  //   const interval = setInterval(() => {
-  //     console.log(
-  //       Math.floor(Math.random() * 10),
-  //       chatId,
-  //       this.autoMessageIntervals.has(chatId),
-  //     );
-
-  //     void this.messageAutoService.sendAutoMessage(chatId, position);
-  //   }, 60_00);
-  //   this.autoMessageIntervals.set(chatId, interval);
-  // }
-
-  // stopAutoMessage(chatId: string) {
-  //   const interval = this.autoMessageIntervals.get(chatId);
-  //   if (!interval) return;
-
-  //   clearInterval(interval);
-  //   this.autoMessageIntervals.delete(chatId);
-
-  //   console.log('ðŸ›‘ auto message arrÃªtÃ©', chatId);
-  // }
 }

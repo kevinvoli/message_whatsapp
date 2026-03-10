@@ -182,7 +182,7 @@ export class CronConfigService implements OnModuleInit {
     return saved;
   }
 
-  async runNow(key: string): Promise<void> {
+  async runNow(key: string): Promise<{ ok: boolean; ranAt: string }> {
     const config = await this.findByKey(key);
     const handler = this.handlers.get(key);
     if (!handler) {
@@ -191,6 +191,7 @@ export class CronConfigService implements OnModuleInit {
     this.logger.log(`Running cron "${key}" immediately`);
     await handler();
     await this.updateLastRunAt(config);
+    return { ok: true, ranAt: new Date().toISOString() };
   }
 
   // ─────────────────────────── Scheduling public ───────────────────────────

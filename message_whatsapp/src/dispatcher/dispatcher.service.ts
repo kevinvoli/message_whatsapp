@@ -325,8 +325,6 @@ export class DispatcherService {
   }
 
   async jobRunnertcheque(poste_id: string) {
-    // console.log('mes verification sont ici', commercialId);
-
     const now = new Date();
 
     const chats = await this.chatRepository.find({
@@ -343,6 +341,28 @@ export class DispatcherService {
 
     for (const chat of chats) {
       await this.reinjectConversation(chat);
+    }
+  }
+
+  /** Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé. */
+  async jobRunnerAllPostes(): Promise<void> {
+    const now = new Date();
+
+    const chats = await this.chatRepository.find({
+      where: {
+        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
+        last_poste_message_at: IsNull(),
+        first_response_deadline_at: LessThan(now),
+      },
+    });
+    this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) expirée(s)`);
+
+    for (const chat of chats) {
+      try {
+        await this.reinjectConversation(chat);
+      } catch (err) {
+        this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
+      }
     }
   }
 
