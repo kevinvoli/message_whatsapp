@@ -13,7 +13,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true); // Start as loading
 
   useEffect(() => {
-    
+
     async function checkAuthStatus() {
       try {
         const authenticated = await checkAdminAuth();
@@ -22,6 +22,7 @@ export default function Home() {
         } else {
           router.replace('/login');
         }
+        
       } catch (error) {
         logger.error("Authentication check failed", {
           error: error instanceof Error ? error.message : String(error),
