@@ -25,6 +25,7 @@ for (const envFile of envFiles) {
   }
 }
 
+
 const env = process.env;
 
 export type TestMode = 'messages' | 'status' | 'mix';
