@@ -13,6 +13,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true); // Start as loading
 
   useEffect(() => {
+    
     async function checkAuthStatus() {
       try {
         const authenticated = await checkAdminAuth();
