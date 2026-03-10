@@ -500,9 +500,20 @@ export class WhatsappMessageGateway
     if (!this.throttle.allow(client.id, 'messages:get')) {
       return this.emitRateLimited(client, 'messages:get');
     }
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+
     const tenantIds = this.getTenantIds(client);
     const chat = await this.chatService.findBychat_id(payload.chat_id);
-    if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) {
+
+    // Allow if chat belongs to the agent's poste (direct assignment) OR passes tenant check
+    const isOwnPosteChat = !!chat && chat.poste_id === agent.posteId;
+    if (!chat || (!isOwnPosteChat && !this.isAllowedTenantChat(chat, tenantIds))) {
+      // Emit empty list so the frontend exits the loading state
+      client.emit('chat:event', {
+        type: 'MESSAGE_LIST',
+        payload: { chat_id: payload.chat_id, messages: [] },
+      });
       return;
     }
     const messages = await this.messageService.findBychat_id(payload.chat_id);

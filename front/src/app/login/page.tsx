@@ -12,6 +12,10 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleLogin = async (formData: { email: string; password: string }) => {
+    // Demander la permission notifications depuis ce geste utilisateur (clic login)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      void Notification.requestPermission();
+    }
     try {
       await login(formData.email, formData.password);
       // La redirection se fera automatiquement via l'effet ci-dessous

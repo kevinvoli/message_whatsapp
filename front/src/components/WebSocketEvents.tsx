@@ -99,9 +99,8 @@ const WebSocketEvents = () => {
                 body: message.text || 'Media recu',
                 icon: '/favicon.ico',
               });
-            } else if (Notification.permission !== 'denied') {
-              Notification.requestPermission();
-            }
+            // requestPermission() ne peut être appelé que depuis un geste utilisateur
+            // → la demande est faite au login, pas ici
           }
 
           break;
