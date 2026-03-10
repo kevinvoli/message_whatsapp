@@ -104,9 +104,7 @@ export class MessageAutoService {
       return;
     }
 
-    // Marquer la conversation comme "en cours d'envoi"
     await this.chatService.update(chatId, {
-      read_only: true,
       auto_message_status: 'sending',
     });
 
@@ -116,6 +114,9 @@ export class MessageAutoService {
         name: chat.name,
         numero: chat.contact_client,
       });
+
+      // 🤖 Typing WA vers le client (best-effort : silencieux si Meta ou erreur réseau)
+      void this.messageService.typingStart(chatId).catch(() => {});
 
       const message = await this.messageService.createAgentMessage({
         chat_id: chat.chat_id,
@@ -131,19 +132,21 @@ export class MessageAutoService {
 
       await this.gateway.notifyNewMessage(message, chat);
 
-      // Débloquer après envoi
       await this.chatService.update(chatId, {
         read_only: false,
         auto_message_status: 'sent',
         auto_message_id: template.id,
       });
     } catch (err) {
-      // Toujours débloquer la conversation même en cas d'erreur
       await this.chatService.update(chatId, {
         read_only: false,
         auto_message_status: 'failed',
       });
       throw err;
+    } finally {
+      // 🛑 Stop typing WA (best-effort) + déverrouillage frontend
+      void this.messageService.typingStop(chatId).catch(() => {});
+      this.gateway.emitConversationReadonly({ ...chat, read_only: false } as typeof chat);
     }
   }
 

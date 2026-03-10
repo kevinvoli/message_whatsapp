@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Edit, PlusCircle, Trash2, RefreshCw, CheckCircle2, PauseCircle, Settings } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
-import { MessageAuto, AutoMessageScopeConfig, AutoMessageScopeType } from '@/app/lib/definitions';
+import { MessageAuto, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload } from '@/app/lib/definitions';
 import {
   createMessageAuto,
   deleteMessageAuto,
@@ -12,6 +12,8 @@ import {
   getScopeConfigs,
   upsertScopeConfig,
   deleteScopeConfig,
+  getCronConfigs,
+  updateCronConfig,
 } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
@@ -23,6 +25,285 @@ interface MessageAutoViewProps {
 }
 
 type AutoMessageChannel = 'whatsapp' | 'sms' | 'email';
+
+// ─── Formulaire partagé ajout/édition ─────────────────────────────────────────
+
+interface MessageAutoFormFieldsProps {
+  body: string;
+  onBodyChange: (v: string) => void;
+  delai: number | undefined;
+  onDelaiChange: (v: number | undefined) => void;
+  canal: AutoMessageChannel | undefined;
+  onCanalChange: (v: AutoMessageChannel | undefined) => void;
+  position: number;
+  onPositionChange: (v: number) => void;
+  actif: boolean;
+  onActifChange: (v: boolean) => void;
+  idPrefix: string;
+}
+
+function MessageAutoFormFields({
+  body, onBodyChange,
+  delai, onDelaiChange,
+  canal, onCanalChange,
+  position, onPositionChange,
+  actif, onActifChange,
+  idPrefix,
+}: MessageAutoFormFieldsProps) {
+  return (
+    <>
+      <div className="mb-4">
+        <label htmlFor={`${idPrefix}-body`} className="mb-2 block text-sm font-bold text-gray-700">
+          Corps du message
+        </label>
+        <textarea
+          id={`${idPrefix}-body`}
+          rows={4}
+          className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+          value={body}
+          onChange={(e) => onBodyChange(e.target.value)}
+          placeholder="Ex: Bonjour #name#, comment puis-je vous aider ?"
+          required
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Placeholders : <code className="rounded bg-gray-100 px-1">#name#</code> → prénom du client,{' '}
+          <code className="rounded bg-gray-100 px-1">#numero#</code> → numéro de téléphone
+        </p>
+      </div>
+      <div className="mb-4">
+        <label htmlFor={`${idPrefix}-delai`} className="mb-2 block text-sm font-bold text-gray-700">
+          Délai (secondes) — 0 ou vide = utiliser les délais globaux
+        </label>
+        <input
+          type="number"
+          id={`${idPrefix}-delai`}
+          min={0}
+          className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+          value={delai ?? ''}
+          onChange={(e) =>
+            onDelaiChange(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
+          }
+        />
+      </div>
+      <div className="mb-4">
+        <label htmlFor={`${idPrefix}-canal`} className="mb-2 block text-sm font-bold text-gray-700">
+          Canal
+        </label>
+        <select
+          id={`${idPrefix}-canal`}
+          className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+          value={canal ?? ''}
+          onChange={(e) =>
+            onCanalChange(e.target.value ? (e.target.value as AutoMessageChannel) : undefined)
+          }
+        >
+          <option value="">Tous les canaux</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+          <option value="email">Email</option>
+        </select>
+      </div>
+      <div className="mb-4">
+        <label htmlFor={`${idPrefix}-position`} className="mb-2 block text-sm font-bold text-gray-700">
+          Position (ordre d&apos;envoi, min. 1)
+        </label>
+        <input
+          type="number"
+          id={`${idPrefix}-position`}
+          min={1}
+          className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+          value={position}
+          onChange={(e) => onPositionChange(Number.parseInt(e.target.value || '1', 10))}
+          required
+        />
+      </div>
+      <div className="mb-4 flex items-center">
+        <input
+          type="checkbox"
+          id={`${idPrefix}-actif`}
+          className="mr-2 leading-tight"
+          checked={actif}
+          onChange={(e) => onActifChange(e.target.checked)}
+        />
+        <label htmlFor={`${idPrefix}-actif`} className="text-sm font-bold text-gray-700">
+          Actif
+        </label>
+      </div>
+    </>
+  );
+}
+
+// ─── Panneau config globale ───────────────────────────────────────────────────
+
+function GlobalConfigPanel() {
+  const { addToast } = useToast();
+  const [config, setConfig] = useState<CronConfig | null>(null);
+  const [toggling, setToggling] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [delayMin, setDelayMin] = useState(20);
+  const [delayMax, setDelayMax] = useState(45);
+  const [maxSteps, setMaxSteps] = useState(3);
+
+  const load = useCallback(async () => {
+    try {
+      const all = await getCronConfigs();
+      const found = all.find((c) => c.key === 'auto-message') ?? null;
+      if (found) {
+        setConfig(found);
+        setDelayMin(found.delayMinSeconds ?? 20);
+        setDelayMax(found.delayMaxSeconds ?? 45);
+        setMaxSteps(found.maxSteps ?? 3);
+      }
+    } catch {
+      // silently ignore — not critical
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleToggle = async () => {
+    if (!config) return;
+    setToggling(true);
+    try {
+      const updated = await updateCronConfig(config.key, { enabled: !config.enabled });
+      setConfig(updated);
+      addToast({
+        type: updated.enabled ? 'success' : 'info',
+        message: `Messages automatiques ${updated.enabled ? 'activés' : 'désactivés'} globalement.`,
+      });
+    } catch (err) {
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Erreur.' });
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleSaveDetails = async () => {
+    if (!config) return;
+    setSaving(true);
+    try {
+      const payload: UpdateCronConfigPayload = {
+        delayMinSeconds: delayMin,
+        delayMaxSeconds: delayMax,
+        maxSteps,
+      };
+      const updated = await updateCronConfig(config.key, payload);
+      setConfig(updated);
+      addToast({ type: 'success', message: 'Configuration mise à jour.' });
+      setShowDetails(false);
+    } catch (err) {
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Erreur sauvegarde.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!config) return null;
+
+  const enabled = config.enabled;
+
+  return (
+    <div className={`rounded-xl border shadow-sm ${enabled ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-200 bg-gray-50'}`}>
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
+          {enabled
+            ? <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+            : <PauseCircle className="h-5 w-5 text-gray-400 flex-shrink-0" />
+          }
+          <div>
+            <p className="text-sm font-semibold text-gray-800">
+              Messages automatiques {enabled ? 'activés' : 'désactivés'} globalement
+            </p>
+            <p className="text-xs text-gray-500">
+              {enabled
+                ? `Délai : ${config.delayMinSeconds ?? 20}–${config.delayMaxSeconds ?? 45}s · Max ${config.maxSteps ?? 3} étape(s)`
+                : 'Aucun message automatique ne sera envoyé.'
+              }
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            title="Configurer les délais et étapes"
+            className="rounded-md border border-gray-200 bg-white p-1.5 text-gray-500 hover:bg-gray-100"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => void handleToggle()}
+            disabled={toggling}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+              enabled ? 'bg-emerald-500' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                enabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {showDetails && (
+        <div className="border-t border-gray-200 px-4 py-4 bg-white rounded-b-xl">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Délais & étapes</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Délai min (s)</label>
+              <input
+                type="number" min={1} value={delayMin}
+                onChange={(e) => setDelayMin(Number(e.target.value))}
+                className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Délai max (s)</label>
+              <input
+                type="number" min={1} value={delayMax}
+                onChange={(e) => setDelayMax(Number(e.target.value))}
+                className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Étapes max</label>
+              <input
+                type="number" min={1} max={20} value={maxSteps}
+                onChange={(e) => setMaxSteps(Number(e.target.value))}
+                className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDetails(false)}
+              className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveDetails()}
+              disabled={saving}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MessageAutoView ──────────────────────────────────────────────────────────
 
 export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
   const refreshRef = useRef<() => Promise<void>>(async () => {});
@@ -74,14 +355,14 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
   const [formBody, setFormBody] = useState('');
   const [formDelai, setFormDelai] = useState<number | undefined>(undefined);
   const [formCanal, setFormCanal] = useState<AutoMessageChannel | undefined>(undefined);
-  const [formPosition, setFormPosition] = useState(0);
+  const [formPosition, setFormPosition] = useState(1);
   const [formActif, setFormActif] = useState(true);
 
   const openAddModal = () => {
     setFormBody('');
     setFormDelai(undefined);
     setFormCanal(undefined);
-    setFormPosition(0);
+    setFormPosition(1);
     setFormActif(true);
     clearStatus();
     setShowAddModal(true);
@@ -119,7 +400,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
         position: formPosition,
         actif: formActif,
       },
-      'Message automatique ajoute.',
+      'Message automatique ajouté.',
     );
     if (result.ok) closeAddModal();
   };
@@ -136,14 +417,14 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
         position: formPosition,
         actif: formActif,
       },
-      'Message automatique mis a jour.',
+      'Message automatique mis à jour.',
     );
     if (result.ok) closeEditModal();
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Supprimer ce message automatique ?')) return;
-    await remove(id, 'Message automatique supprime.');
+    await remove(id, 'Message automatique supprimé.');
   };
 
   // ─── Scope configs ────────────────────────────────────────────────────────
@@ -220,7 +501,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
         }
         return [...prev, saved];
       });
-      addToast({ type: 'success', message: 'Restriction scope sauvegardee.' });
+      addToast({ type: 'success', message: 'Restriction scope sauvegardée.' });
       closeScopeModal();
     } catch (err) {
       addToast({
@@ -237,7 +518,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
     try {
       await deleteScopeConfig(id);
       setScopes((prev) => prev.filter((s) => s.id !== id));
-      addToast({ type: 'success', message: 'Restriction scope supprimee.' });
+      addToast({ type: 'success', message: 'Restriction scope supprimée.' });
     } catch (err) {
       addToast({
         type: 'error',
@@ -254,36 +535,39 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => void fetchData()}
-          title="Rafraichir"
-          aria-label="Rafraichir"
-          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
 
-      {/* ─── Messages auto ─────────────────────────────────────────────────── */}
+      {/* ─── Config globale ──────────────────────────────────────────────────── */}
+      <GlobalConfigPanel />
+
+      {/* ─── Header messages auto ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Messages Automatiques</h2>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          disabled={loading}
-        >
-          <PlusCircle className="h-4 w-4" />
-          Ajouter un message auto
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void fetchData()}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            disabled={loading}
+          >
+            <PlusCircle className="h-4 w-4" />
+            Ajouter un message auto
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <EntityTable
           items={messagesAuto}
           loading={loading}
-          emptyMessage="Aucun message automatique trouve."
+          emptyMessage="Aucun message automatique trouvé."
           getRowKey={(msg) => msg.id}
           columns={[
             {
@@ -299,12 +583,12 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
               ),
             },
             {
-              header: 'Delai (s)',
-              render: (msg) => <span className="text-gray-700">{msg.delai ?? 'N/A'}</span>,
+              header: 'Délai (s)',
+              render: (msg) => <span className="text-gray-700">{msg.delai ?? 'Global'}</span>,
             },
             {
               header: 'Canal',
-              render: (msg) => <span className="text-gray-700">{msg.canal ?? 'N/A'}</span>,
+              render: (msg) => <span className="text-gray-700">{msg.canal ?? 'Tous'}</span>,
             },
             {
               header: 'Actif',
@@ -321,7 +605,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
               ),
             },
             {
-              header: 'Cree le',
+              header: 'Créé le',
               render: (msg) => (
                 <span className="text-sm text-gray-500">
                   {formatDateShort(msg.createdAt)}
@@ -340,7 +624,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => handleDelete(msg.id)}
+                    onClick={() => void handleDelete(msg.id)}
                     className="rounded p-1 text-red-600 hover:bg-red-50"
                     disabled={loading}
                   >
@@ -361,15 +645,15 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
               Restrictions par scope
             </h3>
             <p className="text-xs text-gray-400">
-              Desactiver les messages auto pour un poste, un canal ou un provider specifique.
+              Désactiver les messages auto pour un poste, un canal ou un provider spécifique.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => void fetchScopes()}
-              title="Rafraichir scopes"
-              aria-label="Rafraichir scopes"
+              title="Rafraîchir scopes"
+              aria-label="Rafraîchir scopes"
               className="p-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100"
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -389,7 +673,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
           <p className="px-4 py-6 text-center text-sm text-gray-500">Chargement...</p>
         ) : scopes.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-gray-500">
-            Aucune restriction configuree. Les messages auto s&apos;appliquent a tous les scopes.
+            Aucune restriction configurée. Les messages auto s&apos;appliquent à tous les scopes.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -399,7 +683,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
                   <th className="px-4 py-2">Type</th>
                   <th className="px-4 py-2">ID / Valeur</th>
                   <th className="px-4 py-2">Label</th>
-                  <th className="px-4 py-2">Etat</th>
+                  <th className="px-4 py-2">État</th>
                   <th className="px-4 py-2">Actions</th>
                 </tr>
               </thead>
@@ -423,7 +707,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
                             : 'bg-red-100 text-red-800'
                         }`}
                       >
-                        {scope.enabled ? 'Actif' : 'Desactive'}
+                        {scope.enabled ? 'Actif' : 'Désactivé'}
                       </span>
                     </td>
                     <td className="px-4 py-2">
@@ -435,7 +719,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleScopeDelete(scope.id)}
+                          onClick={() => void handleScopeDelete(scope.id)}
                           className="rounded p-1 text-red-600 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -460,80 +744,17 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
         submitLabel="Ajouter"
         loadingLabel="Ajout en cours..."
       >
-        <div className="mb-4">
-          <label htmlFor="body" className="mb-2 block text-sm font-bold text-gray-700">
-            Corps du message
-          </label>
-          <textarea
-            id="body"
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formBody}
-            onChange={(e) => setFormBody(e.target.value)}
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="delai" className="mb-2 block text-sm font-bold text-gray-700">
-            Delai (secondes) — 0 = utiliser les delais globaux
-          </label>
-          <input
-            type="number"
-            id="delai"
-            min={0}
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formDelai ?? ''}
-            onChange={(e) =>
-              setFormDelai(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
-            }
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="canal" className="mb-2 block text-sm font-bold text-gray-700">
-            Canal
-          </label>
-          <select
-            id="canal"
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formCanal ?? ''}
-            onChange={(e) =>
-              setFormCanal(e.target.value ? (e.target.value as AutoMessageChannel) : undefined)
-            }
-          >
-            <option value="">Selectionner un canal</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="sms">SMS</option>
-            <option value="email">Email</option>
-          </select>
-        </div>
-        <div className="mb-4">
-          <label htmlFor="position" className="mb-2 block text-sm font-bold text-gray-700">
-            Position (ordre d&apos;envoi, min. 1)
-          </label>
-          <input
-            type="number"
-            id="position"
-            min={1}
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formPosition}
-            onChange={(e) => setFormPosition(Number.parseInt(e.target.value || '1', 10))}
-            required
-          />
-        </div>
-        <div className="mb-4 flex items-center">
-          <input
-            type="checkbox"
-            id="actif"
-            className="mr-2 leading-tight"
-            checked={formActif}
-            onChange={(e) => setFormActif(e.target.checked)}
-          />
-          <label htmlFor="actif" className="text-sm font-bold text-gray-700">
-            Actif
-          </label>
-        </div>
+        <MessageAutoFormFields
+          idPrefix="add"
+          body={formBody} onBodyChange={setFormBody}
+          delai={formDelai} onDelaiChange={setFormDelai}
+          canal={formCanal} onCanalChange={setFormCanal}
+          position={formPosition} onPositionChange={setFormPosition}
+          actif={formActif} onActifChange={setFormActif}
+        />
       </EntityFormModal>
 
-      {/* ─── Modal message auto — edition ──────────────────────────────────── */}
+      {/* ─── Modal message auto — édition ──────────────────────────────────── */}
       <EntityFormModal
         isOpen={showEditModal && !!currentMessageAuto}
         title="Modifier le message automatique"
@@ -543,77 +764,14 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
         submitLabel="Sauvegarder"
         loadingLabel="Sauvegarde en cours..."
       >
-        <div className="mb-4">
-          <label htmlFor="edit-body" className="mb-2 block text-sm font-bold text-gray-700">
-            Corps du message
-          </label>
-          <textarea
-            id="edit-body"
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formBody}
-            onChange={(e) => setFormBody(e.target.value)}
-            required
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="edit-delai" className="mb-2 block text-sm font-bold text-gray-700">
-            Delai (secondes) — 0 = utiliser les delais globaux
-          </label>
-          <input
-            type="number"
-            id="edit-delai"
-            min={0}
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formDelai ?? ''}
-            onChange={(e) =>
-              setFormDelai(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
-            }
-          />
-        </div>
-        <div className="mb-4">
-          <label htmlFor="edit-canal" className="mb-2 block text-sm font-bold text-gray-700">
-            Canal
-          </label>
-          <select
-            id="edit-canal"
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formCanal ?? ''}
-            onChange={(e) =>
-              setFormCanal(e.target.value ? (e.target.value as AutoMessageChannel) : undefined)
-            }
-          >
-            <option value="">Selectionner un canal</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="sms">SMS</option>
-            <option value="email">Email</option>
-          </select>
-        </div>
-        <div className="mb-4">
-          <label htmlFor="edit-position" className="mb-2 block text-sm font-bold text-gray-700">
-            Position (ordre d&apos;envoi, min. 1)
-          </label>
-          <input
-            type="number"
-            id="edit-position"
-            min={1}
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={formPosition}
-            onChange={(e) => setFormPosition(Number.parseInt(e.target.value || '1', 10))}
-            required
-          />
-        </div>
-        <div className="mb-4 flex items-center">
-          <input
-            type="checkbox"
-            id="edit-actif"
-            className="mr-2 leading-tight"
-            checked={formActif}
-            onChange={(e) => setFormActif(e.target.checked)}
-          />
-          <label htmlFor="edit-actif" className="text-sm font-bold text-gray-700">
-            Actif
-          </label>
-        </div>
+        <MessageAutoFormFields
+          idPrefix="edit"
+          body={formBody} onBodyChange={setFormBody}
+          delai={formDelai} onDelaiChange={setFormDelai}
+          canal={formCanal} onCanalChange={setFormCanal}
+          position={formPosition} onPositionChange={setFormPosition}
+          actif={formActif} onActifChange={setFormActif}
+        />
       </EntityFormModal>
 
       {/* ─── Modal scope config ─────────────────────────────────────────────── */}
@@ -673,14 +831,14 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
             className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
             value={scopeLabel}
             onChange={(e) => setScopeLabel(e.target.value)}
-            placeholder="Ex: Poste support — desactive"
+            placeholder="Ex: Poste support — désactivé"
           />
         </div>
         <div className="mb-4 flex items-center justify-between rounded-lg border border-gray-200 p-3">
           <div>
             <p className="text-sm font-bold text-gray-700">Messages auto actifs pour ce scope</p>
             <p className="text-xs text-gray-500">
-              Desactiver = bloquer les messages auto pour ce scope meme si actif globalement.
+              Désactiver = bloquer les messages auto pour ce scope même si actif globalement.
             </p>
           </div>
           <button

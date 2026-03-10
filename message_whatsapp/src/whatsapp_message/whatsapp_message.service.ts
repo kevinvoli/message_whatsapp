@@ -438,6 +438,10 @@ export class WhatsappMessageService {
     await this.communicationWhapiService.sendTyping(chat_id, true);
   }
 
+  async typingStop(chat_id: string) {
+    await this.communicationWhapiService.sendTyping(chat_id, false);
+  }
+
   async findLastMessageBychat_id(
     chat_id: string,
   ): Promise<WhatsappMessage | null> {
