@@ -99,8 +99,9 @@ const WebSocketEvents = () => {
                 body: message.text || 'Media recu',
                 icon: '/favicon.ico',
               });
-            // requestPermission() ne peut être appelé que depuis un geste utilisateur
-            // → la demande est faite au login, pas ici
+              // requestPermission() ne peut être appelé que depuis un geste utilisateur
+              // → la demande est faite au login, pas ici
+            }
           }
 
           break;
