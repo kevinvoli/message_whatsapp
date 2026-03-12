@@ -112,6 +112,7 @@ export type Channel = {
   is_business: boolean;
   api_version: string;
   core_version: string;
+  tokenExpiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

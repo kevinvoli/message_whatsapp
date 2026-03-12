@@ -160,6 +160,14 @@ export async function updateChannel(id: string, channel: Partial<Channel>): Prom
     return handleResponse<Channel>(response);
 }
 
+export async function refreshChannelToken(id: string): Promise<Channel> {
+    const response = await fetch(`${API_BASE_URL}/channel/${id}/refresh-token`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<Channel>(response);
+}
+
 export async function deleteChannel(id: string): Promise<{ message: string }> {
     const response = await fetch(`${API_BASE_URL}/channel/${id}`, {
         method: 'DELETE',

@@ -47,7 +47,8 @@
       "Bash(set:*)",
       "Bash(docker compose:*)",
       "Bash(ls:*)",
-      "Bash(do grep:*)"
+      "Bash(do grep:*)",
+      "Bash(sc query:*)"
     ]
   }
 }

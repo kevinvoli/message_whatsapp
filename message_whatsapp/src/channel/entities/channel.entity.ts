@@ -40,6 +40,9 @@ export class WhapiChannel {
   @Column({ type: 'text' })
   token: string;
 
+  @Column({ type: 'datetime', nullable: true, name: 'token_expires_at' })
+  tokenExpiresAt: Date | null;
+
   @Column({ type: 'int' })
   start_at: number;
 

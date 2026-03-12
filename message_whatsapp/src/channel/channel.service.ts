@@ -11,6 +11,7 @@ import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { MetaTokenService } from './meta-token.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class ChannelService {
     @InjectRepository(ProviderChannel)
     private readonly providerChannelRepository: Repository<ProviderChannel>,
     private readonly connmunicationService: CommunicationWhapiService,
+    private readonly metaTokenService: MetaTokenService,
     private readonly logger: AppLogger,
   ) {}
 
@@ -48,11 +50,29 @@ export class ChannelService {
       const externalId = dto.external_id?.trim() || channelId;
       const nowEpoch = Math.floor(Date.now() / 1000);
 
+      let metaToken = dto.token;
+      let metaTokenExpiresAt: Date | null = null;
+
+      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+        try {
+          const exchanged = await this.metaTokenService.exchangeForLongLivedToken(dto.token);
+          metaToken = exchanged.accessToken;
+          metaTokenExpiresAt = exchanged.expiresAt;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Impossible d'échanger le token Meta (token court gardé): ${message}`,
+            ChannelService.name,
+          );
+        }
+      }
+
       const metaChannel = this.channelRepository.create({
         provider: 'meta',
         external_id: externalId,
         start_at: nowEpoch,
-        token: dto.token,
+        token: metaToken,
+        tokenExpiresAt: metaTokenExpiresAt,
         channel_id: channelId,
         uptime: 0,
         version: 'meta',
@@ -202,6 +222,28 @@ export class ChannelService {
     if (!channel) {
       throw new NotFoundException(`Channel with ID ${id} not found`);
     }
+
+    // Si un nouveau token est fourni pour un canal Meta, tenter l'échange long-lived
+    if (
+      channel.provider === 'meta' &&
+      dto.token &&
+      dto.token !== channel.token &&
+      process.env.META_APP_ID &&
+      process.env.META_APP_SECRET
+    ) {
+      try {
+        const exchanged = await this.metaTokenService.exchangeForLongLivedToken(dto.token);
+        dto.token = exchanged.accessToken;
+        (dto as UpdateChannelDto & { tokenExpiresAt?: Date }).tokenExpiresAt = exchanged.expiresAt;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Impossible d'échanger le token Meta à la mise à jour (token gardé tel quel): ${message}`,
+          ChannelService.name,
+        );
+      }
+    }
+
     Object.assign(channel, dto);
     return await this.channelRepository.save(channel);
   }

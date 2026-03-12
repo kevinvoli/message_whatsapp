@@ -20,6 +20,7 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
+import { MetaTokenService } from 'src/channel/meta-token.service';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
@@ -64,6 +65,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
     OutboundRouterService,
     WhatsappCommercialService,
     ChannelService,
+    MetaTokenService,
     ContactService,
     WhatsappPosteService,
     OfflineReinjectionJob,

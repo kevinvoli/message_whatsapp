@@ -21,6 +21,7 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
+import { MetaTokenService } from 'src/channel/meta-token.service';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
@@ -73,6 +74,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
     OutboundRouterService,
     FirstResponseTimeoutJob,
     ChannelService,
+    MetaTokenService,
     ContactService,
     WhatsappPosteService,
     MessageAutoService,

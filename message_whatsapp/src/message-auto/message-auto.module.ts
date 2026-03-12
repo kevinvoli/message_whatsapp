@@ -19,6 +19,7 @@ import { OutboundRouterService } from 'src/communication_whapi/outbound-router.s
 import { SocketThrottleGuard } from 'src/whatsapp_message/guards/socket-throttle.guard';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { ChannelService } from 'src/channel/channel.service';
+import { MetaTokenService } from 'src/channel/meta-token.service';
 import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
@@ -74,6 +75,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
     OutboundRouterService,
     SocketThrottleGuard,
     ChannelService,
+    MetaTokenService,
     ContactService,
   ],
 })

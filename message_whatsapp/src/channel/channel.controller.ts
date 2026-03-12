@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ChannelService } from './channel.service';
+import { MetaTokenService } from './meta-token.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
@@ -16,7 +17,10 @@ import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 @Controller('channel')
 @UseGuards(AdminGuard) // Use AdminGuard
 export class ChannelController {
-  constructor(private readonly communicationWhapiService: ChannelService) {}
+  constructor(
+    private readonly communicationWhapiService: ChannelService,
+    private readonly metaTokenService: MetaTokenService,
+  ) {}
 
   @Post()
   create(@Body() createCommunicationWhapiDto: CreateChannelDto) {
@@ -47,5 +51,10 @@ export class ChannelController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.communicationWhapiService.remove(id);
+  }
+
+  @Post(':id/refresh-token')
+  refreshToken(@Param('id') id: string) {
+    return this.metaTokenService.refreshChannelToken(id);
   }
 }

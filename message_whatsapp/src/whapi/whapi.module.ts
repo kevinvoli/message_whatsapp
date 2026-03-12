@@ -21,6 +21,7 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { ChannelService } from 'src/channel/channel.service';
+import { MetaTokenService } from 'src/channel/meta-token.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactService } from 'src/contact/contact.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
@@ -79,6 +80,7 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
     WhatsappChatService,
     WhatsappCommercialService,
     ChannelService,
+    MetaTokenService,
     WhatsappPosteService,
     ContactService,
     CommunicationWhapiService,

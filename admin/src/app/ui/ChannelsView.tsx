@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Edit, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import { Channel } from '@/app/lib/definitions';
-import { createChannel, deleteChannel, getChannels, updateChannel } from '@/app/lib/api';
+import { createChannel, deleteChannel, getChannels, refreshChannelToken, updateChannel } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
@@ -20,6 +20,22 @@ type ChannelCreateInput = {
   external_id?: string;
   is_business?: boolean;
 };
+
+function getTokenExpiryLabel(expiresAt: string | null | undefined): string {
+  if (!expiresAt) return 'Inconnue';
+  const date = new Date(expiresAt);
+  const daysLeft = Math.floor((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 0) return `Expiré (il y a ${Math.abs(daysLeft)}j)`;
+  return `dans ${daysLeft}j (${formatDateShort(expiresAt)})`;
+}
+
+function getTokenExpiryClass(expiresAt: string | null | undefined): string {
+  if (!expiresAt) return 'text-gray-400';
+  const daysLeft = Math.floor((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 7) return 'text-red-600 font-semibold';
+  if (daysLeft < 14) return 'text-orange-500 font-semibold';
+  return 'text-green-600';
+}
 
 export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const refreshRef = useRef<() => Promise<void>>(async () => {});
@@ -127,6 +143,20 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     await remove(id, 'Canal supprime.');
   };
 
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
+  const handleRefreshToken = async (id: string) => {
+    setRefreshingId(id);
+    try {
+      const updated = await refreshChannelToken(id);
+      setItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } catch {
+      // erreur visible via le retour de l'API
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
@@ -216,6 +246,17 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
               ),
             },
             {
+              header: 'Expiration Token',
+              render: (channel) => {
+                if (channel.provider !== 'meta') return <span className="text-gray-400">-</span>;
+                return (
+                  <span className={`text-sm ${getTokenExpiryClass(channel.tokenExpiresAt)}`}>
+                    {getTokenExpiryLabel(channel.tokenExpiresAt)}
+                  </span>
+                );
+              },
+            },
+            {
               header: 'Actions',
               render: (channel) => (
                 <div className="flex items-center gap-2">
@@ -226,6 +267,16 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                   >
                     <Edit className="h-4 w-4" />
                   </button>
+                  {channel.provider === 'meta' && (
+                    <button
+                      onClick={() => void handleRefreshToken(channel.id)}
+                      className="rounded p-1 text-green-600 hover:bg-green-50"
+                      disabled={loading || refreshingId === channel.id}
+                      title="Renouveler le token Meta"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${refreshingId === channel.id ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(channel.id)}
                     className="rounded p-1 text-red-600 hover:bg-red-50"
