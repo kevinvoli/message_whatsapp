@@ -30,6 +30,7 @@ export class ContactController {
   async create(@Body() dto: CreateContactDto) {
     const contact = await this.service.create(dto);
     await this.gateway.emitContactUpsert(contact);
+    
     return contact;
   }
 
