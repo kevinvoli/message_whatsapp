@@ -186,17 +186,27 @@ export const resolveAdminMessageText = (message: AdminMessageLike): string => {
   const mediaType = (message.mediaType || message.type || '').toLowerCase();
   switch (mediaType) {
     case 'image':
-      return '[Photo client]';
+      // return '[Photo client]';
+      return '';
     case 'video':
-      return '[Video client]';
+      // return '[Video client]';
+      return '';
+
     case 'audio':
+      return '';
     case 'voice':
-      return '[Message vocal client]';
+      // return '[Message vocal client]';
+      return '';
     case 'document':
-      return '[Document client]';
+      // return '[Document client]';
+      return '';
+
     case 'location':
+      return '';
+
     case 'live_location':
-      return '[Localisation client]';
+      // return '[Localisation client]';
+      return '';
     default:
       return '[Message client]';
   }
