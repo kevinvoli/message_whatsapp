@@ -58,16 +58,16 @@ export class WhatsappMessageService {
 
     switch (message.type) {
       case 'image':
-        return message.image?.caption ?? '[Photo client]';
+        return message.image?.caption ?? '[Photo]';
       case 'video':
       case 'gif':
       case 'short':
-        return message.video?.caption ?? '[Video client]';
+        return message.video?.caption ?? '[Video]';
       case 'audio':
       case 'voice':
         return '[Message vocal client]';
       case 'document':
-        return message.document?.filename ?? '[Document client]';
+        return message.document?.filename ?? '[Document]';
       case 'location':
       case 'live_location':
         return '[Localisation client]';
@@ -86,16 +86,16 @@ export class WhatsappMessageService {
     }
     switch (message.type) {
       case 'image':
-        return message.media?.caption ?? '[Photo client]';
+        return message.media?.caption ?? '[Photo]';
       case 'video':
       case 'gif':
       case 'short':
-        return message.media?.caption ?? '[Video client]';
+        return message.media?.caption ?? '[Video]';
       case 'audio':
       case 'voice':
         return '[Message vocal client]';
       case 'document':
-        return message.media?.fileName ?? '[Document client]';
+        return message.media?.fileName ?? '[Document]';
       case 'location':
       case 'live_location':
         return '[Localisation client]';
