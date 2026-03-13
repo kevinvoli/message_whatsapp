@@ -353,13 +353,13 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
                     {webhookSummary.providers.map((row) => (
                       <tr key={row.provider} className="border-t">
                         <td className="py-2 font-medium text-gray-900">{row.provider}</td>
-                        <td className="py-2">{row.received}</td>
-                        <td className="py-2">{row.duplicate}</td>
-                        <td className="py-2">{row.error}</td>
-                        <td className="py-2">{row.signature_invalid}</td>
-                        <td className="py-2">{row.tenant_failed}</td>
-                        <td className="py-2">{row.latency.p95} ms</td>
-                        <td className="py-2">{row.latency.p99} ms</td>
+                        <td className="py-2 text-gray-700">{row.received}</td>
+                        <td className="py-2 text-gray-700">{row.duplicate}</td>
+                        <td className="py-2 text-gray-700">{row.error}</td>
+                        <td className="py-2 text-gray-700">{row.signature_invalid}</td>
+                        <td className="py-2 text-gray-700">{row.tenant_failed}</td>
+                        <td className="py-2 text-gray-700">{row.latency.p95} ms</td>
+                        <td className="py-2 text-gray-700">{row.latency.p99} ms</td>
                       </tr>
                     ))}
                   </tbody>
@@ -404,7 +404,7 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
               />
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip
-                labelFormatter={(val) => new Date(String(val)).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                labelFormatter={(val) => new Date(String(val)).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long'})}
               />
               <Legend />
               <Line type="monotone" dataKey="nb_messages" name="Total messages" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
