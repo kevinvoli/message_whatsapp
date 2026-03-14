@@ -15,6 +15,26 @@ import { formatDateShort } from './dateUtils';
 
 export type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
 
+const PERIODE_LABELS: Record<string, string> = {
+  today: "Aujourd'hui",
+  week: 'Cette semaine',
+  month: 'Ce mois',
+  year: 'Cette année',
+};
+
+const PERIODE_FILE_SLUGS: Record<string, string> = {
+  today: 'aujourd_hui',
+  week: 'cette_semaine',
+  month: 'ce_mois',
+  year: 'cette_annee',
+};
+
+interface ExportMeta {
+  title: string;
+  periodeLabel: string;
+  generatedAt: string;
+}
+
 // ─── Téléchargement fichier ────────────────────────────────────────────────────
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -26,51 +46,79 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function downloadCSV(rows: Record<string, unknown>[], filename: string) {
+function csvCell(val: unknown): string {
+  const str = String(val ?? '').replace(/"/g, '""');
+  return str.includes(';') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+}
+
+function downloadCSV(rows: Record<string, unknown>[], filename: string, meta: ExportMeta) {
   if (rows.length === 0) return;
   const headers = Object.keys(rows[0]);
   const lines = [
-    headers.join(';'),
-    ...rows.map((r) =>
-      headers.map((h) => {
-        const val = r[h] ?? '';
-        const str = String(val).replace(/"/g, '""');
-        return str.includes(';') || str.includes('\n') ? `"${str}"` : str;
-      }).join(';'),
-    ),
+    `Rapport;${csvCell(meta.title)}`,
+    `Période;${csvCell(meta.periodeLabel)}`,
+    `Généré le;${csvCell(meta.generatedAt)}`,
+    '',
+    headers.map(csvCell).join(';'),
+    ...rows.map((r) => headers.map((h) => csvCell(r[h])).join(';')),
   ];
   const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   downloadBlob(blob, filename);
 }
 
-function downloadJSON(data: unknown, filename: string) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+function downloadJSON(rows: Record<string, unknown>[], filename: string, meta: ExportMeta) {
+  const payload = {
+    rapport: meta.title,
+    periode: meta.periodeLabel,
+    generatedAt: meta.generatedAt,
+    total: rows.length,
+    data: rows,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   downloadBlob(blob, filename);
 }
 
-function downloadExcel(rows: Record<string, unknown>[], filename: string, sheetName = 'Export') {
-  const ws = XLSX.utils.json_to_sheet(rows);
+function downloadExcel(rows: Record<string, unknown>[], filename: string, meta: ExportMeta) {
+  if (rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  // Lignes de métadonnées en tête de feuille
+  const aoa: unknown[][] = [
+    ['Rapport', meta.title],
+    ['Période', meta.periodeLabel],
+    ['Généré le', meta.generatedAt],
+    ['Nombre de lignes', rows.length],
+    [],
+    headers,
+    ...rows.map((r) => headers.map((h) => r[h] ?? '')),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // Style basique : largeur colonnes
+  ws['!cols'] = headers.map(() => ({ wch: 20 }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.utils.book_append_sheet(wb, ws, meta.title.substring(0, 31));
   XLSX.writeFile(wb, filename);
 }
 
 function downloadPDF(
   columns: string[],
-  rows: (string | number)[][][],
-  title: string,
+  rows: string[][],
   filename: string,
+  meta: ExportMeta,
 ) {
   const doc = new jsPDF({ orientation: 'landscape' });
   doc.setFontSize(14);
-  doc.text(title, 14, 16);
-  doc.setFontSize(9);
-  doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, 14, 22);
+  doc.text(meta.title, 14, 16);
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`Période : ${meta.periodeLabel}`, 14, 23);
+  doc.setFontSize(8);
+  doc.text(`Généré le ${meta.generatedAt} — ${rows.length} ligne(s)`, 14, 29);
+  doc.setTextColor(0, 0, 0);
 
   autoTable(doc, {
     head: [columns],
-    body: rows as unknown as string[][],
-    startY: 28,
+    body: rows,
+    startY: 34,
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -274,21 +322,30 @@ export async function exportData(
   if (!def) throw new Error(`Export non disponible pour la vue: ${viewMode}`);
 
   const rows = await def.fetchData(selectedPeriod);
-  const filename = `${def.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}`;
+
+  const periodeLabel = PERIODE_LABELS[selectedPeriod] ?? selectedPeriod;
+  const periodeSlug = PERIODE_FILE_SLUGS[selectedPeriod] ?? selectedPeriod;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const generatedAt = new Date().toLocaleDateString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  const meta: ExportMeta = { title: def.title, periodeLabel, generatedAt };
+  const filename = `${def.title.replace(/\s+/g, '_')}_${periodeSlug}_${dateStr}`;
 
   switch (format) {
     case 'csv':
-      downloadCSV(rows, `${filename}.csv`);
+      downloadCSV(rows, `${filename}.csv`, meta);
       break;
     case 'json':
-      downloadJSON(rows, `${filename}.json`);
+      downloadJSON(rows, `${filename}.json`, meta);
       break;
     case 'excel':
-      downloadExcel(rows, `${filename}.xlsx`, def.title);
+      downloadExcel(rows, `${filename}.xlsx`, meta);
       break;
     case 'pdf': {
       const pdfRows = rows.map((r) => def.columns.map((col) => safe(r[col])));
-      downloadPDF(def.columns, pdfRows as unknown as (string | number)[][][], def.title, `${filename}.pdf`);
+      downloadPDF(def.columns, pdfRows, `${filename}.pdf`, meta);
       break;
     }
   }
