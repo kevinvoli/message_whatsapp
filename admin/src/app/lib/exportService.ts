@@ -15,19 +15,20 @@ import { formatDateShort } from './dateUtils';
 
 export type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
 
-const PERIODE_LABELS: Record<string, string> = {
-  today: "Aujourd'hui",
-  week: 'Cette semaine',
-  month: 'Ce mois',
-  year: 'Cette année',
-};
-
-const PERIODE_FILE_SLUGS: Record<string, string> = {
-  today: 'aujourd_hui',
-  week: 'cette_semaine',
-  month: 'ce_mois',
-  year: 'cette_annee',
-};
+function periodeToDateRange(periode: string): string {
+  const now = new Date();
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const joursMap: Record<string, number> = { today: 0, week: 7, month: 30, year: 365 };
+  const jours = joursMap[periode] ?? 0;
+  const start = new Date(now);
+  if (jours === 0) {
+    start.setHours(0, 0, 0, 0);
+  } else {
+    start.setDate(start.getDate() - jours);
+    start.setHours(0, 0, 0, 0);
+  }
+  return `du ${fmt(start)} au ${fmt(now)}`;
+}
 
 interface ExportMeta {
   title: string;
@@ -323,15 +324,16 @@ export async function exportData(
 
   const rows = await def.fetchData(selectedPeriod);
 
-  const periodeLabel = PERIODE_LABELS[selectedPeriod] ?? selectedPeriod;
-  const periodeSlug = PERIODE_FILE_SLUGS[selectedPeriod] ?? selectedPeriod;
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const generatedAt = new Date().toLocaleDateString('fr-FR', {
+  const now = new Date();
+  const periodeLabel = periodeToDateRange(selectedPeriod);
+  const generatedAt = now.toLocaleDateString('fr-FR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-
+  // Nom fichier : NomExport_YYYY-MM-DD_HHhMM
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateTimeSlug = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}h${pad(now.getMinutes())}`;
   const meta: ExportMeta = { title: def.title, periodeLabel, generatedAt };
-  const filename = `${def.title.replace(/\s+/g, '_')}_${periodeSlug}_${dateStr}`;
+  const filename = `${def.title.replace(/\s+/g, '_')}_${dateTimeSlug}`;
 
   switch (format) {
     case 'csv':
