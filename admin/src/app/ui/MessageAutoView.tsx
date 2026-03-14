@@ -442,6 +442,11 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
   const [scopeEnabled, setScopeEnabled] = useState(false);
   const [scopeSaving, setScopeSaving] = useState(false);
 
+  // Données pour les selects du modal scope
+  const [postesList, setPostesList] = useState<Poste[]>([]);
+  const [channelsList, setChannelsList] = useState<Channel[]>([]);
+  const [scopeDataLoading, setScopeDataLoading] = useState(false);
+
   const fetchScopes = useCallback(async () => {
     try {
       setScopeLoading(true);
@@ -461,6 +466,19 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
     void fetchScopes();
   }, [fetchScopes]);
 
+  const loadScopeData = useCallback(async () => {
+    setScopeDataLoading(true);
+    try {
+      const [p, c] = await Promise.all([getPostes(), getChannels()]);
+      setPostesList(p);
+      setChannelsList(c);
+    } catch {
+      // silently ignore
+    } finally {
+      setScopeDataLoading(false);
+    }
+  }, []);
+
   const openScopeAddModal = () => {
     setEditingScope(null);
     setScopeType('poste');
@@ -468,6 +486,7 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
     setScopeLabel('');
     setScopeEnabled(false);
     setShowScopeModal(true);
+    void loadScopeData();
   };
 
   const openScopeEditModal = (scope: AutoMessageScopeConfig) => {
@@ -477,6 +496,13 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
     setScopeLabel(scope.label ?? '');
     setScopeEnabled(scope.enabled);
     setShowScopeModal(true);
+    void loadScopeData();
+  };
+
+  const handleScopeTypeChange = (type: AutoMessageScopeType) => {
+    setScopeType(type);
+    setScopeId('');
+    setScopeLabel('');
   };
 
   const closeScopeModal = () => {
@@ -795,38 +821,86 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
             id="scope-type"
             className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
             value={scopeType}
-            onChange={(e) => setScopeType(e.target.value as AutoMessageScopeType)}
+            onChange={(e) => handleScopeTypeChange(e.target.value as AutoMessageScopeType)}
           >
             <option value="poste">Poste</option>
             <option value="canal">Canal</option>
             <option value="provider">Provider</option>
           </select>
         </div>
+
         <div className="mb-4">
           <label htmlFor="scope-id" className="mb-2 block text-sm font-bold text-gray-700">
-            {scopeType === 'poste' && 'ID du poste (UUID)'}
-            {scopeType === 'canal' && 'ID du canal'}
-            {scopeType === 'provider' && 'Provider (ex: whapi, meta)'}
+            {scopeType === 'poste' && 'Poste'}
+            {scopeType === 'canal' && 'Canal'}
+            {scopeType === 'provider' && 'Provider'}
           </label>
-          <input
-            type="text"
-            id="scope-id"
-            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
-            value={scopeId}
-            onChange={(e) => setScopeId(e.target.value)}
-            required
-            placeholder={
-              scopeType === 'poste'
-                ? 'uuid-du-poste'
-                : scopeType === 'canal'
-                ? 'channel_id'
-                : 'whapi ou meta'
-            }
-          />
+
+          {scopeDataLoading ? (
+            <div className="w-full rounded border px-3 py-2 text-sm text-gray-400 bg-gray-50">
+              Chargement...
+            </div>
+          ) : scopeType === 'poste' ? (
+            <select
+              id="scope-id"
+              className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+              value={scopeId}
+              onChange={(e) => {
+                const poste = postesList.find((p) => p.id === e.target.value);
+                setScopeId(e.target.value);
+                setScopeLabel(poste?.name ?? '');
+              }}
+              required
+            >
+              <option value="">-- Sélectionner un poste --</option>
+              {postesList.map((poste) => (
+                <option key={poste.id} value={poste.id}>
+                  {poste.name}
+                </option>
+              ))}
+            </select>
+          ) : scopeType === 'canal' ? (
+            <select
+              id="scope-id"
+              className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+              value={scopeId}
+              onChange={(e) => {
+                const channel = channelsList.find((c) => c.id === e.target.value);
+                setScopeId(e.target.value);
+                setScopeLabel(channel?.label || channel?.channel_id || '');
+              }}
+              required
+            >
+              <option value="">-- Sélectionner un canal --</option>
+              {channelsList.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.label
+                    ? `${channel.label} (${channel.channel_id})`
+                    : channel.channel_id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              id="scope-id"
+              className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+              value={scopeId}
+              onChange={(e) => {
+                setScopeId(e.target.value);
+                setScopeLabel(e.target.value === 'whapi' ? 'Whapi' : e.target.value === 'meta' ? 'Meta' : '');
+              }}
+              required
+            >
+              <option value="">-- Sélectionner un provider --</option>
+              <option value="whapi">Whapi</option>
+              <option value="meta">Meta</option>
+            </select>
+          )}
         </div>
+
         <div className="mb-4">
           <label htmlFor="scope-label" className="mb-2 block text-sm font-bold text-gray-700">
-            Label (optionnel)
+            Label <span className="font-normal text-gray-400">(optionnel — rempli automatiquement)</span>
           </label>
           <input
             type="text"
