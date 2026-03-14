@@ -32,6 +32,7 @@ import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
     LoggingModule,
     CallLogModule,
     JorbsModule,
+    NotificationModule,
   ],
   controllers: [DispatcherController],
   providers: [

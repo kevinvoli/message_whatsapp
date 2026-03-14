@@ -32,6 +32,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
 import { AutoMessageScopeConfig } from './entities/auto-message-scope-config.entity';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
     LoggingModule,
     CallLogModule,
     JorbsModule,
+    NotificationModule,
   ],
   controllers: [MessageAutoController],
   providers: [

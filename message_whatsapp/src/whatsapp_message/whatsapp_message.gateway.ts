@@ -251,6 +251,15 @@ export class WhatsappMessageGateway
     );
 
     if (!isPosteStillActive) {
+      const activeChats = await this.chatService.findByPosteId(agent.posteId);
+      const activeCount = activeChats?.filter(
+        (c) => c.status === WhatsappChatStatus.ACTIF || c.status === WhatsappChatStatus.EN_ATTENTE,
+      ).length ?? 0;
+      void this.notificationService.create(
+        activeCount > 0 ? 'alert' : 'info',
+        `Commercial déconnecté${activeCount > 0 ? ` — ${activeCount} conv. active(s)` : ''}`,
+        `Le poste ${agent.posteId} s'est déconnecté${activeCount > 0 ? ` avec ${activeCount} conversation(s) en cours. Réinjection automatique en attente.` : '.'}`,
+      );
       await this.posteService.setActive(agent.posteId, false);
       await this.queueService.removeFromQueue(agent.posteId);
       this.jobRunner.stopAgentSlaMonitor(agent.posteId);

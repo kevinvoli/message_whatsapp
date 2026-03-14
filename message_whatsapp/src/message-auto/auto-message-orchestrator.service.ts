@@ -6,6 +6,7 @@ import { AppLogger } from 'src/logging/app-logger.service';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class AutoMessageOrchestrator {
@@ -20,6 +21,7 @@ export class AutoMessageOrchestrator {
     private readonly logger: AppLogger,
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly gateway: WhatsappMessageGateway,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async handleClientMessage(chat: WhatsappChat): Promise<void> {
@@ -66,6 +68,11 @@ export class AutoMessageOrchestrator {
       if (!chat.read_only) {
         await this.chatService.update(chatId, { read_only: true });
       }
+      void this.notificationService.create(
+        'info',
+        `Séquence auto terminée — ${chat.name || chatId}`,
+        `La conversation de ${chat.name || chat.contact_client || chatId.split('@')[0]} a atteint l'étape maximale (${maxSteps}). En attente de réponse client.`,
+      );
       return;
     }
 

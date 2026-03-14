@@ -9,6 +9,7 @@ import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class DispatcherService {
@@ -24,6 +25,8 @@ export class DispatcherService {
     private readonly messageGateway: WhatsappMessageGateway,
 
     private readonly whatsappCommercialService: WhatsappCommercialService,
+
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -126,6 +129,12 @@ export class DispatcherService {
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
       this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);
+      const displayName = clientName || clientPhone.split('@')[0];
+      void this.notificationService.create(
+        'queue',
+        `Conversation en attente — ${displayName}`,
+        `Aucun agent disponible. La conversation de ${displayName} est placée en file d'attente.`,
+      );
       if (conversation) {
         if (tenantId && !conversation.tenant_id) {
           conversation.tenant_id = tenantId;
@@ -194,6 +203,11 @@ export class DispatcherService {
 
       conversation.last_client_message_at = new Date();
       const saved = await this.chatRepository.save(conversation);
+      void this.notificationService.create(
+        'info',
+        `Conversation réassignée — ${saved.name || saved.chat_id}`,
+        `La conversation de ${saved.name || saved.contact_client} a été assignée au poste ${nextAgent.name}.`,
+      );
       await this.messageGateway.emitConversationUpsertByChatId(
         saved.chat_id,
       );
@@ -232,6 +246,11 @@ export class DispatcherService {
     this.logger.debug(`Nouvelle conversation creee (${newChat.chat_id})`);
 
     const saved = await this.chatRepository.save(newChat);
+    void this.notificationService.create(
+      'info',
+      `Nouvelle conversation — ${clientName || clientPhone.split('@')[0]}`,
+      `Nouvelle conversation de ${clientName || clientPhone.split('@')[0]} assignée au poste ${nextAgent.name}.`,
+    );
     await this.messageGateway.emitConversationAssigned(saved.chat_id);
     return saved;
   }
@@ -359,6 +378,11 @@ export class DispatcherService {
 
     for (const chat of chats) {
       try {
+        void this.notificationService.create(
+          'alert',
+          `SLA dépassé — ${chat.name || chat.chat_id}`,
+          `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} n'a pas reçu de réponse dans les délais. Réinjection en cours.`,
+        );
         await this.reinjectConversation(chat);
       } catch (err) {
         this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
