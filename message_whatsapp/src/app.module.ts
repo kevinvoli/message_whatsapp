@@ -35,6 +35,7 @@ import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity'; //
 import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added import
 import { MetriquesModule } from './metriques/metriques.module';
 import { LoggingModule } from './logging/logging.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -110,6 +111,7 @@ import { LoggingModule } from './logging/logging.module';
     MessageAutoModule,
     MetriquesModule,
     LoggingModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

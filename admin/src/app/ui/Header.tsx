@@ -169,7 +169,7 @@ export default function Header({
                                                     </p>
                                                     <p className="text-xs text-gray-500 truncate">{n.message}</p>
                                                     <p className="text-[10px] text-gray-400 mt-1">
-                                                        {formatTimeAgo(n.timestamp)}
+                                                        {formatTimeAgo(new Date(n.createdAt))}
                                                     </p>
                                                 </div>
                                                 {!n.read && (

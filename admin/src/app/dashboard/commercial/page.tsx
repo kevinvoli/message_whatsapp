@@ -23,12 +23,25 @@ import DispatchView from '@/app/ui/DispatchView';
 import CronConfigView from '@/app/ui/CronConfigView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
 import GoNoGoView from '@/app/ui/GoNoGoView';
+import NotificationsView from '@/app/ui/NotificationsView';
+import { useNotifications } from '@/app/hooks/useNotifications';
 import { ViewMode } from '@/app/lib/definitions';
 
 export default function AdminDashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('today');
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    const {
+        notifications,
+        total: notificationsTotal,
+        loading: notificationsLoading,
+        unreadCount,
+        reload: reloadNotifications,
+        markAsRead,
+        markAllAsRead,
+        clearAll: clearAllNotifications,
+    } = useNotifications();
 
     const renderContent = () => {
         switch(viewMode) {
@@ -64,6 +77,19 @@ export default function AdminDashboard() {
                 return <ClientsView onRefresh={() => {}} />;
             case 'rapports':
                 return <RapportsView onRefresh={() => {}} />;
+            case 'notifications':
+                return (
+                    <NotificationsView
+                        notifications={notifications}
+                        total={notificationsTotal}
+                        loading={notificationsLoading}
+                        unreadCount={unreadCount}
+                        onMarkAsRead={markAsRead}
+                        onMarkAllAsRead={markAllAsRead}
+                        onClearAll={clearAllNotifications}
+                        onReload={reloadNotifications}
+                    />
+                );
             default:
                 return null;
         }
@@ -86,6 +112,11 @@ export default function AdminDashboard() {
                     setSelectedPeriod={setSelectedPeriod}
                     viewMode={viewMode}
                     navigationItems={navigationItems}
+                    notifications={notifications}
+                    unreadCount={unreadCount}
+                    onMarkAsRead={markAsRead}
+                    onMarkAllAsRead={markAllAsRead}
+                    onClearNotifications={clearAllNotifications}
                 />
 
                 <div className="flex-1 overflow-y-auto p-6">

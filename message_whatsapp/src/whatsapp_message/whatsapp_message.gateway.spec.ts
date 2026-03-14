@@ -22,6 +22,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any, // channelService
       { allow: () => true, removeClient: () => {} } as any, // throttle
       {} as any, // callLogService
+      { create: jest.fn().mockResolvedValue({}) } as any, // notificationService
     );
   };
 

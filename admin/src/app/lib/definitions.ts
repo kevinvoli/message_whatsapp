@@ -36,7 +36,8 @@ export type ViewMode =
   | 'dispatch'
   | 'crons'
   | 'observabilite'
-  | 'go_no_go';
+  | 'go_no_go'
+  | 'notifications';
 
 export type NavigationItem = {
   id: ViewMode;

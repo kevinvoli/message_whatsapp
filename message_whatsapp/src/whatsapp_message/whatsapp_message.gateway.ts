@@ -35,6 +35,7 @@ import { ChannelService } from 'src/channel/channel.service';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
+import { NotificationService } from 'src/notification/notification.service';
 
 type AuthPayload = {
   sub: string;
@@ -88,6 +89,7 @@ export class WhatsappMessageGateway
     private readonly channelService: ChannelService,
     private readonly throttle: SocketThrottleGuard,
     private readonly callLogService: CallLogService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ======================================================
@@ -660,6 +662,8 @@ export class WhatsappMessageGateway
             message: outboundMessage,
           },
         });
+        // Notification admin — message échoué
+        void this.notificationService.create('alert', `Échec envoi message (${outboundCode})`, `Chat ${payload.chat_id} — ${outboundMessage}`);
         return;
       }
 
@@ -715,6 +719,11 @@ export class WhatsappMessageGateway
     this.logger.log(
       `INCOMING_SOCKET_EMIT trace=${message.message_id ?? message.id} chat_id=${chat.chat_id}`,
     );
+
+    // Notification admin — nouveau message entrant
+    const contactName = chat.name || chat.chat_id;
+    const preview = message.text ? message.text.substring(0, 80) : '(média)';
+    void this.notificationService.create('message', `Nouveau message — ${contactName}`, preview);
 
     const lastMessage = await this.messageService.findLastMessageBychat_id(
       chat.chat_id,
