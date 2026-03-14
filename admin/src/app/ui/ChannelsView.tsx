@@ -15,6 +15,7 @@ interface ChannelsViewProps {
 
 type ChannelCreateInput = {
   token: string;
+  label?: string;
   provider?: 'whapi' | 'meta';
   channel_id?: string;
   external_id?: string;
@@ -65,6 +66,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [formProvider, setFormProvider] = useState<'whapi' | 'meta'>('whapi');
+  const [formLabel, setFormLabel] = useState('');
   const [formChannelId, setFormChannelId] = useState('');
   const [formExternalId, setFormExternalId] = useState('');
   const [formToken, setFormToken] = useState('');
@@ -76,6 +78,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       const externalId = formExternalId.trim() || channelId;
       return {
         token: formToken,
+        label: formLabel.trim() || undefined,
         provider: 'meta',
         channel_id: channelId,
         external_id: externalId,
@@ -84,6 +87,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     }
     return {
       token: formToken,
+      label: formLabel.trim() || undefined,
       provider: 'whapi',
       is_business: formIsBusiness,
     };
@@ -91,6 +95,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
 
   const openAddModal = () => {
     setFormProvider('whapi');
+    setFormLabel('');
     setFormChannelId('');
     setFormExternalId('');
     setFormToken('');
@@ -102,6 +107,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const openEditModal = (channel: Channel) => {
     setCurrentChannel(channel);
     setFormProvider(channel.provider === 'meta' ? 'meta' : 'whapi');
+    setFormLabel(channel.label ?? '');
     setFormChannelId(channel.channel_id ?? '');
     setFormExternalId(channel.external_id ?? '');
     setFormToken(channel.token);
@@ -189,6 +195,14 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
           emptyMessage="Aucun canal trouve."
           getRowKey={(channel) => channel.id}
           columns={[
+            {
+              header: 'Nom',
+              render: (channel) => (
+                channel.label
+                  ? <span className="font-semibold text-gray-900">{channel.label}</span>
+                  : <span className="text-gray-400 italic text-xs">Sans nom</span>
+              ),
+            },
             {
               header: 'Provider',
               render: (channel) => (
@@ -301,6 +315,19 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         loadingLabel="Adding..."
       >
         <div className="mb-4">
+          <label htmlFor="add-label" className="mb-2 block text-sm font-bold text-gray-700">
+            Nom / Label <span className="font-normal text-gray-400">(optionnel)</span>
+          </label>
+          <input
+            type="text"
+            id="add-label"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            placeholder="Ex: Canal principal, Numéro Abidjan..."
+            value={formLabel}
+            onChange={(e) => setFormLabel(e.target.value)}
+          />
+        </div>
+        <div className="mb-4">
           <label htmlFor="provider" className="mb-2 block text-sm font-bold text-gray-700">
             Provider
           </label>
@@ -367,6 +394,19 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         submitLabel="Sauvegarder"
         loadingLabel="Saving..."
       >
+        <div className="mb-4">
+          <label htmlFor="edit-label" className="mb-2 block text-sm font-bold text-gray-700">
+            Nom / Label <span className="font-normal text-gray-400">(optionnel)</span>
+          </label>
+          <input
+            type="text"
+            id="edit-label"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            placeholder="Ex: Canal principal, Numéro Abidjan..."
+            value={formLabel}
+            onChange={(e) => setFormLabel(e.target.value)}
+          />
+        </div>
         <div className="mb-4">
           <label htmlFor="edit-provider" className="mb-2 block text-sm font-bold text-gray-700">
             Provider

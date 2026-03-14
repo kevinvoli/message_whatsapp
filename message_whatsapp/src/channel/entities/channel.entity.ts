@@ -23,6 +23,9 @@ export class WhapiChannel {
   @Column({ name: 'tenant_id', type: 'char', length: 36, nullable: true })
   tenant_id?: string | null;
 
+  @Column({ name: 'label', type: 'varchar', length: 100, nullable: true })
+  label?: string | null;
+
   @Column({ name: 'provider', type: 'varchar', length: 32, nullable: true })
   provider?: string | null;
 

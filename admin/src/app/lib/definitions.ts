@@ -101,6 +101,7 @@ export type Poste = {
 export type Channel = {
   id: string;
   tenant_id?: string | null;
+  label?: string | null;
   provider?: 'whapi' | 'meta' | null;
   external_id?: string | null;
   channel_id: string;

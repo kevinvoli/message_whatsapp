@@ -20,4 +20,8 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   is_business?: boolean;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
 }
