@@ -3,6 +3,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Admin } from './entities/admin.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminService {
@@ -21,6 +22,32 @@ export class AdminService {
       .addSelect(['admin.password', 'admin.salt'])
       .where('admin.email = :email', { email })
       .getOne();
+  }
+
+  async findOneById(id: string): Promise<Admin | null> {
+    return this.adminRepository.findOne({ where: { id } });
+  }
+
+  async updateProfile(id: string, name: string, email: string): Promise<Admin> {
+    await this.adminRepository.update(id, { name, email });
+    return this.adminRepository.findOneOrFail({ where: { id } });
+  }
+
+  async updatePassword(id: string, currentPassword: string, newPassword: string): Promise<void> {
+    const admin = await this.adminRepository
+      .createQueryBuilder('admin')
+      .addSelect(['admin.password', 'admin.salt'])
+      .where('admin.id = :id', { id })
+      .getOne();
+
+    if (!admin) throw new InternalServerErrorException('Admin not found');
+
+    const valid = await bcrypt.compare(currentPassword, admin.password);
+    if (!valid) throw new InternalServerErrorException('Mot de passe actuel incorrect');
+
+    const salt = await bcrypt.genSalt(10);
+    const hashed = await bcrypt.hash(newPassword, salt);
+    await this.adminRepository.update(id, { password: hashed, salt });
   }
 
   async ensureAdminUserExists(): Promise<void> {

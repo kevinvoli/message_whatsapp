@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     navigationItems,
     navigationGroups
@@ -24,13 +24,20 @@ import CronConfigView from '@/app/ui/CronConfigView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
 import GoNoGoView from '@/app/ui/GoNoGoView';
 import NotificationsView from '@/app/ui/NotificationsView';
+import SettingsView from '@/app/ui/SettingsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { ViewMode } from '@/app/lib/definitions';
+import { getAdminProfile } from '@/app/lib/api';
 
 export default function AdminDashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('today');
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [adminProfile, setAdminProfile] = useState<{ id: string; name: string; email: string } | null>(null);
+
+    useEffect(() => {
+        void getAdminProfile().then(setAdminProfile).catch(() => null);
+    }, []);
 
     const {
         notifications,
@@ -90,6 +97,13 @@ export default function AdminDashboard() {
                         onReload={reloadNotifications}
                     />
                 );
+            case 'settings':
+                return (
+                    <SettingsView
+                        adminProfile={adminProfile}
+                        onProfileUpdated={setAdminProfile}
+                    />
+                );
             default:
                 return null;
         }
@@ -104,6 +118,7 @@ export default function AdminDashboard() {
                 setViewMode={setViewMode}
                 navigationGroups={navigationGroups}
                 message={[]}
+                adminProfile={adminProfile}
             />
 
             <div className="flex-1 flex flex-col overflow-hidden">

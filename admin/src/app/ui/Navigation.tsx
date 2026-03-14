@@ -6,16 +6,23 @@ import { logoutAdmin } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 
+interface AdminProfile {
+    id: string;
+    name: string;
+    email: string;
+}
+
 interface NavigationProps {
     sidebarOpen: boolean;
     setSidebarOpen: (open: boolean) => void;
     viewMode: string;
     setViewMode: (view: ViewMode) => void;
     navigationGroups: NavigationGroup[];
-    message: WhatsappMessage[]
+    message: WhatsappMessage[];
+    adminProfile?: AdminProfile | null;
 }
 
-export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationGroups, message }: NavigationProps) {
+export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setViewMode, navigationGroups, message, adminProfile }: NavigationProps) {
     const router = useRouter();
     const { addToast } = useToast();
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
@@ -152,17 +159,24 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
             <div className="p-4 border-t border-blue-700">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold">
-                        A
+                        {(adminProfile?.name?.[0] ?? 'A').toUpperCase()}
                     </div>
                     {sidebarOpen && (
-                        <div className="flex-1">
-                            <p className="text-sm font-semibold">Admin</p>
-                            <p className="text-xs text-blue-300">admin@company.ci</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{adminProfile?.name ?? 'Admin'}</p>
+                            <p className="text-xs text-blue-300 truncate">{adminProfile?.email ?? ''}</p>
                         </div>
                     )}
                 </div>
                 {sidebarOpen && (
-                    <button className="w-full mt-3 flex items-center gap-2 px-3 py-2 text-sm text-blue-200 hover:bg-blue-700 rounded-lg transition-colors">
+                    <button
+                        onClick={() => setViewMode('settings')}
+                        className={`w-full mt-3 flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                            viewMode === 'settings'
+                                ? 'bg-blue-700 text-white'
+                                : 'text-blue-200 hover:bg-blue-700'
+                        }`}
+                    >
                         <Settings className="w-4 h-4" />
                         Parametres
                     </button>

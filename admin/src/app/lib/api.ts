@@ -545,13 +545,13 @@ export async function logoutAdmin(): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
-
-
-// admin/src/app/lib/api.ts - AJOUTER CES FONCTIONS
-
-
-
-// ... (garder toutes tes fonctions existantes)
+export async function getAdminProfile(): Promise<{ id: string; name: string; email: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/admin/profile`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<{ id: string; name: string; email: string }>(response);
+}
 
 // ============================================
 // NOUVELLES FONCTIONS POUR LES MÉTRIQUES

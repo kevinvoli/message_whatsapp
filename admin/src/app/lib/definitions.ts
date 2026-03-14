@@ -37,7 +37,8 @@ export type ViewMode =
   | 'crons'
   | 'observabilite'
   | 'go_no_go'
-  | 'notifications';
+  | 'notifications'
+  | 'settings';
 
 export type NavigationItem = {
   id: ViewMode;
