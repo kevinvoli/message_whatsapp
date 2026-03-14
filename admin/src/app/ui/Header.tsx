@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, Bell, Check, Trash2, MessageCircle, ListOrdered, AlertTriangle, Info } from 'lucide-react';
+import { Download, Bell, Check, Trash2, MessageCircle, ListOrdered, AlertTriangle, Info, ChevronDown, Loader2 } from 'lucide-react';
 import { NavigationItem } from '@/app/lib/definitions';
 import { Notification } from '@/app/hooks/useNotifications';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
+import { exportData, EXPORTABLE_VIEWS, ExportFormat } from '@/app/lib/exportService';
 
 interface HeaderProps {
     selectedPeriod: string;
@@ -27,6 +28,13 @@ const notificationIcon = (type: Notification['type']) => {
 
 const formatTimeAgo = (date: Date) => formatRelativeDate(date);
 
+const EXPORT_FORMATS: { key: ExportFormat; label: string; ext: string }[] = [
+    { key: 'csv',   label: 'CSV',         ext: '.csv'  },
+    { key: 'excel', label: 'Excel',        ext: '.xlsx' },
+    { key: 'json',  label: 'JSON',         ext: '.json' },
+    { key: 'pdf',   label: 'PDF',          ext: '.pdf'  },
+];
+
 export default function Header({
     selectedPeriod,
     setSelectedPeriod,
@@ -39,7 +47,34 @@ export default function Header({
     onClearNotifications,
 }: HeaderProps) {
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [exporting, setExporting] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
+    const exportRef = useRef<HTMLDivElement>(null);
+
+    const canExport = EXPORTABLE_VIEWS.includes(viewMode);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+                setShowExportMenu(false);
+            }
+        };
+        if (showExportMenu) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showExportMenu]);
+
+    const handleExport = async (format: ExportFormat) => {
+        setShowExportMenu(false);
+        setExporting(true);
+        try {
+            await exportData(viewMode, selectedPeriod, format);
+        } catch (err) {
+            console.error('Export error', err);
+        } finally {
+            setExporting(false);
+        }
+    };
 
     // Close panel on outside click
     useEffect(() => {
@@ -148,10 +183,37 @@ export default function Header({
                         )}
                     </div>
 
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                        <Download className="w-4 h-4" />
-                        Exporter
-                    </button>
+                    {canExport && (
+                        <div className="relative" ref={exportRef}>
+                            <button
+                                onClick={() => setShowExportMenu(!showExportMenu)}
+                                disabled={exporting}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {exporting
+                                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                                    : <Download className="w-4 h-4" />
+                                }
+                                Exporter
+                                <ChevronDown className="w-3 h-3" />
+                            </button>
+
+                            {showExportMenu && (
+                                <div className="absolute right-0 top-11 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden w-40">
+                                    {EXPORT_FORMATS.map((f) => (
+                                        <button
+                                            key={f.key}
+                                            onClick={() => void handleExport(f.key)}
+                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
+                                        >
+                                            <span>{f.label}</span>
+                                            <span className="text-xs text-gray-400">{f.ext}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
