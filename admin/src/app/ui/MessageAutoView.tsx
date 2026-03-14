@@ -14,7 +14,10 @@ import {
   deleteScopeConfig,
   getCronConfigs,
   updateCronConfig,
+  getPostes,
+  getChannels,
 } from '@/app/lib/api';
+import { Poste, Channel } from '@/app/lib/definitions';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
