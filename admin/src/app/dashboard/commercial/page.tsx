@@ -37,7 +37,7 @@ export default function AdminDashboard() {
             case 'commerciaux':
                 return <CommerciauxView selectedPeriod={selectedPeriod} />;
             case 'postes':
-                return <PostesView selectedPeriod={selectedPeriod} />;
+                return <PostesView />;
             case 'queue':
                 return <QueueView onRefresh={() => {}} />;
             case 'dispatch':

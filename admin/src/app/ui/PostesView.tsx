@@ -19,10 +19,9 @@ import { useToast } from '@/app/ui/ToastProvider';
 
 interface PostesViewProps {
   onRefresh?: () => void;
-  selectedPeriod?: string;
 }
 
-export default function PostesView({ onRefresh, selectedPeriod = 'today' }: PostesViewProps) {
+export default function PostesView({ onRefresh }: PostesViewProps) {
   const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   const {
