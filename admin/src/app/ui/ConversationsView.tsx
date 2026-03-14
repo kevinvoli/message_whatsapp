@@ -13,9 +13,10 @@ import { Pagination } from './Pagination';
 
 interface ConversationsViewProps {
     onRefresh?: () => void;
+    selectedPeriod?: string;
 }
 
-export default function ConversationsView({ onRefresh }: ConversationsViewProps) {
+export default function ConversationsView({ onRefresh, selectedPeriod = 'today' }: ConversationsViewProps) {
     const [chats, setChats] = useState<WhatsappChat[]>([]);
     const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(50);
@@ -36,15 +37,18 @@ export default function ConversationsView({ onRefresh }: ConversationsViewProps)
     const loadChats = useCallback(async (l: number, o: number) => {
         setLoadingChats(true);
         try {
-            const result = await getChats(l, o);
+            const result = await getChats(l, o, selectedPeriod);
             setChats(result.data);
             setTotal(result.total);
         } finally {
             setLoadingChats(false);
         }
-    }, []);
+    }, [selectedPeriod]);
 
     useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
+
+    // Reset à la page 0 quand la période change
+    useEffect(() => { setOffset(0); }, [selectedPeriod]);
 
     useEffect(() => {
         if (selectedChat) {

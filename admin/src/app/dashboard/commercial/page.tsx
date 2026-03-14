@@ -35,9 +35,9 @@ export default function AdminDashboard() {
             case 'overview':
                 return <OverviewView selectedPeriod={selectedPeriod} />;
             case 'commerciaux':
-                return <CommerciauxView />;
+                return <CommerciauxView selectedPeriod={selectedPeriod} />;
             case 'postes':
-                return <PostesView />;
+                return <PostesView selectedPeriod={selectedPeriod} />;
             case 'queue':
                 return <QueueView onRefresh={() => {}} />;
             case 'dispatch':
@@ -53,13 +53,13 @@ export default function AdminDashboard() {
             case 'automessages':
                 return <MessageAutoView />;
             case 'conversations':
-                return <ConversationsView onRefresh={() => {}} />;
+                return <ConversationsView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
             case 'performance':
                 return <PerformanceView selectedPeriod={selectedPeriod} />;
             case 'analytics':
                 return <AnalyticsView onRefresh={() => {}} />;
             case 'messages':
-                return <MessagesView onRefresh={() => {}} />;
+                return <MessagesView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
             case 'clients':
                 return <ClientsView onRefresh={() => {}} />;
             case 'rapports':

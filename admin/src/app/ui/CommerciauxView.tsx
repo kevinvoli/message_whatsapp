@@ -10,9 +10,10 @@ import { EntityFormModal } from './crud/EntityFormModal';
 
 interface CommerciauxViewProps {
   onRefresh?: () => void;
+  selectedPeriod?: string;
 }
 
-export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
+export default function CommerciauxView({ onRefresh, selectedPeriod = 'today' }: CommerciauxViewProps) {
   const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -45,7 +46,7 @@ export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
     setDataLoading(true);
     try {
       const [commerciauxData, postesData] = await Promise.all([
-        getPerformanceCommerciaux(),
+        getPerformanceCommerciaux(selectedPeriod),
         getPostes(),
       ]);
       setCommerciaux(commerciauxData);
@@ -56,7 +57,7 @@ export default function CommerciauxView({ onRefresh }: CommerciauxViewProps) {
     } finally {
       setDataLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, selectedPeriod]);
 
   refreshRef.current = fetchData;
 

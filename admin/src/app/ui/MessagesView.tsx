@@ -11,9 +11,10 @@ import { getMessages } from '@/app/lib/api';
 
 interface MessagesViewProps {
     onRefresh?: () => void;
+    selectedPeriod?: string;
 }
 
-export default function MessagesView({ onRefresh }: MessagesViewProps) {
+export default function MessagesView({ onRefresh, selectedPeriod = 'today' }: MessagesViewProps) {
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
     const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(50);
@@ -24,17 +25,20 @@ export default function MessagesView({ onRefresh }: MessagesViewProps) {
     const load = useCallback(async (l: number, o: number) => {
         setLoading(true);
         try {
-            const result = await getMessages(l, o);
+            const result = await getMessages(l, o, selectedPeriod);
             setMessages(result.data);
             setTotal(result.total);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [selectedPeriod]);
 
     useEffect(() => {
         void load(limit, offset);
     }, [load, limit, offset]);
+
+    // Reset à la page 0 quand la période change
+    useEffect(() => { setOffset(0); }, [selectedPeriod]);
 
     const filtered = search.trim()
         ? messages.filter((m) =>

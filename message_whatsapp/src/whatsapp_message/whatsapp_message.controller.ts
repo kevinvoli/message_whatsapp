@@ -282,10 +282,27 @@ export class WhatsappMessageController {
   async findAll(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('periode') periode?: string,
   ) {
+    let dateStart: Date | undefined;
+    if (periode) {
+      const now = new Date();
+      const joursMap: Record<string, number> = { today: 0, week: 7, month: 30, year: 365 };
+      const jours = joursMap[periode];
+      if (jours !== undefined) {
+        dateStart = new Date(now);
+        if (jours === 0) {
+          dateStart.setHours(0, 0, 0, 0);
+        } else {
+          dateStart.setDate(dateStart.getDate() - jours);
+          dateStart.setHours(0, 0, 0, 0);
+        }
+      }
+    }
     return await this.messageService.findAll(
       limit ? Math.min(parseInt(limit, 10), 200) : 50,
       offset ? parseInt(offset, 10) : 0,
+      dateStart,
     );
   }
 }

@@ -132,7 +132,7 @@ export class WhatsappChatService {
     );
   }
 
-  async findAll(chat_id?: string, limit = 50, offset = 0): Promise<{ data: WhatsappChat[]; total: number }> {
+  async findAll(chat_id?: string, limit = 50, offset = 0, dateStart?: Date): Promise<{ data: WhatsappChat[]; total: number }> {
     if (chat_id) {
       const data = await this.chatRepository
         .createQueryBuilder('chat')
@@ -148,7 +148,7 @@ export class WhatsappChatService {
         .getMany();
       return { data, total: data.length };
     }
-    const [data, total] = await this.chatRepository
+    const qb = this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
@@ -173,10 +173,13 @@ export class WhatsappChatService {
           .limit(1)
           .getQuery()})`,
       )
-      .orderBy('chat.last_activity_at', 'DESC')
-      .take(limit)
-      .skip(offset)
-      .getManyAndCount();
+      .orderBy('chat.last_activity_at', 'DESC');
+
+    if (dateStart) {
+      qb.andWhere('chat.last_activity_at >= :dateStart', { dateStart });
+    }
+
+    const [data, total] = await qb.take(limit).skip(offset).getManyAndCount();
     return { data, total };
   }
 

@@ -49,8 +49,8 @@ export async function getCommerciaux(): Promise<Commercial[]> {
     return handleResponse<Commercial[]>(response);
 }
 
-export async function getMessages(limit = 50, offset = 0): Promise<{ data: WhatsappMessage[]; total: number }> {
-    const response = await fetch(`${API_BASE_URL}/messages?limit=${limit}&offset=${offset}`, {
+export async function getMessages(limit = 50, offset = 0, periode = 'today'): Promise<{ data: WhatsappMessage[]; total: number }> {
+    const response = await fetch(`${API_BASE_URL}/messages?limit=${limit}&offset=${offset}&periode=${periode}`, {
         method: 'GET',
         credentials: 'include',
     });
@@ -289,8 +289,8 @@ export async function deleteClient(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
-export async function getChats(limit = 50, offset = 0): Promise<{ data: WhatsappChat[]; total: number }> {
-    const response = await fetch(`${API_BASE_URL}/chats?limit=${limit}&offset=${offset}`, {
+export async function getChats(limit = 50, offset = 0, periode = 'today'): Promise<{ data: WhatsappChat[]; total: number }> {
+    const response = await fetch(`${API_BASE_URL}/chats?limit=${limit}&offset=${offset}&periode=${periode}`, {
         method: 'GET',
         credentials: 'include',
     });
@@ -571,8 +571,8 @@ export async function getMetriquesGlobales(): Promise<MetriquesGlobales> {
 /**
  * Récupère la performance détaillée de tous les commerciaux
  */
-export async function getPerformanceCommerciaux(): Promise<PerformanceCommercial[]> {
-    const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux`, {
+export async function getPerformanceCommerciaux(periode = 'today'): Promise<PerformanceCommercial[]> {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux?periode=${periode}`, {
         method: 'GET',
         credentials: 'include',
     });

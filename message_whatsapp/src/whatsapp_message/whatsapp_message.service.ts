@@ -5,7 +5,7 @@ import {
   WhatsappMessageStatus,
 } from './entities/whatsapp_message.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, In, MoreThanOrEqual, QueryFailedError, Repository } from 'typeorm';
 
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
@@ -623,13 +623,18 @@ export class WhatsappMessageService {
     return messages;
   }
 
-  async findAll(limit = 50, offset = 0): Promise<{ data: unknown[]; total: number }> {
+  async findAll(limit = 50, offset = 0, dateStart?: Date): Promise<{ data: unknown[]; total: number }> {
+    const where: FindOptionsWhere<WhatsappMessage> = {};
+    if (dateStart) {
+      where.timestamp = MoreThanOrEqual(dateStart);
+    }
     const [messages, total] = await this.messageRepository.findAndCount({
       relations: {
         poste: true,
         chat: true,
         contact: true,
       },
+      where,
       order: { timestamp: 'DESC' },
       take: limit,
       skip: offset,
