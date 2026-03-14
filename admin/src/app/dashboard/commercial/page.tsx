@@ -83,7 +83,7 @@ export default function AdminDashboard() {
             case 'clients':
                 return <ClientsView onRefresh={() => {}} />;
             case 'rapports':
-                return <RapportsView onRefresh={() => {}} />;
+                return <RapportsView />;
             case 'notifications':
                 return (
                     <NotificationsView
