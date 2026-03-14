@@ -85,7 +85,7 @@ export default function MessagesView({ onRefresh, selectedPeriod = 'today' }: Me
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Direction</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commercial</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expéditeur</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                             </tr>
                         </thead>
@@ -103,7 +103,24 @@ export default function MessagesView({ onRefresh, selectedPeriod = 'today' }: Me
                                     </td>
                                     <td className="px-6 py-4 text-gray-700">{msg.direction}</td>
                                     <td className="px-6 py-4 text-gray-700">{msg.poste?.name ?? '—'}</td>
-                                    <td className="px-6 py-4 text-gray-700">{msg.commercial?.name ?? '—'}</td>
+                                    <td className="px-6 py-4">
+                                        {msg.direction === 'IN' ? (
+                                          <span className="inline-flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                                            <span className="text-gray-700 text-sm">{msg.from_name || msg.from || msg.chat_id.split('@')[0]}</span>
+                                          </span>
+                                        ) : msg.commercial ? (
+                                          <span className="inline-flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                                            <span className="text-gray-700 text-sm">{msg.commercial.name}</span>
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0" />
+                                            <span className="text-purple-700 text-sm font-medium">Admin</span>
+                                          </span>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{formatDateShort(msg.timestamp)}</td>
                                 </tr>
                             ))}

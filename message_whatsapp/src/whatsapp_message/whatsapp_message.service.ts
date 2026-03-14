@@ -633,6 +633,7 @@ export class WhatsappMessageService {
         poste: true,
         chat: true,
         contact: true,
+        commercial: true,
       },
       where,
       order: { timestamp: 'DESC' },
