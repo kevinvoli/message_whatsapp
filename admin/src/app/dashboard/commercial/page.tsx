@@ -77,7 +77,7 @@ export default function AdminDashboard() {
             case 'performance':
                 return <PerformanceView selectedPeriod={selectedPeriod} />;
             case 'analytics':
-                return <AnalyticsView onRefresh={() => {}} />;
+                return <AnalyticsView />;
             case 'messages':
                 return <MessagesView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
             case 'clients':
