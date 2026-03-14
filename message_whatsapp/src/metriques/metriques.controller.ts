@@ -23,8 +23,10 @@ export class MetriquesController {
     description: 'Metriques globales recuperees avec succes',
     type: MetriquesGlobalesDto,
   })
-  async getMetriquesGlobales(): Promise<MetriquesGlobalesDto> {
-    return this.metriquesService.getMetriquesGlobales();
+  async getMetriquesGlobales(
+    @Query('periode') periode: string = 'today',
+  ): Promise<MetriquesGlobalesDto> {
+    return this.metriquesService.getMetriquesGlobales(periode);
   }
 
   @Get('commerciaux')
@@ -34,8 +36,10 @@ export class MetriquesController {
     description: 'Performance des commerciaux recuperee avec succes',
     type: [PerformanceCommercialDto],
   })
-  async getPerformanceCommerciaux(): Promise<PerformanceCommercialDto[]> {
-    return this.metriquesService.getPerformanceCommerciaux();
+  async getPerformanceCommerciaux(
+    @Query('periode') periode: string = 'today',
+  ): Promise<PerformanceCommercialDto[]> {
+    return this.metriquesService.getPerformanceCommerciaux(periode);
   }
 
   @Get('channels')
@@ -45,8 +49,10 @@ export class MetriquesController {
     description: 'Statut des channels recupere avec succes',
     type: [StatutChannelDto],
   })
-  async getStatutChannels(): Promise<StatutChannelDto[]> {
-    return this.metriquesService.getStatutChannels();
+  async getStatutChannels(
+    @Query('periode') periode: string = 'today',
+  ): Promise<StatutChannelDto[]> {
+    return this.metriquesService.getStatutChannels(periode);
   }
 
   @Get('performance-temporelle')
@@ -79,17 +85,25 @@ export class MetriquesController {
     status: 200,
     description: 'Donnees du dashboard recuperees avec succes',
   })
-  async getOverview() {
+  async getOverview(@Query('periode') periode: string = 'today') {
+    const joursMap: Record<string, number> = {
+      today: 1,
+      week: 7,
+      month: 30,
+      year: 365,
+    };
+    const jours = joursMap[periode] ?? 7;
+
     const [
       metriques,
       performanceCommercial,
       statutChannels,
       performanceTemporelle,
     ] = await Promise.all([
-      this.metriquesService.getMetriquesGlobales(),
-      this.metriquesService.getPerformanceCommerciaux(),
-      this.metriquesService.getStatutChannels(),
-      this.metriquesService.getPerformanceTemporelle(7),
+      this.metriquesService.getMetriquesGlobales(periode),
+      this.metriquesService.getPerformanceCommerciaux(periode),
+      this.metriquesService.getStatutChannels(periode),
+      this.metriquesService.getPerformanceTemporelle(jours),
     ]);
 
     return {

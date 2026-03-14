@@ -10,9 +10,10 @@ import { Spinner } from './Spinner';
 
 interface PerformanceViewProps {
   onRefresh?: () => void;
+  selectedPeriod?: string;
 }
 
-export default function PerformanceView({ onRefresh }: PerformanceViewProps) {
+export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }: PerformanceViewProps) {
   const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
   const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,13 +21,13 @@ export default function PerformanceView({ onRefresh }: PerformanceViewProps) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getOverviewMetriques();
+      const data = await getOverviewMetriques(selectedPeriod);
       setCommerciaux(data.performanceCommercial);
       setPerformanceTemporelle(data.performanceTemporelle ?? []);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedPeriod]);
 
   useEffect(() => {
     void fetchData();

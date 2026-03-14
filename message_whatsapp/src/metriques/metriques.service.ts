@@ -44,10 +44,40 @@ export class MetriquesService {
     private queueRepository: Repository<QueuePosition>,
   ) {}
 
+  private periodeToDateStart(periode: string): Date {
+    const now = new Date();
+    switch (periode) {
+      case 'week': {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 7);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      case 'month': {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 30);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      case 'year': {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 365);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      default: {
+        const d = new Date(now);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+    }
+  }
+
   /**
    * RÃ©cupÃ¨re toutes les mÃ©triques globales du dashboard
    */
-  async getMetriquesGlobales(): Promise<MetriquesGlobalesDto> {
+  async getMetriquesGlobales(periode = 'today'): Promise<MetriquesGlobalesDto> {
+    const dateStart = this.periodeToDateStart(periode);
     // Utiliser Promise.all pour parallÃ©liser les requÃªtes
     const [
       metriquesMessages,
@@ -58,10 +88,10 @@ export class MetriquesService {
       metriquesChannels,
       chargePostes,
     ] = await Promise.all([
-      this.getMetriquesMessages(),
+      this.getMetriquesMessages(dateStart),
       this.getMetriquesChats(),
       this.getMetriquesCommerciaux(),
-      this.getMetriquesContacts(),
+      this.getMetriquesContacts(dateStart),
       this.getMetriquesPostes(),
       this.getMetriquesChannels(),
       this.getChargeParPoste(),
@@ -81,21 +111,19 @@ export class MetriquesService {
   /**
    * MÃ©triques Messages
    */
-  private async getMetriquesMessages() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Total messages
+  private async getMetriquesMessages(dateStart: Date) {
+    // Total messages dans la pÃ©riode
     const totalMessages = await this.messageRepository.count({
-      where: { deletedAt: IsNull() },
+      where: { deletedAt: IsNull(), createdAt: MoreThanOrEqual(dateStart) },
     });
 
-    // Messages par direction
+    // Messages par direction dans la pÃ©riode
     const messagesParDirection = await this.messageRepository
       .createQueryBuilder('message')
       .select('message.direction', 'direction')
       .addSelect('COUNT(*)', 'count')
       .where('message.deletedAt IS NULL')
+      .andWhere('message.createdAt >= :dateStart', { dateStart })
       .groupBy('message.direction')
       .getRawMany();
 
@@ -104,13 +132,8 @@ export class MetriquesService {
     const messagesSortants =
       messagesParDirection.find((m) => m.direction === 'OUT')?.count || 0;
 
-    // Messages aujourd'hui
-    const messagesAujourdhui = await this.messageRepository.count({
-      where: {
-        deletedAt: IsNull(),
-        createdAt: MoreThanOrEqual(today),
-      },
-    });
+    // messagesAujourdhui = total de la pÃ©riode (compatibilitÃ© DTO)
+    const messagesAujourdhui = totalMessages;
 
     // Taux de rÃ©ponse
     const tauxReponse =
@@ -118,7 +141,7 @@ export class MetriquesService {
         ? Math.round((messagesSortants / messagesEntrants) * 100)
         : 0;
 
-    // Temps de rÃ©ponse moyen
+    // Temps de rÃ©ponse moyen dans la pÃ©riode
     const tempsReponse = await this.messageRepository
       .createQueryBuilder('msg_out')
       .innerJoin(
@@ -136,6 +159,7 @@ export class MetriquesService {
       .andWhere(
         'TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600',
       )
+      .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
       .getRawOne();
 
     const tempsReponseMoyen = parseInt(tempsReponse?.avg_seconds) || 0;
@@ -265,10 +289,7 @@ export class MetriquesService {
   /**
    * MÃ©triques Contacts
    */
-  private async getMetriquesContacts() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+  private async getMetriquesContacts(dateStart: Date) {
     const totalContacts = await this.contactRepository.count({
       where: { deletedAt: IsNull() },
     });
@@ -276,7 +297,7 @@ export class MetriquesService {
     const nouveauxContactsAujourdhui = await this.contactRepository.count({
       where: {
         deletedAt: IsNull(),
-        createdAt: MoreThanOrEqual(today),
+        createdAt: MoreThanOrEqual(dateStart),
       },
     });
 
@@ -364,15 +385,19 @@ export class MetriquesService {
   /**
    * Performance dÃ©taillÃ©e par commercial
    */
-  async getPerformanceCommerciaux(): Promise<PerformanceCommercialDto[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  async getPerformanceCommerciaux(periode = 'today'): Promise<PerformanceCommercialDto[]> {
+    const dateStart = this.periodeToDateStart(periode);
 
     const performance = await this.commercialRepository
       .createQueryBuilder('commercial')
       .leftJoin('commercial.poste', 'poste')
       .leftJoin('poste.chats', 'chat', 'chat.deletedAt IS NULL')
-      .leftJoin('chat.messages', 'message', 'message.deletedAt IS NULL')
+      .leftJoin(
+        'chat.messages',
+        'message',
+        'message.deletedAt IS NULL AND message.createdAt >= :dateStart',
+        { dateStart },
+      )
       .select([
         'commercial.id as id',
         'commercial.name as name',
@@ -400,7 +425,8 @@ export class MetriquesService {
             .from(WhatsappMessage, 'msg')
             .where('msg.commercial_id = commercial.id')
             .andWhere("msg.direction = 'OUT'")
-            .andWhere('msg.deletedAt IS NULL'),
+            .andWhere('msg.deletedAt IS NULL')
+            .andWhere('msg.createdAt >= :dateStart', { dateStart }),
         'nbMessagesEnvoyes',
       )
       .where('commercial.deletedAt IS NULL')
@@ -420,7 +446,7 @@ export class MetriquesService {
             ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100)
             : 0;
 
-        // Temps de rÃ©ponse moyen pour ce commercial
+        // Temps de rÃ©ponse moyen pour ce commercial dans la pÃ©riode
         const tempsReponse = await this.messageRepository
           .createQueryBuilder('msg_out')
           .innerJoin(
@@ -429,6 +455,7 @@ export class MetriquesService {
             'msg_out.chat_id = msg_in.chat_id AND msg_in.direction = "IN" AND msg_out.direction = "OUT" AND msg_out.timestamp > msg_in.timestamp',
           )
           .where('msg_out.poste_id = :posteId', { posteId: perf.poste_id })
+          .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
           .andWhere('msg_out.deletedAt IS NULL')
           .andWhere('msg_in.deletedAt IS NULL')
           .andWhere(
@@ -465,9 +492,8 @@ export class MetriquesService {
   /**
    * Statut dÃ©taillÃ© des channels
    */
-  async getStatutChannels(): Promise<StatutChannelDto[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  async getStatutChannels(periode = 'today'): Promise<StatutChannelDto[]> {
+    const dateStart = this.periodeToDateStart(periode);
 
     const channels = await this.channelRepository
       .createQueryBuilder('channel')
@@ -479,7 +505,8 @@ export class MetriquesService {
       .leftJoin(
         'channel.messages',
         'message',
-        'message.deletedAt IS NULL AND DATE(message.createdAt) = CURDATE()',
+        'message.deletedAt IS NULL AND message.createdAt >= :dateStart',
+        { dateStart },
       )
       .select([
         'channel.id as id',

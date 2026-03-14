@@ -11,11 +11,26 @@ import { getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { formatDate } from '@/app/lib/dateUtils';
 
+const PERIODE_LABELS: Record<string, string> = {
+  today: "Aujourd'hui",
+  week: 'Cette semaine',
+  month: 'Ce mois',
+  year: 'Cette année',
+};
+
+const PERIODE_CHART_LABELS: Record<string, string> = {
+  today: 'Activité du jour',
+  week: 'Activité sur 7 jours',
+  month: 'Activité sur 30 jours',
+  year: 'Activité sur 365 jours',
+};
+
 interface OverviewViewProps {
   onRefresh?: () => void;
+  selectedPeriod?: string;
 }
 
-export default function OverviewView({ onRefresh }: OverviewViewProps) {
+export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: OverviewViewProps) {
   const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
   const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[]>([]);
   const [statutChannels, setStatutChannels] = useState<StatutChannel[]>([]);
@@ -27,7 +42,7 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
     setLoading(true);
     try {
       const [overviewData, webhookData] = await Promise.all([
-        getOverviewMetriques(),
+        getOverviewMetriques(selectedPeriod),
         getWebhookMetrics(),
       ]);
       setMetriques(overviewData.metriques);
@@ -38,7 +53,7 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedPeriod]);
 
   useEffect(() => {
     void fetchData();
@@ -254,11 +269,11 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
 
       {/* Stats secondaires */}
       <div className="grid grid-cols-6 gap-4">
-        {/* Messages aujourd'hui */}
+        {/* Messages période */}
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center gap-2 mb-2">
             <MessageCircle className="w-4 h-4 text-blue-600" />
-            <h4 className="text-xs font-semibold text-blue-900">Aujourd'hui</h4>
+            <h4 className="text-xs font-semibold text-blue-900">{PERIODE_LABELS[selectedPeriod]}</h4>
           </div>
           <p className="text-xl font-bold text-blue-900">{metriques.messagesAujourdhui}</p>
           <p className="text-xs text-blue-700 mt-1">Messages échangés</p>
@@ -387,10 +402,10 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
         )}
       </div>
 
-      {/* Performance Temporelle - Courbe 7 jours */}
+      {/* Performance Temporelle */}
       {performanceTemporelle && performanceTemporelle.length > 0 && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Activite sur 7 jours</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">{PERIODE_CHART_LABELS[selectedPeriod]}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={performanceTemporelle}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -526,7 +541,7 @@ export default function OverviewView({ onRefresh }: OverviewViewProps) {
 
       {/* Top Performers */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performers du jour</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performers — {PERIODE_LABELS[selectedPeriod]}</h3>
         <div className="grid grid-cols-3 gap-4">
           {performanceCommercial
             .sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes)

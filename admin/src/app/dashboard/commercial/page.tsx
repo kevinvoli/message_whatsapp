@@ -33,7 +33,7 @@ export default function AdminDashboard() {
     const renderContent = () => {
         switch(viewMode) {
             case 'overview':
-                return <OverviewView />;
+                return <OverviewView selectedPeriod={selectedPeriod} />;
             case 'commerciaux':
                 return <CommerciauxView />;
             case 'postes':
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
             case 'conversations':
                 return <ConversationsView onRefresh={() => {}} />;
             case 'performance':
-                return <PerformanceView />;
+                return <PerformanceView selectedPeriod={selectedPeriod} />;
             case 'analytics':
                 return <AnalyticsView onRefresh={() => {}} />;
             case 'messages':
