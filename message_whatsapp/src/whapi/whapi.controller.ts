@@ -17,6 +17,10 @@ import { Request } from 'express';
 import { WhapiService } from './whapi.service';
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { MetaWebhookPayload } from './interface/whatsapp-whebhook.interface';
+import { MessengerWebhookPayload } from './interface/messenger-webhook.interface';
+import { InstagramWebhookPayload } from './interface/instagram-webhook.interface';
+import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
+import { ChannelService } from 'src/channel/channel.service';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
@@ -33,6 +37,8 @@ export class WhapiController {
     private readonly healthService: WebhookTrafficHealthService,
     private readonly degradedQueue: WebhookDegradedQueueService,
     private readonly metricsService: WebhookMetricsService,
+    private readonly unifiedIngressService: UnifiedIngressService,
+    private readonly channelService: ChannelService,
   ) {}
 
   @Post('whapi')
@@ -166,6 +172,180 @@ export class WhapiController {
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+
+    this.healthService.record(provider, true, Date.now() - startedAt);
+    this.metricsService.recordLatency(provider, Date.now() - startedAt);
+    return { status: 'ok' };
+  }
+
+  @Get('messenger')
+  verifyMessengerWebhook(
+    @Query('hub.mode') mode: string,
+    @Query('hub.verify_token') token: string,
+    @Query('hub.challenge') challenge: string,
+  ) {
+    if (mode === 'subscribe' && token === process.env.MESSENGER_VERIFY_TOKEN) {
+      return challenge;
+    }
+    throw new ForbiddenException();
+  }
+
+  @Post('messenger')
+  async handleMessengerWebhook(
+    @Body() payload: unknown,
+    @Req() request: Request & { rawBody?: Buffer },
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const startedAt = Date.now();
+    const provider = 'messenger';
+    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
+
+    this.assertPayloadSize(request.rawBody);
+    this.assertMessengerSignature(headers, request.rawBody, payload);
+
+    const messengerPayload = this.assertMessengerPayload(payload);
+
+    const pageId = messengerPayload.entry?.[0]?.id;
+    if (!pageId) {
+      return { status: 'ignored', reason: 'missing_page_id' };
+    }
+
+    const tenantId = await this.resolveTenantOrReject('messenger', pageId);
+    const channel = await this.channelService.resolveTenantByProviderExternalId(
+      'messenger',
+      pageId,
+    );
+    const channelRecord = await this.channelService.findByChannelId(pageId);
+    const channelId = channelRecord?.channel_id ?? pageId;
+
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=messenger tenant_id=${tenantId} page_id=${pageId}`,
+    );
+
+    this.rateLimitService.assertRateLimits(provider, null, tenantId);
+    this.assertCircuitBreaker(provider);
+    this.metricsService.recordReceived(provider, tenantId);
+
+    const idempotency = await this.whapiService.isReplayEvent(
+      messengerPayload,
+      'messenger',
+      tenantId,
+    );
+
+    if (idempotency === 'conflict') {
+      throw new HttpException('Idempotency conflict', HttpStatus.CONFLICT);
+    }
+    if (idempotency === 'duplicate') {
+      this.metricsService.recordDuplicate(provider, tenantId);
+      this.healthService.record(provider, true, Date.now() - startedAt);
+      this.metricsService.recordLatency(provider, Date.now() - startedAt);
+      return { status: 'duplicate_ignored' };
+    }
+
+    try {
+      await this.unifiedIngressService.ingestMessenger(messengerPayload, {
+        provider: 'messenger',
+        tenantId,
+        channelId,
+      });
+    } catch (err) {
+      if (err instanceof HttpException) {
+        this.healthService.record(
+          provider,
+          err.getStatus() < 500,
+          Date.now() - startedAt,
+        );
+        throw err;
+      }
+      this.healthService.record(provider, false, Date.now() - startedAt);
+      this.metricsService.recordError(provider, tenantId, 'exception');
+      throw err;
+    }
+
+    this.healthService.record(provider, true, Date.now() - startedAt);
+    this.metricsService.recordLatency(provider, Date.now() - startedAt);
+    return { status: 'ok' };
+  }
+
+  @Get('instagram')
+  verifyInstagramWebhook(
+    @Query('hub.mode') mode: string,
+    @Query('hub.verify_token') token: string,
+    @Query('hub.challenge') challenge: string,
+  ) {
+    if (mode === 'subscribe' && token === process.env.INSTAGRAM_VERIFY_TOKEN) {
+      return challenge;
+    }
+    throw new ForbiddenException();
+  }
+
+  @Post('instagram')
+  async handleInstagramWebhook(
+    @Body() payload: unknown,
+    @Req() request: Request & { rawBody?: Buffer },
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const startedAt = Date.now();
+    const provider = 'instagram';
+    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
+
+    this.assertPayloadSize(request.rawBody);
+    this.assertInstagramSignature(headers, request.rawBody, payload);
+
+    const igPayload = this.assertInstagramPayload(payload);
+
+    const igAccountId = igPayload.entry?.[0]?.id;
+    if (!igAccountId) {
+      return { status: 'ignored', reason: 'missing_ig_account_id' };
+    }
+
+    const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
+    const channelRecord = await this.channelService.findByChannelId(igAccountId);
+    const channelId = channelRecord?.channel_id ?? igAccountId;
+
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id=${tenantId} ig_account_id=${igAccountId}`,
+    );
+
+    this.rateLimitService.assertRateLimits(provider, null, tenantId);
+    this.assertCircuitBreaker(provider);
+    this.metricsService.recordReceived(provider, tenantId);
+
+    const idempotency = await this.whapiService.isReplayEvent(
+      igPayload,
+      'instagram',
+      tenantId,
+    );
+
+    if (idempotency === 'conflict') {
+      throw new HttpException('Idempotency conflict', HttpStatus.CONFLICT);
+    }
+    if (idempotency === 'duplicate') {
+      this.metricsService.recordDuplicate(provider, tenantId);
+      this.healthService.record(provider, true, Date.now() - startedAt);
+      this.metricsService.recordLatency(provider, Date.now() - startedAt);
+      return { status: 'duplicate_ignored' };
+    }
+
+    try {
+      await this.unifiedIngressService.ingestInstagram(igPayload, {
+        provider: 'instagram',
+        tenantId,
+        channelId,
+      });
+    } catch (err) {
+      if (err instanceof HttpException) {
+        this.healthService.record(
+          provider,
+          err.getStatus() < 500,
+          Date.now() - startedAt,
+        );
+        throw err;
+      }
+      this.healthService.record(provider, false, Date.now() - startedAt);
+      this.metricsService.recordError(provider, tenantId, 'exception');
+      throw err;
     }
 
     this.healthService.record(provider, true, Date.now() - startedAt);
@@ -308,6 +488,130 @@ export class WhapiController {
     this.healthService.record(provider, true, Date.now() - startedAt);
     this.metricsService.recordLatency(provider, Date.now() - startedAt);
     return { status: 'EVENT_RECEIVED' };
+  }
+
+  private assertInstagramSignature(
+    headers: Record<string, string | string[] | undefined>,
+    rawBody: Buffer | undefined,
+    payload: unknown,
+  ): void {
+    const isProd = process.env.NODE_ENV === 'production';
+    const appSecret = (
+      process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET
+    )?.trim();
+
+    if (!appSecret) {
+      if (isProd) {
+        this.metricsService.recordSignatureInvalid('instagram');
+        throw new UnauthorizedException(
+          'Instagram webhook signature secret not configured',
+        );
+      }
+      return;
+    }
+
+    const signatureHeader = this.headerValue(
+      headers['x-hub-signature-256'],
+    )?.trim();
+    if (!signatureHeader) {
+      this.metricsService.recordSignatureInvalid('instagram');
+      throw new UnauthorizedException('Missing Instagram signature');
+    }
+
+    const valid = this.verifyHmacSignature(
+      'instagram',
+      [appSecret],
+      rawBody,
+      payload,
+      signatureHeader,
+      isProd,
+    );
+
+    if (!valid) {
+      this.metricsService.recordSignatureInvalid('instagram');
+      throw new ForbiddenException('Invalid Instagram webhook signature');
+    }
+  }
+
+  private assertInstagramPayload(
+    payload: unknown,
+  ): InstagramWebhookPayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
+    }
+    const p = payload as InstagramWebhookPayload;
+    if (p.object !== 'instagram') {
+      throw new HttpException(
+        'Not an Instagram event',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!Array.isArray(p.entry) || p.entry.length === 0) {
+      throw new HttpException('Missing entry', HttpStatus.BAD_REQUEST);
+    }
+    return p;
+  }
+
+  private assertMessengerSignature(
+    headers: Record<string, string | string[] | undefined>,
+    rawBody: Buffer | undefined,
+    payload: unknown,
+  ): void {
+    const isProd = process.env.NODE_ENV === 'production';
+    const appSecret = (
+      process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET
+    )?.trim();
+
+    if (!appSecret) {
+      if (isProd) {
+        this.metricsService.recordSignatureInvalid('messenger');
+        throw new UnauthorizedException(
+          'Messenger webhook signature secret not configured',
+        );
+      }
+      return;
+    }
+
+    const signatureHeader = this.headerValue(
+      headers['x-hub-signature-256'],
+    )?.trim();
+    if (!signatureHeader) {
+      this.metricsService.recordSignatureInvalid('messenger');
+      throw new UnauthorizedException('Missing Messenger signature');
+    }
+
+    const valid = this.verifyHmacSignature(
+      'messenger',
+      [appSecret],
+      rawBody,
+      payload,
+      signatureHeader,
+      isProd,
+    );
+
+    if (!valid) {
+      this.metricsService.recordSignatureInvalid('messenger');
+      throw new ForbiddenException('Invalid Messenger webhook signature');
+    }
+  }
+
+  private assertMessengerPayload(
+    payload: unknown,
+  ): MessengerWebhookPayload {
+    if (!payload || typeof payload !== 'object') {
+      throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
+    }
+    const p = payload as MessengerWebhookPayload;
+    if (p.object !== 'page') {
+      throw new HttpException(
+        'Not a Messenger page event',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!Array.isArray(p.entry) || p.entry.length === 0) {
+      throw new HttpException('Missing entry', HttpStatus.BAD_REQUEST);
+    }
+    return p;
   }
 
   private assertWhapiSecret(
@@ -523,7 +827,7 @@ export class WhapiController {
   }
 
   private verifyHmacSignature(
-    provider: 'whapi' | 'meta',
+    provider: string,
     secrets: string[],
     rawBody: Buffer | undefined,
     payload: unknown,
@@ -566,7 +870,7 @@ export class WhapiController {
   }
 
   private rateLimit(
-    provider: 'whapi' | 'meta',
+    provider: string,
     request: Request,
     tenantId?: string | null,
   ): void {
@@ -648,7 +952,7 @@ export class WhapiController {
   }
 
   private async resolveTenantOrReject(
-    provider: 'whapi' | 'meta',
+    provider: string,
     externalId?: string,
   ): Promise<string> {
     if (!externalId) {

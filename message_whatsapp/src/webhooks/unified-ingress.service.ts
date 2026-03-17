@@ -1,8 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WhapiWebhookPayload } from 'src/whapi/interface/whapi-webhook.interface';
 import { MetaWebhookPayload } from 'src/whapi/interface/whatsapp-whebhook.interface';
+import { MessengerWebhookPayload } from 'src/whapi/interface/messenger-webhook.interface';
+import { InstagramWebhookPayload } from 'src/whapi/interface/instagram-webhook.interface';
+import { TelegramWebhookPayload } from 'src/whapi/interface/telegram-webhook.interface';
 import { InboundMessageService } from './inbound-message.service';
 import { ProviderAdapterRegistry } from './adapters/provider-adapter.registry';
+import { AdapterContext } from './adapters/provider-adapter.interface';
 
 @Injectable()
 export class UnifiedIngressService {
@@ -96,6 +100,53 @@ export class UnifiedIngressService {
     }
     if (unifiedStatuses.length > 0) {
       await this.inboundService.handleStatuses(unifiedStatuses);
+    }
+  }
+
+  async ingestMessenger(
+    payload: MessengerWebhookPayload,
+    context: AdapterContext,
+  ): Promise<void> {
+    const messengerAdapter =
+      this.adapterRegistry.getAdapter<MessengerWebhookPayload>('messenger');
+    const unifiedMessages = messengerAdapter.normalizeMessages(payload, context);
+    const unifiedStatuses = messengerAdapter.normalizeStatuses(payload, context);
+
+    if (unifiedMessages.length > 0) {
+      await this.inboundService.handleMessages(unifiedMessages);
+    }
+    if (unifiedStatuses.length > 0) {
+      await this.inboundService.handleStatuses(unifiedStatuses);
+    }
+  }
+
+  async ingestInstagram(
+    payload: InstagramWebhookPayload,
+    context: AdapterContext,
+  ): Promise<void> {
+    const instagramAdapter =
+      this.adapterRegistry.getAdapter<InstagramWebhookPayload>('instagram');
+    const unifiedMessages = instagramAdapter.normalizeMessages(payload, context);
+    const unifiedStatuses = instagramAdapter.normalizeStatuses(payload, context);
+
+    if (unifiedMessages.length > 0) {
+      await this.inboundService.handleMessages(unifiedMessages);
+    }
+    if (unifiedStatuses.length > 0) {
+      await this.inboundService.handleStatuses(unifiedStatuses);
+    }
+  }
+
+  async ingestTelegram(
+    payload: TelegramWebhookPayload,
+    context: AdapterContext,
+  ): Promise<void> {
+    const telegramAdapter =
+      this.adapterRegistry.getAdapter<TelegramWebhookPayload>('telegram');
+    const unifiedMessages = telegramAdapter.normalizeMessages(payload, context);
+    // Telegram n'a pas de statuts
+    if (unifiedMessages.length > 0) {
+      await this.inboundService.handleMessages(unifiedMessages);
     }
   }
 

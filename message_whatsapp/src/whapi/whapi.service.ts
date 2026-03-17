@@ -50,23 +50,23 @@ export class WhapiService {
 
   async isReplayEvent(
     payload: unknown,
-    provider: 'whapi' | 'meta',
+    provider: string,
     tenantId?: string | null,
   ): Promise<'accepted' | 'duplicate' | 'conflict'> {
     return this.idempotencyService.check({
       payload,
-      provider,
+      provider: provider as any,
       tenantId,
     });
   }
 
   async hasPersistedIncomingMessage(
-    provider: 'whapi' | 'meta',
+    provider: string,
     providerMessageId: string,
   ): Promise<boolean> {
     const existing =
       await this.whatsappMessageService.findIncomingByProviderMessageId(
-        provider,
+        provider as any,
         providerMessageId,
       );
     return Boolean(existing);

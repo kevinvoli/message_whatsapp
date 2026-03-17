@@ -7,7 +7,7 @@ import { WhapiWebhookPayload } from 'src/whapi/interface/whapi-webhook.interface
 import { MetaWebhookPayload } from 'src/whapi/interface/whatsapp-whebhook.interface';
 import { WebhookMetricsService } from 'src/whapi/webhook-metrics.service';
 
-type ProviderId = 'whapi' | 'meta';
+type ProviderId = 'whapi' | 'meta' | 'messenger' | string;
 
 export type IdempotencyResult = 'accepted' | 'duplicate' | 'conflict';
 
@@ -68,6 +68,48 @@ export class WebhookIdempotencyService {
     provider: ProviderId,
     tenantId: string,
   ): string[] {
+    if (provider === 'instagram') {
+      const igPayload = payload as {
+        entry?: Array<{
+          messaging?: Array<{ message?: { mid?: string }; timestamp?: number }>;
+        }>;
+      };
+      const mids: string[] = [];
+      for (const entry of igPayload?.entry ?? []) {
+        for (const messaging of entry.messaging ?? []) {
+          if (messaging.message?.mid) {
+            mids.push(`${messaging.message.mid}:messages:in`);
+          }
+        }
+      }
+      if (mids.length > 0) return mids;
+      const minuteBucket = Math.floor(Date.now() / 60000);
+      return [
+        `${tenantId}:instagram:${this.hashPayload(payload)}:messages:in:${minuteBucket}`,
+      ];
+    }
+
+    if (provider === 'messenger') {
+      const messengerPayload = payload as {
+        entry?: Array<{
+          messaging?: Array<{ message?: { mid?: string }; timestamp?: number }>;
+        }>;
+      };
+      const mids: string[] = [];
+      for (const entry of messengerPayload?.entry ?? []) {
+        for (const messaging of entry.messaging ?? []) {
+          if (messaging.message?.mid) {
+            mids.push(`${messaging.message.mid}:messages:in`);
+          }
+        }
+      }
+      if (mids.length > 0) return mids;
+      const minuteBucket = Math.floor(Date.now() / 60000);
+      return [
+        `${tenantId}:messenger:${this.hashPayload(payload)}:messages:in:${minuteBucket}`,
+      ];
+    }
+
     if (provider === 'whapi') {
       const whapiPayload = payload as WhapiWebhookPayload;
       const eventType = whapiPayload?.event?.type ?? 'unknown';

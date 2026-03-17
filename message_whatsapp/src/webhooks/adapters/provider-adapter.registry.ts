@@ -1,6 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { MetaAdapter } from './meta.adapter';
 import { WhapiAdapter } from './whapi.adapter';
+import { MessengerAdapter } from './messenger.adapter';
+import { InstagramAdapter } from './instagram.adapter';
+import { TelegramAdapter } from './telegram.adapter';
 import { ProviderAdapter } from './provider-adapter.interface';
 
 @Injectable()
@@ -10,10 +13,16 @@ export class ProviderAdapterRegistry {
   constructor(
     private readonly whapiAdapter: WhapiAdapter,
     private readonly metaAdapter: MetaAdapter,
+    private readonly messengerAdapter: MessengerAdapter,
+    private readonly instagramAdapter: InstagramAdapter,
+    private readonly telegramAdapter: TelegramAdapter,
   ) {
     this.registry = {
       whapi: this.whapiAdapter,
       meta: this.metaAdapter,
+      messenger: this.messengerAdapter,
+      instagram: this.instagramAdapter,
+      telegram: this.telegramAdapter,
     };
   }
 

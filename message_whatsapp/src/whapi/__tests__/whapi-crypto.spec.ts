@@ -18,6 +18,8 @@ const buildController = () =>
     } as any,
     { enqueue: jest.fn() } as any,
     new WebhookMetricsService(),
+    {} as any,
+    {} as any,
   );
 
 describe('Webhook crypto', () => {

@@ -44,6 +44,10 @@ import { WebhookMetricsController } from './webhook-metrics.controller';
 import { WebhookIdempotencyPurgeService } from './webhook-idempotency-purge.service';
 import { WhapiAdapter } from 'src/webhooks/adapters/whapi.adapter';
 import { MetaAdapter } from 'src/webhooks/adapters/meta.adapter';
+import { MessengerAdapter } from 'src/webhooks/adapters/messenger.adapter';
+import { InstagramAdapter } from 'src/webhooks/adapters/instagram.adapter';
+import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { CommunicationInstagramService } from 'src/communication_whapi/communication_instagram.service';
 import { InboundMessageService } from 'src/webhooks/inbound-message.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
@@ -98,6 +102,10 @@ import { NotificationModule } from 'src/notification/notification.module';
     WebhookIdempotencyPurgeService,
     WhapiAdapter,
     MetaAdapter,
+    MessengerAdapter,
+    InstagramAdapter,
+    CommunicationMessengerService,
+    CommunicationInstagramService,
     ProviderAdapterRegistry,
     InboundMessageService,
     UnifiedIngressService,

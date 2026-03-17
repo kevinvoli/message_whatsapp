@@ -39,6 +39,135 @@ export class ChannelService {
       throw new ConflictException('Ce channel existe deja');
     }
 
+    if (provider === 'messenger') {
+      const channelId = dto.channel_id?.trim();
+      if (!channelId) {
+        throw new ConflictException(
+          'channel_id (page_id Facebook) requis pour provider=messenger',
+        );
+      }
+
+      const externalId = dto.external_id?.trim() || channelId;
+      const nowEpoch = Math.floor(Date.now() / 1000);
+
+      let messengerToken = dto.token;
+      let messengerTokenExpiresAt: Date | null = null;
+
+      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+        try {
+          const exchanged =
+            await this.metaTokenService.exchangeForLongLivedToken(dto.token);
+          messengerToken = exchanged.accessToken;
+          messengerTokenExpiresAt = exchanged.expiresAt;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Impossible d'échanger le token Messenger (token court gardé): ${message}`,
+            ChannelService.name,
+          );
+        }
+      }
+
+      const messengerChannel = this.channelRepository.create({
+        provider: 'messenger',
+        external_id: externalId,
+        start_at: nowEpoch,
+        token: messengerToken,
+        tokenExpiresAt: messengerTokenExpiresAt,
+        channel_id: channelId,
+        uptime: 0,
+        version: 'messenger',
+        ip: 'messenger',
+        device_id: 0,
+        is_business: dto.is_business ?? true,
+        api_version: process.env.META_API_VERSION ?? 'v21.0',
+        core_version: 'messenger-graph-api',
+      });
+
+      const savedMessenger =
+        await this.channelRepository.save(messengerChannel);
+      const tenantId = await this.ensureTenantId(savedMessenger);
+      await this.upsertProviderMapping({
+        tenant_id: tenantId,
+        provider: 'messenger',
+        external_id: externalId,
+        channel_id: channelId,
+      });
+
+      this.logger.debug(
+        `Messenger channel persisted: ${savedMessenger.channel_id}`,
+        ChannelService.name,
+      );
+
+      return this.channelRepository.findOne({
+        where: { id: savedMessenger.id },
+      });
+    }
+
+    if (provider === 'instagram') {
+      const channelId = dto.channel_id?.trim();
+      if (!channelId) {
+        throw new ConflictException(
+          'channel_id (instagram_business_account_id) requis pour provider=instagram',
+        );
+      }
+
+      const externalId = dto.external_id?.trim() || channelId;
+      const nowEpoch = Math.floor(Date.now() / 1000);
+
+      let igToken = dto.token;
+      let igTokenExpiresAt: Date | null = null;
+
+      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+        try {
+          const exchanged =
+            await this.metaTokenService.exchangeForLongLivedToken(dto.token);
+          igToken = exchanged.accessToken;
+          igTokenExpiresAt = exchanged.expiresAt;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Impossible d'échanger le token Instagram (token court gardé): ${message}`,
+            ChannelService.name,
+          );
+        }
+      }
+
+      const igChannel = this.channelRepository.create({
+        provider: 'instagram',
+        external_id: externalId,
+        start_at: nowEpoch,
+        token: igToken,
+        tokenExpiresAt: igTokenExpiresAt,
+        channel_id: channelId,
+        uptime: 0,
+        version: 'instagram',
+        ip: 'instagram',
+        device_id: 0,
+        is_business: dto.is_business ?? true,
+        api_version: process.env.META_API_VERSION ?? 'v21.0',
+        core_version: 'instagram-graph-api',
+      });
+
+      const savedIg = await this.channelRepository.save(igChannel);
+      const tenantId = await this.ensureTenantId(savedIg);
+      await this.upsertProviderMapping({
+        tenant_id: tenantId,
+        provider: 'instagram',
+        external_id: externalId,
+        channel_id: channelId,
+      });
+
+      this.logger.debug(
+        `Instagram channel persisted: ${savedIg.channel_id}`,
+        ChannelService.name,
+      );
+
+      return this.channelRepository.findOne({
+        where: { id: savedIg.id },
+      });
+    }
+
     if (provider === 'meta') {
       const channelId = dto.channel_id?.trim();
       if (!channelId) {
