@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -724,4 +724,40 @@ export async function runCronNow(key: string): Promise<void> {
         credentials: 'include',
     });
     await handleResponse<{ ok: boolean; ranAt: string }>(response);
+}
+
+// ─── System Config ────────────────────────────────────────────────────────────
+
+export async function getSystemConfigs(): Promise<SystemConfigEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/system-config`, {
+        credentials: 'include',
+    });
+    return handleResponse<SystemConfigEntry[]>(response);
+}
+
+export async function getSystemConfigCatalogue(): Promise<SystemConfigCatalogueEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/system-config/catalogue`, {
+        credentials: 'include',
+    });
+    return handleResponse<SystemConfigCatalogueEntry[]>(response);
+}
+
+export async function updateSystemConfig(key: string, value: string): Promise<SystemConfigEntry> {
+    const response = await fetch(`${API_BASE_URL}/system-config/${encodeURIComponent(key)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ key, value }),
+    });
+    return handleResponse<SystemConfigEntry>(response);
+}
+
+export async function bulkUpdateSystemConfig(entries: { key: string; value: string }[]): Promise<{ updated: number }> {
+    const response = await fetch(`${API_BASE_URL}/system-config/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ entries }),
+    });
+    return handleResponse<{ updated: number }>(response);
 }

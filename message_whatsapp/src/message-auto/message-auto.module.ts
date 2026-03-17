@@ -15,6 +15,9 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { CommunicationInstagramService } from 'src/communication_whapi/communication_instagram.service';
+import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { SocketThrottleGuard } from 'src/whatsapp_message/guards/socket-throttle.guard';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
@@ -74,6 +77,9 @@ import { NotificationModule } from 'src/notification/notification.module';
     DispatcherService,
     CommunicationWhapiService,
     CommunicationMetaService,
+    CommunicationMessengerService,
+    CommunicationInstagramService,
+    CommunicationTelegramService,
     OutboundRouterService,
     SocketThrottleGuard,
     ChannelService,

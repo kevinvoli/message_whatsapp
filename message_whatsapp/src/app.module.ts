@@ -36,6 +36,7 @@ import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added impor
 import { MetriquesModule } from './metriques/metriques.module';
 import { LoggingModule } from './logging/logging.module';
 import { NotificationModule } from './notification/notification.module';
+import { SystemConfigModule } from './system-config/system-config.module';
 
 @Module({
   imports: [
@@ -112,6 +113,7 @@ import { NotificationModule } from './notification/notification.module';
     MetriquesModule,
     LoggingModule,
     NotificationModule,
+    SystemConfigModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

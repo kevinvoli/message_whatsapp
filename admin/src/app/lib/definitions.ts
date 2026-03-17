@@ -518,6 +518,33 @@ export type UpdateCronConfigPayload = {
 };
 
 // ============================================
+// ============================================
+// SYSTEM CONFIG
+// ============================================
+
+export type SystemConfigEntry = {
+  id: string;
+  configKey: string;
+  configValue: string | null;
+  category: string;
+  label: string | null;
+  description: string | null;
+  isSecret: boolean;
+  isReadonly: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SystemConfigCatalogueEntry = {
+  key: string;
+  label: string;
+  category: string;
+  description?: string;
+  isSecret?: boolean;
+  isReadonly?: boolean;
+};
+
+// ============================================
 // CONSTANTES
 // ============================================
 
