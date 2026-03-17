@@ -187,6 +187,8 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
+    console.log(`messenger webhooks: ${token}`);
+
     if (mode === 'subscribe' && token === process.env.MESSENGER_VERIFY_TOKEN) {
       return challenge;
     }
@@ -199,6 +201,8 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
+    console.log(`messenger webhooks: ${JSON.stringify(payload)}`);
+
     const startedAt = Date.now();
     const provider = 'messenger';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
