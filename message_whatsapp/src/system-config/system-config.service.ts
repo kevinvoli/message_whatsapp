@@ -22,9 +22,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'CORS_ORIGINS', label: 'Origines CORS autorisées', category: 'general', description: 'Liste séparée par des virgules, sans espaces' },
 
   // ─── WhatsApp / Whapi ───────────────────────────────────────────────────────
-  { key: 'WHAPI_TOKEN', label: 'Token Whapi', category: 'whapi', isSecret: true },
   { key: 'WHAPI_URL', label: 'URL API Whapi', category: 'whapi' },
-  { key: 'WHATSAPP_NUMBER', label: 'Numéro WhatsApp', category: 'whapi' },
   { key: 'WHAPI_WEBHOOK_SECRET_HEADER', label: 'Header secret webhook Whapi', category: 'whapi' },
   { key: 'WHAPI_WEBHOOK_SECRET_VALUE', label: 'Valeur secret webhook Whapi', category: 'whapi', isSecret: true },
   { key: 'WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS', label: 'Valeur secret webhook Whapi (précédente)', category: 'whapi', isSecret: true },
@@ -51,9 +49,6 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'FF_SHADOW_UNIFIED', label: 'Mode shadow (routing parallèle)', category: 'feature_flags', description: 'true / false' },
   { key: 'FF_UNIFIED_WHAPI_PCT', label: 'Pourcentage trafic Whapi unifié', category: 'feature_flags', description: '0–100' },
 
-  // ─── Cron ───────────────────────────────────────────────────────────────────
-  { key: 'REDISPATCH_CRON', label: 'Cron de re-dispatch', category: 'cron', description: 'Expression cron (ex: */30 * * * * *)' },
-  { key: 'MESSAGE_RESPONSE_TIMEOUT_HOURS', label: 'Délai de réponse (heures)', category: 'cron', description: 'Entre 1 et 240 heures' },
 ];
 
 @Injectable()
