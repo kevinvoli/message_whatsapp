@@ -28,7 +28,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   instagram: 'Instagram Direct',
   telegram: 'Telegram',
   feature_flags: 'Feature Flags',
-  cron: 'Cron & Timers',
 };
 
 const CATEGORY_ORDER = ['general', 'whapi', 'meta', 'messenger', 'instagram', 'telegram', 'feature_flags', 'cron'];
