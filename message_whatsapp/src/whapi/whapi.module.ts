@@ -48,6 +48,8 @@ import { MessengerAdapter } from 'src/webhooks/adapters/messenger.adapter';
 import { InstagramAdapter } from 'src/webhooks/adapters/instagram.adapter';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { CommunicationInstagramService } from 'src/communication_whapi/communication_instagram.service';
+import { TelegramAdapter } from 'src/webhooks/adapters/telegram.adapter';
+import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { InboundMessageService } from 'src/webhooks/inbound-message.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
@@ -104,8 +106,10 @@ import { NotificationModule } from 'src/notification/notification.module';
     MetaAdapter,
     MessengerAdapter,
     InstagramAdapter,
+    TelegramAdapter,
     CommunicationMessengerService,
     CommunicationInstagramService,
+    CommunicationTelegramService,
     ProviderAdapterRegistry,
     InboundMessageService,
     UnifiedIngressService,

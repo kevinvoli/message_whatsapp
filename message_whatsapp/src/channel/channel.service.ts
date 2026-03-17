@@ -12,6 +12,7 @@ import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { MetaTokenService } from './meta-token.service';
+import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class ChannelService {
     private readonly providerChannelRepository: Repository<ProviderChannel>,
     private readonly connmunicationService: CommunicationWhapiService,
     private readonly metaTokenService: MetaTokenService,
+    private readonly telegramService: CommunicationTelegramService,
     private readonly logger: AppLogger,
   ) {}
 
@@ -37,6 +39,67 @@ export class ChannelService {
 
     if (existingChannel) {
       throw new ConflictException('Ce channel existe deja');
+    }
+
+    if (provider === 'telegram') {
+      // Valider le token via getMe et récupérer le bot_id
+      const botInfo = await this.telegramService.getMe(dto.token);
+      const botId = String(botInfo.id);
+      const nowEpoch = Math.floor(Date.now() / 1000);
+
+      const telegramChannel = this.channelRepository.create({
+        provider: 'telegram',
+        external_id: botId,
+        start_at: nowEpoch,
+        token: dto.token,
+        tokenExpiresAt: null,  // Bot token permanent
+        channel_id: botId,
+        uptime: 0,
+        version: 'telegram-bot-api',
+        ip: 'telegram',
+        device_id: 0,
+        is_business: false,
+        api_version: 'v7',
+        core_version: 'telegram-bot-api',
+      });
+
+      const savedTg = await this.channelRepository.save(telegramChannel);
+      const tenantId = await this.ensureTenantId(savedTg);
+      await this.upsertProviderMapping({
+        tenant_id: tenantId,
+        provider: 'telegram',
+        external_id: botId,
+        channel_id: botId,
+      });
+
+      // Enregistrer le webhook Telegram
+      const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+      if (appUrl) {
+        const webhookUrl = `${appUrl}/webhooks/telegram/${botId}`;
+        try {
+          await this.telegramService.registerWebhook(dto.token, webhookUrl);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Impossible d'enregistrer le webhook Telegram: ${message}`,
+            ChannelService.name,
+          );
+        }
+      } else {
+        this.logger.warn(
+          'APP_URL non défini — webhook Telegram non enregistré automatiquement',
+          ChannelService.name,
+        );
+      }
+
+      this.logger.debug(
+        `Telegram channel persisted: bot_id=${botId} username=@${botInfo.username}`,
+        ChannelService.name,
+      );
+
+      return this.channelRepository.findOne({
+        where: { id: savedTg.id },
+      });
     }
 
     if (provider === 'messenger') {

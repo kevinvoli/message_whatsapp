@@ -6,8 +6,8 @@ export class CreateChannelDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['whapi', 'meta', 'messenger', 'instagram'])
-  provider?: 'whapi' | 'meta' | 'messenger' | 'instagram';
+  @IsIn(['whapi', 'meta', 'messenger', 'instagram', 'telegram'])
+  provider?: 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram';
 
   @IsOptional()
   @IsString()

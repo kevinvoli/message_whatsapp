@@ -68,6 +68,31 @@ export class WebhookIdempotencyService {
     provider: ProviderId,
     tenantId: string,
   ): string[] {
+    if (provider === 'telegram') {
+      const tgPayload = payload as {
+        update_id?: number;
+        message?: { message_id?: number };
+        callback_query?: { id?: string };
+      };
+      const updateId = tgPayload?.update_id;
+      const messageId = tgPayload?.message?.message_id;
+      const cbqId = tgPayload?.callback_query?.id;
+
+      if (messageId !== undefined) {
+        return [`tg_msg_${messageId}:messages:in`];
+      }
+      if (cbqId) {
+        return [`tg_cbq_${cbqId}:callback:in`];
+      }
+      if (updateId !== undefined) {
+        return [`tg_upd_${updateId}:update:in`];
+      }
+      const minuteBucket = Math.floor(Date.now() / 60000);
+      return [
+        `${tenantId}:telegram:${this.hashPayload(payload)}:update:in:${minuteBucket}`,
+      ];
+    }
+
     if (provider === 'instagram') {
       const igPayload = payload as {
         entry?: Array<{

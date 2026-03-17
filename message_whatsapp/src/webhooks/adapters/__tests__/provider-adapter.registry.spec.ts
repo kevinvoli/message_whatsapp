@@ -9,6 +9,7 @@ describe('ProviderAdapterRegistry', () => {
       new MetaAdapter(),
       {} as any,
       {} as any,
+      {} as any,
     );
 
     expect(registry.getAdapter('whapi')).toBeInstanceOf(WhapiAdapter);
@@ -19,6 +20,7 @@ describe('ProviderAdapterRegistry', () => {
     const registry = new ProviderAdapterRegistry(
       new WhapiAdapter(),
       new MetaAdapter(),
+      {} as any,
       {} as any,
       {} as any,
     );

@@ -6,6 +6,7 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Param,
   Post,
   Query,
   Req,
@@ -19,6 +20,7 @@ import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { MetaWebhookPayload } from './interface/whatsapp-whebhook.interface';
 import { MessengerWebhookPayload } from './interface/messenger-webhook.interface';
 import { InstagramWebhookPayload } from './interface/instagram-webhook.interface';
+import { TelegramWebhookPayload } from './interface/telegram-webhook.interface';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
@@ -246,6 +248,81 @@ export class WhapiController {
     try {
       await this.unifiedIngressService.ingestMessenger(messengerPayload, {
         provider: 'messenger',
+        tenantId,
+        channelId,
+      });
+    } catch (err) {
+      if (err instanceof HttpException) {
+        this.healthService.record(
+          provider,
+          err.getStatus() < 500,
+          Date.now() - startedAt,
+        );
+        throw err;
+      }
+      this.healthService.record(provider, false, Date.now() - startedAt);
+      this.metricsService.recordError(provider, tenantId, 'exception');
+      throw err;
+    }
+
+    this.healthService.record(provider, true, Date.now() - startedAt);
+    this.metricsService.recordLatency(provider, Date.now() - startedAt);
+    return { status: 'ok' };
+  }
+
+  @Post('telegram/:botId')
+  async handleTelegramWebhook(
+    @Param('botId') botId: string,
+    @Body() payload: TelegramWebhookPayload,
+    @Headers('x-telegram-bot-api-secret-token') secretToken: string,
+  ) {
+    const startedAt = Date.now();
+    const provider = 'telegram';
+
+    // Vérifier le secret token
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret && secretToken !== expectedSecret) {
+      this.metricsService.recordSignatureInvalid('telegram');
+      throw new ForbiddenException('Invalid Telegram secret token');
+    }
+
+    // Ignorer les updates sans message exploitable (channel_post, edited_message)
+    const hasContent = payload.message || payload.callback_query;
+    if (!hasContent) {
+      return { status: 'ignored', reason: 'no_actionable_content' };
+    }
+
+    const tenantId = await this.resolveTenantOrReject('telegram', botId);
+    const channelRecord = await this.channelService.findByChannelId(botId);
+    const channelId = channelRecord?.channel_id ?? botId;
+
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED provider=telegram bot_id=${botId} tenant_id=${tenantId} update_id=${payload.update_id}`,
+    );
+
+    this.rateLimitService.assertRateLimits(provider, null, tenantId);
+    this.assertCircuitBreaker(provider);
+    this.metricsService.recordReceived(provider, tenantId);
+
+    const idempotency = await this.whapiService.isReplayEvent(
+      payload,
+      'telegram',
+      tenantId,
+    );
+
+    if (idempotency === 'conflict') {
+      throw new HttpException('Idempotency conflict', HttpStatus.CONFLICT);
+    }
+    if (idempotency === 'duplicate') {
+      this.metricsService.recordDuplicate(provider, tenantId);
+      this.healthService.record(provider, true, Date.now() - startedAt);
+      this.metricsService.recordLatency(provider, Date.now() - startedAt);
+      return { status: 'duplicate_ignored' };
+    }
+
+    try {
+      await this.unifiedIngressService.ingestTelegram(payload, {
+        provider: 'telegram',
         tenantId,
         channelId,
       });
