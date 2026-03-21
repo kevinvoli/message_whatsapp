@@ -467,47 +467,47 @@ export class SyncAllEntities1742601700000 implements MigrationInterface {
     `);
 
     // ── 22. whapi_channels — colonnes manquantes ──────────────────────────────
-    await this.addCol(qr, 'whapi_channels', 'label',
+    await this.addCol(queryRunner, 'whapi_channels', 'label',
       `VARCHAR(100) NULL DEFAULT NULL AFTER \`tenant_id\``);
-    await this.addCol(qr, 'whapi_channels', 'provider',
+    await this.addCol(queryRunner, 'whapi_channels', 'provider',
       `VARCHAR(32) NULL DEFAULT NULL AFTER \`label\``);
-    await this.addCol(qr, 'whapi_channels', 'external_id',
+    await this.addCol(queryRunner, 'whapi_channels', 'external_id',
       `VARCHAR(191) NULL DEFAULT NULL AFTER \`provider\``);
-    await this.addCol(qr, 'whapi_channels', 'meta_app_id',
+    await this.addCol(queryRunner, 'whapi_channels', 'meta_app_id',
       `VARCHAR(64) NULL DEFAULT NULL AFTER \`token\``);
-    await this.addCol(qr, 'whapi_channels', 'meta_app_secret',
+    await this.addCol(queryRunner, 'whapi_channels', 'meta_app_secret',
       `VARCHAR(128) NULL DEFAULT NULL AFTER \`meta_app_id\``);
-    await this.addCol(qr, 'whapi_channels', 'token_expires_at',
+    await this.addCol(queryRunner, 'whapi_channels', 'token_expires_at',
       `DATETIME NULL DEFAULT NULL`);
 
     // ── 23. whatsapp_message — colonnes multi-tenant ──────────────────────────
-    await this.addCol(qr, 'whatsapp_message', 'tenant_id',
+    await this.addCol(queryRunner, 'whatsapp_message', 'tenant_id',
       `CHAR(36) NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_message', 'provider',
+    await this.addCol(queryRunner, 'whatsapp_message', 'provider',
       `VARCHAR(32) NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_message', 'provider_message_id',
+    await this.addCol(queryRunner, 'whatsapp_message', 'provider_message_id',
       `VARCHAR(191) NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_message', 'error_code',
+    await this.addCol(queryRunner, 'whatsapp_message', 'error_code',
       `INT NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_message', 'error_title',
+    await this.addCol(queryRunner, 'whatsapp_message', 'error_title',
       `VARCHAR(255) NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_message', 'quoted_message_id',
+    await this.addCol(queryRunner, 'whatsapp_message', 'quoted_message_id',
       `CHAR(36) NULL DEFAULT NULL`);
 
     // ── 24. whatsapp_chat — colonnes multi-tenant & dispatch ──────────────────
-    await this.addCol(qr, 'whatsapp_chat', 'tenant_id',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'tenant_id',
       `CHAR(36) NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_chat', 'last_msg_client_channel_id',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'last_msg_client_channel_id',
       `VARCHAR(100) NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_chat', 'assigned_mode',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'assigned_mode',
       `ENUM('ONLINE','OFFLINE') NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_chat', 'auto_message_step',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'auto_message_step',
       `INT NOT NULL DEFAULT 0`);
-    await this.addCol(qr, 'whatsapp_chat', 'waiting_client_reply',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'waiting_client_reply',
       `TINYINT(1) NOT NULL DEFAULT 0`);
-    await this.addCol(qr, 'whatsapp_chat', 'last_auto_message_sent_at',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'last_auto_message_sent_at',
       `TIMESTAMP NULL DEFAULT NULL`);
-    await this.addCol(qr, 'whatsapp_chat', 'current_auto_message_id',
+    await this.addCol(queryRunner, 'whatsapp_chat', 'current_auto_message_id',
       `VARCHAR(100) NULL DEFAULT NULL`);
   }
 
