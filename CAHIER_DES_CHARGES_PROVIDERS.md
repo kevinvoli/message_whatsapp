@@ -382,3 +382,4 @@ Les éléments suivants sont **hors scope** de ce cahier des charges :
   5. ☐ Créer le canal via l'UI admin (provider=meta, channel_id=phone_number_id, token)
   6. ☐ Configurer le webhook dans Meta Dev App → l'URL /webhooks/whatsapp avec le bon verify token
   7. ☐ Tester avec un message entrant → vérifier les logs OUTBOUND_* et resolveTenantForMeta
+  
