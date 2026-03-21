@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
@@ -11,9 +11,10 @@ import { EntityFormModal } from './crud/EntityFormModal';
 interface CommerciauxViewProps {
   onRefresh?: () => void;
   selectedPeriod?: string;
+  onViewConversations?: (commercialId: string, posteId: string) => void;
 }
 
-export default function CommerciauxView({ onRefresh, selectedPeriod = 'today' }: CommerciauxViewProps) {
+export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', onViewConversations }: CommerciauxViewProps) {
   const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -430,6 +431,15 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today' }:
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {onViewConversations && (
+                          <button
+                            onClick={() => onViewConversations(commercial.id, commercial.poste_id ?? '')}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                            title="Voir les conversations"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenEditModal(commercial)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"

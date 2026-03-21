@@ -1,10 +1,10 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, getChats } from '@/app/lib/api';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search, Filter, X } from 'lucide-react';
+import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial } from '@/app/lib/api';
 import { Spinner } from './Spinner';
-import { WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
@@ -14,9 +14,16 @@ import { Pagination } from './Pagination';
 interface ConversationsViewProps {
     onRefresh?: () => void;
     selectedPeriod?: string;
+    initialPosteId?: string;
+    initialCommercialId?: string;
 }
 
-export default function ConversationsView({ onRefresh, selectedPeriod = 'today' }: ConversationsViewProps) {
+export default function ConversationsView({
+    onRefresh,
+    selectedPeriod = 'today',
+    initialPosteId,
+    initialCommercialId,
+}: ConversationsViewProps) {
     const [chats, setChats] = useState<WhatsappChat[]>([]);
     const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(50);
@@ -32,23 +39,65 @@ export default function ConversationsView({ onRefresh, selectedPeriod = 'today' 
     const { addToast } = useToast();
     const loadingToastRef = useRef(false);
 
+    // Filtres poste / commercial
+    const [postes, setPostes] = useState<Poste[]>([]);
+    const [commerciaux, setCommerciaux] = useState<CommercialStats[]>([]);
+    const [selectedPosteId, setSelectedPosteId] = useState<string>(initialPosteId ?? '');
+    const [selectedCommercialId, setSelectedCommercialId] = useState<string>(initialCommercialId ?? '');
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Chargement initial des postes et commerciaux (une seule fois)
+    useEffect(() => {
+        void getPostes().then(setPostes).catch(() => {});
+        void getChatStatsByCommercial().then(setCommerciaux).catch(() => {});
+    }, []);
+
+    // Mise à jour des filtres si les props initiales changent (navigation depuis Postes/Commerciaux)
+    useEffect(() => { setSelectedPosteId(initialPosteId ?? ''); }, [initialPosteId]);
+    useEffect(() => { setSelectedCommercialId(initialCommercialId ?? ''); }, [initialCommercialId]);
+
+    const commerciauxForPoste = useMemo(
+        () => selectedPosteId
+            ? commerciaux.filter((c) => c.poste_id === selectedPosteId)
+            : commerciaux,
+        [commerciaux, selectedPosteId],
+    );
+
+    const selectedPoste = postes.find((p) => p.id === selectedPosteId);
+    const selectedCommercial = commerciaux.find((c) => c.commercial_id === selectedCommercialId);
+    const hasFilter = !!(selectedPosteId || selectedCommercialId);
+
+    const contextTitle = useMemo(() => {
+        if (selectedCommercial && selectedPoste) {
+            return `${selectedCommercial.commercial_name} · ${selectedPoste.name}`;
+        }
+        if (selectedCommercial) return selectedCommercial.commercial_name;
+        if (selectedPoste) return `${selectedPoste.name} (${selectedPoste.code})`;
+        return null;
+    }, [selectedPoste, selectedCommercial]);
 
     const loadChats = useCallback(async (l: number, o: number) => {
         setLoadingChats(true);
         try {
-            const result = await getChats(l, o, selectedPeriod);
+            const result = await getChats(
+                l,
+                o,
+                selectedPeriod,
+                selectedPosteId || undefined,
+                selectedCommercialId || undefined,
+            );
             setChats(result.data);
             setTotal(result.total);
         } finally {
             setLoadingChats(false);
         }
-    }, [selectedPeriod]);
+    }, [selectedPeriod, selectedPosteId, selectedCommercialId]);
 
     useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
 
-    // Reset à la page 0 quand la période change
-    useEffect(() => { setOffset(0); }, [selectedPeriod]);
+    // Reset à la page 0 quand la période ou les filtres changent
+    useEffect(() => { setOffset(0); }, [selectedPeriod, selectedPosteId, selectedCommercialId]);
 
     useEffect(() => {
         if (selectedChat) {
@@ -306,9 +355,90 @@ export default function ConversationsView({ onRefresh, selectedPeriod = 'today' 
             {/* Left Panel: Chat List */}
             <div className="w-1/3 border-r border-gray-200 bg-white flex flex-col">
                 <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-10 space-y-3">
-                    <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5" /> Conversations
-                    </h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                            <MessageSquare className="w-5 h-5" />
+                            {contextTitle ? (
+                                <span className="truncate max-w-[180px]" title={contextTitle}>
+                                    {contextTitle}
+                                </span>
+                            ) : (
+                                'Conversations'
+                            )}
+                        </h3>
+                        {hasFilter && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedPosteId('');
+                                    setSelectedCommercialId('');
+                                }}
+                                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-full"
+                                title="Réinitialiser les filtres"
+                            >
+                                <X className="w-3 h-3" /> Réinitialiser
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Sélecteur de poste */}
+                    <div className="flex items-center gap-2">
+                        <Filter className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <select
+                            value={selectedPosteId}
+                            onChange={(e) => {
+                                setSelectedPosteId(e.target.value);
+                                setSelectedCommercialId('');
+                            }}
+                            disabled={!!initialPosteId}
+                            className="flex-1 text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-60"
+                        >
+                            <option value="">Tous les postes</option>
+                            {postes.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name} ({p.code})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Sélecteur de commercial (visible seulement si un poste est sélectionné) */}
+                    {selectedPosteId && (
+                        <select
+                            value={selectedCommercialId}
+                            onChange={(e) => setSelectedCommercialId(e.target.value)}
+                            disabled={!!initialCommercialId}
+                            className="w-full text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-60"
+                        >
+                            <option value="">Tous les commerciaux</option>
+                            {commerciauxForPoste.map((c) => (
+                                <option key={c.commercial_id} value={c.commercial_id}>
+                                    {c.isConnected ? '● ' : '○ '}{c.commercial_name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {/* Compteurs de contexte */}
+                    {hasFilter && (
+                        <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                {total} total
+                            </span>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                {chats.filter((c) => c.status === 'actif').length} actifs
+                            </span>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                                {chats.filter((c) => c.status?.includes('attente')).length} en attente
+                            </span>
+                            {chats.reduce((s, c) => s + (c.unread_count ?? 0), 0) > 0 && (
+                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100">
+                                    {chats.reduce((s, c) => s + (c.unread_count ?? 0), 0)} non lus
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input

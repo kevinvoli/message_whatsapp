@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
+import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw, MessageSquare } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import {
   blockPosteFromQueue,
@@ -19,9 +19,10 @@ import { useToast } from '@/app/ui/ToastProvider';
 
 interface PostesViewProps {
   onRefresh?: () => void;
+  onViewConversations?: (posteId: string) => void;
 }
 
-export default function PostesView({ onRefresh }: PostesViewProps) {
+export default function PostesView({ onRefresh, onViewConversations }: PostesViewProps) {
   const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   const {
@@ -319,6 +320,15 @@ export default function PostesView({ onRefresh }: PostesViewProps) {
                       <Ban className="h-4 w-4" />
                     )}
                   </button>
+                  {onViewConversations && (
+                    <button
+                      onClick={() => onViewConversations(poste.id)}
+                      className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
+                      title="Voir les conversations"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </button>
+                  )}
                   <button
                     onClick={() => openEditModal(poste)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50"

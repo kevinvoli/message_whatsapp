@@ -353,6 +353,34 @@ export type ChargePoste = {
 };
 
 /**
+ * Statistiques de conversations par poste
+ */
+export type PosteStats = {
+  poste_id: string;
+  poste_name: string;
+  poste_code: string;
+  total: number;
+  actif: number;
+  en_attente: number;
+  ferme: number;
+  unread_total: number;
+};
+
+/**
+ * Statistiques de conversations par commercial
+ */
+export type CommercialStats = {
+  commercial_id: string;
+  commercial_name: string;
+  commercial_email: string;
+  poste_id: string | null;
+  poste_name: string | null;
+  conversations_count: number;
+  messages_sent: number;
+  isConnected: boolean;
+};
+
+/**
  * Performance détaillée d'un commercial
  */
 export type PerformanceCommercial = {

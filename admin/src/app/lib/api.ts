@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -290,8 +290,21 @@ export async function deleteClient(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
-export async function getChats(limit = 50, offset = 0, periode = 'today'): Promise<{ data: WhatsappChat[]; total: number }> {
-    const response = await fetch(`${API_BASE_URL}/chats?limit=${limit}&offset=${offset}&periode=${periode}`, {
+export async function getChats(
+    limit = 50,
+    offset = 0,
+    periode = 'today',
+    posteId?: string,
+    commercialId?: string,
+): Promise<{ data: WhatsappChat[]; total: number }> {
+    const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        periode,
+    });
+    if (posteId) params.set('poste_id', posteId);
+    if (commercialId) params.set('commercial_id', commercialId);
+    const response = await fetch(`${API_BASE_URL}/chats?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
     });
@@ -305,6 +318,22 @@ export async function getChats(limit = 50, offset = 0, periode = 'today'): Promi
       status?: string;
     }>; total: number }>(response);
     return { data: result.data.map(normalizeWhatsappChat), total: result.total };
+}
+
+export async function getChatStatsByPoste(): Promise<PosteStats[]> {
+    const response = await fetch(`${API_BASE_URL}/chats/stats/by-poste`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<PosteStats[]>(response);
+}
+
+export async function getChatStatsByCommercial(): Promise<CommercialStats[]> {
+    const response = await fetch(`${API_BASE_URL}/chats/stats/by-commercial`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<CommercialStats[]>(response);
 }
 
 export async function getQueue(): Promise<QueuePosition[]> {

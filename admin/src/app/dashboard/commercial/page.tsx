@@ -34,10 +34,32 @@ export default function AdminDashboard() {
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [adminProfile, setAdminProfile] = useState<{ id: string; name: string; email: string } | null>(null);
+    const [conversationFilterPosteId, setConversationFilterPosteId] = useState<string | undefined>(undefined);
+    const [conversationFilterCommercialId, setConversationFilterCommercialId] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         void getAdminProfile().then(setAdminProfile).catch(() => null);
     }, []);
+
+    const handleViewPosteConversations = (posteId: string) => {
+        setConversationFilterPosteId(posteId);
+        setConversationFilterCommercialId(undefined);
+        setViewMode('conversations');
+    };
+
+    const handleViewCommercialConversations = (commercialId: string, posteId: string) => {
+        setConversationFilterPosteId(posteId || undefined);
+        setConversationFilterCommercialId(commercialId);
+        setViewMode('conversations');
+    };
+
+    const handleSetViewMode = (mode: ViewMode) => {
+        if (mode !== 'conversations') {
+            setConversationFilterPosteId(undefined);
+            setConversationFilterCommercialId(undefined);
+        }
+        setViewMode(mode);
+    };
 
     const {
         notifications,
@@ -55,9 +77,9 @@ export default function AdminDashboard() {
             case 'overview':
                 return <OverviewView selectedPeriod={selectedPeriod} />;
             case 'commerciaux':
-                return <CommerciauxView selectedPeriod={selectedPeriod} />;
+                return <CommerciauxView selectedPeriod={selectedPeriod} onViewConversations={handleViewCommercialConversations} />;
             case 'postes':
-                return <PostesView />;
+                return <PostesView onViewConversations={handleViewPosteConversations} />;
             case 'queue':
                 return <QueueView onRefresh={() => {}} />;
             case 'dispatch':
@@ -73,7 +95,14 @@ export default function AdminDashboard() {
             case 'automessages':
                 return <MessageAutoView />;
             case 'conversations':
-                return <ConversationsView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
+                return (
+                    <ConversationsView
+                        onRefresh={() => {}}
+                        selectedPeriod={selectedPeriod}
+                        initialPosteId={conversationFilterPosteId}
+                        initialCommercialId={conversationFilterCommercialId}
+                    />
+                );
             case 'performance':
                 return <PerformanceView selectedPeriod={selectedPeriod} />;
             case 'analytics':
@@ -115,7 +144,7 @@ export default function AdminDashboard() {
                 sidebarOpen={sidebarOpen}
                 setSidebarOpen={setSidebarOpen}
                 viewMode={viewMode}
-                setViewMode={setViewMode}
+                setViewMode={handleSetViewMode}
                 navigationGroups={navigationGroups}
                 message={[]}
                 adminProfile={adminProfile}

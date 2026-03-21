@@ -2,10 +2,34 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WhatsappChat } from './entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+
+export interface PosteStats {
+  poste_id: string;
+  poste_name: string;
+  poste_code: string;
+  total: number;
+  actif: number;
+  en_attente: number;
+  ferme: number;
+  unread_total: number;
+}
+
+export interface CommercialStats {
+  commercial_id: string;
+  commercial_name: string;
+  commercial_email: string;
+  poste_id: string | null;
+  poste_name: string | null;
+  conversations_count: number;
+  messages_sent: number;
+  isConnected: boolean;
+}
 
 @Injectable()
 export class WhatsappChatService {
@@ -16,6 +40,10 @@ export class WhatsappChatService {
     private readonly chatRepository: Repository<WhatsappChat>,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepository: Repository<WhatsappCommercial>,
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepository: Repository<WhatsappPoste>,
     private readonly posteService: WhatsappPosteService,
   ) {}
 
@@ -132,7 +160,14 @@ export class WhatsappChatService {
     );
   }
 
-  async findAll(chat_id?: string, limit = 50, offset = 0, dateStart?: Date): Promise<{ data: WhatsappChat[]; total: number }> {
+  async findAll(
+    chat_id?: string,
+    limit = 50,
+    offset = 0,
+    dateStart?: Date,
+    posteId?: string,
+    commercialId?: string,
+  ): Promise<{ data: WhatsappChat[]; total: number }> {
     if (chat_id) {
       const data = await this.chatRepository
         .createQueryBuilder('chat')
@@ -177,6 +212,23 @@ export class WhatsappChatService {
 
     if (dateStart) {
       qb.andWhere('chat.last_activity_at >= :dateStart', { dateStart });
+    }
+
+    if (posteId) {
+      qb.andWhere('chat.poste_id = :posteId', { posteId });
+    }
+
+    if (commercialId) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM whatsapp_message m
+          WHERE m.chat_id = chat.chat_id
+            AND m.commercial_id = :commercialId
+            AND m.direction = 'OUT'
+            AND m.deletedAt IS NULL
+        )`,
+        { commercialId },
+      );
     }
 
     const [data, total] = await qb.take(limit).skip(offset).getManyAndCount();
@@ -230,5 +282,87 @@ export class WhatsappChatService {
 
   async unlockConversation(id: string) {
     await this.update(id, { read_only: false });
+  }
+
+  async getStatsByPoste(): Promise<PosteStats[]> {
+    const postes = await this.posteRepository.find({ order: { name: 'ASC' } });
+
+    const rows: Array<{
+      poste_id: string;
+      status: string;
+      count: string;
+      unread_sum: string;
+    }> = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('chat.poste_id', 'poste_id')
+      .addSelect('chat.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('SUM(chat.unread_count)', 'unread_sum')
+      .where('chat.poste_id IS NOT NULL')
+      .groupBy('chat.poste_id')
+      .addGroupBy('chat.status')
+      .getRawMany();
+
+    return postes.map((poste) => {
+      const posteRows = rows.filter((r) => r.poste_id === poste.id);
+      const get = (status: string) =>
+        Number(posteRows.find((r) => r.status === status)?.count ?? 0);
+      const total = posteRows.reduce((s, r) => s + Number(r.count), 0);
+      const unread = posteRows.reduce((s, r) => s + Number(r.unread_sum ?? 0), 0);
+      return {
+        poste_id: poste.id,
+        poste_name: poste.name,
+        poste_code: poste.code,
+        total,
+        actif: get(WhatsappChatStatus.ACTIF),
+        en_attente: get(WhatsappChatStatus.EN_ATTENTE),
+        ferme: get(WhatsappChatStatus.FERME),
+        unread_total: unread,
+      };
+    });
+  }
+
+  async getStatsByCommercial(): Promise<CommercialStats[]> {
+    const commerciaux = await this.commercialRepository.find({
+      relations: ['poste'],
+      order: { name: 'ASC' },
+    });
+
+    const convRows: Array<{ commercial_id: string; conv_count: string }> =
+      await this.messageRepository
+        .createQueryBuilder('msg')
+        .select('msg.commercial_id', 'commercial_id')
+        .addSelect('COUNT(DISTINCT msg.chat_id)', 'conv_count')
+        .where("msg.direction = 'OUT'")
+        .andWhere('msg.commercial_id IS NOT NULL')
+        .andWhere('msg.deletedAt IS NULL')
+        .groupBy('msg.commercial_id')
+        .getRawMany();
+
+    const msgRows: Array<{ commercial_id: string; msg_count: string }> =
+      await this.messageRepository
+        .createQueryBuilder('msg')
+        .select('msg.commercial_id', 'commercial_id')
+        .addSelect('COUNT(*)', 'msg_count')
+        .where("msg.direction = 'OUT'")
+        .andWhere('msg.commercial_id IS NOT NULL')
+        .andWhere('msg.deletedAt IS NULL')
+        .groupBy('msg.commercial_id')
+        .getRawMany();
+
+    return commerciaux.map((c) => ({
+      commercial_id: c.id,
+      commercial_name: c.name,
+      commercial_email: c.email,
+      poste_id: c.poste?.id ?? null,
+      poste_name: c.poste?.name ?? null,
+      conversations_count: Number(
+        convRows.find((r) => r.commercial_id === c.id)?.conv_count ?? 0,
+      ),
+      messages_sent: Number(
+        msgRows.find((r) => r.commercial_id === c.id)?.msg_count ?? 0,
+      ),
+      isConnected: c.isConnected,
+    }));
   }
 }

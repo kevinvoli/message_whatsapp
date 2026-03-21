@@ -21,6 +21,8 @@ export class WhatsappChatController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('periode') periode?: string,
+    @Query('poste_id') poste_id?: string,
+    @Query('commercial_id') commercial_id?: string,
   ) {
     let dateStart: Date | undefined;
     if (periode) {
@@ -42,7 +44,20 @@ export class WhatsappChatController {
       limit ? Math.min(parseInt(limit, 10), 200) : 50,
       offset ? parseInt(offset, 10) : 0,
       dateStart,
+      poste_id,
+      commercial_id,
     );
+  }
+
+  // ⚠️ Doit être AVANT @Get(':chat_id') pour éviter le conflit de route
+  @Get('stats/by-poste')
+  async statsByPoste() {
+    return this.chatService.getStatsByPoste();
+  }
+
+  @Get('stats/by-commercial')
+  async statsByCommercial() {
+    return this.chatService.getStatsByCommercial();
   }
 
   @Get(':chat_id')
