@@ -116,19 +116,20 @@ export class ChannelService {
       let messengerToken = dto.token;
       let messengerTokenExpiresAt: Date | null = null;
 
-      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
-        try {
-          const exchanged =
-            await this.metaTokenService.exchangeForLongLivedToken(dto.token);
-          messengerToken = exchanged.accessToken;
-          messengerTokenExpiresAt = exchanged.expiresAt;
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `Impossible d'échanger le token Messenger (token court gardé): ${message}`,
-            ChannelService.name,
-          );
-        }
+      try {
+        const exchanged = await this.metaTokenService.exchangeForLongLivedToken(
+          dto.token,
+          dto.meta_app_id,
+          dto.meta_app_secret,
+        );
+        messengerToken = exchanged.accessToken;
+        messengerTokenExpiresAt = exchanged.expiresAt;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Impossible d'échanger le token Messenger (token court gardé): ${message}`,
+          ChannelService.name,
+        );
       }
 
       const messengerChannel = this.channelRepository.create({
@@ -138,6 +139,8 @@ export class ChannelService {
         token: messengerToken,
         tokenExpiresAt: messengerTokenExpiresAt,
         channel_id: channelId,
+        meta_app_id: dto.meta_app_id ?? null,
+        meta_app_secret: dto.meta_app_secret ?? null,
         uptime: 0,
         version: 'messenger',
         ip: 'messenger',
@@ -181,19 +184,20 @@ export class ChannelService {
       let igToken = dto.token;
       let igTokenExpiresAt: Date | null = null;
 
-      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
-        try {
-          const exchanged =
-            await this.metaTokenService.exchangeForLongLivedToken(dto.token);
-          igToken = exchanged.accessToken;
-          igTokenExpiresAt = exchanged.expiresAt;
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `Impossible d'échanger le token Instagram (token court gardé): ${message}`,
-            ChannelService.name,
-          );
-        }
+      try {
+        const exchanged = await this.metaTokenService.exchangeForLongLivedToken(
+          dto.token,
+          dto.meta_app_id,
+          dto.meta_app_secret,
+        );
+        igToken = exchanged.accessToken;
+        igTokenExpiresAt = exchanged.expiresAt;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Impossible d'échanger le token Instagram (token court gardé): ${message}`,
+          ChannelService.name,
+        );
       }
 
       const igChannel = this.channelRepository.create({
@@ -203,6 +207,8 @@ export class ChannelService {
         token: igToken,
         tokenExpiresAt: igTokenExpiresAt,
         channel_id: channelId,
+        meta_app_id: dto.meta_app_id ?? null,
+        meta_app_secret: dto.meta_app_secret ?? null,
         uptime: 0,
         version: 'instagram',
         ip: 'instagram',
@@ -245,18 +251,20 @@ export class ChannelService {
       let metaToken = dto.token;
       let metaTokenExpiresAt: Date | null = null;
 
-      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
-        try {
-          const exchanged = await this.metaTokenService.exchangeForLongLivedToken(dto.token);
-          metaToken = exchanged.accessToken;
-          metaTokenExpiresAt = exchanged.expiresAt;
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `Impossible d'échanger le token Meta (token court gardé): ${message}`,
-            ChannelService.name,
-          );
-        }
+      try {
+        const exchanged = await this.metaTokenService.exchangeForLongLivedToken(
+          dto.token,
+          dto.meta_app_id,
+          dto.meta_app_secret,
+        );
+        metaToken = exchanged.accessToken;
+        metaTokenExpiresAt = exchanged.expiresAt;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Impossible d'échanger le token Meta (token court gardé): ${message}`,
+          ChannelService.name,
+        );
       }
 
       const metaChannel = this.channelRepository.create({
@@ -266,6 +274,8 @@ export class ChannelService {
         token: metaToken,
         tokenExpiresAt: metaTokenExpiresAt,
         channel_id: channelId,
+        meta_app_id: dto.meta_app_id ?? null,
+        meta_app_secret: dto.meta_app_secret ?? null,
         uptime: 0,
         version: 'meta',
         ip: 'meta',
@@ -415,22 +425,27 @@ export class ChannelService {
       throw new NotFoundException(`Channel with ID ${id} not found`);
     }
 
-    // Si un nouveau token est fourni pour un canal Meta, tenter l'échange long-lived
+    // Si un nouveau token est fourni pour un canal Meta/Messenger/Instagram, tenter l'échange long-lived
+    const PROVIDERS_WITH_LONG_LIVED_TOKEN = ['meta', 'messenger', 'instagram'];
     if (
-      channel.provider === 'meta' &&
+      PROVIDERS_WITH_LONG_LIVED_TOKEN.includes(channel.provider ?? '') &&
       dto.token &&
-      dto.token !== channel.token &&
-      process.env.META_APP_ID &&
-      process.env.META_APP_SECRET
+      dto.token !== channel.token
     ) {
+      const appId = dto.meta_app_id || channel.meta_app_id;
+      const appSecret = dto.meta_app_secret || channel.meta_app_secret;
       try {
-        const exchanged = await this.metaTokenService.exchangeForLongLivedToken(dto.token);
+        const exchanged = await this.metaTokenService.exchangeForLongLivedToken(
+          dto.token,
+          appId,
+          appSecret,
+        );
         dto.token = exchanged.accessToken;
         (dto as UpdateChannelDto & { tokenExpiresAt?: Date }).tokenExpiresAt = exchanged.expiresAt;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(
-          `Impossible d'échanger le token Meta à la mise à jour (token gardé tel quel): ${message}`,
+          `Impossible d'échanger le token à la mise à jour (token gardé tel quel): ${message}`,
           ChannelService.name,
         );
       }

@@ -19,16 +19,20 @@ export class MetaTokenService {
   /**
    * Échange un token (court ou long) contre un nouveau token longue durée Meta (60 jours).
    */
-  async exchangeForLongLivedToken(shortLivedToken: string): Promise<{
+  async exchangeForLongLivedToken(
+    shortLivedToken: string,
+    channelAppId?: string | null,
+    channelAppSecret?: string | null,
+  ): Promise<{
     accessToken: string;
     expiresAt: Date;
   }> {
-    const appId = process.env.META_APP_ID;
-    const appSecret = process.env.META_APP_SECRET;
+    const appId = channelAppId || process.env.META_APP_ID;
+    const appSecret = channelAppSecret || process.env.META_APP_SECRET;
 
     if (!appId || !appSecret) {
-      throw new Error(
-        "META_APP_ID et META_APP_SECRET doivent être définis dans les variables d'environnement",
+      throw new BadRequestException(
+        "App ID et App Secret Meta requis (renseignez-les dans les propriétés du canal ou via META_APP_ID/META_APP_SECRET dans le .env)",
       );
     }
 
@@ -53,19 +57,29 @@ export class MetaTokenService {
 
       return { accessToken: access_token, expiresAt };
     } catch (err: unknown) {
-      if (err instanceof AxiosError && err.response) {
-        const metaError = err.response.data as {
-          error?: { message?: string; type?: string; code?: number };
-        };
-        const msg =
-          metaError?.error?.message ??
-          `Meta API error ${err.response.status}`;
+      if (err instanceof AxiosError) {
+        if (err.response) {
+          const metaError = err.response.data as {
+            error?: { message?: string; type?: string; code?: number };
+          };
+          const msg =
+            metaError?.error?.message ??
+            `Meta API error ${err.response.status}`;
+          this.logger.error(
+            `Meta token exchange failed (${err.response.status}): ${msg}`,
+            MetaTokenService.name,
+          );
+          throw new BadRequestException(`Meta: ${msg}`);
+        }
+        // Erreur réseau (timeout, ECONNREFUSED, DNS…)
+        const networkMsg = err.message ?? 'Impossible de joindre l\'API Meta';
         this.logger.error(
-          `Meta token exchange failed (${err.response.status}): ${msg}`,
+          `Meta token exchange network error: ${networkMsg}`,
           MetaTokenService.name,
         );
-        throw new BadRequestException(`Meta: ${msg}`);
+        throw new BadRequestException(`Erreur réseau Meta: ${networkMsg}`);
       }
+      // Re-throw les BadRequestException/NotFoundException déjà formatées
       throw err;
     }
   }
@@ -89,6 +103,8 @@ export class MetaTokenService {
 
     const { accessToken, expiresAt } = await this.exchangeForLongLivedToken(
       channel.token,
+      channel.meta_app_id,
+      channel.meta_app_secret,
     );
 
     channel.token = accessToken;

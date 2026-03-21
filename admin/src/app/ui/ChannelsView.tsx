@@ -21,6 +21,8 @@ type ChannelCreateInput = {
   channel_id?: string;
   external_id?: string;
   is_business?: boolean;
+  meta_app_id?: string;
+  meta_app_secret?: string;
 };
 
 const PROVIDER_CONFIG: Record<ProviderType, { label: string; badgeClass: string }> = {
@@ -66,15 +68,61 @@ interface DynamicFieldsProps {
   channelId: string;
   externalId: string;
   isBusiness: boolean;
+  metaAppId: string;
+  metaAppSecret: string;
   idPrefix: string;
   onChannelId: (v: string) => void;
   onExternalId: (v: string) => void;
   onIsBusiness: (v: boolean) => void;
+  onMetaAppId: (v: string) => void;
+  onMetaAppSecret: (v: string) => void;
+}
+
+function MetaCredentialsFields({
+  metaAppId, metaAppSecret, idPrefix, onMetaAppId, onMetaAppSecret,
+}: Pick<DynamicFieldsProps, 'metaAppId' | 'metaAppSecret' | 'idPrefix' | 'onMetaAppId' | 'onMetaAppSecret'>) {
+  const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
+  const labelClass = 'mb-2 block text-sm font-bold text-gray-700';
+  return (
+    <div className="mb-4 rounded border border-blue-100 bg-blue-50 p-3 space-y-3">
+      <p className="text-xs font-semibold text-blue-700">Credentials de l&apos;application Meta</p>
+      <div>
+        <label htmlFor={`${idPrefix}-meta-app-id`} className={labelClass}>
+          App ID <span className="text-red-500">*</span>
+          <span className="ml-1 font-normal text-gray-400 text-xs">(identifiant de l&apos;app Meta Developer)</span>
+        </label>
+        <input
+          type="text"
+          id={`${idPrefix}-meta-app-id`}
+          className={inputClass}
+          placeholder="Ex: 123456789012345"
+          value={metaAppId}
+          onChange={(e) => onMetaAppId(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor={`${idPrefix}-meta-app-secret`} className={labelClass}>
+          App Secret <span className="text-red-500">*</span>
+          <span className="ml-1 font-normal text-gray-400 text-xs">(clé secrète de l&apos;app Meta)</span>
+        </label>
+        <input
+          type="password"
+          id={`${idPrefix}-meta-app-secret`}
+          className={inputClass}
+          placeholder="App Secret..."
+          value={metaAppSecret}
+          onChange={(e) => onMetaAppSecret(e.target.value)}
+          required
+        />
+      </div>
+    </div>
+  );
 }
 
 function DynamicFields({
-  provider, channelId, externalId, isBusiness, idPrefix,
-  onChannelId, onExternalId, onIsBusiness,
+  provider, channelId, externalId, isBusiness, metaAppId, metaAppSecret, idPrefix,
+  onChannelId, onExternalId, onIsBusiness, onMetaAppId, onMetaAppSecret,
 }: DynamicFieldsProps) {
   const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
   const labelClass = 'mb-2 block text-sm font-bold text-gray-700';
@@ -111,6 +159,10 @@ function DynamicFields({
             onChange={(e) => onExternalId(e.target.value)}
           />
         </div>
+        <MetaCredentialsFields
+          metaAppId={metaAppId} metaAppSecret={metaAppSecret}
+          idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
+        />
         <div className="mb-4 flex items-center gap-2 rounded bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Le token sera échangé contre un token long-lived automatiquement.
@@ -139,8 +191,7 @@ function DynamicFields({
         </div>
         <div className="mb-4">
           <label htmlFor={`${idPrefix}-channel-id`} className={labelClass}>
-            App ID Meta <span className="text-red-500">*</span>
-            <span className="ml-1 font-normal text-gray-400 text-xs">(identifiant de l&apos;application Meta)</span>
+            Identifiant de page (channel_id) <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -152,6 +203,10 @@ function DynamicFields({
             required
           />
         </div>
+        <MetaCredentialsFields
+          metaAppId={metaAppId} metaAppSecret={metaAppSecret}
+          idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
+        />
         <div className="mb-4 flex items-center gap-2 rounded bg-blue-50 px-3 py-2 text-xs text-blue-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Le token de page sera échangé contre un token long-lived automatiquement.
@@ -180,8 +235,7 @@ function DynamicFields({
         </div>
         <div className="mb-4">
           <label htmlFor={`${idPrefix}-channel-id`} className={labelClass}>
-            App ID Meta <span className="text-red-500">*</span>
-            <span className="ml-1 font-normal text-gray-400 text-xs">(identifiant de l&apos;application Meta)</span>
+            Identifiant business (channel_id) <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -193,6 +247,10 @@ function DynamicFields({
             required
           />
         </div>
+        <MetaCredentialsFields
+          metaAppId={metaAppId} metaAppSecret={metaAppSecret}
+          idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
+        />
         <div className="mb-4 flex items-center gap-2 rounded bg-orange-50 px-3 py-2 text-xs text-orange-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Instagram ne supporte pas l&apos;envoi d&apos;audio ni de documents. Le token sera échangé automatiquement.
@@ -250,6 +308,8 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [formExternalId, setFormExternalId] = useState('');
   const [formToken, setFormToken] = useState('');
   const [formIsBusiness, setFormIsBusiness] = useState(false);
+  const [formMetaAppId, setFormMetaAppId] = useState('');
+  const [formMetaAppSecret, setFormMetaAppSecret] = useState('');
 
   const buildPayload = (): ChannelCreateInput => {
     const base: ChannelCreateInput = {
@@ -257,9 +317,14 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       label: formLabel.trim() || undefined,
       provider: formProvider,
     };
+    const metaCredentials = {
+      meta_app_id: formMetaAppId.trim() || undefined,
+      meta_app_secret: formMetaAppSecret.trim() || undefined,
+    };
     if (formProvider === 'meta') {
       return {
         ...base,
+        ...metaCredentials,
         channel_id: formChannelId.trim(),
         external_id: formExternalId.trim() || formChannelId.trim(),
         is_business: true,
@@ -268,6 +333,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     if (formProvider === 'messenger' || formProvider === 'instagram') {
       return {
         ...base,
+        ...metaCredentials,
         external_id: formExternalId.trim(),
         channel_id: formChannelId.trim(),
       };
@@ -282,6 +348,8 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormExternalId('');
     setFormToken('');
     setFormIsBusiness(false);
+    setFormMetaAppId('');
+    setFormMetaAppSecret('');
   };
 
   const openAddModal = () => {
@@ -299,6 +367,8 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormExternalId(channel.external_id ?? '');
     setFormToken(channel.token);
     setFormIsBusiness(channel.is_business);
+    setFormMetaAppId(channel.meta_app_id ?? '');
+    setFormMetaAppSecret(channel.meta_app_secret ?? '');
     clearStatus();
     setShowEditModal(true);
   };
@@ -382,10 +452,14 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         channelId={formChannelId}
         externalId={formExternalId}
         isBusiness={formIsBusiness}
+        metaAppId={formMetaAppId}
+        metaAppSecret={formMetaAppSecret}
         idPrefix={idPrefix}
         onChannelId={setFormChannelId}
         onExternalId={setFormExternalId}
         onIsBusiness={setFormIsBusiness}
+        onMetaAppId={setFormMetaAppId}
+        onMetaAppSecret={setFormMetaAppSecret}
       />
       <div className="mb-4">
         <label htmlFor={`${idPrefix}-token`} className={labelClass}>

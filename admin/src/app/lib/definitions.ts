@@ -109,6 +109,8 @@ export type Channel = {
   external_id?: string | null;
   channel_id: string;
   token: string;
+  meta_app_id?: string | null;
+  meta_app_secret?: string | null;
   start_at: number;
   uptime: number;
   version: string;

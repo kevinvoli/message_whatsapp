@@ -24,4 +24,14 @@ export class CreateChannelDto {
   @IsOptional()
   @IsString()
   label?: string;
+
+  /** App ID Meta (requis pour meta/messenger/instagram si META_APP_ID non défini dans .env) */
+  @IsOptional()
+  @IsString()
+  meta_app_id?: string;
+
+  /** App Secret Meta (requis pour meta/messenger/instagram si META_APP_SECRET non défini dans .env) */
+  @IsOptional()
+  @IsString()
+  meta_app_secret?: string;
 }

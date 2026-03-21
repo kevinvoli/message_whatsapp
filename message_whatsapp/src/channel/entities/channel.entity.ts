@@ -43,6 +43,12 @@ export class WhapiChannel {
   @Column({ type: 'text' })
   token: string;
 
+  @Column({ name: 'meta_app_id', type: 'varchar', length: 64, nullable: true })
+  meta_app_id?: string | null;
+
+  @Column({ name: 'meta_app_secret', type: 'varchar', length: 128, nullable: true })
+  meta_app_secret?: string | null;
+
   @Column({ type: 'datetime', nullable: true, name: 'token_expires_at' })
   tokenExpiresAt: Date | null;
 
