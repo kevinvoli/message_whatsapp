@@ -274,8 +274,10 @@ export class DispatcherService {
         this.logger.debug(
           `Redispatch ignoré (${chat.chat_id}): le poste (${chat.poste_id}) est le seul dans la queue`,
         );
+        // Étendre à 30 min pour éviter de re-trigger le SLA checker (intervalle 5 min)
+        // à chaque cycle sans qu'aucune action ne soit possible.
         await this.chatRepository.update(chat.id, {
-          first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+          first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
         });
         return;
       }
@@ -335,6 +337,13 @@ export class DispatcherService {
     if (!updatedChat) {
       return;
     }
+    // Notification unique lors d'une réassignation SLA effective
+    void this.notificationService.create(
+      'alert',
+      `SLA dépassé — ${updatedChat.name || updatedChat.chat_id}`,
+      `La conversation de ${updatedChat.name || updatedChat.contact_client || updatedChat.chat_id.split('@')[0]} n'a pas reçu de réponse dans les délais. Réassignée au poste ${nextPoste.name}.`,
+    );
+
     // 🔥 EVENT CENTRAL
     await this.messageGateway.emitConversationReassigned(
       updatedChat,
@@ -378,11 +387,6 @@ export class DispatcherService {
 
     for (const chat of chats) {
       try {
-        void this.notificationService.create(
-          'alert',
-          `SLA dépassé — ${chat.name || chat.chat_id}`,
-          `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} n'a pas reçu de réponse dans les délais. Réinjection en cours.`,
-        );
         await this.reinjectConversation(chat);
       } catch (err) {
         this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
