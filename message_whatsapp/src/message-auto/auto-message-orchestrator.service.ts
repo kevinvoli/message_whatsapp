@@ -27,6 +27,7 @@ export class AutoMessageOrchestrator {
   async handleClientMessage(chat: WhatsappChat): Promise<void> {
     const chatId = chat.chat_id;
 
+    try {
     this.logger.debug(
       `Orchestrator triggered — step=${chat.auto_message_step} chatId=${chatId}`,
       AutoMessageOrchestrator.name,
@@ -49,7 +50,7 @@ export class AutoMessageOrchestrator {
     // ⚙️ Activation globale
     const autoConfig = await this.cronConfigService.findByKey('auto-message');
 
-    if (!autoConfig.enabled) {
+    if (!autoConfig?.enabled) {
       this.logger.debug(
         `Auto messages disabled globally`,
         AutoMessageOrchestrator.name,
@@ -163,6 +164,18 @@ export class AutoMessageOrchestrator {
       const stack = err instanceof Error ? err.stack : undefined;
       this.logger.error(
         `AutoMessage scheduling failed for ${chatId}: ${msg}`,
+        stack,
+        AutoMessageOrchestrator.name,
+      );
+    }
+
+    } catch (err) {
+      // Filet de sécurité global : empêche toute exception non catchée de remonter
+      // comme UnhandledPromiseRejection (crasherait le process Node.js 15+)
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(
+        `AutoMessage orchestrator uncaught error for ${chatId}: ${msg}`,
         stack,
         AutoMessageOrchestrator.name,
       );
