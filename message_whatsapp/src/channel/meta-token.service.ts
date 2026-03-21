@@ -80,8 +80,11 @@ export class MetaTokenService {
       throw new NotFoundException(`Canal ${channelId} introuvable`);
     }
 
-    if (channel.provider !== 'meta') {
-      throw new Error(`Le canal ${channelId} n'est pas un canal Meta`);
+    const PROVIDERS_WITH_LONG_LIVED_TOKEN = ['meta', 'messenger', 'instagram'];
+    if (!PROVIDERS_WITH_LONG_LIVED_TOKEN.includes(channel.provider ?? '')) {
+      throw new BadRequestException(
+        `Le canal ${channelId} (provider: ${channel.provider ?? 'inconnu'}) ne supporte pas le refresh de token`,
+      );
     }
 
     const { accessToken, expiresAt } = await this.exchangeForLongLivedToken(

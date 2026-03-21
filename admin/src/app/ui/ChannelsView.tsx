@@ -8,6 +8,7 @@ import { createChannel, deleteChannel, getChannels, refreshChannelToken, updateC
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
+import { useToast } from '@/app/ui/ToastProvider';
 
 interface ChannelsViewProps {
   onRefresh?: () => void;
@@ -216,6 +217,7 @@ function DynamicFields({
 // ─── Composant principal ──────────────────────────────────────────────────────
 
 export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
+  const { addToast } = useToast();
   const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   const { items: channels, setItems, loading, clearStatus, create, update, remove } =
@@ -329,6 +331,12 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     try {
       const updated = await refreshChannelToken(id);
       setItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      addToast({ type: 'success', message: 'Token renouvelé avec succès.' });
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Échec du renouvellement du token.',
+      });
     } finally {
       setRefreshingId(null);
     }
