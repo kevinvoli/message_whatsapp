@@ -1,5 +1,6 @@
-import { Controller, Delete, Get, MessageEvent, Param, Patch, Query, Sse, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, MessageEvent, Param, Patch, Query, Req, Sse, UseGuards } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { Request } from 'express';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { NotificationService } from './notification.service';
 
@@ -10,8 +11,18 @@ export class NotificationController {
 
   /** SSE — flux temps réel des nouvelles notifications */
   @Sse('stream')
-  stream(): Observable<MessageEvent> {
-    return this.notificationService.stream$;
+  stream(@Req() req: Request): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((observer) => {
+      const sub = this.notificationService.stream$.subscribe(observer);
+
+      // Fermer proprement quand le client se déconnecte
+      req.on('close', () => {
+        sub.unsubscribe();
+        observer.complete();
+      });
+
+      return () => sub.unsubscribe();
+    });
   }
 
   /** Liste paginée des notifications */
