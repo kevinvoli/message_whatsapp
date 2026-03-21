@@ -6,6 +6,13 @@ import {
   MetaWebhookPayload,
   MetaStatusPayload,
   MetaMessagePayload,
+  MessengerWebhookPayload,
+  MessengerMessaging,
+  InstagramWebhookPayload,
+  InstagramMessaging,
+  TelegramWebhookPayload,
+  TelegramMessage,
+  TelegramUser,
 } from './payload.js';
 
 // ============================================================
@@ -32,7 +39,7 @@ function fakeSha256(): string {
 }
 
 // ============================================================
-// Chat IDs
+// Chat IDs / user IDs par provider
 // ============================================================
 
 export function generateChatIds(count: number): string[] {
@@ -40,6 +47,21 @@ export function generateChatIds(count: number): string[] {
     const phone = generateIvoryCoastNumber();
     return `${phone}@s.whatsapp.net`;
   });
+}
+
+/** Génère N IDs numériques bruts (PSID, IGSID, Telegram chat_id…) */
+export function generateNumericIds(count: number): number[] {
+  return Array.from({ length: count }, () =>
+    Math.floor(1_000_000_000 + Math.random() * 9_000_000_000),
+  );
+}
+
+function fakeTelegramFileId(): string {
+  return `AAAA${randomUUID().replace(/-/g, '').substring(0, 32)}`;
+}
+
+function fakeTelegramFileUniqueId(): string {
+  return randomUUID().replace(/-/g, '').substring(0, 16);
 }
 
 // ============================================================
@@ -395,4 +417,295 @@ export function generateMetaStatusPayload(params: {
       },
     ],
   };
+}
+
+// ============================================================
+// Messenger generators
+// ============================================================
+
+export function generateMessengerTextPayload(params: {
+  psid: string;
+  pageId: string;
+  name?: string;
+}): MessengerWebhookPayload {
+  const messaging: MessengerMessaging = {
+    sender: { id: params.psid },
+    recipient: { id: params.pageId },
+    timestamp: Date.now(),
+    message: {
+      mid: `m_${randomUUID().replace(/-/g, '')}`,
+      text: `Message Messenger test ${Math.random().toString(36).slice(2)}`,
+    },
+  };
+  return {
+    object: 'page',
+    entry: [{ id: params.pageId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateMessengerMediaPayload(params: {
+  psid: string;
+  pageId: string;
+  type: 'image' | 'video' | 'audio' | 'file';
+}): MessengerWebhookPayload {
+  const messaging: MessengerMessaging = {
+    sender: { id: params.psid },
+    recipient: { id: params.pageId },
+    timestamp: Date.now(),
+    message: {
+      mid: `m_${randomUUID().replace(/-/g, '')}`,
+      attachments: [
+        {
+          type: params.type,
+          payload: { url: `https://cdn.example.com/test-${params.type}.${params.type === 'file' ? 'pdf' : params.type === 'audio' ? 'mp3' : params.type}` },
+        },
+      ],
+    },
+  };
+  return {
+    object: 'page',
+    entry: [{ id: params.pageId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateMessengerDeliveryPayload(params: {
+  psid: string;
+  pageId: string;
+  mids?: string[];
+}): MessengerWebhookPayload {
+  const mids = params.mids ?? [`m_${randomUUID().replace(/-/g, '')}`];
+  const messaging: MessengerMessaging = {
+    sender: { id: params.psid },
+    recipient: { id: params.pageId },
+    timestamp: Date.now(),
+    delivery: { mids, watermark: Date.now() },
+  };
+  return {
+    object: 'page',
+    entry: [{ id: params.pageId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateMessengerReadPayload(params: {
+  psid: string;
+  pageId: string;
+}): MessengerWebhookPayload {
+  const messaging: MessengerMessaging = {
+    sender: { id: params.psid },
+    recipient: { id: params.pageId },
+    timestamp: Date.now(),
+    read: { watermark: Date.now() - 1000 },
+  };
+  return {
+    object: 'page',
+    entry: [{ id: params.pageId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateMessengerRandomPayload(params: {
+  psid: string;
+  pageId: string;
+}): MessengerWebhookPayload {
+  const types = ['text', 'image', 'video', 'audio', 'file'] as const;
+  const type = types[Math.floor(Math.random() * types.length)];
+  if (type === 'text') return generateMessengerTextPayload(params);
+  return generateMessengerMediaPayload({ ...params, type });
+}
+
+// ============================================================
+// Instagram generators
+// ============================================================
+
+export function generateInstagramTextPayload(params: {
+  igsid: string;
+  igAccountId: string;
+}): InstagramWebhookPayload {
+  const messaging: InstagramMessaging = {
+    sender: { id: params.igsid },
+    recipient: { id: params.igAccountId },
+    timestamp: Date.now(),
+    message: {
+      mid: `17${Math.floor(Math.random() * 1e15)}`,
+      text: `Message Instagram test ${Math.random().toString(36).slice(2)}`,
+    },
+  };
+  return {
+    object: 'instagram',
+    entry: [{ id: params.igAccountId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateInstagramMediaPayload(params: {
+  igsid: string;
+  igAccountId: string;
+  type: 'image' | 'video';
+}): InstagramWebhookPayload {
+  const messaging: InstagramMessaging = {
+    sender: { id: params.igsid },
+    recipient: { id: params.igAccountId },
+    timestamp: Date.now(),
+    message: {
+      mid: `17${Math.floor(Math.random() * 1e15)}`,
+      attachments: [
+        {
+          type: params.type,
+          payload: { url: `https://cdn.example.com/test-ig.${params.type === 'video' ? 'mp4' : 'jpg'}` },
+        },
+      ],
+    },
+  };
+  return {
+    object: 'instagram',
+    entry: [{ id: params.igAccountId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateInstagramReadPayload(params: {
+  igsid: string;
+  igAccountId: string;
+}): InstagramWebhookPayload {
+  const messaging: InstagramMessaging = {
+    sender: { id: params.igsid },
+    recipient: { id: params.igAccountId },
+    timestamp: Date.now(),
+    read: { watermark: Date.now() - 1000 },
+  };
+  return {
+    object: 'instagram',
+    entry: [{ id: params.igAccountId, time: Date.now(), messaging: [messaging] }],
+  };
+}
+
+export function generateInstagramRandomPayload(params: {
+  igsid: string;
+  igAccountId: string;
+}): InstagramWebhookPayload {
+  const types = ['text', 'image', 'video'] as const;
+  const type = types[Math.floor(Math.random() * types.length)];
+  if (type === 'text') return generateInstagramTextPayload(params);
+  return generateInstagramMediaPayload({ ...params, type });
+}
+
+// ============================================================
+// Telegram generators
+// ============================================================
+
+function makeTelegramUser(id: number): TelegramUser {
+  return {
+    id,
+    is_bot: false,
+    first_name: `User${id}`,
+    username: `user_${id}`,
+  };
+}
+
+function makeTelegramMessage(params: {
+  chatId: number;
+  userId: number;
+  overrides?: Partial<TelegramMessage>;
+}): TelegramMessage {
+  return {
+    message_id: Math.floor(1 + Math.random() * 1_000_000),
+    from: makeTelegramUser(params.userId),
+    chat: {
+      id: params.chatId,
+      type: 'private',
+      first_name: `User${params.userId}`,
+      username: `user_${params.userId}`,
+    },
+    date: ts(),
+    ...params.overrides,
+  };
+}
+
+export function generateTelegramTextPayload(chatId: number): TelegramWebhookPayload {
+  return {
+    update_id: Math.floor(10_000_000 + Math.random() * 90_000_000),
+    message: makeTelegramMessage({
+      chatId,
+      userId: chatId,
+      overrides: { text: `Message Telegram test ${Math.random().toString(36).slice(2)}` },
+    }),
+  };
+}
+
+export function generateTelegramPhotoPayload(chatId: number): TelegramWebhookPayload {
+  const fileId = fakeTelegramFileId();
+  return {
+    update_id: Math.floor(10_000_000 + Math.random() * 90_000_000),
+    message: makeTelegramMessage({
+      chatId,
+      userId: chatId,
+      overrides: {
+        caption: 'Photo test',
+        photo: [
+          { file_id: fileId, file_unique_id: fakeTelegramFileUniqueId(), width: 320, height: 240, file_size: 12000 },
+          { file_id: fileId + 'b', file_unique_id: fakeTelegramFileUniqueId(), width: 800, height: 600, file_size: 80000 },
+        ],
+      },
+    }),
+  };
+}
+
+export function generateTelegramDocumentPayload(chatId: number): TelegramWebhookPayload {
+  return {
+    update_id: Math.floor(10_000_000 + Math.random() * 90_000_000),
+    message: makeTelegramMessage({
+      chatId,
+      userId: chatId,
+      overrides: {
+        document: {
+          file_id: fakeTelegramFileId(),
+          file_unique_id: fakeTelegramFileUniqueId(),
+          file_name: `document_${Date.now()}.pdf`,
+          mime_type: 'application/pdf',
+          file_size: 45000,
+        },
+      },
+    }),
+  };
+}
+
+export function generateTelegramVoicePayload(chatId: number): TelegramWebhookPayload {
+  return {
+    update_id: Math.floor(10_000_000 + Math.random() * 90_000_000),
+    message: makeTelegramMessage({
+      chatId,
+      userId: chatId,
+      overrides: {
+        voice: {
+          file_id: fakeTelegramFileId(),
+          file_unique_id: fakeTelegramFileUniqueId(),
+          duration: Math.floor(5 + Math.random() * 55),
+          mime_type: 'audio/ogg',
+          file_size: 20000,
+        },
+      },
+    }),
+  };
+}
+
+export function generateTelegramCallbackQueryPayload(chatId: number): TelegramWebhookPayload {
+  const user = makeTelegramUser(chatId);
+  const message = makeTelegramMessage({ chatId, userId: chatId, overrides: { text: 'Menu principal' } });
+  return {
+    update_id: Math.floor(10_000_000 + Math.random() * 90_000_000),
+    callback_query: {
+      id: String(Math.floor(Math.random() * 1e15)),
+      from: user,
+      message,
+      data: `action_${Math.random().toString(36).slice(2)}`,
+    },
+  };
+}
+
+export function generateTelegramRandomPayload(chatId: number): TelegramWebhookPayload {
+  const generators = [
+    () => generateTelegramTextPayload(chatId),
+    () => generateTelegramPhotoPayload(chatId),
+    () => generateTelegramDocumentPayload(chatId),
+    () => generateTelegramVoicePayload(chatId),
+    () => generateTelegramCallbackQueryPayload(chatId),
+  ];
+  return generators[Math.floor(Math.random() * generators.length)]();
 }

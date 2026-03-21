@@ -49,7 +49,16 @@
       "Bash(ls:*)",
       "Bash(do grep:*)",
       "Bash(sc query:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(where mysql:*)",
+      "Read(//c/Program Files/MySQL/**)",
+      "Read(//c/xampp/mysql/bin/**)",
+      "Read(//c/wamp64/bin/**)",
+      "Bash(docker inspect:*)",
+      "Bash(docker exec:*)",
+      "Read(//c//**)",
+      "Bash(find /c -name mysql.exe -maxdepth 8)",
+      "Bash(docker run:*)"
     ]
   }
 }

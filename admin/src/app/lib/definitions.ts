@@ -99,11 +99,13 @@ export type Poste = {
   commercial?: Commercial[] | null;
 };
 
+export type ProviderType = 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram';
+
 export type Channel = {
   id: string;
   tenant_id?: string | null;
   label?: string | null;
-  provider?: 'whapi' | 'meta' | null;
+  provider?: ProviderType | null;
   external_id?: string | null;
   channel_id: string;
   token: string;
@@ -542,6 +544,13 @@ export type SystemConfigCatalogueEntry = {
   description?: string;
   isSecret?: boolean;
   isReadonly?: boolean;
+};
+
+export type WebhookEntry = {
+  provider: string;
+  label: string;
+  url: string;
+  note: string;
 };
 
 // ============================================

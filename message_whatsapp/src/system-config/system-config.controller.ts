@@ -32,6 +32,12 @@ export class SystemConfigController {
     return this.svc.getCatalogue();
   }
 
+  /** URLs complètes des webhooks calculées depuis SERVER_PUBLIC_HOST. */
+  @Get('webhooks')
+  async getWebhookUrls() {
+    return this.svc.getWebhookUrls();
+  }
+
   /** Clés d'une catégorie donnée. */
   @Get('category/:category')
   async getByCategory(@Param('category') category: string) {

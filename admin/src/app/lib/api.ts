@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -136,7 +136,8 @@ export async function getChannels(): Promise<Channel[]> {
 
 export async function createChannel(channel: {
     token: string;
-    provider?: 'whapi' | 'meta';
+    label?: string;
+    provider?: import('./definitions').ProviderType;
     channel_id?: string;
     external_id?: string;
     is_business?: boolean;
@@ -750,6 +751,13 @@ export async function updateSystemConfig(key: string, value: string): Promise<Sy
         body: JSON.stringify({ key, value }),
     });
     return handleResponse<SystemConfigEntry>(response);
+}
+
+export async function getWebhookUrls(): Promise<WebhookEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/system-config/webhooks`, {
+        credentials: 'include',
+    });
+    return handleResponse<WebhookEntry[]>(response);
 }
 
 export async function bulkUpdateSystemConfig(entries: { key: string; value: string }[]): Promise<{ updated: number }> {

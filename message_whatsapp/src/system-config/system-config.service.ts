@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SystemConfig } from './entities/system-config.entity';
+import { ChannelService } from 'src/channel/channel.service';
 
 export interface ConfigEntry {
   key: string;
@@ -10,6 +11,13 @@ export interface ConfigEntry {
   description?: string;
   isSecret?: boolean;
   isReadonly?: boolean;
+}
+
+export interface WebhookEntry {
+  provider: string;
+  label: string;
+  url: string;
+  note: string;
 }
 
 /** Catalogue des clés gérées par ce module (ordre d'affichage + métadonnées). */
@@ -58,6 +66,7 @@ export class SystemConfigService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(SystemConfig)
     private readonly repo: Repository<SystemConfig>,
+    private readonly channelService: ChannelService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -155,5 +164,70 @@ export class SystemConfigService implements OnApplicationBootstrap {
 
   getCatalogue(): ConfigEntry[] {
     return CONFIG_CATALOGUE;
+  }
+
+  async getWebhookUrls(): Promise<WebhookEntry[]> {
+    const host = (
+      process.env.SERVER_PUBLIC_HOST ??
+      process.env.APP_URL ??
+      ''
+    ).replace(/\/$/, '');
+
+    const base = host || null;
+
+    const fmt = (path: string) =>
+      base ? `${base}${path}` : null;
+
+    const entries: WebhookEntry[] = [
+      {
+        provider: 'whapi',
+        label: 'WhatsApp / Whapi',
+        url: fmt('/webhooks/whapi') ?? '',
+        note: 'À coller dans le champ "Webhook URL" du dashboard Whapi',
+      },
+      {
+        provider: 'meta',
+        label: 'Meta WhatsApp Business',
+        url: fmt('/webhooks/whatsapp') ?? '',
+        note: 'Callback URL dans Facebook Developers → Webhooks → whatsapp_business_account',
+      },
+      {
+        provider: 'messenger',
+        label: 'Facebook Messenger',
+        url: fmt('/webhooks/messenger') ?? '',
+        note: 'Callback URL dans Facebook Developers → Webhooks → page',
+      },
+      {
+        provider: 'instagram',
+        label: 'Instagram Direct',
+        url: fmt('/webhooks/instagram') ?? '',
+        note: 'Callback URL dans Facebook Developers → Webhooks → instagram',
+      },
+    ];
+
+    // Telegram : une URL par bot enregistré dans whapi_channels
+    const allChannels = await this.channelService.findAll();
+    const telegramChannels = allChannels.filter((c) => c.provider === 'telegram');
+
+    if (telegramChannels.length === 0) {
+      entries.push({
+        provider: 'telegram',
+        label: 'Telegram Bot',
+        url: fmt('/webhooks/telegram/:botId') ?? '',
+        note: "Remplacer :botId par l'identifiant numérique du bot. Enregistrer via l'API Telegram setWebhook.",
+      });
+    } else {
+      for (const ch of telegramChannels) {
+        const botId = ch.channel_id;
+        entries.push({
+          provider: 'telegram',
+          label: `Telegram — ${ch.label ?? botId}`,
+          url: fmt(`/webhooks/telegram/${botId}`) ?? '',
+          note: "URL à enregistrer via setWebhook dans l'API Telegram",
+        });
+      }
+    }
+
+    return entries;
   }
 }

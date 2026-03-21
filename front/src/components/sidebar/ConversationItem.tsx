@@ -2,6 +2,7 @@ import React from 'react';
 import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
+import { ProviderBadge } from '../ui/ProviderBadge';
 import { getStatusBadge } from '@/lib/utils';
 import { formatConversationTime } from '@/lib/dateUtils';
 
@@ -124,7 +125,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(conversation.status)}`}>
               {conversation.status.replace('_', ' ')}
             </span>
-            {/* <span className="text-xs text-gray-500">{conversation.status}</span> */}
+            <ProviderBadge chatId={conversation.chat_id} showLabel={false} />
             {conversation?.tags?.map((tag, idx) => (
               <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
                 {tag}

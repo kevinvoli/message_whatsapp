@@ -1,4 +1,10 @@
 // ============================================================
+// Shared / all providers
+// ============================================================
+
+export type ProviderType = 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram';
+
+// ============================================================
 // Whapi types
 // ============================================================
 
@@ -134,4 +140,133 @@ export interface MetaWebhookPayload {
       };
     }>;
   }>;
+}
+
+// ============================================================
+// Messenger types
+// ============================================================
+
+export interface MessengerMessage {
+  mid: string;
+  text?: string;
+  attachments?: Array<{
+    type: 'image' | 'video' | 'audio' | 'file' | 'template' | 'fallback';
+    payload: { url?: string };
+  }>;
+  reply_to?: { mid: string };
+  sticker_id?: number;
+  quick_reply?: { payload: string; title?: string };
+}
+
+export interface MessengerMessaging {
+  sender: { id: string };
+  recipient: { id: string };
+  timestamp: number;
+  message?: MessengerMessage;
+  delivery?: { mids: string[]; watermark: number };
+  read?: { watermark: number };
+  postback?: { payload: string; title: string };
+}
+
+export interface MessengerWebhookPayload {
+  object: 'page';
+  entry: Array<{
+    /** page_id */
+    id: string;
+    time: number;
+    messaging: MessengerMessaging[];
+  }>;
+}
+
+// ============================================================
+// Instagram types
+// ============================================================
+
+export interface InstagramMessage {
+  mid: string;
+  text?: string;
+  attachments?: Array<{
+    type: 'image' | 'video' | 'audio' | 'file' | 'ig_reel' | 'reel' | 'share' | 'story_mention' | 'fallback';
+    payload: { url?: string };
+  }>;
+  reply_to?: { mid: string };
+  is_deleted?: boolean;
+  is_unsupported?: boolean;
+}
+
+export interface InstagramMessaging {
+  sender: { id: string };
+  recipient: { id: string };
+  timestamp: number;
+  message?: InstagramMessage;
+  read?: { watermark: number };
+}
+
+export interface InstagramWebhookPayload {
+  object: 'instagram';
+  entry: Array<{
+    /** instagram_business_account_id */
+    id: string;
+    time: number;
+    messaging: InstagramMessaging[];
+  }>;
+}
+
+// ============================================================
+// Telegram types
+// ============================================================
+
+export interface TelegramUser {
+  id: number;
+  is_bot: boolean;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+}
+
+export interface TelegramChat {
+  id: number;
+  type: 'private' | 'group' | 'supergroup' | 'channel';
+  first_name?: string;
+  username?: string;
+}
+
+export interface TelegramPhotoSize {
+  file_id: string;
+  file_unique_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+}
+
+export interface TelegramMessage {
+  message_id: number;
+  from?: TelegramUser;
+  chat: TelegramChat;
+  /** Unix timestamp */
+  date: number;
+  text?: string;
+  caption?: string;
+  photo?: TelegramPhotoSize[];
+  video?: { file_id: string; file_unique_id: string; duration: number; mime_type?: string; file_size?: number };
+  audio?: { file_id: string; file_unique_id: string; duration: number; mime_type?: string; file_size?: number };
+  voice?: { file_id: string; file_unique_id: string; duration: number; mime_type?: string; file_size?: number };
+  document?: { file_id: string; file_unique_id: string; file_name?: string; mime_type?: string; file_size?: number };
+  sticker?: { file_id: string; file_unique_id: string; width: number; height: number; is_animated: boolean; is_video: boolean; file_size?: number };
+  location?: { latitude: number; longitude: number };
+  reply_to_message?: { message_id: number; from?: TelegramUser; chat: TelegramChat; date: number; text?: string };
+}
+
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+}
+
+/** Un seul Update par POST */
+export interface TelegramWebhookPayload {
+  update_id: number;
+  message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 }

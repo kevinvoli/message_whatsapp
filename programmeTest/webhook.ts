@@ -1,4 +1,10 @@
-import { WhapiWebhookPayload, MetaWebhookPayload } from './payload.js';
+import {
+  WhapiWebhookPayload,
+  MetaWebhookPayload,
+  MessengerWebhookPayload,
+  InstagramWebhookPayload,
+  TelegramWebhookPayload,
+} from './payload.js';
 import {
   generateMessage,
   generateRandomWhapiMessage,
@@ -7,6 +13,16 @@ import {
   generateMetaMediaMessage,
   generateMetaInteractiveMessage,
   generateMetaStatusPayload,
+  generateMessengerTextPayload,
+  generateMessengerMediaPayload,
+  generateMessengerRandomPayload,
+  generateMessengerDeliveryPayload,
+  generateMessengerReadPayload,
+  generateInstagramTextPayload,
+  generateInstagramRandomPayload,
+  generateInstagramReadPayload,
+  generateTelegramTextPayload,
+  generateTelegramRandomPayload,
 } from './generator.js';
 import { config } from './config.js';
 
@@ -106,3 +122,51 @@ export function generateMetaStatusWebhookPayload(recipientId: string, messageId?
 
 /** @deprecated Use generateWhapiMessagePayload */
 export const generateWebhookPayload = generateWhapiMessagePayload;
+
+// ============================================================
+// Messenger payloads
+// ============================================================
+
+export function generateMessengerWebhookPayload(psid: string): MessengerWebhookPayload {
+  return generateMessengerTextPayload({ psid, pageId: config.messengerPageId });
+}
+
+export function generateMessengerRandomWebhookPayload(psid: string): MessengerWebhookPayload {
+  return generateMessengerRandomPayload({ psid, pageId: config.messengerPageId });
+}
+
+export function generateMessengerStatusWebhookPayload(psid: string): MessengerWebhookPayload {
+  return Math.random() < 0.5
+    ? generateMessengerDeliveryPayload({ psid, pageId: config.messengerPageId })
+    : generateMessengerReadPayload({ psid, pageId: config.messengerPageId });
+}
+
+// ============================================================
+// Instagram payloads
+// ============================================================
+
+export function generateInstagramWebhookPayload(igsid: string): InstagramWebhookPayload {
+  return generateInstagramTextPayload({ igsid, igAccountId: config.instagramAccountId });
+}
+
+export function generateInstagramRandomWebhookPayload(igsid: string): InstagramWebhookPayload {
+  return generateInstagramRandomPayload({ igsid, igAccountId: config.instagramAccountId });
+}
+
+export function generateInstagramStatusWebhookPayload(igsid: string): InstagramWebhookPayload {
+  // Instagram n'a que des read receipts (pas de delivery)
+  return generateInstagramReadPayload({ igsid, igAccountId: config.instagramAccountId });
+}
+
+// ============================================================
+// Telegram payloads
+// ============================================================
+
+export function generateTelegramWebhookPayload(chatId: number): TelegramWebhookPayload {
+  return generateTelegramTextPayload(chatId);
+}
+
+export function generateTelegramRandomWebhookPayload(chatId: number): TelegramWebhookPayload {
+  return generateTelegramRandomPayload(chatId);
+}
+// Telegram n'a pas de status receipts — pas de generateTelegramStatusWebhookPayload

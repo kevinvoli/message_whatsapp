@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { SystemConfigEntry } from '@/app/lib/definitions';
-import { bulkUpdateSystemConfig, getSystemConfigs } from '@/app/lib/api';
+import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle, Link, Copy, ExternalLink } from 'lucide-react';
+import { SystemConfigEntry, WebhookEntry } from '@/app/lib/definitions';
+import { bulkUpdateSystemConfig, getSystemConfigs, getWebhookUrls } from '@/app/lib/api';
 
 interface AdminProfile {
   id: string;
@@ -18,7 +18,7 @@ interface SettingsViewProps {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
-type Tab = 'profile' | 'password' | 'system';
+type Tab = 'profile' | 'password' | 'system' | 'webhooks';
 
 const CATEGORY_LABELS: Record<string, string> = {
   general: 'Général',
@@ -39,6 +39,136 @@ function groupByCategory(entries: SystemConfigEntry[]): Record<string, SystemCon
     groups[entry.category].push(entry);
   }
   return groups;
+}
+
+// ─── Webhooks Tab ─────────────────────────────────────────────────────────────
+
+const PROVIDER_COLORS: Record<string, string> = {
+  whapi:     'bg-green-100 text-green-700',
+  meta:      'bg-blue-100 text-blue-700',
+  messenger: 'bg-indigo-100 text-indigo-700',
+  instagram: 'bg-pink-100 text-pink-700',
+  telegram:  'bg-sky-100 text-sky-700',
+};
+
+function WebhooksTab() {
+  const [webhooks, setWebhooks] = useState<WebhookEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const missingHost = webhooks.length > 0 && webhooks.every((w) => !w.url || w.url.startsWith('/'));
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await getWebhookUrls();
+        setWebhooks(data);
+      } catch {
+        setError('Impossible de charger les URLs webhook.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleCopy = (url: string) => {
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopied(url);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-32 text-gray-400">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        Chargement des webhooks…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-red-50 text-red-700">
+        <AlertCircle className="w-4 h-4" />
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {missingHost && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">URL publique non configurée</p>
+            <p className="mt-1 text-amber-700">
+              Définissez <code className="bg-amber-100 px-1 rounded">SERVER_PUBLIC_HOST</code> dans l&apos;onglet{' '}
+              <strong>Configuration système → Général</strong> pour obtenir les URLs complètes.
+              <br />Exemple : <code className="bg-amber-100 px-1 rounded">https://votre-domaine.com</code>
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {webhooks.map((wh) => {
+          const isCopied = copied === wh.url;
+          const isPlaceholder = !wh.url || wh.url.startsWith('/') || wh.url.includes(':botId');
+          return (
+            <div
+              key={`${wh.provider}-${wh.url}`}
+              className="bg-white border border-gray-200 rounded-lg p-4 space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PROVIDER_COLORS[wh.provider] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {wh.provider}
+                </span>
+                <span className="text-sm font-medium text-gray-800">{wh.label}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <code className={`flex-1 text-xs px-3 py-2 rounded-lg font-mono break-all ${
+                  isPlaceholder
+                    ? 'bg-gray-50 text-gray-400 border border-dashed border-gray-300'
+                    : 'bg-gray-50 text-gray-800 border border-gray-200'
+                }`}>
+                  {wh.url || '— non disponible —'}
+                </code>
+                {!isPlaceholder && (
+                  <>
+                    <button
+                      onClick={() => handleCopy(wh.url)}
+                      title="Copier l'URL"
+                      className="shrink-0 p-2 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                    >
+                      {isCopied
+                        ? <CheckCircle className="w-4 h-4 text-green-600" />
+                        : <Copy className="w-4 h-4 text-gray-500" />
+                      }
+                    </button>
+                    <a
+                      href={wh.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Ouvrir"
+                      className="shrink-0 p-2 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4 text-gray-500" />
+                    </a>
+                  </>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-400">{wh.note}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ─── SystemConfig Tab ─────────────────────────────────────────────────────────
@@ -282,6 +412,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'profile', label: 'Profil', icon: <User className="w-4 h-4" /> },
     { id: 'password', label: 'Mot de passe', icon: <Lock className="w-4 h-4" /> },
+    { id: 'webhooks', label: 'URLs Webhooks', icon: <Link className="w-4 h-4" /> },
     { id: 'system', label: 'Configuration système', icon: <Settings className="w-4 h-4" /> },
   ];
 
@@ -421,6 +552,9 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
           </form>
         </div>
       )}
+
+      {/* Webhooks tab */}
+      {activeTab === 'webhooks' && <WebhooksTab />}
 
       {/* System config tab */}
       {activeTab === 'system' && <SystemConfigTab />}

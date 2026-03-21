@@ -28,41 +28,71 @@ for (const envFile of envFiles) {
 const env = process.env;
 
 export type TestMode = 'messages' | 'status' | 'mix';
+export type ProviderConfig = 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram' | 'mix';
 
 export const config = {
-  // Provider selection
-  provider: (env.PROVIDER ?? 'whapi').toLowerCase() as 'whapi' | 'meta' | 'mix',
+  // ── Provider selection ──────────────────────────────────────────────────
+  // Valeurs: whapi | meta | messenger | instagram | telegram | mix
+  // "mix" : distribue entre tous les providers listés dans mixProviders
+  provider: (env.PROVIDER ?? 'whapi').toLowerCase() as ProviderConfig,
 
-  // Test mode: messages (default), status (status webhooks only), mix (all types)
+  // En mode mix, liste des providers actifs (séparés par virgule)
+  // Ex: MIXED_PROVIDERS=whapi,meta,telegram
+  // Par défaut: tous les 5 providers
+  mixProviders: (env.MIXED_PROVIDERS ?? 'whapi,meta,messenger,instagram,telegram')
+    .split(',')
+    .map((p) => p.trim().toLowerCase()) as ProviderConfig[],
+
+  // ── Test mode ───────────────────────────────────────────────────────────
   mode: (env.MODE ?? 'messages').toLowerCase() as TestMode,
 
-  // Webhook URLs
-  webhookUrl: env.WEBHOOK_URL ?? 'http://localhost:3002/webhooks/whapi',
-  metaWebhookUrl: env.META_WEBHOOK_URL ?? 'http://localhost:3002/webhooks/whatsapp',
-
-  // Volume
+  // ── Volume ──────────────────────────────────────────────────────────────
   conversationsCount: Number(env.CONVERSATIONS ?? 1),
   messagesPerConversation: Number(env.MESSAGES_PER_CONVERSATION ?? 2),
   parallelRequests: Number(env.PARALLEL_REQUESTS ?? 1),
 
-  // Mix ratio: probability of picking whapi in mix mode (0.0 to 1.0)
-  mixRatio: Number(env.MIX_RATIO ?? 0.5),
+  // ── Webhook URLs ────────────────────────────────────────────────────────
+  webhookUrl:           env.WEBHOOK_URL           ?? 'http://localhost:3002/webhooks/whapi',
+  metaWebhookUrl:       env.META_WEBHOOK_URL       ?? 'http://localhost:3002/webhooks/meta',
+  messengerWebhookUrl:  env.MESSENGER_WEBHOOK_URL  ?? 'http://localhost:3002/webhooks/messenger',
+  instagramWebhookUrl:  env.INSTAGRAM_WEBHOOK_URL  ?? 'http://localhost:3002/webhooks/instagram',
+  // L'URL Telegram inclut le botId dynamiquement — voir index.ts
+  telegramWebhookBase:  env.TELEGRAM_WEBHOOK_BASE  ?? 'http://localhost:3002/webhooks/telegram',
 
-  // HMAC secrets
-  whapiSecretHeader: env.WHAPI_WEBHOOK_SECRET_HEADER ?? 'x-whapi-signature',
-  whapiSecretValue: env.WHAPI_WEBHOOK_SECRET_VALUE ?? '',
-  metaSecretValue: env.WHATSAPP_APP_SECRET ?? '',
+  // ── HMAC / Secrets ──────────────────────────────────────────────────────
+  // Whapi
+  whapiSecretHeader:    env.WHAPI_WEBHOOK_SECRET_HEADER ?? 'x-whapi-signature',
+  whapiSecretValue:     env.WHAPI_WEBHOOK_SECRET_VALUE  ?? '',
+  // Meta WhatsApp
+  metaSecretValue:      env.WHATSAPP_APP_SECRET         ?? '',
+  // Messenger + Instagram (META_APP_SECRET si différent, sinon même que Meta)
+  messengerAppSecret:   env.META_APP_SECRET ?? env.WHATSAPP_APP_SECRET ?? '',
+  instagramAppSecret:   env.META_APP_SECRET ?? env.WHATSAPP_APP_SECRET ?? '',
+  // Telegram
+  telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET ?? '',
 
-  // Channel IDs
-  channelId: env.WHAPI_CHANNEL_ID ?? 'BATMAN-P8CHE',
-  metaPhoneNumberId: env.META_PHONE_NUMBER_ID ?? 'e2e-shadow-channel',
-  metaWabaId: env.META_WABA_ID ?? 'waba-test',
+  // ── Channel / Account IDs ───────────────────────────────────────────────
+  // Whapi
+  channelId:          env.WHAPI_CHANNEL_ID       ?? 'BATMAN-P8CHE',
+  // Meta WhatsApp
+  metaPhoneNumberId:  env.META_PHONE_NUMBER_ID   ?? 'e2e-shadow-channel',
+  metaWabaId:         env.META_WABA_ID           ?? 'waba-test',
+  // Messenger
+  messengerPageId:    env.MESSENGER_PAGE_ID      ?? 'test-page-id',
+  // Instagram
+  instagramAccountId: env.INSTAGRAM_ACCOUNT_ID  ?? 'test-ig-account-id',
+  // Telegram
+  telegramBotId:      env.TELEGRAM_BOT_ID       ?? 'test-bot-id',
 
-  // DB mapping
+  // ── DB mapping ──────────────────────────────────────────────────────────
   useDbMapping: (env.USE_DB_MAPPING ?? 'false').toLowerCase() === 'true',
-  dbHost: env.MYSQL_HOST ?? 'localhost',
-  dbPort: Number(env.MYSQL_PORT ?? 3306),
-  dbUser: env.MYSQL_USER ?? 'root',
+  dbHost:     env.MYSQL_HOST     ?? 'localhost',
+  dbPort:     Number(env.MYSQL_PORT ?? 3306),
+  dbUser:     env.MYSQL_USER     ?? 'root',
   dbPassword: env.MYSQL_PASSWORD ?? '',
-  dbName: env.MYSQL_DATABASE ?? 'whatsappflow',
+  dbName:     env.MYSQL_DATABASE ?? 'whatsappflow',
+
+  // ── Backward compat ─────────────────────────────────────────────────────
+  /** @deprecated Utiliser mixProviders à la place */
+  mixRatio: Number(env.MIX_RATIO ?? 0.5),
 };
