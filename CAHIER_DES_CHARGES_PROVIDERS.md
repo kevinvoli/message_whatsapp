@@ -370,3 +370,15 @@ Les éléments suivants sont **hors scope** de ce cahier des charges :
 - Rapports / analytics par provider
 - Gestion des templates de messages (WhatsApp Business)
 - Dispatch automatique vers un provider spécifique (la logique de dispatch existe déjà)
+
+
+
+  Checklist pour ajouter un nouveau numéro
+
+  1. ☐ Créer une app dans Meta Developer Dashboard avec le produit "WhatsApp Business"
+  2. ☐ Ajouter le numéro de téléphone à ton WABA
+  3. ☐ Récupérer le Phone Number ID et un Access Token avec les permissions whatsapp_business_messaging
+  4. ☐ S'assurer que META_APP_ID, META_APP_SECRET, WHATSAPP_VERIFY_TOKEN sont définis dans le .env
+  5. ☐ Créer le canal via l'UI admin (provider=meta, channel_id=phone_number_id, token)
+  6. ☐ Configurer le webhook dans Meta Dev App → l'URL /webhooks/whatsapp avec le bon verify token
+  7. ☐ Tester avec un message entrant → vérifier les logs OUTBOUND_* et resolveTenantForMeta

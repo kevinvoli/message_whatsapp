@@ -40,10 +40,11 @@ const normalizeUser = (raw: User): User => ({
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { reset } = useChatStore();
+  const reset = useChatStore((s) => s.reset);
 
   useEffect(() => {
     const bootstrapSession = async () => {
@@ -77,13 +78,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
 
     try {
-      const response = await axios.post<{ user: User }>(
+      const response = await axios.post<{ user: User; accessToken: string }>(
         `${apiBaseUrl}/auth/login`,
         { email, password },
         { withCredentials: true },
       );
 
       setUser(normalizeUser(response.data.user));
+      setToken(response.data.accessToken ?? null);
     } catch (err) {
       let errorMessage = 'Login failed due to an unexpected error';
       if (axios.isAxiosError(err)) {
@@ -112,6 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setUser(null);
+    setToken(null);
     reset();
   };
 
@@ -119,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
-        token: null,
+        token,
         login,
         logout,
         initialized,

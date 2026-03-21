@@ -104,7 +104,13 @@ export class WhatsappMessageGateway
 
     const commercial =
       await this.commercialService.findOneWithPoste(commercialId);
-    if (!commercial?.poste) return;
+    if (!commercial?.poste) {
+      this.logger.warn(
+        `Socket auth refused: commercial ${commercialId} has no poste (${client.id})`,
+      );
+      client.disconnect();
+      return;
+    }
 
     const posteId = commercial.poste.id;
     const tenantIds = await this.resolveTenantIdsForPoste(posteId);

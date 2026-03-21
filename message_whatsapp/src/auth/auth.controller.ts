@@ -47,7 +47,7 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
     });
 
-    return { user };
+    return { user, accessToken };
   }
 
   @UseGuards(AuthGuard('jwt'))
