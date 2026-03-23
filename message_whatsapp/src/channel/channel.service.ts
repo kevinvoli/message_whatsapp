@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomBytes } from 'crypto';
 import { Repository } from 'typeorm';
 
 import { CreateChannelDto } from './dto/create-channel.dto';
@@ -31,14 +32,22 @@ export class ChannelService {
   async create(dto: CreateChannelDto) {
     const provider = dto.provider ?? 'whapi';
 
-    const existingChannel = await this.channelRepository.findOne({
-      where: {
-        token: dto.token,
-      },
+    const existingByToken = await this.channelRepository.findOne({
+      where: { token: dto.token },
     });
+    if (existingByToken) {
+      throw new ConflictException('Un canal avec ce token existe déjà');
+    }
 
-    if (existingChannel) {
-      throw new ConflictException('Ce channel existe deja');
+    if (dto.channel_id?.trim()) {
+      const existingByChannelId = await this.channelRepository.findOne({
+        where: { channel_id: dto.channel_id.trim() },
+      });
+      if (existingByChannelId) {
+        throw new ConflictException(
+          `Un canal avec cet identifiant (${dto.channel_id.trim()}) existe déjà`,
+        );
+      }
     }
 
     if (provider === 'telegram') {
@@ -47,6 +56,9 @@ export class ChannelService {
       const botId = String(botInfo.id);
       const nowEpoch = Math.floor(Date.now() / 1000);
 
+      // Webhook secret : utiliser celui fourni ou en générer un aléatoire
+      const webhookSecret = dto.webhook_secret?.trim() || randomBytes(32).toString('hex');
+
       const telegramChannel = this.channelRepository.create({
         provider: 'telegram',
         external_id: botId,
@@ -54,6 +66,7 @@ export class ChannelService {
         token: dto.token,
         tokenExpiresAt: null,  // Bot token permanent
         channel_id: botId,
+        webhook_secret: webhookSecret,
         uptime: 0,
         version: 'telegram-bot-api',
         ip: 'telegram',
@@ -72,12 +85,12 @@ export class ChannelService {
         channel_id: botId,
       });
 
-      // Enregistrer le webhook Telegram
+      // Enregistrer le webhook Telegram avec le secret du canal
       const appUrl = process.env.APP_URL?.replace(/\/$/, '');
       if (appUrl) {
         const webhookUrl = `${appUrl}/webhooks/telegram/${botId}`;
         try {
-          await this.telegramService.registerWebhook(dto.token, webhookUrl);
+          await this.telegramService.registerWebhook(dto.token, webhookUrl, webhookSecret);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           this.logger.warn(
@@ -141,6 +154,7 @@ export class ChannelService {
         channel_id: channelId,
         meta_app_id: dto.meta_app_id ?? null,
         meta_app_secret: dto.meta_app_secret ?? null,
+        verify_token: dto.verify_token ?? null,
         uptime: 0,
         version: 'messenger',
         ip: 'messenger',
@@ -209,6 +223,7 @@ export class ChannelService {
         channel_id: channelId,
         meta_app_id: dto.meta_app_id ?? null,
         meta_app_secret: dto.meta_app_secret ?? null,
+        verify_token: dto.verify_token ?? null,
         uptime: 0,
         version: 'instagram',
         ip: 'instagram',
@@ -276,6 +291,7 @@ export class ChannelService {
         channel_id: channelId,
         meta_app_id: dto.meta_app_id ?? null,
         meta_app_secret: dto.meta_app_secret ?? null,
+        verify_token: dto.verify_token ?? null,
         uptime: 0,
         version: 'meta',
         ip: 'meta',
@@ -360,6 +376,17 @@ export class ChannelService {
     return this.channelRepository.findOne({
       where: { channel_id },
     });
+  }
+
+  /**
+   * Vérifie si un verify_token correspond à un canal existant pour ce provider.
+   * Utilisé pour le challenge GET des webhooks Meta/Messenger/Instagram.
+   */
+  async hasMatchingVerifyToken(provider: string, token: string): Promise<boolean> {
+    const channel = await this.channelRepository.findOne({
+      where: { provider, verify_token: token },
+    });
+    return channel !== null;
   }
 
   async resolveTenantByProviderExternalId(

@@ -13,7 +13,7 @@ L'application supporte 5 providers de messagerie :
 
 | Provider | Identifiant interne |
 |---|---|
-| WhatsApp via Whapi | `whapi` |
+| WhatsApp via Whapi  | `whapi` |
 | WhatsApp via Meta Cloud API | `meta` |
 | Facebook Messenger | `messenger` |
 | Instagram Direct | `instagram` |

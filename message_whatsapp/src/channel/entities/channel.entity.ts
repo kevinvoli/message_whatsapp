@@ -49,6 +49,12 @@ export class WhapiChannel {
   @Column({ name: 'meta_app_secret', type: 'varchar', length: 128, nullable: true })
   meta_app_secret?: string | null;
 
+  @Column({ name: 'webhook_secret', type: 'varchar', length: 128, nullable: true })
+  webhook_secret?: string | null;
+
+  @Column({ name: 'verify_token', type: 'varchar', length: 128, nullable: true })
+  verify_token?: string | null;
+
   @Column({ type: 'datetime', nullable: true, name: 'token_expires_at' })
   tokenExpiresAt: Date | null;
 

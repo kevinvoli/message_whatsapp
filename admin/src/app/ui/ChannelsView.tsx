@@ -23,6 +23,7 @@ type ChannelCreateInput = {
   is_business?: boolean;
   meta_app_id?: string;
   meta_app_secret?: string;
+  verify_token?: string;
 };
 
 const PROVIDER_CONFIG: Record<ProviderType, { label: string; badgeClass: string }> = {
@@ -70,12 +71,14 @@ interface DynamicFieldsProps {
   isBusiness: boolean;
   metaAppId: string;
   metaAppSecret: string;
+  verifyToken: string;
   idPrefix: string;
   onChannelId: (v: string) => void;
   onExternalId: (v: string) => void;
   onIsBusiness: (v: boolean) => void;
   onMetaAppId: (v: string) => void;
   onMetaAppSecret: (v: string) => void;
+  onVerifyToken: (v: string) => void;
 }
 
 function MetaCredentialsFields({
@@ -120,9 +123,33 @@ function MetaCredentialsFields({
   );
 }
 
+function VerifyTokenField({
+  verifyToken, idPrefix, onVerifyToken,
+}: { verifyToken: string; idPrefix: string; onVerifyToken: (v: string) => void }) {
+  const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
+  const labelClass = 'mb-2 block text-sm font-bold text-gray-700';
+  return (
+    <div className="mb-4">
+      <label htmlFor={`${idPrefix}-verify-token`} className={labelClass}>
+        Verify Token <span className="text-red-500">*</span>
+        <span className="ml-1 font-normal text-gray-400 text-xs">(token à saisir dans Meta Developer Console → Webhook)</span>
+      </label>
+      <input
+        type="text"
+        id={`${idPrefix}-verify-token`}
+        className={inputClass}
+        placeholder="Ex: mon_token_webhook_secret"
+        value={verifyToken}
+        onChange={(e) => onVerifyToken(e.target.value)}
+        required
+      />
+    </div>
+  );
+}
+
 function DynamicFields({
-  provider, channelId, externalId, isBusiness, metaAppId, metaAppSecret, idPrefix,
-  onChannelId, onExternalId, onIsBusiness, onMetaAppId, onMetaAppSecret,
+  provider, channelId, externalId, isBusiness, metaAppId, metaAppSecret, verifyToken, idPrefix,
+  onChannelId, onExternalId, onIsBusiness, onMetaAppId, onMetaAppSecret, onVerifyToken,
 }: DynamicFieldsProps) {
   const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
   const labelClass = 'mb-2 block text-sm font-bold text-gray-700';
@@ -163,6 +190,7 @@ function DynamicFields({
           metaAppId={metaAppId} metaAppSecret={metaAppSecret}
           idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
         />
+        <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
         <div className="mb-4 flex items-center gap-2 rounded bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Le token sera échangé contre un token long-lived automatiquement.
@@ -207,6 +235,7 @@ function DynamicFields({
           metaAppId={metaAppId} metaAppSecret={metaAppSecret}
           idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
         />
+        <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
         <div className="mb-4 flex items-center gap-2 rounded bg-blue-50 px-3 py-2 text-xs text-blue-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Le token de page sera échangé contre un token long-lived automatiquement.
@@ -251,6 +280,7 @@ function DynamicFields({
           metaAppId={metaAppId} metaAppSecret={metaAppSecret}
           idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
         />
+        <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
         <div className="mb-4 flex items-center gap-2 rounded bg-orange-50 px-3 py-2 text-xs text-orange-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Instagram ne supporte pas l&apos;envoi d&apos;audio ni de documents. Le token sera échangé automatiquement.
@@ -310,6 +340,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [formIsBusiness, setFormIsBusiness] = useState(false);
   const [formMetaAppId, setFormMetaAppId] = useState('');
   const [formMetaAppSecret, setFormMetaAppSecret] = useState('');
+  const [formVerifyToken, setFormVerifyToken] = useState('');
 
   const buildPayload = (): ChannelCreateInput => {
     const base: ChannelCreateInput = {
@@ -320,6 +351,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     const metaCredentials = {
       meta_app_id: formMetaAppId.trim() || undefined,
       meta_app_secret: formMetaAppSecret.trim() || undefined,
+      verify_token: formVerifyToken.trim() || undefined,
     };
     if (formProvider === 'meta') {
       return {
@@ -350,6 +382,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormIsBusiness(false);
     setFormMetaAppId('');
     setFormMetaAppSecret('');
+    setFormVerifyToken('');
   };
 
   const openAddModal = () => {
@@ -369,6 +402,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormIsBusiness(channel.is_business);
     setFormMetaAppId(channel.meta_app_id ?? '');
     setFormMetaAppSecret(channel.meta_app_secret ?? '');
+    setFormVerifyToken(channel.verify_token ?? '');
     clearStatus();
     setShowEditModal(true);
   };
@@ -454,12 +488,14 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         isBusiness={formIsBusiness}
         metaAppId={formMetaAppId}
         metaAppSecret={formMetaAppSecret}
+        verifyToken={formVerifyToken}
         idPrefix={idPrefix}
         onChannelId={setFormChannelId}
         onExternalId={setFormExternalId}
         onIsBusiness={setFormIsBusiness}
         onMetaAppId={setFormMetaAppId}
         onMetaAppSecret={setFormMetaAppSecret}
+        onVerifyToken={setFormVerifyToken}
       />
       <div className="mb-4">
         <label htmlFor={`${idPrefix}-token`} className={labelClass}>
@@ -573,16 +609,19 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                     >
                       <Edit className="h-4 w-4" />
                     </button>
-                    {HAS_TOKEN_EXPIRY.includes(provider) && (
-                      <button
-                        onClick={() => void handleRefreshToken(channel.id)}
-                        className="rounded p-1 text-green-600 hover:bg-green-50"
-                        disabled={loading || refreshingId === channel.id}
-                        title="Renouveler le token"
-                      >
-                        <RefreshCw className={`h-4 w-4 ${refreshingId === channel.id ? 'animate-spin' : ''}`} />
-                      </button>
-                    )}
+                    {HAS_TOKEN_EXPIRY.includes(provider) && (() => {
+                      const missingCreds = !channel.meta_app_id || !channel.meta_app_secret;
+                      return (
+                        <button
+                          onClick={() => void handleRefreshToken(channel.id)}
+                          className={`rounded p-1 ${missingCreds ? 'text-gray-300 cursor-not-allowed' : 'text-green-600 hover:bg-green-50'}`}
+                          disabled={loading || refreshingId === channel.id || missingCreds}
+                          title={missingCreds ? 'App ID et App Secret requis — modifiez le canal pour les renseigner' : 'Renouveler le token'}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${refreshingId === channel.id ? 'animate-spin' : ''}`} />
+                        </button>
+                      );
+                    })()}
                     <button
                       onClick={() => handleDelete(channel.id)}
                       className="rounded p-1 text-red-600 hover:bg-red-50"

@@ -27,12 +27,12 @@ export class MetaTokenService {
     accessToken: string;
     expiresAt: Date;
   }> {
-    const appId = channelAppId || process.env.META_APP_ID;
-    const appSecret = channelAppSecret || process.env.META_APP_SECRET;
+    const appId = channelAppId;
+    const appSecret = channelAppSecret;
 
     if (!appId || !appSecret) {
       throw new BadRequestException(
-        "App ID et App Secret Meta requis (renseignez-les dans les propriétés du canal ou via META_APP_ID/META_APP_SECRET dans le .env)",
+        "meta_app_id et meta_app_secret sont requis sur le canal pour échanger un token Meta",
       );
     }
 
@@ -53,7 +53,11 @@ export class MetaTokenService {
       });
 
       const { access_token, expires_in } = response.data;
-      const expiresAt = new Date(Date.now() + expires_in * 1000);
+      // expires_in peut être absent sur certains tokens Meta — fallback 60 jours
+      const expiresInMs = expires_in && !isNaN(expires_in)
+        ? expires_in * 1000
+        : 60 * 24 * 60 * 60 * 1000;
+      const expiresAt = new Date(Date.now() + expiresInMs);
 
       return { accessToken: access_token, expiresAt };
     } catch (err: unknown) {
@@ -71,16 +75,20 @@ export class MetaTokenService {
           );
           throw new BadRequestException(`Meta: ${msg}`);
         }
-        // Erreur réseau (timeout, ECONNREFUSED, DNS…)
-        const networkMsg = err.message ?? 'Impossible de joindre l\'API Meta';
+        const networkMsg = err.message ?? "Impossible de joindre l'API Meta";
         this.logger.error(
           `Meta token exchange network error: ${networkMsg}`,
           MetaTokenService.name,
         );
         throw new BadRequestException(`Erreur réseau Meta: ${networkMsg}`);
       }
-      // Re-throw les BadRequestException/NotFoundException déjà formatées
-      throw err;
+      // Pour toute autre erreur inattendue, wrapper en BadRequestException avec message lisible
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Meta token exchange unexpected error: ${msg}`,
+        MetaTokenService.name,
+      );
+      throw new BadRequestException(`Erreur lors de l'échange de token: ${msg}`);
     }
   }
 

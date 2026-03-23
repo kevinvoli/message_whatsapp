@@ -25,8 +25,12 @@ export class CommunicationTelegramService {
     return response.data.result;
   }
 
-  async registerWebhook(token: string, webhookUrl: string): Promise<void> {
-    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  async registerWebhook(
+    token: string,
+    webhookUrl: string,
+    secretToken?: string,
+  ): Promise<void> {
+    const secret = secretToken ?? process.env.TELEGRAM_WEBHOOK_SECRET;
     const payload: Record<string, unknown> = {
       url: webhookUrl,
       allowed_updates: ['message', 'callback_query'],

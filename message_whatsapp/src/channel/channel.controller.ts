@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Controller,
   Get,
+  Logger,
   Post,
   Body,
   Patch,
@@ -17,6 +19,8 @@ import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 @Controller('channel')
 @UseGuards(AdminGuard) // Use AdminGuard
 export class ChannelController {
+  private readonly logger = new Logger(ChannelController.name);
+
   constructor(
     private readonly communicationWhapiService: ChannelService,
     private readonly metaTokenService: MetaTokenService,
@@ -54,7 +58,13 @@ export class ChannelController {
   }
 
   @Post(':id/refresh-token')
-  refreshToken(@Param('id') id: string) {
-    return this.metaTokenService.refreshChannelToken(id);
+  async refreshToken(@Param('id') id: string) {
+    try {
+      return await this.metaTokenService.refreshChannelToken(id);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`refresh-token failed for channel ${id}: ${message}`);
+      throw new BadRequestException(message);
+    }
   }
 }

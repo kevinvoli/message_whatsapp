@@ -182,15 +182,17 @@ export class WhapiController {
   }
 
   @Get('messenger')
-  verifyMessengerWebhook(
+  async verifyMessengerWebhook(
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    console.log(`messenger webhooks: ${token}`);
-
-    if (mode === 'subscribe' && token === process.env.MESSENGER_VERIFY_TOKEN) {
-      return challenge;
+    if (mode === 'subscribe') {
+      const matchesDb = await this.channelService.hasMatchingVerifyToken('messenger', token);
+      const matchesEnv = token === process.env.MESSENGER_VERIFY_TOKEN;
+      if (matchesDb || matchesEnv) {
+        return challenge;
+      }
     }
     throw new ForbiddenException();
   }
@@ -208,7 +210,6 @@ export class WhapiController {
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
 
     this.assertPayloadSize(request.rawBody);
-    this.assertMessengerSignature(headers, request.rawBody, payload);
 
     const messengerPayload = this.assertMessengerPayload(payload);
 
@@ -217,12 +218,15 @@ export class WhapiController {
       return { status: 'ignored', reason: 'missing_page_id' };
     }
 
+    // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
+    const channelRecord = await this.channelService.findByChannelId(pageId);
+    this.assertMessengerSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+
     const tenantId = await this.resolveTenantOrReject('messenger', pageId);
     const channel = await this.channelService.resolveTenantByProviderExternalId(
       'messenger',
       pageId,
     );
-    const channelRecord = await this.channelService.findByChannelId(pageId);
     const channelId = channelRecord?.channel_id ?? pageId;
 
     this.auditLogger.log(
@@ -283,21 +287,21 @@ export class WhapiController {
     const startedAt = Date.now();
     const provider = 'telegram';
 
-    // Vérifier le secret token
-    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (expectedSecret && secretToken !== expectedSecret) {
-      this.metricsService.recordSignatureInvalid('telegram');
-      throw new ForbiddenException('Invalid Telegram secret token');
-    }
-
     // Ignorer les updates sans message exploitable (channel_post, edited_message)
     const hasContent = payload.message || payload.callback_query;
     if (!hasContent) {
       return { status: 'ignored', reason: 'no_actionable_content' };
     }
 
-    const tenantId = await this.resolveTenantOrReject('telegram', botId);
+    // Résoudre le canal pour obtenir son webhook_secret
     const channelRecord = await this.channelService.findByChannelId(botId);
+    const expectedSecret = channelRecord?.webhook_secret ?? process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret && secretToken !== expectedSecret) {
+      this.metricsService.recordSignatureInvalid('telegram');
+      throw new ForbiddenException('Invalid Telegram secret token');
+    }
+
+    const tenantId = await this.resolveTenantOrReject('telegram', botId);
     const channelId = channelRecord?.channel_id ?? botId;
 
     this.auditLogger.log(
@@ -350,13 +354,17 @@ export class WhapiController {
   }
 
   @Get('instagram')
-  verifyInstagramWebhook(
+  async verifyInstagramWebhook(
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    if (mode === 'subscribe' && token === process.env.INSTAGRAM_VERIFY_TOKEN) {
-      return challenge;
+    if (mode === 'subscribe') {
+      const matchesDb = await this.channelService.hasMatchingVerifyToken('instagram', token);
+      const matchesEnv = token === process.env.INSTAGRAM_VERIFY_TOKEN;
+      if (matchesDb || matchesEnv) {
+        return challenge;
+      }
     }
     throw new ForbiddenException();
   }
@@ -372,7 +380,6 @@ export class WhapiController {
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
 
     this.assertPayloadSize(request.rawBody);
-    this.assertInstagramSignature(headers, request.rawBody, payload);
 
     const igPayload = this.assertInstagramPayload(payload);
 
@@ -381,8 +388,11 @@ export class WhapiController {
       return { status: 'ignored', reason: 'missing_ig_account_id' };
     }
 
-    const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
+    // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
     const channelRecord = await this.channelService.findByChannelId(igAccountId);
+    this.assertInstagramSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+
+    const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
     const channelId = channelRecord?.channel_id ?? igAccountId;
 
     this.auditLogger.log(
@@ -435,13 +445,17 @@ export class WhapiController {
   }
 
   @Get('whatsapp')
-  verifyWebhook(
+  async verifyWebhook(
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
-      return challenge;
+    if (mode === 'subscribe') {
+      const matchesDb = await this.channelService.hasMatchingVerifyToken('meta', token);
+      const matchesEnv = token === process.env.WHATSAPP_VERIFY_TOKEN;
+      if (matchesDb || matchesEnv) {
+        return challenge;
+      }
     }
     throw new ForbiddenException();
   }
@@ -458,8 +472,6 @@ export class WhapiController {
     // console.log("affichage du post:2",request);
 
     this.assertPayloadSize(request.rawBody);
-
-    this.assertMetaSignature(headers, request.rawBody, payload);
 
     const metaPayload = this.assertMetaPayload(payload);
 
@@ -478,6 +490,12 @@ export class WhapiController {
     const metaValue = change?.value;
     const wabaId = entry?.id;
     const phoneNumberId = metaValue?.metadata?.phone_number_id;
+
+    // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
+    const channel = phoneNumberId
+      ? await this.channelService.findByChannelId(phoneNumberId)
+      : null;
+    this.assertMetaSignature(headers, request.rawBody, payload, channel?.meta_app_secret);
 
     const tenantId = await this.resolveTenantForMeta(wabaId, phoneNumberId);
     const auditEventKey = this.buildAuditEventKey('meta', metaPayload);
@@ -575,13 +593,16 @@ export class WhapiController {
     headers: Record<string, string | string[] | undefined>,
     rawBody: Buffer | undefined,
     payload: unknown,
+    channelSecret?: string | null,
   ): void {
     const isProd = process.env.NODE_ENV === 'production';
-    const appSecret = (
-      process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET
-    )?.trim();
 
-    if (!appSecret) {
+    const secrets: string[] = [];
+    if (channelSecret) secrets.push(channelSecret.trim());
+    const globalSecret = (process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET)?.trim();
+    if (globalSecret) secrets.push(globalSecret);
+
+    if (secrets.length === 0) {
       if (isProd) {
         this.metricsService.recordSignatureInvalid('instagram');
         throw new UnauthorizedException(
@@ -601,7 +622,7 @@ export class WhapiController {
 
     const valid = this.verifyHmacSignature(
       'instagram',
-      [appSecret],
+      secrets,
       rawBody,
       payload,
       signatureHeader,
@@ -637,13 +658,16 @@ export class WhapiController {
     headers: Record<string, string | string[] | undefined>,
     rawBody: Buffer | undefined,
     payload: unknown,
+    channelSecret?: string | null,
   ): void {
     const isProd = process.env.NODE_ENV === 'production';
-    const appSecret = (
-      process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET
-    )?.trim();
 
-    if (!appSecret) {
+    const secrets: string[] = [];
+    if (channelSecret) secrets.push(channelSecret.trim());
+    const globalSecret = (process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET)?.trim();
+    if (globalSecret) secrets.push(globalSecret);
+
+    if (secrets.length === 0) {
       if (isProd) {
         this.metricsService.recordSignatureInvalid('messenger');
         throw new UnauthorizedException(
@@ -663,7 +687,7 @@ export class WhapiController {
 
     const valid = this.verifyHmacSignature(
       'messenger',
-      [appSecret],
+      secrets,
       rawBody,
       payload,
       signatureHeader,
@@ -747,11 +771,18 @@ export class WhapiController {
     headers: Record<string, string | string[] | undefined>,
     rawBody: Buffer | undefined,
     payload: unknown,
+    channelSecret?: string | null,
   ): void {
     const isProd = process.env.NODE_ENV === 'production';
-    const appSecret = process.env.WHATSAPP_APP_SECRET?.trim();
+
+    const secrets: string[] = [];
+    if (channelSecret) secrets.push(channelSecret.trim());
+    const globalSecret = process.env.WHATSAPP_APP_SECRET?.trim();
     const previousSecret = process.env.WHATSAPP_APP_SECRET_PREVIOUS?.trim();
-    if (!appSecret && !previousSecret) {
+    if (globalSecret) secrets.push(globalSecret);
+    if (previousSecret) secrets.push(previousSecret);
+
+    if (secrets.length === 0) {
       if (isProd) {
         this.metricsService.recordSignatureInvalid('meta');
         throw new UnauthorizedException(
@@ -768,10 +799,6 @@ export class WhapiController {
       this.metricsService.recordSignatureInvalid('meta');
       throw new UnauthorizedException('Missing signature');
     }
-
-    const secrets = [appSecret, previousSecret].filter(
-      (value): value is string => Boolean(value),
-    );
 
     const valid = this.verifyHmacSignature(
       'meta',

@@ -34,4 +34,14 @@ export class CreateChannelDto {
   @IsOptional()
   @IsString()
   meta_app_secret?: string;
+
+  /** Secret de webhook (Telegram uniquement — généré automatiquement si absent) */
+  @IsOptional()
+  @IsString()
+  webhook_secret?: string;
+
+  /** Token de vérification webhook (meta/messenger/instagram — requis pour le challenge GET Meta) */
+  @IsOptional()
+  @IsString()
+  verify_token?: string;
 }
