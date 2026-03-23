@@ -187,10 +187,15 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
+    console.log("verification de webhooks", mode, token, challenge);
+    
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('messenger', token);
-      const matchesEnv = token === process.env.MESSENGER_VERIFY_TOKEN;
-      if (matchesDb || matchesEnv) {
+    console.log("verification matchsDb", matchesDb);
+
+      if (matchesDb) {
+    console.log("verification token if:", challenge);
+
         return challenge;
       }
     }
@@ -203,8 +208,6 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    console.log(`messenger webhooks: ${JSON.stringify(payload)}`);
-
     const startedAt = Date.now();
     const provider = 'messenger';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
@@ -295,9 +298,9 @@ export class WhapiController {
 
     // Résoudre le canal pour obtenir son webhook_secret
     const channelRecord = await this.channelService.findByChannelId(botId);
-    const expectedSecret = channelRecord?.webhook_secret ?? process.env.TELEGRAM_WEBHOOK_SECRET;
+    const expectedSecret = channelRecord?.webhook_secret;
     if (expectedSecret && secretToken !== expectedSecret) {
-      this.metricsService.recordSignatureInvalid('telegram');
+      this.metricsService.recordSignatureInvalid('telegram');                                                                                                                                                                        
       throw new ForbiddenException('Invalid Telegram secret token');
     }
 
@@ -361,8 +364,7 @@ export class WhapiController {
   ) {
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('instagram', token);
-      const matchesEnv = token === process.env.INSTAGRAM_VERIFY_TOKEN;
-      if (matchesDb || matchesEnv) {
+      if (matchesDb) {
         return challenge;
       }
     }
@@ -452,8 +454,7 @@ export class WhapiController {
   ) {
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('meta', token);
-      const matchesEnv = token === process.env.WHATSAPP_VERIFY_TOKEN;
-      if (matchesDb || matchesEnv) {
+      if (matchesDb) {
         return challenge;
       }
     }
@@ -599,8 +600,6 @@ export class WhapiController {
 
     const secrets: string[] = [];
     if (channelSecret) secrets.push(channelSecret.trim());
-    const globalSecret = (process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET)?.trim();
-    if (globalSecret) secrets.push(globalSecret);
 
     if (secrets.length === 0) {
       if (isProd) {
@@ -664,8 +663,6 @@ export class WhapiController {
 
     const secrets: string[] = [];
     if (channelSecret) secrets.push(channelSecret.trim());
-    const globalSecret = (process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET)?.trim();
-    if (globalSecret) secrets.push(globalSecret);
 
     if (secrets.length === 0) {
       if (isProd) {
@@ -777,10 +774,6 @@ export class WhapiController {
 
     const secrets: string[] = [];
     if (channelSecret) secrets.push(channelSecret.trim());
-    const globalSecret = process.env.WHATSAPP_APP_SECRET?.trim();
-    const previousSecret = process.env.WHATSAPP_APP_SECRET_PREVIOUS?.trim();
-    if (globalSecret) secrets.push(globalSecret);
-    if (previousSecret) secrets.push(previousSecret);
 
     if (secrets.length === 0) {
       if (isProd) {
