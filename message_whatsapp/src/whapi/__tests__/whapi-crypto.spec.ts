@@ -44,8 +44,6 @@ describe('Webhook crypto', () => {
     delete process.env.WHAPI_WEBHOOK_SECRET_HEADER;
     delete process.env.WHAPI_WEBHOOK_SECRET_VALUE;
     delete process.env.WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS;
-    delete process.env.WHATSAPP_APP_SECRET;
-    delete process.env.WHATSAPP_APP_SECRET_PREVIOUS;
     delete process.env.NODE_ENV;
   });
 
@@ -105,21 +103,16 @@ describe('Webhook crypto', () => {
     ).not.toThrow();
   });
 
-  it('rejects missing meta signature', () => {
-    process.env.WHATSAPP_APP_SECRET = 'meta-secret';
+  it('rejects missing meta signature when channel secret is provided', () => {
     const controller = buildController();
     expect(() =>
-      (controller as any).assertMetaSignature({}, undefined, payload),
+      (controller as any).assertMetaSignature({}, undefined, payload, 'meta-secret'),
     ).toThrow(UnauthorizedException);
   });
 
-  it('accepts previous meta secret during rotation window', () => {
-    process.env.WHATSAPP_APP_SECRET = 'current-secret';
-    process.env.WHATSAPP_APP_SECRET_PREVIOUS = 'previous-secret';
+  it('accepts valid meta channel secret', () => {
     const rawBody = Buffer.from(JSON.stringify(payload));
-    const digest = createHmac('sha256', 'previous-secret')
-      .update(rawBody)
-      .digest('hex');
+    const digest = createHmac('sha256', 'channel-secret').update(rawBody).digest('hex');
     const signature = `sha256=${digest}`;
 
     const controller = buildController();
@@ -128,7 +121,15 @@ describe('Webhook crypto', () => {
         { 'x-hub-signature-256': signature },
         rawBody,
         payload,
+        'channel-secret',
       ),
+    ).not.toThrow();
+  });
+
+  it('skips meta signature check in dev when no channel secret', () => {
+    const controller = buildController();
+    expect(() =>
+      (controller as any).assertMetaSignature({}, undefined, payload, null),
     ).not.toThrow();
   });
 

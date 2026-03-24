@@ -23,14 +23,11 @@ type Tab = 'profile' | 'password' | 'system' | 'webhooks';
 const CATEGORY_LABELS: Record<string, string> = {
   general: 'Général',
   whapi: 'WhatsApp / Whapi',
-  meta: 'Meta / WhatsApp Business',
-  messenger: 'Facebook Messenger',
-  instagram: 'Instagram Direct',
-  telegram: 'Telegram',
+  meta: 'Meta (API)',
   feature_flags: 'Feature Flags',
 };
 
-const CATEGORY_ORDER = ['general', 'whapi', 'meta', 'messenger', 'instagram', 'telegram', 'feature_flags', 'cron'];
+const CATEGORY_ORDER = ['general', 'whapi', 'meta', 'feature_flags', 'cron'];
 
 function groupByCategory(entries: SystemConfigEntry[]): Record<string, SystemConfigEntry[]> {
   const groups: Record<string, SystemConfigEntry[]> = {};

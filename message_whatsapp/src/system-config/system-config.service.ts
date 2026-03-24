@@ -37,20 +37,6 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
 
   // ─── Meta / WhatsApp Business ───────────────────────────────────────────────
   { key: 'META_API_VERSION', label: 'Version API Meta', category: 'meta' },
-  { key: 'WHATSAPP_VERIFY_TOKEN', label: 'Token de vérification webhook WhatsApp', category: 'meta', isSecret: true },
-  { key: 'WHATSAPP_APP_SECRET', label: 'App Secret WhatsApp (HMAC webhooks)', category: 'meta', isSecret: true },
-  { key: 'WHATSAPP_APP_SECRET_PREVIOUS', label: 'App Secret WhatsApp (précédent)', category: 'meta', isSecret: true },
-  { key: 'META_APP_ID', label: 'Meta App ID', category: 'meta' },
-  { key: 'META_APP_SECRET', label: 'Meta App Secret (échange token longue durée)', category: 'meta', isSecret: true },
-
-  // ─── Messenger ──────────────────────────────────────────────────────────────
-  { key: 'MESSENGER_VERIFY_TOKEN', label: 'Token de vérification webhook Messenger', category: 'messenger', isSecret: true },
-
-  // ─── Instagram ──────────────────────────────────────────────────────────────
-  { key: 'INSTAGRAM_VERIFY_TOKEN', label: 'Token de vérification webhook Instagram', category: 'instagram', isSecret: true },
-
-  // ─── Telegram ───────────────────────────────────────────────────────────────
-  { key: 'TELEGRAM_WEBHOOK_SECRET', label: 'Secret webhook Telegram', category: 'telegram', isSecret: true, description: 'Token arbitraire transmis à setWebhook (X-Telegram-Bot-Api-Secret-Token)' },
 
   // ─── Feature flags ──────────────────────────────────────────────────────────
   { key: 'FF_UNIFIED_WEBHOOK_ROUTER', label: 'Activer le routeur webhook unifié', category: 'feature_flags', description: 'true / false' },

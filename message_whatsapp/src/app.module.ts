@@ -67,8 +67,6 @@ import { SystemConfigModule } from './system-config/system-config.module';
         WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().allow('').optional(),
         WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().allow('').optional(),
         WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
-        WHATSAPP_APP_SECRET: Joi.string().allow('').optional(),
-        WHATSAPP_APP_SECRET_PREVIOUS: Joi.string().allow('').optional(),
         FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
         FF_SHADOW_UNIFIED: Joi.string().optional(),
         MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number()
