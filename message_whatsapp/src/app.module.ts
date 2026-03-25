@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AgentStateModule } from './agent-state/agent-state.module';
 import { WhatsappErrorModule } from './whatsapp_error/whatsapp_error.module';
 import { WhatsappChatModule } from './whatsapp_chat/whatsapp_chat.module';
 import { WhatsappChatLabelModule } from './whatsapp_chat_label/whatsapp_chat_label.module';
@@ -46,6 +48,8 @@ import { SystemConfigModule } from './system-config/system-config.module';
       WhapiChannel,
       WhatsappChat,
     ]),
+    EventEmitterModule.forRoot(),
+    AgentStateModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,

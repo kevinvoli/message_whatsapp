@@ -1,12 +1,13 @@
 ﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DispatcherService } from './dispatcher.service';
 import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { QueueService } from './services/queue.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { AgentStateService } from 'src/agent-state/agent-state.service';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { NotificationService } from 'src/notification/notification.service';
 
@@ -22,12 +23,13 @@ describe('DispatcherService', () => {
     getNextInQueue: jest.fn(),
     getQueuePositions: jest.fn(),
   };
-  const gateway = {
-    isAgentConnected: jest.fn(),
-    emitConversationReassigned: jest.fn(),
-    emitConversationUpsertByChatId: jest.fn(),
-    emitConversationAssigned: jest.fn(),
-    emitConversationRemoved: jest.fn(),
+  const agentStateService = {
+    isConnected: jest.fn(),
+    register: jest.fn(),
+    unregister: jest.fn(),
+  };
+  const eventEmitter = {
+    emit: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -36,7 +38,8 @@ describe('DispatcherService', () => {
         DispatcherService,
         { provide: getRepositoryToken(WhatsappChat), useValue: chatRepository },
         { provide: QueueService, useValue: queueService },
-        { provide: WhatsappMessageGateway, useValue: gateway },
+        { provide: AgentStateService, useValue: agentStateService },
+        { provide: EventEmitter2, useValue: eventEmitter },
         { provide: WhatsappCommercialService, useValue: {} },
         { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
@@ -52,7 +55,7 @@ describe('DispatcherService', () => {
       unread_count: 0,
     });
     chatRepository.save.mockImplementation(async (chat) => chat);
-    gateway.isAgentConnected.mockReturnValue(false);
+    agentStateService.isConnected.mockReturnValue(false);
 
     const result = await service.assignConversation('123@c.us', 'Client');
     // read_only conversations are returned as-is (not null) after incrementing unread_count
@@ -73,7 +76,7 @@ describe('DispatcherService', () => {
     };
 
     chatRepository.findOne.mockResolvedValue(conversation);
-    gateway.isAgentConnected.mockReturnValue(false);
+    agentStateService.isConnected.mockReturnValue(false);
     queueService.getNextInQueue.mockResolvedValue({
       id: 'poste-1',
       name: 'Poste 1',

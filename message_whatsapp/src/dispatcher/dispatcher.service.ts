@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   WhatsappChat,
@@ -6,8 +6,16 @@ import {
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { QueueService } from './services/queue.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { AgentStateService } from 'src/agent-state/agent-state.service';
+import {
+  EVENTS,
+  ConversationUpsertEvent,
+  ConversationRemovedEvent,
+  ConversationAssignedEvent,
+  ConversationReassignedEvent,
+} from 'src/events/events.constants';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { NotificationService } from 'src/notification/notification.service';
 
@@ -21,8 +29,9 @@ export class DispatcherService {
 
     private readonly queueService: QueueService,
 
-    @Inject(forwardRef(() => WhatsappMessageGateway))
-    private readonly messageGateway: WhatsappMessageGateway,
+    private readonly agentStateService: AgentStateService,
+
+    private readonly eventEmitter: EventEmitter2,
 
     private readonly whatsappCommercialService: WhatsappCommercialService,
 
@@ -82,7 +91,7 @@ export class DispatcherService {
     // Déterminer si l'agent actuel est connecté
     const currentPosteId = conversation?.poste?.id;
     const isAgentConnected = currentPosteId
-      ? this.messageGateway.isAgentConnected(currentPosteId)
+      ? this.agentStateService.isConnected(currentPosteId)
       : false;
 
     /**
@@ -119,9 +128,9 @@ export class DispatcherService {
         `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.name ?? 'NON ASSIGNE'}`,
       );
       const saved = await this.chatRepository.save(conversation);
-      await this.messageGateway.emitConversationUpsertByChatId(
-        saved.chat_id,
-      );
+      this.eventEmitter.emit(EVENTS.CONVERSATION_UPSERT, {
+        chatId: saved.chat_id,
+      } satisfies ConversationUpsertEvent);
       return saved;
     }
 
@@ -208,9 +217,9 @@ export class DispatcherService {
         `Conversation réassignée — ${saved.name || saved.chat_id}`,
         `La conversation de ${saved.name || saved.contact_client} a été assignée au poste ${nextAgent.name}.`,
       );
-      await this.messageGateway.emitConversationUpsertByChatId(
-        saved.chat_id,
-      );
+      this.eventEmitter.emit(EVENTS.CONVERSATION_UPSERT, {
+        chatId: saved.chat_id,
+      } satisfies ConversationUpsertEvent);
       return saved;
     }
 
@@ -251,7 +260,9 @@ export class DispatcherService {
       `Nouvelle conversation — ${clientName || clientPhone.split('@')[0]}`,
       `Nouvelle conversation de ${clientName || clientPhone.split('@')[0]} assignée au poste ${nextAgent.name}.`,
     );
-    await this.messageGateway.emitConversationAssigned(saved.chat_id);
+    this.eventEmitter.emit(EVENTS.CONVERSATION_ASSIGNED, {
+      chatId: saved.chat_id,
+    } satisfies ConversationAssignedEvent);
     return saved;
   }
 
@@ -314,7 +325,10 @@ export class DispatcherService {
       this.logger.warn(
         `⏳ Aucun agent disponible pour réinjecter (${chat.chat_id}), passage EN_ATTENTE`,
       );
-      await this.messageGateway.emitConversationRemoved(chat.chat_id, oldPoste);
+      this.eventEmitter.emit(EVENTS.CONVERSATION_REMOVED, {
+        chatId: chat.chat_id,
+        oldPosteId: oldPoste,
+      } satisfies ConversationRemovedEvent);
       return;
     }
 
@@ -345,11 +359,11 @@ export class DispatcherService {
     );
 
     // 🔥 EVENT CENTRAL
-    await this.messageGateway.emitConversationReassigned(
-      updatedChat,
-      oldPoste,
-      nextPoste.id,
-    );
+    this.eventEmitter.emit(EVENTS.CONVERSATION_REASSIGNED, {
+      chat: updatedChat,
+      oldPosteId: oldPoste,
+      newPosteId: nextPoste.id,
+    } satisfies ConversationReassignedEvent);
   }
 
   async jobRunnertcheque(poste_id: string) {

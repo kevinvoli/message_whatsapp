@@ -1,7 +1,11 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
+import { MessageQueryService } from './services/message-query.service';
+import { MessageStatusService } from './services/message-status.service';
+import { InboundPersistenceService } from './services/inbound-persistence.service';
+import { OutboundMessageService } from './services/outbound-message.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -62,7 +66,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       WhatsappMedia,
     ]),
     WhatsappChatModule,
-    forwardRef(() => DispatcherModule),
+    DispatcherModule,
     LoggingModule,
     CallLogModule,
     JorbsModule,
@@ -73,6 +77,10 @@ import { NotificationModule } from 'src/notification/notification.module';
     WhatsappChatService,
     WhatsappMessageGateway,
     WhatsappMessageService,
+    MessageQueryService,
+    MessageStatusService,
+    InboundPersistenceService,
+    OutboundMessageService,
     WhatsappCommercialService,
     CommunicationWhapiService,
     CommunicationMetaService,
@@ -91,6 +99,10 @@ import { NotificationModule } from 'src/notification/notification.module';
   exports: [
     WhatsappMessageGateway,
     WhatsappMessageService,
+    MessageQueryService,
+    MessageStatusService,
+    InboundPersistenceService,
+    OutboundMessageService,
     FirstResponseTimeoutJob,
   ],
 })

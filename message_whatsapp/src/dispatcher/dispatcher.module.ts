@@ -1,13 +1,16 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DispatcherService } from './dispatcher.service';
 import { QueueService } from './services/queue.service';
+import { MessageQueryService } from 'src/whatsapp_message/services/message-query.service';
+import { MessageStatusService } from 'src/whatsapp_message/services/message-status.service';
+import { InboundPersistenceService } from 'src/whatsapp_message/services/inbound-persistence.service';
+import { OutboundMessageService } from 'src/whatsapp_message/services/outbound-message.service';
 import { QueuePosition } from './entities/queue-position.entity';
 import { DispatchSettings } from './entities/dispatch-settings.entity';
 import { DispatchSettingsAudit } from './entities/dispatch-settings-audit.entity';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { CronConfig } from 'src/jorbs/entities/cron-config.entity';
-import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -53,7 +56,6 @@ import { NotificationModule } from 'src/notification/notification.module';
       WhatsappPoste,
       WhatsappMedia,
     ]),
-    forwardRef(() => WhatsappMessageModule),
     LoggingModule,
     CallLogModule,
     JorbsModule,
@@ -64,6 +66,10 @@ import { NotificationModule } from 'src/notification/notification.module';
     DispatcherService,
     QueueService,
     WhatsappMessageService,
+    MessageQueryService,
+    MessageStatusService,
+    InboundPersistenceService,
+    OutboundMessageService,
     WhatsappChatService,
     CommunicationWhapiService,
     CommunicationMetaService,

@@ -8,6 +8,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -36,6 +37,14 @@ import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { NotificationService } from 'src/notification/notification.service';
+import { AgentStateService } from 'src/agent-state/agent-state.service';
+import {
+  EVENTS,
+  ConversationUpsertEvent,
+  ConversationRemovedEvent,
+  ConversationAssignedEvent,
+  ConversationReassignedEvent,
+} from 'src/events/events.constants';
 
 type AuthPayload = {
   sub: string;
@@ -93,6 +102,7 @@ export class WhatsappMessageGateway
     private readonly throttle: SocketThrottleGuard,
     private readonly callLogService: CallLogService,
     private readonly notificationService: NotificationService,
+    private readonly agentStateService: AgentStateService,
   ) {}
 
   // ======================================================
@@ -132,6 +142,7 @@ export class WhatsappMessageGateway
       tenantId,
       tenantIds,
     });
+    this.agentStateService.register(client.id, posteId);
     for (const tid of tenantIds) {
       await client.join(`tenant:${tid}`);
     }
@@ -250,6 +261,7 @@ export class WhatsappMessageGateway
     if (!agent) return;
 
     this.connectedAgents.delete(client.id);
+    this.agentStateService.unregister(client.id);
     await this.commercialService.updateStatus(agent.commercialId, false);
 
     // Verifier si un autre commercial du MEME poste est encore connecte.
@@ -1147,6 +1159,34 @@ export class WhatsappMessageGateway
         : null,
       read_only: chat.read_only,
     };
+  }
+
+  // ======================================================
+  // EVENT HANDLERS (EventEmitter2 — découplage DispatcherService)
+  // ======================================================
+
+  @OnEvent(EVENTS.CONVERSATION_UPSERT)
+  async onConversationUpsert(payload: ConversationUpsertEvent): Promise<void> {
+    await this.emitConversationUpsertByChatId(payload.chatId);
+  }
+
+  @OnEvent(EVENTS.CONVERSATION_REMOVED)
+  onConversationRemoved(payload: ConversationRemovedEvent): void {
+    this.emitConversationRemoved(payload.chatId, payload.oldPosteId);
+  }
+
+  @OnEvent(EVENTS.CONVERSATION_ASSIGNED)
+  async onConversationAssigned(payload: ConversationAssignedEvent): Promise<void> {
+    await this.emitConversationAssigned(payload.chatId);
+  }
+
+  @OnEvent(EVENTS.CONVERSATION_REASSIGNED)
+  async onConversationReassigned(payload: ConversationReassignedEvent): Promise<void> {
+    await this.emitConversationReassigned(
+      payload.chat,
+      payload.oldPosteId,
+      payload.newPosteId,
+    );
   }
 
   private resolveMessageText(message: WhatsappMessage): string | null {
