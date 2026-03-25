@@ -4,17 +4,20 @@ import { LessThan, Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
 import { WhapiChannel } from './entities/channel.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MetaTokenService {
-  private readonly META_API_VERSION =
-    process.env.META_API_VERSION ?? 'v22.0';
+  private readonly META_API_VERSION: string;
 
   constructor(
     @InjectRepository(WhapiChannel)
     private readonly channelRepo: Repository<WhapiChannel>,
     private readonly logger: AppLogger,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.META_API_VERSION = this.configService.get<string>('META_API_VERSION') ?? 'v22.0';
+  }
 
   /**
    * Échange un token (court ou long) contre un nouveau token longue durée Meta (60 jours).

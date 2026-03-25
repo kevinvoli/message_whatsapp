@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -26,9 +27,6 @@ import {
 
 @Injectable()
 export class WhatsappMessageService {
-  private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
-  private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN;
-
   private readonly logger = new Logger(WhatsappMessageService.name);
 
   constructor(
@@ -41,7 +39,7 @@ export class WhatsappMessageService {
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly channelService: ChannelService,
     private readonly contactService: ContactService,
-
+    private readonly configService: ConfigService,
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
     @InjectRepository(WhatsappMedia)
@@ -430,7 +428,7 @@ export class WhatsappMessageService {
   }
 
   private getResponseTimeoutHours(): number {
-    const parsed = Number(process.env.MESSAGE_RESPONSE_TIMEOUT_HOURS ?? 24);
+    const parsed = Number(this.configService.get<string>('MESSAGE_RESPONSE_TIMEOUT_HOURS') ?? 24);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
   }
 

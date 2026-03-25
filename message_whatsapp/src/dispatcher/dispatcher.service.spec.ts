@@ -8,6 +8,7 @@ import {
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
+import { NotificationService } from 'src/notification/notification.service';
 
 describe('DispatcherService', () => {
   let service: DispatcherService;
@@ -24,6 +25,9 @@ describe('DispatcherService', () => {
   const gateway = {
     isAgentConnected: jest.fn(),
     emitConversationReassigned: jest.fn(),
+    emitConversationUpsertByChatId: jest.fn(),
+    emitConversationAssigned: jest.fn(),
+    emitConversationRemoved: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -34,6 +38,7 @@ describe('DispatcherService', () => {
         { provide: QueueService, useValue: queueService },
         { provide: WhatsappMessageGateway, useValue: gateway },
         { provide: WhatsappCommercialService, useValue: {} },
+        { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 
@@ -44,11 +49,15 @@ describe('DispatcherService', () => {
     chatRepository.findOne.mockResolvedValue({
       chat_id: '123@c.us',
       read_only: true,
+      unread_count: 0,
     });
+    chatRepository.save.mockImplementation(async (chat) => chat);
     gateway.isAgentConnected.mockReturnValue(false);
 
     const result = await service.assignConversation('123@c.us', 'Client');
-    expect(result).toBeNull();
+    // read_only conversations are returned as-is (not null) after incrementing unread_count
+    expect(result).not.toBeNull();
+    expect(result?.read_only).toBe(true);
     expect(queueService.getNextInQueue).not.toHaveBeenCalled();
   });
 

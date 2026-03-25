@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
 import { WebhookEventLog } from './entities/webhook-event.entity';
@@ -14,6 +15,7 @@ export class WebhookIdempotencyPurgeService implements OnModuleInit {
     private readonly webhookEventRepository: Repository<WebhookEventLog>,
     private readonly metricsService: WebhookMetricsService,
     private readonly cronConfigService: CronConfigService,
+    private readonly configService: ConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -53,7 +55,7 @@ export class WebhookIdempotencyPurgeService implements OnModuleInit {
       const config = await this.cronConfigService.findByKey('webhook-purge');
       if (config.ttlDays && config.ttlDays > 0) return config.ttlDays;
     } catch {}
-    const raw = process.env.WEBHOOK_IDEMPOTENCY_TTL_DAYS;
+    const raw = this.configService.get<string>('WEBHOOK_IDEMPOTENCY_TTL_DAYS');
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 14;
   }

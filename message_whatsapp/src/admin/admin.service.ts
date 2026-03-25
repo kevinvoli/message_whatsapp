@@ -4,12 +4,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Admin } from './entities/admin.entity';
 import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AdminService {
   constructor(
     @InjectRepository(Admin)
     private readonly adminRepository: Repository<Admin>,
+    private readonly configService: ConfigService,
   ) {}
 
   async findOneByEmail(email: string): Promise<Admin | null> {
@@ -51,10 +53,10 @@ export class AdminService {
   }
 
   async ensureAdminUserExists(): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminName = process.env.ADMIN_NAME || 'Admin';
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    const isProduction = process.env.NODE_ENV === 'production';
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
+    const adminName = this.configService.get<string>('ADMIN_NAME') || 'Admin';
+    const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
 
     if (!adminEmail || !adminPassword) {
       if (isProduction) {

@@ -28,6 +28,7 @@ import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { json } from 'stream/consumers';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('webhooks')
 export class WhapiController {
@@ -41,6 +42,7 @@ export class WhapiController {
     private readonly metricsService: WebhookMetricsService,
     private readonly unifiedIngressService: UnifiedIngressService,
     private readonly channelService: ChannelService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('whapi')
@@ -596,7 +598,7 @@ export class WhapiController {
     payload: unknown,
     channelSecret?: string | null,
   ): void {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
 
     const secrets: string[] = [];
     if (channelSecret) secrets.push(channelSecret.trim());
@@ -659,7 +661,7 @@ export class WhapiController {
     payload: unknown,
     channelSecret?: string | null,
   ): void {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
 
     const secrets: string[] = [];
     if (channelSecret) secrets.push(channelSecret.trim());
@@ -721,16 +723,16 @@ export class WhapiController {
     rawBody: Buffer | undefined,
     payload: unknown,
   ): void {
-    if (process.env.WHAPI_WEBHOOK_SKIP_SIGNATURE === 'true') {
+    if (this.configService.get<string>('WHAPI_WEBHOOK_SKIP_SIGNATURE') === 'true') {
       return;
     }
 
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
     const configuredHeader =
-      process.env.WHAPI_WEBHOOK_SECRET_HEADER?.trim().toLowerCase();
-    const configuredValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE?.trim();
+      this.configService.get<string>('WHAPI_WEBHOOK_SECRET_HEADER')?.trim().toLowerCase();
+    const configuredValue = this.configService.get<string>('WHAPI_WEBHOOK_SECRET_VALUE')?.trim();
     const configuredPrevious =
-      process.env.WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS?.trim();
+      this.configService.get<string>('WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS')?.trim();
 
     if (isProd && (!configuredHeader || !configuredValue)) {
       this.metricsService.recordSignatureInvalid('whapi');
@@ -770,7 +772,7 @@ export class WhapiController {
     payload: unknown,
     channelSecret?: string | null,
   ): void {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
 
     const secrets: string[] = [];
     if (channelSecret) secrets.push(channelSecret.trim());

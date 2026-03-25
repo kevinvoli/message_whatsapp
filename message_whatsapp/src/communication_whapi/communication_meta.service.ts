@@ -7,15 +7,20 @@ import {
   WhapiFailureKind,
   WhapiOutboundError,
 } from './errors/whapi-outbound.error';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CommunicationMetaService {
-  private readonly META_API_VERSION = process.env.META_API_VERSION ?? 'v22.0';
-  private readonly maxRetries = Number(
-    process.env.META_OUTBOUND_MAX_RETRIES ?? 2,
-  );
+  private readonly META_API_VERSION: string;
+  private readonly maxRetries: number;
 
-  constructor(private readonly logger: AppLogger) {}
+  constructor(
+    private readonly logger: AppLogger,
+    private readonly configService: ConfigService,
+  ) {
+    this.META_API_VERSION = this.configService.get<string>('META_API_VERSION') ?? 'v22.0';
+    this.maxRetries = Number(this.configService.get<string>('META_OUTBOUND_MAX_RETRIES') ?? 2);
+  }
 
   async sendTextMessage(data: {
     text: string;

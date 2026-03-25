@@ -5,6 +5,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -15,7 +16,10 @@ import { tap } from 'rxjs/operators';
  */
 @Injectable()
 export class AdminTokenRefreshInterceptor implements NestInterceptor {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
@@ -53,7 +57,7 @@ export class AdminTokenRefreshInterceptor implements NestInterceptor {
             httpOnly: true,
             maxAge: 24 * 60 * 60 * 1000, // 24h en ms
             sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
+            secure: this.configService.get<string>('NODE_ENV') === 'production',
           });
         } catch {
           // Fail silencieux — ne jamais interrompre la réponse pour un refresh

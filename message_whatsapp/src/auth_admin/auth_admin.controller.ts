@@ -15,12 +15,14 @@ import { AdminService } from '../admin/admin.service';
 import { LoginDto } from '../auth/shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth/admin')
 export class AuthAdminController {
   constructor(
     private authAdminService: AuthAdminService,
     private adminService: AdminService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('login')
@@ -39,18 +41,19 @@ export class AuthAdminController {
 
     const { accessToken, refreshToken } = this.authAdminService.login(admin);
 
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     res.cookie('AuthenticationAdmin', accessToken, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
     });
 
     res.cookie('RefreshAdmin', refreshToken, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
     });
 
     return { admin };

@@ -30,7 +30,8 @@ describe('WebhookIdempotencyPurgeService', () => {
     const repo = new FakeRepo(2) as unknown as Repository<WebhookEventLog>;
     const metrics = new WebhookMetricsService();
     const fakeCronConfig = { registerHandler: () => undefined, findByKey: async () => null } as any;
-    const service = new WebhookIdempotencyPurgeService(repo, metrics, fakeCronConfig);
+    const fakeConfigService = { get: (key: string) => process.env[key] } as any;
+    const service = new WebhookIdempotencyPurgeService(repo, metrics, fakeCronConfig, fakeConfigService);
 
     await service.purgeOldEvents();
 

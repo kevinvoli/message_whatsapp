@@ -2,13 +2,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CommunicationInstagramService {
-  private readonly META_API_VERSION =
-    process.env.META_API_VERSION ?? 'v21.0';
+  private readonly META_API_VERSION: string;
 
-  constructor(private readonly logger: AppLogger) {}
+  constructor(
+    private readonly logger: AppLogger,
+    private readonly configService: ConfigService,
+  ) {
+    this.META_API_VERSION = this.configService.get<string>('META_API_VERSION') ?? 'v21.0';
+  }
 
   async sendTextMessage(data: {
     text: string;

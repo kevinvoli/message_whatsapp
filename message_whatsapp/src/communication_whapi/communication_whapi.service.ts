@@ -17,14 +17,13 @@ import {
   WhapiFailureKind,
   WhapiOutboundError,
 } from './errors/whapi-outbound.error';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CommunicationWhapiService {
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
-  private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN;
-  private readonly maxRetries = Number(
-    process.env.WHAPI_OUTBOUND_MAX_RETRIES ?? 2,
-  );
+  private readonly WHAPI_TOKEN: string | undefined;
+  private readonly maxRetries: number;
 
   constructor(
     @InjectRepository(WhapiChannel)
@@ -32,7 +31,11 @@ export class CommunicationWhapiService {
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
     private readonly logger: AppLogger,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.WHAPI_TOKEN = this.configService.get<string>('WHAPI_TOKEN');
+    this.maxRetries = Number(this.configService.get<string>('WHAPI_OUTBOUND_MAX_RETRIES') ?? 2);
+  }
 
   // async sendToWhapi(
   //   to: string,

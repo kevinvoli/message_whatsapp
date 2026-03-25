@@ -28,10 +28,9 @@ import { ContactModule } from './contact/contact.module';
 import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
 import { MessageAutoModule } from './message-auto/message-auto.module';
 import { AdminModule } from './admin/admin.module';
-import { Admin } from './admin/entities/admin.entity';
-import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity'; // Added import
-import { WhapiChannel } from './channel/entities/channel.entity'; // Added import
-import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity'; // Added import
+import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity';
+import { WhapiChannel } from './channel/entities/channel.entity';
+import { WhatsappChat } from './whatsapp_chat/entities/whatsapp_chat.entity';
 import { AuthAdminModule } from './auth_admin/auth_admin.module'; // Added import
 import { MetriquesModule } from './metriques/metriques.module';
 import { LoggingModule } from './logging/logging.module';
@@ -40,14 +39,16 @@ import { SystemConfigModule } from './system-config/system-config.module';
 
 @Module({
   imports: [
+    // AppService.getStats() utilise ces repos directement — ils restent ici
+    // jusqu'à ce qu'AppService soit migré vers un module dédié (Phase E).
     TypeOrmModule.forFeature([
       WhatsappCommercial,
       WhapiChannel,
       WhatsappChat,
-      Admin,
     ]),
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
+      isGlobal: true,
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()
           .valid('development', 'production', 'test')

@@ -15,6 +15,7 @@ const buildController = () =>
     new WebhookMetricsService(),
     {} as any,
     {} as any,
+    { get: (key: string) => process.env[key] } as any,
   );
 
 describe('Webhook payload validation', () => {

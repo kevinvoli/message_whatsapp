@@ -44,6 +44,9 @@ type AuthPayload = {
   tenantId?: string;
 };
 
+// process.env est intentionnel ici : @WebSocketGateway() est un décorateur évalué
+// à la définition de la classe, avant que l'injection de dépendances soit disponible.
+// ConfigService ne peut pas être injecté dans les arguments de décorateurs.
 const wsPort =
   process.env.NODE_ENV === 'test' ? 0 : Number(process.env.WS_PORT ?? 3001);
 

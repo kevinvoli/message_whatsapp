@@ -15,6 +15,7 @@ import { CommunicationWhapiService } from 'src/communication_whapi/communication
 import { MetaTokenService } from './meta-token.service';
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ChannelService {
@@ -27,6 +28,7 @@ export class ChannelService {
     private readonly metaTokenService: MetaTokenService,
     private readonly telegramService: CommunicationTelegramService,
     private readonly logger: AppLogger,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(dto: CreateChannelDto) {
@@ -86,7 +88,7 @@ export class ChannelService {
       });
 
       // Enregistrer le webhook Telegram avec le secret du canal
-      const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+      const appUrl = this.configService.get<string>('APP_URL')?.replace(/\/$/, '');
       if (appUrl) {
         const webhookUrl = `${appUrl}/webhooks/telegram/${botId}`;
         try {
@@ -160,7 +162,7 @@ export class ChannelService {
         ip: 'messenger',
         device_id: 0,
         is_business: dto.is_business ?? true,
-        api_version: process.env.META_API_VERSION ?? 'v21.0',
+        api_version: this.configService.get<string>('META_API_VERSION') ?? 'v21.0',
         core_version: 'messenger-graph-api',
       });
 
@@ -229,7 +231,7 @@ export class ChannelService {
         ip: 'instagram',
         device_id: 0,
         is_business: dto.is_business ?? true,
-        api_version: process.env.META_API_VERSION ?? 'v21.0',
+        api_version: this.configService.get<string>('META_API_VERSION') ?? 'v21.0',
         core_version: 'instagram-graph-api',
       });
 
@@ -297,7 +299,7 @@ export class ChannelService {
         ip: 'meta',
         device_id: 0,
         is_business: dto.is_business ?? true,
-        api_version: process.env.META_API_VERSION ?? 'v21.0',
+        api_version: this.configService.get<string>('META_API_VERSION') ?? 'v21.0',
         core_version: 'meta-cloud-api',
       });
 
