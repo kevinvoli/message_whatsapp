@@ -1,52 +1,35 @@
 import { HttpException } from '@nestjs/common';
-import { WhapiController } from '../whapi.controller';
-import { WebhookMetricsService } from '../webhook-metrics.service';
+import { WebhookPayloadValidationService } from '../webhook-payload-validation.service';
 
-const buildController = () =>
-  new WhapiController(
-    {} as any,
-    { assertRateLimits: jest.fn() } as any,
-    {
-      isDegraded: jest.fn(),
-      isCircuitOpen: jest.fn(),
-      record: jest.fn(),
-    } as any,
-    { enqueue: jest.fn() } as any,
-    new WebhookMetricsService(),
-    {} as any,
-    {} as any,
-    { get: (key: string) => process.env[key] } as any,
-  );
+const buildService = () => new WebhookPayloadValidationService();
 
 describe('Webhook payload validation', () => {
   it('rejects invalid whapi payload', () => {
-    const controller = buildController();
+    const service = buildService();
     expect(() =>
-      (controller as any).assertWhapiPayload({ channel_id: null }),
+      service.assertWhapiPayload({ channel_id: null } as any),
     ).toThrow(HttpException);
   });
 
   it('rejects whapi payload without messages/statuses', () => {
-    const controller = buildController();
+    const service = buildService();
     expect(() =>
-      (controller as any).assertWhapiPayload({
+      service.assertWhapiPayload({
         channel_id: 'ch-1',
         event: { type: 'messages', event: 'messages' },
-      }),
+      } as any),
     ).toThrow(HttpException);
   });
 
   it('rejects invalid meta payload', () => {
-    const controller = buildController();
-    expect(() => (controller as any).assertMetaPayload({})).toThrow(
-      HttpException,
-    );
+    const service = buildService();
+    expect(() => service.assertMetaPayload({})).toThrow(HttpException);
   });
 
   it('rejects meta payload without messages/statuses', () => {
-    const controller = buildController();
+    const service = buildService();
     expect(() =>
-      (controller as any).assertMetaPayload({
+      service.assertMetaPayload({
         object: 'whatsapp_business_account',
         entry: [
           {

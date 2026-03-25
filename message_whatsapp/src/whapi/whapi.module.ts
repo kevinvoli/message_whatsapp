@@ -55,6 +55,8 @@ import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
 import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 import { NotificationModule } from 'src/notification/notification.module';
+import { WebhookCryptoService } from './webhook-crypto.service';
+import { WebhookPayloadValidationService } from './webhook-payload-validation.service';
 
 @Module({
   imports: [
@@ -114,6 +116,8 @@ import { NotificationModule } from 'src/notification/notification.module';
     InboundMessageService,
     UnifiedIngressService,
     WebhookIdempotencyService,
+    WebhookCryptoService,
+    WebhookPayloadValidationService,
   ],
 })
 export class WhapiModule {}
