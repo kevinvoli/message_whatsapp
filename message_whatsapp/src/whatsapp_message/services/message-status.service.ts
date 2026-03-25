@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   WhatsappMessage,
   WhatsappMessageStatus,
 } from '../entities/whatsapp_message.entity';
+import { IMessageRepository } from 'src/domain/repositories/i-message.repository';
+import { MESSAGE_REPOSITORY } from 'src/domain/repositories/repository.tokens';
 
 /**
  * Mutations sur le statut des messages (SENT → DELIVERED → READ, erreurs).
@@ -14,8 +14,8 @@ export class MessageStatusService {
   private readonly logger = new Logger(MessageStatusService.name);
 
   constructor(
-    @InjectRepository(WhatsappMessage)
-    private readonly messageRepository: Repository<WhatsappMessage>,
+    @Inject(MESSAGE_REPOSITORY)
+    private readonly messageRepository: IMessageRepository,
   ) {}
 
   async updateByStatus(status: {
@@ -26,23 +26,10 @@ export class MessageStatusService {
     errorTitle?: string;
   }) {
     try {
-      const candidateConditions: FindOptionsWhere<WhatsappMessage>[] = [];
-
-      if (status.recipient_id) {
-        candidateConditions.push(
-          { external_id: status.id, chat_id: status.recipient_id },
-          { provider_message_id: status.id, chat_id: status.recipient_id },
-        );
-      } else {
-        candidateConditions.push(
-          { external_id: status.id },
-          { provider_message_id: status.id },
-        );
-      }
-
-      const message = await this.messageRepository.findOne({
-        where: candidateConditions,
-      });
+      const message = await this.messageRepository.findForStatusUpdate(
+        status.id,
+        status.recipient_id || undefined,
+      );
 
       if (!message) {
         this.logger.warn(
@@ -88,18 +75,7 @@ export class MessageStatusService {
   }
 
   async markIncomingMessagesAsRead(chat_id: string): Promise<void> {
-    // Ancrage explicite de `timestamp` et updatedAt pour bloquer ON UPDATE CURRENT_TIMESTAMP
-    // côté MySQL (le moteur applique ON UPDATE même sur les raw queries).
-    await this.messageRepository.query(
-      `UPDATE whatsapp_message
-       SET status    = 'READ',
-           updatedAt = updatedAt,
-           \`timestamp\` = \`timestamp\`
-       WHERE chat_id = ?
-         AND direction = 'IN'
-         AND status != 'READ'`,
-      [chat_id],
-    );
+    await this.messageRepository.markIncomingAsRead(chat_id);
     this.logger.debug(`Incoming messages marked as read for chat ${chat_id}`);
   }
 }

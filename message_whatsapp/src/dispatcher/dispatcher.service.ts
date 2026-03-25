@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
+import { IConversationRepository } from 'src/domain/repositories/i-conversation.repository';
+import { CONVERSATION_REPOSITORY } from 'src/domain/repositories/repository.tokens';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { QueueService } from './services/queue.service';
 import { AgentStateService } from 'src/agent-state/agent-state.service';
@@ -24,8 +24,8 @@ export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
   private readonly dispatchLock = new Mutex();
   constructor(
-    @InjectRepository(WhatsappChat)
-    private readonly chatRepository: Repository<WhatsappChat>,
+    @Inject(CONVERSATION_REPOSITORY)
+    private readonly chatRepository: IConversationRepository,
 
     private readonly queueService: QueueService,
 
@@ -70,10 +70,7 @@ export class DispatcherService {
       this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
     }
 
-    const conversation = await this.chatRepository.findOne({
-      where: { chat_id: clientPhone },
-      relations: ['messages', 'poste', 'channel'],
-    });
+    const conversation = await this.chatRepository.findByChatId(clientPhone);
 
     if (conversation?.read_only) {
       this.logger.warn(
@@ -160,7 +157,7 @@ export class DispatcherService {
         return this.chatRepository.save(conversation);
       }
 
-      const waitingChat = this.chatRepository.create({
+      const waitingChat = this.chatRepository.build({
         chat_id: clientPhone,
         name: clientName,
         tenant_id: tenantId ?? null,
@@ -230,7 +227,7 @@ export class DispatcherService {
       `🆕 Création nouvelle conversation pour ${clientPhone} avec agent (${nextAgent.name})`,
     );
 
-    const newChat = this.chatRepository.create({
+    const newChat = this.chatRepository.build({
       chat_id: clientPhone,
       name: clientName,
       tenant_id: tenantId ?? null,
@@ -287,14 +284,14 @@ export class DispatcherService {
         );
         // Étendre à 30 min pour éviter de re-trigger le SLA checker (intervalle 5 min)
         // à chaque cycle sans qu'aucune action ne soit possible.
-        await this.chatRepository.update(chat.id, {
+        await this.chatRepository.update({ id: chat.id }, {
           first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
         });
         return;
       }
     }
 
-    await this.chatRepository.update(chat.id, {
+    await this.chatRepository.update({ id: chat.id }, {
       poste: null,
       poste_id: null,
       assigned_mode: null,
@@ -332,7 +329,7 @@ export class DispatcherService {
       return;
     }
 
-    await this.chatRepository.update(chat.id, {
+    await this.chatRepository.update({ id: chat.id }, {
       poste: nextPoste,
       poste_id: nextPoste.id,
       assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
@@ -343,10 +340,7 @@ export class DispatcherService {
       first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    const updatedChat = await this.chatRepository.findOne({
-      where: { chat_id: chat.chat_id },
-      relations: ['poste', 'messages'],
-    });
+    const updatedChat = await this.chatRepository.findByChatId(chat.chat_id);
 
     if (!updatedChat) {
       return;
@@ -369,14 +363,12 @@ export class DispatcherService {
   async jobRunnertcheque(poste_id: string) {
     const now = new Date();
 
-    const chats = await this.chatRepository.find({
-      where: {
-        poste_id: poste_id,
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        last_poste_message_at: IsNull(),
-        first_response_deadline_at: LessThan(now),
-      },
-    });
+    const chats = (
+      await this.chatRepository.findExpiredSla(
+        [WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF],
+        now,
+      )
+    ).filter((c) => c.poste_id === poste_id);
     this.logger.debug(
       `Verification SLA reponses (${poste_id}) - ${chats.length} conversations`,
     );
@@ -390,13 +382,10 @@ export class DispatcherService {
   async jobRunnerAllPostes(): Promise<void> {
     const now = new Date();
 
-    const chats = await this.chatRepository.find({
-      where: {
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        last_poste_message_at: IsNull(),
-        first_response_deadline_at: LessThan(now),
-      },
-    });
+    const chats = await this.chatRepository.findExpiredSla(
+      [WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF],
+      now,
+    );
     this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) expirée(s)`);
 
     for (const chat of chats) {
@@ -414,12 +403,7 @@ export class DispatcherService {
     waiting_items: WhatsappChat[];
   }> {
     const queue = await this.queueService.getQueuePositions();
-    const waitingChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.EN_ATTENTE },
-      relations: ['poste'],
-      order: { updatedAt: 'DESC' },
-      take: 50,
-    });
+    const waitingChats = await this.chatRepository.findRecentWaiting(50);
 
     return {
       queue_size: queue.length,

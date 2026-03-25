@@ -7,6 +7,16 @@ import { MessageStatusService } from './services/message-status.service';
 import { InboundPersistenceService } from './services/inbound-persistence.service';
 import { OutboundMessageService } from './services/outbound-message.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MessageTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/message.typeorm-repository';
+import { ConversationTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/conversation.typeorm-repository';
+import { CommercialTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/commercial.typeorm-repository';
+import { MediaTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/media.typeorm-repository';
+import {
+  MESSAGE_REPOSITORY,
+  CONVERSATION_REPOSITORY,
+  COMMERCIAL_REPOSITORY,
+  MEDIA_REPOSITORY,
+} from 'src/domain/repositories/repository.tokens';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
@@ -74,6 +84,10 @@ import { NotificationModule } from 'src/notification/notification.module';
   ],
   controllers: [WhatsappMessageController],
   providers: [
+    { provide: MESSAGE_REPOSITORY, useClass: MessageTypeOrmRepository },
+    { provide: CONVERSATION_REPOSITORY, useClass: ConversationTypeOrmRepository },
+    { provide: COMMERCIAL_REPOSITORY, useClass: CommercialTypeOrmRepository },
+    { provide: MEDIA_REPOSITORY, useClass: MediaTypeOrmRepository },
     WhatsappChatService,
     WhatsappMessageGateway,
     WhatsappMessageService,

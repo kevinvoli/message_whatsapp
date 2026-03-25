@@ -1,27 +1,31 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DispatcherService } from './dispatcher.service';
-import {
-  WhatsappChat,
-  WhatsappChatStatus,
-} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { QueueService } from './services/queue.service';
 import { AgentStateService } from 'src/agent-state/agent-state.service';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { CONVERSATION_REPOSITORY } from 'src/domain/repositories/repository.tokens';
 
 describe('DispatcherService', () => {
   let service: DispatcherService;
   const chatRepository = {
-    findOne: jest.fn(),
+    findByChatId: jest.fn(),
+    findByChatIdShallow: jest.fn(),
+    findByStatuses: jest.fn(),
+    findExpiredSla: jest.fn(),
+    findRecentWaiting: jest.fn(),
     save: jest.fn(),
     update: jest.fn(),
-    find: jest.fn(),
+    build: jest.fn(),
+    countQueuedPostesExcluding: jest.fn(),
+    findByPosteId: jest.fn(),
   };
   const queueService = {
     getNextInQueue: jest.fn(),
     getQueuePositions: jest.fn(),
+    countQueuedPostesExcluding: jest.fn(),
   };
   const agentStateService = {
     isConnected: jest.fn(),
@@ -36,7 +40,7 @@ describe('DispatcherService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DispatcherService,
-        { provide: getRepositoryToken(WhatsappChat), useValue: chatRepository },
+        { provide: CONVERSATION_REPOSITORY, useValue: chatRepository },
         { provide: QueueService, useValue: queueService },
         { provide: AgentStateService, useValue: agentStateService },
         { provide: EventEmitter2, useValue: eventEmitter },
@@ -49,7 +53,7 @@ describe('DispatcherService', () => {
   });
 
   it('ignores read_only conversations', async () => {
-    chatRepository.findOne.mockResolvedValue({
+    chatRepository.findByChatId.mockResolvedValue({
       chat_id: '123@c.us',
       read_only: true,
       unread_count: 0,
@@ -75,7 +79,7 @@ describe('DispatcherService', () => {
       assigned_mode: null,
     };
 
-    chatRepository.findOne.mockResolvedValue(conversation);
+    chatRepository.findByChatId.mockResolvedValue(conversation);
     agentStateService.isConnected.mockReturnValue(false);
     queueService.getNextInQueue.mockResolvedValue({
       id: 'poste-1',

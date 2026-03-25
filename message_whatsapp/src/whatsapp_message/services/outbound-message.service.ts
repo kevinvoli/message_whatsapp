@@ -1,7 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -9,15 +7,22 @@ import {
 } from '../entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import {
-  WhatsappMedia,
-  WhatsappMediaType,
-} from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { WhatsappMediaType } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { ChannelService } from 'src/channel/channel.service';
+import { IMessageRepository } from 'src/domain/repositories/i-message.repository';
+import { IConversationRepository } from 'src/domain/repositories/i-conversation.repository';
+import { ICommercialRepository } from 'src/domain/repositories/i-commercial.repository';
+import { IMediaRepository } from 'src/domain/repositories/i-media.repository';
+import {
+  MESSAGE_REPOSITORY,
+  CONVERSATION_REPOSITORY,
+  COMMERCIAL_REPOSITORY,
+  MEDIA_REPOSITORY,
+} from 'src/domain/repositories/repository.tokens';
 
 /**
  * Envoi de messages sortants (texte, médias) et typing indicators.
@@ -27,14 +32,14 @@ export class OutboundMessageService {
   private readonly logger = new Logger(OutboundMessageService.name);
 
   constructor(
-    @InjectRepository(WhatsappMessage)
-    private readonly messageRepository: Repository<WhatsappMessage>,
-    @InjectRepository(WhatsappChat)
-    private readonly chatRepository: Repository<WhatsappChat>,
-    @InjectRepository(WhatsappCommercial)
-    private readonly commercialRepository: Repository<WhatsappCommercial>,
-    @InjectRepository(WhatsappMedia)
-    private readonly mediaRepository: Repository<WhatsappMedia>,
+    @Inject(MESSAGE_REPOSITORY)
+    private readonly messageRepository: IMessageRepository,
+    @Inject(CONVERSATION_REPOSITORY)
+    private readonly chatRepository: IConversationRepository,
+    @Inject(COMMERCIAL_REPOSITORY)
+    private readonly commercialRepository: ICommercialRepository,
+    @Inject(MEDIA_REPOSITORY)
+    private readonly mediaRepository: IMediaRepository,
     private readonly chatService: WhatsappChatService,
     private readonly communicationWhapiService: CommunicationWhapiService,
     private readonly outboundRouter: OutboundRouterService,
@@ -62,15 +67,12 @@ export class OutboundMessageService {
       chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
       if (data.commercial_id) {
-        commercial = await this.commercialRepository.findOne({
-          where: { id: data.commercial_id },
-        });
+        commercial = await this.commercialRepository.findById(data.commercial_id);
       }
 
-      const lastInboundMessage = await this.messageRepository.findOne({
-        where: { chat_id: data.chat_id, direction: MessageDirection.IN },
-        order: { timestamp: 'DESC' },
-      });
+      const lastInboundMessage = await this.messageRepository.findLastInboundByChatId(
+        data.chat_id,
+      );
 
       if (lastInboundMessage) {
         const diff =
@@ -89,9 +91,7 @@ export class OutboundMessageService {
 
       let quotedMsg: WhatsappMessage | null = null;
       if (data.quotedMessageId) {
-        quotedMsg = await this.messageRepository.findOne({
-          where: { id: data.quotedMessageId },
-        });
+        quotedMsg = await this.messageRepository.findById(data.quotedMessageId);
       }
 
       const sendResponse = await this.outboundRouter.sendTextMessage({
@@ -110,7 +110,7 @@ export class OutboundMessageService {
         throw new NotFoundException('Channel not found');
       }
 
-      const messageEntity = this.messageRepository.create({
+      const messageEntity = this.messageRepository.build({
         message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
         external_id: sendResponse.providerMessageId,
         provider: sendResponse.provider,
@@ -183,15 +183,12 @@ export class OutboundMessageService {
       chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
       if (data.commercial_id) {
-        commercial = await this.commercialRepository.findOne({
-          where: { id: data.commercial_id },
-        });
+        commercial = await this.commercialRepository.findById(data.commercial_id);
       }
 
-      const lastInboundMessage = await this.messageRepository.findOne({
-        where: { chat_id: data.chat_id, direction: MessageDirection.IN },
-        order: { timestamp: 'DESC' },
-      });
+      const lastInboundMessage = await this.messageRepository.findLastInboundByChatId(
+        data.chat_id,
+      );
       if (lastInboundMessage) {
         const diff =
           new Date().getTime() -
@@ -226,7 +223,7 @@ export class OutboundMessageService {
         throw new NotFoundException('Channel not found');
       }
 
-      const messageEntity = this.messageRepository.create({
+      const messageEntity = this.messageRepository.build({
         message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
         external_id: sendResponse.providerMessageId,
         provider: sendResponse.provider,
@@ -258,7 +255,7 @@ export class OutboundMessageService {
         resolvedMediaUrl = `/messages/media/whapi/${sendResponse.providerMessageId}${channelQuery}`;
       }
 
-      const mediaEntity = this.mediaRepository.create({
+      const mediaEntity = this.mediaRepository.build({
         media_id: `agent_media_${Date.now()}`,
         provider_media_id: sendResponse.providerMediaId ?? null,
         whapi_media_id:
@@ -294,10 +291,7 @@ export class OutboundMessageService {
         },
       );
 
-      const result = await this.messageRepository.findOne({
-        where: { id: savedMessage.id },
-        relations: ['chat', 'medias', 'channel', 'poste', 'commercial'],
-      });
+      const result = await this.messageRepository.findWithMedias(savedMessage.id);
       return result!;
     } catch (error) {
       this.logger.error(
@@ -333,7 +327,7 @@ export class OutboundMessageService {
       return;
     }
 
-    const failedMessage = this.messageRepository.create({
+    const failedMessage = this.messageRepository.build({
       message_id: `failed_${Date.now()}`,
       external_id: undefined,
       poste_id: data.poste_id,

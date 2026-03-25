@@ -1,6 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DispatcherService } from './dispatcher.service';
+import { MessageTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/message.typeorm-repository';
+import { ConversationTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/conversation.typeorm-repository';
+import { CommercialTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/commercial.typeorm-repository';
+import { MediaTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/media.typeorm-repository';
+import {
+  MESSAGE_REPOSITORY,
+  CONVERSATION_REPOSITORY,
+  COMMERCIAL_REPOSITORY,
+  MEDIA_REPOSITORY,
+} from 'src/domain/repositories/repository.tokens';
 import { QueueService } from './services/queue.service';
 import { MessageQueryService } from 'src/whatsapp_message/services/message-query.service';
 import { MessageStatusService } from 'src/whatsapp_message/services/message-status.service';
@@ -63,6 +73,10 @@ import { NotificationModule } from 'src/notification/notification.module';
   ],
   controllers: [DispatcherController],
   providers: [
+    { provide: MESSAGE_REPOSITORY, useClass: MessageTypeOrmRepository },
+    { provide: CONVERSATION_REPOSITORY, useClass: ConversationTypeOrmRepository },
+    { provide: COMMERCIAL_REPOSITORY, useClass: CommercialTypeOrmRepository },
+    { provide: MEDIA_REPOSITORY, useClass: MediaTypeOrmRepository },
     DispatcherService,
     QueueService,
     WhatsappMessageService,

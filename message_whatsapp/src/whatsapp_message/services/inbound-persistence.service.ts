@@ -1,17 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import {
   MessageDirection,
   WhatsappMessage,
   WhatsappMessageStatus,
 } from '../entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhapiMessage } from 'src/whapi/interface/whapi-webhook.interface';
 import { UnifiedMessage } from 'src/webhooks/normalization/unified-message';
 import { ChannelService } from 'src/channel/channel.service';
 import { ContactService } from 'src/contact/contact.service';
+import { IMessageRepository } from 'src/domain/repositories/i-message.repository';
+import { IConversationRepository } from 'src/domain/repositories/i-conversation.repository';
+import { ICommercialRepository } from 'src/domain/repositories/i-commercial.repository';
+import {
+  MESSAGE_REPOSITORY,
+  CONVERSATION_REPOSITORY,
+  COMMERCIAL_REPOSITORY,
+} from 'src/domain/repositories/repository.tokens';
 
 /**
  * Persistance des messages entrants (Whapi, Meta/unified, interne).
@@ -21,12 +27,12 @@ export class InboundPersistenceService {
   private readonly logger = new Logger(InboundPersistenceService.name);
 
   constructor(
-    @InjectRepository(WhatsappMessage)
-    private readonly messageRepository: Repository<WhatsappMessage>,
-    @InjectRepository(WhatsappChat)
-    private readonly chatRepository: Repository<WhatsappChat>,
-    @InjectRepository(WhatsappCommercial)
-    private readonly commercialRepository: Repository<WhatsappCommercial>,
+    @Inject(MESSAGE_REPOSITORY)
+    private readonly messageRepository: IMessageRepository,
+    @Inject(CONVERSATION_REPOSITORY)
+    private readonly chatRepository: IConversationRepository,
+    @Inject(COMMERCIAL_REPOSITORY)
+    private readonly commercialRepository: ICommercialRepository,
     private readonly channelService: ChannelService,
     private readonly contactService: ContactService,
   ) {}
@@ -40,9 +46,9 @@ export class InboundPersistenceService {
       this.logger.log(
         `INCOMING_SAVE_REQUEST trace=${traceId} chat_id=${message.chat_id}`,
       );
-      const existingMessage = await this.messageRepository.findOne({
-        where: { message_id: message.id },
-      });
+      const existingMessage = await this.messageRepository.findByMessageId(
+        message.id,
+      );
       if (existingMessage) {
         this.logger.log(
           `INCOMING_DUPLICATE trace=${traceId} db_message_id=${existingMessage.id} direction=${existingMessage.direction}`,
@@ -70,7 +76,7 @@ export class InboundPersistenceService {
 
       try {
         const saved = await this.messageRepository.save(
-          this.messageRepository.create({
+          this.messageRepository.build({
             channel: channel,
             chat: chat,
             contact_id: contact?.id,
@@ -100,9 +106,9 @@ export class InboundPersistenceService {
             (error as any).driverError.code,
           )
         ) {
-          const duplicated = await this.messageRepository.findOne({
-            where: { message_id: message.id },
-          });
+          const duplicated = await this.messageRepository.findByMessageId(
+            message.id,
+          );
           if (duplicated) {
             this.logger.log(
               `INCOMING_DUPLICATE_RACE trace=${traceId} db_message_id=${duplicated.id}`,
@@ -136,9 +142,9 @@ export class InboundPersistenceService {
       this.logger.debug(
         `INCOMING_PROBE trace=${traceId} provider=${message.provider} providerMessageId=${message.providerMessageId} direction=${message.direction}`,
       );
-      const existingMessage = await this.messageRepository.findOne({
-        where: { provider_message_id: message.providerMessageId },
-      });
+      const existingMessage = await this.messageRepository.findByProviderMessageId(
+        message.providerMessageId,
+      );
       if (existingMessage) {
         this.logger.log(
           `INCOMING_DUPLICATE trace=${traceId} db_message_id=${existingMessage.id}`,
@@ -171,13 +177,13 @@ export class InboundPersistenceService {
 
       let quotedMsg: WhatsappMessage | null = null;
       if (message.quotedProviderMessageId) {
-        quotedMsg = await this.messageRepository.findOne({
-          where: { provider_message_id: message.quotedProviderMessageId },
-        });
+        quotedMsg = await this.messageRepository.findByProviderMessageId(
+          message.quotedProviderMessageId,
+        );
       }
 
       const buildMessageEntity = (chatRef: WhatsappChat) =>
-        this.messageRepository.create({
+        this.messageRepository.build({
           tenant_id: message.tenantId,
           provider: message.provider,
           provider_message_id: message.providerMessageId,
@@ -218,13 +224,10 @@ export class InboundPersistenceService {
           errorCode &&
           ['ER_DUP_ENTRY', '23505', 'SQLITE_CONSTRAINT'].includes(errorCode)
         ) {
-          const duplicated = await this.messageRepository.findOne({
-            where: {
-              provider_message_id: message.providerMessageId,
-              provider: message.provider,
-              direction: MessageDirection.IN,
-            },
-          });
+          const duplicated = await this.messageRepository.findIncomingByProviderMessageId(
+            message.provider,
+            message.providerMessageId,
+          );
           if (duplicated) {
             this.logger.log(
               `INCOMING_DUPLICATE_RACE trace=${traceId} db_message_id=${duplicated.id}`,
@@ -237,10 +240,9 @@ export class InboundPersistenceService {
           this.logger.warn(
             `INCOMING_FK_VIOLATION trace=${traceId} chat_id=${message.chatId} — reloading fresh chat and retrying`,
           );
-          const freshChat = await this.chatRepository.findOne({
-            where: { chat_id: message.chatId },
-            relations: ['poste'],
-          });
+          const freshChat = await this.chatRepository.findByChatId(
+            message.chatId,
+          );
           if (freshChat) {
             const saved = await this.messageRepository.save(
               buildMessageEntity(freshChat),
@@ -265,25 +267,27 @@ export class InboundPersistenceService {
 
   async createInternalMessage(message: any, commercialId?: string) {
     try {
-      const chat = await this.chatRepository.findOne({
-        where: { chat_id: message.chat_id },
-      });
+      const chat = await this.chatRepository.findByChatIdShallow(
+        message.chat_id,
+      );
 
       if (!chat) {
         throw new Error('Chat not found or created');
       }
 
-      const chekMessage = await this.messageRepository.findOne({
-        where: { message_id: message.id },
-      });
+      const chekMessage = await this.messageRepository.findByMessageId(
+        message.id,
+      );
 
       if (chekMessage) {
         return chekMessage;
       }
 
-      const commercial = await this.commercialRepository.findOne({
-        where: { id: commercialId },
-      });
+      if (!commercialId) {
+        return null;
+      }
+
+      const commercial = await this.commercialRepository.findById(commercialId);
 
       if (!commercial) {
         return null;
@@ -302,7 +306,7 @@ export class InboundPersistenceService {
         source: message.source,
       };
 
-      const messageEntity = this.messageRepository.create(data);
+      const messageEntity = this.messageRepository.build(data);
       return this.messageRepository.save(messageEntity);
     } catch (error) {
       this.logger.error(

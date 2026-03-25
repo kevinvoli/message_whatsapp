@@ -70,10 +70,10 @@ export class ConversationTypeOrmRepository implements IConversationRepository {
   }
 
   async update(
-    criteria: { id?: number; chat_id?: string },
+    criteria: { id?: string; chat_id?: string },
     fields: Partial<WhatsappChat>,
   ): Promise<void> {
-    await this.repo.update(criteria, fields);
+    await this.repo.update(criteria as any, fields);
   }
 
   build(data: Partial<WhatsappChat>): WhatsappChat {

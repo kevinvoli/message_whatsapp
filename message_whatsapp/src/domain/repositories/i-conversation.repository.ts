@@ -45,7 +45,7 @@ export interface IConversationRepository {
 
   /** Mise à jour partielle ciblée par critère. */
   update(
-    criteria: { id?: number; chat_id?: string },
+    criteria: { id?: string; chat_id?: string },
     fields: Partial<WhatsappChat>,
   ): Promise<void>;
 
