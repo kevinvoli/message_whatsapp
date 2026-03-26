@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
+import { SendTextMessageHandler } from './application/commands/send-text-message.handler';
+import { GetMessagesForChatHandler } from './application/queries/get-messages-for-chat.handler';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
@@ -43,8 +46,6 @@ import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { MessageAutoService } from 'src/message-auto/message-auto.service';
-import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
@@ -72,9 +73,9 @@ import { NotificationModule } from 'src/notification/notification.module';
       ProviderChannel,
       Contact,
       WhatsappPoste,
-      MessageAuto,
       WhatsappMedia,
     ]),
+    CqrsModule,
     WhatsappChatModule,
     DispatcherModule,
     LoggingModule,
@@ -107,8 +108,9 @@ import { NotificationModule } from 'src/notification/notification.module';
     MetaTokenService,
     ContactService,
     WhatsappPosteService,
-    MessageAutoService,
     SocketThrottleGuard,
+    SendTextMessageHandler,
+    GetMessagesForChatHandler,
   ],
   exports: [
     WhatsappMessageGateway,

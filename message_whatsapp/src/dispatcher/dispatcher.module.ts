@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
+import { AssignConversationHandler } from './application/commands/assign-conversation.handler';
+import { GetDispatchSnapshotHandler } from './application/queries/get-dispatch-snapshot.handler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DispatcherService } from './dispatcher.service';
 import { MessageTypeOrmRepository } from 'src/infrastructure/persistence/typeorm/message.typeorm-repository';
@@ -66,6 +69,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       WhatsappPoste,
       WhatsappMedia,
     ]),
+    CqrsModule,
     LoggingModule,
     CallLogModule,
     JorbsModule,
@@ -99,6 +103,8 @@ import { NotificationModule } from 'src/notification/notification.module';
     OfflineReinjectionJob,
     ReadOnlyEnforcementJob,
     DispatchSettingsService,
+    AssignConversationHandler,
+    GetDispatchSnapshotHandler,
   ],
   exports: [DispatcherService, QueueService, DispatchSettingsService],
 })

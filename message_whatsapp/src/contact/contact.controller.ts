@@ -16,21 +16,21 @@ import { CreateContactDto } from './dto/create-contact.dto'; // Added import
 import { UpdateContactCallDto } from './dto/update-contact-call.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Added import
 import { AuthGuard } from '@nestjs/passport';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENTS } from 'src/events/events.constants';
 
 @Controller('contact')
 export class ContactController {
   constructor(
     private readonly service: ContactService,
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Post()
   @UseGuards(AdminGuard)
   async create(@Body() dto: CreateContactDto) {
     const contact = await this.service.create(dto);
-    await this.gateway.emitContactUpsert(contact);
-    
+    this.eventEmitter.emit(EVENTS.CONTACT_UPSERT, { contact });
     return contact;
   }
 
@@ -56,7 +56,7 @@ export class ContactController {
   @UseGuards(AdminGuard)
   async update(@Param('id') id: string, @Body() dto: UpdateContactDto) {
     const contact = await this.service.update(id, dto);
-    await this.gateway.emitContactUpsert(contact);
+    this.eventEmitter.emit(EVENTS.CONTACT_UPSERT, { contact });
     return contact;
   }
 
@@ -72,8 +72,8 @@ export class ContactController {
       dto,
       req.user.userId,
     );
-    await this.gateway.emitContactCallStatusUpdated(contact);
-    await this.gateway.emitCallLogNew(contact, callLog);
+    this.eventEmitter.emit(EVENTS.CONTACT_CALL_STATUS_UPDATED, { contact });
+    this.eventEmitter.emit(EVENTS.CALL_LOG_NEW, { contact, callLog });
     return contact;
   }
 
@@ -81,7 +81,7 @@ export class ContactController {
   @UseGuards(AdminGuard)
   async remove(@Param('id') id: string) {
     const contact = await this.service.remove(id);
-    await this.gateway.emitContactRemoved(contact);
+    this.eventEmitter.emit(EVENTS.CONTACT_REMOVED, { contact });
     return contact;
   }
 }

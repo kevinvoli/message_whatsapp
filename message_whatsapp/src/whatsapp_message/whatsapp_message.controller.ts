@@ -29,6 +29,9 @@ import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { Response } from 'express';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { SendTextMessageCommand } from 'src/application/commands/send-text-message.command';
+import { GetMessagesForChatQuery } from 'src/application/queries/get-messages-for-chat.query';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
 
@@ -50,18 +53,21 @@ export class WhatsappMessageController {
     private readonly channelService: ChannelService,
     private readonly metaService: CommunicationMetaService,
     private readonly whapiService: CommunicationWhapiService,
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
   ) {}
 
   @Post()
   @UseGuards(AdminGuard)
   async create(@Body() createMessageDto: CreateWhatsappMessageDto) {
-    return this.messageService.createAgentMessage({
-      chat_id: createMessageDto.chat_id,
-      text: createMessageDto.text,
-      poste_id: createMessageDto.poste_id,
-      timestamp: new Date(),
-      channel_id: createMessageDto.channel_id,
-    });
+    return this.commandBus.execute(
+      new SendTextMessageCommand(
+        createMessageDto.chat_id,
+        createMessageDto.text,
+        createMessageDto.poste_id,
+        createMessageDto.channel_id,
+      ),
+    );
   }
 
   @Post('media')
@@ -274,7 +280,7 @@ export class WhatsappMessageController {
   @Get(':chat_id')
   @UseGuards(AdminGuard)
   async findByChatId(@Param('chat_id') chat_id: string) {
-    return this.messageService.findBychat_id(chat_id);
+    return this.queryBus.execute(new GetMessagesForChatQuery(chat_id));
   }
 
   @Get()

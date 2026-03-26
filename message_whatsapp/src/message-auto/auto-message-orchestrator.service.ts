@@ -1,12 +1,13 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { NotificationService } from 'src/notification/notification.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENTS } from 'src/events/events.constants';
 
 @Injectable()
 export class AutoMessageOrchestrator {
@@ -19,8 +20,7 @@ export class AutoMessageOrchestrator {
     private readonly cronConfigService: CronConfigService,
     private readonly scopeConfigService: AutoMessageScopeConfigService,
     private readonly logger: AppLogger,
-    @Inject(forwardRef(() => WhatsappMessageGateway))
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly eventEmitter: EventEmitter2,
     private readonly notificationService: NotificationService,
   ) {}
 
@@ -109,7 +109,7 @@ export class AutoMessageOrchestrator {
     // 🚫 Verrouillage immédiat de la conversation côté commercial
     // Le commercial ne peut pas envoyer de message pendant le délai d'attente.
     await this.chatService.update(chatId, { read_only: true });
-    this.gateway.emitConversationReadonly({ ...chat, read_only: true } as WhatsappChat);
+    this.eventEmitter.emit(EVENTS.CONVERSATION_SET_READONLY, { chat: { ...chat, read_only: true } });
 
     this.logger.debug(
       `Conversation ${chatId} locked for auto-message scheduling`,
@@ -158,7 +158,7 @@ export class AutoMessageOrchestrator {
       // Libérer le lock et déverrouiller la conversation si le scheduling échoue
       this.locks.delete(chatId);
       await this.chatService.update(chatId, { read_only: false });
-      this.gateway.emitConversationReadonly({ ...chat, read_only: false } as WhatsappChat);
+      this.eventEmitter.emit(EVENTS.CONVERSATION_SET_READONLY, { chat: { ...chat, read_only: false } });
 
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;

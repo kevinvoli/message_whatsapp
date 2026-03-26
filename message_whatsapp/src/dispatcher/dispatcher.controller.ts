@@ -16,6 +16,8 @@ import { DispatcherService } from './dispatcher.service';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { DispatchSettings } from './entities/dispatch-settings.entity';
 import { UpdateDispatchSettingsDto } from './dto/update-dispatch-settings.dto';
+import { QueryBus } from '@nestjs/cqrs';
+import { GetDispatchSnapshotQuery } from 'src/application/queries/get-dispatch-snapshot.query';
 
 @ApiTags('Queue')
 @Controller('queue')
@@ -26,6 +28,7 @@ export class DispatcherController {
     private readonly gateway: WhatsappMessageGateway,
     private readonly dispatcherService: DispatcherService,
     private readonly dispatchSettingsService: DispatchSettingsService,
+    private readonly queryBus: QueryBus,
   ) {}
 
   @Get()
@@ -74,7 +77,7 @@ export class DispatcherController {
     waiting_count: number;
     waiting_items: unknown[];
   }> {
-    return this.dispatcherService.getDispatchSnapshot();
+    return this.queryBus.execute(new GetDispatchSnapshotQuery());
   }
 
   @Get('dispatch/settings')

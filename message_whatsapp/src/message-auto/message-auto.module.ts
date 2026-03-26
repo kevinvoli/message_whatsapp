@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { MessageAutoController } from './message-auto.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -60,7 +60,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       Contact,
       WhatsappMedia,
     ]),
-    forwardRef(() => WhatsappMessageModule),
+    WhatsappMessageModule,
     LoggingModule,
     CallLogModule,
     JorbsModule,

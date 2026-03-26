@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
+import { GetConversationsForAgentHandler } from './application/queries/get-conversations-for-agent.handler';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { WhatsappChatController } from './whatsapp_chat.controller';
 import { WhatsappChatGateway } from './whatsapp_chat.gateway';
@@ -15,6 +17,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 
 @Module({
   imports: [
+    CqrsModule,
     TypeOrmModule.forFeature([
       WhatsappChat,
       WhatsappChatLabel,
@@ -31,6 +34,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
     WhatsappPosteService,
     WhatsappCommercialService,
     QueueService,
+    GetConversationsForAgentHandler,
   ],
 })
 export class WhatsappChatModule {}

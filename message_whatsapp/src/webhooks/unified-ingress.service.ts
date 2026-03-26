@@ -4,16 +4,18 @@ import { MetaWebhookPayload } from 'src/whapi/interface/whatsapp-whebhook.interf
 import { MessengerWebhookPayload } from 'src/whapi/interface/messenger-webhook.interface';
 import { InstagramWebhookPayload } from 'src/whapi/interface/instagram-webhook.interface';
 import { TelegramWebhookPayload } from 'src/whapi/interface/telegram-webhook.interface';
-import { InboundMessageService } from './inbound-message.service';
 import { ProviderAdapterRegistry } from './adapters/provider-adapter.registry';
 import { AdapterContext } from './adapters/provider-adapter.interface';
+import { CommandBus } from '@nestjs/cqrs';
+import { HandleInboundMessageCommand } from 'src/application/commands/handle-inbound-message.command';
+import { UpdateMessageStatusCommand } from 'src/application/commands/update-message-status.command';
 
 @Injectable()
 export class UnifiedIngressService {
   private readonly logger = new Logger(UnifiedIngressService.name);
   constructor(
     private readonly adapterRegistry: ProviderAdapterRegistry,
-    private readonly inboundService: InboundMessageService,
+    private readonly commandBus: CommandBus,
   ) {}
 
   async ingestWhapi(
@@ -34,10 +36,10 @@ export class UnifiedIngressService {
     });
 
     if (unifiedMessages.length > 0) {
-      await this.inboundService.handleMessages(unifiedMessages);
+      await this.commandBus.execute(new HandleInboundMessageCommand(unifiedMessages));
     }
     if (unifiedStatuses.length > 0) {
-      await this.inboundService.handleStatuses(unifiedStatuses);
+      await this.commandBus.execute(new UpdateMessageStatusCommand(unifiedStatuses));
     }
   }
 
@@ -96,10 +98,10 @@ export class UnifiedIngressService {
     });
 
     if (unifiedMessages.length > 0) {
-      await this.inboundService.handleMessages(unifiedMessages);
+      await this.commandBus.execute(new HandleInboundMessageCommand(unifiedMessages));
     }
     if (unifiedStatuses.length > 0) {
-      await this.inboundService.handleStatuses(unifiedStatuses);
+      await this.commandBus.execute(new UpdateMessageStatusCommand(unifiedStatuses));
     }
   }
 
@@ -113,10 +115,10 @@ export class UnifiedIngressService {
     const unifiedStatuses = messengerAdapter.normalizeStatuses(payload, context);
 
     if (unifiedMessages.length > 0) {
-      await this.inboundService.handleMessages(unifiedMessages);
+      await this.commandBus.execute(new HandleInboundMessageCommand(unifiedMessages));
     }
     if (unifiedStatuses.length > 0) {
-      await this.inboundService.handleStatuses(unifiedStatuses);
+      await this.commandBus.execute(new UpdateMessageStatusCommand(unifiedStatuses));
     }
   }
 
@@ -130,10 +132,10 @@ export class UnifiedIngressService {
     const unifiedStatuses = instagramAdapter.normalizeStatuses(payload, context);
 
     if (unifiedMessages.length > 0) {
-      await this.inboundService.handleMessages(unifiedMessages);
+      await this.commandBus.execute(new HandleInboundMessageCommand(unifiedMessages));
     }
     if (unifiedStatuses.length > 0) {
-      await this.inboundService.handleStatuses(unifiedStatuses);
+      await this.commandBus.execute(new UpdateMessageStatusCommand(unifiedStatuses));
     }
   }
 
@@ -146,7 +148,7 @@ export class UnifiedIngressService {
     const unifiedMessages = telegramAdapter.normalizeMessages(payload, context);
     // Telegram n'a pas de statuts
     if (unifiedMessages.length > 0) {
-      await this.inboundService.handleMessages(unifiedMessages);
+      await this.commandBus.execute(new HandleInboundMessageCommand(unifiedMessages));
     }
   }
 

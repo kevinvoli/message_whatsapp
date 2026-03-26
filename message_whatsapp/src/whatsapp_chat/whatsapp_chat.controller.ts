@@ -9,11 +9,16 @@ import {
 } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
+import { QueryBus } from '@nestjs/cqrs';
+import { GetConversationsForAgentQuery } from 'src/application/queries/get-conversations-for-agent.query';
 
 @Controller('chats')
 @UseGuards(AdminGuard)
 export class WhatsappChatController {
-  constructor(private readonly chatService: WhatsappChatService) {}
+  constructor(
+    private readonly chatService: WhatsappChatService,
+    private readonly queryBus: QueryBus,
+  ) {}
 
   @Get()
   async findAll(
@@ -39,13 +44,15 @@ export class WhatsappChatController {
         }
       }
     }
-    return this.chatService.findAll(
-      chat_id,
-      limit ? Math.min(parseInt(limit, 10), 200) : 50,
-      offset ? parseInt(offset, 10) : 0,
-      dateStart,
-      poste_id,
-      commercial_id,
+    return this.queryBus.execute(
+      new GetConversationsForAgentQuery(
+        chat_id,
+        limit ? Math.min(parseInt(limit, 10), 200) : 50,
+        offset ? parseInt(offset, 10) : 0,
+        dateStart,
+        poste_id,
+        commercial_id,
+      ),
     );
   }
 

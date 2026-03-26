@@ -1,18 +1,14 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MessageAuto } from './entities/message-auto.entity';
 import { Repository } from 'typeorm';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { CreateMessageAutoDto } from './dto/create-message-auto.dto';
 import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENTS } from 'src/events/events.constants';
 
 @Injectable()
 export class MessageAutoService {
@@ -22,8 +18,7 @@ export class MessageAutoService {
 
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
-    @Inject(forwardRef(() => WhatsappMessageGateway))
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly eventEmitter: EventEmitter2,
     private readonly logger: AppLogger,
   ) {}
 
@@ -130,7 +125,7 @@ export class MessageAutoService {
         channel_id: chat.last_msg_client_channel_id,
       });
 
-      await this.gateway.notifyNewMessage(message, chat);
+      this.eventEmitter.emit(EVENTS.MESSAGE_NOTIFY_NEW, { message, chat });
 
       await this.chatService.update(chatId, {
         read_only: false,
@@ -146,7 +141,7 @@ export class MessageAutoService {
     } finally {
       // 🛑 Stop typing WA (best-effort) + déverrouillage frontend
       void this.messageService.typingStop(chatId).catch(() => {});
-      this.gateway.emitConversationReadonly({ ...chat, read_only: false } as typeof chat);
+      this.eventEmitter.emit(EVENTS.CONVERSATION_SET_READONLY, { chat: { ...chat, read_only: false } });
     }
   }
 

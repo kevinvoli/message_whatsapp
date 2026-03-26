@@ -57,6 +57,9 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
 import { NotificationModule } from 'src/notification/notification.module';
 import { WebhookCryptoService } from './webhook-crypto.service';
 import { WebhookPayloadValidationService } from './webhook-payload-validation.service';
+import { CqrsModule } from '@nestjs/cqrs';
+import { HandleInboundMessageHandler } from 'src/webhooks/application/commands/handle-inbound-message.handler';
+import { UpdateMessageStatusHandler } from 'src/webhooks/application/commands/update-message-status.handler';
 
 @Module({
   imports: [
@@ -74,6 +77,7 @@ import { WebhookPayloadValidationService } from './webhook-payload-validation.se
       AutoMessageScopeConfig,
       WebhookEventLog,
     ]),
+    CqrsModule,
     DispatcherModule,
     WhatsappMessageModule,
     WhatsappChatModule,
@@ -118,6 +122,8 @@ import { WebhookPayloadValidationService } from './webhook-payload-validation.se
     WebhookIdempotencyService,
     WebhookCryptoService,
     WebhookPayloadValidationService,
+    HandleInboundMessageHandler,
+    UpdateMessageStatusHandler,
   ],
 })
 export class WhapiModule {}

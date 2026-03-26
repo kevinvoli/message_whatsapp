@@ -18,7 +18,6 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
       {} as any, // channelService
       { allow: () => true, removeClient: () => {} } as any, // throttle
       {} as any, // callLogService
@@ -44,7 +43,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       chat_id: 'chat-1',
     } as any);
 
-    expect(to).toHaveBeenCalledWith('poste_poste-1');
+    expect(to).toHaveBeenCalledWith('poste:poste-1');
     expect(emit).toHaveBeenCalledWith('contact:event', {
       type: 'CONTACT_UPSERT',
       payload: expect.objectContaining({
@@ -67,7 +66,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       chat_id: 'chat-2',
     } as any);
 
-    expect(to).toHaveBeenCalledWith('poste_poste-2');
+    expect(to).toHaveBeenCalledWith('poste:poste-2');
     expect(emit).toHaveBeenCalledWith('contact:event', {
       type: 'CONTACT_REMOVED',
       payload: {
@@ -91,7 +90,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       call_status: 'appelÃ©',
     } as any);
 
-    expect(to).toHaveBeenCalledWith('poste_poste-3');
+    expect(to).toHaveBeenCalledWith('poste:poste-3');
     expect(emit).toHaveBeenCalledWith('contact:event', {
       type: 'CONTACT_CALL_STATUS_UPDATED',
       payload: expect.objectContaining({
@@ -121,7 +120,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       payload: { chat_id: 'chat-9' },
     });
 
-    expect(to).toHaveBeenCalledWith('poste_poste-9');
+    expect(to).toHaveBeenCalledWith('poste:poste-9');
     expect(emit).toHaveBeenCalledWith('chat:event', {
       type: 'TYPING_START',
       payload: {

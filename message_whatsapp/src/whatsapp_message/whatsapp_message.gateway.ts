@@ -21,7 +21,6 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { QueueService } from '../dispatcher/services/queue.service';
 import { DispatcherService } from '../dispatcher/dispatcher.service';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
-import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import {
@@ -44,6 +43,12 @@ import {
   ConversationRemovedEvent,
   ConversationAssignedEvent,
   ConversationReassignedEvent,
+  ConversationSetReadonlyEvent,
+  MessageNotifyNewEvent,
+  ContactUpsertEvent,
+  ContactRemovedEvent,
+  ContactCallStatusUpdatedEvent,
+  CallLogNewEvent,
 } from 'src/events/events.constants';
 
 type AuthPayload = {
@@ -93,7 +98,6 @@ export class WhatsappMessageGateway
     private readonly queueService: QueueService,
     private readonly dispatcherService: DispatcherService,
     private readonly jobRunner: FirstResponseTimeoutJob,
-    private readonly autoMessageService: MessageAutoService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly contactService: ContactService,
@@ -1187,6 +1191,36 @@ export class WhatsappMessageGateway
       payload.oldPosteId,
       payload.newPosteId,
     );
+  }
+
+  @OnEvent(EVENTS.CONVERSATION_SET_READONLY)
+  onConversationSetReadonly(payload: ConversationSetReadonlyEvent): void {
+    this.emitConversationReadonly(payload.chat);
+  }
+
+  @OnEvent(EVENTS.MESSAGE_NOTIFY_NEW)
+  async onMessageNotifyNew(payload: MessageNotifyNewEvent): Promise<void> {
+    await this.notifyNewMessage(payload.message, payload.chat);
+  }
+
+  @OnEvent(EVENTS.CONTACT_UPSERT)
+  async onContactUpsert(payload: ContactUpsertEvent): Promise<void> {
+    await this.emitContactUpsert(payload.contact);
+  }
+
+  @OnEvent(EVENTS.CONTACT_REMOVED)
+  async onContactRemoved(payload: ContactRemovedEvent): Promise<void> {
+    await this.emitContactRemoved(payload.contact);
+  }
+
+  @OnEvent(EVENTS.CONTACT_CALL_STATUS_UPDATED)
+  async onContactCallStatusUpdated(payload: ContactCallStatusUpdatedEvent): Promise<void> {
+    await this.emitContactCallStatusUpdated(payload.contact);
+  }
+
+  @OnEvent(EVENTS.CALL_LOG_NEW)
+  async onCallLogNew(payload: CallLogNewEvent): Promise<void> {
+    await this.emitCallLogNew(payload.contact, payload.callLog);
   }
 
   private resolveMessageText(message: WhatsappMessage): string | null {
