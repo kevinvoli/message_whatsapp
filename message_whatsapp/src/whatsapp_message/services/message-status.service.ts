@@ -38,7 +38,7 @@ export class MessageStatusService {
         return null;
       }
 
-      message.status = status.status as WhatsappMessageStatus;
+      message.status = status.status.toLowerCase() as WhatsappMessageStatus;
 
       if (status.errorCode !== undefined) {
         message.error_code = status.errorCode;

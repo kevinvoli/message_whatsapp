@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 type RateBucket = {
   tokens: number;
@@ -11,6 +12,8 @@ export class WebhookRateLimitService {
   private readonly providerLimit = this.getLimit('WEBHOOK_PROVIDER_RPS', 150);
   private readonly ipLimit = this.getLimit('WEBHOOK_IP_RPS', 60);
   private readonly tenantLimit = this.getLimit('WEBHOOK_TENANT_RPM', 1200);
+
+  constructor(private readonly configService: ConfigService) {}
 
   private readonly globalBucket = this.createBucket(this.globalLimit);
   private readonly providerBuckets = new Map<string, RateBucket>();
@@ -104,7 +107,7 @@ export class WebhookRateLimitService {
   }
 
   private getLimit(envKey: string, fallback: number): number {
-    const raw = process.env[envKey];
+    const raw = this.configService.get<string>(envKey);
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
     if (Number.isFinite(parsed) && parsed > 0) {
       return parsed;

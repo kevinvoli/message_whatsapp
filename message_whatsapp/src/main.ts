@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { EventEmitter } from 'events';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AdminService } from './admin/admin.service';
 import { AppLogger } from './logging/app-logger.service';
 import * as cookieParser from 'cookie-parser'; // Import cookie-parser
@@ -18,6 +19,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
   });
+  const configService = app.get(ConfigService);
   const appLogger = app.get(AppLogger);
   app.useLogger(appLogger);
   app.useGlobalPipes(
@@ -35,7 +37,7 @@ async function bootstrap() {
   // Enable CORS for the frontend application
   // CORS_ORIGINS = liste d'origines séparées par des virgules
   // ex: http://148.230.112.175:3000,http://148.230.112.175:3001
-  const allowedOrigins = (process.env.CORS_ORIGINS ?? '')
+  const allowedOrigins = (configService.get<string>('CORS_ORIGINS') ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
@@ -58,6 +60,6 @@ async function bootstrap() {
   await adminService.ensureAdminUserExists();
 
   // Start the application on the port defined in the .env file
-  await app.listen(process.env.SERVER_PORT ?? 3002, '0.0.0.0');
+  await app.listen(configService.get<number>('SERVER_PORT') ?? 3002, '0.0.0.0');
 }
 bootstrap();

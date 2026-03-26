@@ -78,6 +78,12 @@ import { SystemConfigModule } from './system-config/system-config.module';
           .min(1)
           .max(240)
           .default(24),
+        CORS_ORIGINS: Joi.string().allow('').optional(),
+        WS_PORT: Joi.number().default(3001),
+        WEBHOOK_GLOBAL_RPS: Joi.number().min(1).optional(),
+        WEBHOOK_PROVIDER_RPS: Joi.number().min(1).optional(),
+        WEBHOOK_IP_RPS: Joi.number().min(1).optional(),
+        WEBHOOK_TENANT_RPM: Joi.number().min(1).optional(),
         ADMIN_NAME: Joi.string().optional(),
         ADMIN_EMAIL: Joi.when('NODE_ENV', {
           is: 'production',

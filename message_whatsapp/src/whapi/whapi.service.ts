@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { WhapiWebhookPayload } from './interface/whapi-webhook.interface';
 import { ChannelService } from 'src/channel/channel.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
@@ -19,6 +20,7 @@ export class WhapiService {
     private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly messageGateway: WhatsappMessageGateway,
+    private readonly configService: ConfigService,
   ) {}
 
   async findChannelByExternalId(channelId: string) {
@@ -196,7 +198,7 @@ export class WhapiService {
   }
 
   private readFlag(name: string, defaultValue: boolean): boolean {
-    const raw = process.env[name];
+    const raw = this.configService.get<string>(name);
     if (raw == null || raw === '') {
       return defaultValue;
     }

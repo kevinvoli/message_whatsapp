@@ -1,21 +1,21 @@
 import { HttpException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { WebhookRateLimitService } from '../webhook-rate-limit.service';
 
+function makeConfig(values: Record<string, string>): ConfigService {
+  return { get: (key: string) => values[key] } as unknown as ConfigService;
+}
+
 describe('WebhookRateLimitService', () => {
-  afterEach(() => {
-    delete process.env.WEBHOOK_GLOBAL_RPS;
-    delete process.env.WEBHOOK_PROVIDER_RPS;
-    delete process.env.WEBHOOK_IP_RPS;
-    delete process.env.WEBHOOK_TENANT_RPM;
-  });
-
   it('enforces tenant quota per minute', () => {
-    process.env.WEBHOOK_GLOBAL_RPS = '1000';
-    process.env.WEBHOOK_PROVIDER_RPS = '1000';
-    process.env.WEBHOOK_IP_RPS = '1000';
-    process.env.WEBHOOK_TENANT_RPM = '2';
-
-    const service = new WebhookRateLimitService();
+    const service = new WebhookRateLimitService(
+      makeConfig({
+        WEBHOOK_GLOBAL_RPS: '1000',
+        WEBHOOK_PROVIDER_RPS: '1000',
+        WEBHOOK_IP_RPS: '1000',
+        WEBHOOK_TENANT_RPM: '2',
+      }),
+    );
     const tenantId = 'tenant-1';
 
     service.assertRateLimits('whapi', null, tenantId);

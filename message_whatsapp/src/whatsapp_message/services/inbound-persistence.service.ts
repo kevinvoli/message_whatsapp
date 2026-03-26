@@ -267,6 +267,10 @@ export class InboundPersistenceService {
 
   async createInternalMessage(message: any, commercialId?: string) {
     try {
+      if (!commercialId) {
+        return null;
+      }
+
       const chat = await this.chatRepository.findByChatIdShallow(
         message.chat_id,
       );
@@ -281,10 +285,6 @@ export class InboundPersistenceService {
 
       if (chekMessage) {
         return chekMessage;
-      }
-
-      if (!commercialId) {
-        return null;
       }
 
       const commercial = await this.commercialRepository.findById(commercialId);
