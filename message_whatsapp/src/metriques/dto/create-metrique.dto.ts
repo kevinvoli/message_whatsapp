@@ -150,6 +150,13 @@ export class MetriquesGlobalesDto {
   })
   @IsNumber()
   tempsPremiereReponse: number;
+
+  @ApiProperty({
+    description: 'Variations en % par rapport à la période précédente (null = pas de données)',
+    required: false,
+  })
+  @IsOptional()
+  variations?: Record<string, number | null>;
 }
 
 /**

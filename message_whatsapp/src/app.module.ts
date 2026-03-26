@@ -69,8 +69,16 @@ import { SystemConfigModule } from './system-config/system-config.module';
         LOG_LEVEL: Joi.string()
           .valid('error', 'warn', 'log', 'debug', 'verbose', 'info')
           .default('info'),
-        WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().allow('').optional(),
-        WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().allow('').optional(),
+        WHAPI_WEBHOOK_SECRET_HEADER: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().required(),
+          otherwise: Joi.string().allow('').optional(),
+        }),
+        WHAPI_WEBHOOK_SECRET_VALUE: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().required(),
+          otherwise: Joi.string().allow('').optional(),
+        }),
         WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
         FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
         FF_SHADOW_UNIFIED: Joi.string().optional(),
@@ -78,7 +86,11 @@ import { SystemConfigModule } from './system-config/system-config.module';
           .min(1)
           .max(240)
           .default(24),
-        CORS_ORIGINS: Joi.string().allow('').optional(),
+        CORS_ORIGINS: Joi.when('NODE_ENV', {
+          is: 'production',
+          then: Joi.string().min(1).required(),
+          otherwise: Joi.string().allow('').optional(),
+        }),
         WS_PORT: Joi.number().default(3001),
         WEBHOOK_GLOBAL_RPS: Joi.number().min(1).optional(),
         WEBHOOK_PROVIDER_RPS: Joi.number().min(1).optional(),

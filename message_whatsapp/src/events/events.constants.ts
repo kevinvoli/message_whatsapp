@@ -9,6 +9,7 @@ export const EVENTS = {
   CONTACT_REMOVED: 'contact.removed',
   CONTACT_CALL_STATUS_UPDATED: 'contact.call.status.updated',
   CALL_LOG_NEW: 'call.log.new',
+  SLA_BREACH_DETECTED: 'sla.breach.detected',
 } as const;
 
 export interface ConversationUpsertEvent {

@@ -100,6 +100,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setShowEmojiPicker(false);
   }, []);
 
+  // Cleanup typing sur fermeture de page
+  useEffect(() => {
+    const handleUnload = () => {
+      if (chat_id && isTyping.current) onTypingStop(chat_id);
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [chat_id, onTypingStop]);
+
+  // Cleanup typing sur changement de conversation
+  useEffect(() => {
+    return () => {
+      if (chat_id && isTyping.current) {
+        isTyping.current = false;
+        onTypingStop(chat_id);
+      }
+    };
+  }, [chat_id, onTypingStop]);
+
   // Close picker on outside click
   useEffect(() => {
     if (!showEmojiPicker) return;

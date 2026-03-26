@@ -85,6 +85,8 @@ export class WhatsappMessageGateway
     }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
+  /** TTL typing : Map<`${chatId}:${commercialId}`, timer> — auto-stop après 5s sans mise à jour */
+  private readonly typingTimers = new Map<string, NodeJS.Timeout>();
   private pendingAgentMessages = new Map<string, NodeJS.Timeout | null>();
   private readonly pendingCooldownMs = 1500; // bloquer les contenus identiques pendant 1,5s
   private recentTempIds = new Map<string, NodeJS.Timeout>();
@@ -518,6 +520,29 @@ export class WhatsappMessageGateway
     this.logger.debug(
       `Typing ${data.type === 'TYPING_START' ? 'start' : 'stop'} (${commercialId}) chat ${chatId}`,
     );
+
+    const timerKey = `${chatId}:${commercialId}`;
+
+    if (data.type === 'TYPING_STOP') {
+      const existingTimer = this.typingTimers.get(timerKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        this.typingTimers.delete(timerKey);
+      }
+    } else {
+      // TYPING_START : réinitialiser le TTL de 5s
+      const existingTimer = this.typingTimers.get(timerKey);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      const timer = setTimeout(() => {
+        this.typingTimers.delete(timerKey);
+        client.to(`poste:${agent.posteId}`).emit('chat:event', {
+          type: 'TYPING_STOP',
+          payload: { chat_id: chatId, commercial_id: commercialId },
+        });
+      }, 5000);
+      this.typingTimers.set(timerKey, timer);
+    }
 
     client.to(`poste:${agent.posteId}`).emit('chat:event', {
       type: data.type,

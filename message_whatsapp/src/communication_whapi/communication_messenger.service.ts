@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { ConfigService } from '@nestjs/config';
+import { ProviderOutboundError } from 'src/common/errors/provider-outbound.error';
 
 @Injectable()
 export class CommunicationMessengerService {
@@ -41,21 +42,32 @@ export class CommunicationMessengerService {
       CommunicationMessengerService.name,
     );
 
-    const response = await axios.post(url, payload, {
-      headers: {
-        Authorization: `Bearer ${data.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const messageId: string = response.data?.message_id;
-    if (!messageId) {
-      throw new Error(
-        `Messenger API response missing message_id: ${JSON.stringify(response.data)}`,
+    try {
+      const response = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Bearer ${data.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const messageId: string = response.data?.message_id;
+      if (!messageId) {
+        this.logger.error(
+          `OUTBOUND_ERROR provider=messenger status=0 kind=permanent to=${data.recipientPsid}`,
+          CommunicationMessengerService.name,
+        );
+        throw new ProviderOutboundError('messenger', 0, 'permanent', `Messenger API response missing message_id: ${JSON.stringify(response.data)}`);
+      }
+      return { providerMessageId: messageId };
+    } catch (err) {
+      if (err instanceof ProviderOutboundError) throw err;
+      const status = (err instanceof AxiosError) ? (err.response?.status ?? 0) : 0;
+      const kind = ProviderOutboundError.classifyHttpStatus(status);
+      this.logger.error(
+        `OUTBOUND_ERROR provider=messenger status=${status} kind=${kind} to=${data.recipientPsid}`,
+        CommunicationMessengerService.name,
       );
+      throw new ProviderOutboundError('messenger', status, kind, `Messenger sendMessage failed: ${String(err)}`);
     }
-
-    return { providerMessageId: messageId };
   }
 
   async sendMediaMessage(data: {

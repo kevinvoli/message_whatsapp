@@ -3,7 +3,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { Mutex } from 'async-mutex';
+import { Mutex, withTimeout, E_TIMEOUT } from 'async-mutex';
 import { IConversationRepository } from 'src/domain/repositories/i-conversation.repository';
 import { CONVERSATION_REPOSITORY } from 'src/domain/repositories/repository.tokens';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -22,7 +22,7 @@ import { NotificationService } from 'src/notification/notification.service';
 @Injectable()
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
-  private readonly dispatchLock = new Mutex();
+  private readonly dispatchLock = withTimeout(new Mutex(), 10_000);
   constructor(
     @Inject(CONVERSATION_REPOSITORY)
     private readonly chatRepository: IConversationRepository,
@@ -50,14 +50,22 @@ export class DispatcherService {
     traceId?: string,
     tenantId?: string,
   ): Promise<WhatsappChat | null> {
-    return this.dispatchLock.runExclusive(() =>
-      this.assignConversationInternal(
-        clientPhone,
-        clientName,
-        traceId,
-        tenantId,
-      ),
-    );
+    try {
+      return await this.dispatchLock.runExclusive(() =>
+        this.assignConversationInternal(
+          clientPhone,
+          clientName,
+          traceId,
+          tenantId,
+        ),
+      );
+    } catch (err) {
+      if (err === E_TIMEOUT) {
+        this.logger.error(`DISPATCH_LOCK_TIMEOUT trace=${traceId} chat_id=${clientPhone}`);
+        return null;
+      }
+      throw err;
+    }
   }
 
   private async assignConversationInternal(

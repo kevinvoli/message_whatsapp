@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { ProviderOutboundError } from 'src/common/errors/provider-outbound.error';
 
 @Injectable()
 export class CommunicationTelegramService {
@@ -100,19 +101,33 @@ export class CommunicationTelegramService {
       CommunicationTelegramService.name,
     );
 
-    const response = await axios.post(
-      this.apiUrl(data.botToken, 'sendMessage'),
-      payload,
-      { headers: { 'Content-Type': 'application/json' } },
-    );
-
-    if (!response.data?.ok) {
-      throw new Error(
-        `Telegram sendMessage failed: ${response.data?.description ?? 'unknown'}`,
+    try {
+      const response = await axios.post(
+        this.apiUrl(data.botToken, 'sendMessage'),
+        payload,
+        { headers: { 'Content-Type': 'application/json' } },
       );
+      if (!response.data?.ok) {
+        const desc = response.data?.description ?? 'unknown';
+        const errorCode: number = response.data?.error_code ?? 0;
+        const kind = ProviderOutboundError.classifyHttpStatus(errorCode);
+        this.logger.error(
+          `OUTBOUND_ERROR provider=telegram status=${errorCode} kind=${kind} chatId=${numericChatId}`,
+          CommunicationTelegramService.name,
+        );
+        throw new ProviderOutboundError('telegram', errorCode, kind, `Telegram sendMessage failed: ${desc}`);
+      }
+      return { providerMessageId: String(response.data.result.message_id) };
+    } catch (err) {
+      if (err instanceof ProviderOutboundError) throw err;
+      const status = (err instanceof AxiosError) ? (err.response?.status ?? 0) : 0;
+      const kind = ProviderOutboundError.classifyHttpStatus(status);
+      this.logger.error(
+        `OUTBOUND_ERROR provider=telegram status=${status} kind=${kind} chatId=${numericChatId}`,
+        CommunicationTelegramService.name,
+      );
+      throw new ProviderOutboundError('telegram', status, kind, `Telegram sendMessage failed: ${String(err)}`);
     }
-
-    return { providerMessageId: String(response.data.result.message_id) };
   }
 
   async sendMediaMessage(data: {
@@ -154,19 +169,33 @@ export class CommunicationTelegramService {
       CommunicationTelegramService.name,
     );
 
-    const response = await axios.post(
-      this.apiUrl(data.botToken, method),
-      form,
-      { headers: form.getHeaders() },
-    );
-
-    if (!response.data?.ok) {
-      throw new Error(
-        `Telegram ${method} failed: ${response.data?.description ?? 'unknown'}`,
+    try {
+      const mediaResponse = await axios.post(
+        this.apiUrl(data.botToken, method),
+        form,
+        { headers: form.getHeaders() },
       );
+      if (!mediaResponse.data?.ok) {
+        const desc = mediaResponse.data?.description ?? 'unknown';
+        const errorCode: number = mediaResponse.data?.error_code ?? 0;
+        const kind = ProviderOutboundError.classifyHttpStatus(errorCode);
+        this.logger.error(
+          `OUTBOUND_ERROR provider=telegram status=${errorCode} kind=${kind} chatId=${numericChatId}`,
+          CommunicationTelegramService.name,
+        );
+        throw new ProviderOutboundError('telegram', errorCode, kind, `Telegram ${method} failed: ${desc}`);
+      }
+      return { providerMessageId: String(mediaResponse.data.result.message_id) };
+    } catch (err) {
+      if (err instanceof ProviderOutboundError) throw err;
+      const status = (err instanceof AxiosError) ? (err.response?.status ?? 0) : 0;
+      const kind = ProviderOutboundError.classifyHttpStatus(status);
+      this.logger.error(
+        `OUTBOUND_ERROR provider=telegram status=${status} kind=${kind} chatId=${numericChatId}`,
+        CommunicationTelegramService.name,
+      );
+      throw new ProviderOutboundError('telegram', status, kind, `Telegram ${method} failed: ${String(err)}`);
     }
-
-    return { providerMessageId: String(response.data.result.message_id) };
   }
 
   private resolveMediaMethod(

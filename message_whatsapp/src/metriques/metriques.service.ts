@@ -7,7 +7,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
+import { Between, IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import {
   ChargePosteDto,
   MetriquesGlobalesDto,
@@ -44,6 +44,22 @@ export class MetriquesService {
     private queueRepository: Repository<QueuePosition>,
   ) {}
 
+  private periodeToDateStartPrevious(periode: string, currentDateStart: Date): Date {
+    const d = new Date(currentDateStart);
+    switch (periode) {
+      case 'week':   d.setDate(d.getDate() - 7);   break;
+      case 'month':  d.setDate(d.getDate() - 30);  break;
+      case 'year':   d.setDate(d.getDate() - 365); break;
+      default:       d.setDate(d.getDate() - 1);   break; // today → yesterday
+    }
+    return d;
+  }
+
+  private computeVariation(current: number, previous: number): number | null {
+    if (previous === 0) return null;
+    return Math.round(((current - previous) / previous) * 1000) / 10; // 1 décimale
+  }
+
   private periodeToDateStart(periode: string): Date {
     const now = new Date();
     switch (periode) {
@@ -78,6 +94,7 @@ export class MetriquesService {
    */
   async getMetriquesGlobales(periode = 'today'): Promise<MetriquesGlobalesDto> {
     const dateStart = this.periodeToDateStart(periode);
+    const prevDateStart = this.periodeToDateStartPrevious(periode, dateStart);
     // Utiliser Promise.all pour parallÃ©liser les requÃªtes
     const [
       metriquesMessages,
@@ -87,6 +104,9 @@ export class MetriquesService {
       metriquesPostes,
       metriquesChannels,
       chargePostes,
+      prevTotalMessages,
+      prevMessagesDir,
+      prevNouveauxContacts,
     ] = await Promise.all([
       this.getMetriquesMessages(dateStart),
       this.getMetriquesChats(),
@@ -95,7 +115,33 @@ export class MetriquesService {
       this.getMetriquesPostes(),
       this.getMetriquesChannels(),
       this.getChargeParPoste(),
+      this.messageRepository.count({
+        where: { deletedAt: IsNull(), createdAt: Between(prevDateStart, dateStart) },
+      }),
+      this.messageRepository
+        .createQueryBuilder('message')
+        .select('message.direction', 'direction')
+        .addSelect('COUNT(*)', 'count')
+        .where('message.deletedAt IS NULL')
+        .andWhere('message.createdAt >= :prevDateStart', { prevDateStart })
+        .andWhere('message.createdAt < :dateStart', { dateStart })
+        .groupBy('message.direction')
+        .getRawMany(),
+      this.contactRepository.count({
+        where: { deletedAt: IsNull(), createdAt: Between(prevDateStart, dateStart) },
+      }),
     ]);
+
+    const prevIn = parseInt(prevMessagesDir.find((m: { direction: string; count: string }) => m.direction === 'IN')?.count || 0);
+    const prevOut = parseInt(prevMessagesDir.find((m: { direction: string; count: string }) => m.direction === 'OUT')?.count || 0);
+    const prevTauxReponse = prevIn > 0 ? Math.round((prevOut / prevIn) * 100) : 0;
+
+    const variations: Record<string, number | null> = {
+      totalMessages: this.computeVariation(metriquesMessages.totalMessages, prevTotalMessages),
+      nouveauxContactsAujourdhui: this.computeVariation(metriquesContacts.nouveauxContactsAujourdhui, prevNouveauxContacts),
+      tauxReponse: this.computeVariation(metriquesMessages.tauxReponse, prevTauxReponse),
+      chatsActifs: null, // état courant — pas de comparaison temporelle pertinente
+    };
 
     return {
       ...metriquesMessages,
@@ -105,6 +151,7 @@ export class MetriquesService {
       ...metriquesPostes,
       ...metriquesChannels,
       chargePostes,
+      variations,
     };
   }
 

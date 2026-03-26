@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { ConfigService } from '@nestjs/config';
+import { ProviderOutboundError } from 'src/common/errors/provider-outbound.error';
 
 @Injectable()
 export class CommunicationInstagramService {
@@ -39,21 +40,32 @@ export class CommunicationInstagramService {
       CommunicationInstagramService.name,
     );
 
-    const response = await axios.post(url, payload, {
-      headers: {
-        Authorization: `Bearer ${data.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const messageId: string = response.data?.message_id;
-    if (!messageId) {
-      throw new Error(
-        `Instagram API response missing message_id: ${JSON.stringify(response.data)}`,
+    try {
+      const response = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Bearer ${data.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const messageId: string = response.data?.message_id;
+      if (!messageId) {
+        this.logger.error(
+          `OUTBOUND_ERROR provider=instagram status=0 kind=permanent to=${data.recipientIgsid}`,
+          CommunicationInstagramService.name,
+        );
+        throw new ProviderOutboundError('instagram', 0, 'permanent', `Instagram API response missing message_id: ${JSON.stringify(response.data)}`);
+      }
+      return { providerMessageId: messageId };
+    } catch (err) {
+      if (err instanceof ProviderOutboundError) throw err;
+      const status = (err instanceof AxiosError) ? (err.response?.status ?? 0) : 0;
+      const kind = ProviderOutboundError.classifyHttpStatus(status);
+      this.logger.error(
+        `OUTBOUND_ERROR provider=instagram status=${status} kind=${kind} to=${data.recipientIgsid}`,
+        CommunicationInstagramService.name,
       );
+      throw new ProviderOutboundError('instagram', status, kind, `Instagram sendMessage failed: ${String(err)}`);
     }
-
-    return { providerMessageId: messageId };
   }
 
   async sendMediaMessage(data: {

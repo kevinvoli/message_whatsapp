@@ -55,7 +55,7 @@ export class WhapiController {
     const requestId = this.cryptoService.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
 
-    // this.cryptoService.assertWhapiSecret(headers, request.rawBody, payload);
+    this.cryptoService.assertWhapiSecret(headers, request.rawBody, payload);
 
     this.payloadValidator.assertWhapiPayload(payload);
 

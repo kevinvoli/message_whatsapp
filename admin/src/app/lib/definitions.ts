@@ -342,6 +342,9 @@ export type MetriquesGlobales = {
   messagesEnAttente: number;
   tauxAssignation: number;
   tempsPremiereReponse: number;
+
+  // Variations vs période précédente (null = données insuffisantes)
+  variations?: Record<string, number | null>;
 };
 
 /**

@@ -3,7 +3,7 @@ import {
   MessageCircle, Users, Activity, TrendingUp,
   UserCheck, Clock, Archive, Target,
   Zap, CheckCircle, AlertCircle, Mail,
-  ArrowUpRight, BarChart3, RefreshCw
+  ArrowUpRight, ArrowDownRight, BarChart3, RefreshCw
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
@@ -72,8 +72,16 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
     return `${hours}h${remainingMinutes}min`;
   };
 
-  const getVariation = (valeur: number) => {
-    return Math.floor(Math.random() * 30) - 10;
+  const renderVariation = (key: string) => {
+    const val = metriques?.variations?.[key];
+    if (val == null) return null;
+    const positive = val >= 0;
+    return (
+      <span className={`text-xs font-medium flex items-center gap-1 ${positive ? 'text-green-600' : 'text-red-600'}`}>
+        {positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+        {positive ? '+' : ''}{val}%
+      </span>
+    );
   };
 
   const parseLabels = (key: string) => {
@@ -182,10 +190,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <MessageCircle className="w-5 h-5 text-blue-600" />
             </div>
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-              <ArrowUpRight className="w-3 h-3" />
-              +{Math.abs(getVariation(metriques.totalMessages))}%
-            </span>
+            {renderVariation('totalMessages')}
           </div>
           <h3 className="text-gray-600 text-xs mb-1">Total Messages</h3>
           <p className="text-2xl font-bold text-gray-900">{metriques.totalMessages.toLocaleString()}</p>
@@ -201,10 +206,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <Activity className="w-5 h-5 text-green-600" />
             </div>
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-              <ArrowUpRight className="w-3 h-3" />
-              +{Math.abs(getVariation(metriques.chatsActifs))}%
-            </span>
+            {renderVariation('chatsActifs')}
           </div>
           <h3 className="text-gray-600 text-xs mb-1">Conversations Actives</h3>
           <p className="text-2xl font-bold text-gray-900">{metriques.chatsActifs}</p>
@@ -236,10 +238,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
             <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
               <UserCheck className="w-5 h-5 text-orange-600" />
             </div>
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-              <ArrowUpRight className="w-3 h-3" />
-              +{Math.abs(getVariation(metriques.nouveauxContactsAujourdhui))}%
-            </span>
+            {renderVariation('nouveauxContactsAujourdhui')}
           </div>
           <h3 className="text-gray-600 text-xs mb-1">Nouveaux contacts</h3>
           <p className="text-2xl font-bold text-gray-900">{metriques.nouveauxContactsAujourdhui}</p>
@@ -254,10 +253,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
             <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-pink-600" />
             </div>
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-              <ArrowUpRight className="w-3 h-3" />
-              +{Math.abs(getVariation(metriques.tauxReponse))}%
-            </span>
+            {renderVariation('tauxReponse')}
           </div>
           <h3 className="text-gray-600 text-xs mb-1">Taux de réponse</h3>
           <p className="text-2xl font-bold text-gray-900">{metriques.tauxReponse}%</p>
