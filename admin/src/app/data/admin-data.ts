@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, ToggleRight } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -43,6 +43,7 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'canaux', name: 'Canaux', icon: Globe, badge: null },
       { id: 'observabilite', name: 'Observabilite', icon: Activity, badge: 'SLO' },
       { id: 'go_no_go', name: 'GO/NO-GO', icon: ShieldCheck, badge: 'OPS' },
+      { id: 'feature_flags', name: 'Feature Flags', icon: ToggleRight, badge: null },
     ],
   },
   {

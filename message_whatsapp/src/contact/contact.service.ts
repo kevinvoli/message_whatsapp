@@ -5,6 +5,7 @@ import { UpdateContactCallDto } from './dto/update-contact-call.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact } from './entities/contact.entity';
+import { normalizePhone } from 'src/common/utils/phone.utils';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CallLogService } from 'src/call-log/call_log.service';
@@ -26,23 +27,33 @@ export class ContactService {
   }
 
   async findOrCreate(phone: string, chat_id?: string | null, name?: string) {
+    const phoneNormalized = normalizePhone(phone);
+
+    // Chercher d'abord par numéro normalisé (déduplication)
     let contact = await this.repo.findOne({
-      where: { phone },
-      relations: {
-        messages: true,
-      },
+      where: { phoneNormalized },
+      relations: { messages: true },
     });
+
+    // Fallback : chercher par numéro brut (contacts créés avant la migration)
+    if (!contact) {
+      contact = await this.repo.findOne({
+        where: { phone },
+        relations: { messages: true },
+      });
+    }
 
     if (!contact) {
       contact = this.repo.create({
         phone,
+        phoneNormalized,
         name: name ?? phone,
         chat_id: chat_id ?? undefined,
       });
       return this.repo.save(contact);
     }
 
-    // Keep chat link and display name fresh when webhook provides new values.
+    // Keep chat link, display name and normalized phone fresh
     let shouldSave = false;
     if (chat_id && contact.chat_id !== chat_id) {
       contact.chat_id = chat_id;
@@ -50,6 +61,10 @@ export class ContactService {
     }
     if (name && contact.name !== name) {
       contact.name = name;
+      shouldSave = true;
+    }
+    if (!contact.phoneNormalized) {
+      contact.phoneNormalized = phoneNormalized;
       shouldSave = true;
     }
 

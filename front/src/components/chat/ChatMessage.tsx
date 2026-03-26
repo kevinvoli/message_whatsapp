@@ -25,6 +25,12 @@ function formatDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+const scrollToMessage = (id?: string) => {
+  if (!id) return;
+  const el = document.querySelector(`[data-message-id="${id}"]`);
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
 export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -68,6 +74,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
 
   return (
     <div
+      data-message-id={messageId}
       className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -98,13 +105,14 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
           }`}
         >
           {/* Bloc citation si ce message est une réponse */}
-          {msg.quotedMessage && (
+          {msg.quotedMessage ? (
             <div
-              className={`mb-2 pl-2 border-l-2 rounded text-xs ${
+              className={`mb-2 pl-2 border-l-2 rounded text-xs cursor-pointer ${
                 isFromMe
                   ? 'border-green-300 bg-green-500/30 text-green-100'
                   : 'border-green-500 bg-gray-50 text-gray-600'
               } px-2 py-1`}
+              onClick={() => scrollToMessage(msg.quotedMessage?.id)}
             >
               <p className="font-semibold mb-0.5">
                 {msg.quotedMessage.from_me ? 'Moi' : (msg.quotedMessage.from_name || 'Client')}
@@ -113,7 +121,11 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
                 {msg.quotedMessage.text || '[Média]'}
               </p>
             </div>
-          )}
+          ) : msg.quotedMessage === null && (msg as any).quotedMessageId ? (
+            <div className={`mb-2 pl-2 border-l-2 border-gray-400 rounded text-xs px-2 py-1 italic ${isFromMe ? 'bg-green-500/20 text-green-200' : 'bg-gray-50 text-gray-400'}`}>
+              Message supprimé
+            </div>
+          ) : null}
           {/* Images */}
           {imageMedias.map((img, i) => {
             const src = resolveMediaUrl(img.url);

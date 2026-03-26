@@ -38,7 +38,8 @@ export type ViewMode =
   | 'observabilite'
   | 'go_no_go'
   | 'notifications'
-  | 'settings';
+  | 'settings'
+  | 'feature_flags';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -345,6 +346,15 @@ export type MetriquesGlobales = {
 
   // Variations vs période précédente (null = données insuffisantes)
   variations?: Record<string, number | null>;
+};
+
+export type FeatureFlagEntry = {
+  key: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  envVar: string;
+  category: 'security' | 'resilience' | 'messaging' | 'infra';
 };
 
 /**

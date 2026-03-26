@@ -18,6 +18,7 @@ interface ChatInputProps {
 }
 
 const TYPING_STOP_DELAY = 2000; // 2s
+const MAX_RECORDING_SECONDS = 300; // 5 minutes
 
 function computeAvgResponseTime(messages: Message[]): string | null {
   const delays: number[] = [];
@@ -83,6 +84,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewMimeRef = useRef<string>('audio/ogg');
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -118,6 +122,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
       }
     };
   }, [chat_id, onTypingStop]);
+
+  // Libérer les pistes micro sur fermeture de page
+  useEffect(() => {
+    const handleUnload = () => {
+      mediaRecorderRef.current?.stream?.getTracks().forEach((t) => t.stop());
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
+
+  // Révoquer l'URL de prévisualisation à la destruction
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -212,25 +232,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
+      previewMimeRef.current = mimeType;
+      mediaRecorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (blob.size > 0 && chat_id) {
-          setIsUploading(true);
-          try {
-            const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
-            const extension = normalizedMime === 'audio/webm'
-              ? 'webm'
-              : normalizedMime === 'audio/opus'
-                ? 'opus'
-                : 'ogg';
-            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.${extension}`);
-            logger.debug('Voice message uploaded', { chat_id });
-          } catch (err) {
-            logger.error('Voice upload failed', { error: err instanceof Error ? err.message : String(err) });
-          } finally {
-            setIsUploading(false);
-          }
+        if (blob.size > 0) {
+          const url = URL.createObjectURL(blob);
+          setPreviewBlob(blob);
+          setPreviewUrl(url);
         }
       };
 
@@ -238,7 +247,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
       setIsRecording(true);
       setRecordingDuration(0);
       recordingIntervalRef.current = setInterval(() => {
-        setRecordingDuration((d) => d + 1);
+        setRecordingDuration((prev) => {
+          if (prev + 1 >= MAX_RECORDING_SECONDS) {
+            stopRecording();
+          }
+          return prev + 1;
+        });
       }, 1000);
     } catch (err) {
       logger.error('Microphone access denied', { error: err instanceof Error ? err.message : String(err) });
@@ -254,6 +268,33 @@ const ChatInput: React.FC<ChatInputProps> = ({
       clearInterval(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
     }
+  };
+
+  const sendVoicePreview = async () => {
+    if (!previewBlob || !chat_id) return;
+    setIsUploading(true);
+    try {
+      const mime = previewMimeRef.current;
+      const normalizedMime = mime.split(';')[0].trim().toLowerCase();
+      const extension = normalizedMime === 'audio/webm' ? 'webm' : normalizedMime === 'audio/opus' ? 'opus' : 'ogg';
+      await uploadMedia(chat_id, previewBlob, `vocal_${Date.now()}.${extension}`);
+      logger.debug('Voice message uploaded', { chat_id });
+    } catch (err) {
+      logger.error('Voice upload failed', { error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setIsUploading(false);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewBlob(null);
+      setPreviewUrl(null);
+      setRecordingDuration(0);
+    }
+  };
+
+  const cancelVoicePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewBlob(null);
+    setPreviewUrl(null);
+    setRecordingDuration(0);
   };
 
   const cancelRecording = () => {
@@ -306,28 +347,57 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
         </div>
 
-        {isRecording ? (
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={cancelRecording}
-              className="p-3 text-red-500 hover:text-red-700"
-              title="Annuler"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex-1 flex items-center gap-2">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-sm text-gray-600">Enregistrement... {formatDuration(recordingDuration)}</span>
+        {previewBlob && previewUrl ? (
+          <div className="flex flex-col gap-2">
+            <audio controls src={previewUrl} className="w-full h-10" />
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={cancelVoicePreview}
+                className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => void sendVoicePreview()}
+                disabled={isUploading}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                {isUploading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+                Envoyer
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={stopRecording}
-              className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700"
-              title="Envoyer"
-            >
-              <Send className="w-5 h-5" />
-            </button>
+          </div>
+        ) : isRecording ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className="p-3 text-red-500 hover:text-red-700"
+                title="Annuler"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex-1 flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-sm text-gray-600">Enregistrement... {formatDuration(recordingDuration)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700"
+                title="Arrêter et prévisualiser"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+            {recordingDuration >= MAX_RECORDING_SECONDS - 30 && (
+              <span className="text-red-500 text-xs text-center">
+                Arrêt automatique dans {MAX_RECORDING_SECONDS - recordingDuration}s
+              </span>
+            )}
           </div>
         ) : (
           <div className="flex items-end gap-3">

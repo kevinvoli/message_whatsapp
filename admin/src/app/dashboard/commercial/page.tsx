@@ -23,6 +23,7 @@ import DispatchView from '@/app/ui/DispatchView';
 import CronConfigView from '@/app/ui/CronConfigView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
 import GoNoGoView from '@/app/ui/GoNoGoView';
+import FeatureFlagsView from '@/app/ui/FeatureFlagsView';
 import NotificationsView from '@/app/ui/NotificationsView';
 import SettingsView from '@/app/ui/SettingsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
@@ -90,6 +91,8 @@ export default function AdminDashboard() {
                 return <ObservabiliteView />;
             case 'go_no_go':
                 return <GoNoGoView />;
+            case 'feature_flags':
+                return <FeatureFlagsView />;
             case 'canaux':
                 return <ChannelsView />;
             case 'automessages':

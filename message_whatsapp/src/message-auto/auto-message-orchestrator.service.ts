@@ -146,6 +146,7 @@ export class AutoMessageOrchestrator {
               stack,
               AutoMessageOrchestrator.name,
             );
+            void this.handleAutoMessageFailure(chatId);
           })
           .finally(() => {
             this.locks.delete(chatId);
@@ -225,6 +226,37 @@ export class AutoMessageOrchestrator {
       waiting_client_reply: true,
       last_auto_message_sent_at: new Date(),
     });
+  }
+
+  private async handleAutoMessageFailure(chatId: string): Promise<void> {
+    const MAX_RETRIES = 3;
+    try {
+      const chat = await this.chatService.findBychat_id(chatId);
+      if (!chat) return;
+
+      // Décoder le compteur depuis auto_message_status : 'retrying:1', 'retrying:2', etc.
+      const currentStatus = chat.auto_message_status ?? '';
+      const failMatch = currentStatus.match(/^retrying:(\d+)$/);
+      const failCount = failMatch ? parseInt(failMatch[1], 10) + 1 : 1;
+
+      if (failCount >= MAX_RETRIES) {
+        await this.chatService.update(chatId, { auto_message_status: 'failed', read_only: false });
+        this.logger.error(
+          `AUTO_MSG_DLQ chatId=${chatId} failCount=${failCount}`,
+          undefined,
+          AutoMessageOrchestrator.name,
+        );
+        this.eventEmitter.emit(EVENTS.AUTO_MESSAGE_FAILED, { chat });
+      } else {
+        await this.chatService.update(chatId, { auto_message_status: `retrying:${failCount}` });
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to record auto-message failure for ${chatId}: ${String(err)}`,
+        undefined,
+        AutoMessageOrchestrator.name,
+      );
+    }
   }
 
   private randomBetween(min: number, max: number): number {

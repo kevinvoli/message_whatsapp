@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MessageAuto } from './entities/message-auto.entity';
+import { MessageTemplateStatus } from './entities/message-template-status.entity';
 import { Repository } from 'typeorm';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
@@ -15,6 +16,9 @@ export class MessageAutoService {
   constructor(
     @InjectRepository(MessageAuto)
     private readonly autoMessageRepo: Repository<MessageAuto>,
+
+    @InjectRepository(MessageTemplateStatus)
+    private readonly templateStatusRepo: Repository<MessageTemplateStatus>,
 
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
@@ -97,6 +101,20 @@ export class MessageAutoService {
         MessageAutoService.name,
       );
       return;
+    }
+
+    // 🛡️ Guard template HSM : vérifier le statut d'approbation avant envoi
+    if (template.templateName && template.templateLanguage) {
+      const templateStatus = await this.templateStatusRepo.findOne({
+        where: { templateName: template.templateName, language: template.templateLanguage },
+      });
+      if (templateStatus && templateStatus.status !== 'APPROVED') {
+        this.logger.warn(
+          `TEMPLATE_SKIPPED template=${template.templateName} status=${templateStatus.status} chatId=${chatId}`,
+          MessageAutoService.name,
+        );
+        return;
+      }
     }
 
     await this.chatService.update(chatId, {

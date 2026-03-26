@@ -10,6 +10,7 @@ export const EVENTS = {
   CONTACT_CALL_STATUS_UPDATED: 'contact.call.status.updated',
   CALL_LOG_NEW: 'call.log.new',
   SLA_BREACH_DETECTED: 'sla.breach.detected',
+  AUTO_MESSAGE_FAILED: 'auto.message.failed',
 } as const;
 
 export interface ConversationUpsertEvent {

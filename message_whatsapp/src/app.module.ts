@@ -38,6 +38,7 @@ import { MetriquesModule } from './metriques/metriques.module';
 import { LoggingModule } from './logging/logging.module';
 import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
+import { FeatureFlagModule } from './feature-flags/feature-flag.module';
 
 @Module({
   imports: [
@@ -82,6 +83,15 @@ import { SystemConfigModule } from './system-config/system-config.module';
         WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
         FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
         FF_SHADOW_UNIFIED: Joi.string().optional(),
+        FF_HMAC_WEBHOOK: Joi.string().optional(),
+        FF_PHONE_DEDUP: Joi.string().optional(),
+        FF_VOICE_PREVIEW: Joi.string().optional(),
+        FF_TYPING_TTL: Joi.string().optional(),
+        FF_DISPATCH_LOCK_TIMEOUT: Joi.string().optional(),
+        FF_SLA_CRON: Joi.string().optional(),
+        FF_TEMPLATE_GUARD: Joi.string().optional(),
+        FF_AUTO_MESSAGE_DLQ: Joi.string().optional(),
+        FF_REPLY_MESSAGE: Joi.string().optional(),
         MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number()
           .min(1)
           .max(240)
@@ -135,6 +145,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
     LoggingModule,
     NotificationModule,
     SystemConfigModule,
+    FeatureFlagModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

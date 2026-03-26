@@ -22,6 +22,14 @@ export class MessageAuto {
   @Column({ type: 'text', nullable: false })
   body: string;
 
+  /** Nom du template HSM WhatsApp Business (null = message texte libre) */
+  @Column({ name: 'template_name', type: 'varchar', length: 100, nullable: true })
+  templateName?: string | null;
+
+  /** Langue du template HSM (ex: 'fr', 'en_US') */
+  @Column({ name: 'template_language', type: 'varchar', length: 20, nullable: true })
+  templateLanguage?: string | null;
+
   @Column({ type: 'int', default: 0, nullable: true })
   delai?: number | null;
 

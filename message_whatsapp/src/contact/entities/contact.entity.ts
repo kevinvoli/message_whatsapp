@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -34,6 +35,11 @@ export class Contact {
 
   @Column({ name: 'contact', type: 'varchar', length: 100, nullable: false })
   phone: string;
+
+  /** Numéro normalisé E.164 (ex: +213612345678) — index unique pour éviter les doublons */
+  @Index('UQ_contact_phone_normalized', { unique: true })
+  @Column({ name: 'phone_normalized', type: 'varchar', length: 30, nullable: true })
+  phoneNormalized?: string | null;
 
   @Column({
     name: 'chat_id',
