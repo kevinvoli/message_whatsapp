@@ -214,6 +214,10 @@ export class WhatsappMessage {
   @Column({ name: 'error_title', type: 'varchar', length: 255, nullable: true })
   error_title?: string | null;
 
+  /** Emoji de réaction posé sur ce message (webhook Meta type=reaction) */
+  @Column({ name: 'reaction_emoji', type: 'varchar', length: 10, nullable: true })
+  reaction_emoji?: string | null;
+
   @Column({
     name: 'commercial_id',
     type: 'uuid',

@@ -8,6 +8,7 @@ import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhapiStatus } from './interface/whapi-webhook.interface';
+import { FeatureFlagService } from 'src/feature-flags/feature-flag.service';
 
 @Injectable()
 export class WhapiService {
@@ -21,6 +22,7 @@ export class WhapiService {
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly messageGateway: WhatsappMessageGateway,
     private readonly configService: ConfigService,
+    private readonly featureFlagService: FeatureFlagService,
   ) {}
 
   async findChannelByExternalId(channelId: string) {
@@ -190,19 +192,11 @@ export class WhapiService {
   }
 
   private isUnifiedRouterEnabled(): boolean {
-    return this.readFlag('FF_UNIFIED_WEBHOOK_ROUTER', true);
+    return this.featureFlagService.isEnabled('FF_UNIFIED_WEBHOOK_ROUTER');
   }
 
   private isShadowUnifiedEnabled(): boolean {
-    return this.readFlag('FF_SHADOW_UNIFIED', false);
-  }
-
-  private readFlag(name: string, defaultValue: boolean): boolean {
-    const raw = this.configService.get<string>(name);
-    if (raw == null || raw === '') {
-      return defaultValue;
-    }
-    return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
+    return this.featureFlagService.isEnabled('FF_SHADOW_UNIFIED');
   }
 
   private isValidLegacyChatId(chatId?: string | null): boolean {

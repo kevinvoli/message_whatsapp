@@ -52,6 +52,24 @@ function getTokenExpiryClass(expiresAt: string | null | undefined): string {
   return 'text-green-600';
 }
 
+const META_ACCOUNT_STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
+  ACTIVE:     { label: 'Actif',      cls: 'bg-green-100 text-green-800' },
+  FLAGGED:    { label: 'Signalé',    cls: 'bg-yellow-100 text-yellow-800' },
+  RESTRICTED: { label: 'Restreint', cls: 'bg-orange-100 text-orange-800' },
+  DISABLED:   { label: 'Désactivé', cls: 'bg-red-100 text-red-800' },
+  BANNED:     { label: 'Banni',     cls: 'bg-red-200 text-red-900' },
+};
+
+function MetaAccountStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return null;
+  const cfg = META_ACCOUNT_STATUS_CONFIG[status] ?? { label: status, cls: 'bg-gray-100 text-gray-700' };
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
 function ProviderBadge({ provider }: { provider: ProviderType | null | undefined }) {
   const p = provider ?? 'whapi';
   const cfg = PROVIDER_CONFIG[p];
@@ -556,7 +574,14 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
             },
             {
               header: 'Provider',
-              render: (channel) => <ProviderBadge provider={channel.provider} />,
+              render: (channel) => (
+                <div className="flex flex-col gap-1">
+                  <ProviderBadge provider={channel.provider} />
+                  {channel.provider === 'meta' && channel.meta_account_status && (
+                    <MetaAccountStatusBadge status={channel.meta_account_status} />
+                  )}
+                </div>
+              ),
             },
             {
               header: 'Identifiant',

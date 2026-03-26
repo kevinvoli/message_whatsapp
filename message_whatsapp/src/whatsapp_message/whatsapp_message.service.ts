@@ -78,6 +78,10 @@ export class WhatsappMessageService {
     return this.statusService.markIncomingMessagesAsRead(chat_id);
   }
 
+  updateReactionEmoji(targetProviderMessageId: string, emoji: string) {
+    return this.statusService.updateReactionEmoji(targetProviderMessageId, emoji);
+  }
+
   // ── Query ─────────────────────────────────────────────────────────────────
 
   findLastMessageBychat_id(chat_id: string) {

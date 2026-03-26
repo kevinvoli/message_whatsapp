@@ -109,6 +109,131 @@ describe('MetaAdapter', () => {
     });
   });
 
+  it('maps reaction type to unknown (not yet handled)', () => {
+    const payload: MetaWebhookPayload = {
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'waba-3',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                metadata: { display_phone_number: '+123', phone_number_id: 'phone-1' },
+                messages: [
+                  {
+                    from: '333',
+                    id: 'meta-reaction-1',
+                    timestamp: '1700006000',
+                    type: 'reaction',
+                    reaction: { message_id: 'meta-msg-1', emoji: '👍' },
+                  } as any,
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = adapter.normalizeMessages(payload, {
+      provider: 'meta',
+      tenantId: 'tenant-meta',
+      channelId: 'phone-1',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('unknown');
+    expect(result[0].providerMessageId).toBe('meta-reaction-1');
+  });
+
+  it('maps system type to unknown (not yet handled)', () => {
+    const payload: MetaWebhookPayload = {
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'waba-4',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                metadata: { display_phone_number: '+123', phone_number_id: 'phone-1' },
+                messages: [
+                  {
+                    from: '444',
+                    id: 'meta-system-1',
+                    timestamp: '1700007000',
+                    type: 'system',
+                    system: { type: 'user_changed_number', new_wa_id: '555' },
+                  } as any,
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = adapter.normalizeMessages(payload, {
+      provider: 'meta',
+      tenantId: 'tenant-meta',
+      channelId: 'phone-1',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('unknown');
+    expect(result[0].providerMessageId).toBe('meta-system-1');
+  });
+
+  it('maps referral payload without crash', () => {
+    const payload: MetaWebhookPayload = {
+      object: 'whatsapp_business_account',
+      entry: [
+        {
+          id: 'waba-5',
+          changes: [
+            {
+              field: 'messages',
+              value: {
+                messaging_product: 'whatsapp',
+                metadata: { display_phone_number: '+123', phone_number_id: 'phone-1' },
+                contacts: [{ wa_id: '555', profile: { name: 'Ad Lead' } }],
+                messages: [
+                  {
+                    from: '555',
+                    id: 'meta-referral-1',
+                    timestamp: '1700008000',
+                    type: 'text',
+                    text: { body: 'Je viens de votre pub' },
+                    referral: {
+                      source_url: 'https://fb.com/ad/123',
+                      source_type: 'ad',
+                      source_id: 'ad-123',
+                      headline: 'Offre spéciale',
+                    },
+                  } as any,
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = adapter.normalizeMessages(payload, {
+      provider: 'meta',
+      tenantId: 'tenant-meta',
+      channelId: 'phone-1',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('text');
+    expect(result[0].text).toBe('Je viens de votre pub');
+    expect(result[0].fromName).toBe('Ad Lead');
+  });
+
   it('maps statuses', () => {
     const payload: MetaWebhookPayload = {
       object: 'whatsapp_business_account',

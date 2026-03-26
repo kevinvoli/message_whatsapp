@@ -98,7 +98,16 @@ import { FeatureFlagModule } from './feature-flags/feature-flag.module';
           .default(24),
         CORS_ORIGINS: Joi.when('NODE_ENV', {
           is: 'production',
-          then: Joi.string().min(1).required(),
+          then: Joi.string()
+            .min(1)
+            .required()
+            .custom((value, helpers) => {
+              if (value === '*' || value.includes('*')) {
+                return helpers.error('any.invalid');
+              }
+              return value;
+            })
+            .messages({ 'any.invalid': 'CORS_ORIGINS ne peut pas contenir de wildcard (*) en production' }),
           otherwise: Joi.string().allow('').optional(),
         }),
         WS_PORT: Joi.number().default(3001),

@@ -26,6 +26,7 @@ import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { WebhookCryptoService } from './webhook-crypto.service';
 import { WebhookPayloadValidationService } from './webhook-payload-validation.service';
+import { MetaAccountEventService } from './meta-account-event.service';
 
 @Controller('webhooks')
 export class WhapiController {
@@ -41,6 +42,7 @@ export class WhapiController {
     private readonly channelService: ChannelService,
     private readonly cryptoService: WebhookCryptoService,
     private readonly payloadValidator: WebhookPayloadValidationService,
+    private readonly metaAccountEventService: MetaAccountEventService,
   ) {}
 
   @Post('whapi')
@@ -480,12 +482,13 @@ export class WhapiController {
     const change = entry?.changes?.[0];
     const field = change?.field;
 
-    // P3: Ignorer les webhooks Meta non-messages (account_update, etc.)
+    // Dispatcher les webhooks Meta non-messages (account_update, etc.)
     if (field !== 'messages') {
       this.auditLogger.log(
-        `WEBHOOK_IGNORED provider=meta field=${field ?? 'unknown'}`,
+        `WEBHOOK_NON_MESSAGES provider=meta field=${field ?? 'unknown'} waba=${entry?.id ?? '-'}`,
       );
-      return { status: 'ignored', reason: `unsupported_field:${field}` };
+      await this.metaAccountEventService.dispatch(field ?? '', change?.value, entry?.id);
+      return { status: 'EVENT_RECEIVED' };
     }
 
     const metaValue = change?.value;

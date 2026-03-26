@@ -123,6 +123,8 @@ export type Channel = {
   api_version: string;
   core_version: string;
   tokenExpiresAt?: string | null;
+  meta_account_status?: string | null;
+  meta_account_status_updated_at?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -155,6 +157,7 @@ export type Client = {
   conversion_status?: string | null;
   source?: string | null;
   priority?: string | null;
+  marketing_opt_out?: boolean;
   messages?: WhatsappMessage[];
   createdAt: string;
   updatedAt: string;
@@ -274,6 +277,17 @@ export type DispatchSettings = {
   auto_message_delay_min_seconds: number;
   auto_message_delay_max_seconds: number;
   auto_message_max_steps: number;
+};
+
+export type MessageTemplateStatus = {
+  id: string;
+  templateName: string;
+  language: string;
+  status: string;
+  qualityScore?: string | null;
+  lastCheckedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';

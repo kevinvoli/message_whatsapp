@@ -160,7 +160,7 @@ const WebSocketEvents = () => {
         }
 
         case 'MESSAGE_STATUS_UPDATE': {
-          const { chat_id, message_id, status } = data.payload as {
+          const { chat_id, message_id, status, error_code, error_title } = data.payload as {
             message_id: string;
             external_id?: string;
             chat_id: string;
@@ -169,7 +169,23 @@ const WebSocketEvents = () => {
             error_title?: string;
           };
           const frontStatus = status === 'failed' ? 'error' : status;
-          chatState.updateMessageStatus(chat_id, message_id, frontStatus as Message['status']);
+          chatState.updateMessageStatus(
+            chat_id,
+            message_id,
+            frontStatus as Message['status'],
+            error_code ?? null,
+            error_title ?? null,
+          );
+          break;
+        }
+
+        case 'MESSAGE_REACTION': {
+          const { chat_id, message_id, reaction_emoji } = data.payload as {
+            message_id: string;
+            chat_id: string;
+            reaction_emoji: string | null;
+          };
+          chatState.updateMessageReaction(chat_id, message_id, reaction_emoji);
           break;
         }
 

@@ -124,9 +124,16 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
             {
               header: 'Statut',
               render: (c) => (
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {c.is_active ? 'Actif' : 'Inactif'}
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {c.is_active ? 'Actif' : 'Inactif'}
+                  </span>
+                  {c.marketing_opt_out && (
+                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-800" title="Ce contact a refusé les messages marketing">
+                      🚫 Opt-out
+                    </span>
+                  )}
+                </div>
               ),
             },
             { header: 'Créé le', render: (c) => <span className="text-sm text-gray-500">{formatDateShort(c.createdAt)}</span> },

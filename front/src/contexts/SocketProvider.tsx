@@ -9,11 +9,13 @@ import { Commercial } from '@/types/chat';
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  isReconnecting: boolean;
 }
 
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   isConnected: false,
+  isReconnecting: false,
 });
 
 export const useSocket = () => {
@@ -26,6 +28,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const { user, token } = useAuth() as { user: Commercial | null; token: string | null };
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -40,8 +43,11 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
       setSocket(newSocket);
 
-      newSocket.on('connect', () => setIsConnected(true));
+      newSocket.on('connect', () => { setIsConnected(true); setIsReconnecting(false); });
       newSocket.on('disconnect', () => setIsConnected(false));
+      newSocket.on('reconnecting', () => setIsReconnecting(true));
+      newSocket.on('reconnect', () => setIsReconnecting(false));
+      newSocket.on('reconnect_failed', () => setIsReconnecting(false));
 
       // Cleanup on component unmount or user change
       return () => {
@@ -60,7 +66,8 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const contextValue = useMemo(() => ({
     socket,
     isConnected,
-  }), [socket, isConnected]);
+    isReconnecting,
+  }), [socket, isConnected, isReconnecting]);
 
   return (
     <SocketContext.Provider value={contextValue}>

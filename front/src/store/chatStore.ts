@@ -50,6 +50,13 @@ interface ChatState {
     chat_id: string | undefined,
     messageId: string,
     status: Message["status"],
+    errorCode?: number | null,
+    errorTitle?: string | null,
+  ) => void;
+  updateMessageReaction: (
+    chat_id: string | undefined,
+    messageId: string,
+    reactionEmoji: string | null,
   ) => void;
   setTyping: (chat_id: string) => void;
   clearTyping: (chat_id: string) => void;
@@ -72,6 +79,7 @@ const initialState: Omit<
   | "addConversation"
   | "removeConversationBychat_id"
   | "updateMessageStatus"
+  | "updateMessageReaction"
   | "setTyping"
   | "clearTyping"
   | "reset"
@@ -392,13 +400,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     chat_id: string | undefined,
     messageId: string,
     status: Message["status"],
+    errorCode?: number | null,
+    errorTitle?: string | null,
   ) => {
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
 
       return {
         messages: state.messages.map((m) =>
-          m.id === messageId ? { ...m, status } : m,
+          m.id === messageId
+            ? {
+                ...m,
+                status,
+                ...(errorCode !== undefined ? { error_code: errorCode } : {}),
+                ...(errorTitle !== undefined ? { error_title: errorTitle } : {}),
+              }
+            : m,
+        ),
+      };
+    });
+  },
+
+  updateMessageReaction: (
+    chat_id: string | undefined,
+    messageId: string,
+    reactionEmoji: string | null,
+  ) => {
+    set((state) => {
+      if (state.selectedConversation?.chat_id !== chat_id) return state;
+      return {
+        messages: state.messages.map((m) =>
+          m.id === messageId ? { ...m, reaction_emoji: reactionEmoji } : m,
         ),
       };
     });

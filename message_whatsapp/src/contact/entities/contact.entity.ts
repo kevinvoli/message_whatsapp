@@ -103,6 +103,10 @@ export class Contact {
   @Column({ default: true })
   is_active: boolean;
 
+  /** Opt-out marketing (user_preferences webhook Meta) — RGPD */
+  @Column({ name: 'marketing_opt_out', type: 'boolean', default: false })
+  marketing_opt_out: boolean;
+
   @CreateDateColumn({
     name: 'createdAt',
     type: 'timestamp',

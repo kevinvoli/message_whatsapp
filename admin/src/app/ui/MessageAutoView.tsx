@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Edit, PlusCircle, Trash2, RefreshCw, CheckCircle2, PauseCircle, Settings } from 'lucide-react';
+import { Edit, PlusCircle, Trash2, RefreshCw, CheckCircle2, PauseCircle, Settings, ShieldAlert } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
-import { MessageAuto, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload } from '@/app/lib/definitions';
+import { MessageAuto, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, MessageTemplateStatus } from '@/app/lib/definitions';
 import {
   createMessageAuto,
   deleteMessageAuto,
@@ -16,6 +16,7 @@ import {
   updateCronConfig,
   getPostes,
   getChannels,
+  getTemplateStatuses,
 } from '@/app/lib/api';
 import { Poste, Channel } from '@/app/lib/definitions';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -542,6 +543,25 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
     }
   };
 
+  // ─── Template statuses ────────────────────────────────────────────────────
+
+  const [templateStatuses, setTemplateStatuses] = useState<MessageTemplateStatus[]>([]);
+  const [templateStatusLoading, setTemplateStatusLoading] = useState(false);
+
+  const fetchTemplateStatuses = useCallback(async () => {
+    setTemplateStatusLoading(true);
+    try {
+      const data = await getTemplateStatuses();
+      setTemplateStatuses(data);
+    } catch {
+      // silently ignore
+    } finally {
+      setTemplateStatusLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchTemplateStatuses(); }, [fetchTemplateStatuses]);
+
   const handleScopeDelete = async (id: string) => {
     if (!window.confirm('Supprimer cette restriction de scope ?')) return;
     try {
@@ -757,6 +777,88 @@ export default function MessageAutoView({ onRefresh }: MessageAutoViewProps) {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Statuts templates HSM ───────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-orange-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Statuts Templates HSM (Meta)</h3>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{templateStatuses.length}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void fetchTemplateStatuses()}
+            title="Rafraîchir"
+            aria-label="Rafraîchir statuts templates"
+            className="p-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {templateStatusLoading ? (
+          <p className="px-4 py-6 text-center text-sm text-gray-500">Chargement...</p>
+        ) : templateStatuses.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-gray-500">
+            Aucun statut template enregistré. Les statuts sont mis à jour via les webhooks Meta.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="px-4 py-2">Template</th>
+                  <th className="px-4 py-2">Langue</th>
+                  <th className="px-4 py-2">Statut</th>
+                  <th className="px-4 py-2">Qualité</th>
+                  <th className="px-4 py-2">Dernière vérif.</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {templateStatuses.map((ts) => {
+                  const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+                    APPROVED: { bg: 'bg-green-100', text: 'text-green-800', label: 'Approuvé' },
+                    PAUSED: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pausé' },
+                    REJECTED: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejeté' },
+                    PENDING: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'En attente' },
+                    DISABLED: { bg: 'bg-gray-200', text: 'text-gray-700', label: 'Désactivé' },
+                  };
+                  const sc = statusConfig[ts.status] ?? { bg: 'bg-gray-100', text: 'text-gray-700', label: ts.status };
+                  const qualityConfig: Record<string, { bg: string; text: string }> = {
+                    GREEN: { bg: 'bg-green-100', text: 'text-green-800' },
+                    YELLOW: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+                    RED: { bg: 'bg-red-100', text: 'text-red-800' },
+                  };
+                  const qc = ts.qualityScore ? (qualityConfig[ts.qualityScore] ?? { bg: 'bg-gray-100', text: 'text-gray-700' }) : null;
+                  return (
+                    <tr key={ts.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 font-mono text-xs text-gray-900">{ts.templateName}</td>
+                      <td className="px-4 py-2 text-gray-600 uppercase text-xs">{ts.language}</td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.bg} ${sc.text}`}>
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        {qc ? (
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${qc.bg} ${qc.text}`}>
+                            {ts.qualityScore}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-500">
+                        {ts.lastCheckedAt ? formatDateShort(ts.lastCheckedAt) : '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

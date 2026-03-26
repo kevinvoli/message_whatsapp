@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MessageAuto } from './entities/message-auto.entity';
 import { MessageTemplateStatus } from './entities/message-template-status.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
+import { normalizePhone } from 'src/common/utils/phone.utils';
 import { Repository } from 'typeorm';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
@@ -19,6 +21,9 @@ export class MessageAutoService {
 
     @InjectRepository(MessageTemplateStatus)
     private readonly templateStatusRepo: Repository<MessageTemplateStatus>,
+
+    @InjectRepository(Contact)
+    private readonly contactRepo: Repository<Contact>,
 
     private readonly chatService: WhatsappChatService,
     private readonly messageService: WhatsappMessageService,
@@ -54,6 +59,10 @@ export class MessageAutoService {
     if (result.affected === 0) {
       throw new NotFoundException(`Auto message with ID ${id} not found`);
     }
+  }
+
+  async findAllTemplateStatuses(): Promise<MessageTemplateStatus[]> {
+    return this.templateStatusRepo.find({ order: { templateName: 'ASC', language: 'ASC' } });
   }
 
   /**
@@ -101,6 +110,23 @@ export class MessageAutoService {
         MessageAutoService.name,
       );
       return;
+    }
+
+    // 🚫 Guard RGPD : bloquer l'envoi si le contact a opted-out du marketing
+    if (chat.contact_client) {
+      const phoneNormalized = normalizePhone(chat.contact_client);
+      const contact = phoneNormalized
+        ? await this.contactRepo.findOne({ where: { phoneNormalized } })
+        : null;
+      if (contact?.marketing_opt_out) {
+        this.logger.warn(
+          `AUTOMSG_SKIPPED_OPT_OUT chatId=${chatId} phone=${chat.contact_client}`,
+          MessageAutoService.name,
+        );
+        await this.chatService.update(chatId, { read_only: false });
+        this.eventEmitter.emit(EVENTS.CONVERSATION_SET_READONLY, { chat: { ...chat, read_only: false } });
+        return;
+      }
     }
 
     // 🛡️ Guard template HSM : vérifier le statut d'approbation avant envoi

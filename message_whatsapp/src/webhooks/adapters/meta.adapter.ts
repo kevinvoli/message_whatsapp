@@ -61,6 +61,11 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
     const type = this.mapType(message.type);
     const chatId = `${message.from}@s.whatsapp.net`;
     const timestamp = Number.parseInt(message.timestamp, 10);
+
+    // Pour les réactions : le quotedProviderMessageId pointe vers le message cible
+    const quotedProviderMessageId =
+      message.type === 'reaction' ? message.reaction?.message_id : undefined;
+
     return {
       provider: context.provider,
       providerMessageId: message.id,
@@ -76,6 +81,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       media: this.resolveMedia(message),
       location: this.resolveLocation(message),
       interactive: this.resolveInteractive(message),
+      quotedProviderMessageId,
       raw,
     };
   }
@@ -111,6 +117,11 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       case 'document':
       case 'location':
       case 'interactive':
+      case 'sticker':
+      case 'reaction':
+      case 'contacts':
+      case 'system':
+      case 'unsupported':
         return type;
       case 'button':
         return 'interactive';
@@ -134,6 +145,30 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
     }
     if (message.type === 'video') {
       return message.video?.caption;
+    }
+    if (message.type === 'reaction') {
+      return message.reaction?.emoji ?? '';
+    }
+    if (message.type === 'system') {
+      const sys = message.system;
+      if (sys?.type === 'user_changed_number') {
+        const from = sys.old_wa_id ? `+${sys.old_wa_id}` : '?';
+        const to = sys.new_wa_id ? `+${sys.new_wa_id}` : sys.customer ? `+${sys.customer}` : '?';
+        return `📱 Changement de numéro : ${from} → ${to}`;
+      }
+      return `⚙️ Message système (${sys?.type ?? 'unknown'})`;
+    }
+    if (message.type === 'contacts') {
+      const first = message.contacts?.[0];
+      const name = first?.name?.formatted_name ?? 'Contact inconnu';
+      const phone = first?.phones?.[0]?.phone ?? '';
+      return `📇 Contact : ${name}${phone ? ` — ${phone}` : ''}`;
+    }
+    if (message.type === 'sticker') {
+      return '[Sticker]';
+    }
+    if (message.type === 'unsupported') {
+      return '[Type de message non supporté]';
     }
     return undefined;
   }

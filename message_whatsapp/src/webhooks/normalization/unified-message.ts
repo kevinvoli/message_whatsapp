@@ -14,6 +14,10 @@ export type UnifiedMessageType =
   | 'live_location'
   | 'interactive'
   | 'button'
+  | 'reaction'
+  | 'contacts'
+  | 'system'
+  | 'unsupported'
   | 'unknown';
 
 export type UnifiedDirection = 'in' | 'out';

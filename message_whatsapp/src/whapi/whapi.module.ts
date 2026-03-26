@@ -55,8 +55,11 @@ import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
 import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 import { NotificationModule } from 'src/notification/notification.module';
+import { FeatureFlagModule } from 'src/feature-flags/feature-flag.module';
 import { WebhookCryptoService } from './webhook-crypto.service';
 import { WebhookPayloadValidationService } from './webhook-payload-validation.service';
+import { MetaAccountEventService } from './meta-account-event.service';
+import { MessageTemplateStatus } from 'src/message-auto/entities/message-template-status.entity';
 import { CqrsModule } from '@nestjs/cqrs';
 import { HandleInboundMessageHandler } from 'src/webhooks/application/commands/handle-inbound-message.handler';
 import { UpdateMessageStatusHandler } from 'src/webhooks/application/commands/update-message-status.handler';
@@ -76,6 +79,7 @@ import { UpdateMessageStatusHandler } from 'src/webhooks/application/commands/up
       MessageAuto,
       AutoMessageScopeConfig,
       WebhookEventLog,
+      MessageTemplateStatus,
     ]),
     CqrsModule,
     DispatcherModule,
@@ -86,6 +90,7 @@ import { UpdateMessageStatusHandler } from 'src/webhooks/application/commands/up
     CallLogModule,
     JorbsModule,
     NotificationModule,
+    FeatureFlagModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
@@ -124,6 +129,7 @@ import { UpdateMessageStatusHandler } from 'src/webhooks/application/commands/up
     WebhookPayloadValidationService,
     HandleInboundMessageHandler,
     UpdateMessageStatusHandler,
+    MetaAccountEventService,
   ],
 })
 export class WhapiModule {}

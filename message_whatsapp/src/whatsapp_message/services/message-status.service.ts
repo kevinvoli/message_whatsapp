@@ -78,4 +78,18 @@ export class MessageStatusService {
     await this.messageRepository.markIncomingAsRead(chat_id);
     this.logger.debug(`Incoming messages marked as read for chat ${chat_id}`);
   }
+
+  /** Met à jour la réaction emoji sur le message cible (type=reaction webhook Meta). */
+  async updateReactionEmoji(
+    targetProviderMessageId: string,
+    emoji: string,
+  ): Promise<WhatsappMessage | null> {
+    const message = await this.messageRepository.findForStatusUpdate(
+      targetProviderMessageId,
+      undefined,
+    );
+    if (!message) return null;
+    message.reaction_emoji = emoji || null;
+    return this.messageRepository.save(message);
+  }
 }

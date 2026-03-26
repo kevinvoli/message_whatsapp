@@ -36,6 +36,13 @@ export class MessageAutoController {
     return this.messageAutoService.findAll();
   }
 
+  // ─── Template statuses (lecture seule) ───────────────────────────────────
+
+  @Get('template-status')
+  findAllTemplateStatuses() {
+    return this.messageAutoService.findAllTemplateStatuses();
+  }
+
   // ─── Scope config — routes avant `:id` pour éviter la collision NestJS ───
 
   /** Liste tous les overrides (poste + canal + provider) */

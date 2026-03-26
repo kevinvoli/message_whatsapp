@@ -65,9 +65,14 @@ const buildService = (
     debug: jest.fn(),
   } as unknown as AppLogger;
 
+  const contactRepo = {
+    findOne: jest.fn().mockResolvedValue(null), // pas de contact opt-out par défaut
+  };
+
   const service = new MessageAutoService(
     autoMessageRepo as any,
     templateStatusRepo as any,
+    contactRepo as any,
     chatService as any,
     messageService as any,
     eventEmitter as any,

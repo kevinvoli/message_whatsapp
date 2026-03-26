@@ -55,6 +55,12 @@ export class WhapiChannel {
   @Column({ name: 'verify_token', type: 'varchar', length: 128, nullable: true })
   verify_token?: string | null;
 
+  @Column({ name: 'meta_account_status', type: 'varchar', length: 32, nullable: true })
+  meta_account_status?: string | null;
+
+  @Column({ name: 'meta_account_status_updated_at', type: 'datetime', nullable: true })
+  meta_account_status_updated_at?: Date | null;
+
   @Column({ type: 'datetime', nullable: true, name: 'token_expires_at' })
   tokenExpiresAt: Date | null;
 

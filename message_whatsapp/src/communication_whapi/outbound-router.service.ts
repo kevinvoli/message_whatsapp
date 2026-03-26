@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { CommunicationWhapiService } from './communication_whapi.service';
 import { CommunicationMetaService } from './communication_meta.service';
 import { CommunicationMessengerService } from './communication_messenger.service';
@@ -33,6 +33,18 @@ export class OutboundRouterService {
     }
 
     const provider = channel.provider ?? 'whapi';
+
+    const BLOCKED_META_STATUSES = ['DISABLED', 'BANNED'];
+    if (channel.meta_account_status && BLOCKED_META_STATUSES.includes(channel.meta_account_status)) {
+      this.logger.error(
+        `OUTBOUND_BLOCKED channel=${data.channelId} meta_account_status=${channel.meta_account_status}`,
+        OutboundRouterService.name,
+      );
+      throw new HttpException(
+        `Canal ${data.channelId} désactivé (statut Meta: ${channel.meta_account_status}) — envoi bloqué`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
 
     if (provider === 'meta') {
       if (!channel.external_id) {
@@ -176,6 +188,18 @@ export class OutboundRouterService {
 
 
     const provider = channel.provider ?? 'whapi';
+
+    const BLOCKED_META_STATUSES = ['DISABLED', 'BANNED'];
+    if (channel.meta_account_status && BLOCKED_META_STATUSES.includes(channel.meta_account_status)) {
+      this.logger.error(
+        `OUTBOUND_MEDIA_BLOCKED channel=${data.channelId} meta_account_status=${channel.meta_account_status}`,
+        OutboundRouterService.name,
+      );
+      throw new HttpException(
+        `Canal ${data.channelId} désactivé (statut Meta: ${channel.meta_account_status}) — envoi bloqué`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
 
     if (provider === 'meta') {
       if (!channel.external_id) {

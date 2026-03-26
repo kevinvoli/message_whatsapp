@@ -66,6 +66,12 @@ export class InboundMessageService {
         continue;
       }
 
+      // Les réactions ne créent pas de nouveau message — elles mettent à jour le message cible
+      if (message.type === 'reaction') {
+        await this.handleReaction(message);
+        continue;
+      }
+
       const chatValidation = this.validateIncomingChatId(message.chatId);
       if (!chatValidation.valid) {
         this.logger.warn(
@@ -144,10 +150,12 @@ export class InboundMessageService {
             `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
           );
 
-          // 🤖 Messages automatiques : déclenché uniquement si l'agent
-          // n'a jamais répondu sur ce chat (last_poste_message_at = null).
-          // Fire-and-forget : le setTimeout interne est non-bloquant.
-          if (!conversation.last_poste_message_at) {
+          // 🤖 Messages automatiques : déclenché uniquement pour les vrais messages client
+          // (pas pour les messages système ou les réactions).
+          if (
+            message.type !== 'system' &&
+            !conversation.last_poste_message_at
+          ) {
             void this.autoMessageOrchestrator.handleClientMessage(conversation);
           }
         });
@@ -321,6 +329,40 @@ export class InboundMessageService {
     }
 
     return { valid: true };
+  }
+
+  private async handleReaction(message: UnifiedMessage): Promise<void> {
+    const targetProviderMessageId = message.quotedProviderMessageId;
+    const emoji = message.text ?? '';
+
+    if (!targetProviderMessageId) {
+      this.logger.warn(
+        `REACTION_SKIP no target message_id from=${message.chatId}`,
+      );
+      return;
+    }
+
+    const updated = await this.whatsappMessageService.updateReactionEmoji(
+      targetProviderMessageId,
+      emoji,
+    );
+
+    if (!updated) {
+      this.logger.warn(
+        `REACTION_SKIP target not found provider_message_id=${targetProviderMessageId}`,
+      );
+      return;
+    }
+
+    await this.messageGateway.notifyReactionUpdate({
+      messageId: updated.id,
+      chatId: updated.chat_id,
+      reactionEmoji: emoji || null,
+    });
+
+    this.logger.log(
+      `REACTION_APPLIED message_id=${updated.id} emoji=${emoji || '(removed)'}`,
+    );
   }
 
   private buildMessageTraceId(

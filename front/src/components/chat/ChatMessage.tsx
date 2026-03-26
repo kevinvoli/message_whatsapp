@@ -43,6 +43,16 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
     currentAudioRef.current = audioEl;
   };
 
+  const META_ERROR_LABELS: Record<number, string> = {
+    131026: "Numéro absent de WhatsApp",
+    131047: "Fenêtre 24h expirée — utilisez un template",
+    131048: "Signalé comme spam par le destinataire",
+    131051: "Type de message non supporté",
+    131052: "Média expiré — renvoyez-le",
+    130429: "Limite de débit — réessayez dans quelques minutes",
+    131000: "Erreur Meta interne — réessayez",
+  };
+
   const renderStatusIcon = (status?: string) => {
     switch (status) {
       case 'sending':
@@ -71,6 +81,17 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const videoMedias = msg.medias?.filter((m) => m.type === 'video') ?? [];
   const documentMedias = msg.medias?.filter((m) => m.type === 'document') ?? [];
   const locationMedias = msg.medias?.filter((m) => m.type === 'location') ?? [];
+
+  // Messages système : bulle centrée, style neutre
+  if (msg.type === 'system') {
+    return (
+      <div data-message-id={messageId} className="flex justify-center my-1">
+        <div className="bg-gray-100 text-gray-500 text-xs rounded-full px-4 py-1 max-w-sm text-center">
+          {messageText ?? '[Message système]'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -240,12 +261,64 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             </MediaBubble>
           ))}
 
-          {/* Text */}
-          {messageText && <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>}
+          {/* Message système centré (changement de numéro, etc.) */}
+          {msg.type === 'system' && messageText && (
+            <p className="text-xs italic opacity-90 text-center py-0.5">{messageText}</p>
+          )}
+
+          {/* Sticker placeholder */}
+          {msg.type === 'sticker' && (
+            <p className="text-sm italic opacity-70">🎭 Sticker WhatsApp</p>
+          )}
+
+          {/* Contact partagé */}
+          {msg.type === 'contacts' && messageText && (
+            <p className="text-sm">{messageText}</p>
+          )}
+
+          {/* Type non supporté */}
+          {(msg.type === 'unsupported' || msg.type === 'unknown') && (
+            <p className="text-xs italic opacity-70">⚠️ Type de message non supporté</p>
+          )}
+
+          {/* Text (types classiques) */}
+          {msg.type !== 'system' &&
+            msg.type !== 'sticker' &&
+            msg.type !== 'unsupported' &&
+            msg.type !== 'unknown' &&
+            msg.type !== 'contacts' &&
+            messageText && (
+              <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>
+            )}
 
           {/* Fallback for empty messages */}
-          {!messageText && !hasMedia && (
-            <p className="text-sm italic opacity-80">[Message vide]</p>
+          {!messageText && !hasMedia &&
+            msg.type !== 'system' &&
+            msg.type !== 'sticker' &&
+            msg.type !== 'unsupported' &&
+            msg.type !== 'unknown' && (
+              <p className="text-sm italic opacity-80">[Message vide]</p>
+            )}
+
+          {/* Réaction emoji (posée par le client sur ce message) */}
+          {msg.reaction_emoji && (
+            <div className={`mt-1 flex ${isFromMe ? 'justify-end' : 'justify-start'}`}>
+              <span className="text-base bg-white/20 rounded-full px-1.5 py-0.5 shadow-sm">
+                {msg.reaction_emoji}
+              </span>
+            </div>
+          )}
+
+          {/* Label d'erreur de livraison Meta */}
+          {isFromMe && msg.status === 'error' && (msg.error_code || msg.error_title) && (
+            <div className="mt-1 flex items-center gap-1 text-xs text-red-300">
+              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+              <span>
+                {msg.error_code && META_ERROR_LABELS[msg.error_code]
+                  ? META_ERROR_LABELS[msg.error_code]
+                  : (msg.error_title ?? 'Message non délivré')}
+              </span>
+            </div>
           )}
 
           {/* Timestamp + status */}

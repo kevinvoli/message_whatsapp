@@ -141,6 +141,12 @@ export interface Message {
   chat_id: string;
 
   status?: MessageStatus;
+  error_code?: number | null;
+  error_title?: string | null;
+  /** Type de message (text, image, system, reaction, sticker, contacts, unsupported…) */
+  type?: string;
+  /** Emoji de réaction posé sur ce message */
+  reaction_emoji?: string | null;
   direction?: "IN" | "OUT";
 
   commercial_id?: string | null;
@@ -432,6 +438,10 @@ interface RawMessageData {
   poste_id?: string;
   chat_id: string;
 
+  /** Champ "types" envoyé par le gateway (text, image, system, reaction, sticker…) */
+  types?: string;
+  reaction_emoji?: string | null;
+
   // 🔊 Voice : c'est ce que le backend envoie réellement
   voice?: RawVoiceData;
 
@@ -627,6 +637,9 @@ export const transformToMessage = (raw: RawMessageData): Message => {
           from_me: raw.quotedMessage.from_me,
         }
       : undefined,
+
+    type: raw.types ?? undefined,
+    reaction_emoji: raw.reaction_emoji ?? null,
   };
 };
 

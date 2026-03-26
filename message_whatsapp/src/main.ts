@@ -37,7 +37,15 @@ async function bootstrap() {
   // Enable CORS for the frontend application
   // CORS_ORIGINS = liste d'origines séparées par des virgules
   // ex: http://148.230.112.175:3000,http://148.230.112.175:3001
-  const allowedOrigins = (configService.get<string>('CORS_ORIGINS') ?? '')
+  const nodeEnv = configService.get<string>('NODE_ENV');
+  const rawOrigins = configService.get<string>('CORS_ORIGINS') ?? '';
+
+  // Guard de démarrage : en production, CORS_ORIGINS doit être défini sans wildcard
+  if (nodeEnv === 'production' && (!rawOrigins || rawOrigins.includes('*'))) {
+    throw new Error('CORS_ORIGINS doit être défini et sans wildcard (*) en production');
+  }
+
+  const allowedOrigins = rawOrigins
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);

@@ -845,6 +845,27 @@ export class WhatsappMessageGateway
     );
   }
 
+  async notifyReactionUpdate(data: {
+    messageId: string;
+    chatId: string;
+    reactionEmoji: string | null;
+  }) {
+    const message = await this.messageService.findOneWithMedias(data.messageId);
+    if (!message?.chat?.poste_id) return;
+
+    this.server.to(`poste:${message.chat.poste_id}`).emit('chat:event', {
+      type: 'MESSAGE_REACTION',
+      payload: {
+        message_id: data.messageId,
+        chat_id: data.chatId,
+        reaction_emoji: data.reactionEmoji,
+      },
+    });
+    this.logger.log(
+      `REACTION_EMITTED message_id=${data.messageId} emoji=${data.reactionEmoji ?? '(removed)'}`,
+    );
+  }
+
   // ======================================================
   // AUTO-MESSAGE avec Typing
   // ======================================================
@@ -1099,6 +1120,7 @@ export class WhatsappMessageGateway
     poste_id: message.poste_id,
     direction: message.direction,
     types: message.type,
+    reaction_emoji: message.reaction_emoji ?? null,
     medias:
       message.medias?.map((m) => ({
         id: m.media_id,

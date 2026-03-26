@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthProvider";
 import { SocketProvider } from "@/contexts/SocketProvider";
 import WebSocketEvents from "@/components/WebSocketEvents";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import ReconnectingBanner from "@/components/ReconnectingBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <AuthProvider>
             <SocketProvider>
+              <ReconnectingBanner />
               <WebSocketEvents />
               {children}
             </SocketProvider>
