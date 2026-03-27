@@ -26,6 +26,7 @@ import GoNoGoView from '@/app/ui/GoNoGoView';
 import FeatureFlagsView from '@/app/ui/FeatureFlagsView';
 import CannedResponsesView from '@/app/ui/CannedResponsesView';
 import TagsView from '@/app/ui/TagsView';
+import CsatView from '@/app/ui/CsatView';
 import NotificationsView from '@/app/ui/NotificationsView';
 import SettingsView from '@/app/ui/SettingsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
@@ -99,6 +100,8 @@ export default function AdminDashboard() {
                 return <CannedResponsesView />;
             case 'tags':
                 return <TagsView />;
+            case 'csat':
+                return <CsatView />;
             case 'canaux':
                 return <ChannelsView />;
             case 'automessages':

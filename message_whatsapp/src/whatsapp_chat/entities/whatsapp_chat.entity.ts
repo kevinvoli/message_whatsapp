@@ -225,6 +225,11 @@ export class WhatsappChat {
   })
   last_auto_message_sent_at: Date | null;
 
+  // ─── CSAT ─────────────────────────────────────────────────────────────────
+
+  @Column({ name: 'csat_sent_at', type: 'timestamp', nullable: true })
+  csat_sent_at?: Date | null;
+
   // ─── Referral Meta (origin publicitaire) ─────────────────────────────────
 
   @Column({ name: 'referral_source_type', type: 'varchar', length: 32, nullable: true })

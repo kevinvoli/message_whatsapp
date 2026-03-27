@@ -37,6 +37,7 @@ export type ViewMode =
   | 'crons'
   | 'canned_responses'
   | 'tags'
+  | 'csat'
   | 'observabilite'
   | 'go_no_go'
   | 'notifications'
@@ -319,6 +320,13 @@ export type ConversationTag = {
   color: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CsatStats = {
+  totalResponses: number;
+  averageScore: number | null;
+  distribution: Record<number, number>;
+  byCommercial: { commercial_id: string; count: number; average: number }[];
 };
 
 export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';

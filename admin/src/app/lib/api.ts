@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, FeatureFlagEntry, MessageTemplateStatus, CannedResponse, ConversationNote, ConversationTag } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, FeatureFlagEntry, MessageTemplateStatus, CannedResponse, ConversationNote, ConversationTag, CsatStats } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -904,4 +904,12 @@ export async function deleteTag(id: string): Promise<void> {
         credentials: 'include',
     });
     if (!response.ok) throw new Error('Erreur suppression tag');
+}
+
+export async function getCsatStats(): Promise<CsatStats> {
+    const response = await fetch(`${API_BASE_URL}/csat/stats`, {
+        credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erreur chargement stats CSAT');
+    return handleResponse<CsatStats>(response);
 }

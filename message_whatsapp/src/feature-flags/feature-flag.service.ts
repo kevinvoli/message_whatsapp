@@ -88,6 +88,13 @@ const FLAG_DEFINITIONS: Omit<FeatureFlagEntry, 'enabled'>[] = [
     envVar: 'FF_REPLY_MESSAGE',
     category: 'messaging',
   },
+  {
+    key: 'FF_CSAT',
+    label: 'Enquête CSAT automatique',
+    description: 'Envoie automatiquement une enquête de satisfaction à la clôture d\'une conversation',
+    envVar: 'FF_CSAT',
+    category: 'messaging',
+  },
 ];
 
 @Injectable()

@@ -42,6 +42,7 @@ import { FeatureFlagModule } from './feature-flags/feature-flag.module';
 import { CannedResponsesModule } from './canned-responses/canned-responses.module';
 import { ConversationNotesModule } from './conversation-notes/conversation-notes.module';
 import { TagsModule } from './tags/tags.module';
+import { CsatModule } from './csat/csat.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { TagsModule } from './tags/tags.module';
         FF_TEMPLATE_GUARD: Joi.string().optional(),
         FF_AUTO_MESSAGE_DLQ: Joi.string().optional(),
         FF_REPLY_MESSAGE: Joi.string().optional(),
+        FF_CSAT: Joi.string().optional(),
         MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number()
           .min(1)
           .max(240)
@@ -161,6 +163,7 @@ import { TagsModule } from './tags/tags.module';
     CannedResponsesModule,
     ConversationNotesModule,
     TagsModule,
+    CsatModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

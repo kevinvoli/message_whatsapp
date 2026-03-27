@@ -405,7 +405,7 @@ export class DispatcherService {
             chatId: chat.chat_id,
             clientName: chat.name || chat.contact_client || chat.chat_id.split('@')[0],
             posteId: chat.poste_id,
-            deadlineAt: chat.first_response_deadline_at,
+            deadlineAt: chat.first_response_deadline_at ?? new Date(),
           } satisfies SlaBreachDetectedEvent);
         }
         await this.reinjectConversation(chat);

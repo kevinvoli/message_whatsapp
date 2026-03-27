@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -52,6 +53,7 @@ import {
   QueueUpdateEvent,
   SlaBreachDetectedEvent,
   CallMissedEvent,
+  ConversationClosedEvent,
 } from 'src/events/events.constants';
 
 type AuthPayload = {
@@ -112,6 +114,7 @@ export class WhatsappMessageGateway
     private readonly callLogService: CallLogService,
     private readonly notificationService: NotificationService,
     private readonly agentStateService: AgentStateService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ======================================================
@@ -499,6 +502,11 @@ export class WhatsappMessageGateway
       this.logger.log(`Conversation status changed: ${chatId} → ${newStatus}`);
 
       const updatedChat = await this.chatService.findBychat_id(chatId);
+      if (newStatus === WhatsappChatStatus.FERME && updatedChat) {
+        this.eventEmitter.emit(EVENTS.CONVERSATION_CLOSED, {
+          chat: updatedChat,
+        } satisfies ConversationClosedEvent);
+      }
       if (!updatedChat?.poste_id) return;
 
       const lastMessage =

@@ -11,6 +11,7 @@ export const EVENTS = {
   CALL_LOG_NEW: 'call.log.new',
   SLA_BREACH_DETECTED: 'sla.breach.detected',
   CALL_MISSED: 'call.missed',
+  CONVERSATION_CLOSED: 'conversation.closed',
   AUTO_MESSAGE_FAILED: 'auto.message.failed',
   QUEUE_UPDATE: 'queue.update',
 } as const;
@@ -76,4 +77,8 @@ export interface CallMissedEvent {
   clientName: string;
   phone: string;
   posteId: string;
+}
+
+export interface ConversationClosedEvent {
+  chat: import('src/whatsapp_chat/entities/whatsapp_chat.entity').WhatsappChat;
 }
