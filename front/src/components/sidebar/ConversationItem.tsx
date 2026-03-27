@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge } from '../ui/ProviderBadge';
@@ -126,9 +126,20 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.status.replace('_', ' ')}
             </span>
             <ProviderBadge chatId={conversation.chat_id} showLabel={false} />
-            {conversation?.tags?.map((tag, idx) => (
-              <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
-                {tag}
+            {conversation.first_response_deadline_at &&
+              new Date(conversation.first_response_deadline_at).getTime() < Date.now() && (
+              <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium animate-pulse">
+                <Clock className="w-3 h-3" />
+                SLA
+              </span>
+            )}
+            {conversation?.tags?.map((tag) => (
+              <span
+                key={tag.id}
+                className="text-xs px-2 py-0.5 rounded text-white font-medium"
+                style={{ backgroundColor: tag.color }}
+              >
+                {tag.name}
               </span>
             ))}
           </div>

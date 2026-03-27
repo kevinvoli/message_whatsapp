@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddReactionEmojiToMessage20260326 implements MigrationInterface {
+export class AddReactionEmojiToMessage1774483200005 implements MigrationInterface {
+  name = 'AddReactionEmojiToMessage1774483200005';
+
   public async up(queryRunner: QueryRunner): Promise<void> {
     const table = 'whatsapp_message';
     if (!(await queryRunner.hasColumn(table, 'reaction_emoji'))) {

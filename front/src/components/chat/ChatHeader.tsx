@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { MessageCircle, User, Clock, Search, X } from 'lucide-react';
-import { CallStatus, Conversation, ConversationStatus } from '@/types/chat';
+import { CallStatus, Conversation, ConversationStatus, ConversationTag } from '@/types/chat';
 import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
+import { TagDropdown } from '../conversation/TagDropdown';
 import { useChatStore } from '@/store/chatStore';
 
 interface ChatHeaderProps {
@@ -89,6 +90,10 @@ export default function ChatHeader({ currentConv, totalMessages, searchTerm, onS
       });
     };
 
+    const handleTagsChange = (tags: ConversationTag[]) => {
+      updateConversation({ ...currentConv, tags });
+    };
+
     return (
         <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -128,6 +133,11 @@ export default function ChatHeader({ currentConv, totalMessages, searchTerm, onS
                     >
                         <Search className="w-4 h-4" />
                     </button>
+                    <TagDropdown
+                      chatId={currentConv.chat_id}
+                      currentTags={currentConv.tags ?? []}
+                      onTagsChange={handleTagsChange}
+                    />
                     <CallButton conversation={currentConv}
                     onCallStatusChange={handleCallStatusChange} />
                     <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />

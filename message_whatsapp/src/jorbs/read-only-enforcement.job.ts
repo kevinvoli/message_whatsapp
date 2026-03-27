@@ -4,16 +4,17 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { LessThan, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENTS } from 'src/events/events.constants';
 
 @Injectable()
 export class ReadOnlyEnforcementJob implements OnModuleInit {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly eventEmitter: EventEmitter2,
     private readonly cronConfigService: CronConfigService,
   ) {}
 
@@ -37,7 +38,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     for (const chat of chats) {
       chat.read_only = true;
       await this.chatRepo.save(chat);
-      this.gateway.emitConversationReadonly(chat);
+      this.eventEmitter.emit(EVENTS.CONVERSATION_SET_READONLY, { chat });
     }
   }
 }

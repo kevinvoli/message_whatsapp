@@ -46,12 +46,14 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { LoggingModule } from 'src/logging/logging.module';
 import { DispatcherController } from './dispatcher.controller';
+import { ConversationController } from './conversation.controller';
 import { OfflineReinjectionJob } from 'src/jorbs/offline-reinjection.job';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { TagsModule } from 'src/tags/tags.module';
 
 @Module({
   imports: [
@@ -74,8 +76,9 @@ import { NotificationModule } from 'src/notification/notification.module';
     CallLogModule,
     JorbsModule,
     NotificationModule,
+    TagsModule,
   ],
-  controllers: [DispatcherController],
+  controllers: [DispatcherController, ConversationController],
   providers: [
     { provide: MESSAGE_REPOSITORY, useClass: MessageTypeOrmRepository },
     { provide: CONVERSATION_REPOSITORY, useClass: ConversationTypeOrmRepository },

@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, ToggleRight, BookOpen } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, ToggleRight, BookOpen, Tag } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -26,6 +26,7 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'messages', name: 'Messages', icon: MessageCircle, badge: null },
       { id: 'automessages', name: 'Messages auto', icon: MessageSquareText, badge: null },
       { id: 'canned_responses', name: 'Réponses prédéfinies', icon: BookOpen, badge: null },
+      { id: 'tags', name: 'Tags', icon: Tag, badge: null },
     ],
   },
   {

@@ -264,7 +264,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
       </div>
 
       {/* Stats secondaires */}
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-7 gap-4">
         {/* Messages période */}
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center gap-2 mb-2">
@@ -323,6 +323,16 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
           </div>
           <p className="text-xl font-bold text-gray-900">{metriques.chatsArchives}</p>
           <p className="text-xs text-gray-700 mt-1">{metriques.chatsFermes} fermés</p>
+        </div>
+
+        {/* SLA dépassés */}
+        <div className={`bg-gradient-to-br p-4 rounded-lg border ${(metriques.chatsSlaDepasses ?? 0) > 0 ? 'from-red-50 to-red-100 border-red-300' : 'from-gray-50 to-gray-100 border-gray-200'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className={`w-4 h-4 ${(metriques.chatsSlaDepasses ?? 0) > 0 ? 'text-red-600' : 'text-gray-400'}`} />
+            <h4 className={`text-xs font-semibold ${(metriques.chatsSlaDepasses ?? 0) > 0 ? 'text-red-900' : 'text-gray-700'}`}>SLA</h4>
+          </div>
+          <p className={`text-xl font-bold ${(metriques.chatsSlaDepasses ?? 0) > 0 ? 'text-red-900' : 'text-gray-500'}`}>{metriques.chatsSlaDepasses ?? 0}</p>
+          <p className={`text-xs mt-1 ${(metriques.chatsSlaDepasses ?? 0) > 0 ? 'text-red-700' : 'text-gray-500'}`}>Dépassés</p>
         </div>
       </div>
 

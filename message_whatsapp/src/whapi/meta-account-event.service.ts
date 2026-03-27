@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { MessageTemplateStatus } from 'src/message-auto/entities/message-template-status.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { normalizePhone } from 'src/common/utils/phone.utils';
 import {
   MetaAccountAlertsValue,
@@ -15,6 +17,7 @@ import {
   MetaTemplateStatusValue,
   MetaUserPreferencesValue,
 } from './interface/whatsapp-whebhook.interface';
+import { EVENTS, CallMissedEvent } from 'src/events/events.constants';
 
 @Injectable()
 export class MetaAccountEventService {
@@ -27,6 +30,9 @@ export class MetaAccountEventService {
     private readonly templateStatusRepo: Repository<MessageTemplateStatus>,
     @InjectRepository(Contact)
     private readonly contactRepo: Repository<Contact>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepo: Repository<WhatsappChat>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async dispatch(field: string, value: unknown, wabaId?: string): Promise<void> {
@@ -230,6 +236,21 @@ export class MetaAccountEventService {
         this.logger.log(
           `META_CALL_MISSED contact_id=${contact.id} marked as à_appeler`,
         );
+
+        // Notifier l'agent assigné via WebSocket
+        if (contact.chat_id) {
+          const chat = await this.chatRepo.findOne({
+            where: { chat_id: contact.chat_id },
+          });
+          if (chat?.poste_id) {
+            this.eventEmitter.emit(EVENTS.CALL_MISSED, {
+              chatId: chat.chat_id,
+              clientName: contact.name || phoneNormalized || from,
+              phone: from,
+              posteId: chat.poste_id,
+            } satisfies CallMissedEvent);
+          }
+        }
       } else {
         this.logger.log(
           `META_CALL_MISSED no contact found for phone=${from} — skipped`,

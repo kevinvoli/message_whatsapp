@@ -10,8 +10,14 @@ export const EVENTS = {
   CONTACT_CALL_STATUS_UPDATED: 'contact.call.status.updated',
   CALL_LOG_NEW: 'call.log.new',
   SLA_BREACH_DETECTED: 'sla.breach.detected',
+  CALL_MISSED: 'call.missed',
   AUTO_MESSAGE_FAILED: 'auto.message.failed',
+  QUEUE_UPDATE: 'queue.update',
 } as const;
+
+export interface QueueUpdateEvent {
+  reason: string;
+}
 
 export interface ConversationUpsertEvent {
   chatId: string;
@@ -56,4 +62,18 @@ export interface ContactCallStatusUpdatedEvent {
 export interface CallLogNewEvent {
   contact: import('src/contact/entities/contact.entity').Contact;
   callLog: import('src/call-log/entities/call_log.entity').CallLog;
+}
+
+export interface SlaBreachDetectedEvent {
+  chatId: string;
+  clientName: string;
+  posteId: string;
+  deadlineAt: Date;
+}
+
+export interface CallMissedEvent {
+  chatId: string;
+  clientName: string;
+  phone: string;
+  posteId: string;
 }

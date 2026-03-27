@@ -36,6 +36,7 @@ export type ViewMode =
   | 'dispatch'
   | 'crons'
   | 'canned_responses'
+  | 'tags'
   | 'observabilite'
   | 'go_no_go'
   | 'notifications'
@@ -312,6 +313,14 @@ export type ConversationNote = {
   updatedAt: string;
 };
 
+export type ConversationTag = {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';
 
 export type AutoMessageScopeConfig = {
@@ -379,6 +388,7 @@ export type MetriquesGlobales = {
   messagesEnAttente: number;
   tauxAssignation: number;
   tempsPremiereReponse: number;
+  chatsSlaDepasses?: number;
 
   // Variations vs période précédente (null = données insuffisantes)
   variations?: Record<string, number | null>;

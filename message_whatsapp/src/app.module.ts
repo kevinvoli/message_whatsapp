@@ -41,6 +41,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
 import { FeatureFlagModule } from './feature-flags/feature-flag.module';
 import { CannedResponsesModule } from './canned-responses/canned-responses.module';
 import { ConversationNotesModule } from './conversation-notes/conversation-notes.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -159,6 +160,7 @@ import { ConversationNotesModule } from './conversation-notes/conversation-notes
     FeatureFlagModule,
     CannedResponsesModule,
     ConversationNotesModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

@@ -7,7 +7,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { Between, IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
+import { Between, IsNull, LessThan, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import {
   ChargePosteDto,
   MetriquesGlobalesDto,
@@ -287,6 +287,14 @@ export class MetriquesService {
       .andWhere('chat.deletedAt IS NULL')
       .getRawOne();
 
+    // Conversations SLA dépassé (actives ou en attente avec deadline passée)
+    const chatsSlaDepasses = await this.chatRepository.count({
+      where: [
+        { deletedAt: IsNull(), status: 'actif' as any, first_response_deadline_at: LessThan(new Date()) },
+        { deletedAt: IsNull(), status: 'en attente' as any, first_response_deadline_at: LessThan(new Date()) },
+      ],
+    });
+
     return {
       totalChats,
       chatsActifs,
@@ -296,6 +304,7 @@ export class MetriquesService {
       chatsArchives,
       tauxAssignation,
       tempsPremiereReponse: parseInt(tempsPremiereReponse?.avg_seconds) || 0,
+      chatsSlaDepasses,
     };
   }
 

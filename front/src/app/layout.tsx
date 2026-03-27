@@ -6,6 +6,7 @@ import { SocketProvider } from "@/contexts/SocketProvider";
 import WebSocketEvents from "@/components/WebSocketEvents";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ReconnectingBanner from "@/components/ReconnectingBanner";
+import { ToastContainer } from "@/components/ui/ToastContainer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
             <SocketProvider>
               <ReconnectingBanner />
               <WebSocketEvents />
+              <ToastContainer />
               {children}
             </SocketProvider>
           </AuthProvider>

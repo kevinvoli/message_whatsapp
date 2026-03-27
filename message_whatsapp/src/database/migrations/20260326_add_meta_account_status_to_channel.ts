@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMetaAccountStatusToChannel20260326 implements MigrationInterface {
+export class AddMetaAccountStatusToChannel1774483200004 implements MigrationInterface {
+  name = 'AddMetaAccountStatusToChannel1774483200004';
+
   public async up(queryRunner: QueryRunner): Promise<void> {
     const table = 'whapi_channels';
 

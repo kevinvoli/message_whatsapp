@@ -22,6 +22,8 @@ interface SidebarProps {
   showStats: boolean;
   totalUnread: number;
   setFilterStatus: (status: string) => void;
+  filterTagId: string | null;
+  setFilterTagId: (id: string | null) => void;
   onSearchChange: (term: string) => void;
   onSelectConversation: (conv: Conversation) => void;
   setShowStats: (show: boolean) => void;
@@ -41,6 +43,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   isConnected,
   showStats,
   setFilterStatus,
+  filterTagId,
+  setFilterTagId,
   totalUnread,
   stats,
   filterStatus,
@@ -110,6 +114,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             totalUnread={totalUnread}
             filterStatus={filterStatus}
             setFilterStatus={setFilterStatus}
+            filterTagId={filterTagId}
+            setFilterTagId={setFilterTagId}
           />
           <ConversationList
             filteredConversations={filteredConversations}

@@ -49,6 +49,9 @@ import {
   ContactRemovedEvent,
   ContactCallStatusUpdatedEvent,
   CallLogNewEvent,
+  QueueUpdateEvent,
+  SlaBreachDetectedEvent,
+  CallMissedEvent,
 } from 'src/events/events.constants';
 
 type AuthPayload = {
@@ -1245,6 +1248,11 @@ export class WhatsappMessageGateway
     this.emitConversationReadonly(payload.chat);
   }
 
+  @OnEvent(EVENTS.QUEUE_UPDATE)
+  async onQueueUpdate(payload: QueueUpdateEvent): Promise<void> {
+    await this.emitQueueUpdatePublic(payload.reason);
+  }
+
   @OnEvent(EVENTS.MESSAGE_NOTIFY_NEW)
   async onMessageNotifyNew(payload: MessageNotifyNewEvent): Promise<void> {
     await this.notifyNewMessage(payload.message, payload.chat);
@@ -1268,6 +1276,39 @@ export class WhatsappMessageGateway
   @OnEvent(EVENTS.CALL_LOG_NEW)
   async onCallLogNew(payload: CallLogNewEvent): Promise<void> {
     await this.emitCallLogNew(payload.contact, payload.callLog);
+  }
+
+  @OnEvent(EVENTS.CALL_MISSED)
+  onCallMissed(payload: CallMissedEvent): void {
+    for (const [socketId, agent] of this.connectedAgents.entries()) {
+      if (agent.posteId === payload.posteId) {
+        const client = this.server.sockets.sockets.get(socketId);
+        if (client) {
+          client.emit('call_missed', {
+            chatId: payload.chatId,
+            clientName: payload.clientName,
+            phone: payload.phone,
+          });
+        }
+      }
+    }
+  }
+
+  @OnEvent(EVENTS.SLA_BREACH_DETECTED)
+  onSlaBreachDetected(payload: SlaBreachDetectedEvent): void {
+    // Notify all connected agents of this poste
+    for (const [socketId, agent] of this.connectedAgents.entries()) {
+      if (agent.posteId === payload.posteId) {
+        const client = this.server.sockets.sockets.get(socketId);
+        if (client) {
+          client.emit('sla_breach', {
+            chatId: payload.chatId,
+            clientName: payload.clientName,
+            deadlineAt: payload.deadlineAt,
+          });
+        }
+      }
+    }
   }
 
   private resolveMessageText(message: WhatsappMessage): string | null {

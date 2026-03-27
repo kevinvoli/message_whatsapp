@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
-import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
@@ -14,7 +13,6 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
-    private readonly messageAutoService: MessageAutoService,
     private readonly cronConfigService: CronConfigService,
   ) {}
 

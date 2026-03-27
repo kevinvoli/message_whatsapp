@@ -9,8 +9,7 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
-import { QueueService } from 'src/dispatcher/services/queue.service';
-import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
@@ -63,6 +62,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       WhatsappMedia,
     ]),
     WhatsappMessageModule,
+    DispatcherModule,
     LoggingModule,
     CallLogModule,
     JorbsModule,
@@ -75,8 +75,6 @@ import { NotificationModule } from 'src/notification/notification.module';
     WhatsappChatService,
     WhatsappCommercialService,
     WhatsappPosteService,
-    QueueService,
-    DispatcherService,
     CommunicationWhapiService,
     CommunicationMetaService,
     CommunicationMessengerService,

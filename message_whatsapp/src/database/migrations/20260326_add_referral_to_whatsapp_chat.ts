@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddReferralToWhatsappChat20260326 implements MigrationInterface {
-  name = 'AddReferralToWhatsappChat20260326';
+export class AddReferralToWhatsappChat1774483200002 implements MigrationInterface {
+  name = 'AddReferralToWhatsappChat1774483200002';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     const table = await queryRunner.getTable('whatsapp_chat');

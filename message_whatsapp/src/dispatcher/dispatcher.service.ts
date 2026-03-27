@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -15,6 +15,7 @@ import {
   ConversationRemovedEvent,
   ConversationAssignedEvent,
   ConversationReassignedEvent,
+  SlaBreachDetectedEvent,
 } from 'src/events/events.constants';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { NotificationService } from 'src/notification/notification.service';
@@ -398,6 +399,15 @@ export class DispatcherService {
 
     for (const chat of chats) {
       try {
+        // Notify the assigned agent before reassigning
+        if (chat.poste_id) {
+          this.eventEmitter.emit(EVENTS.SLA_BREACH_DETECTED, {
+            chatId: chat.chat_id,
+            clientName: chat.name || chat.contact_client || chat.chat_id.split('@')[0],
+            posteId: chat.poste_id,
+            deadlineAt: chat.first_response_deadline_at,
+          } satisfies SlaBreachDetectedEvent);
+        }
         await this.reinjectConversation(chat);
       } catch (err) {
         this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
@@ -418,5 +428,31 @@ export class DispatcherService {
       waiting_count: waitingChats.length,
       waiting_items: waitingChats,
     };
+  }
+
+  async transferConversation(
+    chatId: string,
+    toPosteId: string,
+  ): Promise<WhatsappChat> {
+    const chat = await this.chatRepository.findByChatId(chatId);
+    if (!chat) throw new NotFoundException(`Conversation ${chatId} introuvable`);
+
+    const oldPosteId = chat.poste_id ?? '';
+
+    chat.poste_id = toPosteId;
+    chat.status = WhatsappChatStatus.ACTIF;
+    chat.first_response_deadline_at = null;
+    chat.assigned_at = new Date();
+
+    const saved = await this.chatRepository.save(chat);
+
+    this.eventEmitter.emit(EVENTS.CONVERSATION_REASSIGNED, {
+      chat: saved,
+      oldPosteId,
+      newPosteId: toPosteId,
+    } satisfies ConversationReassignedEvent);
+
+    this.logger.log(`TRANSFER chat=${chatId} ${oldPosteId} → ${toPosteId}`);
+    return saved;
   }
 }

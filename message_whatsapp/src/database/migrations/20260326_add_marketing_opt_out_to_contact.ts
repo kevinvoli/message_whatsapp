@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMarketingOptOutToContact20260326 implements MigrationInterface {
+export class AddMarketingOptOutToContact1774483200003 implements MigrationInterface {
+  name = 'AddMarketingOptOutToContact1774483200003';
+
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasColumn('contact', 'marketing_opt_out'))) {
       await queryRunner.query(

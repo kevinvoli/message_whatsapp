@@ -10,7 +10,6 @@
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { QueueService } from './services/queue.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { QueuePosition } from './entities/queue-position.entity';
 import { DispatcherService } from './dispatcher.service';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
@@ -18,6 +17,8 @@ import { DispatchSettings } from './entities/dispatch-settings.entity';
 import { UpdateDispatchSettingsDto } from './dto/update-dispatch-settings.dto';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetDispatchSnapshotQuery } from 'src/application/queries/get-dispatch-snapshot.query';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENTS } from 'src/events/events.constants';
 
 @ApiTags('Queue')
 @Controller('queue')
@@ -25,7 +26,7 @@ import { GetDispatchSnapshotQuery } from 'src/application/queries/get-dispatch-s
 export class DispatcherController {
   constructor(
     private readonly queueService: QueueService,
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly eventEmitter: EventEmitter2,
     private readonly dispatcherService: DispatcherService,
     private readonly dispatchSettingsService: DispatchSettingsService,
     private readonly queryBus: QueryBus,
@@ -43,7 +44,7 @@ export class DispatcherController {
   @ApiResponse({ status: 200, description: 'Queue reset' })
   async resetQueue(): Promise<{ success: boolean }> {
     await this.queueService.resetQueueState();
-    this.gateway.emitQueueUpdatePublic('admin_reset');
+    this.eventEmitter.emit(EVENTS.QUEUE_UPDATE, { reason: 'admin_reset' });
     return { success: true };
   }
 
@@ -54,7 +55,7 @@ export class DispatcherController {
     @Param('posteId') posteId: string,
   ): Promise<{ success: boolean }> {
     await this.queueService.blockPoste(posteId);
-    this.gateway.emitQueueUpdatePublic('admin_block');
+    this.eventEmitter.emit(EVENTS.QUEUE_UPDATE, { reason: 'admin_block' });
     return { success: true };
   }
 
@@ -65,7 +66,7 @@ export class DispatcherController {
     @Param('posteId') posteId: string,
   ): Promise<{ success: boolean }> {
     await this.queueService.unblockPoste(posteId);
-    this.gateway.emitQueueUpdatePublic('admin_unblock');
+    this.eventEmitter.emit(EVENTS.QUEUE_UPDATE, { reason: 'admin_unblock' });
     return { success: true };
   }
 

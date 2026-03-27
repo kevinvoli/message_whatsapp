@@ -15,6 +15,7 @@ import {
   transformToMessage,
   transformToCallLog,
 } from '@/types/chat';
+import { useToastStore } from '@/store/toastStore';
 
 const WebSocketEvents = () => {
   const { socket } = useSocket();
@@ -22,6 +23,7 @@ const WebSocketEvents = () => {
 
   const setSocket = useChatStore((s) => s.setSocket);
   const loadConversations = useChatStore((s) => s.loadConversations);
+  const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
     if (!socket || !user) {
@@ -268,10 +270,28 @@ const WebSocketEvents = () => {
       });
     };
 
+    const handleSlaBreachEvent = (data: { chatId: string; clientName: string; deadlineAt: string }) => {
+      addToast({
+        type: 'warning',
+        message: `SLA dépassé — ${data.clientName} n'a pas reçu de réponse dans les délais.`,
+        duration: 8000,
+      });
+    };
+
+    const handleCallMissedEvent = (data: { chatId: string; clientName: string; phone: string }) => {
+      addToast({
+        type: 'warning',
+        message: `📞 Appel manqué de ${data.clientName} (${data.phone})`,
+        duration: 8000,
+      });
+    };
+
     socket.on('chat:event', handleChatEvent);
     socket.on('contact:event', handleContactEvent);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
+    socket.on('sla_breach', handleSlaBreachEvent);
+    socket.on('call_missed', handleCallMissedEvent);
 
     if (socket.connected) {
       refreshAfterConnect();
@@ -282,9 +302,11 @@ const WebSocketEvents = () => {
       socket.off('contact:event', handleContactEvent);
       socket.off('error', handleSocketError);
       socket.off('connect', refreshAfterConnect);
+      socket.off('sla_breach', handleSlaBreachEvent);
+      socket.off('call_missed', handleCallMissedEvent);
       setSocket(null);
     };
-  }, [socket, user, setSocket, loadConversations]);
+  }, [socket, user, setSocket, loadConversations, addToast]);
 
   return null;
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Check, X, MoreVertical, Archive, Tag, AlertCircle } from 'lucide-react';
+import { ArrowRightLeft, Check, X, MoreVertical, Tag, AlertCircle } from 'lucide-react';
 import { Conversation, ConversationStatus } from '@/types/chat';
+import { TransferModal } from './TransferModal';
 
 interface ConversationOptionsMenuProps {
   conversation: Conversation;
@@ -15,6 +16,7 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState<ConversationStatus | null>(null);
+  const [showTransfer, setShowTransfer] = useState(false);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
     if (newStatus === 'fermé' || newStatus === 'converti') {
@@ -107,6 +109,14 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
                 Changer le statut
               </p>
             </div>
+            <button
+              onClick={() => { setShowTransfer(true); setIsOpen(false); }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
+            >
+              <ArrowRightLeft className="w-4 h-4" />
+              <span className="flex-1 text-left text-sm font-medium">Transférer</span>
+            </button>
+            <div className="border-t border-gray-100 my-1" />
             {statusOptions.map((status) => (
               <button
                 key={status}
@@ -129,6 +139,14 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
             ))}
           </div>
         </>
+      )}
+
+      {showTransfer && (
+        <TransferModal
+          chatId={conversation.chat_id}
+          onClose={() => setShowTransfer(false)}
+          onSuccess={() => setShowTransfer(false)}
+        />
       )}
 
       {/* Modal de confirmation */}

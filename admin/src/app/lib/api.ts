@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, FeatureFlagEntry, MessageTemplateStatus, CannedResponse, ConversationNote } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, FeatureFlagEntry, MessageTemplateStatus, CannedResponse, ConversationNote, ConversationTag } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -877,4 +877,31 @@ export async function deleteConversationNote(chatId: string, noteId: string): Pr
         credentials: 'include',
     });
     if (!response.ok) throw new Error('Erreur suppression note');
+}
+
+// ============================================
+// TAGS
+// ============================================
+
+export async function getTags(): Promise<ConversationTag[]> {
+    const response = await fetch(`${API_BASE_URL}/tags`, { credentials: 'include' });
+    return handleResponse<ConversationTag[]>(response);
+}
+
+export async function createTag(dto: { name: string; color?: string }): Promise<ConversationTag> {
+    const response = await fetch(`${API_BASE_URL}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(dto),
+    });
+    return handleResponse<ConversationTag>(response);
+}
+
+export async function deleteTag(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/tags/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erreur suppression tag');
 }

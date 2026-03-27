@@ -264,10 +264,17 @@ export interface Contact {
   source?: string;
   priority?: Priority;
   tags?: string[];
-  
+  marketing_opt_out?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
+}
+
+export interface ConversationTag {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export interface Conversation {
@@ -292,7 +299,7 @@ export interface Conversation {
   status: ConversationStatus;
   source: string;
   priority: Priority;
-  tags: string[];
+  tags: ConversationTag[];
   
   // 🆕 Informations d'appel
   call_status?: CallStatus;
@@ -512,7 +519,7 @@ interface RawConversationData {
     name: string;
     code: string;
   };
-  tags?: string[];
+  tags?: { id: string; name: string; color: string }[];
   priority: Priority;
   name?: string;
   client_phone?: string;
@@ -595,7 +602,8 @@ interface RawContactData {
   source?: string;
   priority?: Priority;
   tags?: string[];
-  
+  marketing_opt_out?: boolean;
+
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
   deletedAt?: string | number | Date | null;
@@ -867,7 +875,8 @@ export const transformToContact = (raw: RawContactData): Contact => {
     source: raw.source,
     priority: raw.priority,
     tags: raw.tags,
-    
+    marketing_opt_out: raw.marketing_opt_out,
+
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt),
     deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : undefined,

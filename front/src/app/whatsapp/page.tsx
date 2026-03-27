@@ -41,6 +41,7 @@ const WhatsAppPage = () => {
 
   const [showStats, setShowStats] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterTagId, setFilterTagId] = useState<string | null>(null);
 
    const [viewMode, setViewMode] = useState<ViewMode>('conversations');
     const [searchQuery, setSearchQuery] = useState('');
@@ -67,10 +68,14 @@ const WhatsAppPage = () => {
   const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
   const filteredConversations = conversations.filter(conv => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'unread') return conv.unreadCount > 0;
-    if (filterStatus === 'nouveau') return conv.status === 'nouveau';
-    if (filterStatus === 'urgent') return conv.priority === 'haute';
+    if (filterStatus === 'unread' && conv.unreadCount === 0) return false;
+    if (filterStatus === 'nouveau' && conv.status !== 'nouveau') return false;
+    if (filterStatus === 'urgent' && conv.priority !== 'haute') return false;
+    if (filterStatus === 'sla') {
+      const deadline = conv.first_response_deadline_at;
+      if (!deadline || new Date(deadline).getTime() >= Date.now()) return false;
+    }
+    if (filterTagId && !conv.tags?.some((t) => t.id === filterTagId)) return false;
     return true;
   });
 
@@ -120,6 +125,8 @@ const WhatsAppPage = () => {
         onSelectConversation={handleSelectConversation}
 
         setFilterStatus={setFilterStatus}
+        filterTagId={filterTagId}
+        setFilterTagId={setFilterTagId}
         stats={stats}
         filterStatus={filterStatus}
         totalUnread={totalUnread}

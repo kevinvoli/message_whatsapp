@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateCannedResponses20260326 implements MigrationInterface {
-  name = 'CreateCannedResponses20260326';
+export class CreateCannedResponses1774483200001 implements MigrationInterface {
+  name = 'CreateCannedResponses1774483200001';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
