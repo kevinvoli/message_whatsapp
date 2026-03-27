@@ -396,7 +396,8 @@ export class DispatcherService {
 
   async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
     const waitingChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.EN_ATTENTE, poste_id: IsNull() },
+      where: { status: WhatsappChatStatus.EN_ATTENTE },
+      relations: ['poste'],
     });
 
     let dispatched = 0;
