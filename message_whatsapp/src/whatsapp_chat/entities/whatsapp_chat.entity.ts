@@ -225,6 +225,23 @@ export class WhatsappChat {
   })
   last_auto_message_sent_at: Date | null;
 
+  // ─── Referral Meta (origin publicitaire) ─────────────────────────────────
+
+  @Column({ name: 'referral_source_type', type: 'varchar', length: 32, nullable: true })
+  referral_source_type?: string | null;
+
+  @Column({ name: 'referral_source_id', type: 'varchar', length: 128, nullable: true })
+  referral_source_id?: string | null;
+
+  @Column({ name: 'referral_headline', type: 'varchar', length: 255, nullable: true })
+  referral_headline?: string | null;
+
+  @Column({ name: 'referral_source_url', type: 'text', nullable: true })
+  referral_source_url?: string | null;
+
+  @Column({ name: 'referral_ctwa_clid', type: 'varchar', length: 128, nullable: true })
+  referral_ctwa_clid?: string | null;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

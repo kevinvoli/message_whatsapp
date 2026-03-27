@@ -1,10 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Mic, MicOff, Paperclip, Send, Smile, X } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Paperclip, Send, Smile, StickyNote, X } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
 import { Message } from '@/types/chat';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+
+interface CannedResponseItem {
+  id: string;
+  shortcut: string;
+  title: string;
+  content: string;
+  category?: string | null;
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -15,6 +23,7 @@ interface ChatInputProps {
   chat_id?: string | null;
   isConnected: boolean;
   disabled?: boolean;
+  onAddNote?: (content: string) => void | Promise<void>;
 }
 
 const TYPING_STOP_DELAY = 2000; // 2s
@@ -78,6 +87,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   chat_id,
   isConnected,
   disabled = false,
+  onAddNote,
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -98,6 +108,40 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const avgResponseTime = useMemo(() => computeAvgResponseTime(storeMessages), [storeMessages]);
   const replyToMessage = useChatStore((s) => s.replyToMessage);
   const clearReplyTo = useChatStore((s) => s.clearReplyTo);
+
+  // ─── Note mode ───────────────────────────────────────────────────────────
+  const [noteMode, setNoteMode] = useState(false);
+
+  // ─── Canned responses ────────────────────────────────────────────────────
+  const [cannedSuggestions, setCannedSuggestions] = useState<CannedResponseItem[]>([]);
+  const [cannedSelectedIndex, setCannedSelectedIndex] = useState(0);
+  const showCannedPopover = cannedSuggestions.length > 0;
+  const cannedFetchTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchCannedSuggestions = useCallback(async (prefix: string) => {
+    if (cannedFetchTimer.current) clearTimeout(cannedFetchTimer.current);
+    if (!prefix) { setCannedSuggestions([]); return; }
+    cannedFetchTimer.current = setTimeout(async () => {
+      try {
+        const resp = await fetch(
+          `${API_URL}/canned-responses/suggest?prefix=${encodeURIComponent(prefix)}`,
+          { credentials: 'include' },
+        );
+        if (resp.ok) {
+          const data: CannedResponseItem[] = await resp.json();
+          setCannedSuggestions(data);
+          setCannedSelectedIndex(0);
+        }
+      } catch {
+        setCannedSuggestions([]);
+      }
+    }, 150);
+  }, []);
+
+  const applyCannedResponse = useCallback((item: CannedResponseItem) => {
+    setMessage(item.content);
+    setCannedSuggestions([]);
+  }, []);
 
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
@@ -152,14 +196,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, [showEmojiPicker]);
 
   const handleSubmit = () => {
-    if (message.trim() && !disabled && isConnected) {
-      onSendMessage(message.trim());
+    if (!message.trim() || disabled) return;
+    if (noteMode && onAddNote) {
+      void onAddNote(message.trim());
       setMessage('');
+      setNoteMode(false);
+      return;
+    }
+    if (!isConnected) return;
+    onSendMessage(message.trim());
+    setMessage('');
 
-      if (isTyping.current) {
-        isTyping.current = false;
-        onTypingStop(chat_id || '');
-      }
+    if (isTyping.current) {
+      isTyping.current = false;
+      onTypingStop(chat_id || '');
     }
   };
 
@@ -345,6 +395,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
+          {onAddNote && (
+            <button
+              type="button"
+              onClick={() => { setNoteMode((v) => !v); setMessage(''); }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                noteMode
+                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+              title="Note interne"
+            >
+              <StickyNote className="w-3.5 h-3.5" />
+              Note interne
+            </button>
+          )}
         </div>
 
         {previewBlob && previewUrl ? (
@@ -420,19 +485,75 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 <Paperclip className="w-5 h-5" />
               )}
             </button>
+            <div className="relative flex-1">
+            {showCannedPopover && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                {cannedSuggestions.map((item, i) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => applyCannedResponse(item)}
+                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex flex-col gap-0.5 ${i === cannedSelectedIndex ? 'bg-green-50' : ''}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-semibold text-green-700">{item.shortcut}</span>
+                      <span className="text-xs text-gray-500">{item.title}</span>
+                      {item.category && <span className="ml-auto text-xs text-gray-400">{item.category}</span>}
+                    </div>
+                    <p className="text-xs text-gray-600 truncate">{item.content}</p>
+                  </button>
+                ))}
+              </div>
+            )}
             <textarea
               value={message}
               onChange={(e) => {
-                setMessage(e.target.value);
-                handleTyping();
+                const val = e.target.value;
+                setMessage(val);
+                if (!noteMode) {
+                  handleTyping();
+                  if (val.startsWith('/')) {
+                    void fetchCannedSuggestions(val.split(' ')[0]);
+                  } else {
+                    setCannedSuggestions([]);
+                  }
+                }
               }}
-              onFocus={handleTyping}
-              onKeyDown={handleKeyDown}
-              placeholder="Tapez votre message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-gray-500"
-              rows={1}
-              disabled={disabled || !isConnected || isUploading}
+              onFocus={() => { if (!noteMode) handleTyping(); }}
+              onKeyDown={(e) => {
+                if (showCannedPopover) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setCannedSelectedIndex((i) => Math.min(i + 1, cannedSuggestions.length - 1));
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setCannedSelectedIndex((i) => Math.max(i - 1, 0));
+                    return;
+                  }
+                  if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    applyCannedResponse(cannedSuggestions[cannedSelectedIndex]);
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    setCannedSuggestions([]);
+                    return;
+                  }
+                }
+                handleKeyDown(e);
+              }}
+              placeholder={noteMode ? 'Rédigez une note interne (visible uniquement par les agents)...' : 'Tapez votre message...'}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-transparent resize-none ${
+                noteMode
+                  ? 'border-yellow-300 bg-yellow-50 text-yellow-900 focus:ring-yellow-400 placeholder-yellow-500'
+                  : 'border-gray-300 text-gray-500 focus:ring-green-500'
+              }`}
+              rows={noteMode ? 3 : 1}
+              disabled={(!noteMode && (!isConnected || disabled)) || isUploading}
             />
+            </div>
             <div className="relative" ref={emojiPickerRef}>
               <button
                 type="button"
@@ -457,10 +578,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!message.trim() || disabled || !isConnected || isUploading}
-              className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              disabled={!message.trim() || isUploading || (!noteMode && (!isConnected || disabled))}
+              className={`p-3 rounded-lg transition-colors disabled:cursor-not-allowed ${
+                noteMode
+                  ? 'bg-yellow-500 text-white hover:bg-yellow-600 disabled:bg-gray-300'
+                  : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300'
+              }`}
             >
-              <Send className="w-5 h-5" />
+              {noteMode ? <StickyNote className="w-5 h-5" /> : <Send className="w-5 h-5" />}
             </button>
           </div>
         )}

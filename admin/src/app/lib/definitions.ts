@@ -35,6 +35,7 @@ export type ViewMode =
   | 'queue'
   | 'dispatch'
   | 'crons'
+  | 'canned_responses'
   | 'observabilite'
   | 'go_no_go'
   | 'notifications'
@@ -279,6 +280,16 @@ export type DispatchSettings = {
   auto_message_max_steps: number;
 };
 
+export type CannedResponse = {
+  id: string;
+  shortcut: string;
+  title: string;
+  content: string;
+  category?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MessageTemplateStatus = {
   id: string;
   templateName: string;
@@ -286,6 +297,17 @@ export type MessageTemplateStatus = {
   status: string;
   qualityScore?: string | null;
   lastCheckedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ConversationNote = {
+  id: string;
+  chatId: string;
+  authorId: string;
+  authorName?: string | null;
+  authorType: 'commercial' | 'admin';
+  content: string;
   createdAt: string;
   updatedAt: string;
 };

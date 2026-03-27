@@ -308,6 +308,12 @@ export interface Conversation {
   // SLA
   first_response_deadline_at?: Date | null;
 
+  // 📢 Referral Meta (origine publicitaire)
+  referral_source_type?: string | null;
+  referral_source_id?: string | null;
+  referral_headline?: string | null;
+  referral_source_url?: string | null;
+
   // 🆕 Date de conversion/fermeture
   closed_at?: Date | null;
   converted_at?: Date | null;
@@ -363,6 +369,32 @@ export interface LoginFormData {
   password: string;
 }
 
+
+// ==============================================
+// NOTES INTERNES
+// ==============================================
+
+export interface ConversationNote {
+  id: string;
+  chatId: string;
+  authorId: string;
+  authorName?: string | null;
+  authorType: 'commercial' | 'admin';
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const transformToNote = (raw: Record<string, unknown>): ConversationNote => ({
+  id: raw.id as string,
+  chatId: raw.chatId as string,
+  authorId: raw.authorId as string,
+  authorName: (raw.authorName as string | null | undefined) ?? null,
+  authorType: (raw.authorType as 'commercial' | 'admin') ?? 'commercial',
+  content: raw.content as string,
+  createdAt: new Date(raw.createdAt as string),
+  updatedAt: new Date(raw.updatedAt as string),
+});
 
 // ==============================================
 // INTERFACES POUR FILTRES ET VUES
@@ -519,6 +551,12 @@ interface RawConversationData {
   read_only?: boolean;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
+
+  // 📢 Referral Meta
+  referral_source_type?: string | null;
+  referral_source_id?: string | null;
+  referral_headline?: string | null;
+  referral_source_url?: string | null;
 }
 
 interface RawCommercialData {
@@ -774,6 +812,11 @@ export const transformToConversation = (
     closed_at: raw.closed_at ? new Date(raw.closed_at) : null,
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
     closed_by: raw.closed_by,
+
+    referral_source_type: raw.referral_source_type ?? null,
+    referral_source_id: raw.referral_source_id ?? null,
+    referral_headline: raw.referral_headline ?? null,
+    referral_source_url: raw.referral_source_url ?? null,
 
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),

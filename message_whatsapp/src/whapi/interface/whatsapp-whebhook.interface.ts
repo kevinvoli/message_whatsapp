@@ -110,11 +110,25 @@ export interface MetaContact {
   };
 }
 
+export interface MetaReferral {
+  source_url: string;
+  source_type: 'ad' | 'post' | 'unknown';
+  source_id: string;
+  headline?: string;
+  body?: string;
+  media_type?: string;
+  image_url?: string;
+  video_url?: string;
+  thumbnail_url?: string;
+  ctwa_clid?: string;
+}
+
 export interface MetaMessageBase {
   from: string;
   id: string;
   timestamp: string;
   type: MetaMessageType;
+  referral?: MetaReferral;
 }
 
 export type MetaMessageType =

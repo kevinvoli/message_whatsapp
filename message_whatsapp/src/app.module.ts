@@ -39,6 +39,8 @@ import { LoggingModule } from './logging/logging.module';
 import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { FeatureFlagModule } from './feature-flags/feature-flag.module';
+import { CannedResponsesModule } from './canned-responses/canned-responses.module';
+import { ConversationNotesModule } from './conversation-notes/conversation-notes.module';
 
 @Module({
   imports: [
@@ -155,6 +157,8 @@ import { FeatureFlagModule } from './feature-flags/feature-flag.module';
     NotificationModule,
     SystemConfigModule,
     FeatureFlagModule,
+    CannedResponsesModule,
+    ConversationNotesModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

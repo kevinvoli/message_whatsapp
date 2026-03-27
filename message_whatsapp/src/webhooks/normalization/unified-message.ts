@@ -47,6 +47,15 @@ export interface UnifiedInteractive {
   description?: string;
 }
 
+export interface UnifiedReferral {
+  sourceUrl: string;
+  sourceType: 'ad' | 'post' | 'unknown';
+  sourceId: string;
+  headline?: string;
+  body?: string;
+  ctwaClid?: string;
+}
+
 export interface UnifiedMessage {
   provider: ProviderId;
   providerMessageId: string;
@@ -64,5 +73,7 @@ export interface UnifiedMessage {
   interactive?: UnifiedInteractive;
   /** Provider message ID of the quoted message (Whapi: context.quoted_id) */
   quotedProviderMessageId?: string;
+  /** Referral from a Meta ad or post (first message only) */
+  referral?: UnifiedReferral;
   raw: unknown;
 }

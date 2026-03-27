@@ -7,6 +7,7 @@ import {
 import {
   UnifiedMessage,
   UnifiedMessageType,
+  UnifiedReferral,
 } from '../normalization/unified-message';
 import { UnifiedStatus } from '../normalization/unified-status';
 import { AdapterContext, ProviderAdapter } from './provider-adapter.interface';
@@ -66,6 +67,8 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
     const quotedProviderMessageId =
       message.type === 'reaction' ? message.reaction?.message_id : undefined;
 
+    const referral = this.resolveReferral(message);
+
     return {
       provider: context.provider,
       providerMessageId: message.id,
@@ -82,6 +85,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       location: this.resolveLocation(message),
       interactive: this.resolveInteractive(message),
       quotedProviderMessageId,
+      referral,
       raw,
     };
   }
@@ -235,6 +239,19 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       longitude: message.location.longitude,
       name: message.location.name,
       address: message.location.address,
+    };
+  }
+
+  private resolveReferral(message: MetaMessage): UnifiedReferral | undefined {
+    const ref = message.referral;
+    if (!ref?.source_id) return undefined;
+    return {
+      sourceUrl: ref.source_url,
+      sourceType: ref.source_type,
+      sourceId: ref.source_id,
+      headline: ref.headline,
+      body: ref.body,
+      ctwaClid: ref.ctwa_clid,
     };
   }
 

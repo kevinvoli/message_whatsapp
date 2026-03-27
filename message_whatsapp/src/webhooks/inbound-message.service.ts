@@ -96,6 +96,21 @@ export class InboundMessageService {
             return;
           }
 
+          // 📢 Referral Meta (pub/post) — persisté une seule fois sur la conversation
+          if (message.referral && !conversation.referral_source_id) {
+            await this.chatService.update(conversation.chat_id, {
+              referral_source_type: message.referral.sourceType,
+              referral_source_id: message.referral.sourceId,
+              referral_headline: message.referral.headline ?? null,
+              referral_source_url: message.referral.sourceUrl,
+              referral_ctwa_clid: message.referral.ctwaClid ?? null,
+            });
+            conversation.referral_source_id = message.referral.sourceId;
+            this.logger.log(
+              `REFERRAL_SAVED trace=${traceId} source_id=${message.referral.sourceId} type=${message.referral.sourceType}`,
+            );
+          }
+
           const savedMessage =
             await this.whatsappMessageService.saveIncomingFromUnified(
               message,

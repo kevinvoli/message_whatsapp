@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, FeatureFlagEntry, MessageTemplateStatus } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, FeatureFlagEntry, MessageTemplateStatus, CannedResponse, ConversationNote } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -213,6 +213,46 @@ export async function deleteMessageAuto(id: string): Promise<{ message: string }
         credentials: 'include',
     });
     return handleResponse<{ message: string }>(response);
+}
+
+export async function getCannedResponses(search?: string, category?: string): Promise<CannedResponse[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    const qs = params.toString();
+    const response = await fetch(`${API_BASE_URL}/canned-responses${qs ? `?${qs}` : ''}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<CannedResponse[]>(response);
+}
+
+export async function createCannedResponse(dto: { shortcut: string; title: string; content: string; category?: string }): Promise<CannedResponse> {
+    const response = await fetch(`${API_BASE_URL}/canned-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(dto),
+    });
+    return handleResponse<CannedResponse>(response);
+}
+
+export async function updateCannedResponse(id: string, dto: Partial<{ shortcut: string; title: string; content: string; category: string }>): Promise<CannedResponse> {
+    const response = await fetch(`${API_BASE_URL}/canned-responses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(dto),
+    });
+    return handleResponse<CannedResponse>(response);
+}
+
+export async function deleteCannedResponse(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/canned-responses/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erreur suppression réponse prédéfinie');
 }
 
 export async function getTemplateStatuses(): Promise<MessageTemplateStatus[]> {
@@ -812,4 +852,29 @@ export async function getFeatureFlags(): Promise<FeatureFlagEntry[]> {
         credentials: 'include',
     });
     return handleResponse<FeatureFlagEntry[]>(response);
+}
+
+export async function getConversationNotes(chatId: string): Promise<ConversationNote[]> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(chatId)}/notes`, {
+        credentials: 'include',
+    });
+    return handleResponse<ConversationNote[]>(response);
+}
+
+export async function createConversationNote(chatId: string, content: string): Promise<ConversationNote> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(chatId)}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content }),
+    });
+    return handleResponse<ConversationNote>(response);
+}
+
+export async function deleteConversationNote(chatId: string, noteId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(chatId)}/notes/${noteId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erreur suppression note');
 }
