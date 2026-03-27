@@ -394,6 +394,48 @@ export class DispatcherService {
     }
   }
 
+  async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
+    const waitingChats = await this.chatRepository.find({
+      where: { status: WhatsappChatStatus.EN_ATTENTE, poste_id: IsNull() },
+    });
+
+    let dispatched = 0;
+    for (const chat of waitingChats) {
+      if (chat.read_only) continue;
+      const assigned = await this.dispatchLock.runExclusive(async () => {
+        const nextAgent = await this.queueService.getNextInQueue();
+        if (!nextAgent) return false;
+
+        await this.chatRepository.update(chat.id, {
+          poste: nextAgent,
+          poste_id: nextAgent.id,
+          status: nextAgent.is_active
+            ? WhatsappChatStatus.ACTIF
+            : WhatsappChatStatus.EN_ATTENTE,
+          assigned_at: new Date(),
+          assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
+          first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+        });
+
+        await this.messageGateway.emitConversationAssigned(chat.chat_id);
+        void this.notificationService.create(
+          'info',
+          `Conversation assignée (manuel) — ${chat.name || chat.chat_id}`,
+          `Assignée au poste ${nextAgent.name}.`,
+        );
+        return true;
+      });
+
+      if (!assigned) break;
+      dispatched++;
+    }
+
+    this.logger.log(
+      `Redispatch manuel: ${dispatched} assignées, ${waitingChats.length - dispatched} toujours en attente`,
+    );
+    return { dispatched, still_waiting: waitingChats.length - dispatched };
+  }
+
   async getDispatchSnapshot(): Promise<{
     queue_size: number;
     waiting_count: number;

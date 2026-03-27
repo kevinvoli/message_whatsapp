@@ -66,6 +66,13 @@ export class DispatcherController {
     return { success: true };
   }
 
+  @Post('dispatch/redispatch-all')
+  @ApiOperation({ summary: 'Redispatcher manuellement toutes les conversations en attente' })
+  @ApiResponse({ status: 200, description: 'Conversations redispatchées' })
+  async redispatchAll(): Promise<{ dispatched: number; still_waiting: number }> {
+    return this.dispatcherService.redispatchWaiting();
+  }
+
   @Get('dispatch')
   @ApiOperation({ summary: 'Snapshot dispatch (queue + en attente)' })
   @ApiResponse({ status: 200, description: 'Snapshot dispatch recupere' })

@@ -411,6 +411,14 @@ export async function getDispatchSettingsAuditPage(
     return handleResponse<{ data: DispatchSettingsAudit[]; total: number }>(response);
 }
 
+export async function redispatchAllWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
+    const response = await fetch(`${API_BASE_URL}/queue/dispatch/redispatch-all`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<{ dispatched: number; still_waiting: number }>(response);
+}
+
 export async function resetQueue(): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/queue/reset`, {
         method: 'POST',

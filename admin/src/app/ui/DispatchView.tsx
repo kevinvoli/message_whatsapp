@@ -7,6 +7,7 @@ import {
   getDispatchSettings,
   getDispatchSettingsAudit,
   getDispatchSnapshot,
+  redispatchAllWaiting,
   updateDispatchSettings,
 } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -75,6 +76,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
 
   const [loading, setLoading] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
+  const [redispatching, setRedispatching] = useState(false);
 
   const { addToast } = useToast();
 
@@ -124,6 +126,31 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     void refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Redispatch manuel ──────────────────────────────────────────────────────
+
+  const handleRedispatchAll = async () => {
+    try {
+      setRedispatching(true);
+      const result = await redispatchAllWaiting();
+      if (result.dispatched === 0) {
+        addToast({ type: 'info', message: 'Aucune conversation à redispatcher.' });
+      } else {
+        addToast({
+          type: 'success',
+          message: `${result.dispatched} conversation(s) assignée(s).${result.still_waiting > 0 ? ` ${result.still_waiting} toujours en attente (aucun agent disponible).` : ''}`,
+        });
+      }
+      await refresh();
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur redispatch.',
+      });
+    } finally {
+      setRedispatching(false);
+    }
+  };
 
   // ── Sauvegarde Messages auto ───────────────────────────────────────────────
 
@@ -231,6 +258,23 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
 
         {/* ── Onglet : File d'attente ── */}
         {activeTab === 'queue' && (
+          <div>
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+              <p className="text-xs text-gray-500">
+                {snapshot?.waiting_count
+                  ? `${snapshot.waiting_count} conversation(s) en attente d'un agent.`
+                  : 'Aucune conversation en attente.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => { void handleRedispatchAll(); }}
+                disabled={redispatching || !snapshot?.waiting_count}
+                className="flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-200"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${redispatching ? 'animate-spin' : ''}`} />
+                {redispatching ? 'Redispatch...' : 'Redispatcher'}
+              </button>
+            </div>
           <div className="max-h-[480px] overflow-y-auto">
             {snapshot?.waiting_items?.length ? (
               <table className="w-full text-sm">
@@ -260,6 +304,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                 Aucune conversation en attente.
               </p>
             )}
+          </div>
           </div>
         )}
 
