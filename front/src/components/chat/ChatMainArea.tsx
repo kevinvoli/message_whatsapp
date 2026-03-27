@@ -42,6 +42,8 @@ export default function ChatMainArea() {
   } = useChatStore();
 
   const [notes, setNotes] = useState<ConversationNote[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [matchCount, setMatchCount] = useState(0);
 
   const loadNotes = useCallback(async (chatId: string) => {
     try {
@@ -63,6 +65,8 @@ export default function ChatMainArea() {
     } else {
       setNotes([]);
     }
+    setSearchTerm('');
+    setMatchCount(0);
   }, [selectedConversation?.chat_id, loadNotes]);
 
   const handleAddNote = useCallback(async (content: string) => {
@@ -119,6 +123,9 @@ export default function ChatMainArea() {
               <ChatHeader
                 currentConv={selectedConversation}
                 totalMessages={totalMessages || 0}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                matchCount={matchCount}
               />
               <ClientInfoBanner currentConv={selectedConversation} />
               <ReferralBanner conv={selectedConversation} />
@@ -127,6 +134,8 @@ export default function ChatMainArea() {
                 currentConv={selectedConversation}
                 notes={notes}
                 onDeleteNote={(id) => void handleDeleteNote(id)}
+                searchTerm={searchTerm}
+                onMatchCountChange={setMatchCount}
               />
             </>
           )}

@@ -1,10 +1,10 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search, Filter, X } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial } from '@/app/lib/api';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search, Filter, X, StickyNote, Trash2, PlusCircle } from 'lucide-react';
+import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial, getConversationNotes, createConversationNote, deleteConversationNote } from '@/app/lib/api';
 import { Spinner } from './Spinner';
-import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import { CommercialStats, ConversationNote, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
@@ -35,7 +35,10 @@ export default function ConversationsView({
     const [messageInput, setMessageInput] = useState('');
     const [loadingChats, setLoadingChats] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
-    const [activeTab, setActiveTab] = useState<'conversation' | 'infos'>('conversation');
+    const [activeTab, setActiveTab] = useState<'conversation' | 'infos' | 'notes'>('conversation');
+    const [notes, setNotes] = useState<ConversationNote[]>([]);
+    const [loadingNotes, setLoadingNotes] = useState(false);
+    const [noteInput, setNoteInput] = useState('');
     const { addToast } = useToast();
     const loadingToastRef = useRef(false);
 
@@ -104,11 +107,54 @@ export default function ConversationsView({
             messageCountRef.current = 0;
             fetchMessages(selectedChat.chat_id);
             setActiveTab('conversation');
+            setNotes([]);
+            setNoteInput('');
         } else {
             messageCountRef.current = 0;
             setMessages([]);
+            setNotes([]);
         }
     }, [selectedChat]);
+
+    const loadNotes = useCallback(async (chatId: string) => {
+        setLoadingNotes(true);
+        try {
+            const data = await getConversationNotes(chatId);
+            setNotes(data);
+        } catch {
+            // silencieux
+        } finally {
+            setLoadingNotes(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'notes' && selectedChat) {
+            void loadNotes(selectedChat.chat_id);
+        }
+    }, [activeTab, selectedChat, loadNotes]);
+
+    const handleAddNote = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!noteInput.trim() || !selectedChat) return;
+        try {
+            const created = await createConversationNote(selectedChat.chat_id, noteInput.trim());
+            setNotes((prev) => [...prev, created]);
+            setNoteInput('');
+        } catch {
+            addToast({ type: 'error', message: 'Erreur lors de la création de la note.' });
+        }
+    };
+
+    const handleDeleteNote = async (noteId: string) => {
+        if (!selectedChat) return;
+        try {
+            await deleteConversationNote(selectedChat.chat_id, noteId);
+            setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        } catch {
+            addToast({ type: 'error', message: 'Erreur lors de la suppression de la note.' });
+        }
+    };
 
     useEffect(() => {
         // Scroll to bottom when messages change
@@ -563,6 +609,22 @@ export default function ConversationsView({
                                 >
                                     Infos
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('notes')}
+                                    className={`relative px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                                        activeTab === 'notes'
+                                            ? 'bg-yellow-500 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    Notes
+                                    {notes.length > 0 && (
+                                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 text-yellow-900 text-[9px] font-bold rounded-full flex items-center justify-center">
+                                            {notes.length}
+                                        </span>
+                                    )}
+                                </button>
                             </div>
                         </div>
 
@@ -768,6 +830,67 @@ export default function ConversationsView({
                         </div>
                         )}
 
+                        {activeTab === 'notes' && (
+                            <div className="flex-1 flex flex-col overflow-hidden">
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                                    {loadingNotes ? (
+                                        <div className="flex justify-center items-center h-full"><Spinner /></div>
+                                    ) : notes.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
+                                            <StickyNote className="w-10 h-10" />
+                                            <p className="text-sm">Aucune note sur cette conversation.</p>
+                                        </div>
+                                    ) : (
+                                        notes.map((note) => (
+                                            <div key={note.id} className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 shadow-sm group relative">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <StickyNote className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
+                                                    <span className="text-xs font-semibold text-yellow-700">
+                                                        {note.authorName ?? (note.authorType === 'admin' ? 'Admin' : 'Agent')}
+                                                    </span>
+                                                    <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full ${
+                                                        note.authorType === 'admin'
+                                                            ? 'bg-slate-200 text-slate-700'
+                                                            : 'bg-green-100 text-green-700'
+                                                    }`}>
+                                                        {note.authorType}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleDeleteNote(note.id)}
+                                                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-yellow-500 hover:text-red-500"
+                                                        title="Supprimer la note"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{note.content}</p>
+                                                <p className="text-[10px] text-yellow-500 mt-1 text-right">{formatDate(note.createdAt)}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                <form onSubmit={(e) => void handleAddNote(e)} className="p-3 border-t border-slate-200 bg-white flex gap-2 sticky bottom-0">
+                                    <textarea
+                                        value={noteInput}
+                                        onChange={(e) => setNoteInput(e.target.value)}
+                                        placeholder="Ajouter une note interne..."
+                                        rows={2}
+                                        className="flex-1 px-3 py-2 text-sm border border-yellow-300 bg-yellow-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none placeholder-yellow-500 text-yellow-900"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!noteInput.trim()}
+                                        className="self-end p-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                                        title="Ajouter la note"
+                                    >
+                                        <PlusCircle className="w-5 h-5" />
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+
+                        {activeTab !== 'notes' && (
                         <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-200 bg-white flex items-center gap-2 sticky bottom-0">
                             <input
                                 type="text"
@@ -785,6 +908,7 @@ export default function ConversationsView({
                                 {loadingMessages ? <Spinner  /> : <Send className="w-5 h-5" />}
                             </button>
                         </form>
+                        )}
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col justify-center items-center text-gray-500">

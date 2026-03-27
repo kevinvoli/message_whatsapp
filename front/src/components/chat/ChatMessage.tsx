@@ -9,6 +9,24 @@ import { useChatStore } from '@/store/chatStore';
 interface ChatMessageProps {
   msg: Message;
   index: number;
+  onQuotedClick?: (targetId: string) => void;
+  isHighlighted?: boolean;
+  searchTerm?: string;
+}
+
+function HighlightText({ text, term }: { text: string; term: string }) {
+  if (!term) return <>{text}</>;
+  const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === term.toLowerCase()
+          ? <mark key={i} className="bg-yellow-300 text-gray-900 rounded-sm px-0.5">{part}</mark>
+          : part,
+      )}
+    </>
+  );
 }
 
 function formatFileSize(bytes?: number): string {
@@ -25,13 +43,7 @@ function formatDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const scrollToMessage = (id?: string) => {
-  if (!id) return;
-  const el = document.querySelector(`[data-message-id="${id}"]`);
-  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-};
-
-export default function ChatMessage({ msg, index }: ChatMessageProps) {
+export default function ChatMessage({ msg, index, onQuotedClick, isHighlighted = false, searchTerm = '' }: ChatMessageProps) {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const setReplyTo = useChatStore((s) => s.setReplyTo);
@@ -96,7 +108,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   return (
     <div
       data-message-id={messageId}
-      className={`flex ${isFromMe ? 'justify-end' : 'justify-start'}`}
+      className={`flex ${isFromMe ? 'justify-end' : 'justify-start'} transition-transform duration-200 ${isHighlighted ? 'scale-[1.02]' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -119,7 +131,9 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
         )}
 
         <div
-          className={`px-4 py-2 rounded-lg ${
+          className={`px-4 py-2 rounded-lg transition-all duration-300 ${
+            isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-1' : ''
+          } ${
             isFromMe
               ? 'bg-green-600 text-white rounded-br-none'
               : 'bg-white text-gray-900 rounded-bl-none shadow-sm'
@@ -133,7 +147,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
                   ? 'border-green-300 bg-green-500/30 text-green-100'
                   : 'border-green-500 bg-gray-50 text-gray-600'
               } px-2 py-1`}
-              onClick={() => scrollToMessage(msg.quotedMessage?.id)}
+              onClick={() => msg.quotedMessage?.id && onQuotedClick?.(msg.quotedMessage.id)}
             >
               <p className="font-semibold mb-0.5">
                 {msg.quotedMessage.from_me ? 'Moi' : (msg.quotedMessage.from_name || 'Client')}
@@ -288,7 +302,9 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             msg.type !== 'unknown' &&
             msg.type !== 'contacts' &&
             messageText && (
-              <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">
+                <HighlightText text={messageText} term={searchTerm} />
+              </p>
             )}
 
           {/* Fallback for empty messages */}

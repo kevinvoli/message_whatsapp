@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Conversation, ConversationNote, Message } from '@/types/chat';
 import ChatMessage from './ChatMessage';
 import { formatDateLong, formatTime } from '@/lib/dateUtils';
@@ -9,18 +9,39 @@ interface ChatMessagesProps {
   currentConv: Conversation;
   notes: ConversationNote[];
   onDeleteNote: (noteId: string) => void;
+  searchTerm?: string;
+  onMatchCountChange?: (count: number) => void;
 }
 
 type TimelineItem =
   | { kind: 'message'; ts: number; msg: Message; index: number }
   | { kind: 'note'; ts: number; note: ConversationNote };
 
-const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv, notes, onDeleteNote }) => {
+const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv, notes, onDeleteNote, searchTerm = '', onMatchCountChange }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleQuotedClick = useCallback((targetId: string) => {
+    const el = document.querySelector(`[data-message-id="${targetId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightedId(targetId);
+    highlightTimerRef.current = setTimeout(() => setHighlightedId(null), 1500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, notes]);
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
 
   // Merge messages and notes sorted by time
   const timeline: TimelineItem[] = [
@@ -37,12 +58,29 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv, note
     })),
   ].sort((a, b) => a.ts - b.ts);
 
-  if (timeline.length === 0) {
+  const filteredTimeline = normalizedSearch
+    ? timeline.filter((item) => {
+        if (item.kind === 'message') {
+          return item.msg.text?.toLowerCase().includes(normalizedSearch);
+        }
+        return item.note.content.toLowerCase().includes(normalizedSearch);
+      })
+    : timeline;
+
+  useEffect(() => {
+    if (onMatchCountChange) onMatchCountChange(normalizedSearch ? filteredTimeline.length : 0);
+  }, [filteredTimeline.length, normalizedSearch, onMatchCountChange]);
+
+  if (filteredTimeline.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-400">
-          <p className="text-lg">Aucun message</p>
-          <p className="text-sm mt-2">Envoyez le premier message pour démarrer la conversation</p>
+          <p className="text-lg">{normalizedSearch ? 'Aucun résultat' : 'Aucun message'}</p>
+          <p className="text-sm mt-2">
+            {normalizedSearch
+              ? `Aucun message ne contient "${searchTerm}"`
+              : 'Envoyez le premier message pour démarrer la conversation'}
+          </p>
         </div>
       </div>
     );
@@ -56,9 +94,18 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv, note
             <p className="text-xs text-gray-500">Début de la conversation - {formatDateLong(currentConv?.createdAt)}</p>
           </div>
         </div>
-        {timeline.map((item) => {
+        {filteredTimeline.map((item) => {
           if (item.kind === 'message') {
-            return <ChatMessage key={item.msg.id} msg={item.msg} index={item.index} />;
+            return (
+              <ChatMessage
+                key={item.msg.id}
+                msg={item.msg}
+                index={item.index}
+                onQuotedClick={handleQuotedClick}
+                isHighlighted={highlightedId === item.msg.id}
+                searchTerm={normalizedSearch}
+              />
+            );
           }
           // Note interne
           const note = item.note;
