@@ -274,7 +274,52 @@ export class WhatsappMessageController {
   @Get(':chat_id')
   @UseGuards(AdminGuard)
   async findByChatId(@Param('chat_id') chat_id: string) {
-    return this.messageService.findBychat_id(chat_id);
+    const messages = await this.messageService.findBychat_id(chat_id);
+    return messages.map((msg) => ({
+      ...msg,
+      medias: msg.medias?.map((m) => ({
+        id: m.id,
+        type: m.media_type,
+        url: this.resolveAdminMediaUrl(msg, m),
+        mime_type: m.mime_type,
+        caption: m.caption,
+        file_name: m.file_name,
+        file_size: m.file_size,
+        seconds: m.duration_seconds,
+        latitude: m.latitude,
+        longitude: m.longitude,
+      })) ?? [],
+    }));
+  }
+
+  private resolveAdminMediaUrl(
+    message: { provider?: string | null; channel_id?: string | null },
+    media: { provider_media_id?: string | null; media_id: string; url?: string | null },
+  ): string | null {
+    const channelQuery = message.channel_id
+      ? `?channelId=${encodeURIComponent(message.channel_id)}`
+      : '';
+
+    if (message.provider === 'meta') {
+      const providerMediaId = media.provider_media_id ?? media.media_id;
+      if (!providerMediaId) return null;
+      return `/messages/media/meta/${providerMediaId}${channelQuery}`;
+    }
+
+    const directUrl = media.url ?? null;
+    if (directUrl) {
+      if (directUrl.startsWith('/')) return directUrl;
+      try {
+        const parsed = new URL(directUrl);
+        if (parsed.pathname.startsWith('/messages/media/')) {
+          return `${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // URL invalide → retourner telle quelle
+      }
+    }
+
+    return directUrl;
   }
 
   @Get()
