@@ -8,6 +8,11 @@ import {
 import { IsNull, Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
+export interface OfflineReinjectionPreview {
+  total: number;
+  conversations: { chat_id: string; name: string; poste_id: string | null; unread_count: number; last_activity_at: Date | null; read_only: boolean }[];
+}
+
 @Injectable()
 export class OfflineReinjectionJob implements OnModuleInit {
   private readonly logger = new Logger(OfflineReinjectionJob.name);
@@ -22,6 +27,28 @@ export class OfflineReinjectionJob implements OnModuleInit {
     this.cronConfigService.registerHandler('offline-reinject', () =>
       this.offlineReinject(),
     );
+    this.cronConfigService.registerPreviewHandler('offline-reinject', () =>
+      this.preview(),
+    );
+  }
+
+  async preview(): Promise<OfflineReinjectionPreview> {
+    const chats = await this.chatRepo.find({
+      where: { status: WhatsappChatStatus.ACTIF, last_poste_message_at: IsNull() },
+      relations: ['poste'],
+    });
+    const candidates = chats.filter((c) => c.poste && !c.poste.is_active);
+    return {
+      total: candidates.length,
+      conversations: candidates.map((c) => ({
+        chat_id: c.chat_id,
+        name: c.name,
+        poste_id: c.poste_id ?? null,
+        unread_count: c.unread_count,
+        last_activity_at: c.last_activity_at ?? null,
+        read_only: c.read_only,
+      })),
+    };
   }
 
   async offlineReinject() {

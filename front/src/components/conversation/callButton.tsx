@@ -178,7 +178,7 @@ export const CallButton: React.FC<CallButtonProps> = ({
                     <span className={`text-sm font-medium ${
                       selectedStatus === 'à_appeler' ? 'text-blue-700' : 'text-gray-700'
                     }`}>
-                      À appeler
+                      Appel initial
                     </span>
                   </div>
                   {selectedStatus === 'à_appeler' && (

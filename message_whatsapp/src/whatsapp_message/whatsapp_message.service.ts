@@ -203,7 +203,10 @@ export class WhatsappMessageService {
       await this.chatRepository.update(
         { chat_id: chat.chat_id },
         {
-          unread_count: 0,
+          // unread_count remis à 0 uniquement quand un vrai agent humain répond.
+          // Les messages auto ne comptent pas comme une lecture : le commercial
+          // n'a pas encore vu la conversation.
+          ...(data.poste_id ? { unread_count: 0 } : {}),
           // N'actualise last_poste_message_at que pour les vrais agents humains.
           // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
           ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),

@@ -756,6 +756,13 @@ export async function resetCronConfig(key: string): Promise<CronConfig> {
     return handleResponse<CronConfig>(response);
 }
 
+export async function getCronPreview(key: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs/${key}/preview`, {
+        credentials: 'include',
+    });
+    return handleResponse<unknown>(response);
+}
+
 export async function runCronNow(key: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/cron-configs/${key}/run`, {
         method: 'POST',

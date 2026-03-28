@@ -578,8 +578,11 @@ export const ContactsListView: React.FC<ContactsListViewProps> = ({
                           <PhoneMissed className="w-5 h-5" />
                         )}
                         {status === 'à_appeler' && <Phone className="w-5 h-5" />}
-                        <span className="text-sm font-medium capitalize">
-                          {status.replace('_', ' ')}
+de reinjection des message                         <span className="text-sm font-medium">
+                          {status === 'appelé' ? 'Appelé'
+                            : status === 'rappeler' ? 'À rappeler'
+                            : status === 'non_joignable' ? 'Non joignable'
+                            : 'Appel initial'}
                         </span>
                       </div>
                     </button>
