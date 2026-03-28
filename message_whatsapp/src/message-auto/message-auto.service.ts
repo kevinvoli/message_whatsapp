@@ -133,20 +133,22 @@ export class MessageAutoService {
       await this.gateway.notifyNewMessage(message, chat);
 
       await this.chatService.update(chatId, {
-        read_only: false,
+        read_only: true,
         auto_message_status: 'sent',
         auto_message_id: template.id,
       });
+      this.gateway.emitConversationReadonly({ ...chat, read_only: true } as typeof chat);
     } catch (err) {
+      // En cas d'erreur d'envoi, déverrouiller pour que le commercial puisse prendre la main
       await this.chatService.update(chatId, {
         read_only: false,
         auto_message_status: 'failed',
       });
+      this.gateway.emitConversationReadonly({ ...chat, read_only: false } as typeof chat);
       throw err;
     } finally {
-      // 🛑 Stop typing WA (best-effort) + déverrouillage frontend
+      // 🛑 Stop typing WA (best-effort)
       void this.messageService.typingStop(chatId).catch(() => {});
-      this.gateway.emitConversationReadonly({ ...chat, read_only: false } as typeof chat);
     }
   }
 
