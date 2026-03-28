@@ -92,6 +92,9 @@ export class CronConfigService implements OnModuleInit {
   /** Handlers enregistrés par les job services via registerHandler() */
   private readonly handlers = new Map<string, () => Promise<void>>();
 
+  /** Preview handlers — retournent des infos sans exécuter d'action */
+  private readonly previewHandlers = new Map<string, () => Promise<unknown>>();
+
   constructor(
     @InjectRepository(CronConfig)
     private readonly repo: Repository<CronConfig>,
@@ -122,6 +125,18 @@ export class CronConfigService implements OnModuleInit {
   registerHandler(key: string, fn: () => Promise<void>): void {
     this.handlers.set(key, fn);
     this.logger.log(`Handler registered for cron key="${key}"`);
+  }
+
+  registerPreviewHandler(key: string, fn: () => Promise<unknown>): void {
+    this.previewHandlers.set(key, fn);
+  }
+
+  async preview(key: string): Promise<unknown> {
+    const fn = this.previewHandlers.get(key);
+    if (!fn) {
+      return { available: false, message: 'Aucun aperçu disponible pour ce CRON.' };
+    }
+    return fn();
   }
 
   // ────────────────────────────── CRUD public ───────────────────────────────

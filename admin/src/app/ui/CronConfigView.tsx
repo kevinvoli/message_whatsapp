@@ -1,11 +1,178 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Clock, PauseCircle, Play, RefreshCw, RotateCcw, Timer, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Clock, Lock, PauseCircle, Play, RefreshCw, RotateCcw, Timer, X, Zap } from 'lucide-react';
 import { CronConfig, UpdateCronConfigPayload } from '@/app/lib/definitions';
-import { getCronConfigs, resetCronConfig, runCronNow, updateCronConfig } from '@/app/lib/api';
+import { getCronConfigs, getCronPreview, resetCronConfig, runCronNow, updateCronConfig } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate, formatRelativeDate } from '@/app/lib/dateUtils';
+
+// ─── Types preview ────────────────────────────────────────────────────────────
+
+interface ReinjectionPreviewRow {
+  chat_id: string; name: string; poste_id: string | null;
+  unread_count: number; last_activity_at: string | null; read_only: boolean;
+}
+interface ReinjectionPreview { total: number; conversations: ReinjectionPreviewRow[] }
+
+interface ReadOnlyRow {
+  chat_id: string; name: string; last_client_message_at: string | null; idle_hours: number;
+}
+interface ReadOnlyPreview { total: number; conversations: ReadOnlyRow[] }
+
+interface NoPreview { available: false; message: string }
+
+type CronPreviewData = ReinjectionPreview | ReadOnlyPreview | NoPreview | null;
+
+// ─── Modal de confirmation ────────────────────────────────────────────────────
+
+function PreviewModal({
+  cronKey,
+  cronLabel,
+  data,
+  onConfirm,
+  onClose,
+  confirming,
+}: {
+  cronKey: string;
+  cronLabel: string;
+  data: CronPreviewData;
+  onConfirm: () => void;
+  onClose: () => void;
+  confirming: boolean;
+}) {
+  const noPreview = data && 'available' in data && data.available === false;
+
+  const renderContent = () => {
+    if (!data) return <p className="text-sm text-gray-500">Chargement de l&apos;aperçu...</p>;
+    if (noPreview) return <p className="text-sm text-gray-500">{(data as NoPreview).message}</p>;
+
+    if (cronKey === 'offline-reinject') {
+      const d = data as ReinjectionPreview;
+      return (
+        <div>
+          <p className="text-sm text-gray-700 mb-3">
+            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront réinjectées dans le système.
+          </p>
+          {d.total === 0 ? (
+            <p className="text-xs text-gray-400 italic">Aucune conversation à réinjecter.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Client</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Non lus</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Lecture seule</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Dernière activité</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {d.conversations.map((c) => (
+                    <tr key={c.chat_id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-800">{c.name}</td>
+                      <td className="px-3 py-2 text-center">
+                        {c.unread_count > 0
+                          ? <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-100 text-red-700 font-bold text-[10px]">{c.unread_count}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {c.read_only ? <Lock className="w-3.5 h-3.5 text-amber-500 mx-auto" /> : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">
+                        {c.last_activity_at ? formatRelativeDate(c.last_activity_at) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (cronKey === 'read-only-enforcement') {
+      const d = data as ReadOnlyPreview;
+      return (
+        <div>
+          <p className="text-sm text-gray-700 mb-3">
+            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront passées en lecture seule (inactives &gt; 24h).
+          </p>
+          {d.total === 0 ? (
+            <p className="text-xs text-gray-400 italic">Aucune conversation concernée.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Client</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Inactivité</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Dernier message client</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {d.conversations.map((c) => (
+                    <tr key={c.chat_id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-800">{c.name}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 font-semibold text-[10px]">{c.idle_hours}h</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">
+                        {c.last_client_message_at ? formatRelativeDate(c.last_client_message_at) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return <p className="text-sm text-gray-500">Aperçu non disponible pour ce CRON.</p>;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Confirmer l&apos;exécution</h2>
+            <p className="mt-0.5 text-sm text-gray-500">{cronLabel}</p>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-gray-100">
+            <X className="h-4 w-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <div className="mb-4 flex items-start gap-3 rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">Cette action sera exécutée immédiatement, en dehors du planning habituel.</p>
+          </div>
+          {renderContent()}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+          <button onClick={onClose} disabled={confirming}
+            className="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            Annuler
+          </button>
+          <button onClick={onConfirm} disabled={confirming}
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            <Play className="h-3.5 w-3.5" />
+            {confirming ? 'Exécution...' : 'Confirmer l\'exécution'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -49,6 +216,11 @@ function ConfigPanel({
   const [saving,    setSaving]    = useState(false);
   const [resetting, setResetting] = useState(false);
   const [running,   setRunning]   = useState(false);
+
+  // Preview modal
+  const [previewOpen,   setPreviewOpen]   = useState(false);
+  const [previewData,   setPreviewData]   = useState<CronPreviewData>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   useEffect(() => {
     setEnabled(config.enabled);
@@ -98,10 +270,25 @@ function ConfigPanel({
     }
   };
 
-  const handleRunNow = async () => {
+  const handleOpenPreview = async () => {
+    setPreviewOpen(true);
+    setPreviewData(null);
+    setLoadingPreview(true);
+    try {
+      const data = await getCronPreview(config.key);
+      setPreviewData(data as CronPreviewData);
+    } catch {
+      setPreviewData({ available: false, message: 'Impossible de charger l\'aperçu.' });
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleConfirmRun = async () => {
     setRunning(true);
     try {
       await runCronNow(config.key);
+      setPreviewOpen(false);
       addToast({ type: 'success', message: `"${config.label}" exécuté immédiatement.` });
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : "Erreur d'exécution." });
@@ -265,10 +452,10 @@ function ConfigPanel({
               <RotateCcw className="h-3.5 w-3.5" />
               {resetting ? 'Reset...' : 'Remettre défaut'}
             </button>
-            <button type="button" onClick={handleRunNow} disabled={busy}
+            <button type="button" onClick={() => void handleOpenPreview()} disabled={busy || loadingPreview}
               className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-blue-300">
               <Play className="h-3.5 w-3.5" />
-              {running ? 'Exécution...' : 'Exécuter maintenant'}
+              {loadingPreview ? 'Chargement...' : 'Exécuter maintenant'}
             </button>
             <button type="button" onClick={handleSave} disabled={busy}
               className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300">
@@ -277,6 +464,17 @@ function ConfigPanel({
           </div>
         </div>
       </div>
+
+      {previewOpen && (
+        <PreviewModal
+          cronKey={config.key}
+          cronLabel={config.label}
+          data={loadingPreview ? null : previewData}
+          onConfirm={() => void handleConfirmRun()}
+          onClose={() => setPreviewOpen(false)}
+          confirming={running}
+        />
+      )}
     </div>
   );
 }

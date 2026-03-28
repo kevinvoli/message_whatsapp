@@ -42,6 +42,12 @@ export class CronConfigController {
     return this.cronConfigService.reset(key);
   }
 
+  /** Retourne un aperçu des données affectées sans exécuter le CRON */
+  @Get(':key/preview')
+  preview(@Param('key') key: string) {
+    return this.cronConfigService.preview(key);
+  }
+
   /** Exécute un CRON immédiatement (hors schedule) */
   @Post(':key/run')
   @HttpCode(200)
