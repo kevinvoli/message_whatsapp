@@ -752,10 +752,25 @@ export default function ConversationsView({
                                                             );
                                                         }
                                                         if (mediaType === 'audio' || mediaType === 'voice') {
+                                                            const audioSrc = resolveMediaUrl(media.url);
                                                             return (
-                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
-                                                                    <Mic className="w-4 h-4 flex-shrink-0" />
-                                                                    <span className="text-xs">{media.seconds ? `${media.seconds}s` : 'Audio'}</span>
+                                                                <div key={idx} className="flex flex-col gap-1 p-2 bg-black/10 rounded">
+                                                                    {audioSrc ? (
+                                                                        <audio
+                                                                            controls
+                                                                            preload="metadata"
+                                                                            src={audioSrc}
+                                                                            className="w-full h-8"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Mic className="w-4 h-4 flex-shrink-0" />
+                                                                            <span className="text-xs">Audio indisponible</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {media.seconds && media.seconds > 0 && (
+                                                                        <span className="text-[10px] text-current opacity-60">{media.seconds}s</span>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         }
