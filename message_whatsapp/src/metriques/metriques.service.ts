@@ -7,7 +7,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
+import { Between, IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import {
   ChargePosteDto,
   MetriquesGlobalesDto,
@@ -73,11 +73,22 @@ export class MetriquesService {
     }
   }
 
+  private dateRange(
+    periode: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ): { dateStart: Date; dateEnd: Date } {
+    if (dateFrom && dateTo) {
+      return { dateStart: new Date(dateFrom), dateEnd: new Date(dateTo) };
+    }
+    return { dateStart: this.periodeToDateStart(periode), dateEnd: new Date() };
+  }
+
   /**
    * RÃ©cupÃ¨re toutes les mÃ©triques globales du dashboard
    */
-  async getMetriquesGlobales(periode = 'today'): Promise<MetriquesGlobalesDto> {
-    const dateStart = this.periodeToDateStart(periode);
+  async getMetriquesGlobales(periode = 'today', dateFrom?: string, dateTo?: string): Promise<MetriquesGlobalesDto> {
+    const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
     // Utiliser Promise.all pour parallÃ©liser les requÃªtes
     const [
       metriquesMessages,
@@ -88,13 +99,13 @@ export class MetriquesService {
       metriquesChannels,
       chargePostes,
     ] = await Promise.all([
-      this.getMetriquesMessages(dateStart),
-      this.getMetriquesChats(),
-      this.getMetriquesCommerciaux(),
-      this.getMetriquesContacts(dateStart),
+      this.getMetriquesMessages(dateStart, dateEnd),
+      this.getMetriquesChats(dateStart, dateEnd),
+      this.getMetriquesCommerciaux(dateStart, dateEnd),
+      this.getMetriquesContacts(dateStart, dateEnd),
       this.getMetriquesPostes(),
       this.getMetriquesChannels(),
-      this.getChargeParPoste(),
+      this.getChargeParPoste(dateStart, dateEnd),
     ]);
 
     return {
@@ -111,10 +122,10 @@ export class MetriquesService {
   /**
    * MÃ©triques Messages
    */
-  private async getMetriquesMessages(dateStart: Date) {
+  private async getMetriquesMessages(dateStart: Date, dateEnd: Date) {
     // Total messages dans la pÃ©riode
     const totalMessages = await this.messageRepository.count({
-      where: { deletedAt: IsNull(), createdAt: MoreThanOrEqual(dateStart) },
+      where: { deletedAt: IsNull(), createdAt: Between(dateStart, dateEnd) },
     });
 
     // Messages par direction dans la pÃ©riode
@@ -124,6 +135,7 @@ export class MetriquesService {
       .addSelect('COUNT(*)', 'count')
       .where('message.deletedAt IS NULL')
       .andWhere('message.createdAt >= :dateStart', { dateStart })
+      .andWhere('message.createdAt <= :dateEnd', { dateEnd })
       .groupBy('message.direction')
       .getRawMany();
 
@@ -160,6 +172,7 @@ export class MetriquesService {
         'TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp) < 3600',
       )
       .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
+      .andWhere('msg_out.createdAt <= :dateEnd', { dateEnd })
       .getRawOne();
 
     const tempsReponseMoyen = parseInt(tempsReponse?.avg_seconds) || 0;
@@ -177,17 +190,19 @@ export class MetriquesService {
   /**
    * MÃ©triques Chats
    */
-  private async getMetriquesChats() {
+  private async getMetriquesChats(dateStart: Date, dateEnd: Date) {
     const totalChats = await this.chatRepository.count({
-      where: { deletedAt: IsNull() },
+      where: { deletedAt: IsNull(), createdAt: Between(dateStart, dateEnd) },
     });
 
-    // Chats par statut
+    // Chats par statut dans la période
     const chatsParStatut = await this.chatRepository
       .createQueryBuilder('chat')
       .select('chat.status', 'status')
       .addSelect('COUNT(*)', 'count')
       .where('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
       .groupBy('chat.status')
       .getRawMany();
 
@@ -198,37 +213,40 @@ export class MetriquesService {
       chatsParStatut.find((c) => c.status === 'en attente')?.count || 0,
     );
     const chatsFermes = parseInt(
-      chatsParStatut.find((c) => c.status === 'fermÃ©')?.count || 0,
+      chatsParStatut.find((c) => c.status === 'fermé')?.count || 0,
     );
 
-    // Chats non lus
+    // Chats non lus dans la période
     const chatsNonLus = await this.chatRepository.count({
       where: {
         deletedAt: IsNull(),
         unread_count: MoreThan(0),
+        createdAt: Between(dateStart, dateEnd),
       },
     });
 
-    // Chats archivÃ©s
+    // Chats archivés dans la période
     const chatsArchives = await this.chatRepository.count({
       where: {
         deletedAt: IsNull(),
         is_archived: true,
+        createdAt: Between(dateStart, dateEnd),
       },
     });
 
-    // Taux d'assignation
+    // Taux d'assignation dans la période
     const chatsAssignes = await this.chatRepository.count({
       where: {
         deletedAt: IsNull(),
         poste_id: Not(IsNull()),
+        createdAt: Between(dateStart, dateEnd),
       },
     });
 
     const tauxAssignation =
       totalChats > 0 ? Math.round((chatsAssignes / totalChats) * 100) : 0;
 
-    // Temps premiÃ¨re rÃ©ponse
+    // Temps première réponse dans la période
     const tempsPremiereReponse = await this.chatRepository
       .createQueryBuilder('chat')
       .select(
@@ -238,6 +256,8 @@ export class MetriquesService {
       .where('chat.first_response_deadline_at IS NOT NULL')
       .andWhere('chat.last_client_message_at IS NOT NULL')
       .andWhere('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
       .getRawOne();
 
     return {
@@ -255,7 +275,7 @@ export class MetriquesService {
   /**
    * MÃ©triques Commerciaux
    */
-  private async getMetriquesCommerciaux() {
+  private async getMetriquesCommerciaux(dateStart?: Date, dateEnd?: Date) {
     const commerciauxTotal = await this.commercialRepository.count({
       where: { deletedAt: IsNull() },
     });
@@ -267,15 +287,24 @@ export class MetriquesService {
       },
     });
 
-    // Commerciaux actifs (ayant au moins un chat actif)
-    const commerciauxActifs = await this.commercialRepository
+    // Commerciaux ayant eu au moins un chat actif dans la période
+    const qb = this.commercialRepository
       .createQueryBuilder('commercial')
       .innerJoin('commercial.poste', 'poste')
-      .innerJoin('poste.chats', 'chat', 'chat.status = :status', {
-        status: 'actif',
-      })
-      .where('commercial.deletedAt IS NULL')
-      .andWhere('chat.deletedAt IS NULL')
+      .innerJoin(
+        'poste.chats',
+        'chat',
+        'chat.status = :status AND chat.deletedAt IS NULL',
+        { status: 'actif' },
+      )
+      .where('commercial.deletedAt IS NULL');
+
+    if (dateStart && dateEnd) {
+      qb.andWhere('chat.createdAt >= :dateStart', { dateStart })
+        .andWhere('chat.createdAt <= :dateEnd', { dateEnd });
+    }
+
+    const commerciauxActifs = await qb
       .select('COUNT(DISTINCT commercial.id)', 'count')
       .getRawOne();
 
@@ -289,7 +318,7 @@ export class MetriquesService {
   /**
    * MÃ©triques Contacts
    */
-  private async getMetriquesContacts(dateStart: Date) {
+  private async getMetriquesContacts(dateStart: Date, dateEnd: Date) {
     const totalContacts = await this.contactRepository.count({
       where: { deletedAt: IsNull() },
     });
@@ -297,7 +326,7 @@ export class MetriquesService {
     const nouveauxContactsAujourdhui = await this.contactRepository.count({
       where: {
         deletedAt: IsNull(),
-        createdAt: MoreThanOrEqual(dateStart),
+        createdAt: Between(dateStart, dateEnd),
       },
     });
 
@@ -334,10 +363,15 @@ export class MetriquesService {
   /**
    * Charge par Poste
    */
-  private async getChargeParPoste(): Promise<ChargePosteDto[]> {
+  private async getChargeParPoste(dateStart: Date, dateEnd: Date): Promise<ChargePosteDto[]> {
     const chargePostes = await this.posteRepository
       .createQueryBuilder('poste')
-      .leftJoin('poste.chats', 'chat', 'chat.deletedAt IS NULL')
+      .leftJoin(
+        'poste.chats',
+        'chat',
+        'chat.deletedAt IS NULL AND chat.createdAt >= :dateStart AND chat.createdAt <= :dateEnd',
+        { dateStart, dateEnd },
+      )
       .select('poste.id', 'poste_id')
       .addSelect('poste.name', 'poste_name')
       .addSelect('poste.code', 'poste_code')
@@ -385,8 +419,8 @@ export class MetriquesService {
   /**
    * Performance dÃ©taillÃ©e par commercial
    */
-  async getPerformanceCommerciaux(periode = 'today'): Promise<PerformanceCommercialDto[]> {
-    const dateStart = this.periodeToDateStart(periode);
+  async getPerformanceCommerciaux(periode = 'today', dateFrom?: string, dateTo?: string): Promise<PerformanceCommercialDto[]> {
+    const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
     const performance = await this.commercialRepository
       .createQueryBuilder('commercial')
@@ -395,8 +429,8 @@ export class MetriquesService {
       .leftJoin(
         'chat.messages',
         'message',
-        'message.deletedAt IS NULL AND message.createdAt >= :dateStart',
-        { dateStart },
+        'message.deletedAt IS NULL AND message.createdAt >= :dateStart AND message.createdAt <= :dateEnd',
+        { dateStart, dateEnd },
       )
       .select([
         'commercial.id as id',
@@ -426,7 +460,8 @@ export class MetriquesService {
             .where('msg.commercial_id = commercial.id')
             .andWhere("msg.direction = 'OUT'")
             .andWhere('msg.deletedAt IS NULL')
-            .andWhere('msg.createdAt >= :dateStart', { dateStart }),
+            .andWhere('msg.createdAt >= :dateStart', { dateStart })
+            .andWhere('msg.createdAt <= :dateEnd', { dateEnd }),
         'nbMessagesEnvoyes',
       )
       .where('commercial.deletedAt IS NULL')
@@ -456,6 +491,7 @@ export class MetriquesService {
           )
           .where('msg_out.poste_id = :posteId', { posteId: perf.poste_id })
           .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
+          .andWhere('msg_out.createdAt <= :dateEnd', { dateEnd })
           .andWhere('msg_out.deletedAt IS NULL')
           .andWhere('msg_in.deletedAt IS NULL')
           .andWhere(
@@ -492,8 +528,8 @@ export class MetriquesService {
   /**
    * Statut dÃ©taillÃ© des channels
    */
-  async getStatutChannels(periode = 'today'): Promise<StatutChannelDto[]> {
-    const dateStart = this.periodeToDateStart(periode);
+  async getStatutChannels(periode = 'today', dateFrom?: string, dateTo?: string): Promise<StatutChannelDto[]> {
+    const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
     const channels = await this.channelRepository
       .createQueryBuilder('channel')
@@ -505,8 +541,8 @@ export class MetriquesService {
       .leftJoin(
         'channel.messages',
         'message',
-        'message.deletedAt IS NULL AND message.createdAt >= :dateStart',
-        { dateStart },
+        'message.deletedAt IS NULL AND message.createdAt >= :dateStart AND message.createdAt <= :dateEnd',
+        { dateStart, dateEnd },
       )
       .select([
         'channel.id as id',
@@ -545,8 +581,8 @@ export class MetriquesService {
   /**
    * Performance temporelle (7 derniers jours)
    */
-  async getPerformanceTemporelle(jours: number = 7) {
-    const performance = await this.messageRepository
+  async getPerformanceTemporelle(jours: number = 7, dateFrom?: string, dateTo?: string) {
+    const qb = this.messageRepository
       .createQueryBuilder('message')
       .select('DATE(message.createdAt)', 'date')
       .addSelect('COUNT(*)', 'nb_messages')
@@ -559,10 +595,18 @@ export class MetriquesService {
         'messages_out',
       )
       .addSelect('COUNT(DISTINCT message.chat_id)', 'nb_conversations')
-      .where('message.createdAt >= DATE_SUB(CURDATE(), INTERVAL :jours DAY)', {
-        jours,
-      })
-      .andWhere('message.deletedAt IS NULL')
+      .andWhere('message.deletedAt IS NULL');
+
+    if (dateFrom && dateTo) {
+      qb.where('message.createdAt >= :dateStart AND message.createdAt <= :dateEnd', {
+        dateStart: new Date(dateFrom),
+        dateEnd: new Date(dateTo),
+      });
+    } else {
+      qb.where('message.createdAt >= DATE_SUB(CURDATE(), INTERVAL :jours DAY)', { jours });
+    }
+
+    const performance = await qb
       .groupBy('DATE(message.createdAt)')
       .orderBy('date', 'ASC')
       .getRawMany();

@@ -644,8 +644,11 @@ export async function getPerformanceTemporelle(jours: number = 7): Promise<Perfo
  * Récupère toutes les données du dashboard en une seule requête
  * C'est l'endpoint le plus optimisé pour charger le dashboard
  */
-export async function getOverviewMetriques(periode = 'today') {
-    const response = await fetch(`${API_BASE_URL}/api/metriques/overview?periode=${periode}`, {
+export async function getOverviewMetriques(periode = 'today', dateFrom?: string, dateTo?: string) {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(`${API_BASE_URL}/api/metriques/overview?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
     });

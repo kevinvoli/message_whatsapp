@@ -85,7 +85,11 @@ export class MetriquesController {
     status: 200,
     description: 'Donnees du dashboard recuperees avec succes',
   })
-  async getOverview(@Query('periode') periode: string = 'today') {
+  async getOverview(
+    @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
     const joursMap: Record<string, number> = {
       today: 1,
       week: 7,
@@ -100,10 +104,10 @@ export class MetriquesController {
       statutChannels,
       performanceTemporelle,
     ] = await Promise.all([
-      this.metriquesService.getMetriquesGlobales(periode),
-      this.metriquesService.getPerformanceCommerciaux(periode),
-      this.metriquesService.getStatutChannels(periode),
-      this.metriquesService.getPerformanceTemporelle(jours),
+      this.metriquesService.getMetriquesGlobales(periode, dateFrom, dateTo),
+      this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo),
+      this.metriquesService.getStatutChannels(periode, dateFrom, dateTo),
+      this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo),
     ]);
 
     return {

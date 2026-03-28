@@ -13,7 +13,7 @@ import {
     LineChart,
     Line,
 } from 'recharts';
-import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X } from 'lucide-react';
 import { getOverviewMetriques } from '@/app/lib/api';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
@@ -72,10 +72,17 @@ export default function AnalyticsView() {
     const [perf, setPerf] = useState<PerformanceCommercial[]>([]);
     const [temporelle, setTemporelle] = useState<PerformanceTemporelle[]>([]);
 
-    const load = useCallback(async (p: Period) => {
+    // Filtre plage de dates
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [activeDateFrom, setActiveDateFrom] = useState('');
+    const [activeDateTo, setActiveDateTo] = useState('');
+    const hasCustomRange = !!(activeDateFrom && activeDateTo);
+
+    const load = useCallback(async (p: Period, from?: string, to?: string) => {
         setLoading(true);
         try {
-            const data = await getOverviewMetriques(p);
+            const data = await getOverviewMetriques(p, from, to);
             setMetriques(data.metriques);
             setPerf(data.performanceCommercial);
             setTemporelle(data.performanceTemporelle);
@@ -86,7 +93,22 @@ export default function AnalyticsView() {
         }
     }, []);
 
-    useEffect(() => { void load(period); }, [load, period]);
+    useEffect(() => {
+        void load(period, activeDateFrom || undefined, activeDateTo || undefined);
+    }, [load, period, activeDateFrom, activeDateTo]);
+
+    const applyCustomRange = () => {
+        if (!dateFrom || !dateTo) return;
+        setActiveDateFrom(dateFrom);
+        setActiveDateTo(dateTo);
+    };
+
+    const clearCustomRange = () => {
+        setDateFrom('');
+        setDateTo('');
+        setActiveDateFrom('');
+        setActiveDateTo('');
+    };
 
     const chartData = temporelle.map((t) => ({
         date: formatDate(t.periode, period),
@@ -111,15 +133,15 @@ export default function AnalyticsView() {
                     <TrendingUp className="w-6 h-6 text-blue-600" />
                     <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
                 </div>
-                <div className="flex items-center gap-3">
-                    {/* Période */}
-                    <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Période prédéfinie — désactivée si plage custom active */}
+                    <div className={`flex rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm ${hasCustomRange ? 'opacity-40 pointer-events-none' : ''}`}>
                         {PERIODS.map((p) => (
                             <button
                                 key={p.value}
                                 onClick={() => setPeriod(p.value)}
                                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                                    period === p.value
+                                    period === p.value && !hasCustomRange
                                         ? 'bg-blue-600 text-white'
                                         : 'text-gray-600 hover:bg-gray-50'
                                 }`}
@@ -128,8 +150,43 @@ export default function AnalyticsView() {
                             </button>
                         ))}
                     </div>
+
+                    {/* Filtre plage de dates */}
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
+                        <CalendarRange className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        <input
+                            type="datetime-local"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            className="text-sm text-gray-700 border-none outline-none bg-transparent w-44"
+                        />
+                        <span className="text-gray-400 text-sm">→</span>
+                        <input
+                            type="datetime-local"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            className="text-sm text-gray-700 border-none outline-none bg-transparent w-44"
+                        />
+                        <button
+                            onClick={applyCustomRange}
+                            disabled={!dateFrom || !dateTo}
+                            className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-md hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Appliquer
+                        </button>
+                        {hasCustomRange && (
+                            <button
+                                onClick={clearCustomRange}
+                                className="ml-1 p-1 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100"
+                                title="Effacer le filtre"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+
                     <button
-                        onClick={() => void load(period)}
+                        onClick={() => void load(period, activeDateFrom || undefined, activeDateTo || undefined)}
                         disabled={loading}
                         className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
                         title="Rafraîchir"
@@ -138,6 +195,17 @@ export default function AnalyticsView() {
                     </button>
                 </div>
             </div>
+
+            {/* Badge plage active */}
+            {hasCustomRange && (
+                <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 w-fit">
+                    <CalendarRange className="w-4 h-4 flex-shrink-0" />
+                    <span>Filtre actif : <strong>{new Date(activeDateFrom).toLocaleString('fr-FR')}</strong> → <strong>{new Date(activeDateTo).toLocaleString('fr-FR')}</strong></span>
+                    <button onClick={clearCustomRange} className="ml-2 text-blue-400 hover:text-blue-700">
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
 
             {loading && !metriques && (
                 <div className="flex justify-center py-16">
