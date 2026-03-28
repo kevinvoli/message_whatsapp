@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { WhatsappMessage } from '../lib/definitions';
 import { Search, RefreshCw } from 'lucide-react';
 import { resolveAdminMessageText } from '../lib/utils';
-import { formatDateShort } from '@/app/lib/dateUtils';
+import { formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
 import { Spinner } from './Spinner';
 import { Pagination } from './Pagination';
 import { getMessages } from '@/app/lib/api';
@@ -121,7 +121,7 @@ export default function MessagesView({ onRefresh, selectedPeriod = 'today' }: Me
                                           </span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">{formatDateShort(msg.timestamp)}</td>
+                                    <td className="px-6 py-4 text-sm font-medium text-blue-900">{formatDateTimeWithSeconds(msg.timestamp)}</td>
                                 </tr>
                             ))}
                         </tbody>

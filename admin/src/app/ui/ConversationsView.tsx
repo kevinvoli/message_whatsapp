@@ -8,7 +8,7 @@ import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/de
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
-import { formatDate, formatTime } from '@/app/lib/dateUtils';
+import { formatDate, formatTime, formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
 import { Pagination } from './Pagination';
 
 interface ConversationsViewProps {
@@ -514,6 +514,9 @@ export default function ConversationsView({
                                     <p className="text-[11px] text-slate-400 mt-1 truncate">
                                         {getStatusLabel(chat)} • Poste: {resolvePosteLabel(chat)} • Canal: {resolveChannelLabel(chat)}
                                     </p>
+                                    <p className="text-[10px] text-blue-900 mt-0.5 truncate">
+                                        Début: {formatDate(chat.createdAt)} · Fin: {formatDate(chat.last_message?.timestamp ?? chat.last_activity_at)}
+                                    </p>
                                 </div>
                                 {getUnreadCount(chat) > 0 && (
                                     <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-slate-900 text-white text-[11px] rounded-full">
@@ -805,7 +808,7 @@ export default function ConversationsView({
                                             )}
                                             <p>{resolveAdminMessageText(msg)}</p>
                                             <span className="block text-right text-xs mt-1 opacity-75">
-                                                {formatTime(msg.timestamp)}
+                                                {formatDateTimeWithSeconds(msg.timestamp)}
                                                 {msg.status && (
                                                     <span className={`ml-1.5 ${
                                                         msg.status === 'READ' ? 'text-blue-300' :

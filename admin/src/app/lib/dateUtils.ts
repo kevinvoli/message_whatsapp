@@ -42,6 +42,14 @@ export function formatDateLong(value: Date | string | number | null | undefined)
   return `${datePart} à ${timePart}`;
 }
 
+/** Date + heure + secondes : "18/02/2026 14:30:25" */
+export function formatDateTimeWithSeconds(value: Date | string | number | null | undefined): string {
+  const d = safeDate(value);
+  if (!d) return '-';
+  const time = d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return `${formatDateShort(d)} ${time}`;
+}
+
 /** Date relative : "Il y a 2h", "Hier", "Il y a 3 jours", ou date courte si > 7j */
 export function formatRelativeDate(value: Date | string | number | null | undefined): string {
   const d = safeDate(value);
