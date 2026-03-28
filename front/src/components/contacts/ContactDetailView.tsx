@@ -45,7 +45,7 @@ function EditModal({ name, phone, currentStatus, currentNotes, onClose, onConfir
     { value: 'appelé',        label: 'Appelé',        icon: <PhoneCall   className="w-4 h-4" /> },
     { value: 'rappeler',      label: 'À rappeler',    icon: <Clock       className="w-4 h-4" /> },
     { value: 'non_joignable', label: 'Non joignable', icon: <PhoneMissed className="w-4 h-4" /> },
-    { value: 'à_appeler',     label: 'À appeler',     icon: <Phone       className="w-4 h-4" /> },
+    { value: 'à_appeler',     label: 'Appel initial',  icon: <Phone       className="w-4 h-4" /> },
   ];
 
   const outcomeOpts: { value: CallOutcomeValue; label: string }[] = [
