@@ -219,6 +219,11 @@ export class StatutChannelDto {
   @IsString()
   channel_id: string;
 
+  @ApiProperty({ description: 'Nom lisible du channel', required: false })
+  @IsString()
+  @IsOptional()
+  label?: string | null;
+
   @ApiProperty({ description: 'Compte business ou personnel' })
   @IsBoolean()
   is_business: boolean;

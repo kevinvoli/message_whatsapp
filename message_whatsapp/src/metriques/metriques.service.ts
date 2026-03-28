@@ -511,6 +511,7 @@ export class MetriquesService {
       .select([
         'channel.id as id',
         'channel.channel_id as channel_id',
+        'channel.label as label',
         'channel.is_business as is_business',
         'channel.uptime as uptime',
         'channel.version as version',
@@ -521,7 +522,7 @@ export class MetriquesService {
         'COUNT(DISTINCT message.id) as nb_messages',
       ])
       .groupBy(
-        'channel.id, channel.channel_id, channel.is_business, channel.uptime, channel.version, channel.api_version, channel.core_version, channel.ip',
+        'channel.id, channel.channel_id, channel.label, channel.is_business, channel.uptime, channel.version, channel.api_version, channel.core_version, channel.ip',
       )
       .orderBy('nb_messages', 'DESC')
       .getRawMany();
@@ -529,6 +530,7 @@ export class MetriquesService {
     return channels.map((ch) => ({
       id: ch.id,
       channel_id: ch.channel_id,
+      label: ch.label ?? null,
       is_business: Boolean(ch.is_business),
       uptime: parseInt(ch.uptime) || 0,
       version: ch.version,

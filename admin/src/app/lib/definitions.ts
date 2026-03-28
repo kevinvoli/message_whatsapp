@@ -408,6 +408,7 @@ export type PerformanceCommercial = {
 export type StatutChannel = {
   id: string;
   channel_id: string;
+  label?: string | null;
   is_business: boolean;
   uptime: number;
   version: string;

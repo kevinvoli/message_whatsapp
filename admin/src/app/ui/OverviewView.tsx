@@ -387,15 +387,19 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
                 {webhookSummary.topTenants.length === 0 && (
                   <p className="text-xs text-gray-500">Aucun trafic tenant.</p>
                 )}
-                {webhookSummary.topTenants.map(([tenant, count]) => (
-                  <div
-                    key={tenant}
-                    className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
-                  >
-                    <span className="text-xs font-medium text-gray-700">{tenant}</span>
-                    <span className="text-xs font-semibold text-gray-900">{count}</span>
-                  </div>
-                ))}
+                {webhookSummary.topTenants.map(([tenant, count]) => {
+                  const ch = statutChannels.find((c) => c.channel_id === tenant);
+                  const displayName = ch?.label ?? ch?.channel_id?.substring(0, 15) ?? tenant.substring(0, 15);
+                  return (
+                    <div
+                      key={tenant}
+                      className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
+                    >
+                      <span className="text-xs font-medium text-gray-700">{displayName}</span>
+                      <span className="text-xs font-semibold text-gray-900">{count}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -520,7 +524,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
               <div key={idx} className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-900">
-                    {channel.channel_id.substring(0, 15)}...
+                    {channel.label ?? channel.channel_id.substring(0, 15) + '...'}
                   </span>
                   <div className={`w-2 h-2 rounded-full ${
                     channel.uptime > 80000 ? 'bg-green-500' : 'bg-yellow-500'
