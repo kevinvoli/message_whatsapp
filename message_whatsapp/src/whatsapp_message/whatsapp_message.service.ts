@@ -207,8 +207,9 @@ export class WhatsappMessageService {
           // N'actualise last_poste_message_at que pour les vrais agents humains.
           // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
           ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),
+          // Le commercial vient de répondre → lecture seule jusqu'à la prochaine réponse client
+          ...(data.poste_id ? { read_only: true } : {}),
           last_activity_at: new Date(),
-          read_only: true,
         },
       );
 
@@ -370,8 +371,8 @@ export class WhatsappMessageService {
         {
           unread_count: 0,
           last_poste_message_at: messageEntity.createdAt,
-          last_activity_at: new Date(),
           read_only: true,
+          last_activity_at: new Date(),
         },
       );
 

@@ -66,9 +66,8 @@ export class AutoMessageOrchestrator {
         `Max steps reached (${chat.auto_message_step}/${maxSteps}) for ${chatId}`,
         AutoMessageOrchestrator.name,
       );
-      if (!chat.read_only) {
-        await this.chatService.update(chatId, { read_only: true });
-      }
+      // La séquence est terminée : ne pas mettre read_only=true.
+      // Le commercial doit pouvoir répondre librement au prochain message client.
       void this.notificationService.create(
         'info',
         `Séquence auto terminée — ${chat.name || chatId}`,

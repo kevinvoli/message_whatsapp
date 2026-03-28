@@ -1,8 +1,8 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, Image, Video, Mic, FileText, MapPin, Search, Filter, X } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial } from '@/app/lib/api';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X } from 'lucide-react';
+import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial, patchChat } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
@@ -321,6 +321,20 @@ export default function ConversationsView({
 
     useRealtimePolling(pollMessages, { interval: 3000, enabled: !!selectedChat });
 
+    const handleUnlockChat = useCallback(async () => {
+        if (!selectedChat) return;
+        try {
+            await patchChat(selectedChat.chat_id, { read_only: false });
+            setSelectedChat(prev => prev ? { ...prev, read_only: false } : prev);
+            setChats(prev => prev.map(c =>
+                c.chat_id === selectedChat.chat_id ? { ...c, read_only: false } : c,
+            ));
+            addToast({ type: 'success', message: 'Conversation déverrouillée.' });
+        } catch {
+            addToast({ type: 'error', message: 'Impossible de déverrouiller la conversation.' });
+        }
+    }, [selectedChat, addToast]);
+
     const filteredChats = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
         if (!term) return chats;
@@ -519,9 +533,15 @@ export default function ConversationsView({
                                         {getStatusLabel(selectedChat)}
                                     </span>
                                     {selectedChat.read_only && (
-                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-100">
-                                            Lecture seule
-                                        </span>
+                                        <button
+                                            onClick={() => void handleUnlockChat()}
+                                            title="Déverrouiller la conversation pour permettre les réponses"
+                                            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 hover:border-amber-400 transition-colors cursor-pointer"
+                                        >
+                                            <Lock className="w-3 h-3" />
+                                            Lecture seule — Déverrouiller
+                                            <LockOpen className="w-3 h-3" />
+                                        </button>
                                     )}
                                     {selectedChat.is_archived && (
                                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
