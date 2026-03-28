@@ -335,6 +335,20 @@ export default function ConversationsView({
         }
     }, [selectedChat, addToast]);
 
+    const handleLockChat = useCallback(async () => {
+        if (!selectedChat) return;
+        try {
+            await patchChat(selectedChat.chat_id, { read_only: true });
+            setSelectedChat(prev => prev ? { ...prev, read_only: true } : prev);
+            setChats(prev => prev.map(c =>
+                c.chat_id === selectedChat.chat_id ? { ...c, read_only: true } : c,
+            ));
+            addToast({ type: 'success', message: 'Conversation verrouillée.' });
+        } catch {
+            addToast({ type: 'error', message: 'Impossible de verrouiller la conversation.' });
+        }
+    }, [selectedChat, addToast]);
+
     const filteredChats = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
         if (!term) return chats;
@@ -532,7 +546,7 @@ export default function ConversationsView({
                                     <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                                         {getStatusLabel(selectedChat)}
                                     </span>
-                                    {selectedChat.read_only && (
+                                    {selectedChat.read_only ? (
                                         <button
                                             onClick={() => void handleUnlockChat()}
                                             title="Déverrouiller la conversation pour permettre les réponses"
@@ -541,6 +555,16 @@ export default function ConversationsView({
                                             <Lock className="w-3 h-3" />
                                             Lecture seule — Déverrouiller
                                             <LockOpen className="w-3 h-3" />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => void handleLockChat()}
+                                            title="Verrouiller la conversation (lecture seule)"
+                                            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 hover:border-slate-400 transition-colors cursor-pointer"
+                                        >
+                                            <LockOpen className="w-3 h-3" />
+                                            Verrouiller
+                                            <Lock className="w-3 h-3" />
                                         </button>
                                     )}
                                     {selectedChat.is_archived && (
