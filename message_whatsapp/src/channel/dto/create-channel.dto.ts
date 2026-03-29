@@ -49,4 +49,9 @@ export class CreateChannelDto {
   @IsOptional()
   @IsString()
   page_id?: string;
+
+  /** Token permanent (System User) — skip l'échange long-lived, jamais expiré */
+  @IsOptional()
+  @IsBoolean()
+  permanent_token?: boolean;
 }

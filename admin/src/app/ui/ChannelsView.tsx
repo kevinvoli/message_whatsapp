@@ -24,6 +24,7 @@ type ChannelCreateInput = {
   meta_app_id?: string;
   meta_app_secret?: string;
   verify_token?: string;
+  permanent_token?: boolean;
 };
 
 const PROVIDER_CONFIG: Record<ProviderType, { label: string; badgeClass: string }> = {
@@ -36,8 +37,17 @@ const PROVIDER_CONFIG: Record<ProviderType, { label: string; badgeClass: string 
 
 const HAS_TOKEN_EXPIRY: ProviderType[] = ['meta', 'messenger', 'instagram'];
 
+const PERMANENT_THRESHOLD_DAYS = 365 * 10; // > 10 ans = token permanent
+
+function isPermanentToken(expiresAt: string | null | undefined): boolean {
+  if (!expiresAt) return false;
+  const daysLeft = Math.floor((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  return daysLeft > PERMANENT_THRESHOLD_DAYS;
+}
+
 function getTokenExpiryLabel(expiresAt: string | null | undefined): string {
   if (!expiresAt) return 'Inconnue';
+  if (isPermanentToken(expiresAt)) return 'Permanent (System User)';
   const date = new Date(expiresAt);
   const daysLeft = Math.floor((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (daysLeft < 0) return `Expiré (il y a ${Math.abs(daysLeft)}j)`;
@@ -46,6 +56,7 @@ function getTokenExpiryLabel(expiresAt: string | null | undefined): string {
 
 function getTokenExpiryClass(expiresAt: string | null | undefined): string {
   if (!expiresAt) return 'text-gray-400';
+  if (isPermanentToken(expiresAt)) return 'text-emerald-600 font-semibold';
   const daysLeft = Math.floor((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (daysLeft < 7) return 'text-red-600 font-semibold';
   if (daysLeft < 14) return 'text-orange-500 font-semibold';
@@ -341,10 +352,11 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [formMetaAppId, setFormMetaAppId] = useState('');
   const [formMetaAppSecret, setFormMetaAppSecret] = useState('');
   const [formVerifyToken, setFormVerifyToken] = useState('');
+  const [formPermanentToken, setFormPermanentToken] = useState(false);
 
   const buildPayload = (): ChannelCreateInput => {
     const base: ChannelCreateInput = {
-      token: formToken,
+      token: formToken.trim(),
       label: formLabel.trim() || undefined,
       provider: formProvider,
     };
@@ -352,6 +364,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       meta_app_id: formMetaAppId.trim() || undefined,
       meta_app_secret: formMetaAppSecret.trim() || undefined,
       verify_token: formVerifyToken.trim() || undefined,
+      permanent_token: formPermanentToken || undefined,
     };
     if (formProvider === 'meta') {
       return {
@@ -383,6 +396,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormMetaAppId('');
     setFormMetaAppSecret('');
     setFormVerifyToken('');
+    setFormPermanentToken(false);
   };
 
   const openAddModal = () => {
@@ -403,6 +417,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormMetaAppId(channel.meta_app_id ?? '');
     setFormMetaAppSecret(channel.meta_app_secret ?? '');
     setFormVerifyToken(channel.verify_token ?? '');
+    setFormPermanentToken(isPermanentToken(channel.tokenExpiresAt));
     clearStatus();
     setShowEditModal(true);
   };
@@ -511,6 +526,31 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
           required
         />
       </div>
+      {['meta', 'messenger', 'instagram'].includes(formProvider) && (
+        <div className="mb-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formPermanentToken}
+              onChange={(e) => setFormPermanentToken(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-emerald-600"
+            />
+            <span className="text-sm font-bold text-gray-700">
+              Token permanent (System User — ne expire jamais)
+            </span>
+          </label>
+          {formPermanentToken && (
+            <p className="mt-1 text-xs text-emerald-700 bg-emerald-50 rounded px-3 py-2">
+              Le token sera stocké tel quel sans échange. Utiliser uniquement avec un token System User Meta Business Manager.
+            </p>
+          )}
+          {!formPermanentToken && (
+            <p className="mt-1 text-xs text-blue-700 bg-blue-50 rounded px-3 py-2">
+              Le token sera automatiquement échangé contre un token long-lived (60 jours).
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 
@@ -609,7 +649,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                     >
                       <Edit className="h-4 w-4" />
                     </button>
-                    {HAS_TOKEN_EXPIRY.includes(provider) && (() => {
+                    {HAS_TOKEN_EXPIRY.includes(provider) && !isPermanentToken(channel.tokenExpiresAt) && (() => {
                       const missingCreds = !channel.meta_app_id || !channel.meta_app_secret;
                       return (
                         <button

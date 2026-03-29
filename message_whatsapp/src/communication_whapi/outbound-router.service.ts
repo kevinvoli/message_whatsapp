@@ -32,6 +32,9 @@ export class OutboundRouterService {
       throw new NotFoundException(`Channel ${data.channelId} introuvable`);
     }
 
+    // Trim pour éviter les caractères invalides dans le header Authorization
+    channel.token = channel.token?.trim();
+
     const provider = channel.provider ?? 'whapi';
 
     if (provider === 'meta') {
