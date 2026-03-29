@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { IsNull, LessThan, Or, Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
 import { WhapiChannel } from './entities/channel.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
@@ -82,7 +82,6 @@ export class MetaTokenService {
         );
         throw new BadRequestException(`Erreur réseau Meta: ${networkMsg}`);
       }
-      // Pour toute autre erreur inattendue, wrapper en BadRequestException avec message lisible
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(
         `Meta token exchange unexpected error: ${msg}`,
@@ -94,6 +93,7 @@ export class MetaTokenService {
 
   /**
    * Rafraîchit le token d'un canal Meta spécifique et met à jour la BDD.
+   * Déclenche aussi la re-souscription webhook pour éviter la déconnexion silencieuse.
    */
   async refreshChannelToken(channelId: string): Promise<WhapiChannel> {
     const channel = await this.channelRepo.findOne({ where: { id: channelId } });
@@ -124,21 +124,37 @@ export class MetaTokenService {
       MetaTokenService.name,
     );
 
+    // Re-souscription automatique du webhook après refresh
+    // Évite que Meta suspende la livraison des webhooks après changement de token
+    if (channel.provider === 'meta' && channel.meta_app_id && channel.meta_app_secret) {
+      await this.resubscribeWhatsappWebhook(
+        channel.meta_app_id,
+        channel.meta_app_secret,
+        channel.verify_token ?? undefined,
+      );
+    } else if (['messenger', 'instagram'].includes(channel.provider ?? '') && channel.page_id) {
+      await this.resubscribePageWebhook(channel.page_id, accessToken);
+    }
+
     return channel;
   }
 
   /**
-   * Cron : refresh automatique des canaux Meta dont le token expire dans < 7 jours.
+   * Cron : refresh automatique des canaux Meta/Messenger/Instagram
+   * dont le token expire dans < 7 jours OU dont tokenExpiresAt est NULL.
    */
   async refreshExpiringTokens(): Promise<void> {
     const threshold = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const PROVIDERS = ['meta', 'messenger', 'instagram'];
 
-    const channels = await this.channelRepo.find({
-      where: {
-        provider: 'meta',
-        tokenExpiresAt: LessThan(threshold),
-      },
-    });
+    const channels = await this.channelRepo
+      .createQueryBuilder('channel')
+      .where('channel.provider IN (:...providers)', { providers: PROVIDERS })
+      .andWhere(
+        '(channel.tokenExpiresAt IS NULL OR channel.tokenExpiresAt < :threshold)',
+        { threshold },
+      )
+      .getMany();
 
     if (channels.length === 0) {
       this.logger.log('Aucun token Meta à renouveler', MetaTokenService.name);
@@ -146,7 +162,7 @@ export class MetaTokenService {
     }
 
     this.logger.log(
-      `${channels.length} token(s) Meta à renouveler (expiration < 7 jours)`,
+      `${channels.length} token(s) Meta à renouveler (expiration < 7 jours ou non initialisé)`,
       MetaTokenService.name,
     );
 
@@ -160,6 +176,83 @@ export class MetaTokenService {
           MetaTokenService.name,
         );
       }
+    }
+  }
+
+  /**
+   * Re-souscrit le webhook WhatsApp Business au niveau de l'app.
+   * Utilise un app access token (APP_ID|APP_SECRET).
+   */
+  private async resubscribeWhatsappWebhook(
+    appId: string,
+    appSecret: string,
+    verifyToken?: string,
+  ): Promise<void> {
+    try {
+      const appToken = `${appId}|${appSecret}`;
+      const params: Record<string, string> = {
+        object: 'whatsapp_business_account',
+        fields: 'messages,message_template_status_update',
+        access_token: appToken,
+      };
+
+      const callbackUrl = process.env.SERVER_PUBLIC_HOST
+        ? `${process.env.SERVER_PUBLIC_HOST}/api/webhook/whatsapp`
+        : null;
+      if (callbackUrl) params['callback_url'] = callbackUrl;
+      if (verifyToken) params['verify_token'] = verifyToken;
+
+      await axios.post(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${appId}/subscriptions`,
+        null,
+        { params },
+      );
+
+      this.logger.log(
+        `Webhook WhatsApp re-souscrit pour app ${appId}`,
+        MetaTokenService.name,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof AxiosError
+        ? (err.response?.data as any)?.error?.message ?? err.message
+        : err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Échec re-souscription webhook WhatsApp app ${appId}: ${msg}`,
+        MetaTokenService.name,
+      );
+    }
+  }
+
+  /**
+   * Re-souscrit le webhook Messenger/Instagram au niveau de la page.
+   */
+  private async resubscribePageWebhook(
+    pageId: string,
+    accessToken: string,
+  ): Promise<void> {
+    try {
+      await axios.post(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${pageId}/subscribed_apps`,
+        null,
+        {
+          params: {
+            subscribed_fields: 'messages,messaging_postbacks,messaging_optins',
+            access_token: accessToken,
+          },
+        },
+      );
+      this.logger.log(
+        `Webhook Messenger/Instagram re-souscrit pour page ${pageId}`,
+        MetaTokenService.name,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof AxiosError
+        ? (err.response?.data as any)?.error?.message ?? err.message
+        : err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Échec re-souscription webhook page ${pageId}: ${msg}`,
+        MetaTokenService.name,
+      );
     }
   }
 }

@@ -44,4 +44,9 @@ export class CreateChannelDto {
   @IsOptional()
   @IsString()
   verify_token?: string;
+
+  /** Page ID Facebook/Instagram (requis pour re-souscription webhook Messenger/Instagram) */
+  @IsOptional()
+  @IsString()
+  page_id?: string;
 }

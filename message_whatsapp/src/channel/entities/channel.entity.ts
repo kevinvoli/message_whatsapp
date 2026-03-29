@@ -55,6 +55,9 @@ export class WhapiChannel {
   @Column({ name: 'verify_token', type: 'varchar', length: 128, nullable: true })
   verify_token?: string | null;
 
+  @Column({ name: 'page_id', type: 'varchar', length: 64, nullable: true })
+  page_id?: string | null;
+
   @Column({ type: 'datetime', nullable: true, name: 'token_expires_at' })
   tokenExpiresAt: Date | null;
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Edit, Trash2, UserPlus, RefreshCw } from 'lucide-react';
-import { formatDateShort } from '@/app/lib/dateUtils';
+import { formatDate } from '@/app/lib/dateUtils';
 import { Client } from '@/app/lib/definitions';
 import { createClient, deleteClient, updateClient, getClients } from '@/app/lib/api';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
@@ -129,7 +129,8 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
                 </span>
               ),
             },
-            { header: 'Créé le', render: (c) => <span className="text-sm text-gray-500">{formatDateShort(c.createdAt)}</span> },
+            { header: 'Créé le', render: (c) => <span className="text-sm font-medium text-blue-900">{formatDate(c.createdAt)}</span> },
+            { header: 'Modifié le', render: (c) => <span className="text-sm text-gray-500">{formatDate(c.updatedAt)}</span> },
             {
               header: 'Actions',
               render: (c) => (
