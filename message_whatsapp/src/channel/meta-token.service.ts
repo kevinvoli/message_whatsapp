@@ -196,11 +196,16 @@ export class MetaTokenService {
         access_token: appToken,
       };
 
-      const callbackUrl = process.env.SERVER_PUBLIC_HOST
-        ? `${process.env.SERVER_PUBLIC_HOST}/api/webhook/whatsapp`
+      const host = process.env.SERVER_PUBLIC_HOST ?? '';
+      const port = process.env.SERVER_PORT ? `:${process.env.SERVER_PORT}` : '';
+      const callbackUrl = host
+        ? `${host}${port}/api/webhook/whatsapp`
         : null;
       if (callbackUrl) params['callback_url'] = callbackUrl;
-      if (verifyToken) params['verify_token'] = verifyToken;
+
+      // verify_token : priorité au token du canal, sinon fallback env global
+      const resolvedVerifyToken = verifyToken ?? process.env.WHATSAPP_VERIFY_TOKEN;
+      if (resolvedVerifyToken) params['verify_token'] = resolvedVerifyToken;
 
       await axios.post(
         `https://graph.facebook.com/${this.META_API_VERSION}/${appId}/subscriptions`,
