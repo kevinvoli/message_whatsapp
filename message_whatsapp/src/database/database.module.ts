@@ -19,6 +19,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           password: configService.get<string>('MYSQL_PASSWORD'),
           database: configService.get<string>('MYSQL_DATABASE'),
           connectTimeout: 10000,
+          charset: 'utf8mb4',
           autoLoadEntities: true,
           retryAttempts: 0,
           synchronize: isDev && forceSync,
