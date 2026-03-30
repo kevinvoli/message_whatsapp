@@ -230,6 +230,14 @@ export class InboundMessageService {
       mediaUrl = `/messages/media/meta/${context.providerMediaId}${channelQuery}`;
     }
 
+    // Messenger: les URLs CDN expirent → toujours utiliser le proxy qui re-fetch via Graph API
+    if (context?.provider === 'messenger' && context?.providerMediaId) {
+      const channelQuery = context.channelId
+        ? `?channelId=${encodeURIComponent(context.channelId)}`
+        : '';
+      mediaUrl = `/messages/media/messenger/${context.providerMediaId}${channelQuery}`;
+    }
+
     entity.url = mediaUrl;
 
     entity.chat = chatEntity;

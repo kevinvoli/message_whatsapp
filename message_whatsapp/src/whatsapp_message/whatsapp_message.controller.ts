@@ -27,6 +27,7 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { Repository } from 'typeorm';
 import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
+import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { Response } from 'express';
 
@@ -49,6 +50,7 @@ export class WhatsappMessageController {
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly channelService: ChannelService,
     private readonly metaService: CommunicationMetaService,
+    private readonly messengerService: CommunicationMessengerService,
     private readonly whapiService: CommunicationWhapiService,
   ) {}
 
@@ -264,6 +266,50 @@ export class WhatsappMessageController {
     return res.send(downloaded.buffer);
   }
 
+  @Get('media/messenger/:messageId')
+  async streamMessengerMedia(
+    @Param('messageId') messageId: string,
+    @Query('channelId') channelId: string | undefined,
+    @Res() res: Response,
+  ) {
+    if (!messageId) {
+      throw new BadRequestException('messageId is required');
+    }
+
+    const media = await this.mediaRepository.findOne({
+      where: { provider_media_id: messageId, provider: 'messenger' },
+      relations: ['message'],
+    });
+
+    const resolvedChannelId =
+      media?.message?.channel_id ??
+      media?.message?.chat?.last_msg_client_channel_id ??
+      channelId ??
+      null;
+
+    if (!resolvedChannelId) {
+      throw new NotFoundException('Channel non résolu pour ce média Messenger');
+    }
+
+    const channel = await this.channelService.findByChannelId(resolvedChannelId);
+    if (!channel?.token) {
+      throw new NotFoundException('Token du canal Messenger introuvable');
+    }
+
+    const downloaded = await this.messengerService.downloadMedia(
+      messageId,
+      channel.token.trim(),
+    );
+
+    if (!downloaded) {
+      throw new NotFoundException('Média Messenger introuvable');
+    }
+
+    res.setHeader('Content-Type', downloaded.mimeType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(downloaded.buffer);
+  }
+
   @Get(':chat_id/count')
   @UseGuards(AdminGuard)
   async countByChatId(@Param('chat_id') chat_id: string) {
@@ -304,6 +350,12 @@ export class WhatsappMessageController {
       const providerMediaId = media.provider_media_id ?? media.media_id;
       if (!providerMediaId) return null;
       return `/messages/media/meta/${providerMediaId}${channelQuery}`;
+    }
+
+    if (message.provider === 'messenger') {
+      const providerMediaId = media.provider_media_id ?? media.media_id;
+      if (!providerMediaId) return null;
+      return `/messages/media/messenger/${providerMediaId}${channelQuery}`;
     }
 
     const directUrl = media.url ?? null;

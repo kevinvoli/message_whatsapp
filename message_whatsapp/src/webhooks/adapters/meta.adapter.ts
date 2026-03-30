@@ -111,6 +111,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       case 'document':
       case 'location':
       case 'interactive':
+      case 'sticker':
         return type;
       case 'button':
         return 'interactive';
@@ -182,6 +183,14 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
         fileName: message.document.filename,
         sha256: message.document.sha256,
         link: message.document.url,
+      };
+    }
+    if (message.type === 'sticker') {
+      return {
+        id: message.sticker.id,
+        mimeType: message.sticker.mime_type,
+        sha256: message.sticker.sha256,
+        link: message.sticker.url,
       };
     }
     return undefined;

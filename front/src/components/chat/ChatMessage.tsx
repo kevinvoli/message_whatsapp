@@ -65,6 +65,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const videoMedias = msg.medias?.filter((m) => m.type === 'video') ?? [];
   const documentMedias = msg.medias?.filter((m) => m.type === 'document') ?? [];
   const locationMedias = msg.medias?.filter((m) => m.type === 'location') ?? [];
+  const stickerMedias = msg.medias?.filter((m) => m.type === 'sticker') ?? [];
 
   return (
     <div
@@ -133,6 +134,21 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
                   </p>
                 )}
               </MediaBubble>
+            );
+          })}
+
+          {/* Stickers */}
+          {stickerMedias.map((sticker, i) => {
+            const src = resolveMediaUrl(sticker.url);
+            return (
+              <div key={`sticker-${messageId}-${i}`} className="p-1">
+                <img
+                  src={src ?? undefined}
+                  alt="sticker"
+                  className="w-24 h-24 object-contain"
+                  loading="lazy"
+                />
+              </div>
             );
           })}
 

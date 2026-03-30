@@ -135,6 +135,39 @@ export class CommunicationMessengerService {
     return { providerMessageId: messageId, attachmentId };
   }
 
+  async downloadMedia(
+    messageId: string,
+    accessToken: string,
+  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    try {
+      const metaUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${messageId}?fields=attachments`;
+      const metaResponse = await axios.get(metaUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const attachments: Array<{ payload?: { url?: string } }> =
+        metaResponse.data?.attachments?.data ?? [];
+      const attachmentUrl = attachments[0]?.payload?.url ?? null;
+      if (!attachmentUrl) return null;
+
+      const downloadResponse = await axios.get(attachmentUrl, {
+        responseType: 'arraybuffer',
+      });
+
+      const buffer = Buffer.from(downloadResponse.data);
+      const mimeType =
+        (downloadResponse.headers['content-type'] as string | undefined) ??
+        'application/octet-stream';
+      return { buffer, mimeType };
+    } catch (error) {
+      this.logger.warn(
+        `MESSENGER_MEDIA_DOWNLOAD_FAILED messageId=${messageId}`,
+        CommunicationMessengerService.name,
+      );
+      return null;
+    }
+  }
+
   private toMessengerAttachmentType(
     mediaType: 'image' | 'video' | 'audio' | 'document',
   ): string {

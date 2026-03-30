@@ -141,7 +141,7 @@ export class WhatsappMessageService {
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
         if (diffHours > this.getResponseTimeoutHours()) {
           throw new Error(
-            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse WhatsApp (${this.getResponseTimeoutHours()}h) est expirée`,
+            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${this.getResponseTimeoutHours()}h) est expirée`,
           );
         }
       }
@@ -280,7 +280,7 @@ export class WhatsappMessageService {
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
         if (diffHours > this.getResponseTimeoutHours()) {
           throw new Error(
-            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse WhatsApp (${this.getResponseTimeoutHours()}h) est expirée`,
+            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${this.getResponseTimeoutHours()}h) est expirée`,
           );
         }
       }
@@ -478,7 +478,7 @@ export class WhatsappMessageService {
   }
 
   async findIncomingByProviderMessageId(
-    provider: 'whapi' | 'meta',
+    provider: 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram',
     providerMessageId: string,
   ): Promise<WhatsappMessage | null> {
     return this.messageRepository.findOne({

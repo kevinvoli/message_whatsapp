@@ -48,7 +48,8 @@ export type MetaMessageType =
   | 'document'
   | 'location'
   | 'interactive'
-  | 'button';
+  | 'button'
+  | 'sticker';
 
 export interface MetaTextMessage extends MetaMessageBase {
   type: 'text';
@@ -121,6 +122,11 @@ export interface MetaInteractiveMessage extends MetaMessageBase {
   };
 }
 
+export interface MetaStickerMessage extends MetaMessageBase {
+  type: 'sticker';
+  sticker: MetaMedia & { animated?: boolean };
+}
+
 export type MetaMessage =
   | MetaTextMessage
   | MetaImageMessage
@@ -129,7 +135,8 @@ export type MetaMessage =
   | MetaDocumentMessage
   | MetaLocationMessage
   | MetaButtonMessage
-  | MetaInteractiveMessage;
+  | MetaInteractiveMessage
+  | MetaStickerMessage;
 
 export interface MetaStatus {
   id: string;
