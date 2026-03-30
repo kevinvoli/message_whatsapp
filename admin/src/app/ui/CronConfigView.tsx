@@ -20,9 +20,23 @@ interface ReadOnlyRow {
 }
 interface ReadOnlyPreview { total: number; conversations: ReadOnlyRow[] }
 
+interface SlaCheckerRow {
+  chat_id: string; name: string; status: string;
+  first_response_deadline_at: string | null; minutes_overdue: number;
+}
+interface SlaCheckerPreview { total: number; conversations: SlaCheckerRow[] }
+
+interface WebhookPurgePreview { total: number; ttlDays: number; cutoffDate: string }
+
+interface MetaTokenRow {
+  id: string; label: string | null; provider: string;
+  tokenExpiresAt: string | null; daysLeft: number | null;
+}
+interface MetaTokenPreview { total: number; channels: MetaTokenRow[] }
+
 interface NoPreview { available: false; message: string }
 
-type CronPreviewData = ReinjectionPreview | ReadOnlyPreview | NoPreview | null;
+type CronPreviewData = ReinjectionPreview | ReadOnlyPreview | SlaCheckerPreview | WebhookPurgePreview | MetaTokenPreview | NoPreview | null;
 
 // ─── Modal de confirmation ────────────────────────────────────────────────────
 
@@ -92,12 +106,109 @@ function PreviewModal({
       );
     }
 
+    if (cronKey === 'sla-checker') {
+      const d = data as SlaCheckerPreview;
+      return (
+        <div>
+          <p className="text-sm text-gray-700 mb-3">
+            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront réinjectées (délai de première réponse dépassé).
+          </p>
+          {d.total === 0 ? (
+            <p className="text-xs text-gray-400 italic">Aucune conversation concernée.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Client</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Statut</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Dépassement</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {d.conversations.map((c) => (
+                    <tr key={c.chat_id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-800">{c.name || c.chat_id}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 font-semibold text-[10px] uppercase">{c.status}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-semibold text-[10px]">{c.minutes_overdue} min</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (cronKey === 'webhook-purge') {
+      const d = data as WebhookPurgePreview;
+      return (
+        <div>
+          <p className="text-sm text-gray-700 mb-3">
+            <strong>{d.total}</strong> événement{d.total !== 1 ? 's' : ''} webhook seront supprimés (antérieurs au {formatDate(d.cutoffDate)}, rétention {d.ttlDays}j).
+          </p>
+          {d.total === 0 && (
+            <p className="text-xs text-gray-400 italic">Aucun événement à purger.</p>
+          )}
+        </div>
+      );
+    }
+
+    if (cronKey === 'meta-token-refresh') {
+      const d = data as MetaTokenPreview;
+      return (
+        <div>
+          <p className="text-sm text-gray-700 mb-3">
+            <strong>{d.total}</strong> canal{d.total !== 1 ? 'aux' : ''} Meta dont le token sera renouvelé.
+          </p>
+          {d.total === 0 ? (
+            <p className="text-xs text-gray-400 italic">Aucun token à renouveler.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Canal</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Provider</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Expiration</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {d.channels.map((c) => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-800">{c.label || c.id}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="rounded-full bg-purple-100 text-purple-700 px-2 py-0.5 font-semibold text-[10px] uppercase">{c.provider}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {c.daysLeft === null
+                          ? <span className="rounded-full bg-gray-100 text-gray-500 px-2 py-0.5 text-[10px]">non initialisé</span>
+                          : c.daysLeft < 0
+                            ? <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-semibold text-[10px]">expiré</span>
+                            : <span className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 font-semibold text-[10px]">{c.daysLeft}j restants</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (cronKey === 'read-only-enforcement') {
       const d = data as ReadOnlyPreview;
       return (
         <div>
           <p className="text-sm text-gray-700 mb-3">
-            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront passées en lecture seule (inactives &gt; 24h).
+            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront passées en lecture seule (inactives selon le seuil configuré).
           </p>
           {d.total === 0 ? (
             <p className="text-xs text-gray-400 italic">Aucune conversation concernée.</p>
@@ -208,7 +319,7 @@ function ConfigPanel({
   const [enabled, setEnabled]                 = useState(config.enabled);
   const [intervalMinutes, setIntervalMinutes] = useState(config.intervalMinutes ?? 5);
   const [cronExpression, setCronExpression]   = useState(config.cronExpression ?? '');
-  const [ttlDays, setTtlDays]                 = useState(config.ttlDays ?? 14);
+  const [ttlDays, setTtlDays]                 = useState(config.ttlDays ?? (config.key === 'read-only-enforcement' ? 24 : config.key === 'meta-token-refresh' ? 7 : 14));
   const [delayMin, setDelayMin]               = useState(config.delayMinSeconds ?? 20);
   const [delayMax, setDelayMax]               = useState(config.delayMaxSeconds ?? 45);
   const [maxSteps, setMaxSteps]               = useState(config.maxSteps ?? 3);
@@ -226,7 +337,7 @@ function ConfigPanel({
     setEnabled(config.enabled);
     setIntervalMinutes(config.intervalMinutes ?? 5);
     setCronExpression(config.cronExpression ?? '');
-    setTtlDays(config.ttlDays ?? 14);
+    setTtlDays(config.ttlDays ?? (config.key === 'read-only-enforcement' ? 24 : config.key === 'meta-token-refresh' ? 7 : 14));
     setDelayMin(config.delayMinSeconds ?? 20);
     setDelayMax(config.delayMaxSeconds ?? 45);
     setMaxSteps(config.maxSteps ?? 3);
@@ -240,7 +351,9 @@ function ConfigPanel({
       const payload: UpdateCronConfigPayload = { enabled };
       if (config.scheduleType === 'interval') payload.intervalMinutes = intervalMinutes;
       if (config.scheduleType === 'cron')     payload.cronExpression  = cronExpression;
-      if (config.key === 'webhook-purge')     payload.ttlDays         = ttlDays;
+      if (config.key === 'webhook-purge' || config.key === 'read-only-enforcement' || config.key === 'meta-token-refresh') {
+        payload.ttlDays = ttlDays;
+      }
       if (config.key === 'auto-message') {
         payload.delayMinSeconds = delayMin;
         payload.delayMaxSeconds = delayMax;
@@ -374,6 +487,42 @@ function ConfigPanel({
               />
               <p className="mt-1 text-[11px] text-gray-400">
                 Événements webhook supprimés après {ttlDays} jour{ttlDays !== 1 ? 's' : ''}.
+              </p>
+            </div>
+          )}
+
+          {/* Seuil inactivité read-only-enforcement */}
+          {config.key === 'read-only-enforcement' && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Seuil inactivité (heures)
+              </label>
+              <input
+                type="number" min={1} max={720}
+                value={ttlDays}
+                onChange={(e) => setTtlDays(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Passage en lecture seule après {ttlDays}h sans message client.
+              </p>
+            </div>
+          )}
+
+          {/* Seuil renouvellement meta-token-refresh */}
+          {config.key === 'meta-token-refresh' && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Seuil renouvellement (jours)
+              </label>
+              <input
+                type="number" min={1} max={60}
+                value={ttlDays}
+                onChange={(e) => setTtlDays(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Renouvelle les tokens qui expirent dans moins de {ttlDays} jour{ttlDays !== 1 ? 's' : ''}.
               </p>
             </div>
           )}

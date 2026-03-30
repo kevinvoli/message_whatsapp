@@ -437,9 +437,46 @@ export class DispatcherService {
     return { dispatched, still_waiting: waitingChats.length - dispatched };
   }
 
+  /**
+   * Réinitialise les conversations ACTIF dont l'agent est hors ligne (is_active = false)
+   * vers EN_ATTENTE, sans les réassigner immédiatement.
+   * Les agents les récupèrent naturellement en se connectant via le dispatch normal.
+   */
+  async resetStuckActiveToWaiting(): Promise<{ reset: number }> {
+    const activeChats = await this.chatRepository.find({
+      where: { status: WhatsappChatStatus.ACTIF, read_only: false },
+      relations: ['poste'],
+    });
+
+    const stuck = activeChats.filter((c) => !c.poste || !c.poste.is_active);
+
+    if (stuck.length === 0) {
+      return { reset: 0 };
+    }
+
+    for (const chat of stuck) {
+      await this.chatRepository.update(chat.id, {
+        poste: null,
+        poste_id: null,
+        status: WhatsappChatStatus.EN_ATTENTE,
+        assigned_at: null,
+        assigned_mode: null,
+        first_response_deadline_at: null,
+      });
+      // Notifier le socket que la conversation n'est plus sur l'ancien poste
+      if (chat.poste_id) {
+        await this.messageGateway.emitConversationRemoved(chat.chat_id, chat.poste_id);
+      }
+    }
+
+    this.logger.log(`resetStuckActiveToWaiting: ${stuck.length} conversation(s) remises en EN_ATTENTE`);
+    return { reset: stuck.length };
+  }
+
   async getDispatchSnapshot(): Promise<{
     queue_size: number;
     waiting_count: number;
+    stuck_active_count: number;
     waiting_items: WhatsappChat[];
   }> {
     const queue = await this.queueService.getQueuePositions();
@@ -449,10 +486,16 @@ export class DispatcherService {
       order: { updatedAt: 'DESC' },
       take: 50,
     });
+    const activeChats = await this.chatRepository.find({
+      where: { status: WhatsappChatStatus.ACTIF, read_only: false },
+      relations: ['poste'],
+    });
+    const stuckActiveCount = activeChats.filter((c) => !c.poste || !c.poste.is_active).length;
 
     return {
       queue_size: queue.length,
       waiting_count: waitingChats.length,
+      stuck_active_count: stuckActiveCount,
       waiting_items: waitingChats,
     };
   }

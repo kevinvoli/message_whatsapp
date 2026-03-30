@@ -419,6 +419,14 @@ export async function redispatchAllWaiting(): Promise<{ dispatched: number; stil
     return handleResponse<{ dispatched: number; still_waiting: number }>(response);
 }
 
+export async function resetStuckConversations(): Promise<{ reset: number }> {
+    const response = await fetch(`${API_BASE_URL}/queue/dispatch/reset-stuck`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<{ reset: number }>(response);
+}
+
 export async function resetQueue(): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/queue/reset`, {
         method: 'POST',

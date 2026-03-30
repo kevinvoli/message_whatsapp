@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Clock, ListChecks, RefreshCw, Bot, History } from 'lucide-react';
+import { AlertTriangle, Clock, ListChecks, RefreshCw, Bot, History } from 'lucide-react';
 import { DispatchSettings, DispatchSettingsAudit, DispatchSnapshot } from '@/app/lib/definitions';
 import {
   getDispatchSettings,
   getDispatchSettingsAudit,
   getDispatchSnapshot,
   redispatchAllWaiting,
+  resetStuckConversations,
   updateDispatchSettings,
 } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -77,6 +78,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [loading, setLoading] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
   const [redispatching, setRedispatching] = useState(false);
+  const [resettingStuck, setResettingStuck] = useState(false);
 
   const { addToast } = useToast();
 
@@ -152,6 +154,31 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     }
   };
 
+  // ── Reset conversations bloquées ──────────────────────────────────────────
+
+  const handleResetStuck = async () => {
+    try {
+      setResettingStuck(true);
+      const result = await resetStuckConversations();
+      if (result.reset === 0) {
+        addToast({ type: 'info', message: 'Aucune conversation bloquée trouvée.' });
+      } else {
+        addToast({
+          type: 'success',
+          message: `${result.reset} conversation(s) remises en attente. Les agents les récupèreront en se connectant.`,
+        });
+      }
+      await refresh();
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur reset conversations bloquées.',
+      });
+    } finally {
+      setResettingStuck(false);
+    }
+  };
+
   // ── Sauvegarde Messages auto ───────────────────────────────────────────────
 
   const handleSaveAutoMessages = async () => {
@@ -205,7 +232,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       </div>
 
       {/* Compteurs */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
@@ -219,12 +246,24 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
               <Clock className="h-5 w-5" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">En attente</p>
               <p className="text-2xl font-semibold text-gray-900">{snapshot?.waiting_count ?? 0}</p>
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-xl border p-4 shadow-sm ${(snapshot?.stuck_active_count ?? 0) > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${(snapshot?.stuck_active_count ?? 0) > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'}`}>
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Actifs bloqués</p>
+              <p className={`text-2xl font-semibold ${(snapshot?.stuck_active_count ?? 0) > 0 ? 'text-red-700' : 'text-gray-900'}`}>{snapshot?.stuck_active_count ?? 0}</p>
+              <p className="text-[10px] text-gray-400">agent hors ligne</p>
             </div>
           </div>
         </div>
@@ -259,21 +298,36 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         {/* ── Onglet : File d'attente ── */}
         {activeTab === 'queue' && (
           <div>
-            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
               <p className="text-xs text-gray-500">
                 {snapshot?.waiting_count
                   ? `${snapshot.waiting_count} conversation(s) en attente d'un agent.`
                   : 'Aucune conversation en attente.'}
+                {(snapshot?.stuck_active_count ?? 0) > 0 && (
+                  <span className="ml-2 font-semibold text-red-600">{snapshot!.stuck_active_count} actives bloquées (agent offline).</span>
+                )}
               </p>
-              <button
-                type="button"
-                onClick={() => { void handleRedispatchAll(); }}
-                disabled={redispatching || !snapshot?.waiting_count}
-                className="flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-200"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${redispatching ? 'animate-spin' : ''}`} />
-                {redispatching ? 'Redispatch...' : 'Redispatcher'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => { void handleRedispatchAll(); }}
+                  disabled={redispatching || resettingStuck || !snapshot?.waiting_count}
+                  className="flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-200"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${redispatching ? 'animate-spin' : ''}`} />
+                  {redispatching ? 'Redispatch...' : 'Redispatcher en attente'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { void handleResetStuck(); }}
+                  disabled={resettingStuck || redispatching || (snapshot?.stuck_active_count ?? 0) === 0}
+                  title="Remet en EN_ATTENTE toutes les conversations ACTIF dont l'agent est hors ligne"
+                  className="flex items-center gap-1.5 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-200"
+                >
+                  <AlertTriangle className={`h-3.5 w-3.5 ${resettingStuck ? 'animate-pulse' : ''}`} />
+                  {resettingStuck ? 'En cours...' : `Libérer bloquées${(snapshot?.stuck_active_count ?? 0) > 0 ? ` (${snapshot!.stuck_active_count})` : ''}`}
+                </button>
+              </div>
             </div>
           <div className="max-h-[480px] overflow-y-auto">
             {snapshot?.waiting_items?.length ? (

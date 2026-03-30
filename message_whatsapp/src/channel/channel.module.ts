@@ -10,12 +10,13 @@ import { CommunicationWhapiService } from 'src/communication_whapi/communication
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { LoggingModule } from 'src/logging/logging.module';
-// import { WhapiUser } from './entities/whapi-user.entity';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat]),
     LoggingModule,
+    JorbsModule,
   ],
   controllers: [ChannelController],
   providers: [ChannelService, CommunicationWhapiService, CommunicationTelegramService, MetaTokenService, MetaTokenSchedulerService],

@@ -31,8 +31,19 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     );
   }
 
+  private async getThresholdMs(): Promise<number> {
+    try {
+      const config = await this.cronConfigService.findByKey('read-only-enforcement');
+      const hours = config.ttlDays && config.ttlDays > 0 ? config.ttlDays : 24;
+      return hours * 60 * 60 * 1000;
+    } catch {
+      return 24 * 60 * 60 * 1000;
+    }
+  }
+
   async preview(): Promise<ReadOnlyEnforcementPreview> {
-    const limit = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const thresholdMs = await this.getThresholdMs();
+    const limit = new Date(Date.now() - thresholdMs);
     const chats = await this.chatRepo.find({
       where: { read_only: false, last_client_message_at: LessThan(limit), status: WhatsappChatStatus.ACTIF },
     });
@@ -50,7 +61,8 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
   }
 
   async enforce24h() {
-    const limit = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const thresholdMs = await this.getThresholdMs();
+    const limit = new Date(Date.now() - thresholdMs);
 
     const chats = await this.chatRepo.find({
       where: {

@@ -252,6 +252,7 @@ export type QueuePosition = {
 export type DispatchSnapshot = {
   queue_size: number;
   waiting_count: number;
+  stuck_active_count: number;
   waiting_items: Array<{
     id: string;
     chat_id: string;

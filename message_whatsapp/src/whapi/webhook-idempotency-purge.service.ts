@@ -20,6 +20,22 @@ export class WebhookIdempotencyPurgeService implements OnModuleInit {
     this.cronConfigService.registerHandler('webhook-purge', () =>
       this.purgeOldEvents(),
     );
+    this.cronConfigService.registerPreviewHandler('webhook-purge', () =>
+      this.previewPurge(),
+    );
+  }
+
+  async previewPurge(): Promise<{ total: number; ttlDays: number; cutoffDate: string }> {
+    const ttlDays = await this.getTtlDays();
+    const cutoff = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
+    try {
+      const total = await this.webhookEventRepository.count({
+        where: { createdAt: LessThan(cutoff) },
+      });
+      return { total, ttlDays, cutoffDate: cutoff.toISOString() };
+    } catch {
+      return { total: 0, ttlDays, cutoffDate: cutoff.toISOString() };
+    }
   }
 
   async purgeOldEvents(): Promise<void> {

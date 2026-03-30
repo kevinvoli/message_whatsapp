@@ -140,11 +140,45 @@ export class MetaTokenService {
   }
 
   /**
-   * Cron : refresh automatique des canaux Meta/Messenger/Instagram
-   * dont le token expire dans < 7 jours OU dont tokenExpiresAt est NULL.
+   * Retourne les canaux Meta/Messenger/Instagram dont le token expire dans < thresholdDays jours.
+   * Utilisé pour le preview admin.
    */
-  async refreshExpiringTokens(): Promise<void> {
-    const threshold = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  async getExpiringChannels(thresholdDays: number = 7): Promise<{
+    total: number;
+    channels: { id: string; label: string | null; provider: string; tokenExpiresAt: Date | null; daysLeft: number | null }[];
+  }> {
+    const threshold = new Date(Date.now() + thresholdDays * 24 * 60 * 60 * 1000);
+    const PROVIDERS = ['meta', 'messenger', 'instagram'];
+
+    const channels = await this.channelRepo
+      .createQueryBuilder('channel')
+      .where('channel.provider IN (:...providers)', { providers: PROVIDERS })
+      .andWhere(
+        '(channel.tokenExpiresAt IS NULL OR channel.tokenExpiresAt < :threshold)',
+        { threshold },
+      )
+      .getMany();
+
+    return {
+      total: channels.length,
+      channels: channels.map((c) => ({
+        id: c.id,
+        label: c.label ?? null,
+        provider: c.provider ?? '',
+        tokenExpiresAt: c.tokenExpiresAt,
+        daysLeft: c.tokenExpiresAt
+          ? Math.floor((new Date(c.tokenExpiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+          : null,
+      })),
+    };
+  }
+
+  /**
+   * Cron : refresh automatique des canaux Meta/Messenger/Instagram
+   * dont le token expire dans < thresholdDays jours OU dont tokenExpiresAt est NULL.
+   */
+  async refreshExpiringTokens(thresholdDays: number = 7): Promise<void> {
+    const threshold = new Date(Date.now() + thresholdDays * 24 * 60 * 60 * 1000);
     const PROVIDERS = ['meta', 'messenger', 'instagram'];
 
     const channels = await this.channelRepo
@@ -241,7 +275,7 @@ export class MetaTokenService {
         null,
         {
           params: {
-            subscribed_fields: 'messages,messaging_postbacks,messaging_optins',
+            subscribed_fields: 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads',
             access_token: accessToken,
           },
         },

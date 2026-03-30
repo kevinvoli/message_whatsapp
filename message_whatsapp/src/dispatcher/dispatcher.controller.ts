@@ -73,6 +73,13 @@ export class DispatcherController {
     return this.dispatcherService.redispatchWaiting();
   }
 
+  @Post('dispatch/reset-stuck')
+  @ApiOperation({ summary: 'Remet en EN_ATTENTE les conversations ACTIF dont l\'agent est hors ligne' })
+  @ApiResponse({ status: 200, description: 'Conversations réinitialisées' })
+  async resetStuck(): Promise<{ reset: number }> {
+    return this.dispatcherService.resetStuckActiveToWaiting();
+  }
+
   @Get('dispatch')
   @ApiOperation({ summary: 'Snapshot dispatch (queue + en attente)' })
   @ApiResponse({ status: 200, description: 'Snapshot dispatch recupere' })
