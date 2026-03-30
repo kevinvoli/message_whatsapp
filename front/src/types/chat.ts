@@ -149,7 +149,7 @@ export interface Message {
   // 🔊 VOCAL (optionnel)
   medias?: Array<{
     id?: string;
-    type: "audio" | "voice" | "image" | "video" | "document" | "location";
+    type: "audio" | "voice" | "image" | "video" | "document" | "location" | "sticker";
     url: string;
     mime_type?: string;
     caption?: string;
@@ -439,7 +439,7 @@ interface RawMessageData {
   audio?: RawAudioData;
   medias?: Array<{
     id?: string;
-    type: "audio" | "voice" | "image" | "video" | "document" | "location";
+    type: "audio" | "voice" | "image" | "video" | "document" | "location" | "sticker";
     url: string;
     mime_type?: string;
     caption?: string;
