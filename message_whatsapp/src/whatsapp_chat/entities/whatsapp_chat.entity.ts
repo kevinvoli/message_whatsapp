@@ -27,6 +27,12 @@ export enum WhatsappChatStatus {
 @Index('UQ_whatsapp_chat_tenant_chat_id', ['tenant_id', 'chat_id'], {
   unique: true,
 })
+// Index pour les requêtes analytiques (filtre temporel + soft-delete)
+@Index('IDX_chat_analytics_time',        ['createdAt', 'deletedAt'])
+// Index pour les agrégations par statut dans une période
+@Index('IDX_chat_analytics_status_time', ['status', 'createdAt', 'deletedAt'])
+// Index pour les chats par poste dans une période
+@Index('IDX_chat_poste_time',            ['poste_id', 'createdAt', 'deletedAt'])
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

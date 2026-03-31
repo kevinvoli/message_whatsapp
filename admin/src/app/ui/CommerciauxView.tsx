@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
@@ -447,6 +447,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                           title="Modifier"
                         >
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteCommercial(commercial.id)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          disabled={loading}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

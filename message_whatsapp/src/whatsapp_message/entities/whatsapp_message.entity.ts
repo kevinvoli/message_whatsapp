@@ -41,6 +41,15 @@ export enum WhatsappMessageStatus {
   ['tenant_id', 'provider', 'provider_message_id', 'direction'],
   { unique: true },
 )
+// Index pour les requêtes analytiques (filtre temporel + soft-delete)
+@Index('IDX_msg_analytics_time',       ['createdAt', 'deletedAt'])
+@Index('IDX_msg_analytics_dir_time',   ['direction', 'createdAt', 'deletedAt'])
+// Index pour le calcul du temps de réponse (self-join sur chat_id + direction + timestamp)
+@Index('IDX_msg_response_time',        ['chat_id', 'direction', 'timestamp'])
+// Index pour la performance des commerciaux (messages OUT par commercial)
+@Index('IDX_msg_commercial_dir_time',  ['commercial_id', 'direction', 'createdAt'])
+// Index pour les requêtes par poste
+@Index('IDX_msg_poste_dir_time',       ['poste_id', 'direction', 'createdAt'])
 export class WhatsappMessage {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
