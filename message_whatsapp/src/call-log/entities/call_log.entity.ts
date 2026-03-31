@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -15,6 +16,12 @@ export enum CallOutcome {
 }
 
 @Entity()
+// logs par contact (vue historique appels)
+@Index('IDX_call_log_contact_id',    ['contact_id'])
+// logs par commercial (tableau de bord commercial)
+@Index('IDX_call_log_commercial_id', ['commercial_id'])
+// tri chronologique
+@Index('IDX_call_log_called_at',     ['called_at'])
 export class CallLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;

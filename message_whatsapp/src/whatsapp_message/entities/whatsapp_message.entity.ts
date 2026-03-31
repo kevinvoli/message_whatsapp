@@ -50,6 +50,12 @@ export enum WhatsappMessageStatus {
 @Index('IDX_msg_commercial_dir_time',  ['commercial_id', 'direction', 'createdAt'])
 // Index pour les requêtes par poste
 @Index('IDX_msg_poste_dir_time',       ['poste_id', 'direction', 'createdAt'])
+// message_id : déduplication sur chaque message entrant Whapi (saveIncomingFromWhapi)
+@Index('IDX_msg_message_id',           ['message_id'])
+// external_id : lookup lors des mises à jour de statut (updateByStatus)
+@Index('IDX_msg_external_id',          ['external_id'])
+// provider_message_id seul : dedup rapide saveIncomingFromUnified (sans tenant ni direction)
+@Index('IDX_msg_provider_message_id',  ['provider_message_id'])
 export class WhatsappMessage {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

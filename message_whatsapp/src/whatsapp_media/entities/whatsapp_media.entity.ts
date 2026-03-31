@@ -27,8 +27,12 @@ export type WhatsappMediaType =
   | 'contact_list';
 
 @Entity()
-@Index('UQ_whatsapp_media_media_id', ['media_id'], { unique: true })
+@Index('UQ_whatsapp_media_media_id',   ['media_id'],    { unique: true })
 @Index('IDX_whatsapp_media_tenant_id', ['tenant_id'])
+// FK lookup — findByMessage(message_id) utilisé dans WhatsappMediaService
+@Index('IDX_whatsapp_media_message_id', ['message'])
+// lookup par chat pour chargement des médias dans une conversation
+@Index('IDX_whatsapp_media_chat_id',    ['chat'])
 export class WhatsappMedia {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

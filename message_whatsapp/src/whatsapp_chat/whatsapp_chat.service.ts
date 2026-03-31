@@ -128,15 +128,14 @@ export class WhatsappChatService {
    * ➕ MESSAGE ENTRANT
    * ======================= */
   async incrementUnreadCount(chat_id: string): Promise<void> {
-    await this.chatRepository.increment(
-      { chat_id: chat_id },
-      'unread_count',
-      1,
-    );
-
-    await this.chatRepository.update(
-      { chat_id: chat_id },
-      { last_activity_at: new Date() },
+    // Fusion des 2 UPDATE en 1 seul aller-retour DB
+    await this.chatRepository.query(
+      `UPDATE whatsapp_chat
+       SET unread_count    = unread_count + 1,
+           last_activity_at = NOW(),
+           updatedAt        = updatedAt
+       WHERE chat_id = ?`,
+      [chat_id],
     );
   }
 
@@ -328,41 +327,36 @@ export class WhatsappChatService {
       order: { name: 'ASC' },
     });
 
-    const convRows: Array<{ commercial_id: string; conv_count: string }> =
-      await this.messageRepository
-        .createQueryBuilder('msg')
-        .select('msg.commercial_id', 'commercial_id')
-        .addSelect('COUNT(DISTINCT msg.chat_id)', 'conv_count')
-        .where("msg.direction = 'OUT'")
-        .andWhere('msg.commercial_id IS NOT NULL')
-        .andWhere('msg.deletedAt IS NULL')
-        .groupBy('msg.commercial_id')
-        .getRawMany();
+    // Fusion des 2 requêtes en 1 seule passe (COUNT + COUNT DISTINCT simultanés)
+    const statsRows: Array<{
+      commercial_id: string;
+      conv_count: string;
+      msg_count: string;
+    }> = await this.messageRepository
+      .createQueryBuilder('msg')
+      .select('msg.commercial_id',              'commercial_id')
+      .addSelect('COUNT(DISTINCT msg.chat_id)', 'conv_count')
+      .addSelect('COUNT(*)',                    'msg_count')
+      .where("msg.direction = 'OUT'")
+      .andWhere('msg.commercial_id IS NOT NULL')
+      .andWhere('msg.deletedAt IS NULL')
+      .groupBy('msg.commercial_id')
+      .getRawMany();
 
-    const msgRows: Array<{ commercial_id: string; msg_count: string }> =
-      await this.messageRepository
-        .createQueryBuilder('msg')
-        .select('msg.commercial_id', 'commercial_id')
-        .addSelect('COUNT(*)', 'msg_count')
-        .where("msg.direction = 'OUT'")
-        .andWhere('msg.commercial_id IS NOT NULL')
-        .andWhere('msg.deletedAt IS NULL')
-        .groupBy('msg.commercial_id')
-        .getRawMany();
+    const statsMap = new Map(statsRows.map((r) => [r.commercial_id, r]));
 
-    return commerciaux.map((c) => ({
-      commercial_id: c.id,
-      commercial_name: c.name,
-      commercial_email: c.email,
-      poste_id: c.poste?.id ?? null,
-      poste_name: c.poste?.name ?? null,
-      conversations_count: Number(
-        convRows.find((r) => r.commercial_id === c.id)?.conv_count ?? 0,
-      ),
-      messages_sent: Number(
-        msgRows.find((r) => r.commercial_id === c.id)?.msg_count ?? 0,
-      ),
-      isConnected: c.isConnected,
-    }));
+    return commerciaux.map((c) => {
+      const row = statsMap.get(c.id);
+      return {
+        commercial_id:       c.id,
+        commercial_name:     c.name,
+        commercial_email:    c.email,
+        poste_id:            c.poste?.id ?? null,
+        poste_name:          c.poste?.name ?? null,
+        conversations_count: Number(row?.conv_count ?? 0),
+        messages_sent:       Number(row?.msg_count  ?? 0),
+        isConnected:         c.isConnected,
+      };
+    });
   }
 }

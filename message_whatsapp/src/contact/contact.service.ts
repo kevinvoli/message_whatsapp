@@ -26,11 +26,10 @@ export class ContactService {
   }
 
   async findOrCreate(phone: string, chat_id?: string | null, name?: string) {
+    // Pas de chargement des relations — findOrCreate ne les utilise pas
+    // (charger messages ici déclencherait un SELECT * pour chaque message entrant)
     let contact = await this.repo.findOne({
       where: { phone },
-      relations: {
-        messages: true,
-      },
     });
 
     if (!contact) {

@@ -5,12 +5,16 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 @Entity()
+// filtrages fréquents dans MetriquesService et QueueService
+@Index('IDX_poste_is_active',         ['is_active'])
+@Index('IDX_poste_queue_enabled',     ['is_queue_enabled'])
 export class WhatsappPoste {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

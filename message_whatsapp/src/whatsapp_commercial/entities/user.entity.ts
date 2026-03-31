@@ -2,6 +2,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import {
   Entity,
   Column,
+  Index,
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -17,6 +18,10 @@ import * as bcrypt from 'bcrypt';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Entity()
+// filtre connexion temps réel (OverviewView + MetriquesService)
+@Index('IDX_commercial_is_connected', ['isConnected'])
+// soft-delete systématique
+@Index('IDX_commercial_deleted_at',   ['deletedAt'])
 export class WhatsappCommercial {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

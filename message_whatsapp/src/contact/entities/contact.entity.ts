@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -22,6 +23,12 @@ export enum Priority {
 }
 
 @Entity()
+// phone : hot path — appelé sur chaque message entrant (findOrCreate)
+@Index('IDX_contact_phone',              ['phone'])
+// chat_id : JOIN dans findAllByPosteId (contact.chat_id = chat.chat_id)
+@Index('IDX_contact_chat_id',           ['chat_id'])
+// filtre temporel + soft-delete
+@Index('IDX_contact_created_deleted',   ['createdAt', 'deletedAt'])
 export class Contact {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',
