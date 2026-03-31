@@ -409,8 +409,13 @@ export class MetriquesService {
 
   // ---------------------------------------------------------------------------
   // Public — Performance par commercial
-  // AVANT : N+1 queries (1 requête tempsReponseMoyen par commercial)
-  // APRÈS  : 2 requêtes batch — 1 requête principale + 1 GROUP BY poste_id
+  //
+  // PROBLÈME PRÉCÉDENT : jointure 3 niveaux commercial→poste→chats→messages
+  //   → produit des millions de lignes intermédiaires avant GROUP BY
+  //   → 2 sous-requêtes corrélées (nbChatsActifs, nbMessagesEnvoyes) par commercial
+  //
+  // SOLUTION : 5 requêtes ciblées en parallèle, chacune utilisant un index dédié,
+  //   sans jointure multi-niveaux — résultats agrégés en mémoire via Map O(1)
   // ---------------------------------------------------------------------------
 
   async getPerformanceCommerciaux(
@@ -424,105 +429,123 @@ export class MetriquesService {
 
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
-    // Requête 1 : données principales (inchangée)
-    const performance = await this.commercialRepository
+    // ── Requête 1 : commerciaux + poste (simple, aucune jointure vers messages) ──
+    const commerciaux = await this.commercialRepository
       .createQueryBuilder('commercial')
       .leftJoin('commercial.poste', 'poste')
-      .leftJoin('poste.chats', 'chat', 'chat.deletedAt IS NULL')
-      .leftJoin(
-        'chat.messages',
-        'message',
-        'message.deletedAt IS NULL AND message.createdAt >= :dateStart AND message.createdAt <= :dateEnd',
-        { dateStart, dateEnd },
-      )
       .select([
-        'commercial.id             as id',
-        'commercial.name           as name',
-        'commercial.email          as email',
-        'commercial.isConnected    as isConnected',
+        'commercial.id               as id',
+        'commercial.name             as name',
+        'commercial.email            as email',
+        'commercial.isConnected      as isConnected',
         'commercial.lastConnectionAt as lastConnectionAt',
-        'poste.name                as poste_name',
-        'poste.id                  as poste_id',
-        'COUNT(CASE WHEN message.direction = "IN" THEN 1 END) as nbMessagesRecus',
+        'poste.name                  as poste_name',
+        'poste.id                    as poste_id',
       ])
-      .addSelect(
-        (sub) =>
-          sub
-            .select('COUNT(*)')
-            .from(WhatsappChat, 'c')
-            .where('c.poste_id = poste.id')
-            .andWhere("c.status = 'actif'")
-            .andWhere('c.deletedAt IS NULL'),
-        'nbChatsActifs',
-      )
-      .addSelect(
-        (sub) =>
-          sub
-            .select('COUNT(*)')
-            .from(WhatsappMessage, 'msg')
-            .where('msg.commercial_id = commercial.id')
-            .andWhere("msg.direction = 'OUT'")
-            .andWhere('msg.deletedAt IS NULL')
-            .andWhere('msg.createdAt >= :dateStart', { dateStart })
-            .andWhere('msg.createdAt <= :dateEnd',   { dateEnd }),
-        'nbMessagesEnvoyes',
-      )
       .where('commercial.deletedAt IS NULL')
-      .groupBy(
-        'commercial.id, commercial.name, commercial.email, commercial.isConnected, commercial.lastConnectionAt, poste.name, poste.id',
-      )
       .getRawMany();
 
-    // Requête 2 : tempsReponseMoyen pour TOUS les postes en 1 seule requête (fin du N+1)
-    const posteIds = [...new Set(performance.map((p) => p.poste_id).filter(Boolean))];
-    const tempsParPoste = new Map<string, number>();
+    if (commerciaux.length === 0) return [];
 
-    if (posteIds.length > 0) {
-      const tempsRows = await this.messageRepository
-        .createQueryBuilder('msg_out')
-        .innerJoin(
-          'whatsapp_message',
-          'msg_in',
-          `msg_out.chat_id = msg_in.chat_id
-           AND msg_in.direction  = "IN"
-           AND msg_out.direction = "OUT"
-           AND msg_in.timestamp  <  msg_out.timestamp
-           AND msg_in.timestamp  >= msg_out.timestamp - INTERVAL 1 HOUR`,
-        )
-        .select('msg_out.poste_id', 'poste_id')
-        .addSelect(
-          'AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))',
-          'avg',
-        )
-        .where('msg_out.poste_id IN (:...posteIds)', { posteIds })
-        .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
-        .andWhere('msg_out.createdAt <= :dateEnd',   { dateEnd })
-        .andWhere('msg_out.deletedAt IS NULL')
-        .andWhere('msg_in.deletedAt IS NULL')
-        .groupBy('msg_out.poste_id')
-        .getRawMany();
+    const posteIds      = [...new Set(commerciaux.map((c) => c.poste_id).filter(Boolean))];
+    const commercialIds = commerciaux.map((c) => c.id);
 
-      for (const row of tempsRows) {
-        tempsParPoste.set(row.poste_id, parseInt(row.avg) || 0);
-      }
-    }
+    // ── Requêtes 2-5 en parallèle : chacune cible un index précis ──────────────
+    const [msgInRows, msgOutRows, chatsActifsRows, tempsRows] = await Promise.all([
 
-    const result = performance
+      // Req 2 — Messages IN par poste (utilise IDX_msg_poste_dir_time)
+      posteIds.length > 0
+        ? this.messageRepository
+            .createQueryBuilder('msg')
+            .select('msg.poste_id', 'poste_id')
+            .addSelect('COUNT(*)',  'count')
+            .where('msg.poste_id IN (:...posteIds)', { posteIds })
+            .andWhere('msg.direction = "IN"')
+            .andWhere('msg.deletedAt IS NULL')
+            .andWhere('msg.createdAt >= :dateStart', { dateStart })
+            .andWhere('msg.createdAt <= :dateEnd',   { dateEnd })
+            .groupBy('msg.poste_id')
+            .getRawMany()
+        : Promise.resolve([]),
+
+      // Req 3 — Messages OUT par commercial (utilise IDX_msg_commercial_dir_time)
+      commercialIds.length > 0
+        ? this.messageRepository
+            .createQueryBuilder('msg')
+            .select('msg.commercial_id', 'commercial_id')
+            .addSelect('COUNT(*)',        'count')
+            .where('msg.commercial_id IN (:...commercialIds)', { commercialIds })
+            .andWhere('msg.direction = "OUT"')
+            .andWhere('msg.deletedAt IS NULL')
+            .andWhere('msg.createdAt >= :dateStart', { dateStart })
+            .andWhere('msg.createdAt <= :dateEnd',   { dateEnd })
+            .groupBy('msg.commercial_id')
+            .getRawMany()
+        : Promise.resolve([]),
+
+      // Req 4 — Chats actifs par poste (utilise IDX_chat_poste_time)
+      posteIds.length > 0
+        ? this.chatRepository
+            .createQueryBuilder('chat')
+            .select('chat.poste_id', 'poste_id')
+            .addSelect('COUNT(*)',   'count')
+            .where('chat.poste_id IN (:...posteIds)', { posteIds })
+            .andWhere("chat.status = 'actif'")
+            .andWhere('chat.deletedAt IS NULL')
+            .groupBy('chat.poste_id')
+            .getRawMany()
+        : Promise.resolve([]),
+
+      // Req 5 — Temps de réponse par poste (filtre ON clause = index IDX_msg_response_time)
+      posteIds.length > 0
+        ? this.messageRepository
+            .createQueryBuilder('msg_out')
+            .innerJoin(
+              'whatsapp_message',
+              'msg_in',
+              `msg_out.chat_id = msg_in.chat_id
+               AND msg_in.direction  = "IN"
+               AND msg_out.direction = "OUT"
+               AND msg_in.timestamp  <  msg_out.timestamp
+               AND msg_in.timestamp  >= msg_out.timestamp - INTERVAL 1 HOUR`,
+            )
+            .select('msg_out.poste_id', 'poste_id')
+            .addSelect(
+              'AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))',
+              'avg',
+            )
+            .where('msg_out.poste_id IN (:...posteIds)', { posteIds })
+            .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
+            .andWhere('msg_out.createdAt <= :dateEnd',   { dateEnd })
+            .andWhere('msg_out.deletedAt IS NULL')
+            .andWhere('msg_in.deletedAt IS NULL')
+            .groupBy('msg_out.poste_id')
+            .getRawMany()
+        : Promise.resolve([]),
+    ]);
+
+    // ── Lookup Maps O(1) ──────────────────────────────────────────────────────
+    const msgInMap     = new Map(msgInRows.map((r)     => [r.poste_id,      parseInt(r.count) || 0]));
+    const msgOutMap    = new Map(msgOutRows.map((r)    => [r.commercial_id, parseInt(r.count) || 0]));
+    const chatsMap     = new Map(chatsActifsRows.map((r) => [r.poste_id,   parseInt(r.count) || 0]));
+    const tempsParPoste = new Map(tempsRows.map((r)   => [r.poste_id,      parseInt(r.avg)   || 0]));
+
+    const result = commerciaux
       .map((perf) => {
-        const nbMessagesRecus   = parseInt(perf.nbMessagesRecus)   || 0;
-        const nbMessagesEnvoyes = parseInt(perf.nbMessagesEnvoyes) || 0;
+        const nbMessagesRecus   = msgInMap.get(perf.poste_id)   ?? 0;
+        const nbMessagesEnvoyes = msgOutMap.get(perf.id)         ?? 0;
         return {
-          id:             perf.id,
-          name:           perf.name,
-          email:          perf.email,
-          isConnected:    Boolean(perf.isConnected),
+          id:               perf.id,
+          name:             perf.name,
+          email:            perf.email,
+          isConnected:      Boolean(perf.isConnected),
           lastConnectionAt: perf.lastConnectionAt,
-          poste_name:     perf.poste_name || 'Non assigné',
-          poste_id:       perf.poste_id,
-          nbChatsActifs:  parseInt(perf.nbChatsActifs) || 0,
+          poste_name:       perf.poste_name || 'Non assigné',
+          poste_id:         perf.poste_id,
+          nbChatsActifs:    chatsMap.get(perf.poste_id)   ?? 0,
           nbMessagesEnvoyes,
           nbMessagesRecus,
-          tauxReponse:    nbMessagesRecus > 0
+          tauxReponse:      nbMessagesRecus > 0
             ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100)
             : 0,
           tempsReponseMoyen: tempsParPoste.get(perf.poste_id) ?? 0,

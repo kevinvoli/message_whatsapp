@@ -192,21 +192,6 @@ export class WhatsappChatService {
         'contact',
         'contact.chat_id = chat.chat_id',
       )
-      .leftJoinAndMapOne(
-        'chat.last_message',
-        WhatsappMessage,
-        'last_message',
-        `last_message.id = (${this.chatRepository
-          .createQueryBuilder()
-          .subQuery()
-          .select('m.id')
-          .from(WhatsappMessage, 'm')
-          .where('m.chat_id = chat.chat_id')
-          .andWhere('m.deletedAt IS NULL')
-          .orderBy('m.timestamp', 'DESC')
-          .limit(1)
-          .getQuery()})`,
-      )
       .orderBy('chat.last_activity_at', 'DESC');
 
     if (dateStart) {
@@ -231,6 +216,33 @@ export class WhatsappChatService {
     }
 
     const [data, total] = await qb.take(limit).skip(offset).getManyAndCount();
+
+    // Bulk-fetch last message per chat in a single query (replaces N correlated subqueries)
+    if (data.length > 0) {
+      const chatIds = data.map((c) => c.chat_id);
+      const lastMessages = await this.messageRepository
+        .createQueryBuilder('m')
+        .innerJoin(
+          (sub) =>
+            sub
+              .select('m2.chat_id', 'cid')
+              .addSelect('MAX(m2.timestamp)', 'max_ts')
+              .from(WhatsappMessage, 'm2')
+              .where('m2.chat_id IN (:...chatIds)', { chatIds })
+              .andWhere('m2.deletedAt IS NULL')
+              .groupBy('m2.chat_id'),
+          'latest',
+          'm.chat_id = latest.cid AND m.timestamp = latest.max_ts AND m.deletedAt IS NULL',
+        )
+        .where('m.chat_id IN (:...chatIds)', { chatIds })
+        .getMany();
+
+      const lastMsgMap = new Map(lastMessages.map((m) => [m.chat_id, m]));
+      for (const chat of data) {
+        (chat as any).last_message = lastMsgMap.get(chat.chat_id) ?? null;
+      }
+    }
+
     return { data, total };
   }
 
