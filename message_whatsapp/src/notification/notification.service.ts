@@ -47,6 +47,6 @@ export class NotificationService {
   }
 
   async clearAll(): Promise<void> {
-    await this.repo.delete({});
+    await this.repo.createQueryBuilder().delete().from(AdminNotification).execute();
   }
 }
