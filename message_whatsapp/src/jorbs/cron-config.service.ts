@@ -81,19 +81,6 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: 45,
     maxSteps: 3,
   },
-  'meta-token-refresh': {
-    label: 'Refresh tokens Meta / Messenger / Instagram',
-    description:
-      'Renouvelle automatiquement les tokens Meta (WhatsApp Cloud, Messenger, Instagram) qui expirent dans moins de N jours (configurable).',
-    enabled: true,
-    scheduleType: 'cron',
-    intervalMinutes: null,
-    cronExpression: '0 3 * * *',
-    ttlDays: 7,
-    delayMinSeconds: null,
-    delayMaxSeconds: null,
-    maxSteps: null,
-  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
