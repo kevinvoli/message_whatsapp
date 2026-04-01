@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
 
 @Injectable()
@@ -16,15 +15,15 @@ export class AnalyticsCronService implements OnModuleInit {
       .catch((err) => this.logger.error('SNAPSHOT_WARMUP_ERROR', err instanceof Error ? err.stack : undefined));
   }
 
-  /** Toutes les 10 minutes — recalcule les snapshots */
-  @Cron('0 */10 * * * *')
+  /** Désactivé — recalcul des snapshots toutes les 10 min (trop lourd en CPU) */
+  // @Cron('0 */10 * * * *')
   async refreshSnapshots(): Promise<void> {
     this.logger.debug('CRON_SNAPSHOT_REFRESH triggered');
     await this.snapshotService.computeAll();
   }
 
-  /** Toutes les heures — purge les snapshots expirés */
-  @Cron('0 0 * * * *')
+  /** Désactivé — purge des snapshots expirés toutes les heures */
+  // @Cron('0 0 * * * *')
   async purgeSnapshots(): Promise<void> {
     this.logger.debug('CRON_SNAPSHOT_PURGE triggered');
     await this.snapshotService.purgeExpired();
