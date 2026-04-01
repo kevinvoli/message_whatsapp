@@ -57,6 +57,7 @@ export class AnalyticsSnapshotService {
     this.logger.log(`SNAPSHOT_COMPUTE_DONE elapsed=${Date.now() - start}ms`);
   }
 
+
   /**
    * Retourne le dernier snapshot valide (non expiré) pour le scope/scope_id donnés.
    */

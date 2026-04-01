@@ -22,10 +22,6 @@ export class MetriquesService {
   private readonly logger = new Logger(MetriquesService.name);
   private readonly queueWarningThreshold = 20;
 
-  /** Cache en mémoire — TTL 60 s pour éviter de recalculer à chaque refresh */
-  private readonly cache = new Map<string, { data: unknown; expiresAt: number }>();
-  private readonly CACHE_TTL_MS = 60_000;
-
   constructor(
     @InjectRepository(WhatsappMessage)
     private messageRepository: Repository<WhatsappMessage>,
@@ -48,23 +44,6 @@ export class MetriquesService {
     @InjectRepository(QueuePosition)
     private queueRepository: Repository<QueuePosition>,
   ) {}
-
-  // ---------------------------------------------------------------------------
-  // Cache helpers
-  // ---------------------------------------------------------------------------
-
-  private getCached<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry || Date.now() > entry.expiresAt) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.data as T;
-  }
-
-  private setCached(key: string, data: unknown): void {
-    this.cache.set(key, { data, expiresAt: Date.now() + this.CACHE_TTL_MS });
-  }
 
   // ---------------------------------------------------------------------------
   // Date helpers
@@ -119,42 +98,35 @@ export class MetriquesService {
     dateFrom?: string,
     dateTo?: string,
   ): Promise<MetriquesGlobalesDto> {
-    const cacheKey = `globales_${periode}_${dateFrom ?? ''}_${dateTo ?? ''}`;
-    const cached = this.getCached<MetriquesGlobalesDto>(cacheKey);
-    if (cached) return cached;
-
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
-    const [
-      metriquesMessages,
-      metriquesChats,
-      metriquesCommerciaux,
-      metriquesContacts,
-      metriquesPostes,
-      metriquesChannels,
-      chargePostes,
-    ] = await Promise.all([
-      this.getMetriquesMessages(dateStart, dateEnd),
-      this.getMetriquesChats(dateStart, dateEnd),
-      this.getMetriquesCommerciaux(dateStart, dateEnd),
-      this.getMetriquesContacts(dateStart, dateEnd),
-      this.getMetriquesPostes(),
-      this.getMetriquesChannels(),
-      this.getChargeParPoste(dateStart, dateEnd),
-    ]);
+      const [
+        metriquesMessages,
+        metriquesChats,
+        metriquesCommerciaux,
+        metriquesContacts,
+        metriquesPostes,
+        metriquesChannels,
+        chargePostes,
+      ] = await Promise.all([
+        this.getMetriquesMessages(dateStart, dateEnd),
+        this.getMetriquesChats(dateStart, dateEnd),
+        this.getMetriquesCommerciaux(dateStart, dateEnd),
+        this.getMetriquesContacts(dateStart, dateEnd),
+        this.getMetriquesPostes(),
+        this.getMetriquesChannels(),
+        this.getChargeParPoste(dateStart, dateEnd),
+      ]);
 
-    const result = {
-      ...metriquesMessages,
-      ...metriquesChats,
-      ...metriquesCommerciaux,
-      ...metriquesContacts,
-      ...metriquesPostes,
-      ...metriquesChannels,
-      chargePostes,
-    };
-
-    this.setCached(cacheKey, result);
-    return result;
+      return {
+        ...metriquesMessages,
+        ...metriquesChats,
+        ...metriquesCommerciaux,
+        ...metriquesContacts,
+        ...metriquesPostes,
+        ...metriquesChannels,
+        chargePostes,
+      };
   }
 
   // ---------------------------------------------------------------------------
@@ -423,10 +395,6 @@ export class MetriquesService {
     dateFrom?: string,
     dateTo?: string,
   ): Promise<PerformanceCommercialDto[]> {
-    const cacheKey = `perf_commerciaux_${periode}_${dateFrom ?? ''}_${dateTo ?? ''}`;
-    const cached = this.getCached<PerformanceCommercialDto[]>(cacheKey);
-    if (cached) return cached;
-
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
     // ── Requête 1 : commerciaux + poste (simple, aucune jointure vers messages) ──
@@ -553,12 +521,11 @@ export class MetriquesService {
       })
       .sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);
 
-    this.setCached(cacheKey, result);
     return result;
   }
 
   // ---------------------------------------------------------------------------
-  // Public — Statut channels (avec cache)
+  // Public — Statut channels
   // ---------------------------------------------------------------------------
 
   async getStatutChannels(
@@ -566,10 +533,6 @@ export class MetriquesService {
     dateFrom?: string,
     dateTo?: string,
   ): Promise<StatutChannelDto[]> {
-    const cacheKey = `channels_${periode}_${dateFrom ?? ''}_${dateTo ?? ''}`;
-    const cached = this.getCached<StatutChannelDto[]>(cacheKey);
-    if (cached) return cached;
-
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
     const channels = await this.channelRepository
@@ -618,12 +581,11 @@ export class MetriquesService {
       nb_messages:    parseInt(ch.nb_messages)    || 0,
     }));
 
-    this.setCached(cacheKey, result);
     return result;
   }
 
   // ---------------------------------------------------------------------------
-  // Public — Performance temporelle (avec cache)
+  // Public — Performance temporelle
   // ---------------------------------------------------------------------------
 
   async getPerformanceTemporelle(
@@ -631,10 +593,6 @@ export class MetriquesService {
     dateFrom?: string,
     dateTo?: string,
   ): Promise<PerformanceTemporelleDto[]> {
-    const cacheKey = `temporelle_${jours}_${dateFrom ?? ''}_${dateTo ?? ''}`;
-    const cached = this.getCached<PerformanceTemporelleDto[]>(cacheKey);
-    if (cached) return cached;
-
     const qb = this.messageRepository
       .createQueryBuilder('message')
       .select('DATE(message.createdAt)', 'date')
@@ -666,7 +624,6 @@ export class MetriquesService {
       nb_conversations: parseInt(p.nb_conversations),
     }));
 
-    this.setCached(cacheKey, result);
     return result;
   }
 

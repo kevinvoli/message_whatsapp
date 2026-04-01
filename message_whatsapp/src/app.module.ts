@@ -87,7 +87,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
       }).and('WHAPI_WEBHOOK_SECRET_HEADER', 'WHAPI_WEBHOOK_SECRET_VALUE'),
     }),
     DatabaseModule,
-    AdminModule, // Import AdminModule
+    AdminModule,
     WhatsappErrorModule,
     WhatsappChatModule,
     WhatsappChatLabelModule,

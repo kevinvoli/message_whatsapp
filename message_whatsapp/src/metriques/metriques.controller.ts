@@ -156,4 +156,6 @@ export class MetriquesController {
     await this.snapshotService.computeAll();
     return { success: true, message: 'Snapshots recalculés' };
   }
+
 }
+

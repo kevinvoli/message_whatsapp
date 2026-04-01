@@ -13,7 +13,7 @@ import {
     LineChart,
     Line,
 } from 'recharts';
-import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X } from 'lucide-react';
+import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle } from 'lucide-react';
 import { getOverviewMetriques } from '@/app/lib/api';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
@@ -71,6 +71,8 @@ export default function AnalyticsView() {
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
     const [perf, setPerf] = useState<PerformanceCommercial[]>([]);
     const [temporelle, setTemporelle] = useState<PerformanceTemporelle[]>([]);
+    const [computedAt, setComputedAt] = useState<Date | null>(null);
+    const [fromSnapshot, setFromSnapshot] = useState(false);
 
     // Filtre plage de dates
     const [dateFrom, setDateFrom] = useState('');
@@ -86,6 +88,8 @@ export default function AnalyticsView() {
             setMetriques(data.metriques);
             setPerf(data.performanceCommercial);
             setTemporelle(data.performanceTemporelle);
+            setComputedAt(data.computed_at ? new Date(data.computed_at) : new Date());
+            setFromSnapshot(data.from_snapshot ?? false);
         } catch {
             // silencieux — l'UI reste avec les données précédentes
         } finally {
@@ -185,6 +189,19 @@ export default function AnalyticsView() {
                         )}
                     </div>
 
+                    {computedAt && (() => {
+                        const ageMin = Math.round((Date.now() - computedAt.getTime()) / 60000);
+                        const isStale = ageMin > 15;
+                        return (
+                            <span className={`flex items-center gap-1 text-sm ${isStale ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                                {isStale && <AlertCircle className="w-4 h-4" />}
+                                {fromSnapshot
+                                    ? `Données mises à jour il y a ${ageMin} min`
+                                    : 'Données en temps réel'}
+                                {isStale && ' — potentiellement obsolètes'}
+                            </span>
+                        );
+                    })()}
                     <button
                         onClick={() => void load(period, activeDateFrom || undefined, activeDateTo || undefined)}
                         disabled={loading}
