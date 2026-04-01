@@ -295,14 +295,17 @@ export class WhatsappMessageGateway
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    let chats = await this.chatService.findByPosteId(agent.posteId);
+    // En mode recherche : inclure toutes les conversations (fermées aussi) pour trouver l'historique.
+    // En mode normal : exclure les conversations fermées/converties pour réduire la charge.
+    const excludeStatuses = searchTerm ? [] : ['fermé', 'converti'];
+    let chats = await this.chatService.findByPosteId(agent.posteId, excludeStatuses);
     if (!chats) return;
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
       chats = chats.filter((c) => c.tenant_id && tenantSet.has(c.tenant_id));
     }
 
-    // Calcul de filtrage côté back
+    // Filtrage textuel côté back
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       chats = chats.filter(

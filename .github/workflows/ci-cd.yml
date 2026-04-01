@@ -150,18 +150,38 @@ jobs:
             set -e
             cd /var/www/whatsapp
 
-            # Pull les nouvelles images
+            # ── Sauvegarde des images actuelles pour rollback ──────────────────
+            echo "=== SAUVEGARDE DES IMAGES ACTUELLES ==="
+            docker tag ghcr.io/${{ github.repository }}/back:latest  ghcr.io/${{ github.repository }}/back:previous  2>/dev/null || true
+            docker tag ghcr.io/${{ github.repository }}/front:latest ghcr.io/${{ github.repository }}/front:previous 2>/dev/null || true
+            docker tag ghcr.io/${{ github.repository }}/admin:latest ghcr.io/${{ github.repository }}/admin:previous 2>/dev/null || true
+
+            # ── Pull les nouvelles images ──────────────────────────────────────
             docker compose pull
 
-            # Lancer les migrations AVANT de démarrer les containers
+            # ── Migrations AVANT de démarrer les containers ───────────────────
             docker run --rm \
               --env-file ./message_whatsapp/.env \
               --add-host host.docker.internal:host-gateway \
               ghcr.io/${{ github.repository }}/back:latest \
               npm run migration:run:prod
 
-            # Redémarre les containers (DB déjà à jour)
-            docker compose up -d --remove-orphans
+            # ── Redémarre les containers ───────────────────────────────────────
+            docker compose up -d --remove-orphans && {
+              echo "=== DÉPLOIEMENT RÉUSSI ==="
+              docker image prune -f
+            } || {
+              echo ""
+              echo "=== DÉPLOIEMENT ÉCHOUÉ — LOGS BACKEND ==="
+              docker logs whatsapp-back --tail=150 2>&1 || true
 
-            # Nettoyage des anciennes images
-            docker image prune -f
+              echo ""
+              echo "=== ROLLBACK VERS LA VERSION PRÉCÉDENTE ==="
+              docker tag ghcr.io/${{ github.repository }}/back:previous  ghcr.io/${{ github.repository }}/back:latest  2>/dev/null || true
+              docker tag ghcr.io/${{ github.repository }}/front:previous ghcr.io/${{ github.repository }}/front:latest 2>/dev/null || true
+              docker tag ghcr.io/${{ github.repository }}/admin:previous ghcr.io/${{ github.repository }}/admin:latest 2>/dev/null || true
+
+              docker compose up -d --remove-orphans || true
+              echo "=== ROLLBACK TERMINÉ — ANCIENNE VERSION RESTAURÉE ==="
+              exit 1
+            }

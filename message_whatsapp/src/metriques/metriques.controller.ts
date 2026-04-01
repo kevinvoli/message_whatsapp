@@ -157,5 +157,29 @@ export class MetriquesController {
     return { success: true, message: 'Snapshots recalculés' };
   }
 
+  @Get('snapshot-status')
+  @ApiOperation({ summary: 'État des snapshots par période' })
+  async getSnapshotStatus() {
+    const periods = ['today', 'week', 'month', 'year'];
+    const status = await Promise.all(
+      periods.map(async (p) => {
+        const [snap, raw] = await Promise.all([
+          this.snapshotService.getLatest('global', p),
+          this.snapshotService.getRaw('global', p),
+        ]);
+        const ageSeconds = raw
+          ? Math.round((Date.now() - new Date(raw.computed_at).getTime()) / 1000)
+          : null;
+        return {
+          period: p,
+          has_valid_snapshot: snap !== null,
+          age_seconds: ageSeconds,
+          ttl_seconds: raw?.ttl_seconds ?? null,
+          computed_at: raw?.computed_at ?? null,
+        };
+      }),
+    );
+    return { now: new Date().toISOString(), snapshots: status };
+  }
 }
 

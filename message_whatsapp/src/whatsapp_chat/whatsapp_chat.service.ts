@@ -47,14 +47,23 @@ export class WhatsappChatService {
   ) {}
 
   // Dans WhatsappChatService
-  async findByPosteId(poste_id: string): Promise<WhatsappChat[]> {
-    const chats = await this.chatRepository.find({
-      where: { poste_id: poste_id },
-      order: { last_activity_at: 'DESC' },
-      relations: ['poste', 'channel'],
-    });
+  async findByPosteId(
+    poste_id: string,
+    excludeStatuses: string[] = ['fermé', 'converti'],
+  ): Promise<WhatsappChat[]> {
+    const qb = this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .where('chat.poste_id = :poste_id', { poste_id })
+      .orderBy('chat.last_activity_at', 'DESC')
+      .take(200);
 
-    return chats;
+    if (excludeStatuses.length > 0) {
+      qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });
+    }
+
+    return qb.getMany();
   }
 
   async findOrCreateChat(

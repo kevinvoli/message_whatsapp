@@ -33,6 +33,8 @@ export enum WhatsappChatStatus {
 @Index('IDX_chat_analytics_status_time', ['status', 'createdAt', 'deletedAt'])
 // Index pour les chats par poste dans une période
 @Index('IDX_chat_poste_time',            ['poste_id', 'createdAt', 'deletedAt'])
+// Index hot-path : liste des conversations d'un poste triées par activité récente
+@Index('IDX_chat_poste_activity',        ['poste_id', 'last_activity_at'])
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

@@ -8,11 +8,12 @@ export class AnalyticsCronService implements OnModuleInit {
 
   constructor(private readonly snapshotService: AnalyticsSnapshotService) {}
 
-  /** Au démarrage — pré-chauffe les snapshots pour éviter la première requête lente */
-  async onModuleInit(): Promise<void> {
+  /** Au démarrage — pré-chauffe les snapshots en arrière-plan (non-bloquant) */
+  onModuleInit(): void {
     this.logger.log('SNAPSHOT_WARMUP_START');
-    await this.snapshotService.computeAll();
-    this.logger.log('SNAPSHOT_WARMUP_DONE');
+    this.snapshotService.computeAll()
+      .then(() => this.logger.log('SNAPSHOT_WARMUP_DONE'))
+      .catch((err) => this.logger.error('SNAPSHOT_WARMUP_ERROR', err instanceof Error ? err.stack : undefined));
   }
 
   /** Toutes les 10 minutes — recalcule les snapshots */

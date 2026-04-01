@@ -40,7 +40,7 @@ export class AnalyticsSnapshotService {
           scope_id: periode,
           date_start: null,
           date_end: null,
-          ttl_seconds: 600,
+          ttl_seconds: 720,
           data: { metriques, performanceCommercial, statutChannels, performanceTemporelle },
         });
 
@@ -57,6 +57,16 @@ export class AnalyticsSnapshotService {
     this.logger.log(`SNAPSHOT_COMPUTE_DONE elapsed=${Date.now() - start}ms`);
   }
 
+
+  /**
+   * Retourne le dernier snapshot brut (sans vérification TTL) — pour diagnostic.
+   */
+  async getRaw(scope: string, scope_id?: string): Promise<AnalyticsSnapshot | null> {
+    return this.snapshotRepository.findOne({
+      where: { scope: scope as any, ...(scope_id !== undefined ? { scope_id } : {}) },
+      order: { computed_at: 'DESC' },
+    });
+  }
 
   /**
    * Retourne le dernier snapshot valide (non expiré) pour le scope/scope_id donnés.
