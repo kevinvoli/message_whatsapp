@@ -263,15 +263,34 @@ export class CronConfigService implements OnModuleInit {
   }
 
   private stopSchedule(key: string): void {
-    if (this.schedulerRegistry.doesExist('interval', key)) {
-      this.schedulerRegistry.deleteInterval(key);
+    try {
+      if (this.schedulerRegistry.doesExist('interval', key)) {
+        this.schedulerRegistry.deleteInterval(key);
+        this.logger.log(`Cron "${key}" interval stopped`);
+      }
+    } catch (err) {
+      this.logger.warn(`Could not delete interval "${key}": ${String(err)}`);
     }
-    if (this.schedulerRegistry.doesExist('cron', key)) {
-      this.schedulerRegistry.deleteCronJob(key);
+    try {
+      if (this.schedulerRegistry.doesExist('cron', key)) {
+        this.schedulerRegistry.deleteCronJob(key);
+        this.logger.log(`Cron "${key}" cron job stopped`);
+      }
+    } catch (err) {
+      this.logger.warn(`Could not delete cron job "${key}": ${String(err)}`);
     }
   }
 
   private async runHandler(key: string): Promise<void> {
+    // Double-vérification en DB : si le cron a été désactivé pendant qu'une exécution
+    // était en attente (ex: setInterval déjà schedulé), on l'ignore.
+    const config = await this.repo.findOne({ where: { key } });
+    if (!config?.enabled) {
+      this.logger.warn(`Cron "${key}" is disabled in DB — skipping execution`);
+      this.stopSchedule(key); // nettoyage défensif
+      return;
+    }
+
     const handler = this.handlers.get(key);
     if (!handler) {
       this.logger.warn(`No handler registered for cron key="${key}" — skipping`);
@@ -279,8 +298,7 @@ export class CronConfigService implements OnModuleInit {
     }
     try {
       await handler();
-      const config = await this.repo.findOne({ where: { key } });
-      if (config) await this.updateLastRunAt(config);
+      await this.updateLastRunAt(config);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
