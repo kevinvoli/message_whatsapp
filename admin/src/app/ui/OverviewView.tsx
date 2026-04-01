@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
-import { getOverviewMetriques, getWebhookMetrics } from '@/app/lib/api';
+import { getOverviewMetriques, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { formatDate } from '@/app/lib/dateUtils';
 
@@ -37,6 +37,9 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
   const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
   const [webhookMetrics, setWebhookMetrics] = useState<WebhookMetricsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [computedAt, setComputedAt] = useState<Date | null>(null);
+  const [fromSnapshot, setFromSnapshot] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -50,10 +53,22 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
       setStatutChannels(overviewData.statutChannels);
       setPerformanceTemporelle(overviewData.performanceTemporelle ?? []);
       setWebhookMetrics(webhookData);
+      setComputedAt(overviewData.computed_at ? new Date(overviewData.computed_at) : new Date());
+      setFromSnapshot(overviewData.from_snapshot ?? false);
     } finally {
       setLoading(false);
     }
   }, [selectedPeriod]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshSnapshots();
+      await fetchData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchData]);
 
   useEffect(() => {
     void fetchData();
@@ -163,15 +178,33 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between">
+        {/* Indicateur dernière mise à jour */}
+        <div className="flex items-center gap-2 text-sm">
+          {computedAt && (() => {
+            const ageMin = Math.round((Date.now() - computedAt.getTime()) / 60000);
+            const isStale = ageMin > 15;
+            return (
+              <span className={`flex items-center gap-1 ${isStale ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                {isStale && <AlertCircle className="w-4 h-4" />}
+                {fromSnapshot
+                  ? `Données mises à jour il y a ${ageMin} min`
+                  : 'Données en temps réel'}
+                {isStale && ' — potentiellement obsolètes'}
+              </span>
+            );
+          })()}
+        </div>
         <button
           type="button"
-          onClick={() => void fetchData()}
-          title="Rafraîchir"
-          aria-label="Rafraîchir"
-          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
+          onClick={() => void handleRefresh()}
+          disabled={refreshing}
+          title="Actualiser les snapshots"
+          aria-label="Actualiser"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 text-sm"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Actualiser
         </button>
       </div>
       {/* Stats globales principales */}

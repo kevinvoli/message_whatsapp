@@ -660,10 +660,12 @@ export async function getOverviewMetriques(periode = 'today', dateFrom?: string,
         method: 'GET',
         credentials: 'include',
     });
-    
+
     const result = await handleResponse<{
         success: boolean;
         timestamp: string;
+        computed_at?: string;
+        from_snapshot?: boolean;
         data: {
             metriques: MetriquesGlobales;
             performanceCommercial: PerformanceCommercial[];
@@ -671,8 +673,16 @@ export async function getOverviewMetriques(periode = 'today', dateFrom?: string,
             performanceTemporelle: PerformanceTemporelle[];
         };
     }>(response);
-    
-    return result.data;
+
+    return { ...result.data, computed_at: result.computed_at, from_snapshot: result.from_snapshot };
+}
+
+export async function refreshSnapshots(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/metriques/refresh-snapshots`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    await handleResponse<{ success: boolean }>(response);
 }
 
 export async function getWebhookMetrics(): Promise<WebhookMetricsSnapshot> {

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import {
@@ -9,12 +9,18 @@ import {
 } from './dto/create-metrique.dto';
 import { QueueMetricsDto } from './dto/create-metrique.dto';
 import { MetriquesService } from './metriques.service';
+import { AnalyticsSnapshotService } from './analytics-snapshot.service';
+
+const STANDARD_PERIODS = new Set(['today', 'week', 'month', 'year']);
 
 @ApiTags('Metriques')
 @Controller('api/metriques')
 @UseGuards(AdminGuard)
 export class MetriquesController {
-  constructor(private readonly metriquesService: MetriquesService) {}
+  constructor(
+    private readonly metriquesService: MetriquesService,
+    private readonly snapshotService: AnalyticsSnapshotService,
+  ) {}
 
   @Get('globales')
   @ApiOperation({ summary: 'Recupere toutes les metriques globales' })
@@ -98,6 +104,26 @@ export class MetriquesController {
     };
     const jours = joursMap[periode] ?? 7;
 
+    // Lecture depuis le snapshot si période standard et pas de filtre custom
+    if (STANDARD_PERIODS.has(periode) && !dateFrom && !dateTo) {
+      const snap = await this.snapshotService.getLatest('global', periode);
+      if (snap) {
+        const d = snap.data as any;
+        return {
+          success: true,
+          timestamp: new Date().toISOString(),
+          computed_at: snap.computed_at,
+          from_snapshot: true,
+          data: {
+            metriques: d.metriques,
+            performanceCommercial: d.performanceCommercial,
+            statutChannels: d.statutChannels,
+            performanceTemporelle: d.performanceTemporelle,
+          },
+        };
+      }
+    }
+
     const [
       metriques,
       performanceCommercial,
@@ -113,6 +139,8 @@ export class MetriquesController {
     return {
       success: true,
       timestamp: new Date().toISOString(),
+      computed_at: new Date(),
+      from_snapshot: false,
       data: {
         metriques,
         performanceCommercial,
@@ -120,5 +148,12 @@ export class MetriquesController {
         performanceTemporelle,
       },
     };
+  }
+
+  @Post('refresh-snapshots')
+  @ApiOperation({ summary: 'Force le recalcul immédiat de tous les snapshots' })
+  async refreshSnapshots() {
+    await this.snapshotService.computeAll();
+    return { success: true, message: 'Snapshots recalculés' };
   }
 }

@@ -9,8 +9,9 @@ import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
-
-// Importer vos entités
+import { AnalyticsSnapshot } from './entities/analytics-snapshot.entity';
+import { AnalyticsSnapshotService } from './analytics-snapshot.service';
+import { AnalyticsCronService } from './analytics-cron.service';
 
 @Module({
   imports: [
@@ -22,10 +23,11 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
       WhatsappPoste,
       WhapiChannel,
       QueuePosition,
+      AnalyticsSnapshot,
     ]),
   ],
   controllers: [MetriquesController],
-  providers: [MetriquesService],
-  exports: [MetriquesService], // Export si vous voulez utiliser le service ailleurs
+  providers: [MetriquesService, AnalyticsSnapshotService, AnalyticsCronService],
+  exports: [MetriquesService],
 })
 export class MetriquesModule {}
