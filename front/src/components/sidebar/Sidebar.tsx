@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Search, LogOut, Wifi, WifiOff, User } from 'lucide-react';
 import { Commercial, Contact, Conversation, Stats, ViewMode } from '@/types/chat';
 import ConversationItem from './ConversationItem';
@@ -50,6 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setShowStats,
   viewMode,
   onViewModeChange,
+  searchQuery,
 
 }) => {
 
@@ -57,32 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { logout } = useAuth()
   const typingStatus = useChatStore((state) => state.typingStatus);
 
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Données (à remplacer par vos vraies données)
   logger.debug("Contacts loaded in sidebar", { count: contacts.length });
-
-
-  const filteredConversations = conversations?.filter((conv) => {
-    if (!searchQuery) return true;
-    const query = searchQuery?.toLowerCase();
-    return (
-      conv.clientName?.toLowerCase()?.includes(query) ||
-      conv.clientPhone?.includes(query) ||
-      conv.lastMessage?.text?.toLowerCase()?.includes(query)
-    );
-  });
-
-  // Filtrage des contacts basé sur la recherche
-  const filteredContacts = contacts?.filter((contact) => {
-    if (!searchQuery) return true;
-    const query = searchQuery?.toLowerCase();
-    return (
-      contact?.name?.toLowerCase()?.includes(query) ||
-      contact?.contact?.includes(query) ||
-      contact?.call_notes?.toLowerCase()?.includes(query)
-    );
-  });
 
   // Handlers
 
@@ -99,8 +75,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         onLogout={logout}
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchQuery={searchQuery ?? '' }
+        onSearchChange={onSearchChange}
       />
 
       {viewMode === 'conversations' ? (
@@ -112,14 +88,14 @@ const Sidebar: React.FC<SidebarProps> = ({
             setFilterStatus={setFilterStatus}
           />
           <ConversationList
-            filteredConversations={filteredConversations}
+            filteredConversations={conversations}
             selectedConversation={selectedConversation}
             onSelectConversation={onSelectConversation}
             selectedConv={''}
           />
         </>
       ) : (
-        <ContactSidebarPanel searchQuery={searchQuery} />
+        <ContactSidebarPanel searchQuery={searchQuery ?? ''} />
       )}
     </div>
 

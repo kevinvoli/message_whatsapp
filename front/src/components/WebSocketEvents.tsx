@@ -119,6 +119,12 @@ const WebSocketEvents = () => {
           break;
         }
 
+        case 'MESSAGE_LIST_PREPEND': {
+          const older: Message[] = data.payload.messages.map(transformToMessage);
+          chatState.prependMessages(data.payload.chat_id, older);
+          break;
+        }
+
         case 'CONVERSATION_REMOVED':
           chatState.removeConversationBychat_id(data.payload.chat_id);
           break;

@@ -24,6 +24,8 @@ interface ChatState {
   messages: Message[];
   selectedConversation: Conversation | null;
   isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMoreMessages: boolean;
   error: string | null;
   messageIdCache: Record<string, Set<string>>;
   replyToMessage: Message | null;
@@ -38,10 +40,12 @@ interface ChatState {
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
   changeConversationStatus: (chat_id: string, status: ConversationStatus) => void;
+  loadMoreMessages: () => void;
 
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[]) => void;
   setMessages: (chat_id: string, messages: Message[]) => void;
+  prependMessages: (chat_id: string, older: Message[]) => void;
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
@@ -67,6 +71,7 @@ const initialState: Omit<
   | "clearReplyTo"
   | "setConversations"
   | "setMessages"
+  | "prependMessages"
   | "addMessage"
   | "updateConversation"
   | "addConversation"
@@ -78,12 +83,15 @@ const initialState: Omit<
   | "onTypingStart"
   | "onTypingStop"
   | "changeConversationStatus"
+  | "loadMoreMessages"
 > = {
   socket: null,
   conversations: [],
   messages: [],
   selectedConversation: null,
   isLoading: false,
+  isLoadingMore: false,
+  hasMoreMessages: true,
   error: null,
   typingStatus: {},
   messageIdCache: {},
@@ -131,6 +139,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ),
         messages: [],
         isLoading: true,
+        isLoadingMore: false,
+        hasMoreMessages: true,
         messageIdCache: { ...state.messageIdCache, [chat_id]: new Set<string>() },
         replyToMessage: null,
       };
@@ -231,6 +241,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     logger.debug("Conversation status change emitted", { chat_id, status });
   },
 
+  loadMoreMessages: () => {
+    const { socket, messages, selectedConversation, isLoadingMore, hasMoreMessages } = get();
+    if (!socket || !selectedConversation || isLoadingMore || !hasMoreMessages) return;
+    if (messages.length === 0) return;
+    const oldest = messages[0];
+    set({ isLoadingMore: true });
+    socket.emit('messages:get', {
+      chat_id: selectedConversation.chat_id,
+      limit: 50,
+      before: oldest.timestamp.toISOString(),
+    });
+  },
+
   setConversations: (conversations) => {
     set((state) => {
       const selectedChatId = state.selectedConversation?.chat_id;
@@ -250,9 +273,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return {
         messages: deduped,
         isLoading: false,
+        hasMoreMessages: messages.length >= 50,
         messageIdCache: {
           ...state.messageIdCache,
           [chat_id]: new Set(deduped.map((m) => m.id)),
+        },
+      };
+    });
+  },
+
+  prependMessages: (chat_id, older) => {
+    set((state) => {
+      if (state.selectedConversation?.chat_id !== chat_id) return state;
+      const merged = dedupeMessagesById([...older, ...state.messages]);
+      return {
+        messages: merged,
+        isLoadingMore: false,
+        hasMoreMessages: older.length >= 50,
+        messageIdCache: {
+          ...state.messageIdCache,
+          [chat_id]: new Set(merged.map((m) => m.id)),
         },
       };
     });

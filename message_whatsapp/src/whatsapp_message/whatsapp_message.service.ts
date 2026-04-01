@@ -493,22 +493,69 @@ export class WhatsappMessageService {
 
   async findBychat_id(
     chat_id: string,
-    limit = 100,
-    offset = 0,
+    limit = 50,
+    before?: Date,
   ): Promise<WhatsappMessage[]> {
     try {
-      const mess = await this.messageRepository.find({
-        where: { chat_id: chat_id },
-        relations: ['chat', 'poste', 'medias', 'quotedMessage'],
-        order: { timestamp: 'ASC', createdAt: 'ASC' },
-        take: limit,
-        skip: offset,
-      });
+      const qb = this.messageRepository
+        .createQueryBuilder('m')
+        .leftJoinAndSelect('m.chat', 'chat')
+        .leftJoinAndSelect('m.poste', 'poste')
+        .leftJoinAndSelect('m.medias', 'medias')
+        .leftJoinAndSelect('m.quotedMessage', 'quotedMessage')
+        .where('m.chat_id = :chat_id', { chat_id })
+        .orderBy('m.timestamp', 'DESC')
+        .addOrderBy('m.createdAt', 'DESC')
+        .take(limit);
 
-      return mess;
+      if (before) {
+        qb.andWhere('m.timestamp < :before', { before });
+      }
+
+      const rows = await qb.getMany();
+      return rows.reverse();
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
     }
+  }
+
+  async findLastMessagesBulk(chatIds: string[]): Promise<Map<string, WhatsappMessage>> {
+    if (chatIds.length === 0) return new Map();
+    const rows = await this.messageRepository
+      .createQueryBuilder('m')
+      .leftJoinAndSelect('m.medias', 'medias')
+      .innerJoin(
+        (sub) =>
+          sub
+            .select('m2.chat_id', 'cid')
+            .addSelect('MAX(m2.timestamp)', 'max_ts')
+            .from(WhatsappMessage, 'm2')
+            .where('m2.chat_id IN (:...chatIds)', { chatIds })
+            .andWhere('m2.deletedAt IS NULL')
+            .groupBy('m2.chat_id'),
+        'latest',
+        'm.chat_id = latest.cid AND m.timestamp = latest.max_ts AND m.deletedAt IS NULL',
+      )
+      .where('m.chat_id IN (:...chatIds)', { chatIds })
+      .getMany();
+    return new Map(rows.map((m) => [m.chat_id, m]));
+  }
+
+  async countUnreadMessagesBulk(chatIds: string[]): Promise<Map<string, number>> {
+    if (chatIds.length === 0) return new Map();
+    const rows: Array<{ chat_id: string; cnt: string }> = await this.messageRepository
+      .createQueryBuilder('m')
+      .select('m.chat_id', 'chat_id')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('m.chat_id IN (:...chatIds)', { chatIds })
+      .andWhere('m.from_me = false')
+      .andWhere("m.status IN ('SENT', 'DELIVERED')")
+      .andWhere('m.deletedAt IS NULL')
+      .groupBy('m.chat_id')
+      .getRawMany();
+    const map = new Map<string, number>();
+    for (const r of rows) map.set(r.chat_id, parseInt(r.cnt) || 0);
+    return map;
   }
 
   /* =======================

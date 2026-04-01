@@ -52,7 +52,7 @@ export class WhatsappChatService {
     const chats = await this.chatRepository.find({
       where: { poste_id: poste_id },
       order: { last_activity_at: 'DESC' },
-      relations: ['poste', 'messages', 'channel'],
+      relations: ['poste', 'channel'],
     });
 
     return chats;
@@ -67,7 +67,7 @@ export class WhatsappChatService {
     try {
       const existingChat = await this.chatRepository.findOne({
         where: { chat_id: chat_id },
-        relations: ['poste', 'messages', 'channel'],
+        relations: ['poste', 'channel'],
       });
 
       if (existingChat) {

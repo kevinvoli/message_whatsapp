@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -66,23 +66,23 @@ const WhatsAppPage = () => {
   const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
   const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
-  const filteredConversations = conversations.filter(conv => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'unread') return conv.unreadCount > 0;
-    if (filterStatus === 'nouveau') return conv.status === 'nouveau';
-    if (filterStatus === 'urgent') return conv.priority === 'haute';
-    return true;
-  });
+  const filteredConversations = useMemo(() => {
+    return conversations.filter((conv) => {
+      const matchesStatus =
+        filterStatus === 'all' ? true :
+        filterStatus === 'unread' ? conv.unreadCount > 0 :
+        filterStatus === 'nouveau' ? conv.status === 'nouveau' :
+        filterStatus === 'urgent' ? conv.priority === 'haute' : true;
 
-  const filteredSercheConversation = conversations.filter((conv) => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return (
-            conv.clientName.toLowerCase().includes(query) ||
-            conv.clientPhone.includes(query) ||
-            conv.lastMessage?.text.toLowerCase().includes(query)
-        );
+      const matchesSearch = !searchQuery
+        ? true
+        : conv.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          conv.clientPhone?.includes(searchQuery) ||
+          (conv.lastMessage?.text ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesStatus && matchesSearch;
     });
+  }, [conversations, filterStatus, searchQuery]);
 
     // Filtrage des contacts basé sur la recherche
     const filteredContacts = contacts.filter((contact) => {

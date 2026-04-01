@@ -312,17 +312,18 @@ export class WhatsappMessageGateway
       );
     }
 
-    const conversations = await Promise.all(
-      chats.map(async (chat) => {
-        const lastMessage = await this.messageService.findLastMessageBychat_id(
-          chat.chat_id,
-        );
-        const unreadCount = await this.messageService.countUnreadMessages(
-          chat.chat_id,
-        );
+    const chatIds = chats.map((c) => c.chat_id);
+    const [lastMsgMap, unreadMap] = await Promise.all([
+      this.messageService.findLastMessagesBulk(chatIds),
+      this.messageService.countUnreadMessagesBulk(chatIds),
+    ]);
 
-        return this.mapConversation(chat, lastMessage, unreadCount);
-      }),
+    const conversations = chats.map((chat) =>
+      this.mapConversation(
+        chat,
+        lastMsgMap.get(chat.chat_id) ?? null,
+        unreadMap.get(chat.chat_id) ?? 0,
+      ),
     );
 
     client.emit('chat:event', {
@@ -512,7 +513,7 @@ export class WhatsappMessageGateway
   @SubscribeMessage('messages:get')
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chat_id: string },
+    @MessageBody() payload: { chat_id: string; limit?: number; before?: string },
   ) {
     if (!this.throttle.allow(client.id, 'messages:get')) {
       return this.emitRateLimited(client, 'messages:get');
@@ -526,16 +527,22 @@ export class WhatsappMessageGateway
     // Allow if chat belongs to the agent's poste (direct assignment) OR passes tenant check
     const isOwnPosteChat = !!chat && chat.poste_id === agent.posteId;
     if (!chat || (!isOwnPosteChat && !this.isAllowedTenantChat(chat, tenantIds))) {
-      // Emit empty list so the frontend exits the loading state
       client.emit('chat:event', {
         type: 'MESSAGE_LIST',
         payload: { chat_id: payload.chat_id, messages: [] },
       });
       return;
     }
-    const messages = await this.messageService.findBychat_id(payload.chat_id);
+
+    const before = payload.before ? new Date(payload.before) : undefined;
+    const messages = await this.messageService.findBychat_id(
+      payload.chat_id,
+      payload.limit ?? 50,
+      before,
+    );
+
     client.emit('chat:event', {
-      type: 'MESSAGE_LIST',
+      type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
       payload: {
         chat_id: payload.chat_id,
         messages: messages.map(this.mapMessage),
