@@ -630,6 +630,23 @@ export class WhatsappMessageGateway
         return;
       }
 
+      // 🔒 Fenêtre de messagerie 23h — si le client n'a pas écrit depuis plus de 23h,
+      // WhatsApp n'autorise plus l'envoi de messages ordinaires.
+      const WINDOW_MS = 23 * 60 * 60 * 1000;
+      const lastClientAt = chat.last_client_message_at;
+      if (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS) {
+        client.emit('chat:event', {
+          type: 'MESSAGE_SEND_ERROR',
+          payload: {
+            chat_id: payload.chat_id,
+            tempId: payload.tempId,
+            code: 'WINDOW_EXPIRED',
+            message: 'Fenêtre de 23h expirée — en attente d\'un message du client.',
+          },
+        });
+        return;
+      }
+
       const resolvedChannelId = await this.resolveChannelIdForChat(chat);
       if (!resolvedChannelId) {
         this.logger.warn(

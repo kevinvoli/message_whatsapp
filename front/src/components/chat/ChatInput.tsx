@@ -15,6 +15,7 @@ interface ChatInputProps {
   chat_id?: string | null;
   isConnected: boolean;
   disabled?: boolean;
+  windowExpired?: boolean;
 }
 
 const TYPING_STOP_DELAY = 2000; // 2s
@@ -77,6 +78,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   chat_id,
   isConnected,
   disabled = false,
+  windowExpired = false,
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -258,6 +260,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const s = sec % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  // Fenêtre de messagerie expirée → afficher uniquement la bannière, pas l'input
+  if (windowExpired) {
+    return (
+      <div className="bg-orange-50 border-t border-orange-200 p-4">
+        <div className="max-w-4xl mx-auto flex items-center gap-3 text-orange-700">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Fenêtre de messagerie expirée</p>
+            <p className="text-xs text-orange-600">
+              Le client n&apos;a pas écrit depuis plus de 23h. En attente d&apos;un message de sa part pour reprendre la conversation.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border-t border-gray-200 p-3">

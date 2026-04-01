@@ -21,6 +21,14 @@ export default function ChatMainArea() {
 
   const totalMessages = selectedConversation ? messages?.length : 0;
 
+  // Fenêtre de messagerie 23h : si le client n'a pas écrit depuis plus de 23h,
+  // l'envoi de messages ordinaires est interdit côté WhatsApp.
+  const WINDOW_MS = 23 * 60 * 60 * 1000;
+  const lastClientAt = selectedConversation?.last_client_message_at;
+  const windowExpired =
+    selectedConversation != null &&
+    (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS);
+
   return (
     <div className="flex-1 flex flex-col">
       {selectedConversation ? (
@@ -52,7 +60,8 @@ export default function ChatMainArea() {
                 onTypingStart={onTypingStart}
                 onTypingStop={onTypingStop}
                 isConnected={isWebSocketConnected}
-                disabled={!!selectedConversation?.readonly}
+                disabled={!!selectedConversation?.readonly || windowExpired}
+                windowExpired={windowExpired}
               />
 
           {error && (

@@ -200,6 +200,19 @@ export class AutoMessageOrchestrator {
       return;
     }
 
+    // 🔒 Fenêtre de messagerie 23h : si le client n'a pas écrit depuis plus de 23h,
+    // ne pas envoyer d'auto-message (WhatsApp n'autorise pas l'envoi hors fenêtre).
+    const WINDOW_MS = 23 * 60 * 60 * 1000;
+    if (Date.now() - new Date(lastClient).getTime() > WINDOW_MS) {
+      this.logger.warn(
+        `Auto-message blocked for ${chatId}: 23h window expired (last client msg: ${lastClient.toISOString()})`,
+        AutoMessageOrchestrator.name,
+      );
+      await this.chatService.update(chatId, { read_only: false });
+      this.gateway.emitConversationReadonly({ ...freshChat, read_only: false } as WhatsappChat);
+      return;
+    }
+
     // 🔐 Double sécurité DB : un auto-message a déjà été envoyé après le dernier message client
     if (lastAuto && lastAuto >= lastClient) {
       this.logger.debug(
