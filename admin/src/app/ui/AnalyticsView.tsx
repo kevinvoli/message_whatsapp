@@ -66,7 +66,7 @@ function KpiCard({ label, value, sub, icon, color }: KpiCardProps) {
 }
 
 export default function AnalyticsView() {
-    const [period, setPeriod] = useState<Period>('week');
+    const [period, setPeriod] = useState<Period>('today');
     const [loading, setLoading] = useState(false);
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
     const [perf, setPerf] = useState<PerformanceCommercial[]>([]);
