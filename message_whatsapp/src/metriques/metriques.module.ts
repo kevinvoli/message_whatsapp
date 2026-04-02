@@ -11,7 +11,6 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { AnalyticsSnapshot } from './entities/analytics-snapshot.entity';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
-import { AnalyticsCronService } from './analytics-cron.service';
 
 @Module({
   imports: [
@@ -27,7 +26,7 @@ import { AnalyticsCronService } from './analytics-cron.service';
     ]),
   ],
   controllers: [MetriquesController],
-  providers: [MetriquesService, AnalyticsSnapshotService, AnalyticsCronService],
+  providers: [MetriquesService, AnalyticsSnapshotService],
   exports: [MetriquesService],
 })
 export class MetriquesModule {}
