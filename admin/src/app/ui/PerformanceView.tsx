@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
-import { getOverviewMetriques } from '@/app/lib/api';
+import { getOverviewSection } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 
 interface PerformanceViewProps {
@@ -14,38 +14,52 @@ interface PerformanceViewProps {
 }
 
 export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }: PerformanceViewProps) {
-  const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
-  const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
+  const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[] | null>(null);
+  const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try {
-      const data = await getOverviewMetriques(selectedPeriod);
-      setCommerciaux(data.performanceCommercial);
-      setPerformanceTemporelle(data.performanceTemporelle ?? []);
-    } finally {
-      setLoading(false);
-    }
+    setCommerciaux(null);
+    setPerformanceTemporelle(null);
+
+    const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', selectedPeriod)
+      .then((data) => { setCommerciaux(data); setLoading(false); })
+      .catch(() => { setCommerciaux([]); setLoading(false); });
+
+    const temporelleP = getOverviewSection<PerformanceTemporelle[]>('temporelle', selectedPeriod)
+      .then((data) => setPerformanceTemporelle(data))
+      .catch(() => setPerformanceTemporelle([]));
+
+    await Promise.allSettled([commerciauxP, temporelleP]);
   }, [selectedPeriod]);
 
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
 
+  const SectionSkeleton = ({ rows = 3 }: { rows?: number }) => (
+    <div className="animate-pulse space-y-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-10 bg-gray-100 rounded-lg" />
+      ))}
+    </div>
+  );
+
   if (loading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
   }
 
-  const sorted = [...commerciaux].sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);
+  const sorted = [...(commerciaux ?? [])].sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);
+  const safeCommerciaux = commerciaux ?? [];
 
-  const totalMessages = commerciaux.reduce((s, c) => s + c.nbMessagesEnvoyes + c.nbMessagesRecus, 0);
-  const totalChatsActifs = commerciaux.reduce((s, c) => s + c.nbChatsActifs, 0);
-  const avgTauxReponse = commerciaux.length
-    ? Math.round(commerciaux.reduce((s, c) => s + c.tauxReponse, 0) / commerciaux.length)
+  const totalMessages = safeCommerciaux.reduce((s, c) => s + c.nbMessagesEnvoyes + c.nbMessagesRecus, 0);
+  const totalChatsActifs = safeCommerciaux.reduce((s, c) => s + c.nbChatsActifs, 0);
+  const avgTauxReponse = safeCommerciaux.length
+    ? Math.round(safeCommerciaux.reduce((s, c) => s + c.tauxReponse, 0) / safeCommerciaux.length)
     : 0;
-  const avgTempsReponse = commerciaux.length
-    ? Math.round(commerciaux.reduce((s, c) => s + c.tempsReponseMoyen, 0) / commerciaux.length)
+  const avgTempsReponse = safeCommerciaux.length
+    ? Math.round(safeCommerciaux.reduce((s, c) => s + c.tempsReponseMoyen, 0) / safeCommerciaux.length)
     : 0;
 
   const formatTemps = (seconds: number) => {
@@ -108,7 +122,13 @@ export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }:
       </div>
 
       {/* Chart - Messages par commercial */}
-      {chartData.length > 0 && (
+      {commerciaux === null && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Messages par commercial</h3>
+          <SectionSkeleton rows={5} />
+        </div>
+      )}
+      {commerciaux !== null && chartData.length > 0 && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Messages par commercial</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -126,7 +146,13 @@ export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }:
       )}
 
       {/* Performance temporelle */}
-      {performanceTemporelle && performanceTemporelle.length > 0 && (
+      {performanceTemporelle === null && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tendance sur 7 jours</h3>
+          <SectionSkeleton rows={4} />
+        </div>
+      )}
+      {performanceTemporelle !== null && performanceTemporelle.length > 0 && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Tendance sur 7 jours</h3>
           <ResponsiveContainer width="100%" height={250}>
@@ -159,6 +185,7 @@ export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }:
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Classement des commerciaux</h3>
         </div>
+        {commerciaux === null ? <SectionSkeleton rows={5} /> : (
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-gray-50">
@@ -213,6 +240,7 @@ export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }:
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

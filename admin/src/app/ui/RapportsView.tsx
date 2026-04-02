@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { FileText, Download, RefreshCw, MessageCircle, Users, BarChart2, Calendar } from 'lucide-react';
-import { getOverviewMetriques } from '@/app/lib/api';
+import { getOverviewSection } from '@/app/lib/api';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
 import { formatDateShort } from '@/app/lib/dateUtils';
@@ -101,21 +101,36 @@ export default function RapportsView() {
     const [period, setPeriod] = useState<Period>('week');
     const [loading, setLoading] = useState(false);
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
-    const [perf, setPerf] = useState<PerformanceCommercial[]>([]);
-    const [temporelle, setTemporelle] = useState<PerformanceTemporelle[]>([]);
+    const [perf, setPerf] = useState<PerformanceCommercial[] | null>(null);
+    const [temporelle, setTemporelle] = useState<PerformanceTemporelle[] | null>(null);
+
+    const SectionSkeleton = ({ rows = 4 }: { rows?: number }) => (
+        <div className="animate-pulse space-y-3">
+            {Array.from({ length: rows }).map((_, i) => (
+                <div key={i} className="h-8 bg-gray-100 rounded-lg" />
+            ))}
+        </div>
+    );
 
     const load = useCallback(async (p: Period) => {
         setLoading(true);
-        try {
-            const data = await getOverviewMetriques(p);
-            setMetriques(data.metriques);
-            setPerf(data.performanceCommercial);
-            setTemporelle(data.performanceTemporelle);
-        } catch {
-            // silencieux
-        } finally {
-            setLoading(false);
-        }
+        setMetriques(null);
+        setPerf(null);
+        setTemporelle(null);
+
+        const globalesP = getOverviewSection<MetriquesGlobales>('globales', p)
+            .then((data) => { setMetriques(data); setLoading(false); })
+            .catch(() => { setLoading(false); });
+
+        const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', p)
+            .then((data) => setPerf(data))
+            .catch(() => setPerf([]));
+
+        const temporelleP = getOverviewSection<PerformanceTemporelle[]>('temporelle', p)
+            .then((data) => setTemporelle(data))
+            .catch(() => setTemporelle([]));
+
+        await Promise.allSettled([globalesP, commerciauxP, temporelleP]);
     }, []);
 
     useEffect(() => { void load(period); }, [load, period]);
@@ -141,7 +156,7 @@ export default function RapportsView() {
 
     const exportEquipe = () => {
         const headers = ['Nom', 'Email', 'Poste', 'Connecté', 'Messages envoyés', 'Messages reçus', 'Taux réponse (%)', 'Conv. actives', 'Temps réponse moy (s)'];
-        const rows = perf.map((c) => [
+        const rows = (perf ?? []).map((c) => [
             c.name, c.email, c.poste_name,
             c.isConnected ? 'Oui' : 'Non',
             c.nbMessagesEnvoyes, c.nbMessagesRecus,
@@ -171,7 +186,7 @@ export default function RapportsView() {
 
     const exportDetailJours = () => {
         const headers = ['Date', 'Total messages', 'Entrants', 'Sortants', 'Conversations'];
-        const rows = temporelle.map((t) => [
+        const rows = (temporelle ?? []).map((t) => [
             t.periode, t.nb_messages, t.messages_in, t.messages_out, t.nb_conversations ?? 0,
         ]);
         downloadCsv(toCsv(headers, rows), `rapport_detail_jours_${todayLabel()}.csv`);
@@ -280,7 +295,9 @@ export default function RapportsView() {
                         description={`Détail par commercial — ${periodLabel}`}
                         onExport={exportEquipe}
                     >
-                        {perf.length === 0 ? (
+                        {perf === null ? (
+                            <SectionSkeleton rows={5} />
+                        ) : perf.length === 0 ? (
                             <p className="text-sm text-gray-400 text-center py-6">Aucune donnée disponible pour cette période.</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -326,7 +343,18 @@ export default function RapportsView() {
                     </ReportCard>
 
                     {/* Détail par jour */}
-                    {temporelle.length > 0 && (
+                    {temporelle === null && (
+                        <ReportCard
+                            icon={<Calendar className="w-4 h-4 text-orange-600" />}
+                            iconBg="bg-orange-100"
+                            title="Détail par jour"
+                            description="Volume de messages et conversations par date"
+                            onExport={exportDetailJours}
+                        >
+                            <SectionSkeleton rows={5} />
+                        </ReportCard>
+                    )}
+                    {temporelle !== null && temporelle.length > 0 && (
                         <ReportCard
                             icon={<Calendar className="w-4 h-4 text-orange-600" />}
                             iconBg="bg-orange-100"
