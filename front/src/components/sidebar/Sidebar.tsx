@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, LogOut, Wifi, WifiOff, User } from 'lucide-react';
-import { Commercial, Contact, Conversation, Stats, ViewMode } from '@/types/chat';
+import { Commercial, Conversation, Stats, ViewMode } from '@/types/chat';
 import ConversationItem from './ConversationItem';
 import { useChatStore } from '@/store/chatStore';
 import UserHeader from './UserHeader';
@@ -13,7 +13,6 @@ import { ContactSidebarPanel } from '@/components/contacts/ContactSidebarPanel';
 interface SidebarProps {
   commercial: Commercial;
   conversations: Conversation[];
-  contacts: Contact[];
   filterStatus: string;
   searchTerm: string;
   selectedConversation: Conversation | null;
@@ -35,7 +34,6 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({
   commercial,
   conversations,
-  contacts,
   searchTerm,
   selectedConversation,
   isConnected,
@@ -57,8 +55,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const { logout } = useAuth()
   const typingStatus = useChatStore((state) => state.typingStatus);
-
-  logger.debug("Contacts loaded in sidebar", { count: contacts.length });
 
   // Handlers
 

@@ -22,6 +22,7 @@ import {
 import { UnifiedMessage } from './normalization/unified-message';
 import { UnifiedStatus } from './normalization/unified-status';
 import { ChannelService } from 'src/channel/channel.service';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
 
@@ -104,12 +105,19 @@ export class InboundMessageService {
           );
 
           const medias = this.extractMediaFromUnified(message);
+          // OPT-4 : résoudre le channel une seule fois pour tous les médias
+          const mediaChannel: WhapiChannel | null =
+            medias.length > 0 && message.channelId
+              ? await this.channelService.findByChannelId(message.channelId)
+              : null;
+
           for (const media of medias) {
             await this.saveMedia(media, savedMessage, conversation, {
               tenantId: message.tenantId,
               provider: message.provider,
               providerMediaId: message.media?.id,
               channelId: message.channelId,
+              resolvedChannel: mediaChannel,
             });
           }
 
@@ -139,7 +147,9 @@ export class InboundMessageService {
             conversation.auto_message_step = 0;
           }
 
-          await this.messageGateway.notifyNewMessage(fullMessage, conversation);
+          // Passer fullMessage comme lastMessage : c'est le message entrant = dernier message
+          // → évite un SELECT supplémentaire dans notifyNewMessage (OPT-2)
+          await this.messageGateway.notifyNewMessage(fullMessage, conversation, fullMessage);
           this.logger.log(
             `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
           );
@@ -189,6 +199,7 @@ export class InboundMessageService {
       provider?: string;
       providerMediaId?: string;
       channelId?: string;
+      resolvedChannel?: WhapiChannel | null;
     },
   ) {
     const entity = new WhatsappMedia();
@@ -208,13 +219,13 @@ export class InboundMessageService {
     const raw = media.payload as WhapiRawMedia | undefined;
     entity.sha256 = raw?.sha256 ?? null;
 
-    // Attach channel when possible (helps later media resolution)
-    if (context?.channelId) {
-      const resolvedChannel = await this.channelService.findByChannelId(
-        context.channelId,
-      );
-      if (resolvedChannel) {
-        entity.channel = resolvedChannel;
+    // Attach channel — utiliser le channel pré-résolu (OPT-4) sinon charger depuis la DB
+    if (context?.resolvedChannel) {
+      entity.channel = context.resolvedChannel;
+    } else if (context?.channelId) {
+      const ch = await this.channelService.findByChannelId(context.channelId);
+      if (ch) {
+        entity.channel = ch;
       }
     }
 

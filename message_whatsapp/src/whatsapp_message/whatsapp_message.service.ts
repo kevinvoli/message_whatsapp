@@ -865,9 +865,10 @@ export class WhatsappMessageService {
       relations: {
         medias: true,
         chat: true,
-        poste: true,
-        contact: true,
-        quotedMessage: true,
+        // poste et contact ne sont pas utilisés dans mapMessage → retirés (OPT-5)
+        quotedMessage: {
+          medias: true, // resolveMessageText en a besoin pour les messages quotés media
+        },
       },
     });
   }
@@ -903,38 +904,43 @@ export class WhatsappMessageService {
         return existingMessage;
       }
 
-      const channel = await this.channelService.findOne(message.channelId);
+      // OPT-3 : channel et contact sont indépendants → chargement en parallèle
+      const [channel, contact] = await Promise.all([
+        this.channelService.findOne(message.channelId),
+        this.contactService.findOrCreate(
+          message.from,
+          message.chatId,
+          message.fromName ?? message.from,
+        ),
+      ]);
+
       if (!channel) {
         throw new Error(`Channel ${message.channelId} non trouve`);
       }
 
-      const contact = await this.contactService.findOrCreate(
-        message.from,
-        message.chatId,
-        message.fromName ?? message.from,
-      );
-
-      if (message.direction === 'in') {
-        // Utiliser update() ciblé pour éviter que TypeORM n'écrase channel_id
-        // via la relation chargée (chat.channel = ancien WhapiChannel) lors du save().
-        await this.chatRepository.update(
-          { id: chat.id },
-          {
-            last_msg_client_channel_id: channel.channel_id,
-            channel_id: channel.channel_id,
-          },
-        );
-        chat.last_msg_client_channel_id = channel.channel_id;
-        chat.channel_id = channel.channel_id;
-      }
-
-      // Résoudre le message quoté (si le client répond à un de nos messages)
-      let quotedMsg: WhatsappMessage | null = null;
-      if (message.quotedProviderMessageId) {
-        quotedMsg = await this.messageRepository.findOne({
-          where: { provider_message_id: message.quotedProviderMessageId },
-        });
-      }
+      // OPT-3b : mise à jour du chat et recherche du message quoté en parallèle
+      const [, quotedMsg] = await Promise.all([
+        message.direction === 'in'
+          ? this.chatRepository
+              .update(
+                { id: chat.id },
+                {
+                  last_msg_client_channel_id: channel.channel_id,
+                  channel_id: channel.channel_id,
+                },
+              )
+              .then(() => {
+                // Mutations en mémoire après l'UPDATE
+                chat.last_msg_client_channel_id = channel.channel_id;
+                chat.channel_id = channel.channel_id;
+              })
+          : Promise.resolve(),
+        message.quotedProviderMessageId
+          ? this.messageRepository.findOne({
+              where: { provider_message_id: message.quotedProviderMessageId },
+            })
+          : Promise.resolve(null),
+      ]);
 
       const buildMessageEntity = (chatRef: WhatsappChat) =>
         this.messageRepository.create({

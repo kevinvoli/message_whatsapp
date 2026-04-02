@@ -3,7 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import { User } from 'lucide-react';
 import { useContactStore } from '@/store/contactStore';
-import { CallStatus } from '@/types/chat';
+import { useChatStore } from '@/store/chatStore';
+import { CallStatus, convToContact } from '@/types/chat';
 import { ContactCard } from './ContactCard';
 
 interface ContactSidebarPanelProps {
@@ -13,8 +14,15 @@ interface ContactSidebarPanelProps {
 type FilterKey = 'all' | CallStatus;
 
 export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
-  const { contacts, selectedContact, selectContact } = useContactStore();
+  const conversations = useChatStore((s) => s.conversations);
+  const { selectedContactDetail, selectContactByChatId } = useContactStore();
   const [filter, setFilter] = useState<FilterKey>('all');
+
+  // Dériver la liste des contacts depuis les conversations
+  const contacts = useMemo(
+    () => conversations.map(convToContact).filter(Boolean) as NonNullable<ReturnType<typeof convToContact>>[],
+    [conversations],
+  );
 
   const counts = useMemo(() => ({
     all:           contacts.length,
@@ -27,19 +35,16 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
   const filteredContacts = useMemo(() => {
     let result = [...contacts];
 
-    // Filtre par statut
     if (filter !== 'all') {
       result = result.filter((c) => c.call_status === filter);
     }
 
-    // Filtre par recherche (vient du header)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
-          c.contact.includes(q) ||
-          c.call_notes?.toLowerCase().includes(q),
+          c.contact.includes(q),
       );
     }
 
@@ -58,7 +63,7 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Barre de filtres — même style que ConversationFilters */}
+      {/* Barre de filtres */}
       <div className="p-3 border-b border-gray-200 bg-gray-50">
         <div className="p-2 flex items-center gap-2 overflow-x-auto">
           {pills.map(({ key, label }) => (
@@ -77,7 +82,7 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
         </div>
       </div>
 
-      {/* Liste — même conteneur que ConversationList */}
+      {/* Liste */}
       <div className="flex-1 overflow-y-auto">
         {filteredContacts.length === 0 ? (
           <div className="text-center py-10">
@@ -89,8 +94,8 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
             <ContactCard
               key={contact.id}
               contact={contact}
-              isSelected={selectedContact?.id === contact.id}
-              onClick={() => selectContact(contact.id)}
+              isSelected={selectedContactDetail?.chat_id === contact.chat_id}
+              onClick={() => selectContactByChatId(contact.chat_id)}
             />
           ))
         )}

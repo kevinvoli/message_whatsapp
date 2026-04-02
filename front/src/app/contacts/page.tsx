@@ -11,7 +11,6 @@ import {
   MessageSquare,
   PhoneMissed,
   User,
-  RefreshCw,
   Archive,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -21,6 +20,7 @@ import {
   Contact,
   CallStatus,
   ContactFilters,
+  convToContact,
   getCallStatusColor,
   getCallStatusLabel,
 } from '@/types/chat';
@@ -311,8 +311,13 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
 export default function ContactsPage() {
   const router = useRouter();
 
-  // Données provenant du backend via WebSocket (useContactStore)
-  const { contacts, selectedContact, isLoading, loadContacts, selectContact, upsertContact } =
+  // Contacts dérivés des conversations déjà chargées
+  const { conversations } = useChatStore();
+  const contacts = useMemo(
+    () => conversations.map(convToContact).filter(Boolean) as Contact[],
+    [conversations],
+  );
+  const { selectedContactDetail: selectedContact, isLoadingDetail: isLoading, selectContactByChatId, upsertContact } =
     useContactStore();
   const { selectConversation } = useChatStore();
 
@@ -370,6 +375,10 @@ export default function ContactsPage() {
     router.push('/whatsapp');
   }
 
+  function handleSelectContact(contact: Contact) {
+    selectContactByChatId(contact.chat_id);
+  }
+
   async function handleConfirmEdit(status: CallStatus, notes: string) {
     if (!selectedContact) return;
     try {
@@ -394,8 +403,8 @@ export default function ContactsPage() {
     // TODO: émettre socket pour archiver le contact
   }
 
-  // Spinner si chargement initial
-  if (isLoading && contacts.length === 0) {
+  // Spinner si chargement du détail
+  if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -433,13 +442,6 @@ export default function ContactsPage() {
           >
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-gray-900">Contacts rapides</h2>
-              <button
-                onClick={loadContacts}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Actualiser"
-              >
-                <RefreshCw className="w-4 h-4 text-gray-400" />
-              </button>
             </div>
 
             {filteredContacts.length === 0 ? (
@@ -453,8 +455,8 @@ export default function ContactsPage() {
                   <ContactCard
                     key={contact.id}
                     contact={contact}
-                    isSelected={selectedContact?.id === contact.id}
-                    onClick={() => selectContact(contact.id)}
+                    isSelected={selectedContact?.chat_id === contact.chat_id}
+                    onClick={() => handleSelectContact(contact)}
                   />
                 ))}
               </div>

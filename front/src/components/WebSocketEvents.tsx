@@ -7,7 +7,6 @@ import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
 import { logger } from '@/lib/logger';
 import {
-  Contact,
   Conversation,
   Message,
   transformToContact,
@@ -211,15 +210,35 @@ const WebSocketEvents = () => {
 
     const handleContactEvent = (data: { type: string; payload: any }) => {
       const contactState = useContactStore.getState();
+      const chatState = useChatStore.getState();
 
       switch (data.type) {
-        case 'CONTACT_LIST': {
-          const contacts: Contact[] = data.payload.map(transformToContact);
-          contactState.setContacts(contacts);
+        case 'CONTACT_DETAIL': {
+          if (data.payload) {
+            contactState.setSelectedContactDetail(transformToContact(data.payload));
+          } else {
+            contactState.setSelectedContactDetail(null);
+          }
           break;
         }
-        case 'CONTACT_UPSERT': {
-          const contact: Contact = transformToContact(data.payload);
+        case 'CONTACT_UPSERT':
+        case 'CONTACT_CALL_STATUS_UPDATED': {
+          const contact = transformToContact(data.payload);
+          // Mettre à jour le contact_summary dans la conversation correspondante
+          if (contact.chat_id) {
+            chatState.updateConversationContactSummary(contact.chat_id, {
+              id: contact.id,
+              call_status: contact.call_status,
+              call_count: contact.call_count,
+              priority: contact.priority,
+              source: contact.source,
+              tags: contact.tags,
+              conversion_status: contact.conversion_status,
+              last_call_date: contact.last_call_date ?? null,
+              is_active: contact.is_active,
+            });
+          }
+          // Mettre à jour aussi le détail si c'est le même contact
           contactState.upsertContact(contact);
           break;
         }
@@ -229,11 +248,6 @@ const WebSocketEvents = () => {
           if (typeof contactId === 'string') {
             contactState.removeContact(contactId);
           }
-          break;
-        }
-        case 'CONTACT_CALL_STATUS_UPDATED': {
-          const contact: Contact = transformToContact(data.payload);
-          contactState.upsertContact(contact);
           break;
         }
         case 'CALL_LOG_LIST': {

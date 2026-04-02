@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useContactStore } from '@/store/contactStore';
 import { useChatStore } from '@/store/chatStore';
-import { CallStatus, getCallStatusColor, getCallStatusLabel } from '@/types/chat';
+import { CallStatus, convToContact, getCallStatusColor, getCallStatusLabel } from '@/types/chat';
 import { formatDate, formatDateShort, formatTime, formatRelativeDate } from '@/lib/dateUtils';
 import { ContactTimeline } from './ContactTimeline';
 import { CallLogHistory } from './CallLogHistory';
@@ -169,9 +169,15 @@ interface ContactDetailViewProps {
 
 export function ContactDetailView({ onSwitchToConversations }: ContactDetailViewProps) {
   const router = useRouter();
-  const { selectedContact, upsertContact, contacts: allContacts } = useContactStore();
-  const { selectConversation } = useChatStore();
+  const { selectedContactDetail: selectedContact, isLoadingDetail, upsertContact } = useContactStore();
+  const { selectConversation, conversations } = useChatStore();
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Contacts similaires dérivés des conversations (même source ou tags communs)
+  const allContacts = useMemo(
+    () => conversations.map(convToContact).filter(Boolean) as NonNullable<ReturnType<typeof convToContact>>[],
+    [conversations],
+  );
 
   const recentMessages = useMemo(
     () =>
@@ -264,6 +270,18 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
     } else {
       router.push('/whatsapp');
     }
+  }
+
+  // ── Chargement du détail ──
+  if (isLoadingDetail) {
+    return (
+      <div className="flex-1 h-full flex items-center justify-center" style={{ background: '#f3f4f6' }}>
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p style={{ color: '#9ca3af', fontSize: 14 }}>Chargement du contact…</p>
+        </div>
+      </div>
+    );
   }
 
   // ── État vide ──

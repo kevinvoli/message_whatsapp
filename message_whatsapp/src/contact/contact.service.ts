@@ -3,7 +3,7 @@ import { UpdateContactDto } from './dto/update-contact.dto';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactCallDto } from './dto/update-contact-call.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Contact } from './entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
@@ -53,6 +53,23 @@ export class ContactService {
     }
 
     return shouldSave ? this.repo.save(contact) : contact;
+  }
+
+  /** Charge les contacts correspondant à une liste de chat_ids (batch, sans relations). */
+  async findByChatIds(chatIds: string[]): Promise<Map<string, Contact>> {
+    if (!chatIds.length) return new Map();
+    const contacts = await this.repo.find({
+      where: { chat_id: In(chatIds) },
+    });
+    return new Map(contacts.map((c) => [c.chat_id!, c]));
+  }
+
+  /** Charge un contact par chat_id avec ses messages (pour la vue détail). */
+  async findOneByChatId(chatId: string): Promise<Contact | null> {
+    return this.repo.findOne({
+      where: { chat_id: chatId },
+      relations: { messages: true },
+    });
   }
 
   async findAll(limit = 50, offset = 0): Promise<{ data: unknown[]; total: number }> {

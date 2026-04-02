@@ -1,0 +1,196 @@
+name: CI/CD — Build & Deploy (Production)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Déclenché uniquement sur push vers la branche "production"
+# Les images sont taguées :prod (distinctes des images dev :latest)
+# Les secrets SSH pointent vers le VPS de production
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [production]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+
+  # ──────────────────────────────────────────────
+  # 1. DÉTECTION DES CHANGEMENTS
+  # ──────────────────────────────────────────────
+  changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      backend:  ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      admin:    ${{ steps.filter.outputs.admin }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'message_whatsapp/**'
+            frontend:
+              - 'front/**'
+            admin:
+              - 'admin/**'
+
+  # ──────────────────────────────────────────────
+  # 2a. BUILD BACKEND
+  # ──────────────────────────────────────────────
+  build-backend:
+    name: Build — Backend (prod)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push backend image (prod)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./message_whatsapp
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/back:prod
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/back:prod-${{ github.sha }}
+
+  # ──────────────────────────────────────────────
+  # 2b. BUILD FRONTEND
+  # ──────────────────────────────────────────────
+  build-frontend:
+    name: Build — Frontend (prod)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push frontend image (prod)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./front
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.PROD_API_URL }}
+            NEXT_PUBLIC_SOCKET_URL=${{ secrets.PROD_SOCKET_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/front:prod
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/front:prod-${{ github.sha }}
+
+  # ──────────────────────────────────────────────
+  # 2c. BUILD ADMIN
+  # ──────────────────────────────────────────────
+  build-admin:
+    name: Build — Admin (prod)
+    needs: changes
+    if: needs.changes.outputs.admin == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push admin image (prod)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./admin
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.PROD_API_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/admin:prod
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/admin:prod-${{ github.sha }}
+
+  # ──────────────────────────────────────────────
+  # 3. DÉPLOIEMENT SUR LE SERVEUR DE PRODUCTION
+  # ──────────────────────────────────────────────
+  deploy:
+    name: Deploy to production server
+    needs: [build-backend, build-frontend, build-admin]
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH (production)
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key:      ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/whatsapp
+
+            # ── Sauvegarde des images actuelles pour rollback ──────────────────
+            echo "=== SAUVEGARDE DES IMAGES PROD ACTUELLES ==="
+            docker tag ghcr.io/${{ github.repository }}/back:prod  ghcr.io/${{ github.repository }}/back:prod-previous  2>/dev/null || true
+            docker tag ghcr.io/${{ github.repository }}/front:prod ghcr.io/${{ github.repository }}/front:prod-previous 2>/dev/null || true
+            docker tag ghcr.io/${{ github.repository }}/admin:prod ghcr.io/${{ github.repository }}/admin:prod-previous 2>/dev/null || true
+
+            # ── Pull les nouvelles images prod ────────────────────────────────
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}/back:prod  || true
+            docker pull ghcr.io/${{ github.repository }}/front:prod || true
+            docker pull ghcr.io/${{ github.repository }}/admin:prod || true
+
+            # ── Migrations AVANT de démarrer les containers ───────────────────
+            docker run --rm \
+              --env-file ./message_whatsapp/.env \
+              --add-host host.docker.internal:host-gateway \
+              ghcr.io/${{ github.repository }}/back:prod \
+              npm run migration:run:prod
+
+            # ── Redémarre les containers ───────────────────────────────────────
+            docker compose up -d --remove-orphans && {
+              echo "=== DÉPLOIEMENT PRODUCTION RÉUSSI ==="
+              docker image prune -f
+            } || {
+              echo ""
+              echo "=== DÉPLOIEMENT PROD ÉCHOUÉ — LOGS BACKEND ==="
+              docker logs whatsapp-back --tail=150 2>&1 || true
+
+              echo ""
+              echo "=== ROLLBACK VERS LA VERSION PRÉCÉDENTE ==="
+              docker tag ghcr.io/${{ github.repository }}/back:prod-previous  ghcr.io/${{ github.repository }}/back:prod  2>/dev/null || true
+              docker tag ghcr.io/${{ github.repository }}/front:prod-previous ghcr.io/${{ github.repository }}/front:prod 2>/dev/null || true
+              docker tag ghcr.io/${{ github.repository }}/admin:prod-previous ghcr.io/${{ github.repository }}/admin:prod 2>/dev/null || true
+
+              docker compose up -d --remove-orphans || true
+              echo "=== ROLLBACK TERMINÉ — ANCIENNE VERSION RESTAURÉE ==="
+              exit 1
+            }

@@ -14,7 +14,16 @@ import { NotificationService } from 'src/notification/notification.service';
 @Injectable()
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
-  private readonly dispatchLock = new Mutex();
+  private readonly chatDispatchLocks = new Map<string, Mutex>();
+
+  private getChatDispatchLock(chatId: string): Mutex {
+    let mutex = this.chatDispatchLocks.get(chatId);
+    if (!mutex) {
+      mutex = new Mutex();
+      this.chatDispatchLocks.set(chatId, mutex);
+    }
+    return mutex;
+  }
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
@@ -41,14 +50,16 @@ export class DispatcherService {
     traceId?: string,
     tenantId?: string,
   ): Promise<WhatsappChat | null> {
-    return this.dispatchLock.runExclusive(() =>
-      this.assignConversationInternal(
-        clientPhone,
-        clientName,
-        traceId,
-        tenantId,
-      ),
-    );
+    const lock = this.getChatDispatchLock(clientPhone);
+    try {
+      return await lock.runExclusive(() =>
+        this.assignConversationInternal(clientPhone, clientName, traceId, tenantId),
+      );
+    } finally {
+      if (!lock.isLocked()) {
+        this.chatDispatchLocks.delete(clientPhone);
+      }
+    }
   }
 
   private async assignConversationInternal(
@@ -403,7 +414,8 @@ export class DispatcherService {
     let dispatched = 0;
     for (const chat of waitingChats) {
       if (chat.read_only) continue;
-      const assigned = await this.dispatchLock.runExclusive(async () => {
+      const lock = this.getChatDispatchLock(chat.chat_id);
+      const assigned = await lock.runExclusive(async () => {
         const nextAgent = await this.queueService.getNextInQueue();
         if (!nextAgent) return false;
 
@@ -429,6 +441,9 @@ export class DispatcherService {
 
       if (!assigned) break;
       dispatched++;
+      if (!lock.isLocked()) {
+        this.chatDispatchLocks.delete(chat.chat_id);
+      }
     }
 
     this.logger.log(

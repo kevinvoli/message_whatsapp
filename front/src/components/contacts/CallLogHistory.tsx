@@ -31,11 +31,11 @@ const statusDot: Record<CallStatus, { bg: string; text: string }> = {
 // ── Composant ─────────────────────────────────────────────────────────────────
 
 export function CallLogHistory() {
-  const { selectedContact, callLogs } = useContactStore();
+  const { selectedContactDetail, callLogs } = useContactStore();
 
-  if (!selectedContact) return null;
+  if (!selectedContactDetail) return null;
 
-  const logs: CallLog[] = callLogs[selectedContact.id] ?? [];
+  const logs: CallLog[] = callLogs[selectedContactDetail.id] ?? [];
 
   return (
     <div style={{ background: 'white', borderRadius: 16, padding: 18, border: '1px solid #e5e7eb', marginTop: 16 }}>

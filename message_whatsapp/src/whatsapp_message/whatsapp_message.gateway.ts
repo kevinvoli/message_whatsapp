@@ -154,7 +154,6 @@ export class WhatsappMessageGateway
 
     await this.emitQueueUpdate('agent_connected');
     await this.sendConversationsToClient(client);
-    await this.sendContactsToClient(client);
   }
 
   private async resolveCommercialId(client: Socket): Promise<string | null> {
@@ -316,16 +315,18 @@ export class WhatsappMessageGateway
     }
 
     const chatIds = chats.map((c) => c.chat_id);
-    const [lastMsgMap, unreadMap] = await Promise.all([
+    const [lastMsgMap, unreadMap, contactMap] = await Promise.all([
       this.messageService.findLastMessagesBulk(chatIds),
       this.messageService.countUnreadMessagesBulk(chatIds),
+      this.contactService.findByChatIds(chatIds),
     ]);
 
     const conversations = chats.map((chat) =>
-      this.mapConversation(
+      this.mapConversationWithContact(
         chat,
         lastMsgMap.get(chat.chat_id) ?? null,
         unreadMap.get(chat.chat_id) ?? 0,
+        contactMap.get(chat.chat_id),
       ),
     );
 
@@ -415,6 +416,22 @@ export class WhatsappMessageGateway
       return this.emitRateLimited(client, 'conversations:get');
     }
     await this.sendConversationsToClient(client, payload?.search);
+  }
+
+  /** Charge le détail complet d'un contact (avec messages) à la demande. */
+  @SubscribeMessage('contact:get_detail')
+  async handleGetContactDetail(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chat_id: string },
+  ) {
+    if (!this.throttle.allow(client.id, 'contact:get_detail')) {
+      return this.emitRateLimited(client, 'contact:get_detail');
+    }
+    const contact = await this.contactService.findOneByChatId(payload.chat_id);
+    client.emit('contact:event', {
+      type: 'CONTACT_DETAIL',
+      payload: contact,
+    });
   }
 
   @SubscribeMessage('contacts:get')
@@ -740,7 +757,11 @@ export class WhatsappMessageGateway
   // ======================================================
   // WEBHOOK → SERVER
   // ======================================================
-  async notifyNewMessage(message: WhatsappMessage, chat: WhatsappChat) {
+  async notifyNewMessage(
+    message: WhatsappMessage,
+    chat: WhatsappChat,
+    lastMessage?: WhatsappMessage,
+  ) {
     // Typing avant le message pour auto-message
     if (!message.from_me) {
       void this.emitTyping(chat.chat_id, true);
@@ -767,19 +788,21 @@ export class WhatsappMessageGateway
     const preview = message.text ? message.text.substring(0, 80) : '(média)';
     void this.notificationService.create('message', `Nouveau message — ${contactName}`, preview);
 
-    const lastMessage = await this.messageService.findLastMessageBychat_id(
-      chat.chat_id,
-    );
-    const unreadCount = await this.messageService.countUnreadMessages(
-      chat.chat_id,
-    );
+    // Utiliser le lastMessage fourni (message entrant = dernier message)
+    // Fallback vers la DB pour les autres appelants qui ne le fournissent pas
+    const [resolvedLastMessage, unreadCount] = await Promise.all([
+      lastMessage
+        ? Promise.resolve(lastMessage)
+        : this.messageService.findLastMessageBychat_id(chat.chat_id),
+      this.messageService.countUnreadMessages(chat.chat_id),
+    ]);
     this.logger.debug(
       `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
     );
 
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
+      payload: this.mapConversation(chat, resolvedLastMessage, unreadCount),
     });
   }
 
@@ -1136,6 +1159,32 @@ export class WhatsappMessageGateway
     }
 
     return directUrl ?? null;
+  }
+
+  /** Version enrichie avec les données du contact pour l'envoi initial. */
+  private mapConversationWithContact(
+    chat: WhatsappChat,
+    lastMessage?: WhatsappMessage | null,
+    unreadCount?: number,
+    contact?: Contact,
+  ) {
+    return {
+      ...this.mapConversation(chat, lastMessage, unreadCount),
+      contact_client: chat.contact_client,
+      contact_summary: contact
+        ? {
+            id: contact.id,
+            call_status: contact.call_status,
+            call_count: contact.call_count ?? 0,
+            priority: contact.priority ?? null,
+            source: contact.source ?? null,
+            tags: [],
+            conversion_status: contact.conversion_status ?? null,
+            last_call_date: contact.last_call_date ?? null,
+            is_active: contact.is_active,
+          }
+        : null,
+    };
   }
 
   private mapConversation(

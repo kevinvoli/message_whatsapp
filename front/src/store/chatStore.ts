@@ -1,7 +1,7 @@
 // src/store/chatStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
-import { Conversation, ConversationStatus, Message } from "@/types/chat";
+import { ContactSummary, Conversation, ConversationStatus, Message } from "@/types/chat";
 import { logger } from "@/lib/logger";
 
 // crypto.randomUUID() n'est disponible qu'en contexte sécurisé (HTTPS/localhost)
@@ -57,6 +57,8 @@ interface ChatState {
   ) => void;
   setTyping: (chat_id: string) => void;
   clearTyping: (chat_id: string) => void;
+  /** Met à jour le contact_summary d'une conversation (ex. après CONTACT_CALL_STATUS_UPDATED). */
+  updateConversationContactSummary: (chatId: string, summary: Partial<ContactSummary>) => void;
 
   reset: () => void;
 }
@@ -84,6 +86,7 @@ const initialState: Omit<
   | "onTypingStop"
   | "changeConversationStatus"
   | "loadMoreMessages"
+  | "updateConversationContactSummary"
 > = {
   socket: null,
   conversations: [],
@@ -150,6 +153,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = get().socket;
     socket?.emit("messages:get", { chat_id });
     socket?.emit("messages:read", { chat_id });
+  },
+
+  updateConversationContactSummary: (chatId, summary) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.chat_id === chatId
+          ? { ...c, contact_summary: { ...(c.contact_summary ?? {} as any), ...summary } }
+          : c,
+      ),
+    }));
   },
 
   removeConversationBychat_id: (chat_id: string) => {

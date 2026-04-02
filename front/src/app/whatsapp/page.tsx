@@ -13,14 +13,12 @@ import { useRouter } from 'next/navigation';
 import { CallStatus, Conversation, ViewMode } from '@/types/chat';
 import { useStatsStore } from '@/store/stats.store';
 import ChatMainArea from '@/components/chat/ChatMainArea';
-import { useContactStore } from '@/store/contactStore';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
 import { logger } from '@/lib/logger';
 
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
-  const { contacts, setContacts } = useContactStore();
   const {
     conversations,
     selectedConversation,
@@ -84,17 +82,6 @@ const WhatsAppPage = () => {
     });
   }, [conversations, filterStatus, searchQuery]);
 
-    // Filtrage des contacts basé sur la recherche
-    const filteredContacts = contacts.filter((contact) => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return (
-            contact.name.toLowerCase().includes(query) ||
-            contact.contact.includes(query) ||
-            contact.call_notes?.toLowerCase().includes(query)
-        );
-    });
-
     const handleViewModeChange = (mode: ViewMode) => {
         setViewMode(mode);
         setSearchQuery(''); // Réinitialiser la recherche lors du changement de vue
@@ -129,8 +116,6 @@ const WhatsAppPage = () => {
         onViewModeChange={handleViewModeChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        contacts={contacts}
-
       />
       {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />}
 

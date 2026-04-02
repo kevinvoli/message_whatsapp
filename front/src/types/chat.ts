@@ -234,6 +234,19 @@ export const transformToCallLog = (raw: Record<string, any>): CallLog => ({
   updatedAt: new Date(raw.updatedAt),
 });
 
+/** Résumé léger du contact embarqué dans chaque conversation (chargé en batch au connect). */
+export interface ContactSummary {
+  id: string;
+  call_status: CallStatus;
+  call_count: number;
+  priority?: Priority | null;
+  source?: string | null;
+  tags?: string[];
+  conversion_status?: string | null;
+  last_call_date?: Date | null;
+  is_active: boolean;
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -306,6 +319,9 @@ export interface Conversation {
   closed_at?: Date | null;
   converted_at?: Date | null;
   closed_by?: string;
+
+  /** Données du contact associé, chargées en batch avec les conversations. */
+  contact_summary?: ContactSummary | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -509,6 +525,17 @@ interface RawConversationData {
   read_only?: boolean;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
+  contact_summary?: {
+    id: string;
+    call_status?: string;
+    call_count?: number;
+    priority?: string | null;
+    source?: string | null;
+    tags?: string[];
+    conversion_status?: string | null;
+    last_call_date?: string | Date | null;
+    is_active?: boolean;
+  } | null;
 }
 
 interface RawCommercialData {
@@ -762,10 +789,51 @@ export const transformToConversation = (
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
     closed_by: raw.closed_by,
 
+    contact_summary: raw.contact_summary
+      ? {
+          id: raw.contact_summary.id,
+          call_status: (raw.contact_summary.call_status as CallStatus) || 'à_appeler',
+          call_count: raw.contact_summary.call_count ?? 0,
+          priority: (raw.contact_summary.priority as Priority) ?? null,
+          source: raw.contact_summary.source ?? null,
+          tags: raw.contact_summary.tags ?? [],
+          conversion_status: raw.contact_summary.conversion_status ?? null,
+          last_call_date: raw.contact_summary.last_call_date
+            ? new Date(raw.contact_summary.last_call_date)
+            : null,
+          is_active: raw.contact_summary.is_active ?? true,
+        }
+      : null,
+
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),
   };
 };
+/**
+ * Crée un objet Contact léger depuis une Conversation + son contact_summary.
+ * Retourne null si la conversation n'a pas de contact associé.
+ */
+export const convToContact = (conv: Conversation): Contact | null => {
+  const s = conv.contact_summary;
+  if (!s) return null;
+  return {
+    id: s.id,
+    name: conv.clientName,
+    contact: conv.clientPhone,
+    chat_id: conv.chat_id,
+    is_active: s.is_active,
+    call_status: s.call_status,
+    call_count: s.call_count,
+    priority: s.priority ?? undefined,
+    source: s.source ?? undefined,
+    tags: s.tags ?? [],
+    conversion_status: (s.conversion_status as Contact['conversion_status']) ?? undefined,
+    last_call_date: s.last_call_date ?? undefined,
+    createdAt: conv.createdAt,
+    updatedAt: conv.updatedAt,
+  };
+};
+
 /**
  * Transforme des données brutes en un objet Commercial valide.
  */

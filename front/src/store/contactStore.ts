@@ -1,4 +1,4 @@
-﻿// src/store/chatStore.ts
+// src/store/contactStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
 import { Contact, CallLog } from "@/types/chat";
@@ -6,24 +6,26 @@ import { logger } from "@/lib/logger";
 
 interface ContactState {
   socket: Socket | null;
-  selectedContact: Contact | null;
-  isLoading: boolean;
-  error: string | null;
-  contacts: Contact[];
-  /** Historique des appels indexé par contact_id (F-02) */
+  /** Contact chargé en détail (avec messages) lors d'un clic — null tant que non sélectionné. */
+  selectedContactDetail: Contact | null;
+  /** Vrai pendant le chargement du détail depuis le backend. */
+  isLoadingDetail: boolean;
+  /** Historique des appels indexé par contact_id. */
   callLogs: Record<string, CallLog[]>;
+
   // Actions
   setSocket: (socket: Socket | null) => void;
-  // Setters for WebSocket events
-  selectContact: (contact_id: string) => void;
-  setContacts: (contact: Contact[]) => void;
-  upsertContact: (contact: Contact) => void;
-  removeContact: (contact_id: string) => void;
-  // updateContactStatus: (contact: Contact) => void;
-  loadContacts: () => void;
-  /** Stocke la liste complète des logs d'un contact (F-02) */
-  setCallLogs: (contact_id: string, logs: CallLog[]) => void;
-  /** Ajoute un nouveau log en tête de liste (F-02) */
+  /** Émet contact:get_detail au backend pour charger le contact complet (messages inclus). */
+  selectContactByChatId: (chatId: string) => void;
+  /** Met à jour le détail sélectionné (après update call status, etc.). */
+  upsertContact: (contact: Partial<Contact> & { id: string }) => void;
+  /** Vide le détail si c'est le contact supprimé. */
+  removeContact: (contactId: string) => void;
+  /** Appelé par WebSocketEvents quand CONTACT_DETAIL arrive. */
+  setSelectedContactDetail: (contact: Contact | null) => void;
+  /** Stocke la liste complète des logs d'un contact. */
+  setCallLogs: (contactId: string, logs: CallLog[]) => void;
+  /** Ajoute un nouveau log en tête de liste. */
   addCallLog: (log: CallLog) => void;
   reset: () => void;
 }
@@ -31,139 +33,71 @@ interface ContactState {
 const initialState: Omit<
   ContactState,
   | "setSocket"
-  | "selectContact"
-  | "loadContacts"
-  | "setContacts"
+  | "selectContactByChatId"
   | "upsertContact"
   | "removeContact"
+  | "setSelectedContactDetail"
   | "setCallLogs"
   | "addCallLog"
   | "reset"
 > = {
-  contacts: [],
-  selectedContact: null,
-  isLoading: false,
-  error: null,
   socket: null,
+  selectedContactDetail: null,
+  isLoadingDetail: false,
   callLogs: {},
 };
-
 
 export const useContactStore = create<ContactState>((set, get) => ({
   ...initialState,
 
   setSocket: (socket) => set({ socket }),
 
-  loadContacts: () => {
-    const { socket } = get();
+  selectContactByChatId: (chatId: string) => {
+    const { socket, selectedContactDetail } = get();
     if (!socket) return;
 
-    set({ isLoading: true });
-    logger.debug("Contacts load requested");
+    // Éviter un rechargement si c'est déjà le même contact
+    if (selectedContactDetail?.chat_id === chatId) return;
 
-    socket?.emit("contacts:get");
+    set({ isLoadingDetail: true, selectedContactDetail: null });
+    logger.debug("Contact detail requested", { chatId });
+    socket.emit("contact:get_detail", { chat_id: chatId });
+
+    // Charge aussi l'historique des appels si l'id est déjà connu
+    // (sera rechargé depuis CONTACT_DETAIL une fois reçu)
   },
 
-  
-  selectContact: (contact_id: string) => {
-    set((state) => {
-      const contact = state.contacts.find(
-        (c) => c.id === contact_id,
-      );
-
-      if (!contact) return state;
-
-      return {
-        selectedContact: { ...contact, unreadCount: 0 },
-        contacts: state.contacts.map((c) =>
-          c.id === contact_id ? { ...c, unreadCount: 0 } : c,
-        ),
-        messages: [],
-        isLoading: true,
-      };
-    });
-
-    // Charge l'historique des appels (F-02)
-    const { socket } = get();
-    if (socket) {
-      socket.emit('call_logs:get', { contact_id });
+  setSelectedContactDetail: (contact) => {
+    set({ selectedContactDetail: contact, isLoadingDetail: false });
+    // Charge l'historique des appels
+    if (contact) {
+      const { socket } = get();
+      socket?.emit("call_logs:get", { contact_id: contact.id });
     }
-  },
-
-  setContacts: (contacts) => {
-    logger.debug("Contacts loaded", { count: contacts.length });
-
-    set({ contacts, isLoading: false });
   },
 
   upsertContact: (contact) => {
     set((state) => {
-      const existingIndex = state.contacts.findIndex(
-        (c) => c.id === contact.id,
-      );
-      const nextContacts =
-        existingIndex === -1
-          ? [contact, ...state.contacts]
-          : state.contacts.map((c) =>
-              c.id === contact.id ? { ...c, ...contact } : c,
-            );
-
-      const nextSelected =
-        state.selectedContact?.id === contact.id
-          ? { ...state.selectedContact, ...contact }
-          : state.selectedContact;
-
+      if (!state.selectedContactDetail) return state;
+      if (state.selectedContactDetail.id !== contact.id) return state;
       return {
-        contacts: nextContacts,
-        selectedContact: nextSelected,
+        selectedContactDetail: { ...state.selectedContactDetail, ...contact },
       };
     });
   },
 
-  removeContact: (contact_id) => {
-    set((state) => {
-      const nextContacts = state.contacts.filter((c) => c.id !== contact_id);
-      const nextSelected =
-        state.selectedContact?.id === contact_id ? null : state.selectedContact;
-
-      return {
-        contacts: nextContacts,
-        selectedContact: nextSelected,
-      };
-    });
-  },
-
-
-
-
-
-  // update: (updatedContact: Contact) => {
-  //   set((state) => {
-  //     const isSelected =
-  //       state.selectedContact?.id === updatedContact.id;
-
-  //   });
-  // },
-
-  // updateContactStatus: (
-  //   contact_id: string | undefined,
-  //   messageId: string,
-  //   status: Contact["call_status"],
-  // ) => {
-  //   return set((state) => {
-  //     if (state.selectedContact?.chat_id !== contact_id) return state;
-
-  //     return {
-  //       contact: state.contact.map((m) => m.id === messageId ? { ...m, call_status: status } : m
-
-  //       ),
-  //     };
-  //   });
-  // },
-  
-  setCallLogs: (contact_id, logs) => {
+  removeContact: (contactId) => {
     set((state) => ({
-      callLogs: { ...state.callLogs, [contact_id]: logs },
+      selectedContactDetail:
+        state.selectedContactDetail?.id === contactId
+          ? null
+          : state.selectedContactDetail,
+    }));
+  },
+
+  setCallLogs: (contactId, logs) => {
+    set((state) => ({
+      callLogs: { ...state.callLogs, [contactId]: logs },
     }));
   },
 
@@ -181,4 +115,3 @@ export const useContactStore = create<ContactState>((set, get) => ({
 
   reset: () => set({ ...initialState }),
 }));
-
