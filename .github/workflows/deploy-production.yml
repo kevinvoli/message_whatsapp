@@ -163,7 +163,7 @@ jobs:
             docker tag ghcr.io/${{ github.repository }}/admin:prod ghcr.io/${{ github.repository }}/admin:prod-previous 2>/dev/null || true
 
             # ── Pull les nouvelles images prod ────────────────────────────────
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ github.repository }}/back:prod  || true
             docker pull ghcr.io/${{ github.repository }}/front:prod || true
             docker pull ghcr.io/${{ github.repository }}/admin:prod || true
