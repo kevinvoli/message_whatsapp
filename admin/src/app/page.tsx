@@ -23,6 +23,7 @@ export default function Home() {
           router.replace('/login');
         }
         
+        
       } catch (error) {
         logger.error("Authentication check failed", {
           error: error instanceof Error ? error.message : String(error),
