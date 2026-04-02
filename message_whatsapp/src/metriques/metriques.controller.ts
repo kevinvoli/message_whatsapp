@@ -86,7 +86,7 @@ export class MetriquesController {
   }
 
   @Get('overview')
-  @ApiOperation({ summary: 'Recupere toutes les donnees du dashboard' })
+  @ApiOperation({ summary: 'Recupere toutes les donnees du dashboard (ou une section)' })
   @ApiResponse({
     status: 200,
     description: 'Donnees du dashboard recuperees avec succes',
@@ -95,6 +95,7 @@ export class MetriquesController {
     @Query('periode') periode: string = 'today',
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
+    @Query('section') section?: 'globales' | 'commerciaux' | 'channels' | 'temporelle',
   ) {
     const joursMap: Record<string, number> = {
       today: 1,
@@ -103,9 +104,42 @@ export class MetriquesController {
       year: 365,
     };
     const jours = joursMap[periode] ?? 7;
+    const isStandard = STANDARD_PERIODS.has(periode) && !dateFrom && !dateTo;
 
-    // Lecture depuis le snapshot si période standard et pas de filtre custom
-    if (STANDARD_PERIODS.has(periode) && !dateFrom && !dateTo) {
+    // ── Lecture snapshot pour une section précise ──────────────────────────────
+    if (section && isStandard) {
+      const snap = await this.snapshotService.getLatest('global', periode);
+      if (snap) {
+        const d = snap.data as any;
+        const sectionMap: Record<string, unknown> = {
+          globales:    d.metriques,
+          commerciaux: d.performanceCommercial,
+          channels:    d.statutChannels,
+          temporelle:  d.performanceTemporelle,
+        };
+        return {
+          success: true,
+          timestamp: new Date().toISOString(),
+          computed_at: snap.computed_at,
+          from_snapshot: true,
+          section,
+          data: sectionMap[section],
+        };
+      }
+      // Snapshot expiré → calcul de la section uniquement
+      const liveData = await this.computeSection(section, periode, jours, dateFrom, dateTo);
+      return {
+        success: true,
+        timestamp: new Date().toISOString(),
+        computed_at: new Date(),
+        from_snapshot: false,
+        section,
+        data: liveData,
+      };
+    }
+
+    // ── Lecture snapshot complète (comportement historique) ───────────────────
+    if (isStandard) {
       const snap = await this.snapshotService.getLatest('global', periode);
       if (snap) {
         const d = snap.data as any;
@@ -124,6 +158,7 @@ export class MetriquesController {
       }
     }
 
+    // ── Calcul complet (date custom ou snapshot expiré) ───────────────────────
     const [
       metriques,
       performanceCommercial,
@@ -148,6 +183,21 @@ export class MetriquesController {
         performanceTemporelle,
       },
     };
+  }
+
+  private async computeSection(
+    section: 'globales' | 'commerciaux' | 'channels' | 'temporelle',
+    periode: string,
+    jours: number,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<unknown> {
+    switch (section) {
+      case 'globales':    return this.metriquesService.getMetriquesGlobales(periode, dateFrom, dateTo);
+      case 'commerciaux': return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo);
+      case 'channels':    return this.metriquesService.getStatutChannels(periode, dateFrom, dateTo);
+      case 'temporelle':  return this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo);
+    }
   }
 
   @Post('refresh-snapshots')

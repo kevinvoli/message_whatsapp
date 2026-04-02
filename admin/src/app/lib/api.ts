@@ -677,6 +677,29 @@ export async function getOverviewMetriques(periode = 'today', dateFrom?: string,
     return { ...result.data, computed_at: result.computed_at, from_snapshot: result.from_snapshot };
 }
 
+export async function getOverviewSection<T>(
+  section: 'globales' | 'commerciaux' | 'channels' | 'temporelle',
+  periode = 'today',
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<T> {
+  const params = new URLSearchParams({ periode, section });
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+  const response = await fetch(`${API_BASE_URL}/api/metriques/overview?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const result = await handleResponse<{
+    success: boolean;
+    data: T;
+    computed_at?: string;
+    from_snapshot?: boolean;
+    section: string;
+  }>(response);
+  return result.data;
+}
+
 export async function refreshSnapshots(): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/api/metriques/refresh-snapshots`, {
         method: 'POST',

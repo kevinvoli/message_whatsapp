@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
-import { getOverviewMetriques, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api';
+import { getOverviewSection, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { formatDate } from '@/app/lib/dateUtils';
 
@@ -32,9 +32,9 @@ interface OverviewViewProps {
 
 export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: OverviewViewProps) {
   const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
-  const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[]>([]);
-  const [statutChannels, setStatutChannels] = useState<StatutChannel[]>([]);
-  const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[]>([]);
+  const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[] | null>(null);
+  const [statutChannels, setStatutChannels] = useState<StatutChannel[] | null>(null);
+  const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[] | null>(null);
   const [webhookMetrics, setWebhookMetrics] = useState<WebhookMetricsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,21 +43,33 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [overviewData, webhookData] = await Promise.all([
-        getOverviewMetriques(selectedPeriod),
-        getWebhookMetrics(),
-      ]);
-      setMetriques(overviewData.metriques);
-      setPerformanceCommercial(overviewData.performanceCommercial);
-      setStatutChannels(overviewData.statutChannels);
-      setPerformanceTemporelle(overviewData.performanceTemporelle ?? []);
-      setWebhookMetrics(webhookData);
-      setComputedAt(overviewData.computed_at ? new Date(overviewData.computed_at) : new Date());
-      setFromSnapshot(overviewData.from_snapshot ?? false);
-    } finally {
-      setLoading(false);
-    }
+    setMetriques(null);
+    setPerformanceCommercial(null);
+    setStatutChannels(null);
+    setPerformanceTemporelle(null);
+
+    // Chargement progressif : chaque section s'affiche dès qu'elle arrive
+    const globalesP = getOverviewSection<MetriquesGlobales>('globales', selectedPeriod)
+      .then((data) => { setMetriques(data); setLoading(false); })
+      .catch(() => { setMetriques(undefined as unknown as MetriquesGlobales); setLoading(false); });
+
+    const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', selectedPeriod)
+      .then((data) => setPerformanceCommercial(data))
+      .catch(() => setPerformanceCommercial([]));
+
+    const channelsP = getOverviewSection<StatutChannel[]>('channels', selectedPeriod)
+      .then((data) => setStatutChannels(data))
+      .catch(() => setStatutChannels([]));
+
+    const temporelleP = getOverviewSection<PerformanceTemporelle[]>('temporelle', selectedPeriod)
+      .then((data) => setPerformanceTemporelle(data))
+      .catch(() => setPerformanceTemporelle([]));
+
+    const webhookP = getWebhookMetrics()
+      .then((data) => { setWebhookMetrics(data); setComputedAt(new Date()); setFromSnapshot(false); })
+      .catch(() => setWebhookMetrics(null));
+
+    await Promise.allSettled([globalesP, commerciauxP, channelsP, temporelleP, webhookP]);
   }, [selectedPeriod]);
 
   const handleRefresh = useCallback(async () => {
@@ -171,6 +183,14 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
       windowMinutes: webhookMetrics.window_minutes,
     };
   }, [webhookMetrics]);
+
+  const SectionSkeleton = ({ rows = 3 }: { rows?: number }) => (
+    <div className="animate-pulse space-y-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-10 bg-gray-100 rounded-lg" />
+      ))}
+    </div>
+  );
 
   if (loading || !metriques) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -421,7 +441,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
                   <p className="text-xs text-gray-500">Aucun trafic tenant.</p>
                 )}
                 {webhookSummary.topTenants.map(([tenant, count]) => {
-                  const ch = statutChannels.find((c) => c.channel_id === tenant);
+                  const ch = (statutChannels ?? []).find((c) => c.channel_id === tenant);
                   const displayName = ch?.label ?? ch?.channel_id?.substring(0, 15) ?? tenant.substring(0, 15);
                   return (
                     <div
@@ -440,7 +460,13 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
       </div>
 
       {/* Performance Temporelle */}
-      {performanceTemporelle && performanceTemporelle.length > 0 && (
+      {performanceTemporelle === null && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">{PERIODE_CHART_LABELS[selectedPeriod]}</h3>
+          <SectionSkeleton rows={5} />
+        </div>
+      )}
+      {performanceTemporelle !== null && performanceTemporelle.length > 0 && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">{PERIODE_CHART_LABELS[selectedPeriod]}</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -552,8 +578,9 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
         {/* Statut des Channels */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Statut Channels</h3>
+          {statutChannels === null ? <SectionSkeleton rows={4} /> : (
           <div className="space-y-3">
-            {statutChannels.slice(0, 5).map((channel, idx) => (
+            {(statutChannels ?? []).slice(0, 5).map((channel, idx) => (
               <div key={idx} className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-900">
@@ -573,14 +600,16 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
 
       {/* Top Performers */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performers — {PERIODE_LABELS[selectedPeriod]}</h3>
+        {performanceCommercial === null ? <SectionSkeleton rows={4} /> : (
         <div className="grid grid-cols-3 gap-4">
-          {performanceCommercial
+          {(performanceCommercial ?? [])
             .sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes)
             .slice(0, 3)
             .map((commercial, idx) => (
@@ -613,6 +642,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
               </div>
             ))}
         </div>
+        )}
       </div>
 
       {/* Alertes et Notifications */}
