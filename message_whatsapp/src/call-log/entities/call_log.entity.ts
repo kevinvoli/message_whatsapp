@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+
 export enum CallOutcome {
   Répondu = 'répondu',
   Messagerie = 'messagerie',
