@@ -176,7 +176,7 @@ jobs:
               npm run migration:run:prod
 
             # ── Redémarre les containers ───────────────────────────────────────
-            docker compose up -d --remove-orphans && {
+            IMAGE_TAG=prod GITHUB_REPOSITORY=${{ github.repository }} docker compose up -d --remove-orphans && {
               echo "=== DÉPLOIEMENT PRODUCTION RÉUSSI ==="
               docker image prune -f
             } || {
@@ -190,7 +190,7 @@ jobs:
               docker tag ghcr.io/${{ github.repository }}/front:prod-previous ghcr.io/${{ github.repository }}/front:prod 2>/dev/null || true
               docker tag ghcr.io/${{ github.repository }}/admin:prod-previous ghcr.io/${{ github.repository }}/admin:prod 2>/dev/null || true
 
-              docker compose up -d --remove-orphans || true
+              IMAGE_TAG=prod GITHUB_REPOSITORY=${{ github.repository }} docker compose up -d --remove-orphans || true
               echo "=== ROLLBACK TERMINÉ — ANCIENNE VERSION RESTAURÉE ==="
               exit 1
             }
