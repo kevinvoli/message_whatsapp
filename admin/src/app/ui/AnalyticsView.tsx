@@ -14,7 +14,7 @@ import {
     Line,
 } from 'recharts';
 import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle } from 'lucide-react';
-import { getOverviewMetriques } from '@/app/lib/api';
+import { getOverviewSection } from '@/app/lib/api';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
 
@@ -69,8 +69,8 @@ export default function AnalyticsView() {
     const [period, setPeriod] = useState<Period>('today');
     const [loading, setLoading] = useState(false);
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
-    const [perf, setPerf] = useState<PerformanceCommercial[]>([]);
-    const [temporelle, setTemporelle] = useState<PerformanceTemporelle[]>([]);
+    const [perf, setPerf] = useState<PerformanceCommercial[] | null>(null);
+    const [temporelle, setTemporelle] = useState<PerformanceTemporelle[] | null>(null);
     const [computedAt, setComputedAt] = useState<Date | null>(null);
     const [fromSnapshot, setFromSnapshot] = useState(false);
 
@@ -83,18 +83,23 @@ export default function AnalyticsView() {
 
     const load = useCallback(async (p: Period, from?: string, to?: string) => {
         setLoading(true);
-        try {
-            const data = await getOverviewMetriques(p, from, to);
-            setMetriques(data.metriques);
-            setPerf(data.performanceCommercial);
-            setTemporelle(data.performanceTemporelle);
-            setComputedAt(data.computed_at ? new Date(data.computed_at) : new Date());
-            setFromSnapshot(data.from_snapshot ?? false);
-        } catch {
-            // silencieux — l'UI reste avec les données précédentes
-        } finally {
-            setLoading(false);
-        }
+        setMetriques(null);
+        setPerf(null);
+        setTemporelle(null);
+
+        const globalesP = getOverviewSection<MetriquesGlobales>('globales', p, from, to)
+            .then((data) => { setMetriques(data); setLoading(false); setComputedAt(new Date()); })
+            .catch(() => setLoading(false));
+
+        const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', p, from, to)
+            .then((data) => setPerf(data))
+            .catch(() => setPerf([]));
+
+        const temporelleP = getOverviewSection<PerformanceTemporelle[]>('temporelle', p, from, to)
+            .then((data) => { setTemporelle(data); setFromSnapshot(false); })
+            .catch(() => setTemporelle([]));
+
+        await Promise.allSettled([globalesP, commerciauxP, temporelleP]);
     }, []);
 
     useEffect(() => {
@@ -114,12 +119,20 @@ export default function AnalyticsView() {
         setActiveDateTo('');
     };
 
-    const chartData = temporelle.map((t) => ({
+    const chartData = (temporelle ?? []).map((t) => ({
         date: formatDate(t.periode, period),
         'Entrants': t.messages_in,
         'Sortants': t.messages_out,
         'Total': t.nb_messages,
     }));
+
+    const SectionSkeleton = ({ rows = 3 }: { rows?: number }) => (
+        <div className="animate-pulse space-y-3">
+            {Array.from({ length: rows }).map((_, i) => (
+                <div key={i} className="h-10 bg-gray-100 rounded-lg" />
+            ))}
+        </div>
+    );
 
     // Répartition conversations
     const chatsTotal = (metriques?.chatsActifs ?? 0) + (metriques?.chatsEnAttente ?? 0) + (metriques?.chatsFermes ?? 0);
@@ -293,7 +306,13 @@ export default function AnalyticsView() {
                     </div>
 
                     {/* Graphique volume de messages */}
-                    {chartData.length > 0 && (
+                    {temporelle === null && (
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                            <h2 className="text-base font-semibold text-gray-900 mb-4">Volume de messages</h2>
+                            <SectionSkeleton rows={5} />
+                        </div>
+                    )}
+                    {temporelle !== null && chartData.length > 0 && (
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                             <h2 className="text-base font-semibold text-gray-900 mb-4">Volume de messages</h2>
                             <ResponsiveContainer width="100%" height={260}>
@@ -360,7 +379,7 @@ export default function AnalyticsView() {
                         {/* Performance commerciaux top 5 */}
                         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                             <h2 className="text-base font-semibold text-gray-900 mb-4">Performance par commercial</h2>
-                            {perf.length === 0 ? (
+                            {perf === null ? <SectionSkeleton rows={4} /> : (perf ?? []).length === 0 ? (
                                 <p className="text-sm text-gray-400 text-center py-8">Aucune donnée disponible</p>
                             ) : (
                                 <div className="overflow-x-auto">
@@ -375,7 +394,7 @@ export default function AnalyticsView() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {perf.map((c) => (
+                                            {(perf ?? []).map((c) => (
                                                 <tr key={c.id} className="hover:bg-gray-50">
                                                     <td className="py-2.5 pr-4">
                                                         <div className="flex items-center gap-2">
@@ -408,6 +427,7 @@ export default function AnalyticsView() {
                     </div>
                 </>
             )}
+
         </div>
     );
 }
