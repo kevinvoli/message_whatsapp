@@ -296,6 +296,18 @@ export class WhatsappMessageGateway
   private async sendConversationsToClient(client: Socket, searchTerm?: string) {
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
+    try {
+      await this.sendConversationsToClientInternal(client, agent, searchTerm);
+    } catch (err) {
+      this.logger.error(`sendConversationsToClient failed for poste ${agent.posteId}`, err instanceof Error ? err.stack : err);
+    }
+  }
+
+  private async sendConversationsToClientInternal(
+    client: Socket,
+    agent: { posteId: string; tenantIds: string[] },
+    searchTerm?: string,
+  ) {
 
     // En mode recherche : inclure toutes les conversations (fermées aussi) pour trouver l'historique.
     // En mode normal : exclure les conversations fermées/converties pour réduire la charge.
@@ -320,12 +332,19 @@ export class WhatsappMessageGateway
     }
 
     const chatIds = chats.map((c) => c.chat_id);
-    const [lastMsgMap, unreadMap, contactMap, recentMsgsMap] = await Promise.all([
+    const [lastMsgMap, unreadMap, contactMap] = await Promise.all([
       this.messageService.findLastMessagesBulk(chatIds),
       this.messageService.countUnreadMessagesBulk(chatIds),
       this.contactService.findByChatIds(chatIds),
-      this.messageService.findRecentByChatIds(chatIds),
     ]);
+
+    // Chargement des messages en bulk — isolé pour ne pas bloquer les conversations si ça échoue
+    let recentMsgsMap = new Map<string, Record<string, any>[]>();
+    try {
+      recentMsgsMap = await this.messageService.findRecentByChatIds(chatIds);
+    } catch (err) {
+      this.logger.error('findRecentByChatIds failed, messages will be empty', err instanceof Error ? err.message : err);
+    }
 
     const conversations = chats.map((chat) => ({
       ...this.mapConversationWithContact(
