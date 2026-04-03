@@ -173,7 +173,8 @@ export class WhatsappMessageGateway
   }
 
   private async resolveTenantIdsForPoste(posteId: string): Promise<string[]> {
-    const chats = await this.chatService.findByPosteId(posteId);
+    // On inclut toutes les conversations (même fermées) pour la résolution des tenants
+    const chats = await this.chatService.findByPosteId(posteId, []);
     const tenantIds = [
       ...new Set(
         chats.map((chat) => chat.tenant_id).filter(Boolean) as string[],
@@ -301,7 +302,9 @@ export class WhatsappMessageGateway
     if (!chats) return;
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
-      chats = chats.filter((c) => c.tenant_id && tenantSet.has(c.tenant_id));
+      // Inclure les conversations sans tenant_id (créées avant le système multi-tenant)
+      // ET celles dont le tenant est dans la liste autorisée
+      chats = chats.filter((c) => !c.tenant_id || tenantSet.has(c.tenant_id));
     }
 
     // Filtrage textuel côté back
