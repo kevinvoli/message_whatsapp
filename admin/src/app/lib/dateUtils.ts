@@ -70,8 +70,9 @@ export function formatRelativeDate(value: Date | string | number | null | undefi
 }
 
 /**
- * Format intelligent pour les sidebars de conversation :
+ * Format intelligent pour les sidebars de conversation (comparaison par jour calendaire) :
  * - Aujourd'hui : "14:30"
+ * - Hier        : "Hier"
  * - Cette semaine : "Lun."
  * - Plus ancien : "18/02"
  */
@@ -79,8 +80,13 @@ export function formatConversationTime(value: Date | string | number | null | un
   const d = safeDate(value);
   if (!d) return '-';
 
-  const diffMs = Date.now() - d.getTime();
-  if (diffMs < 86400000) return formatTime(d);
-  if (diffMs < 604800000) return d.toLocaleDateString(LOCALE, { weekday: 'short' });
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 86400000);
+  const startOf7DaysAgo = new Date(startOfToday.getTime() - 6 * 86400000);
+
+  if (d >= startOfToday) return formatTime(d);
+  if (d >= startOfYesterday) return 'Hier';
+  if (d >= startOf7DaysAgo) return d.toLocaleDateString(LOCALE, { weekday: 'short' });
   return d.toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit' });
 }
