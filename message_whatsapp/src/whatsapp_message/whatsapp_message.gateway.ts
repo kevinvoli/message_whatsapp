@@ -219,7 +219,9 @@ export class WhatsappMessageGateway
     tenantIds: string[],
   ): boolean {
     if (tenantIds.length === 0) return true;
-    return !!chat.tenant_id && tenantIds.includes(chat.tenant_id);
+    // Conversations sans tenant_id (données avant multi-tenant) sont toujours autorisées
+    if (!chat.tenant_id) return true;
+    return tenantIds.includes(chat.tenant_id);
   }
 
   private extractAuthToken(client: Socket): string | null {
@@ -1222,6 +1224,8 @@ export class WhatsappMessageGateway
           }
         : null,
       read_only: chat.read_only,
+      contact_client: chat.contact_client,
+      first_response_deadline_at: chat.first_response_deadline_at,
     };
   }
 

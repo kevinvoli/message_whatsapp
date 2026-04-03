@@ -272,10 +272,15 @@ const WebSocketEvents = () => {
       });
     };
 
+    const handleQueueUpdated = (data: { timestamp: string; reason: string; data: unknown[] }) => {
+      logger.debug('Queue updated', { reason: data.reason, size: data.data?.length });
+    };
+
     socket.on('chat:event', handleChatEvent);
     socket.on('contact:event', handleContactEvent);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
+    socket.on('queue:updated', handleQueueUpdated);
 
     if (socket.connected) {
       refreshAfterConnect();
@@ -286,6 +291,7 @@ const WebSocketEvents = () => {
       socket.off('contact:event', handleContactEvent);
       socket.off('error', handleSocketError);
       socket.off('connect', refreshAfterConnect);
+      socket.off('queue:updated', handleQueueUpdated);
       setSocket(null);
     };
   }, [socket, user, setSocket, loadConversations]);
