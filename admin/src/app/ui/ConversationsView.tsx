@@ -26,6 +26,8 @@ export default function ConversationsView({
 }: ConversationsViewProps) {
     const [chats, setChats] = useState<WhatsappChat[]>([]);
     const [total, setTotal] = useState(0);
+    const [totalUnread, setTotalUnread] = useState(0);
+    const [totalFermes, setTotalFermes] = useState(0);
     const [limit, setLimit] = useState(50);
     const [offset, setOffset] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
@@ -89,6 +91,8 @@ export default function ConversationsView({
             );
             setChats(result.data);
             setTotal(result.total);
+            setTotalUnread(result.totalUnread);
+            setTotalFermes(result.totalFermes);
         } finally {
             setLoadingChats(false);
         }
@@ -459,9 +463,14 @@ export default function ConversationsView({
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
                                 {chats.filter((c) => c.status?.includes('attente')).length} en attente
                             </span>
-                            {chats.reduce((s, c) => s + (c.unread_count ?? 0), 0) > 0 && (
+                            {totalFermes > 0 && (
+                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                    {totalFermes} fermés
+                                </span>
+                            )}
+                            {totalUnread > 0 && (
                                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100">
-                                    {chats.reduce((s, c) => s + (c.unread_count ?? 0), 0)} non lus
+                                    {totalUnread} non lus
                                 </span>
                             )}
                         </div>

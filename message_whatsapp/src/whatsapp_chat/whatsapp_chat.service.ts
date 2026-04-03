@@ -174,7 +174,7 @@ export class WhatsappChatService {
     dateStart?: Date,
     posteId?: string,
     commercialId?: string,
-  ): Promise<{ data: WhatsappChat[]; total: number }> {
+  ): Promise<{ data: WhatsappChat[]; total: number; totalUnread: number; totalFermes: number }> {
     if (chat_id) {
       const data = await this.chatRepository
         .createQueryBuilder('chat')
@@ -188,7 +188,7 @@ export class WhatsappChatService {
         )
         .where('chat.chat_id = :chat_id', { chat_id })
         .getMany();
-      return { data, total: data.length };
+      return { data, total: data.length, totalUnread: 0, totalFermes: 0 };
     }
     const qb = this.chatRepository
       .createQueryBuilder('chat')
@@ -254,7 +254,36 @@ export class WhatsappChatService {
       }
     }
 
-    return { data, total };
+    // Statistiques globales (sans filtre de date ni pagination)
+    // pour avoir le vrai total de non-lus et de fermés du poste
+    const statsQb = this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COALESCE(SUM(chat.unread_count), 0)', 'totalUnread')
+      .addSelect("SUM(CASE WHEN chat.status = 'fermé' THEN 1 ELSE 0 END)", 'totalFermes')
+      .where('chat.deletedAt IS NULL');
+
+    if (posteId) statsQb.andWhere('chat.poste_id = :posteId', { posteId });
+    if (commercialId) {
+      statsQb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM whatsapp_message m
+          WHERE m.chat_id = chat.chat_id
+            AND m.commercial_id = :commercialId
+            AND m.direction = 'OUT'
+            AND m.deletedAt IS NULL
+        )`,
+        { commercialId },
+      );
+    }
+
+    const stats = await statsQb.getRawOne<{ totalUnread: string; totalFermes: string }>();
+
+    return {
+      data,
+      total,
+      totalUnread: parseInt(stats?.totalUnread ?? '0') || 0,
+      totalFermes: parseInt(stats?.totalFermes ?? '0') || 0,
+    };
   }
 
   async findBychat_id(chat_id: string): Promise<WhatsappChat | null> {
