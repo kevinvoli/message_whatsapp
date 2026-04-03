@@ -44,10 +44,7 @@ type AuthPayload = {
   tenantId?: string;
 };
 
-const wsPort =
-  process.env.NODE_ENV === 'test' ? 0 : Number(process.env.WS_PORT ?? 3001);
-
-@WebSocketGateway(wsPort, {
+@WebSocketGateway({
   cors: { origin: '*', credentials: true },
 })
 export class WhatsappMessageGateway
