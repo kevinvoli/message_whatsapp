@@ -43,9 +43,9 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     maxSteps: null,
   },
   'offline-reinject': {
-    label: 'Réinjection des chats des agents hors ligne',
+    label: 'Réinjection — agents hors ligne & conversations orphelines',
     description:
-      "Réinjecte dans la queue les chats actifs assignés à des postes hors ligne qui n'ont reçu aucune réponse de l'agent.",
+      "Réinjecte dans la queue (1) les chats actifs sur des postes hors ligne sans réponse, et (2) les conversations orphelines (poste_id = null) qui n'ont jamais été assignées.",
     enabled: true,
     scheduleType: 'cron',
     intervalMinutes: null,
