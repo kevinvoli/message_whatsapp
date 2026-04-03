@@ -56,7 +56,10 @@ export class WhatsappChatService {
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
       .where('chat.poste_id = :poste_id', { poste_id })
-      .orderBy('chat.last_activity_at', 'DESC')
+      // Conversations non lues en premier (toujours dans le take(200))
+      // puis tri par activité récente
+      .orderBy('chat.unread_count', 'DESC')
+      .addOrderBy('chat.last_activity_at', 'DESC')
       .take(200);
 
     if (excludeStatuses.length > 0) {
@@ -67,11 +70,18 @@ export class WhatsappChatService {
   }
 
   async getTotalUnreadForPoste(poste_id: string): Promise<number> {
-    const result = await this.chatRepository
-      .createQueryBuilder('chat')
-      .select('COALESCE(SUM(chat.unread_count), 0)', 'total')
-      .where('chat.poste_id = :poste_id', { poste_id })
-      .andWhere('chat.deletedAt IS NULL')
+    // Compte le nombre de CONVERSATIONS ayant au moins un message entrant non lu
+    // (status SENT ou DELIVERED) — même logique que countUnreadMessagesBulk du gateway
+    // pour garantir que le badge correspond exactement au filtre "non lus" du frontend.
+    const result = await this.messageRepository
+      .createQueryBuilder('m')
+      .select('COUNT(DISTINCT m.chat_id)', 'total')
+      .innerJoin('whatsapp_chat', 'c', 'c.chat_id = m.chat_id')
+      .where('c.poste_id = :poste_id', { poste_id })
+      .andWhere('c.deletedAt IS NULL')
+      .andWhere('m.from_me = :fromMe', { fromMe: false })
+      .andWhere('m.status IN (:...statuses)', { statuses: ['sent', 'delivered'] })
+      .andWhere('m.deletedAt IS NULL')
       .getRawOne<{ total: string }>();
     return parseInt(result?.total ?? '0') || 0;
   }
