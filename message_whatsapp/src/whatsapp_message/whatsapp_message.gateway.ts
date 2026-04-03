@@ -348,7 +348,7 @@ export class WhatsappMessageGateway
       ...this.mapConversationWithContact(
         chat,
         lastMsgMap.get(chat.chat_id) ?? null,
-        unreadMap.get(chat.chat_id) ?? 0,
+        unreadMap.get(chat.chat_id) ?? chat.unread_count ?? 0,
         contactMap.get(chat.chat_id),
       ),
       messages: (recentMsgsMap.get(chat.chat_id) ?? []).map((row) => ({

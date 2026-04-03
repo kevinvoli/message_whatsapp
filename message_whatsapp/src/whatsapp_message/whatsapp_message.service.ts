@@ -578,8 +578,10 @@ export class WhatsappMessageService {
       .select('m.chat_id', 'chat_id')
       .addSelect('COUNT(*)', 'cnt')
       .where('m.chat_id IN (:...chatIds)', { chatIds })
-      .andWhere('m.from_me = false')
-      .andWhere("m.status IN ('SENT', 'DELIVERED')")
+      .andWhere('m.from_me = :fromMe', { fromMe: false })
+      .andWhere('m.status IN (:...statuses)', {
+        statuses: [WhatsappMessageStatus.SENT, WhatsappMessageStatus.DELIVERED],
+      })
       .andWhere('m.deletedAt IS NULL')
       .groupBy('m.chat_id')
       .getRawMany();
