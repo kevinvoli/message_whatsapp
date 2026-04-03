@@ -373,6 +373,14 @@ export class WhatsappMessageGateway
       type: 'CONVERSATION_LIST',
       payload: conversations,
     });
+
+    // Envoie le total de messages non lus global (toutes conv. du poste, y compris fermées)
+    // Indépendant de la liste paginée pour garantir l'exactitude du compteur
+    const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
+    client.emit('chat:event', {
+      type: 'TOTAL_UNREAD_UPDATE',
+      payload: { totalUnread },
+    });
   }
 
   private async sendContactsToClient(client: Socket) {
@@ -638,6 +646,13 @@ export class WhatsappMessageGateway
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
       payload: this.mapConversation(chat, lastMessage, 0),
+    });
+
+    // Mettre à jour le compteur global non lus pour ce poste
+    const totalUnread = await this.chatService.getTotalUnreadForPoste(chat.poste_id);
+    client.emit('chat:event', {
+      type: 'TOTAL_UNREAD_UPDATE',
+      payload: { totalUnread },
     });
   }
 

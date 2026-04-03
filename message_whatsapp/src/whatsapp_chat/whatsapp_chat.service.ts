@@ -66,6 +66,16 @@ export class WhatsappChatService {
     return qb.getMany();
   }
 
+  async getTotalUnreadForPoste(poste_id: string): Promise<number> {
+    const result = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COALESCE(SUM(chat.unread_count), 0)', 'total')
+      .where('chat.poste_id = :poste_id', { poste_id })
+      .andWhere('chat.deletedAt IS NULL')
+      .getRawOne<{ total: string }>();
+    return parseInt(result?.total ?? '0') || 0;
+  }
+
   async findOrCreateChat(
     chat_id: string,
     from: string,

@@ -21,6 +21,7 @@ const WebSocketEvents = () => {
 
   const setSocket = useChatStore((s) => s.setSocket);
   const loadConversations = useChatStore((s) => s.loadConversations);
+  const setTotalUnread = useChatStore((s) => s.setTotalUnread);
 
   useEffect(() => {
     if (!socket || !user) {
@@ -139,6 +140,10 @@ const WebSocketEvents = () => {
           chatState.setConversations(conversations);
           break;
         }
+
+        case 'TOTAL_UNREAD_UPDATE':
+          setTotalUnread((data.payload as { totalUnread: number }).totalUnread);
+          break;
 
         case 'CONVERSATION_READONLY':
           upsertConversationPatch(data.payload.chat_id, {

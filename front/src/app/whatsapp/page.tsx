@@ -23,6 +23,7 @@ const WhatsAppPage = () => {
     conversations,
     selectedConversation,
     selectConversation,
+    totalUnread: totalUnreadFromStore,
 
     // messages,
     // isLoading,
@@ -62,7 +63,10 @@ const WhatsAppPage = () => {
 
   
   const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
-  const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+  // Utilise la valeur globale envoyée par le backend (inclut les conversations fermées
+  // et toutes les conversations du poste, pas seulement celles visibles dans la liste)
+  // Fallback sur le calcul local si le backend n'a pas encore envoyé TOTAL_UNREAD_UPDATE
+  const totalUnread = totalUnreadFromStore || conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {

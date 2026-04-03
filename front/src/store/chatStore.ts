@@ -29,6 +29,7 @@ interface ChatState {
   error: string | null;
   messageIdCache: Record<string, Set<string>>;
   replyToMessage: Message | null;
+  totalUnread: number;
 
   // Actions
   setSocket: (socket: Socket | null) => void;
@@ -59,6 +60,7 @@ interface ChatState {
   clearTyping: (chat_id: string) => void;
   /** Met à jour le contact_summary d'une conversation (ex. après CONTACT_CALL_STATUS_UPDATED). */
   updateConversationContactSummary: (chatId: string, summary: Partial<ContactSummary>) => void;
+  setTotalUnread: (count: number) => void;
 
   reset: () => void;
 }
@@ -87,6 +89,7 @@ const initialState: Omit<
   | "changeConversationStatus"
   | "loadMoreMessages"
   | "updateConversationContactSummary"
+  | "setTotalUnread"
 > = {
   socket: null,
   conversations: [],
@@ -99,6 +102,7 @@ const initialState: Omit<
   typingStatus: {},
   messageIdCache: {},
   replyToMessage: null,
+  totalUnread: 0,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -176,6 +180,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ),
     }));
   },
+
+  setTotalUnread: (count: number) => set({ totalUnread: count }),
 
   removeConversationBychat_id: (chat_id: string) => {
     set((state) => ({
