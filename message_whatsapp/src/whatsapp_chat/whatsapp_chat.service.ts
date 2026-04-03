@@ -203,7 +203,10 @@ export class WhatsappChatService {
       .orderBy('chat.last_activity_at', 'DESC');
 
     if (dateStart) {
-      qb.andWhere('chat.last_activity_at >= :dateStart', { dateStart });
+      qb.andWhere(
+        '(chat.last_activity_at >= :dateStart OR chat.unread_count > 0)',
+        { dateStart },
+      );
     }
 
     if (posteId) {
