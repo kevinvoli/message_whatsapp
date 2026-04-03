@@ -30,12 +30,12 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     maxSteps: null,
   },
   'read-only-enforcement': {
-    label: 'Passage en lecture seule — inactivité 24h',
+    label: 'Fermeture automatique — sans réponse commerciale',
     description:
-      "Passe en lecture seule les chats ACTIFS dont le client n'a pas écrit depuis plus de 24h.",
+      "Ferme automatiquement les conversations non fermées dont le commercial n'a pas répondu depuis plus de N heures (ttlDays = nombre d'heures).",
     enabled: true,
     scheduleType: 'interval',
-    intervalMinutes: 10,
+    intervalMinutes: 60,
     cronExpression: null,
     ttlDays: 24,
     delayMinSeconds: null,

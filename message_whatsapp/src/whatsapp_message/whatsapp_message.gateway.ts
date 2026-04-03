@@ -1057,6 +1057,24 @@ export class WhatsappMessageGateway
     });
   }
 
+  /**
+   * Appelé après fermeture automatique par le cron.
+   * Envoie CONVERSATION_UPSERT avec status=fermé → le frontend retire la conversation de la liste.
+   */
+  public async emitConversationClosed(chat: WhatsappChat): Promise<void> {
+    if (!chat.poste_id) {
+      return;
+    }
+    const [lastMessage, unreadCount] = await Promise.all([
+      this.messageService.findLastMessageBychat_id(chat.chat_id),
+      this.messageService.countUnreadMessages(chat.chat_id),
+    ]);
+    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, lastMessage, unreadCount),
+    });
+  }
+
   // ======================================================
   // QUEUE
   // ======================================================
