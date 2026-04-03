@@ -541,6 +541,42 @@ export class WhatsappMessageService {
     return new Map(rows.map((m) => [m.chat_id, m]));
   }
 
+  /**
+   * Récupère les N derniers messages pour chaque conversation en une seule requête SQL.
+   * Retourne une Map<chat_id, messages[]> triée par timestamp ASC (ordre d'affichage).
+   */
+  async findRecentByChatIds(
+    chatIds: string[],
+    limitPerChat = 50,
+  ): Promise<Map<string, Record<string, any>[]>> {
+    if (chatIds.length === 0) return new Map();
+
+    const placeholders = chatIds.map(() => '?').join(',');
+    const rows: Record<string, any>[] = await this.messageRepository.query(
+      `SELECT m.id, m.chat_id, m.\`text\`, m.timestamp, m.from_me, m.\`from\`,
+              m.from_name, m.status, m.direction, m.\`type\`, m.poste_id,
+              m.commercial_id, m.message_id, m.createdAt
+       FROM (
+         SELECT *, ROW_NUMBER() OVER (
+           PARTITION BY chat_id ORDER BY timestamp DESC, createdAt DESC
+         ) AS rn
+         FROM whatsapp_message
+         WHERE chat_id IN (${placeholders})
+           AND deletedAt IS NULL
+       ) ranked
+       WHERE rn <= ?
+       ORDER BY chat_id ASC, timestamp ASC, createdAt ASC`,
+      [...chatIds, limitPerChat],
+    );
+
+    const map = new Map<string, Record<string, any>[]>();
+    for (const row of rows) {
+      if (!map.has(row.chat_id)) map.set(row.chat_id, []);
+      map.get(row.chat_id)!.push(row);
+    }
+    return map;
+  }
+
   async countUnreadMessagesBulk(chatIds: string[]): Promise<Map<string, number>> {
     if (chatIds.length === 0) return new Map();
     const rows: Array<{ chat_id: string; cnt: string }> = await this.messageRepository

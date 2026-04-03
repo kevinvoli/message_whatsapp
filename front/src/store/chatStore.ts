@@ -128,6 +128,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   
   selectConversation: (chat_id: string) => {
+    const preloaded = (() => {
+      const conv = get().conversations.find((c) => c.chat_id === chat_id);
+      return conv?.messages && conv.messages.length > 0 ? conv.messages : null;
+    })();
+
     set((state) => {
       const conversation = state.conversations.find(
         (c) => c.chat_id === chat_id,
@@ -140,18 +145,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         conversations: state.conversations.map((c) =>
           c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
         ),
-        messages: [],
-        isLoading: true,
+        messages: preloaded ?? [],
+        isLoading: preloaded === null,
         isLoadingMore: false,
         hasMoreMessages: true,
-        messageIdCache: { ...state.messageIdCache, [chat_id]: new Set<string>() },
+        messageIdCache: {
+          ...state.messageIdCache,
+          [chat_id]: preloaded
+            ? new Set(preloaded.map((m) => m.id))
+            : new Set<string>(),
+        },
         replyToMessage: null,
       };
     });
 
-    // 🔔 Charge les messages + déclenche le READ côté backend
     const socket = get().socket;
-    socket?.emit("messages:get", { chat_id });
+    // Si les messages sont déjà pré-chargés, pas besoin de les redemander
+    if (!preloaded) {
+      socket?.emit("messages:get", { chat_id });
+    }
     socket?.emit("messages:read", { chat_id });
   },
 
@@ -275,7 +287,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
             c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c,
           )
         : conversations;
-      return { conversations: normalized, isLoading: false };
+
+      // Pré-charger le cache de messages depuis les conversations reçues au connect
+      const newMessageIdCache: Record<string, Set<string>> = { ...state.messageIdCache };
+      for (const conv of normalized) {
+        if (conv.messages && conv.messages.length > 0) {
+          newMessageIdCache[conv.chat_id] = new Set(conv.messages.map((m) => m.id));
+        }
+      }
+
+      return { conversations: normalized, isLoading: false, messageIdCache: newMessageIdCache };
     });
   },
 

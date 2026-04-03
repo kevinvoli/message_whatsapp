@@ -320,20 +320,37 @@ export class WhatsappMessageGateway
     }
 
     const chatIds = chats.map((c) => c.chat_id);
-    const [lastMsgMap, unreadMap, contactMap] = await Promise.all([
+    const [lastMsgMap, unreadMap, contactMap, recentMsgsMap] = await Promise.all([
       this.messageService.findLastMessagesBulk(chatIds),
       this.messageService.countUnreadMessagesBulk(chatIds),
       this.contactService.findByChatIds(chatIds),
+      this.messageService.findRecentByChatIds(chatIds, 50),
     ]);
 
-    const conversations = chats.map((chat) =>
-      this.mapConversationWithContact(
+    const conversations = chats.map((chat) => ({
+      ...this.mapConversationWithContact(
         chat,
         lastMsgMap.get(chat.chat_id) ?? null,
         unreadMap.get(chat.chat_id) ?? 0,
         contactMap.get(chat.chat_id),
       ),
-    );
+      messages: (recentMsgsMap.get(chat.chat_id) ?? []).map((row) => ({
+        id: row.id,
+        chat_id: row.chat_id,
+        text: row.text ?? '',
+        timestamp: row.timestamp ?? row.createdAt,
+        from_me: Boolean(row.from_me),
+        from: row.from ?? '',
+        from_name: row.from_name ?? '',
+        status: row.status,
+        direction: row.direction,
+        type: row.type,
+        poste_id: row.poste_id,
+        commercial_id: row.commercial_id ?? null,
+        message_id: row.message_id,
+        medias: [],
+      })),
+    }));
 
     client.emit('chat:event', {
       type: 'CONVERSATION_LIST',
