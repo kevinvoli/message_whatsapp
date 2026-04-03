@@ -306,11 +306,11 @@ export class WhatsappMessageGateway
     searchTerm?: string,
   ) {
 
-    // En mode recherche : inclure toutes les conversations pour trouver l'historique.
-    // En mode normal : exclure seulement les conversations converties.
-    // Les conversations fermées sont conservées et affichées en lecture seule au commercial.
-    const excludeStatuses = searchTerm ? [] : ['converti'];
-    let chats = await this.chatService.findByPosteId(agent.posteId, excludeStatuses);
+    // Inclure TOUS les statuts (actif, attente, fermé, converti…).
+    // Les conversations non lues remontent toujours en tête de liste (orderBy unread_count DESC)
+    // et s'affichent dans le filtre "non lus" quelle que soit leur statut.
+    // Les conversations fermées / converties sont affichées en lecture seule côté frontend.
+    let chats = await this.chatService.findByPosteId(agent.posteId, []);
     if (!chats) return;
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);

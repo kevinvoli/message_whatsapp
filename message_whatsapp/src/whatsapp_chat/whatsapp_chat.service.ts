@@ -56,11 +56,9 @@ export class WhatsappChatService {
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
       .where('chat.poste_id = :poste_id', { poste_id })
-      // Conversations non lues en premier (toujours dans le take(200))
-      // puis tri par activité récente
+      // Conversations non lues en premier, puis tri par activité récente
       .orderBy('chat.unread_count', 'DESC')
-      .addOrderBy('chat.last_activity_at', 'DESC')
-      .take(200);
+      .addOrderBy('chat.last_activity_at', 'DESC');
 
     if (excludeStatuses.length > 0) {
       qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });

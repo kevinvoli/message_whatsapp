@@ -60,9 +60,9 @@ export default function ChatMainArea() {
                 onTypingStart={onTypingStart}
                 onTypingStop={onTypingStop}
                 isConnected={isWebSocketConnected}
-                disabled={!!selectedConversation?.readonly || windowExpired || selectedConversation?.status === 'fermé'}
-                windowExpired={windowExpired && selectedConversation?.status !== 'fermé'}
-                conversationClosed={selectedConversation?.status === 'fermé'}
+                disabled={!!selectedConversation?.readonly || windowExpired || selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
+                windowExpired={windowExpired && selectedConversation?.status !== 'fermé' && selectedConversation?.status !== 'converti'}
+                conversationClosed={selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
                 lastClientMessageAt={selectedConversation?.last_client_message_at}
                 firstResponseDeadlineAt={selectedConversation?.first_response_deadline_at}
               />
