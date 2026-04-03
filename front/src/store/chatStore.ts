@@ -416,17 +416,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return state;
       }
 
-      // Si la conversation est maintenant fermée, la retirer de la liste
-      if (conversationWithUnread.status === 'fermé') {
-        return {
-          conversations: state.conversations.filter(
-            (c) => c.chat_id !== updatedConversation.chat_id,
-          ),
-          selectedConversation: isSelected ? null : state.selectedConversation,
-          messages: isSelected ? [] : state.messages,
-        };
-      }
-
       // Mise à jour + retri par last_activity_at DESC pour remonter la conversation active
       const newConversations = state.conversations
         .map((c) =>

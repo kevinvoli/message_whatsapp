@@ -306,9 +306,10 @@ export class WhatsappMessageGateway
     searchTerm?: string,
   ) {
 
-    // En mode recherche : inclure toutes les conversations (fermées aussi) pour trouver l'historique.
-    // En mode normal : exclure les conversations fermées/converties pour réduire la charge.
-    const excludeStatuses = searchTerm ? [] : ['fermé', 'converti'];
+    // En mode recherche : inclure toutes les conversations pour trouver l'historique.
+    // En mode normal : exclure seulement les conversations converties.
+    // Les conversations fermées sont conservées et affichées en lecture seule au commercial.
+    const excludeStatuses = searchTerm ? [] : ['converti'];
     let chats = await this.chatService.findByPosteId(agent.posteId, excludeStatuses);
     if (!chats) return;
     if (agent.tenantIds.length > 0) {
@@ -682,6 +683,20 @@ export class WhatsappMessageGateway
         return;
       }
       if (!this.isAllowedTenantChat(chat, agent.tenantIds)) {
+        return;
+      }
+
+      // 🔒 Conversation fermée — envoi interdit
+      if (chat.status === WhatsappChatStatus.FERME) {
+        client.emit('chat:event', {
+          type: 'MESSAGE_SEND_ERROR',
+          payload: {
+            chat_id: payload.chat_id,
+            tempId: payload.tempId,
+            code: 'CONVERSATION_CLOSED',
+            message: 'Cette conversation est fermée.',
+          },
+        });
         return;
       }
 
