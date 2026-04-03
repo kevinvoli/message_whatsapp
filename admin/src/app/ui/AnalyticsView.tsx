@@ -108,8 +108,8 @@ export default function AnalyticsView() {
 
     const applyCustomRange = () => {
         if (!dateFrom || !dateTo) return;
-        setActiveDateFrom(dateFrom);
-        setActiveDateTo(dateTo);
+        setActiveDateFrom(new Date(dateFrom).toISOString());
+        setActiveDateTo(new Date(dateTo).toISOString());
     };
 
     const clearCustomRange = () => {
