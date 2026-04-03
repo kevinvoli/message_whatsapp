@@ -138,6 +138,19 @@ export class MetriquesController {
       };
     }
 
+    // ── Section demandée avec plage de dates custom (pas de snapshot) ────────
+    if (section) {
+      const liveData = await this.computeSection(section, periode, jours, dateFrom, dateTo);
+      return {
+        success: true,
+        timestamp: new Date().toISOString(),
+        computed_at: new Date(),
+        from_snapshot: false,
+        section,
+        data: liveData,
+      };
+    }
+
     // ── Lecture snapshot complète (comportement historique) ───────────────────
     if (isStandard) {
       const snap = await this.snapshotService.getLatest('global', periode);
