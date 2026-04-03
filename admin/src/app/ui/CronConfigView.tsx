@@ -16,7 +16,7 @@ interface ReinjectionPreviewRow {
 interface ReinjectionPreview { total: number; conversations: ReinjectionPreviewRow[] }
 
 interface ReadOnlyRow {
-  chat_id: string; name: string; last_client_message_at: string | null; idle_hours: number;
+  chat_id: string; name: string; status: string; last_poste_message_at: string | null; idle_hours: number;
 }
 interface ReadOnlyPreview { total: number; conversations: ReadOnlyRow[] }
 
@@ -208,7 +208,7 @@ function PreviewModal({
       return (
         <div>
           <p className="text-sm text-gray-700 mb-3">
-            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront passées en lecture seule (inactives selon le seuil configuré).
+            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront fermées automatiquement (sans réponse commerciale depuis le seuil configuré).
           </p>
           {d.total === 0 ? (
             <p className="text-xs text-gray-400 italic">Aucune conversation concernée.</p>
@@ -218,8 +218,9 @@ function PreviewModal({
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold text-gray-500">Client</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Inactivité</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Dernier message client</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Statut actuel</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Sans réponse depuis</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Dernière réponse commerciale</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -227,10 +228,13 @@ function PreviewModal({
                     <tr key={c.chat_id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 font-medium text-gray-800">{c.name}</td>
                       <td className="px-3 py-2 text-center">
+                        <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 font-semibold text-[10px] uppercase">{c.status}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
                         <span className="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 font-semibold text-[10px]">{c.idle_hours}h</span>
                       </td>
                       <td className="px-3 py-2 text-gray-500">
-                        {c.last_client_message_at ? formatRelativeDate(c.last_client_message_at) : '—'}
+                        {c.last_poste_message_at ? formatRelativeDate(c.last_poste_message_at) : <span className="italic text-gray-400">jamais</span>}
                       </td>
                     </tr>
                   ))}
