@@ -17,6 +17,8 @@ interface ChatInputProps {
   disabled?: boolean;
   windowExpired?: boolean;
   conversationClosed?: boolean;
+  lastClientMessageAt?: Date | null;
+  firstResponseDeadlineAt?: Date | null;
 }
 
 const TYPING_STOP_DELAY = 2000; // 2s
@@ -81,6 +83,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   disabled = false,
   windowExpired = false,
   conversationClosed = false,
+  lastClientMessageAt,
+  firstResponseDeadlineAt,
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -265,15 +269,29 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   // Conversation fermée → bannière dédiée (prioritaire sur windowExpired)
   if (conversationClosed) {
+    const hoursSinceClient = lastClientMessageAt
+      ? Math.floor((Date.now() - new Date(lastClientMessageAt).getTime()) / 3_600_000)
+      : null;
+
+    const slaExceeded =
+      firstResponseDeadlineAt && new Date() > new Date(firstResponseDeadlineAt);
+
     return (
-      <div className="bg-gray-50 border-t border-gray-200 p-4">
-        <div className="max-w-4xl mx-auto flex items-center gap-3 text-gray-500">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Conversation fermée</p>
-            <p className="text-xs text-gray-400">
-              Cette conversation a été fermée. Vous pouvez consulter les messages mais pas en envoyer.
+      <div className="bg-red-50 border-t border-red-300 p-4">
+        <div className="max-w-4xl mx-auto flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-red-700">Conversation fermée — consultation uniquement</p>
+            <p className="text-xs text-red-600">
+              {hoursSinceClient !== null
+                ? `Le client n'a pas envoyé de message depuis plus de ${hoursSinceClient}h (seuil de fermeture automatique dépassé).`
+                : "Le client n'a pas envoyé de message depuis plus de 24h (seuil de fermeture automatique dépassé)."}
             </p>
+            {slaExceeded && (
+              <p className="text-xs text-red-600 font-semibold">
+                ⚠ SLA dépassé — le délai de première réponse ({new Date(firstResponseDeadlineAt!).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}) n&apos;a pas été respecté.
+              </p>
+            )}
           </div>
         </div>
       </div>

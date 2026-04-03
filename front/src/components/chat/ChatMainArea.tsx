@@ -63,6 +63,8 @@ export default function ChatMainArea() {
                 disabled={!!selectedConversation?.readonly || windowExpired || selectedConversation?.status === 'fermé'}
                 windowExpired={windowExpired && selectedConversation?.status !== 'fermé'}
                 conversationClosed={selectedConversation?.status === 'fermé'}
+                lastClientMessageAt={selectedConversation?.last_client_message_at}
+                firstResponseDeadlineAt={selectedConversation?.first_response_deadline_at}
               />
 
           {error && (
