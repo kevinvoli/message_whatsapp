@@ -69,7 +69,7 @@ const WhatsAppPage = () => {
       const matchesStatus =
         filterStatus === 'all' ? true :
         filterStatus === 'unread' ? conv.unreadCount > 0 :
-        filterStatus === 'nouveau' ? conv.status === 'nouveau' :
+        filterStatus === 'nouveau' ? conv.status === 'attente' :
         filterStatus === 'urgent' ? conv.priority === 'haute' : true;
 
       const matchesSearch = !searchQuery

@@ -336,13 +336,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         : state.messageIdCache;
 
-      return {
-        messages: updatedMessages,
-        conversations: state.conversations.map((c) =>
+      // Mise à jour du lastMessage + retri pour remonter la conversation en haut
+      const updatedConversations = state.conversations
+        .map((c) =>
           c.chat_id === message.chat_id
             ? {
                 ...c,
                 lastMessage: message,
+                last_activity_at: message.timestamp,
                 unreadCount: isActive
                   ? 0
                   : message.from_me
@@ -350,7 +351,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     : (c.unreadCount ?? 0) + 1,
               }
             : c,
-        ),
+        )
+        .sort((a, b) => {
+          const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
+          const bTime = b.last_activity_at?.getTime() ?? b.updatedAt.getTime();
+          return bTime - aTime;
+        });
+
+      return {
+        messages: updatedMessages,
+        conversations: updatedConversations,
         messageIdCache: nextCache,
       };
     });
@@ -385,9 +395,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return state;
       }
 
-      const newConversations = state.conversations.map((c) =>
-        c.chat_id === updatedConversation.chat_id ? conversationWithUnread : c,
-      );
+      // Si la conversation est maintenant fermée, la retirer de la liste
+      if (conversationWithUnread.status === 'fermé') {
+        return {
+          conversations: state.conversations.filter(
+            (c) => c.chat_id !== updatedConversation.chat_id,
+          ),
+          selectedConversation: isSelected ? null : state.selectedConversation,
+          messages: isSelected ? [] : state.messages,
+        };
+      }
+
+      // Mise à jour + retri par last_activity_at DESC pour remonter la conversation active
+      const newConversations = state.conversations
+        .map((c) =>
+          c.chat_id === updatedConversation.chat_id ? conversationWithUnread : c,
+        )
+        .sort((a, b) => {
+          const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
+          const bTime = b.last_activity_at?.getTime() ?? b.updatedAt.getTime();
+          return bTime - aTime;
+        });
 
       const newState: Partial<ChatState> = {
         conversations: newConversations,
