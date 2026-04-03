@@ -324,7 +324,7 @@ export class WhatsappMessageGateway
       this.messageService.findLastMessagesBulk(chatIds),
       this.messageService.countUnreadMessagesBulk(chatIds),
       this.contactService.findByChatIds(chatIds),
-      this.messageService.findRecentByChatIds(chatIds, 50),
+      this.messageService.findRecentByChatIds(chatIds),
     ]);
 
     const conversations = chats.map((chat) => ({
