@@ -16,6 +16,7 @@ interface ChatInputProps {
   isConnected: boolean;
   disabled?: boolean;
   windowExpired?: boolean;
+  conversationClosed?: boolean;
 }
 
 const TYPING_STOP_DELAY = 2000; // 2s
@@ -79,6 +80,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   isConnected,
   disabled = false,
   windowExpired = false,
+  conversationClosed = false,
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -260,6 +262,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const s = sec % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  // Conversation fermée → bannière dédiée (prioritaire sur windowExpired)
+  if (conversationClosed) {
+    return (
+      <div className="bg-gray-50 border-t border-gray-200 p-4">
+        <div className="max-w-4xl mx-auto flex items-center gap-3 text-gray-500">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Conversation fermée</p>
+            <p className="text-xs text-gray-400">
+              Cette conversation a été fermée. Vous pouvez consulter les messages mais pas en envoyer.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Fenêtre de messagerie expirée → afficher uniquement la bannière, pas l'input
   if (windowExpired) {

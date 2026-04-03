@@ -61,7 +61,8 @@ export default function ChatMainArea() {
                 onTypingStop={onTypingStop}
                 isConnected={isWebSocketConnected}
                 disabled={!!selectedConversation?.readonly || windowExpired || selectedConversation?.status === 'fermé'}
-                windowExpired={windowExpired}
+                windowExpired={windowExpired && selectedConversation?.status !== 'fermé'}
+                conversationClosed={selectedConversation?.status === 'fermé'}
               />
 
           {error && (

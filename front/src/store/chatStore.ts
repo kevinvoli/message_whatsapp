@@ -418,9 +418,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Mise à jour + retri par last_activity_at DESC pour remonter la conversation active
       const newConversations = state.conversations
-        .map((c) =>
-          c.chat_id === updatedConversation.chat_id ? conversationWithUnread : c,
-        )
+        .map((c) => {
+          if (c.chat_id !== updatedConversation.chat_id) return c;
+          // Préserver les messages préchargés si l'UPSERT n'en inclut pas
+          // (mapConversation côté backend n'inclut jamais messages[], seulement last_message)
+          const preservedMessages =
+            conversationWithUnread.messages && conversationWithUnread.messages.length > 0
+              ? conversationWithUnread.messages
+              : c.messages ?? [];
+          return { ...conversationWithUnread, messages: preservedMessages };
+        })
         .sort((a, b) => {
           const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
           const bTime = b.last_activity_at?.getTime() ?? b.updatedAt.getTime();
