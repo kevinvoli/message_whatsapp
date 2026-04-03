@@ -307,6 +307,37 @@ export class DispatcherService {
     await this.dispatchExistingConversation(chat);
   }
 
+  /**
+   * Dispatche une conversation orpheline (poste_id = null, status = en_attente).
+   * Trouve le prochain poste dans la queue et émet CONVERSATION_ASSIGNED.
+   */
+  async dispatchOrphanConversation(chat: WhatsappChat): Promise<void> {
+    if (chat.read_only) {
+      this.logger.warn(`Dispatch orphelin ignoré: conversation read_only (${chat.chat_id})`);
+      return;
+    }
+
+    const nextPoste = await this.queueService.getNextInQueue();
+    if (!nextPoste) {
+      this.logger.warn(`⏳ Aucun agent disponible pour orphelin (${chat.chat_id}), reste EN_ATTENTE`);
+      return;
+    }
+
+    await this.chatRepository.update(chat.id, {
+      poste: nextPoste,
+      poste_id: nextPoste.id,
+      assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
+      status: nextPoste.is_active
+        ? WhatsappChatStatus.ACTIF
+        : WhatsappChatStatus.EN_ATTENTE,
+      assigned_at: new Date(),
+      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    await this.messageGateway.emitConversationAssigned(chat.chat_id);
+    this.logger.log(`Orphelin dispatché (${chat.chat_id}) → poste ${nextPoste.id}`);
+  }
+
   async dispatchExistingConversation(chat: WhatsappChat) {
     const oldPoste = chat.poste_id;
     if (chat.read_only) {

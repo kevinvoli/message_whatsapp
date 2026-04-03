@@ -5,7 +5,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
 export interface OfflineReinjectionPreview {
@@ -33,14 +33,26 @@ export class OfflineReinjectionJob implements OnModuleInit {
   }
 
   async preview(): Promise<OfflineReinjectionPreview> {
-    const chats = await this.chatRepo.find({
+    // Conversations actives sur un poste hors-ligne
+    const activesHorsLigne = await this.chatRepo.find({
       where: { status: WhatsappChatStatus.ACTIF, last_poste_message_at: IsNull() },
       relations: ['poste'],
     });
-    const candidates = chats.filter((c) => c.poste && !c.poste.is_active);
+    const candidatesHorsLigne = activesHorsLigne.filter((c) => c.poste && !c.poste.is_active);
+
+    // Conversations orphelines (poste_id = null, pas encore fermées/converties)
+    const orphelines = await this.chatRepo.find({
+      where: {
+        poste_id: IsNull(),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
+        read_only: false,
+      },
+    });
+
+    const all = [...candidatesHorsLigne, ...orphelines];
     return {
-      total: candidates.length,
-      conversations: candidates.map((c) => ({
+      total: all.length,
+      conversations: all.map((c) => ({
         chat_id: c.chat_id,
         name: c.name,
         poste_id: c.poste_id ?? null,
@@ -54,7 +66,8 @@ export class OfflineReinjectionJob implements OnModuleInit {
   async offlineReinject() {
     this.logger.debug('Offline reinjection cron started');
 
-    const chats = await this.chatRepo.find({
+    // 1. Conversations actives sur un poste hors-ligne
+    const actives = await this.chatRepo.find({
       where: {
         status: WhatsappChatStatus.ACTIF,
         last_poste_message_at: IsNull(),
@@ -62,12 +75,25 @@ export class OfflineReinjectionJob implements OnModuleInit {
       relations: ['poste'],
     });
 
-    for (const chat of chats) {
+    for (const chat of actives) {
       const poste = chat.poste;
       if (!poste) continue;
       if (poste.is_active) continue;
-
       await this.dispatcher.reinjectConversation(chat);
+    }
+
+    // 2. Conversations orphelines (poste_id = null) — jamais assignées ou perdues
+    const orphelines = await this.chatRepo.find({
+      where: {
+        poste_id: IsNull(),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
+        read_only: false,
+      },
+    });
+
+    this.logger.debug(`Orphelines trouvées : ${orphelines.length}`);
+    for (const chat of orphelines) {
+      await this.dispatcher.dispatchOrphanConversation(chat);
     }
   }
 }
