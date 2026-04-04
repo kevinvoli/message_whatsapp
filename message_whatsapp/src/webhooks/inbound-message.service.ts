@@ -82,6 +82,7 @@ export class InboundMessageService {
             message.fromName ?? 'Client',
             traceId,
             message.tenantId,
+            message.channelId,
           );
 
           if (!conversation) {

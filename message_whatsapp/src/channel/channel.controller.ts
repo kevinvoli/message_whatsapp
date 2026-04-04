@@ -14,6 +14,7 @@ import { ChannelService } from './channel.service';
 import { MetaTokenService } from './meta-token.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
+import { AssignPosteDto } from './dto/assign-poste.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 
 @Controller('channel')
@@ -55,6 +56,14 @@ export class ChannelController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.communicationWhapiService.remove(id);
+  }
+
+  @Patch(':id/assign-poste')
+  assignPoste(
+    @Param('id') channelId: string,
+    @Body() dto: AssignPosteDto,
+  ) {
+    return this.communicationWhapiService.assignPoste(channelId, dto.poste_id ?? null);
   }
 
   @Post(':id/refresh-token')

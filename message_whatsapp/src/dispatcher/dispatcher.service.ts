@@ -4,12 +4,14 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { ChannelService } from 'src/channel/channel.service';
 
 @Injectable()
 export class DispatcherService {
@@ -28,6 +30,9 @@ export class DispatcherService {
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
 
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepository: Repository<WhatsappPoste>,
+
     private readonly queueService: QueueService,
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
@@ -36,6 +41,8 @@ export class DispatcherService {
     private readonly whatsappCommercialService: WhatsappCommercialService,
 
     private readonly notificationService: NotificationService,
+
+    private readonly channelService: ChannelService,
   ) {}
 
   /**
@@ -49,11 +56,12 @@ export class DispatcherService {
     clientName: string,
     traceId?: string,
     tenantId?: string,
+    channelId?: string,
   ): Promise<WhatsappChat | null> {
     const lock = this.getChatDispatchLock(clientPhone);
     try {
       return await lock.runExclusive(() =>
-        this.assignConversationInternal(clientPhone, clientName, traceId, tenantId),
+        this.assignConversationInternal(clientPhone, clientName, traceId, tenantId, channelId),
       );
     } finally {
       if (!lock.isLocked()) {
@@ -62,11 +70,37 @@ export class DispatcherService {
     }
   }
 
+  /**
+   * Résout le prochain poste selon la priorité :
+   * 1. Poste dédié au channel (si défini) — même offline → EN_ATTENTE sur ce poste
+   * 2. Queue globale (si channel non assigné à un poste)
+   * Retourne null si aucun poste disponible (mode pool uniquement).
+   */
+  private async resolvePosteForChannel(channelId?: string): Promise<WhatsappPoste | null> {
+    if (channelId) {
+      const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
+      if (dedicatedPosteId) {
+        const poste = await this.posteRepository.findOne({ where: { id: dedicatedPosteId } });
+        if (poste) {
+          this.logger.log(`Channel "${channelId}" → poste dédié "${poste.name}" (mode dédié)`);
+          return poste;
+        }
+        // Poste dédié introuvable (supprimé sans cascade) → fallback pool
+        this.logger.warn(
+          `Poste dédié "${dedicatedPosteId}" introuvable pour channel "${channelId}" — fallback queue globale`,
+        );
+      }
+    }
+    // Mode pool : queue globale
+    return this.queueService.getNextInQueue();
+  }
+
   private async assignConversationInternal(
     clientPhone: string,
     clientName: string,
     traceId?: string,
     tenantId?: string,
+    channelId?: string,
   ): Promise<WhatsappChat | null> {
     if (traceId) {
       this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
@@ -136,7 +170,7 @@ export class DispatcherService {
       return saved;
     }
 
-    const nextAgent = await this.queueService.getNextInQueue();
+    const nextAgent = await this.resolvePosteForChannel(channelId);
     // Aucun agent disponible → message en attente
     if (!nextAgent) {
       this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);

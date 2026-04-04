@@ -1,11 +1,14 @@
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -99,6 +102,21 @@ export class WhapiChannel {
 
   @Column()
   core_version: string;
+
+  /**
+   * Poste dédié à ce channel.
+   * NULL  = mode pool — messages distribués via la queue globale (comportement par défaut).
+   * défini = mode dédié — tous les messages de ce channel vont EXCLUSIVEMENT à ce poste.
+   */
+  @Column({ name: 'poste_id', type: 'char', length: 36, nullable: true, default: null })
+  poste_id: string | null;
+
+  @ManyToOne(() => WhatsappPoste, (poste) => poste.channels, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'poste_id', referencedColumnName: 'id' })
+  poste?: WhatsappPoste | null;
 
   @CreateDateColumn()
   createdAt: Date;

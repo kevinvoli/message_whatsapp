@@ -11,6 +11,7 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { MetaTokenService } from './meta-token.service';
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
@@ -23,6 +24,8 @@ export class ChannelService {
     private readonly channelRepository: Repository<WhapiChannel>,
     @InjectRepository(ProviderChannel)
     private readonly providerChannelRepository: Repository<ProviderChannel>,
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepository: Repository<WhatsappPoste>,
     private readonly connmunicationService: CommunicationWhapiService,
     private readonly metaTokenService: MetaTokenService,
     private readonly telegramService: CommunicationTelegramService,
@@ -374,8 +377,56 @@ export class ChannelService {
     });
   }
 
+  /**
+   * Assigne (ou désassigne) un poste dédié à un channel.
+   * poste_id = null → retour en mode pool (queue globale).
+   */
+  async assignPoste(channelId: string, posteId: string | null): Promise<WhapiChannel> {
+    if (posteId !== null) {
+      const poste = await this.posteRepository.findOne({ where: { id: posteId } });
+      if (!poste) {
+        throw new NotFoundException(`Poste introuvable : ${posteId}`);
+      }
+    }
+
+    await this.channelRepository.update(
+      { channel_id: channelId },
+      { poste_id: posteId },
+    );
+
+    this.logger.log(
+      posteId
+        ? `Channel "${channelId}" assigné au poste "${posteId}" (mode dédié)`
+        : `Channel "${channelId}" désassigné — retour en mode pool global`,
+      ChannelService.name,
+    );
+
+    const updated = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      relations: ['poste'],
+    });
+    if (!updated) {
+      throw new NotFoundException(`Channel introuvable : ${channelId}`);
+    }
+    return updated;
+  }
+
+  /**
+   * Retourne le poste_id dédié à ce channel, ou null si mode pool.
+   * Appelé par le dispatcher à chaque message entrant — requête légère (SELECT poste_id uniquement).
+   */
+  async getDedicatedPosteId(channelId: string): Promise<string | null> {
+    if (!channelId) return null;
+    const result = await this.channelRepository
+      .createQueryBuilder('c')
+      .select('c.poste_id', 'poste_id')
+      .where('c.channel_id = :channelId', { channelId })
+      .getRawOne<{ poste_id: string | null }>();
+    return result?.poste_id ?? null;
+  }
+
   async findAll() {
-    return await this.channelRepository.find();
+    return await this.channelRepository.find({ relations: ['poste'] });
   }
 
   async findOne(id: string) {

@@ -11,6 +11,30 @@
 
 ---
 
+## État d'implémentation actuel (audit 2026-04-03)
+
+| # | Événement | Statut | Notes |
+|---|-----------|--------|-------|
+| 1 | `account_update` | ❌ Non implémenté | |
+| 2 | `business_status_update` | ❌ Non implémenté | |
+| 3 | `failed` (codes d'erreur lisibles) | ⚠️ Partiel | Code en base, pas de traduction dans le frontend |
+| 4 | `referral` | ❌ Non implémenté | |
+| 5 | `phone_number_quality_update` | ❌ Non implémenté | |
+| 6 | `account_alerts` | ❌ Non implémenté | |
+| 7 | `message_template_status_update` | ⚠️ Souscrit mais ignoré | Souscrit dans `meta-token.service.ts` L229, handler absent |
+| 8 | `calls` | ❌ Non implémenté | |
+| 9 | `reaction` | ❌ Non implémenté | Instagram ignore explicitement les réactions (L31) |
+| 10 | `user_preferences` | ❌ Non implémenté | |
+| 11 | `system` (changement numéro) | ❌ Non implémenté | |
+| 12 | `flows` | ❌ Non implémenté | |
+| 13 | `message_template_quality_update` | ❌ Non implémenté | |
+| 14 | Statuts visuels (✓ ✓✓ 🔵) | ✅ **Implémenté** | `ChatMessage.tsx` — was listed as missing, incorrect |
+| 15 | `sticker` | ✅ **Implémenté** | `MetaAdapter.resolveMedia()` + `ChatMessage.tsx` — was listed as missing, incorrect |
+| 16 | `contacts` | ❌ Non implémenté | |
+| 17 | `unsupported` | ❌ Non implémenté | |
+
+---
+
 ## Sommaire
 
 - [🔴 CRITIQUE — Action immédiate](#-critique--action-immédiate)
@@ -215,6 +239,8 @@ Canal WhatsApp +213 XX XX XX XX
 
 ### 7. `message_template_status_update` — Statut des templates HSM
 
+> ⚠️ **Audit 2026-04-03** : Ce webhook est déjà **souscrit** dans `meta-token.service.ts` (L229) mais **aucun handler n'existe** dans le contrôleur. Le payload arrive et est ignoré silencieusement.
+
 **Champ webhook** : `message_template_status_update`
 **Interface principale** : 🛡️ Admin
 **Backend** : ⚙️ Bloquer l'envoi si template PAUSED/DISABLED
@@ -405,15 +431,16 @@ Flows actifs
 
 ---
 
-### 14. Progression visuelle des statuts (déjà souscrit — amélioration UX)
+### 14. Progression visuelle des statuts
+
+> ✅ **Audit 2026-04-03 : DÉJÀ IMPLÉMENTÉ** — Ce point était listé comme "ce qui manque" dans la version précédente. L'implémentation est en place.
 
 **Champ webhook** : `messages` (déjà souscrit) → `statuses[]`
 **Interface principale** : 💬 Commercial
-**Backend** : ✅ Déjà en base — amélioration frontend uniquement
+**Backend** : ✅ Déjà en base
+**Frontend** : ✅ `ChatMessage.tsx` affiche la progression complète : sending → ✓ → ✓✓ (grises) → ✓✓ (bleues) → ❌
 
-**Ce qui manque** : L'agent commercial ne voit pas visuellement si son message a été lu.
-
-**Affichage Commercial à implémenter** :
+**Affichage Commercial actuel** :
 ```
 "Votre commande est prête"     ✓      (envoyé)
 "N'hésitez pas à nous appeler" ✓✓     (délivré, coches grises)
@@ -431,14 +458,11 @@ Flows actifs
 
 ### 15. `sticker` — Afficher les stickers WhatsApp
 
+> ✅ **Audit 2026-04-03 : DÉJÀ IMPLÉMENTÉ** — Ce point était listé comme "à implémenter" dans la version précédente. L'implémentation est en place.
+
 **Champ webhook** : `messages` (déjà souscrit) → `type: "sticker"`
 **Interface principale** : 💬 Commercial
-**Effort** : Faible — ajouter le type dans `MetaMessageType`, afficher le WebP
-
-**Affichage Commercial** :
-```
-[Image WebP du sticker]   au lieu de   "❓ Message de type inconnu"
-```
+**État** : ✅ `MetaAdapter.resolveMedia()` mappe le type `sticker`, `ChatMessage.tsx` l'affiche comme image WebP.
 
 ---
 
@@ -594,4 +618,4 @@ PRIORITÉ MOYENNE
 
 ---
 
-*Dérivé de `META_WEBHOOK_EVENTS_BILAN.md` — 2026-03-24*
+*Dérivé de `META_WEBHOOK_EVENTS_BILAN.md` — mis à jour 2026-04-03 (audit complet du code)*

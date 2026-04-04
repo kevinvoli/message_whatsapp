@@ -97,6 +97,7 @@ export type Poste = {
   chats?: WhatsappChat[] | null;
   messages?: WhatsappMessage[] | null;
   commercial?: Commercial[] | null;
+  channels?: Channel[] | null;
 };
 
 export type ProviderType = 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram';
@@ -124,6 +125,8 @@ export type Channel = {
   tokenExpiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  poste_id?: string | null;
+  poste?: Poste | null;
 };
 
 export type MessageAuto = {

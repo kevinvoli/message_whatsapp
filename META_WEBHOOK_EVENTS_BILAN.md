@@ -4,10 +4,10 @@
 > sur la plateforme Meta pour une application WhatsApp Business, leur fonctionnement technique,
 > et leur pertinence dans l'amélioration de l'application actuelle.
 >
-> **Date de rédaction** : 2026-03-24
+> **Date de rédaction** : 2026-03-24 — **Mis à jour** : 2026-04-03 (audit complet du code)
 > **Version API Meta** : v25.0 (liste officielle du tableau de bord)
-> **Application** : Plateforme de messagerie multi-agents (NestJS + React)
-> **Seul champ actuellement souscrit** : `messages` ✅
+> **Application** : Plateforme de messagerie multi-agents (NestJS + React) — providers : WhatsApp (Meta Cloud API), Instagram, Messenger, Telegram (Whapi)
+> **Champ actuellement souscrit** : `messages` ✅ — `message_template_status_update` ⚠️ souscrit mais non traité
 
 ---
 
@@ -78,10 +78,13 @@ MetaWebhookPayload
             └── statuses[]       → accusés de réception ✅ géré (sent/delivered/read/failed)
 ```
 
-**Types de messages actuellement mappés dans `MetaAdapter`** :
-`text`, `image`, `audio`, `video`, `document`, `location`, `interactive` (button_reply + list_reply), `button`
+**Types de messages actuellement mappés dans `MetaAdapter`** (audit 2026-04-03) :
+`text`, `image`, `audio`, `video`, `document`, `location`, `interactive` (button_reply + list_reply), `button`, `sticker` ✅
 
-**Champ unique actuellement souscrit** : `messages`
+**Fournisseurs pris en charge** : WhatsApp (Meta Cloud API via `WebhookController` + `MetaAdapter`), Instagram (`InstagramAdapter`), Messenger (`MessengerAdapter`), Telegram/Whapi (`WhapiController`)
+
+**Champ unique souscrit et entièrement géré** : `messages`
+**Souscrit mais ignoré** : `message_template_status_update` ⚠️ (souscrit dans `meta-token.service.ts` L229 mais payload non traité dans le contrôleur)
 **Tous les autres champs** : non souscrits → aucune notification reçue
 
 ---
@@ -251,10 +254,9 @@ Les vocaux WhatsApp sont en OGG/Opus.
 ```
 **Ce que ça fait** : Sticker statique ou animé (WebP) envoyé par le client.
 
-**État actuel** : ❌ Non géré — `MetaAdapter.mapType()` retourne `'unknown'`.
+**État actuel** : ✅ Géré — `MetaAdapter.resolveMedia()` mappe le type `sticker`, et `ChatMessage.tsx` l'affiche comme une image WebP.
 
-**Recommandation** : Ajouter `sticker` dans `MetaMessageType`, afficher l'image WebP
-dans le frontend. Priorité basse (signal conversationnel, pas d'information métier).
+> Audit 2026-04-03 : ce type était mentionné comme ❌ dans la version précédente de ce document — c'est incorrect. L'implémentation est bien en place.
 
 ---
 
@@ -271,10 +273,10 @@ dans le frontend. Priorité basse (signal conversationnel, pas d'information mé
 **Ce que ça fait** : Réaction posée ou retirée (`emoji: ""`) sur un message.
 Le `message_id` référence le message sur lequel la réaction est posée.
 
-**État actuel** : ❌ Non géré.
+**État actuel** : ❌ Non géré. De plus, `InstagramAdapter` ignore explicitement les réactions (ligne 31 : `if (messaging.message.reactions) continue;`).
 
 **Recommandation** : Implémenter la sauvegarde de réactions liées au message référencé
-et l'affichage dans l'interface (signal d'engagement précieux).
+et l'affichage dans l'interface (signal d'engagement précieux). À faire pour Meta et Instagram.
 
 ---
 
@@ -441,13 +443,15 @@ en base pour la même personne.
 ### 3.2 Statuts de livraison
 
 #### `sent` ✓ (coche grise)
-Le message a quitté les serveurs Meta. **État actuel** : ✅ Géré.
+Le message a quitté les serveurs Meta. **État actuel** : ✅ Géré — sauvegardé en base et affiché dans `ChatMessage.tsx` avec icône ✓.
 
 #### `delivered` ✓✓ (deux coches grises)
-L'appareil du destinataire a reçu le message. **État actuel** : ✅ Géré.
+L'appareil du destinataire a reçu le message. **État actuel** : ✅ Géré — sauvegardé et affiché avec icône ✓✓ grises.
 
 #### `read` ✓✓ (deux coches bleues)
-Le destinataire a ouvert le message. **État actuel** : ✅ Géré.
+Le destinataire a ouvert le message. **État actuel** : ✅ Géré — sauvegardé et affiché avec icône ✓✓ bleues.
+
+> Audit 2026-04-03 : la progression visuelle des statuts (sending → sent → delivered → read → error) est **entièrement implémentée** côté frontend dans `ChatMessage.tsx`. Ce point était listé comme lacune dans la version précédente — c'est incorrect.
 
 #### `failed` — Échec de livraison
 ```json
@@ -474,8 +478,7 @@ Le destinataire a ouvert le message. **État actuel** : ✅ Géré.
 | `131000` | Erreur interne Meta |
 | `100` | Paramètre invalide (ex: `phone_number_id` incorrect) |
 
-**État actuel** : ✅ Partiellement géré — statut sauvegardé mais les codes d'erreur
-ne sont probablement pas affichés de façon lisible à l'agent.
+**État actuel** : ⚠️ Partiellement géré — le statut `failed` et les codes d'erreur sont sauvegardés en base, mais **aucune traduction humaine n'est affichée** dans `ChatMessage.tsx`. L'agent voit "❌ Échec" sans explication du code d'erreur Meta.
 
 **Amélioration critique** : Mapper les codes en messages humains dans le frontend.
 L'agent doit comprendre *pourquoi* son message n'est pas parti.
@@ -1274,14 +1277,15 @@ des solutions partenaires (qui peut voir votre WABA dans le réseau partenaires 
 | `location` | Localisation | ✅ Géré | Amélioration (carte) | Moyen |
 | `interactive` | Réponse interactif | ✅ Géré | — | — |
 | `button` | Quick Reply template | ✅ Géré | Payload → action auto | Élevé |
+| `sticker` | Autocollant WebP | ✅ Géré | — | — |
 | `referral` | Clic pub Meta | ❌ Manquant | **HAUTE** | ROI publicitaire |
 | `reaction` | Emoji de réaction | ❌ Manquant | **MOYENNE** | Engagement |
 | `system` | Changement numéro | ❌ Manquant | **MOYENNE** | Intégrité contacts |
-| `sticker` | Autocollant | ❌ Manquant | **BASSE** | Cosmétique |
 | `contacts` | Fiche contact | ❌ Manquant | **BASSE** | Faible |
 | `order` | Commande catalogue | ❌ Manquant | **BASSE** (si pas e-com) | Faible |
 | `unsupported` | Type inconnu | ❌ Manquant | **BASSE** | UX |
-| `failed` status | Erreur de livraison | ✅ Partiel | Affichage message lisible | **ÉLEVÉ** |
+| `failed` status | Erreur livraison — code en base | ⚠️ Partiel | Affichage message humain manquant | **ÉLEVÉ** |
+| statuts `sent`/`delivered`/`read` | Progression visuelle | ✅ Géré + affiché | — | — |
 
 ### Champs de communication avancée
 
@@ -1332,29 +1336,39 @@ des solutions partenaires (qui peut voir votre WABA dans le réseau partenaires 
 
 ## 11. État actuel du code et lacunes identifiées
 
+> Audit complet du code effectué le 2026-04-03.
+
 ### Ce qui fonctionne bien
-- Architecture `UnifiedIngressService` + `MetaAdapter` propre et extensible
-- Les 8 types de messages principaux gérés
-- Les 4 statuts de livraison sauvegardés en base
-- Idempotence gérée (pas de double traitement)
-- HMAC / signature Meta validée
+- Architecture `UnifiedIngressService` + `MetaAdapter` + `InstagramAdapter` + `MessengerAdapter` propre et extensible
+- 9 types de messages gérés : `text`, `image`, `audio`, `video`, `document`, `location`, `interactive`, `button`, **`sticker`** ✅
+- Les 4 statuts de livraison (sent/delivered/read/failed) sauvegardés en base
+- **Progression visuelle des statuts** (sending → ✓ → ✓✓ grises → ✓✓ bleues → ❌) entièrement implémentée dans `ChatMessage.tsx` ✅
+- Idempotence gérée via table `WebhookIdempotency` (pas de double traitement)
+- HMAC / signature Meta validée (`validateHmacSignature`)
+- Guard HSM sur les templates + Dead Letter Queue ✅
+- Signature HMAC Whapi + validation Joi en production ✅
 
 ### Lacunes côté traitement des messages
-1. `MetaMessageType` ne couvre pas `sticker`, `reaction`, `contacts`, `system`, `unsupported`
-2. `MetaMessageBase` n'a pas de champ `referral` → données publicitaires perdues
-3. `interactive.type: "nfm_reply"` (réponse aux Flows) non géré
-4. Statut `failed` : code d'erreur en base mais pas de message humain affiché à l'agent
-5. Progression des statuts (✓ → ✓✓ → bleu) non rendue visuellement dans le frontend
+1. `MetaMessageBase` n'a pas de champ `referral` → données publicitaires Click-to-WhatsApp perdues
+2. `interactive.type: "nfm_reply"` (réponse aux Flows) non géré
+3. Statut `failed` : code d'erreur sauvegardé en base **mais aucune traduction humaine dans le frontend** — l'agent voit juste "❌ Échec"
+4. `reaction` : non géré côté Meta ; `InstagramAdapter` ignore explicitement les réactions (L31)
+5. `system` (changement de numéro) : non géré → doublons possibles en base
+6. `contacts`, `unsupported`, `order` : non gérés (priorité basse)
 
 ### Lacunes côté monitoring de compte
 1. Aucune souscription aux champs de compte → zéro visibilité sur la santé du compte Meta
-2. Pas de table pour stocker l'état du compte, des templates, du tier
-3. Pas de système d'alerte si compte désactivé ou restreint
-4. Pas de suivi du statut des templates HSM utilisés dans `MessageAuto`
+2. `message_template_status_update` : **souscrit** dans `meta-token.service.ts` (L229) mais **ignoré** dans le contrôleur webhook — aucun handler, aucun stockage
+3. Pas de table pour stocker l'état du compte, des templates, du tier
+4. Pas de système d'alerte si compte désactivé ou restreint
+5. Pas de suivi du statut des templates HSM utilisés dans `MessageAuto`
 
 ---
 
 ## 12. Recommandations priorisées
+
+> Mis à jour suite à l'audit complet du code (2026-04-03).
+> Les items ✅ dans la section 11 ont été retirés de ces recommandations car déjà implémentés.
 
 ### 🔴 Critique — Action immédiate
 
@@ -1363,7 +1377,7 @@ Si le compte est désactivé, tous les envois échouent sans que personne ne soi
 → Ajouter un handler dans le contrôleur webhook, stocker le statut en base, alerter par email/push.
 
 #### 2. Afficher les messages d'erreur de livraison (statut `failed`)
-Les codes d'erreur Meta sont déjà sauvegardés — il faut les exposer dans le frontend.
+Les codes d'erreur Meta sont déjà sauvegardés en base — il faut les exposer dans `ChatMessage.tsx`.
 ```typescript
 const META_ERROR_MESSAGES: Record<number, string> = {
   131026: 'Numéro non joignable sur WhatsApp',
@@ -1376,14 +1390,15 @@ const META_ERROR_MESSAGES: Record<number, string> = {
 
 ### 🟠 Haute priorité — Sprint suivant
 
-#### 3. Souscrire à `phone_number_quality_update`
+#### 3. Brancher le handler `message_template_status_update` (déjà souscrit !)
+Le webhook est déjà souscrit dans `meta-token.service.ts` (L229) mais le payload est ignoré.
+→ Ajouter un handler dans `WebhookController`, stocker le statut du template, bloquer les `MessageAuto` si `PAUSED`/`DISABLED`.
+
+#### 4. Souscrire à `phone_number_quality_update`
 Surveiller le tier et la qualité du numéro. Alerter si dégradation.
 
-#### 4. Souscrire à `account_alerts`
+#### 5. Souscrire à `account_alerts`
 Alertes préventives avant restriction du compte.
-
-#### 5. Souscrire à `message_template_status_update`
-Détecter les templates `PAUSED`/`DISABLED` pour bloquer les `MessageAuto` correspondants.
 
 #### 6. Implémenter `referral` dans `MetaMessageBase`
 Sauvegarder l'origine publicitaire des conversations et l'afficher dans l'interface agent.
@@ -1404,7 +1419,7 @@ referral?: {
 Créer des tickets de rappel automatiques pour les appels manqués.
 
 #### 8. Implémenter `reaction`
-Afficher les emojis de réaction dans l'interface.
+Afficher les emojis de réaction dans l'interface (Meta + Instagram — l'adapter Instagram ignore explicitement les réactions).
 
 #### 9. Souscrire à `user_preferences`
 Respecter les opt-out marketing pour la conformité RGPD.
@@ -1420,15 +1435,20 @@ Potentiel élevé pour remplacer les échanges textuels répétitifs par des for
 
 ### 🟢 Basse priorité — Backlog futur
 
-- `sticker` : Afficher les stickers WebP
 - `contacts` : Afficher les fiches contact partagées
-- `unsupported` : Placeholder "Message non supporté"
+- `unsupported` : Placeholder "Message non supporté" à la place de "type inconnu"
 - `message_echoes` : Si multi-instance nécessaire
 - `history` : Pour les migrations de numéros
 - `tracking_events` : Analytics publicitaires avancées
 - `template_category_update` / `message_template_components_update` : Alertes coût financier
 
+### ✅ Déjà implémenté — Retiré des recommandations
+
+- `sticker` : ✅ Géré dans `MetaAdapter.resolveMedia()` et affiché dans `ChatMessage.tsx`
+- Progression visuelle des statuts (✓ → ✓✓ → 🔵) : ✅ Entièrement implémentée dans `ChatMessage.tsx`
+
 ---
 
-*Document généré à partir de l'analyse du code source de l'application (NestJS / MetaAdapter / UnifiedIngressService)
-et de la liste officielle des champs webhook Meta WhatsApp Business Platform v25.0.*
+*Document généré à partir de l'analyse du code source (NestJS / MetaAdapter / UnifiedIngressService / InstagramAdapter / MessengerAdapter)
+et de la liste officielle des champs webhook Meta WhatsApp Business Platform v25.0.
+Dernière mise à jour : 2026-04-03.*

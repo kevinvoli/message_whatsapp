@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Edit, PlusCircle, Trash2, RefreshCw, Info } from 'lucide-react';
+import { Edit, PlusCircle, Trash2, RefreshCw, Info, Link, X } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
-import { Channel, ProviderType } from '@/app/lib/definitions';
-import { createChannel, deleteChannel, getChannels, refreshChannelToken, updateChannel } from '@/app/lib/api';
+import { Channel, Poste, ProviderType } from '@/app/lib/definitions';
+import { assignChannelToPoste, createChannel, deleteChannel, getChannels, getPostes, refreshChannelToken, updateChannel } from '@/app/lib/api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
@@ -445,6 +445,39 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
 
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
+  // ─── Poste assignment ────────────────────────────────────────────────────────
+  const [postes, setPostes] = useState<Poste[]>([]);
+  const [assignModal, setAssignModal] = useState<{ channel: Channel } | null>(null);
+  const [assigningPosteId, setAssigningPosteId] = useState<string>('');
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  useEffect(() => {
+    getPostes().then(setPostes).catch(() => {});
+  }, []);
+
+  const openAssignModal = (channel: Channel) => {
+    setAssignModal({ channel });
+    setAssigningPosteId(channel.poste_id ?? '');
+  };
+
+  const handleAssignPoste = async () => {
+    if (!assignModal) return;
+    setAssignLoading(true);
+    try {
+      const updated = await assignChannelToPoste(
+        assignModal.channel.channel_id,
+        assigningPosteId || null,
+      );
+      setItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      addToast({ type: 'success', message: assigningPosteId ? 'Canal assigné au poste.' : 'Assignation retirée (mode pool).' });
+      setAssignModal(null);
+    } catch (err) {
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Erreur lors de l\'assignation.' });
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
   const handleRefreshToken = async (id: string) => {
     setRefreshingId(id);
     try {
@@ -636,6 +669,27 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
               },
             },
             {
+              header: 'Poste dédié',
+              render: (channel) => (
+                <div className="flex items-center gap-2">
+                  {channel.poste_id && channel.poste ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
+                      {channel.poste.name}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400 italic">Pool global</span>
+                  )}
+                  <button
+                    onClick={() => openAssignModal(channel)}
+                    className="rounded p-1 text-indigo-500 hover:bg-indigo-50"
+                    title="Changer l'assignation"
+                  >
+                    <Link className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ),
+            },
+            {
               header: 'Actions',
               render: (channel) => {
                 const provider = channel.provider ?? 'whapi';
@@ -701,6 +755,58 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       >
         {sharedFormFields('edit')}
       </EntityFormModal>
+
+      {/* ── Modal assignation poste ── */}
+      {assignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">Assigner un poste dédié</h3>
+              <button onClick={() => setAssignModal(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-4 text-xs text-gray-500">
+              Canal : <span className="font-medium text-gray-700">{assignModal.channel.label || assignModal.channel.channel_id}</span>
+            </p>
+            <div className="mb-5">
+              <label className="mb-1.5 block text-sm font-bold text-gray-700">Poste</label>
+              <select
+                className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+                value={assigningPosteId}
+                onChange={(e) => setAssigningPosteId(e.target.value)}
+              >
+                <option value="">— Pool global (aucun poste dédié) —</option>
+                {postes.filter((p) => p.is_active).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                ))}
+              </select>
+              {assigningPosteId === '' && (
+                <p className="mt-1.5 text-xs text-gray-400">Les conversations de ce canal seront distribuées via la file globale.</p>
+              )}
+              {assigningPosteId !== '' && (
+                <p className="mt-1.5 text-xs text-indigo-600">Toutes les nouvelles conversations de ce canal iront uniquement à ce poste.</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAssignModal(null)}
+                className="rounded px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                disabled={assignLoading}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => void handleAssignPoste()}
+                className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                disabled={assignLoading}
+              >
+                {assignLoading ? 'Enregistrement...' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

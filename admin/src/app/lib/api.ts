@@ -177,6 +177,21 @@ export async function deleteChannel(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
+/**
+ * Assigne ou désassigne un poste dédié à un channel.
+ * @param channelId - channel_id du canal (ex: phone_number_id Meta)
+ * @param posteId   - UUID du poste, ou null pour retour en pool global
+ */
+export async function assignChannelToPoste(channelId: string, posteId: string | null): Promise<Channel> {
+    const response = await fetch(`${API_BASE_URL}/channel/${encodeURIComponent(channelId)}/assign-poste`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poste_id: posteId }),
+        credentials: 'include',
+    });
+    return handleResponse<Channel>(response);
+}
+
 export async function getMessageAuto(): Promise<MessageAuto[]> {
     const response = await fetch(`${API_BASE_URL}/message-auto`, {
         method: 'GET',

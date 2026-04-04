@@ -258,6 +258,28 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
               ),
             },
             {
+              header: 'Canaux dédiés',
+              render: (poste) => {
+                const channels = poste.channels ?? [];
+                if (channels.length === 0) {
+                  return <span className="text-xs text-gray-400 italic">Aucun</span>;
+                }
+                return (
+                  <div className="flex flex-wrap gap-1">
+                    {channels.map((ch) => (
+                      <span
+                        key={ch.id}
+                        className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800"
+                        title={ch.channel_id}
+                      >
+                        {ch.label || ch.channel_id.substring(0, 10)}
+                      </span>
+                    ))}
+                  </div>
+                );
+              },
+            },
+            {
               header: 'Code',
               render: (poste) => <span className="text-gray-700">{poste.code}</span>,
             },
