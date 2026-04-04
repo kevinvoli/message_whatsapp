@@ -34,7 +34,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3002/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -55,7 +55,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -76,7 +76,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
