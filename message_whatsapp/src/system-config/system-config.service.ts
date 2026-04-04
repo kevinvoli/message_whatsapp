@@ -45,6 +45,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
 
 ];
 
+
 @Injectable()
 export class SystemConfigService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SystemConfigService.name);
