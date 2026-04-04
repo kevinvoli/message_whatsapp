@@ -19,6 +19,7 @@ export class ContactService {
     private readonly commercialRepo: Repository<WhatsappCommercial>,
     private readonly callLogService: CallLogService,
   ) {}
+  
 
   async create(dto: CreateContactDto) {
     const contact = this.repo.create(dto);
