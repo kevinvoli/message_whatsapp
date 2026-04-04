@@ -608,11 +608,22 @@ export class WhatsappMessageGateway
       before,
     );
 
+    // Filtrage par canal dédié : isoler les messages selon le contexte du poste
+    const dedicatedChannelIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
+    const filteredMessages = messages.filter((m) => {
+      if (dedicatedChannelIds.length > 0) {
+        // Poste dédié : afficher uniquement les messages de ses canaux dédiés
+        return dedicatedChannelIds.includes(m.dedicated_channel_id ?? '');
+      }
+      // Poste normal (pool) : afficher uniquement les messages hors canal dédié
+      return !m.dedicated_channel_id;
+    });
+
     client.emit('chat:event', {
       type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
       payload: {
         chat_id: payload.chat_id,
-        messages: messages.map(this.mapMessage),
+        messages: filteredMessages.map(this.mapMessage),
       },
     });
   }
@@ -1204,6 +1215,7 @@ export class WhatsappMessageGateway
         latitude: m.latitude,
         longitude: m.longitude,
       })) ?? [],
+    dedicated_channel_id: message.dedicated_channel_id ?? null,
     quotedMessage: message.quotedMessage
       ? {
           id: message.quotedMessage.id,

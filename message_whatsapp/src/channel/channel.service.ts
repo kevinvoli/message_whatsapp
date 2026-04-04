@@ -425,6 +425,18 @@ export class ChannelService {
     return result?.poste_id ?? null;
   }
 
+  /**
+   * Retourne les channel_id de tous les channels dédiés à un poste donné.
+   * Utilisé pour filtrer les messages par canal dédié.
+   */
+  async getDedicatedChannelIdsForPoste(posteId: string): Promise<string[]> {
+    const channels = await this.channelRepository.find({
+      where: { poste_id: posteId },
+      select: ['channel_id'],
+    });
+    return channels.map((c) => c.channel_id);
+  }
+
   async findAll() {
     return await this.channelRepository.find({ relations: ['poste'] });
   }

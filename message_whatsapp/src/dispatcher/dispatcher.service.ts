@@ -316,6 +316,22 @@ export class DispatcherService {
       return;
     }
 
+    // Channel dédié : ne jamais réinjecter dans la queue globale.
+    // La conversation doit rester sur le poste dédié — on renouvelle juste la deadline.
+    const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
+    if (channelId) {
+      const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
+      if (dedicatedPosteId) {
+        this.logger.debug(
+          `Reinject ignoré (${chat.chat_id}): channel dédié au poste ${dedicatedPosteId} — deadline étendue`,
+        );
+        await this.chatRepository.update(chat.id, {
+          first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
+        });
+        return;
+      }
+    }
+
     // Si le poste actuel est le seul dans la queue, un redispatch lui
     // renverrait la conversation immédiatement — sans aucun bénéfice.
     // On renouvelle simplement la deadline pour éviter que le job ne

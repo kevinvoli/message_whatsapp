@@ -194,6 +194,7 @@ export class WhatsappMessageService {
         commercial: commercial,
         contact: null,
         quotedMessage: quotedMsg ?? undefined,
+        dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
       });
 
       const mes = await this.messageRepository.save(messageEntity);
@@ -330,6 +331,7 @@ export class WhatsappMessageService {
         channel: channel,
         commercial: commercial,
         contact: null,
+        dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
       });
 
       const savedMessage = await this.messageRepository.save(messageEntity);
@@ -995,6 +997,8 @@ export class WhatsappMessageService {
           source: message.provider,
           poste: chatRef.poste,
           quotedMessage: quotedMsg ?? undefined,
+          // Canal dédié : rempli si le channel a un poste dédié au moment de la réception
+          dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
         });
 
       try {

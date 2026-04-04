@@ -145,6 +145,7 @@ export interface Message {
 
   commercial_id?: string | null;
   poste_id?: string;
+  dedicated_channel_id?: string | null;
 
   // 🔊 VOCAL (optionnel)
   medias?: Array<{

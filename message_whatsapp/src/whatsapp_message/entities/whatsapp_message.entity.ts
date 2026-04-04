@@ -243,6 +243,14 @@ export class WhatsappMessage {
   @JoinColumn({ name: 'commercial_id', referencedColumnName: 'id' })
   commercial?: WhatsappCommercial | null;
 
+  /**
+   * ID du canal dédié si ce message est arrivé (ou a été envoyé) via un canal dédié à un poste.
+   * NULL = canal normal (pool global).
+   * Utilisé pour isoler les messages par canal dans la vue conversation.
+   */
+  @Column({ name: 'dedicated_channel_id', type: 'varchar', length: 100, nullable: true, default: null })
+  dedicated_channel_id?: string | null;
+
   @Column({ name: 'quoted_message_id', type: 'char', length: 36, nullable: true })
   quoted_message_id: string | null;
 
