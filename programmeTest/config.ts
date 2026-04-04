@@ -52,7 +52,7 @@ export const config = {
   parallelRequests: Number(env.PARALLEL_REQUESTS ?? 1),
 
   // ── Webhook URLs ────────────────────────────────────────────────────────
-  webhookUrl:           env.WEBHOOK_URL           ?? 'http://localhost:3002/webhooks/whapi',
+  webhookUrl:           env.WEBHOOK_URL           ?? 'http://148.230.112.175:3002/webhooks/whapi',
   metaWebhookUrl:       env.META_WEBHOOK_URL       ?? 'http://localhost:3002/webhooks/meta',
   messengerWebhookUrl:  env.MESSENGER_WEBHOOK_URL  ?? 'http://localhost:3002/webhooks/messenger',
   instagramWebhookUrl:  env.INSTAGRAM_WEBHOOK_URL  ?? 'http://localhost:3002/webhooks/instagram',
@@ -73,7 +73,7 @@ export const config = {
 
   // ── Channel / Account IDs ───────────────────────────────────────────────
   // Whapi
-  channelId:          env.WHAPI_CHANNEL_ID       ?? 'BATMAN-P8CHE',
+  channelId:          env.WHAPI_CHANNEL_ID       ?? 'AQUAMN-YDY35',
   // Meta WhatsApp
   metaPhoneNumberId:  env.META_PHONE_NUMBER_ID   ?? 'e2e-shadow-channel',
   metaWabaId:         env.META_WABA_ID           ?? 'waba-test',

@@ -124,14 +124,22 @@ export class DispatcherService {
 
     // console.log("=========================== conversation", conversation);
 
-    // Déterminer si l'agent actuel est connecté
+    // Vérifier si le channel est dédié à un poste spécifique
+    const dedicatedPosteId = channelId
+      ? await this.channelService.getDedicatedPosteId(channelId)
+      : null;
+
+    // Déterminer si l’agent actuel est connecté ET sur le bon poste
     const currentPosteId = conversation?.poste?.id;
-    const isAgentConnected = currentPosteId
-      ? this.messageGateway.isAgentConnected(currentPosteId)
-      : false;
+    const isOnDedicatedPoste =
+      !dedicatedPosteId || currentPosteId === dedicatedPosteId;
+    const isAgentConnected =
+      currentPosteId && isOnDedicatedPoste
+        ? this.messageGateway.isAgentConnected(currentPosteId)
+        : false;
 
     /**
-     * Cas 1️⃣ : conversation existante + agent connecté
+     * Cas 1️⃣ : conversation existante + agent connecté sur le bon poste
      * → juste mettre à jour l’activité et le compteur de messages non lus
      */
     if (conversation && isAgentConnected) {
