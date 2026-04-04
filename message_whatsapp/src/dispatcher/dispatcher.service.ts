@@ -112,14 +112,23 @@ export class DispatcherService {
     });
 
     if (conversation?.read_only) {
-      this.logger.warn(
-        `Conversation read_only ignoree (${conversation.chat_id})`,
-      );
-      conversation.unread_count = (conversation.unread_count ?? 0) + 1;
-      conversation.last_activity_at = new Date();
-      // conversation.last_client_message_at = new Date();
-      await this.chatRepository.save(conversation);
-      return conversation;
+      if (conversation.status === WhatsappChatStatus.FERME) {
+        // Réouverture après fermeture manuelle : on lève le verrou et on laisse
+        // le dispatch normal rouvrir et réassigner la conversation.
+        this.logger.log(
+          `DISPATCH_REOPEN trace=${traceId ?? '-'} chat_id=${conversation.chat_id} (fermeture manuelle levée)`,
+        );
+        conversation.read_only = false;
+        // La suite du flux va mettre le bon statut (ACTIF ou EN_ATTENTE)
+      } else {
+        this.logger.warn(
+          `Conversation read_only ignoree (${conversation.chat_id})`,
+        );
+        conversation.unread_count = (conversation.unread_count ?? 0) + 1;
+        conversation.last_activity_at = new Date();
+        await this.chatRepository.save(conversation);
+        return conversation;
+      }
     }
 
     // console.log("=========================== conversation", conversation);
