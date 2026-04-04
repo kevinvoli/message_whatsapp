@@ -447,17 +447,23 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
 
   // ─── Poste assignment ────────────────────────────────────────────────────────
   const [postes, setPostes] = useState<Poste[]>([]);
+  const [postesLoading, setPostesLoading] = useState(false);
   const [assignModal, setAssignModal] = useState<{ channel: Channel } | null>(null);
   const [assigningPosteId, setAssigningPosteId] = useState<string>('');
   const [assignLoading, setAssignLoading] = useState(false);
 
-  useEffect(() => {
-    getPostes().then(setPostes).catch(() => {});
-  }, []);
-
-  const openAssignModal = (channel: Channel) => {
+  const openAssignModal = async (channel: Channel) => {
     setAssignModal({ channel });
     setAssigningPosteId(channel.poste_id ?? '');
+    setPostesLoading(true);
+    try {
+      const data = await getPostes();
+      setPostes(data);
+    } catch (err) {
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Impossible de charger les postes.' });
+    } finally {
+      setPostesLoading(false);
+    }
   };
 
   const handleAssignPoste = async () => {
@@ -680,7 +686,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                     <span className="text-xs text-gray-400 italic">Pool global</span>
                   )}
                   <button
-                    onClick={() => openAssignModal(channel)}
+                    onClick={() => void openAssignModal(channel)}
                     className="rounded p-1 text-indigo-500 hover:bg-indigo-50"
                     title="Changer l'assignation"
                   >
@@ -775,11 +781,17 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                 className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
                 value={assigningPosteId}
                 onChange={(e) => setAssigningPosteId(e.target.value)}
+                disabled={postesLoading}
               >
-                <option value="">— Pool global (aucun poste dédié) —</option>
-                {postes.filter((p) => p.is_active).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
-                ))}
+                {postesLoading
+                  ? <option value="">Chargement des postes...</option>
+                  : <>
+                      <option value="">— Pool global (aucun poste dédié) —</option>
+                      {postes.filter((p) => p.is_active).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                      ))}
+                    </>
+                }
               </select>
               {assigningPosteId === '' && (
                 <p className="mt-1.5 text-xs text-gray-400">Les conversations de ce canal seront distribuées via la file globale.</p>
