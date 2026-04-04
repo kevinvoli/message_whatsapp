@@ -10,6 +10,7 @@ import { QueuePosition } from '../entities/queue-position.entity';
 import { Mutex } from 'async-mutex';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -32,6 +33,9 @@ export class QueueService implements OnModuleInit {
 
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+
+    @InjectRepository(WhapiChannel)
+    private readonly channelRepository: Repository<WhapiChannel>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -171,7 +175,15 @@ export class QueueService implements OnModuleInit {
         relations: ['poste'],
       });
 
-      const candidates = allPositions.filter((qp) => qp.poste);
+      // Exclure les postes qui ont au moins un canal dédié (mode exclusif)
+      const dedicatedRows = await this.channelRepository
+        .createQueryBuilder('c')
+        .select('DISTINCT c.poste_id', 'poste_id')
+        .where('c.poste_id IS NOT NULL')
+        .getRawMany<{ poste_id: string }>();
+      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
+
+      const candidates = allPositions.filter((qp) => qp.poste && !dedicatedSet.has(qp.poste_id));
       if (candidates.length === 0) {
         this.logger.warn(
           `Aucun poste disponible, message mis en attente (queue vide)`,

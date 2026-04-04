@@ -58,6 +58,7 @@ describe('QueueService', () => {
       posteRepository as any,
       commercialRepository as any,
       {} as any, // chatRepository
+      { createQueryBuilder: () => ({ select: () => ({ where: () => ({ getRawMany: () => Promise.resolve([]) }) }) }) } as any, // channelRepository
       dataSource as any,
     );
   });
