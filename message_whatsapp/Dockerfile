@@ -25,6 +25,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Binaire compilé
 COPY --from=builder /app/dist ./dist
 
+# ffmpeg — nécessaire pour transcoder les audios WebM/Opus (Chrome) vers AAC/MP4
+RUN apk add --no-cache ffmpeg
+
 # Répertoires persistés via volumes
 RUN mkdir -p uploads logs
 
