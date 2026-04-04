@@ -787,8 +787,8 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                   ? <option value="">Chargement des postes...</option>
                   : <>
                       <option value="">— Pool global (aucun poste dédié) —</option>
-                      {postes.filter((p) => p.is_active).map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                      {postes.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} ({p.code}){!p.is_active ? ' — inactif' : ''}</option>
                       ))}
                     </>
                 }
