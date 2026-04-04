@@ -315,6 +315,28 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
               },
             },
             {
+              header: 'Mode dispatch',
+              render: (poste) => {
+                const isDedicated = (poste.channels?.length ?? 0) > 0;
+                return (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      isDedicated
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                    title={
+                      isDedicated
+                        ? 'Ce poste ne reçoit que les messages de ses canaux dédiés'
+                        : 'Ce poste reçoit les messages du pool global'
+                    }
+                  >
+                    {isDedicated ? 'Dédié' : 'Pool global'}
+                  </span>
+                );
+              },
+            },
+            {
               header: 'Cree le',
               render: (poste) => (
                 <span className="text-sm text-gray-500">
