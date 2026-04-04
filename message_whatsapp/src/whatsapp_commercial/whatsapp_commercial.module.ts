@@ -8,6 +8,7 @@ import { QueueService } from 'src/dispatcher/services/queue.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
       WhatsappPoste,
       WhatsappMessage,
       WhatsappChat,
+      WhapiChannel,
     ]),
   ],
   controllers: [WhatsappCommercialController],
