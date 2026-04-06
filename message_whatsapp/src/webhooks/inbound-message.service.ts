@@ -92,11 +92,34 @@ export class InboundMessageService {
             return;
           }
 
-          const savedMessage =
-            await this.whatsappMessageService.saveIncomingFromUnified(
+          let savedMessage: Awaited<
+            ReturnType<
+              typeof this.whatsappMessageService.saveIncomingFromUnified
+            >
+          >;
+          try {
+            savedMessage = await this.whatsappMessageService.saveIncomingFromUnified(
               message,
               conversation,
             );
+          } catch (saveErr) {
+            const msg: string = (saveErr as Error)?.message ?? '';
+            // Canal inconnu → le message ne peut pas être sauvegardé.
+            // On retourne silencieusement (HTTP 200 à Meta/Whapi) pour stopper
+            // les retries infinis du provider.
+            if (
+              msg.toLowerCase().includes('channel') ||
+              msg.toLowerCase().includes('canal') ||
+              msg.toLowerCase().includes('non trouve') ||
+              msg.toLowerCase().includes('not found')
+            ) {
+              this.logger.warn(
+                `INCOMING_CHANNEL_NOT_FOUND trace=${traceId} channel=${message.channelId} — message ignoré, provider ne réessaiera pas`,
+              );
+              return;
+            }
+            throw saveErr;
+          }
 
           if (!savedMessage) {
             throw new NotFoundException('Message non enregistre');

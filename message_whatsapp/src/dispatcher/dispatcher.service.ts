@@ -435,12 +435,14 @@ export class DispatcherService {
         ? WhatsappChatStatus.ACTIF
         : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
-      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+      // 15 min au lieu de 5 min — évite que toutes les conversations non répondues
+      // reviennent dans le SLA checker à chaque cycle de 5 min (boucle de charge infinie)
+      first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
     });
 
     const updatedChat = await this.chatRepository.findOne({
       where: { chat_id: chat.chat_id },
-      relations: ['poste', 'messages'],
+      relations: ['poste'],  // 'messages' retiré — inutile ici et charge tous les messages en RAM
     });
 
     if (!updatedChat) {
@@ -485,12 +487,17 @@ export class DispatcherService {
   async jobRunnerAllPostes(): Promise<void> {
     const now = new Date();
 
+    // LIMIT 50 par cycle — évite le burst de requêtes quand des centaines de
+    // conversations expirent en même temps (commerciaux qui ne répondent pas).
+    // Les conversations non traitées seront reprises au prochain cycle (5 min).
     const chats = await this.chatRepository.find({
       where: {
         status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
         last_poste_message_at: IsNull(),
         first_response_deadline_at: LessThan(now),
       },
+      order: { first_response_deadline_at: 'ASC' }, // les plus urgentes d'abord
+      take: 50,
     });
     this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) expirée(s)`);
 

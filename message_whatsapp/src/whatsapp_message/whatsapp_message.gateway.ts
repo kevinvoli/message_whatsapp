@@ -336,10 +336,12 @@ export class WhatsappMessageGateway
       this.contactService.findByChatIds(chatIds),
     ]);
 
-    // Chargement des messages en bulk — isolé pour ne pas bloquer les conversations si ça échoue
+    // Chargement des messages en bulk — limité aux 500 conversations les plus récentes
+    // et plafonné à 50 messages par conversation pour éviter les OOM sur les gros postes.
+    const chatIdsForMessages = chatIds.slice(0, 500);
     let recentMsgsMap = new Map<string, Record<string, any>[]>();
     try {
-      recentMsgsMap = await this.messageService.findRecentByChatIds(chatIds);
+      recentMsgsMap = await this.messageService.findRecentByChatIds(chatIdsForMessages, 50);
     } catch (err) {
       this.logger.error('findRecentByChatIds failed, messages will be empty', err instanceof Error ? err.message : err);
     }

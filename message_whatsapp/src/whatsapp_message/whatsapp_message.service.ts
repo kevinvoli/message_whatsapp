@@ -544,12 +544,13 @@ export class WhatsappMessageService {
   }
 
   /**
-   * Récupère TOUS les messages pour chaque conversation en une seule requête SQL.
-   * Aucun filtre de statut, aucune limite — retourne tout l'historique.
+   * Récupère les N messages les plus récents pour chaque conversation (défaut: 50).
+   * Utilise ROW_NUMBER() (MySQL 8+) pour limiter par chat_id sans sous-requête corrélée.
    * Retourne une Map<chat_id, messages[]> triée par timestamp ASC (ordre d'affichage).
    */
   async findRecentByChatIds(
     chatIds: string[],
+    perChatLimit = 50,
   ): Promise<Map<string, Record<string, any>[]>> {
     if (chatIds.length === 0) return new Map();
 
@@ -558,11 +559,21 @@ export class WhatsappMessageService {
       `SELECT id, chat_id, \`text\`, timestamp, from_me, \`from\`,
               from_name, status, direction, \`type\`, poste_id,
               commercial_id, message_id, createdAt
-       FROM whatsapp_message
-       WHERE chat_id IN (${placeholders})
-         AND deletedAt IS NULL
+       FROM (
+         SELECT id, chat_id, \`text\`, timestamp, from_me, \`from\`,
+                from_name, status, direction, \`type\`, poste_id,
+                commercial_id, message_id, createdAt,
+                ROW_NUMBER() OVER (
+                  PARTITION BY chat_id
+                  ORDER BY timestamp DESC, createdAt DESC
+                ) AS rn
+         FROM whatsapp_message
+         WHERE chat_id IN (${placeholders})
+           AND deletedAt IS NULL
+       ) ranked
+       WHERE rn <= ?
        ORDER BY chat_id ASC, timestamp ASC, createdAt ASC`,
-      chatIds,
+      [...chatIds, perChatLimit],
     );
 
     const map = new Map<string, Record<string, any>[]>();
