@@ -554,6 +554,7 @@ export class WhatsappMessageService {
   ): Promise<Map<string, Record<string, any>[]>> {
     if (chatIds.length === 0) return new Map();
 
+    
     const placeholders = chatIds.map(() => '?').join(',');
     const rows: Record<string, any>[] = await this.messageRepository.query(
       `SELECT id, chat_id, \`text\`, timestamp, from_me, \`from\`,
