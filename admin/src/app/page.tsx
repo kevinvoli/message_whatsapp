@@ -12,6 +12,7 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true); // Start as loading
 
+  
   useEffect(() => {
 
     async function checkAuthStatus() {

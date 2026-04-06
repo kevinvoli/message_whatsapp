@@ -16,7 +16,6 @@ function generateUUID(): string {
   });
 }
 
-
 interface ChatState {
   typingStatus: Record<string, boolean>;
   socket: Socket | null;
