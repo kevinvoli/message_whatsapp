@@ -85,10 +85,14 @@ export default function ConversationsView({
     const loadChats = useCallback(async (l: number, o: number) => {
         setLoadingChats(true);
         try {
+            // Quand un poste ou un commercial est sélectionné, on désactive le filtre
+            // de période pour voir TOUTES ses conversations (cohérent avec le commercial).
+            // Le filtre de période ne s'applique qu'à la vue globale (sans filtre spécifique).
+            const periodeEffective = (selectedPosteId || selectedCommercialId) ? 'all' : selectedPeriod;
             const result = await getChats(
                 l,
                 o,
-                selectedPeriod,
+                periodeEffective,
                 selectedPosteId || undefined,
                 selectedCommercialId || undefined,
             );

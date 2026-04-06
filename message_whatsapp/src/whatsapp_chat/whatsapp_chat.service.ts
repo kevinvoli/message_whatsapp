@@ -246,6 +246,26 @@ export class WhatsappChatService {
 
     const [data, total] = await qb.take(limit).skip(offset).getManyAndCount();
 
+    // Bulk-fetch unread count réel depuis whatsapp_message (même logique que countUnreadMessagesBulk)
+    // pour être cohérent avec ce que voit le commercial (pas la colonne statique unread_count)
+    if (data.length > 0) {
+      const chatIds = data.map((c) => c.chat_id);
+      const unreadRows: Array<{ chat_id: string; cnt: string }> = await this.messageRepository
+        .createQueryBuilder('m')
+        .select('m.chat_id', 'chat_id')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('m.chat_id IN (:...chatIds)', { chatIds })
+        .andWhere('m.from_me = :fromMe', { fromMe: false })
+        .andWhere('m.status IN (:...statuses)', { statuses: ['sent', 'delivered'] })
+        .andWhere('m.deletedAt IS NULL')
+        .groupBy('m.chat_id')
+        .getRawMany();
+      const unreadMap = new Map(unreadRows.map((r) => [r.chat_id, parseInt(r.cnt) || 0]));
+      for (const chat of data) {
+        chat.unread_count = unreadMap.get(chat.chat_id) ?? 0;
+      }
+    }
+
     // Bulk-fetch last message per chat in a single query (replaces N correlated subqueries)
     if (data.length > 0) {
       const chatIds = data.map((c) => c.chat_id);
@@ -275,12 +295,24 @@ export class WhatsappChatService {
     // Statistiques globales (sans filtre de date ni pagination)
     // pour avoir le vrai total de non-lus, de fermés, et le total réel du poste
     // (indépendant du filtre période pour être cohérent avec ce que voit le commercial)
+    // totalUnread : même logique que countUnreadMessagesBulk / getTotalUnreadForPoste
+    // (conversations avec au moins 1 message entrant status sent/delivered)
+    // pour être cohérent avec ce que voit le commercial en temps réel.
     const statsQb = this.chatRepository
       .createQueryBuilder('chat')
       .select('COUNT(*)', 'totalAll')
       .addSelect("SUM(CASE WHEN chat.status = 'actif' THEN 1 ELSE 0 END)", 'totalActifs')
       .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'totalEnAttente')
-      .addSelect('COALESCE(SUM(chat.unread_count), 0)', 'totalUnread')
+      .addSelect(
+        `SUM(CASE WHEN EXISTS (
+           SELECT 1 FROM whatsapp_message m
+           WHERE m.chat_id = chat.chat_id
+             AND m.from_me = 0
+             AND m.status IN ('sent','delivered')
+             AND m.deletedAt IS NULL
+         ) THEN 1 ELSE 0 END)`,
+        'totalUnread',
+      )
       .addSelect("SUM(CASE WHEN chat.status = 'fermé' THEN 1 ELSE 0 END)", 'totalFermes')
       .where('chat.deletedAt IS NULL');
 

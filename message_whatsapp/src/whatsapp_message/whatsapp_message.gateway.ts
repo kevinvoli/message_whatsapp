@@ -1297,7 +1297,9 @@ export class WhatsappMessageGateway
       last_msg_client_channel_id: chat.last_msg_client_channel_id,
       name: chat.name,
       poste_id: chat.poste_id,
-      status: chat.status,
+      // Normalise 'en attente' → 'attente' une seule fois à la source
+      // pour éviter que chaque client (front/admin) le fasse de son côté
+      status: chat.status === WhatsappChatStatus.EN_ATTENTE ? 'attente' : chat.status,
       unreadCount: unreadCount ?? chat.unread_count ?? 0,
       createdAt: chat.createdAt,
       auto_message_status: chat.auto_message_status,

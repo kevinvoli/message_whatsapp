@@ -7,7 +7,6 @@ export type ConversationStatus =
   | "nouveau"
   | "actif"
   | "attente"
-  | "en attente"
   | "converti"
   | "fermé";
   
@@ -722,16 +721,11 @@ const resolveLastMessage = (
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
-  const normalizedStatus =
-    raw.status === "en attente"
-      ? "attente"
-      : raw.status === "attente" ||
-          raw.status === "actif" ||
-          raw.status === "nouveau" ||
-          raw.status === "converti" ||
-          raw.status === "fermé"
-        ? raw.status
-        : "attente";
+  // Le backend normalise déjà 'en attente' → 'attente' à la source.
+  // Ce fallback défensif couvre d'éventuels anciens enregistrements.
+  const normalizedStatus: ConversationStatus =
+    raw.status === "en attente" || !raw.status ? "attente"
+    : (raw.status as ConversationStatus);
   const unreadCount = raw.unreadCount ?? raw.unread_count ?? 0;
   const sourceChannel =
     raw.channel_id || raw.last_msg_client_channel_id || "inconnu";
