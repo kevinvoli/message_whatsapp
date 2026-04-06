@@ -105,6 +105,7 @@ const WhatsAppPage = () => {
       <Sidebar
         commercial={user}
         conversations={filteredConversations}
+        allConversations={conversations}
         searchTerm=""
         selectedConversation={selectedConversation}
         isConnected={isWebSocketConnected}

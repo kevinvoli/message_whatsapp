@@ -368,6 +368,7 @@ export class WhatsappChatService {
       .addSelect('COUNT(*)', 'count')
       .addSelect('SUM(chat.unread_count)', 'unread_sum')
       .where('chat.poste_id IS NOT NULL')
+      .andWhere('chat.deletedAt IS NULL')
       .groupBy('chat.poste_id')
       .addGroupBy('chat.status')
       .getRawMany();

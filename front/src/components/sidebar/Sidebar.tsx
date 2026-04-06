@@ -13,6 +13,7 @@ import { ContactSidebarPanel } from '@/components/contacts/ContactSidebarPanel';
 interface SidebarProps {
   commercial: Commercial;
   conversations: Conversation[];
+  allConversations?: Conversation[];
   filterStatus: string;
   searchTerm: string;
   selectedConversation: Conversation | null;
@@ -34,6 +35,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({
   commercial,
   conversations,
+  allConversations,
   searchTerm,
   selectedConversation,
   isConnected,
@@ -62,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="w-100 bg-white border-r border-gray-200 flex flex-col">
       <UserHeader
-        conversation={conversations}
+        conversation={allConversations ?? conversations}
         totalUnread={totalUnread}
         setShowStats={setShowStats}
         showStats={showStats}
@@ -78,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {viewMode === 'conversations' ? (
         <>
           <ConversationFilters
-            conversations={conversations}
+            conversations={allConversations ?? conversations}
             totalUnread={totalUnread}
             filterStatus={filterStatus}
             setFilterStatus={setFilterStatus}
