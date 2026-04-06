@@ -33,6 +33,11 @@ services:
     # Accès à MySQL installé directement sur le serveur host
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3002/',r=>process.exit(r.statusCode>=500?1:0)).on('error',()=>process.exit(1))"]
       interval: 30s
