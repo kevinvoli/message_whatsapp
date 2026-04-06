@@ -27,6 +27,8 @@ export default function ConversationsView({
     const [chats, setChats] = useState<WhatsappChat[]>([]);
     const [total, setTotal] = useState(0);
     const [totalAll, setTotalAll] = useState(0);
+    const [totalActifs, setTotalActifs] = useState(0);
+    const [totalEnAttente, setTotalEnAttente] = useState(0);
     const [totalUnread, setTotalUnread] = useState(0);
     const [totalFermes, setTotalFermes] = useState(0);
     const [limit, setLimit] = useState(50);
@@ -93,6 +95,8 @@ export default function ConversationsView({
             setChats(result.data);
             setTotal(result.total);
             setTotalAll(result.totalAll);
+            setTotalActifs(result.totalActifs);
+            setTotalEnAttente(result.totalEnAttente);
             setTotalUnread(result.totalUnread);
             setTotalFermes(result.totalFermes);
         } finally {
@@ -463,10 +467,10 @@ export default function ConversationsView({
                                 )}
                             </span>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                {chats.filter((c) => c.status === 'actif').length} actifs
+                                {totalActifs} actifs
                             </span>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-                                {chats.filter((c) => c.status?.includes('attente')).length} en attente
+                                {totalEnAttente} en attente
                             </span>
                             {totalFermes > 0 && (
                                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">

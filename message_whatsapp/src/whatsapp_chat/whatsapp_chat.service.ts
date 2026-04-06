@@ -192,7 +192,7 @@ export class WhatsappChatService {
     dateStart?: Date,
     posteId?: string,
     commercialId?: string,
-  ): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalUnread: number; totalFermes: number }> {
+  ): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalActifs: number; totalEnAttente: number; totalUnread: number; totalFermes: number }> {
     if (chat_id) {
       const data = await this.chatRepository
         .createQueryBuilder('chat')
@@ -206,7 +206,7 @@ export class WhatsappChatService {
         )
         .where('chat.chat_id = :chat_id', { chat_id })
         .getMany();
-      return { data, total: data.length, totalAll: data.length, totalUnread: 0, totalFermes: 0 };
+      return { data, total: data.length, totalAll: data.length, totalActifs: 0, totalEnAttente: 0, totalUnread: 0, totalFermes: 0 };
     }
     const qb = this.chatRepository
       .createQueryBuilder('chat')
@@ -278,6 +278,8 @@ export class WhatsappChatService {
     const statsQb = this.chatRepository
       .createQueryBuilder('chat')
       .select('COUNT(*)', 'totalAll')
+      .addSelect("SUM(CASE WHEN chat.status = 'actif' THEN 1 ELSE 0 END)", 'totalActifs')
+      .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'totalEnAttente')
       .addSelect('COALESCE(SUM(chat.unread_count), 0)', 'totalUnread')
       .addSelect("SUM(CASE WHEN chat.status = 'fermé' THEN 1 ELSE 0 END)", 'totalFermes')
       .where('chat.deletedAt IS NULL');
@@ -296,12 +298,14 @@ export class WhatsappChatService {
       );
     }
 
-    const stats = await statsQb.getRawOne<{ totalAll: string; totalUnread: string; totalFermes: string }>();
+    const stats = await statsQb.getRawOne<{ totalAll: string; totalActifs: string; totalEnAttente: string; totalUnread: string; totalFermes: string }>();
 
     return {
       data,
       total,
       totalAll: parseInt(stats?.totalAll ?? '0') || 0,
+      totalActifs: parseInt(stats?.totalActifs ?? '0') || 0,
+      totalEnAttente: parseInt(stats?.totalEnAttente ?? '0') || 0,
       totalUnread: parseInt(stats?.totalUnread ?? '0') || 0,
       totalFermes: parseInt(stats?.totalFermes ?? '0') || 0,
     };
