@@ -311,7 +311,7 @@ export async function getChats(
     periode = 'today',
     posteId?: string,
     commercialId?: string,
-): Promise<{ data: WhatsappChat[]; total: number; totalUnread: number; totalFermes: number }> {
+): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalUnread: number; totalFermes: number }> {
     const params = new URLSearchParams({
         limit: String(limit),
         offset: String(offset),
@@ -331,10 +331,11 @@ export async function getChats(
       client_phone?: string;
       contact_client?: string;
       status?: string;
-    }>; total: number; totalUnread?: number; totalFermes?: number }>(response);
+    }>; total: number; totalAll?: number; totalUnread?: number; totalFermes?: number }>(response);
     return {
         data: result.data.map(normalizeWhatsappChat),
         total: result.total,
+        totalAll: result.totalAll ?? result.total,
         totalUnread: result.totalUnread ?? 0,
         totalFermes: result.totalFermes ?? 0,
     };

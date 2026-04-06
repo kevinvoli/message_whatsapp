@@ -26,6 +26,7 @@ export default function ConversationsView({
 }: ConversationsViewProps) {
     const [chats, setChats] = useState<WhatsappChat[]>([]);
     const [total, setTotal] = useState(0);
+    const [totalAll, setTotalAll] = useState(0);
     const [totalUnread, setTotalUnread] = useState(0);
     const [totalFermes, setTotalFermes] = useState(0);
     const [limit, setLimit] = useState(50);
@@ -91,6 +92,7 @@ export default function ConversationsView({
             );
             setChats(result.data);
             setTotal(result.total);
+            setTotalAll(result.totalAll);
             setTotalUnread(result.totalUnread);
             setTotalFermes(result.totalFermes);
         } finally {
@@ -455,7 +457,10 @@ export default function ConversationsView({
                     {hasFilter && (
                         <div className="flex flex-wrap gap-1.5">
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                                {total} total
+                                {totalAll} total
+                                {selectedPeriod !== 'year' && total !== totalAll && (
+                                    <span className="ml-1 text-slate-400">({total} sur période)</span>
+                                )}
                             </span>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                                 {chats.filter((c) => c.status === 'actif').length} actifs
