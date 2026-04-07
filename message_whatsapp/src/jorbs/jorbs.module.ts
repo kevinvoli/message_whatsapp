@@ -10,6 +10,7 @@ import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keywo
 import { MessageAutoModule } from 'src/message-auto/message-auto.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { LoggingModule } from 'src/logging/logging.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     forwardRef(() => MessageAutoModule),
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
+    NotificationModule,
   ],
   controllers: [CronConfigController],
   providers: [

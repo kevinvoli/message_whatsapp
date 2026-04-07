@@ -38,7 +38,7 @@ export class WebhookIdempotencyPurgeService implements OnModuleInit {
     }
   }
 
-  async purgeOldEvents(): Promise<void> {
+  async purgeOldEvents(): Promise<string> {
     const ttlDays = await this.getTtlDays();
     const cutoff = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
 
@@ -46,21 +46,22 @@ export class WebhookIdempotencyPurgeService implements OnModuleInit {
       const result = await this.webhookEventRepository.delete({
         createdAt: LessThan(cutoff),
       });
-      if (typeof result.affected === 'number' && result.affected > 0) {
-        this.metricsService.recordIdempotencyPurge(result.affected);
+      const affected = typeof result.affected === 'number' ? result.affected : 0;
+      if (affected > 0) {
+        this.metricsService.recordIdempotencyPurge(affected);
         this.logger.log(
-          `Idempotency purge removed=${result.affected} before=${cutoff.toISOString()}`,
+          `Idempotency purge removed=${affected} before=${cutoff.toISOString()}`,
         );
       }
+      return `${affected} événement(s) webhook supprimé(s) (antérieurs au ${cutoff.toLocaleDateString('fr-FR')}, TTL ${ttlDays}j)`;
     } catch (error) {
-      const code = error?.driverError?.code;
+      const code = (error as { driverError?: { code?: string } })?.driverError?.code;
       if (code === 'ER_NO_SUCH_TABLE') {
-        this.logger.warn(
-          'Idempotency purge skipped: webhook_event_log missing',
-        );
-        return;
+        this.logger.warn('Idempotency purge skipped: webhook_event_log missing');
+        return 'Ignoré — table webhook_event_log absente';
       }
       this.logger.error('Idempotency purge failed', error as Error);
+      throw error;
     }
   }
 

@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +12,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { CronConfig } from './entities/cron-config.entity';
 import { UpdateCronConfigDto } from './dto/update-cron-config.dto';
+import { NotificationService } from 'src/notification/notification.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Valeurs par défaut par clé
@@ -276,15 +278,19 @@ export class CronConfigService implements OnModuleInit {
   private readonly logger = new Logger(CronConfigService.name);
 
   /** Handlers enregistrés par les job services via registerHandler() */
-  private readonly handlers = new Map<string, () => Promise<void>>();
+  private readonly handlers = new Map<string, () => Promise<string | void>>();
 
   /** Preview handlers — retournent des infos sans exécuter d'action */
   private readonly previewHandlers = new Map<string, () => Promise<unknown>>();
+
+  /** Rapport de la dernière exécution par clé (en mémoire) */
+  private readonly lastRunReports = new Map<string, { report: string; ranAt: Date }>();
 
   constructor(
     @InjectRepository(CronConfig)
     private readonly repo: Repository<CronConfig>,
     private readonly schedulerRegistry: SchedulerRegistry,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -308,9 +314,17 @@ export class CronConfigService implements OnModuleInit {
    * Appelé par chaque job service dans son onModuleInit() pour s'enregistrer.
    * CronConfigService ne stocke aucune référence aux services de jobs.
    */
-  registerHandler(key: string, fn: () => Promise<void>): void {
+  registerHandler(key: string, fn: () => Promise<string | void>): void {
     this.handlers.set(key, fn);
     this.logger.log(`Handler registered for cron key="${key}"`);
+  }
+
+  getLastRunReports(): Record<string, { report: string; ranAt: string }> {
+    const result: Record<string, { report: string; ranAt: string }> = {};
+    for (const [key, value] of this.lastRunReports.entries()) {
+      result[key] = { report: value.report, ranAt: value.ranAt.toISOString() };
+    }
+    return result;
   }
 
   registerPreviewHandler(key: string, fn: () => Promise<unknown>): void {
@@ -502,13 +516,37 @@ export class CronConfigService implements OnModuleInit {
       this.logger.warn(`No handler registered for cron key="${key}" — skipping`);
       return;
     }
+    let report = 'Exécution terminée';
+    let success = true;
+
     try {
-      await handler();
-      await this.updateLastRunAt(config);
+      const result = await handler();
+      if (typeof result === 'string') report = result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
       this.logger.error(`Cron "${key}" execution failed: ${msg}`, stack);
+      report = `Erreur : ${msg}`;
+      success = false;
+    }
+
+    // Stocker le rapport en mémoire
+    this.lastRunReports.set(key, { report, ranAt: new Date() });
+
+    // Notifier le panel admin
+    if (this.notificationService) {
+      void this.notificationService.create(
+        success ? 'info' : 'alert',
+        `CRON ${key}`,
+        report,
+      ).catch(() => undefined);
+    }
+
+    // Toujours mettre à jour lastRunAt, même si le handler a échoué
+    try {
+      await this.updateLastRunAt(config);
+    } catch (updateErr) {
+      this.logger.warn(`Cron "${key}" — échec mise à jour lastRunAt: ${String(updateErr)}`);
     }
   }
 

@@ -956,6 +956,16 @@ export interface AlertConfig {
     recipients: { phone: string; name: string }[];
 }
 
+export interface CronLastReport { report: string; ranAt: string }
+export type CronLastReports = Record<string, CronLastReport>;
+
+export async function getCronLastReports(): Promise<CronLastReports> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs/last-reports`, {
+        credentials: 'include',
+    });
+    return handleResponse<CronLastReports>(response);
+}
+
 export async function getSystemHealthStatus(): Promise<SystemHealthStatus> {
     const response = await fetch(`${API_BASE_URL}/admin/alert-config/status`, {
         credentials: 'include',

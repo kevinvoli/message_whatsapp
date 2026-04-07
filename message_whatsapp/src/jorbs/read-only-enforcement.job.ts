@@ -92,16 +92,19 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     };
   }
 
-  async enforce() {
+  async enforce(): Promise<string> {
     const thresholdMs = await this.getThresholdMs();
     const limit = new Date(Date.now() - thresholdMs);
     const chats = await this.findEligible(limit);
 
+    let closed = 0;
     for (const chat of chats) {
       chat.status = WhatsappChatStatus.FERME;
       chat.read_only = false;
       await this.chatRepo.save(chat);
       await this.gateway.emitConversationClosed(chat);
+      closed++;
     }
+    return `${closed} conversation(s) fermée(s) automatiquement`;
   }
 }

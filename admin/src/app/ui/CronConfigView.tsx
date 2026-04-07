@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Clock, Lock, PauseCircle, Play, RefreshCw, RotateCcw, Timer, X, Zap } from 'lucide-react';
 import { CronConfig, UpdateCronConfigPayload } from '@/app/lib/definitions';
-import { getCronConfigs, getCronPreview, resetCronConfig, runCronNow, updateCronConfig } from '@/app/lib/api';
+import { CronLastReport, CronLastReports, getCronConfigs, getCronLastReports, getCronPreview, resetCronConfig, runCronNow, updateCronConfig } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate, formatRelativeDate } from '@/app/lib/dateUtils';
 
@@ -313,10 +313,12 @@ function ConfigPanel({
   config,
   onUpdate,
   onClose,
+  lastReport,
 }: {
   config: CronConfig;
   onUpdate: (updated: CronConfig) => void;
   onClose: () => void;
+  lastReport?: CronLastReport;
 }) {
   const { addToast } = useToast();
 
@@ -588,6 +590,13 @@ function ConfigPanel({
                 {config.lastRunAt ? formatRelativeDate(config.lastRunAt) : 'jamais'}
               </span>
             </div>
+            {lastReport && (
+              <div className="pt-1 border-t border-gray-100">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-0.5">Rapport</p>
+                <p className="text-xs text-blue-700 italic">{lastReport.report}</p>
+                <p className="text-[10px] text-gray-400">{formatRelativeDate(lastReport.ranAt)}</p>
+              </div>
+            )}
           </div>
 
           {/* Description */}
@@ -639,11 +648,13 @@ function CronRow({
   isOpen,
   onToggleOpen,
   onUpdate,
+  lastReport,
 }: {
   config: CronConfig;
   isOpen: boolean;
   onToggleOpen: () => void;
   onUpdate: (updated: CronConfig) => void;
+  lastReport?: CronLastReport;
 }) {
   const { addToast } = useToast();
   const [toggling, setToggling] = useState(false);
@@ -705,13 +716,18 @@ function CronRow({
             )}
           </div>
 
-          {/* Planning */}
-          <div className="hidden sm:flex flex-col items-end gap-0.5 text-right flex-shrink-0">
+          {/* Planning + rapport */}
+          <div className="hidden sm:flex flex-col items-end gap-0.5 text-right flex-shrink-0 max-w-xs">
             <span className="font-mono text-xs text-gray-600">{scheduleLabel(config)}</span>
             <span className="text-[11px] text-gray-400 flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {config.lastRunAt ? formatRelativeDate(config.lastRunAt) : 'jamais'}
             </span>
+            {lastReport && (
+              <span className="text-[10px] text-blue-600 italic truncate max-w-[220px]" title={lastReport.report}>
+                {lastReport.report}
+              </span>
+            )}
           </div>
 
           {/* Toggle rapide */}
@@ -744,6 +760,7 @@ function CronRow({
           config={config}
           onUpdate={onUpdate}
           onClose={onToggleOpen}
+          lastReport={lastReport}
         />
       )}
     </div>
@@ -753,10 +770,20 @@ function CronRow({
 // ─── CronConfigView ───────────────────────────────────────────────────────────
 
 export default function CronConfigView() {
-  const [configs, setConfigs]   = useState<CronConfig[]>([]);
-  const [loading, setLoading]   = useState(false);
-  const [openKey, setOpenKey]   = useState<string | null>(null);
+  const [configs, setConfigs]     = useState<CronConfig[]>([]);
+  const [loading, setLoading]     = useState(false);
+  const [openKey, setOpenKey]     = useState<string | null>(null);
+  const [reports, setReports]     = useState<CronLastReports>({});
   const { addToast } = useToast();
+
+  const loadReports = useCallback(async () => {
+    try {
+      const data = await getCronLastReports();
+      setReports(data);
+    } catch {
+      // silencieux — les rapports sont en mémoire, absents au premier boot
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -768,7 +795,8 @@ export default function CronConfigView() {
     } finally {
       setLoading(false);
     }
-  }, [addToast]);
+    void loadReports();
+  }, [addToast, loadReports]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -874,6 +902,7 @@ export default function CronConfigView() {
               isOpen={openKey === config.key}
               onToggleOpen={() => toggleOpen(config.key)}
               onUpdate={handleUpdate}
+              lastReport={reports[config.key]}
             />
           ))}
         </div>

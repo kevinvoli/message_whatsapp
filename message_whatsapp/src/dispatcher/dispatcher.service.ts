@@ -483,31 +483,30 @@ export class DispatcherService {
   }
 
   /** Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé. */
-  async jobRunnerAllPostes(): Promise<void> {
-    const now = new Date();
-
+  async jobRunnerAllPostes(): Promise<string> {
     // LIMIT 50 par cycle — évite le burst de requêtes quand des centaines de
     // conversations expirent en même temps (commerciaux qui ne répondent pas).
-    // Les conversations non traitées seront reprises au prochain cycle.
     // unread_count > 0 : ne cibler que les conversations avec messages non lus
-    // (ignorer les conversations où le client n'a pas encore réécrit)
     const chats = await this.chatRepository.find({
       where: {
         status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
         unread_count: MoreThan(0),
       },
-      order: { last_activity_at: 'ASC' }, // les plus anciennes en premier
+      order: { last_activity_at: 'ASC' },
       take: 50,
     });
-    this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) expirée(s)`);
+    this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) ciblée(s)`);
 
+    let reinjected = 0;
     for (const chat of chats) {
       try {
         await this.reinjectConversation(chat);
+        reinjected++;
       } catch (err) {
         this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
       }
     }
+    return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
   }
 
   async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {

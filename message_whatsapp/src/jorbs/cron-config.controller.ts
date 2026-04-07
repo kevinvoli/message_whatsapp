@@ -54,4 +54,10 @@ export class CronConfigController {
   runNow(@Param('key') key: string) {
     return this.cronConfigService.runNow(key);
   }
+
+  /** Retourne le rapport de la dernière exécution de chaque CRON (en mémoire) */
+  @Get('last-reports')
+  getLastRunReports() {
+    return this.cronConfigService.getLastRunReports();
+  }
 }
