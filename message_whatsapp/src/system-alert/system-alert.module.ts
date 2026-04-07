@@ -5,6 +5,7 @@ import { SystemAlertController } from './system-alert.controller';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
@@ -17,7 +18,7 @@ import { AppLogger } from 'src/logging/app-logger.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat]),
+    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste]),
   ],
   providers: [
     SystemAlertService,
