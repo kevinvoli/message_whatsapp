@@ -19,10 +19,10 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
   'sla-checker': {
     label: 'Vérificateur SLA — réinjection premier message',
     description:
-      'Vérifie toutes les N minutes si des chats ont dépassé leur deadline de première réponse et les réinjecte dans la queue.',
+      'Vérifie toutes les N minutes si des chats ont dépassé leur deadline de première réponse et les réinjecte dans la queue. Désactivé automatiquement entre 21h et 5h.',
     enabled: true,
     scheduleType: 'interval',
-    intervalMinutes: 5,
+    intervalMinutes: 120,
     cronExpression: null,
     ttlDays: null,
     delayMinSeconds: null,

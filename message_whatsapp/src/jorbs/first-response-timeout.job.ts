@@ -19,10 +19,17 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    // Le handler utilise jobRunnerAllPostes() — indépendant de l'état socket
-    this.cronConfigService.registerHandler('sla-checker', () =>
-      this.dispatcher.jobRunnerAllPostes(),
-    );
+    this.cronConfigService.registerHandler('sla-checker', async () => {
+      // Désactivé entre 21h et 5h — tous les commerciaux sont hors ligne
+      const hour = new Date().getHours();
+      if (hour >= 21 || hour < 5) {
+        this.logger.debug(
+          `SLA checker ignoré — hors plage horaire (${hour}h, plage active : 5h–21h)`,
+        );
+        return;
+      }
+      return this.dispatcher.jobRunnerAllPostes();
+    });
     this.cronConfigService.registerPreviewHandler('sla-checker', () =>
       this.previewExpiredSla(),
     );

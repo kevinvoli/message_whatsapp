@@ -5,7 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { In, IsNull, LessThan, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -470,8 +470,7 @@ export class DispatcherService {
       where: {
         poste_id: poste_id,
         status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        last_poste_message_at: IsNull(),
-        first_response_deadline_at: LessThan(now),
+        unread_count: MoreThan(0),
       },
     });
     this.logger.debug(
@@ -489,14 +488,15 @@ export class DispatcherService {
 
     // LIMIT 50 par cycle — évite le burst de requêtes quand des centaines de
     // conversations expirent en même temps (commerciaux qui ne répondent pas).
-    // Les conversations non traitées seront reprises au prochain cycle (5 min).
+    // Les conversations non traitées seront reprises au prochain cycle.
+    // unread_count > 0 : ne cibler que les conversations avec messages non lus
+    // (ignorer les conversations où le client n'a pas encore réécrit)
     const chats = await this.chatRepository.find({
       where: {
         status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        last_poste_message_at: IsNull(),
-        first_response_deadline_at: LessThan(now),
+        unread_count: MoreThan(0),
       },
-      order: { first_response_deadline_at: 'ASC' }, // les plus urgentes d'abord
+      order: { last_activity_at: 'ASC' }, // les plus anciennes en premier
       take: 50,
     });
     this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) expirée(s)`);
