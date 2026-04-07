@@ -26,7 +26,7 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
         this.logger.debug(
           `SLA checker ignoré — hors plage horaire (${hour}h, plage active : 5h–21h)`,
         );
-        return;
+        return `Ignoré — hors plage horaire (${hour}h, actif 5h–21h)`;
       }
       return this.dispatcher.jobRunnerAllPostes();
     });

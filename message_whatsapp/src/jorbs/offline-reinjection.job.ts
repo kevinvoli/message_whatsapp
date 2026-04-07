@@ -63,7 +63,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
     };
   }
 
-  async offlineReinject() {
+  async offlineReinject(): Promise<string> {
     this.logger.debug('Offline reinjection cron started');
 
     // 1. Conversations actives sur un poste hors-ligne
@@ -75,11 +75,13 @@ export class OfflineReinjectionJob implements OnModuleInit {
       relations: ['poste'],
     });
 
+    let reinjectedOffline = 0;
     for (const chat of actives) {
       const poste = chat.poste;
       if (!poste) continue;
       if (poste.is_active) continue;
       await this.dispatcher.reinjectConversation(chat);
+      reinjectedOffline++;
     }
 
     // 2. Conversations orphelines (poste_id = null) — jamais assignées ou perdues
@@ -92,8 +94,12 @@ export class OfflineReinjectionJob implements OnModuleInit {
     });
 
     this.logger.debug(`Orphelines trouvées : ${orphelines.length}`);
+    let dispatchedOrphans = 0;
     for (const chat of orphelines) {
       await this.dispatcher.dispatchOrphanConversation(chat);
+      dispatchedOrphans++;
     }
+
+    return `${reinjectedOffline} réinjectée(s) hors-ligne, ${dispatchedOrphans} orpheline(s) dispatché(s)`;
   }
 }
