@@ -38,7 +38,7 @@ function SendResultRow({ r }: { r: AlertSendResult }) {
                         Envoyé via canal <span className="font-mono">{r.channelName ?? r.channelId}</span>
                     </p>
                 ) : (
-                    <p className="text-xs text-red-700">{r.error}</p>
+                    <pre className="text-xs text-red-700 whitespace-pre-wrap font-sans">{r.error}</pre>
                 )}
             </div>
         </div>

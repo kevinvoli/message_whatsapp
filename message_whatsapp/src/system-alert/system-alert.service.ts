@@ -250,20 +250,33 @@ export class SystemAlertService implements OnModuleInit {
       return [];
     }
 
-    const channels = await this.channelRepo.find();
+    // On envoie uniquement via des canaux Whapi (provider = 'whapi' ou null).
+    // Les canaux Meta/Messenger/Instagram/Telegram ne peuvent pas envoyer à un
+    // numéro WhatsApp brut — ils nécessitent un PSID ou un chat_id spécifique.
+    const allChannels = await this.channelRepo.find();
+    const channels = allChannels.filter(
+      (c) => !c.provider || c.provider === 'whapi',
+    );
+
     if (!channels.length) {
-      this.logger.error('Aucun canal WhatsApp disponible');
+      const msg =
+        allChannels.length > 0
+          ? `Aucun canal Whapi disponible (${allChannels.length} canal(aux) ignoré(s) : Meta/Messenger/Instagram/Telegram)`
+          : 'Aucun canal configuré dans le système';
+      this.logger.error(msg);
       return this.config.recipients.map((r) => ({
         recipientName: r.name,
         recipientPhone: r.phone,
         success: false,
         channelId: null,
         channelName: null,
-        error: 'Aucun canal WhatsApp configuré dans le système',
+        error: msg,
       }));
     }
 
-    this.logger.log(`Canaux disponibles pour l'alerte: ${channels.map((c) => c.channel_id).join(', ')}`);
+    this.logger.log(
+      `Canaux Whapi disponibles pour l'alerte (${channels.length}): ${channels.map((c) => c.label ?? c.channel_id).join(', ')}`,
+    );
 
     const text = this.buildMessage(silenceMin);
     const results: AlertSendResult[] = [];
@@ -282,12 +295,17 @@ export class SystemAlertService implements OnModuleInit {
     text: string,
   ): Promise<AlertSendResult> {
     const normalizedPhone = SystemAlertService.normalizePhone(recipient.phone);
-    const to = `${normalizedPhone}@s.whatsapp.net`;
+
+    // CommunicationWhapiService.validateWhapiRecipient() attend UNIQUEMENT des
+    // chiffres (regex ^\d{8,20}$) — PAS de suffixe @s.whatsapp.net.
+    const to = normalizedPhone;
+
+    const channelErrors: string[] = [];
 
     for (const channel of channels) {
       try {
         this.logger.log(
-          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channel.channel_id}`,
+          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channel.label ?? channel.channel_id}`,
         );
         await this.outboundRouter.sendTextMessage({
           text,
@@ -295,7 +313,7 @@ export class SystemAlertService implements OnModuleInit {
           channelId: channel.channel_id,
         });
         this.logger.log(
-          `✅ Alerte envoyée à ${recipient.name} via canal ${channel.channel_id}`,
+          `✅ Alerte envoyée à ${recipient.name} via canal ${channel.label ?? channel.channel_id}`,
         );
         return {
           recipientName: recipient.name,
@@ -307,21 +325,27 @@ export class SystemAlertService implements OnModuleInit {
         };
       } catch (err) {
         const msg = (err as Error).message;
+        channelErrors.push(`[${channel.label ?? channel.channel_id}] ${msg}`);
         this.logger.warn(
-          `❌ Canal ${channel.channel_id} échoué pour ${recipient.name}: ${msg}`,
+          `❌ Canal ${channel.label ?? channel.channel_id} échoué pour ${recipient.name}: ${msg}`,
         );
       }
     }
 
     const errMsg = `Tous les canaux ont échoué (${channels.length} canal(aux) essayé(s))`;
-    this.logger.error(`${errMsg} pour ${recipient.name} (${normalizedPhone})`);
+    const detailedError =
+      channelErrors.length > 0
+        ? `Tous les canaux ont échoué :\n${channelErrors.join('\n')}`
+        : `Aucun canal essayé`;
+
+    this.logger.error(detailedError);
     return {
       recipientName: recipient.name,
       recipientPhone: normalizedPhone,
       success: false,
       channelId: null,
       channelName: null,
-      error: errMsg,
+      error: detailedError,
     };
   }
 
