@@ -31,6 +31,7 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { LoggingModule } from 'src/logging/logging.module';
 import { DispatcherController } from './dispatcher.controller';
 import { OfflineReinjectionJob } from 'src/jorbs/offline-reinjection.job';
+import { OrphanCheckerJob } from 'src/jorbs/orphan-checker.job';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
@@ -77,6 +78,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     ContactService,
     WhatsappPosteService,
     OfflineReinjectionJob,
+    OrphanCheckerJob,
     ReadOnlyEnforcementJob,
     DispatchSettingsService,
   ],

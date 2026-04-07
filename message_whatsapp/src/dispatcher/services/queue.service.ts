@@ -184,49 +184,94 @@ export class QueueService implements OnModuleInit {
       const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
 
       const candidates = allPositions.filter((qp) => qp.poste && !dedicatedSet.has(qp.poste_id));
-      if (candidates.length === 0) {
+
+      // ─── ÉTAPE 1 : stratégie normale via queue_positions ─────────────────────
+      if (candidates.length > 0) {
+        const posteIds = candidates.map((qp) => qp.poste_id);
+        const chatCounts = await this.chatRepository
+          .createQueryBuilder('chat')
+          .select('chat.poste_id', 'poste_id')
+          .addSelect('COUNT(*)', 'count')
+          .where('chat.poste_id IN (:...posteIds)', { posteIds })
+          .andWhere('chat.status IN (:...statuses)', {
+            statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+          })
+          .groupBy('chat.poste_id')
+          .getRawMany<{ poste_id: string; count: string }>();
+
+        const countMap = new Map<string, number>();
+        for (const row of chatCounts) {
+          countMap.set(row.poste_id, parseInt(row.count, 10));
+        }
+
+        let best = candidates[0];
+        let bestCount = countMap.get(best.poste_id) ?? 0;
+
+        for (let i = 1; i < candidates.length; i++) {
+          const count = countMap.get(candidates[i].poste_id) ?? 0;
+          if (count < bestCount) {
+            best = candidates[i];
+            bestCount = count;
+          }
+        }
+
+        this.logger.debug(
+          `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs`,
+        );
+        await this.moveToEndInternal(best.poste_id);
+        return best.poste;
+      }
+
+      // ─── ÉTAPE 2 : fallback BDD (queue vide ou tous exclus par canaux dédiés) ─
+      this.logger.warn(
+        `Queue vide ou tous exclus — fallback BDD vers le poste le moins chargé`,
+      );
+
+      const allPostes = await this.posteRepository
+        .createQueryBuilder('p')
+        .innerJoin('p.commercial', 'c')
+        .where('p.is_queue_enabled = :enabled', { enabled: true })
+        .getMany();
+
+      if (allPostes.length === 0) {
         this.logger.warn(
-          `Aucun poste disponible, message mis en attente (queue vide)`,
+          `Aucun poste configuré avec commercial — message mis en attente`,
         );
         return null;
       }
 
-      // Compter les chats actifs par poste
-      const posteIds = candidates.map((qp) => qp.poste_id);
-      const chatCounts = await this.chatRepository
+      const fallbackIds = allPostes.map((p) => p.id);
+      const fallbackCounts = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'count')
-        .where('chat.poste_id IN (:...posteIds)', { posteIds })
+        .where('chat.poste_id IN (:...fallbackIds)', { fallbackIds })
         .andWhere('chat.status IN (:...statuses)', {
           statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
         })
         .groupBy('chat.poste_id')
         .getRawMany<{ poste_id: string; count: string }>();
 
-      const countMap = new Map<string, number>();
-      for (const row of chatCounts) {
-        countMap.set(row.poste_id, parseInt(row.count, 10));
+      const fallbackCountMap = new Map<string, number>();
+      for (const row of fallbackCounts) {
+        fallbackCountMap.set(row.poste_id, parseInt(row.count, 10));
       }
 
-      // Choisir le poste avec le moins de chats (en respectant l'ordre de queue en cas d'egalite)
-      let best = candidates[0];
-      let bestCount = countMap.get(best.poste_id) ?? 0;
+      let bestFallback = allPostes[0];
+      let bestFallbackCount = fallbackCountMap.get(bestFallback.id) ?? 0;
 
-      for (let i = 1; i < candidates.length; i++) {
-        const count = countMap.get(candidates[i].poste_id) ?? 0;
-        if (count < bestCount) {
-          best = candidates[i];
-          bestCount = count;
+      for (let i = 1; i < allPostes.length; i++) {
+        const count = fallbackCountMap.get(allPostes[i].id) ?? 0;
+        if (count < bestFallbackCount) {
+          bestFallback = allPostes[i];
+          bestFallbackCount = count;
         }
       }
 
-      this.logger.debug(
-        `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs`,
+      this.logger.warn(
+        `Fallback BDD → poste ${bestFallback.name} (${bestFallback.id}) avec ${bestFallbackCount} chats actifs`,
       );
-      await this.moveToEndInternal(best.poste_id);
-
-      return best.poste;
+      return bestFallback;
     });
   }
 

@@ -361,17 +361,46 @@ export class DispatcherService {
       }
     }
 
+    // ─── Approche atomique : trouver le prochain poste AVANT d'effacer l'actuel ──
+    // Évite la fenêtre temporaire où poste_id = NULL et où un crash laisserait
+    // la conversation orpheline définitivement.
+    const oldPosteId = chat.poste_id ?? null;
+
+    const nextPoste = await this.queueService.getNextInQueue();
+    if (!nextPoste) {
+      // Aucune alternative : étendre la deadline et garder le poste actuel
+      this.logger.warn(
+        `Réinjection impossible (${chat.chat_id}): aucun poste alternatif — deadline étendue +30 min`,
+      );
+      await this.chatRepository.update(chat.id, {
+        first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
+      });
+      return;
+    }
+
+    // Un seul UPDATE atomique — poste_id ne passe JAMAIS par NULL
     await this.chatRepository.update(chat.id, {
-      poste: null,
-      poste_id: null,
-      assigned_mode: null,
-      assigned_at: null,
-      first_response_deadline_at: null,
-      status: WhatsappChatStatus.EN_ATTENTE,
+      poste: nextPoste,
+      poste_id: nextPoste.id,
+      assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
+      status: nextPoste.is_active
+        ? WhatsappChatStatus.ACTIF
+        : WhatsappChatStatus.EN_ATTENTE,
+      assigned_at: new Date(),
+      first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
     });
 
-    // Relancer le dispatcher SANS faux message
-    await this.dispatchExistingConversation(chat);
+    void this.notificationService.create(
+      'alert',
+      `SLA dépassé — ${chat.name || chat.chat_id}`,
+      `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} a été réassignée au poste ${nextPoste.name}.`,
+    );
+
+    await this.messageGateway.emitConversationReassigned(
+      { ...chat, poste_id: nextPoste.id, poste: nextPoste } as WhatsappChat,
+      oldPosteId ?? '',
+      nextPoste.id,
+    );
   }
 
   /**

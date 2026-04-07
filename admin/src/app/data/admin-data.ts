@@ -59,6 +59,7 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Bell,
     items: [
       { id: 'notifications', name: 'Notifications', icon: Bell, badge: null },
+      { id: 'alert-config', name: 'Alertes système', icon: Bell, badge: null },
     ],
   },
 ];

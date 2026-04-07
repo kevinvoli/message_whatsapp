@@ -949,11 +949,18 @@ export interface SystemHealthStatus {
     lastInboundAt: string;
 }
 
+export interface AlertRecipient {
+    phone: string; // format international sans + ni 00, ex: 225556789012
+    name: string;
+}
+
 export interface AlertConfig {
     enabled: boolean;
     silenceThresholdMinutes: number;
     retryAfterMinutes: number;
-    recipients: { phone: string; name: string }[];
+    recipients: AlertRecipient[];
+    /** Modèle du message. Placeholder : {silenceMin}. null = message par défaut. */
+    messageTemplate: string | null;
 }
 
 export interface CronLastReport { report: string; ranAt: string }
@@ -988,4 +995,12 @@ export async function updateAlertConfig(patch: Partial<AlertConfig>): Promise<Al
         body: JSON.stringify(patch),
     });
     return handleResponse<AlertConfig>(response);
+}
+
+export async function getAlertDefaultTemplate(): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/admin/alert-config/default-template`, {
+        credentials: 'include',
+    });
+    const data = await handleResponse<{ template: string }>(response);
+    return data.template;
 }

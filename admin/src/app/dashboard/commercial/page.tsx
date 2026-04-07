@@ -21,6 +21,7 @@ import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
 import DispatchView from '@/app/ui/DispatchView';
 import CronConfigView from '@/app/ui/CronConfigView';
+import AlertConfigView from '@/app/ui/AlertConfigView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
 import GoNoGoView from '@/app/ui/GoNoGoView';
 import NotificationsView from '@/app/ui/NotificationsView';
@@ -90,6 +91,8 @@ export default function AdminDashboard() {
                 return <DispatchView onRefresh={() => {}} />;
             case 'crons':
                 return <CronConfigView />;
+            case 'alert-config':
+                return <AlertConfigView />;
             case 'observabilite':
                 return <ObservabiliteView />;
             case 'go_no_go':
