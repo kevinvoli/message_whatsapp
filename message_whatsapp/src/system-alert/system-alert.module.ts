@@ -17,11 +17,13 @@ import { CommunicationTelegramService } from 'src/communication_whapi/communicat
 import { ChannelService } from 'src/channel/channel.service';
 import { MetaTokenService } from 'src/channel/meta-token.service';
 import { LoggingModule } from 'src/logging/logging.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
     ConfigModule,
     LoggingModule,
+    NotificationModule,
     TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste, SystemAlertConfig]),
   ],
   providers: [

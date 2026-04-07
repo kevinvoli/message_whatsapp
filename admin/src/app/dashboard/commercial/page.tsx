@@ -75,7 +75,7 @@ export default function AdminDashboard() {
         clearAll: clearAllNotifications,
     } = useNotifications();
 
-    const systemHealth = useSystemHealth();
+    const { status: systemHealth, refresh: refreshHealth } = useSystemHealth();
 
     const renderContent = () => {
         switch(viewMode) {
@@ -92,7 +92,7 @@ export default function AdminDashboard() {
             case 'crons':
                 return <CronConfigView />;
             case 'alert-config':
-                return <AlertConfigView />;
+                return <AlertConfigView onStatusRefresh={refreshHealth} />;
             case 'observabilite':
                 return <ObservabiliteView />;
             case 'go_no_go':
