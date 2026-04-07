@@ -1004,16 +1004,6 @@ export interface AlertStatus extends SystemHealthStatus {
     enabled: boolean;
 }
 
-export interface CronLastReport { report: string; ranAt: string }
-export type CronLastReports = Record<string, CronLastReport>;
-
-export async function getCronLastReports(): Promise<CronLastReports> {
-    const response = await fetch(`${API_BASE_URL}/cron-configs/last-reports`, {
-        credentials: 'include',
-    });
-    return handleResponse<CronLastReports>(response);
-}
-
 export async function getSystemHealthStatus(): Promise<AlertStatus> {
     const response = await fetch(`${API_BASE_URL}/admin/alert-config/status`, {
         credentials: 'include',
