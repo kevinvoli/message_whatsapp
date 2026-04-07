@@ -913,6 +913,28 @@ export interface AlertConfig {
     messageTemplate: string | null;
 }
 
+export interface AlertSendResult {
+    recipientName: string;
+    recipientPhone: string;
+    success: boolean;
+    channelId: string | null;
+    channelName: string | null;
+    error: string | null;
+}
+
+export interface LastAlertAttempt {
+    triggeredAt: string;
+    silenceMinutes: number;
+    results: AlertSendResult[];
+    overallSuccess: boolean;
+}
+
+export interface AlertStatus extends SystemHealthStatus {
+    lastAlertAttempt: LastAlertAttempt | null;
+    timerActive: boolean;
+    enabled: boolean;
+}
+
 export interface CronLastReport { report: string; ranAt: string }
 export type CronLastReports = Record<string, CronLastReport>;
 
@@ -923,11 +945,11 @@ export async function getCronLastReports(): Promise<CronLastReports> {
     return handleResponse<CronLastReports>(response);
 }
 
-export async function getSystemHealthStatus(): Promise<SystemHealthStatus> {
+export async function getSystemHealthStatus(): Promise<AlertStatus> {
     const response = await fetch(`${API_BASE_URL}/admin/alert-config/status`, {
         credentials: 'include',
     });
-    return handleResponse<SystemHealthStatus>(response);
+    return handleResponse<AlertStatus>(response);
 }
 
 export async function getAlertConfig(): Promise<AlertConfig> {
@@ -953,4 +975,12 @@ export async function getAlertDefaultTemplate(): Promise<string> {
     });
     const data = await handleResponse<{ template: string }>(response);
     return data.template;
+}
+
+export async function sendTestAlert(): Promise<{ results: AlertSendResult[]; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/admin/alert-config/test`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<{ results: AlertSendResult[]; message: string }>(response);
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
@@ -8,6 +8,7 @@ import {
   AlertRecipient,
   SystemAlertConfig,
 } from './entities/system-alert-config.entity';
+import { NotificationService } from 'src/notification/notification.service';
 
 export { AlertRecipient };
 
@@ -16,37 +17,46 @@ export interface AlertConfig {
   silenceThresholdMinutes: number;
   retryAfterMinutes: number;
   recipients: AlertRecipient[];
-  /**
-   * Modèle du message. Placeholder : {silenceMin}
-   * Valeur par défaut si null : message système standard.
-   */
+  /** Modèle du message. Placeholder : {silenceMin}. null = message par défaut. */
   messageTemplate: string | null;
+}
+
+/** Résultat d'un envoi pour un destinataire */
+export interface AlertSendResult {
+  recipientName: string;
+  recipientPhone: string;
+  success: boolean;
+  channelId: string | null;
+  channelName: string | null;
+  error: string | null;
+}
+
+/** Statut du dernier déclenchement d'alerte */
+export interface LastAlertAttempt {
+  triggeredAt: string;         // ISO date
+  silenceMinutes: number;
+  results: AlertSendResult[];
+  overallSuccess: boolean;
 }
 
 const DEFAULT_MESSAGE_TEMPLATE =
   '🚨 *ALERTE SYSTÈME* — Aucun message entrant depuis *{silenceMin} minutes*.\n' +
   'Le serveur WhatsApp est peut-être hors ligne. Vérifiez immédiatement.';
 
-/** ID de la ligne singleton en BDD */
 const CONFIG_ROW_ID = 1;
 
 @Injectable()
 export class SystemAlertService implements OnModuleInit {
   private readonly logger = new Logger(SystemAlertService.name);
 
-  /** Timestamp du dernier message client entrant */
   private lastInboundAt: number = Date.now();
-
-  /** Timer principal — déclenche l'alerte si aucun message dans le délai */
   private silenceTimer: NodeJS.Timeout | null = null;
-
-  /** Timer de retry — planifié si tous les canaux ont échoué */
   private retryTimer: NodeJS.Timeout | null = null;
-
-  /** Référence au server Socket.io pour notifier le panel admin */
   private io: Server | null = null;
 
-  /** Config chargée depuis la BDD (en cache mémoire) */
+  /** Dernier déclenchement — conservé en mémoire pour l'API status */
+  private lastAlertAttempt: LastAlertAttempt | null = null;
+
   private config: AlertConfig = {
     enabled: true,
     silenceThresholdMinutes: 60,
@@ -61,6 +71,7 @@ export class SystemAlertService implements OnModuleInit {
     @InjectRepository(SystemAlertConfig)
     private readonly configRepo: Repository<SystemAlertConfig>,
     private readonly outboundRouter: OutboundRouterService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -68,7 +79,7 @@ export class SystemAlertService implements OnModuleInit {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Chargement / persistance BDD
+  // BDD
   // ─────────────────────────────────────────────────────────────────────────
 
   private async loadConfigFromDb(): Promise<void> {
@@ -83,11 +94,10 @@ export class SystemAlertService implements OnModuleInit {
           messageTemplate: row.messageTemplate ?? null,
         };
         this.logger.log(
-          `Config alerte chargée depuis BDD — seuil: ${this.config.silenceThresholdMinutes} min, ` +
+          `Config alerte chargée — seuil: ${this.config.silenceThresholdMinutes} min, ` +
           `${this.config.recipients.length} destinataire(s)`,
         );
       } else {
-        // Première exécution : créer la ligne singleton
         await this.configRepo.save({
           id: CONFIG_ROW_ID,
           enabled: this.config.enabled,
@@ -100,7 +110,7 @@ export class SystemAlertService implements OnModuleInit {
       }
     } catch (err) {
       this.logger.error(
-        `Impossible de charger la config alerte depuis la BDD: ${(err as Error).message} — utilisation des valeurs par défaut`,
+        `Impossible de charger la config alerte: ${(err as Error).message}`,
       );
     }
   }
@@ -117,22 +127,23 @@ export class SystemAlertService implements OnModuleInit {
       });
     } catch (err) {
       this.logger.error(
-        `Erreur lors de la sauvegarde de la config alerte: ${(err as Error).message}`,
+        `Erreur sauvegarde config alerte: ${(err as Error).message}`,
       );
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Appelé par la gateway Socket.io au démarrage
+  // Gateway Socket.io
   // ─────────────────────────────────────────────────────────────────────────
 
   setSocketServer(io: Server): void {
     this.io = io;
     this.resetTimer();
+    this.logger.log('Timer alerte démarré (Socket.io prêt)');
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Appelé à chaque message entrant du client
+  // Message entrant
   // ─────────────────────────────────────────────────────────────────────────
 
   onInboundMessage(): void {
@@ -141,7 +152,7 @@ export class SystemAlertService implements OnModuleInit {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
-      this.logger.log('Alerte annulée — système rétabli (nouveau message entrant)');
+      this.logger.log('Alerte annulée — système rétabli');
     }
 
     this.emitAdminStatus(false);
@@ -157,7 +168,6 @@ export class SystemAlertService implements OnModuleInit {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
     }
-
     if (!this.config.enabled) return;
 
     const ms = this.config.silenceThresholdMinutes * 60 * 1000;
@@ -169,29 +179,57 @@ export class SystemAlertService implements OnModuleInit {
 
   private async triggerAlert(): Promise<void> {
     const silenceMin = Math.floor((Date.now() - this.lastInboundAt) / 60_000);
-    this.logger.warn(
-      `HEALTH_ALERT — aucun message entrant depuis ${silenceMin} min`,
-    );
+    this.logger.warn(`HEALTH_ALERT — silence depuis ${silenceMin} min`);
 
     this.emitAdminStatus(true, silenceMin);
 
-    const sent = await this.sendAlertsToAll(silenceMin);
+    const results = await this.sendAlertsToAll(silenceMin);
+    const overallSuccess = results.length > 0 && results.every((r) => r.success);
 
-    if (!sent) {
+    // Mémoriser le dernier déclenchement
+    this.lastAlertAttempt = {
+      triggeredAt: new Date().toISOString(),
+      silenceMinutes: silenceMin,
+      results,
+      overallSuccess,
+    };
+
+    // Notification dans l'onglet admin
+    if (this.notificationService) {
+      const summary = this.buildResultSummary(results, silenceMin);
+      void this.notificationService
+        .create(overallSuccess ? 'alert' : 'alert', '🚨 Alerte système', summary)
+        .catch(() => undefined);
+    }
+
+    if (!overallSuccess) {
       this.retryTimer = setTimeout(() => {
         this.retryTimer = null;
         void this.triggerAlert();
       }, this.config.retryAfterMinutes * 60 * 1000);
-      this.logger.warn(
-        `Retry planifié dans ${this.config.retryAfterMinutes} min`,
-      );
+      this.logger.warn(`Retry dans ${this.config.retryAfterMinutes} min`);
     }
 
     this.resetTimer();
   }
 
+  private buildResultSummary(results: AlertSendResult[], silenceMin: number): string {
+    if (results.length === 0) {
+      return `Alerte déclenchée (silence ${silenceMin} min) — aucun destinataire configuré.`;
+    }
+
+    const lines = results.map((r) => {
+      if (r.success) {
+        return `✅ ${r.recipientName} (${r.recipientPhone}) via canal ${r.channelName ?? r.channelId}`;
+      }
+      return `❌ ${r.recipientName} (${r.recipientPhone}) — ${r.error ?? 'échec inconnu'}`;
+    });
+
+    return `Alerte déclenchée (silence ${silenceMin} min) :\n${lines.join('\n')}`;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
-  // Envoi WhatsApp avec fallback sur les canaux
+  // Envoi WhatsApp
   // ─────────────────────────────────────────────────────────────────────────
 
   private buildMessage(silenceMin: number): string {
@@ -199,7 +237,6 @@ export class SystemAlertService implements OnModuleInit {
     return template.replace(/\{silenceMin\}/g, String(silenceMin));
   }
 
-  /** Normalise un numéro de téléphone en format international sans + ni 00 */
   static normalizePhone(raw: string): string {
     let phone = raw.trim().replace(/\s/g, '');
     if (phone.startsWith('+')) phone = phone.slice(1);
@@ -207,62 +244,125 @@ export class SystemAlertService implements OnModuleInit {
     return phone;
   }
 
-  private async sendAlertsToAll(silenceMin: number): Promise<boolean> {
+  private async sendAlertsToAll(silenceMin: number): Promise<AlertSendResult[]> {
     if (this.config.recipients.length === 0) {
-      this.logger.warn('Aucun destinataire configuré pour les alertes système');
-      return true; // Ne pas planifier de retry si pas de destinataires
+      this.logger.warn('Aucun destinataire configuré');
+      return [];
     }
 
     const channels = await this.channelRepo.find();
     if (!channels.length) {
-      this.logger.error('Aucun canal disponible pour envoyer les alertes');
-      return false;
+      this.logger.error('Aucun canal WhatsApp disponible');
+      return this.config.recipients.map((r) => ({
+        recipientName: r.name,
+        recipientPhone: r.phone,
+        success: false,
+        channelId: null,
+        channelName: null,
+        error: 'Aucun canal WhatsApp configuré dans le système',
+      }));
     }
+
+    this.logger.log(`Canaux disponibles pour l'alerte: ${channels.map((c) => c.channel_id).join(', ')}`);
 
     const text = this.buildMessage(silenceMin);
+    const results: AlertSendResult[] = [];
 
-    let allSent = true;
     for (const recipient of this.config.recipients) {
-      const sent = await this.sendWithFallback(channels, recipient, text);
-      if (!sent) allSent = false;
+      const result = await this.sendWithFallback(channels, recipient, text);
+      results.push(result);
     }
-    return allSent;
+
+    return results;
   }
 
   private async sendWithFallback(
     channels: WhapiChannel[],
     recipient: AlertRecipient,
     text: string,
-  ): Promise<boolean> {
+  ): Promise<AlertSendResult> {
     const normalizedPhone = SystemAlertService.normalizePhone(recipient.phone);
     const to = `${normalizedPhone}@s.whatsapp.net`;
 
     for (const channel of channels) {
       try {
+        this.logger.log(
+          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channel.channel_id}`,
+        );
         await this.outboundRouter.sendTextMessage({
           text,
           to,
           channelId: channel.channel_id,
         });
         this.logger.log(
-          `Alerte envoyée à ${recipient.name} (${normalizedPhone}) via canal ${channel.channel_id}`,
+          `✅ Alerte envoyée à ${recipient.name} via canal ${channel.channel_id}`,
         );
-        return true;
+        return {
+          recipientName: recipient.name,
+          recipientPhone: normalizedPhone,
+          success: true,
+          channelId: channel.channel_id,
+          channelName: channel.label ?? channel.channel_id,
+          error: null,
+        };
       } catch (err) {
+        const msg = (err as Error).message;
         this.logger.warn(
-          `Canal ${channel.channel_id} échoué pour ${recipient.name}: ${(err as Error).message}`,
+          `❌ Canal ${channel.channel_id} échoué pour ${recipient.name}: ${msg}`,
         );
       }
     }
 
-    this.logger.error(
-      `Tous les canaux ont échoué pour ${recipient.name} (${normalizedPhone})`,
-    );
-    return false;
+    const errMsg = `Tous les canaux ont échoué (${channels.length} canal(aux) essayé(s))`;
+    this.logger.error(`${errMsg} pour ${recipient.name} (${normalizedPhone})`);
+    return {
+      recipientName: recipient.name,
+      recipientPhone: normalizedPhone,
+      success: false,
+      channelId: null,
+      channelName: null,
+      error: errMsg,
+    };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Notification Socket.io → panel admin
+  // Test manuel (bouton admin)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async sendTestAlert(): Promise<{ results: AlertSendResult[]; message: string }> {
+    const silenceMin = Math.floor((Date.now() - this.lastInboundAt) / 60_000);
+    this.logger.warn(`TEST ALERT manuel déclenché (silence actuel: ${silenceMin} min)`);
+
+    const results = await this.sendAlertsToAll(silenceMin);
+    const overallSuccess = results.length > 0 && results.every((r) => r.success);
+
+    this.lastAlertAttempt = {
+      triggeredAt: new Date().toISOString(),
+      silenceMinutes: silenceMin,
+      results,
+      overallSuccess,
+    };
+
+    if (this.notificationService) {
+      const summary = '[TEST] ' + this.buildResultSummary(results, silenceMin);
+      void this.notificationService
+        .create('info', '🧪 Test alerte système', summary)
+        .catch(() => undefined);
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    const message =
+      results.length === 0
+        ? 'Aucun destinataire configuré'
+        : overallSuccess
+          ? `Test réussi — ${successCount}/${results.length} message(s) envoyé(s)`
+          : `Échec partiel — ${successCount}/${results.length} envoyé(s)`;
+
+    return { results, message };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Socket.io
   // ─────────────────────────────────────────────────────────────────────────
 
   private emitAdminStatus(alerting: boolean, silenceMin = 0): void {
@@ -283,26 +383,34 @@ export class SystemAlertService implements OnModuleInit {
   }
 
   async updateConfig(patch: Partial<AlertConfig>): Promise<AlertConfig> {
-    // Normaliser les numéros à la sauvegarde
     if (patch.recipients) {
       patch.recipients = patch.recipients.map((r) => ({
         ...r,
         phone: SystemAlertService.normalizePhone(r.phone),
       }));
     }
-
     this.config = { ...this.config, ...patch };
     await this.persistConfig();
     this.resetTimer();
     return this.getConfig();
   }
 
-  getStatus(): { alerting: boolean; silenceMinutes: number; lastInboundAt: string } {
+  getStatus(): {
+    alerting: boolean;
+    silenceMinutes: number;
+    lastInboundAt: string;
+    lastAlertAttempt: LastAlertAttempt | null;
+    timerActive: boolean;
+    enabled: boolean;
+  } {
     const silenceMin = Math.floor((Date.now() - this.lastInboundAt) / 60_000);
     return {
       alerting: this.config.enabled && silenceMin >= this.config.silenceThresholdMinutes,
       silenceMinutes: silenceMin,
       lastInboundAt: new Date(this.lastInboundAt).toISOString(),
+      lastAlertAttempt: this.lastAlertAttempt,
+      timerActive: this.silenceTimer !== null,
+      enabled: this.config.enabled,
     };
   }
 

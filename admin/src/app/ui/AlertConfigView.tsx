@@ -4,18 +4,86 @@ import React, { useEffect, useState } from 'react';
 import {
     AlertConfig,
     AlertRecipient,
+    AlertSendResult,
+    AlertStatus,
+    LastAlertAttempt,
     getAlertConfig,
     getAlertDefaultTemplate,
+    getSystemHealthStatus,
+    sendTestAlert,
     updateAlertConfig,
 } from '@/app/lib/api';
-import { Bell, Plus, Trash2, RotateCcw, Save, Phone } from 'lucide-react';
+import { Bell, Plus, Trash2, RotateCcw, Save, Phone, Send, CheckCircle, XCircle, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
+import { formatTime, formatDateShort } from '@/app/lib/dateUtils';
 
-export default function AlertConfigView() {
+interface Props {
+    onStatusRefresh?: () => void;
+}
+
+// ─── Bloc statut du dernier envoi ───────────────────────────────────────────
+
+function SendResultRow({ r }: { r: AlertSendResult }) {
+    return (
+        <div className={`flex items-start gap-3 px-3 py-2 rounded-lg ${r.success ? 'bg-green-50' : 'bg-red-50'}`}>
+            {r.success
+                ? <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                : <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+            }
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800">
+                    {r.recipientName} — <span className="font-mono text-xs">{r.recipientPhone}</span>
+                </p>
+                {r.success ? (
+                    <p className="text-xs text-green-700">
+                        Envoyé via canal <span className="font-mono">{r.channelName ?? r.channelId}</span>
+                    </p>
+                ) : (
+                    <p className="text-xs text-red-700">{r.error}</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function LastAttemptPanel({ attempt }: { attempt: LastAlertAttempt }) {
+    const at = formatTime(new Date(attempt.triggeredAt));
+    const date = formatDateShort(new Date(attempt.triggeredAt));
+    return (
+        <div className={`border rounded-xl p-4 space-y-3 ${attempt.overallSuccess ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'}`}>
+            <div className="flex items-center gap-2">
+                {attempt.overallSuccess
+                    ? <Send className="w-4 h-4 text-green-600" />
+                    : <AlertTriangle className="w-4 h-4 text-red-500" />
+                }
+                <span className="font-medium text-sm text-gray-800">
+                    {attempt.overallSuccess ? 'Dernier envoi réussi' : 'Dernier envoi échoué'}
+                </span>
+                <span className="ml-auto text-xs text-gray-500">
+                    {date} à {at} — silence {attempt.silenceMinutes} min
+                </span>
+            </div>
+            {attempt.results.length === 0 ? (
+                <p className="text-sm text-gray-500 italic">Aucun destinataire configuré au moment de l&apos;envoi</p>
+            ) : (
+                <div className="space-y-1.5">
+                    {attempt.results.map((r, i) => <SendResultRow key={i} r={r} />)}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Vue principale ──────────────────────────────────────────────────────────
+
+export default function AlertConfigView({ onStatusRefresh }: Props) {
     const [config, setConfig] = useState<AlertConfig | null>(null);
+    const [status, setStatus] = useState<AlertStatus | null>(null);
     const [defaultTemplate, setDefaultTemplate] = useState<string>('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<{ results: AlertSendResult[]; message: string } | null>(null);
 
     // Formulaire
     const [enabled, setEnabled] = useState(true);
@@ -29,25 +97,33 @@ export default function AlertConfigView() {
     const [newPhone, setNewPhone] = useState('');
     const [newName, setNewName] = useState('');
 
-    useEffect(() => {
-        Promise.all([getAlertConfig(), getAlertDefaultTemplate()])
-            .then(([cfg, tpl]) => {
-                setConfig(cfg);
-                setDefaultTemplate(tpl);
-                setEnabled(cfg.enabled);
-                setThresholdMin(cfg.silenceThresholdMinutes);
-                setRetryMin(cfg.retryAfterMinutes);
-                setRecipients(cfg.recipients ?? []);
-                if (cfg.messageTemplate) {
-                    setMessageTemplate(cfg.messageTemplate);
-                    setUseDefaultTemplate(false);
-                } else {
-                    setMessageTemplate(tpl);
-                    setUseDefaultTemplate(true);
-                }
-            })
-            .catch(() => setError('Erreur de chargement de la configuration'));
-    }, []);
+    const loadAll = async () => {
+        try {
+            const [cfg, tpl, st] = await Promise.all([
+                getAlertConfig(),
+                getAlertDefaultTemplate(),
+                getSystemHealthStatus(),
+            ]);
+            setConfig(cfg);
+            setDefaultTemplate(tpl);
+            setStatus(st);
+            setEnabled(cfg.enabled);
+            setThresholdMin(cfg.silenceThresholdMinutes);
+            setRetryMin(cfg.retryAfterMinutes);
+            setRecipients(cfg.recipients ?? []);
+            if (cfg.messageTemplate) {
+                setMessageTemplate(cfg.messageTemplate);
+                setUseDefaultTemplate(false);
+            } else {
+                setMessageTemplate(tpl);
+                setUseDefaultTemplate(true);
+            }
+        } catch {
+            setError('Erreur de chargement de la configuration');
+        }
+    };
+
+    useEffect(() => { void loadAll(); }, []);
 
     const addRecipient = () => {
         const phone = newPhone.trim().replace(/\s/g, '');
@@ -84,15 +160,67 @@ export default function AlertConfigView() {
         }
     };
 
+    const handleTest = async () => {
+        setTesting(true);
+        setTestResult(null);
+        setError(null);
+        try {
+            const result = await sendTestAlert();
+            setTestResult(result);
+            // Rafraîchir le statut pour voir le dernier envoi
+            const st = await getSystemHealthStatus();
+            setStatus(st);
+            onStatusRefresh?.();
+        } catch (e) {
+            setError(`Erreur lors du test : ${(e as Error).message}`);
+        } finally {
+            setTesting(false);
+        }
+    };
+
     if (!config) {
         return <div className="p-6 text-gray-500">Chargement…</div>;
     }
 
+    const silenceMin = status?.silenceMinutes ?? 0;
+    const timerActive = status?.timerActive ?? false;
+
     return (
         <div className="p-6 space-y-6 max-w-2xl">
-            <div className="flex items-center gap-3">
-                <Bell className="w-6 h-6 text-orange-500" />
-                <h2 className="text-xl font-semibold text-gray-900">Configuration des alertes système</h2>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <Bell className="w-6 h-6 text-orange-500" />
+                    <h2 className="text-xl font-semibold text-gray-900">Alertes système</h2>
+                </div>
+                {/* Statut live */}
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${
+                    status?.alerting
+                        ? 'bg-red-50 border-red-200 text-red-700'
+                        : 'bg-green-50 border-green-200 text-green-700'
+                }`}>
+                    {status?.alerting
+                        ? <><AlertTriangle className="w-3.5 h-3.5" /> Alerte active</>
+                        : <><CheckCircle className="w-3.5 h-3.5" /> Système OK</>
+                    }
+                </div>
+            </div>
+
+            {/* Statut du timer */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-600">Silence actuel :</span>
+                    <strong className={silenceMin >= thresholdMin ? 'text-red-600' : 'text-gray-800'}>
+                        {silenceMin} min
+                    </strong>
+                    <span className="text-gray-400">/ seuil {thresholdMin} min</span>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                    {timerActive
+                        ? <><Wifi className="w-4 h-4 text-green-500" /><span className="text-green-600">Timer actif</span></>
+                        : <><WifiOff className="w-4 h-4 text-orange-500" /><span className="text-orange-600">Timer inactif (socket non prêt)</span></>
+                    }
+                </div>
             </div>
 
             {error && (
@@ -103,6 +231,31 @@ export default function AlertConfigView() {
             {saved && (
                 <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
                     Configuration sauvegardée avec succès.
+                </div>
+            )}
+
+            {/* Dernier envoi */}
+            {status?.lastAlertAttempt && (
+                <LastAttemptPanel attempt={status.lastAlertAttempt} />
+            )}
+
+            {/* Résultat du test */}
+            {testResult && (
+                <div className={`border rounded-xl p-4 space-y-3 ${
+                    testResult.results.every(r => r.success) ? 'border-green-200 bg-green-50/50' : 'border-orange-200 bg-orange-50/50'
+                }`}>
+                    <div className="flex items-center gap-2">
+                        <Send className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium text-sm text-gray-800">Résultat du test</span>
+                        <span className="ml-auto text-xs text-gray-500">{testResult.message}</span>
+                    </div>
+                    {testResult.results.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">Aucun destinataire configuré</p>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {testResult.results.map((r, i) => <SendResultRow key={i} r={r} />)}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -161,12 +314,13 @@ export default function AlertConfigView() {
             <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
                 <h3 className="font-medium text-gray-800">Destinataires</h3>
                 <p className="text-xs text-gray-500">
-                    Format du numéro : international sans <code className="bg-gray-100 px-1 rounded">+</code> ni <code className="bg-gray-100 px-1 rounded">00</code>.{' '}
-                    Exemple Côte d&apos;Ivoire : <code className="bg-gray-100 px-1 rounded">225556789012</code>
+                    Format : international sans <code className="bg-gray-100 px-1 rounded">+</code> ni <code className="bg-gray-100 px-1 rounded">00</code>.{' '}
+                    Côte d&apos;Ivoire : <code className="bg-gray-100 px-1 rounded">225556789012</code> (sans le 0 local).
+                    Le système normalise automatiquement.
                 </p>
 
                 {recipients.length === 0 && (
-                    <p className="text-sm text-gray-400 italic">Aucun destinataire configuré</p>
+                    <p className="text-sm text-gray-400 italic">Aucun destinataire — les alertes ne seront pas envoyées par WhatsApp.</p>
                 )}
 
                 <div className="space-y-2">
@@ -178,7 +332,7 @@ export default function AlertConfigView() {
                             <div className="flex items-center gap-2">
                                 <Phone className="w-4 h-4 text-gray-400" />
                                 <span className="text-sm font-medium text-gray-800">{r.name}</span>
-                                <span className="text-sm text-gray-500">— {r.phone}</span>
+                                <span className="text-sm text-gray-500 font-mono">+{r.phone}</span>
                             </div>
                             <button
                                 onClick={() => removeRecipient(i)}
@@ -190,14 +344,13 @@ export default function AlertConfigView() {
                     ))}
                 </div>
 
-                {/* Ajout */}
                 <div className="flex gap-2">
                     <input
                         type="text"
                         placeholder="Nom"
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        className="w-36 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                     />
                     <input
                         type="text"
@@ -205,7 +358,7 @@ export default function AlertConfigView() {
                         value={newPhone}
                         onChange={(e) => setNewPhone(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && addRecipient()}
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400"
                     />
                     <button
                         onClick={addRecipient}
@@ -238,7 +391,7 @@ export default function AlertConfigView() {
                 <div>
                     <div className="flex items-center justify-between mb-1">
                         <label className="text-sm text-gray-600">
-                            Modèle du message{' '}
+                            Modèle{' '}
                             <span className="text-gray-400">
                                 (placeholder : <code className="bg-gray-100 px-1 rounded">{'{silenceMin}'}</code>)
                             </span>
@@ -262,17 +415,25 @@ export default function AlertConfigView() {
                     />
                 </div>
 
-                {/* Aperçu */}
                 <div>
-                    <p className="text-xs text-gray-500 mb-1">Aperçu du message :</p>
+                    <p className="text-xs text-gray-500 mb-1">Aperçu :</p>
                     <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap">
-                        {(useDefaultTemplate ? defaultTemplate : messageTemplate).replace(/\{silenceMin\}/g, '42')}
+                        {(useDefaultTemplate ? defaultTemplate : messageTemplate).replace(/\{silenceMin\}/g, String(silenceMin || 42))}
                     </div>
                 </div>
             </div>
 
-            {/* Sauvegarde */}
-            <div className="flex justify-end">
+            {/* Actions */}
+            <div className="flex items-center gap-3 justify-between">
+                <button
+                    onClick={handleTest}
+                    disabled={testing}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                    <Send className="w-4 h-4" />
+                    {testing ? 'Envoi en cours…' : 'Envoyer un test maintenant'}
+                </button>
+
                 <button
                     onClick={handleSave}
                     disabled={saving}

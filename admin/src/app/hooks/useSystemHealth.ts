@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSystemHealthStatus, SystemHealthStatus } from '@/app/lib/api';
+import { AlertStatus, getSystemHealthStatus } from '@/app/lib/api';
 
 const POLL_INTERVAL_MS = 30_000; // 30 secondes
 
 export function useSystemHealth() {
-    const [status, setStatus] = useState<SystemHealthStatus | null>(null);
+    const [status, setStatus] = useState<AlertStatus | null>(null);
 
     const poll = useCallback(async () => {
         try {
@@ -15,11 +15,13 @@ export function useSystemHealth() {
         }
     }, []);
 
+    const refresh = useCallback(() => { void poll(); }, [poll]);
+
     useEffect(() => {
         void poll();
         const interval = setInterval(() => void poll(), POLL_INTERVAL_MS);
         return () => clearInterval(interval);
     }, [poll]);
 
-    return status;
+    return { status, refresh };
 }
