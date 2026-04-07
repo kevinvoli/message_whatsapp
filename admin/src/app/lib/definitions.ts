@@ -38,6 +38,7 @@ export type ViewMode =
   | 'observabilite'
   | 'go_no_go'
   | 'notifications'
+  | 'alert-config'
   | 'settings';
 
 export type NavigationItem = {

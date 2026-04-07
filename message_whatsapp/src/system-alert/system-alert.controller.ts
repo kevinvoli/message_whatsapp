@@ -13,12 +13,17 @@ export class SystemAlertController {
   }
 
   @Patch()
-  updateConfig(@Body() body: Partial<AlertConfig>): AlertConfig {
+  async updateConfig(@Body() body: Partial<AlertConfig>): Promise<AlertConfig> {
     return this.alertService.updateConfig(body);
   }
 
   @Get('status')
   getStatus() {
     return this.alertService.getStatus();
+  }
+
+  @Get('default-template')
+  getDefaultTemplate(): { template: string } {
+    return { template: this.alertService.getDefaultMessageTemplate() };
   }
 }

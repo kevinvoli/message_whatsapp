@@ -83,6 +83,19 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: 45,
     maxSteps: 3,
   },
+  'orphan-checker': {
+    label: 'Rattrapage orphelins — conversations sans poste',
+    description:
+      'Dispatche toutes les 15 min les conversations sans poste (poste_id = NULL). Filet de sécurité si le dispatch initial a échoué. Désactivé automatiquement entre 21h et 5h.',
+    enabled: true,
+    scheduleType: 'interval',
+    intervalMinutes: 15,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
