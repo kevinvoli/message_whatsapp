@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
-import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { Server } from 'socket.io';
 import {
   AlertRecipient,
@@ -34,6 +34,12 @@ export interface AlertSendResult {
   channelId: string | null;
   channelName: string | null;
   error: string | null;
+  /** ID du message Whapi — pour vérification dans le dashboard Whapi */
+  providerMessageId: string | null;
+  /** Statut de livraison retourné par Whapi */
+  messageStatus: 'pending' | 'sent' | 'delivered' | 'read' | null;
+  /** Champ `sent` de la réponse Whapi (false = refusé malgré HTTP 200) */
+  whapiFlagged: boolean;
 }
 
 /** Statut du dernier déclenchement d'alerte */
@@ -76,7 +82,7 @@ export class SystemAlertService implements OnModuleInit {
     private readonly channelRepo: Repository<WhapiChannel>,
     @InjectRepository(SystemAlertConfig)
     private readonly configRepo: Repository<SystemAlertConfig>,
-    private readonly outboundRouter: OutboundRouterService,
+    private readonly whapiService: CommunicationWhapiService,
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
@@ -280,6 +286,9 @@ export class SystemAlertService implements OnModuleInit {
         channelId: null,
         channelName: null,
         error: msg,
+        providerMessageId: null,
+        messageStatus: null,
+        whapiFlagged: false,
       }));
     }
 
@@ -337,32 +346,53 @@ export class SystemAlertService implements OnModuleInit {
     const channelErrors: string[] = [];
 
     for (const channel of channels) {
+      const channelLabel = channel.label ?? channel.channel_id;
       try {
         this.logger.log(
-          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channel.label ?? channel.channel_id}`,
+          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channelLabel}`,
         );
-        await this.outboundRouter.sendTextMessage({
+
+        const response = await this.whapiService.sendToWhapiChannel({
           text,
           to,
           channelId: channel.channel_id,
         });
+
+        const msgId = response.message?.id ?? null;
+        const msgStatus = response.message?.status ?? null;
+        const whapiFlagged = response.sent === false;
+
         this.logger.log(
-          `✅ Alerte envoyée à ${recipient.name} via canal ${channel.label ?? channel.channel_id}`,
+          `Whapi response — sent=${response.sent}, status=${msgStatus}, messageId=${msgId}`,
+        );
+
+        if (whapiFlagged) {
+          // Whapi a accepté la requête (HTTP 200) mais indique que le message
+          // n'a PAS été envoyé (sent=false). Essayer le canal suivant.
+          const reason = `Whapi a retourné sent=false (status=${msgStatus ?? 'inconnu'}, id=${msgId ?? 'none'})`;
+          channelErrors.push(`[${channelLabel}] ${reason}`);
+          this.logger.warn(`❌ ${channelLabel} refus Whapi: ${reason}`);
+          continue;
+        }
+
+        this.logger.log(
+          `✅ Alerte envoyée à ${recipient.name} via ${channelLabel} — id=${msgId}, status=${msgStatus}`,
         );
         return {
           recipientName: recipient.name,
           recipientPhone: normalizedPhone,
           success: true,
           channelId: channel.channel_id,
-          channelName: channel.label ?? channel.channel_id,
+          channelName: channelLabel,
           error: null,
+          providerMessageId: msgId,
+          messageStatus: msgStatus,
+          whapiFlagged: false,
         };
       } catch (err) {
         const msg = (err as Error).message;
-        channelErrors.push(`[${channel.label ?? channel.channel_id}] ${msg}`);
-        this.logger.warn(
-          `❌ Canal ${channel.label ?? channel.channel_id} échoué pour ${recipient.name}: ${msg}`,
-        );
+        channelErrors.push(`[${channelLabel}] ${msg}`);
+        this.logger.warn(`❌ ${channelLabel} erreur pour ${recipient.name}: ${msg}`);
       }
     }
 
@@ -380,6 +410,9 @@ export class SystemAlertService implements OnModuleInit {
       channelId: null,
       channelName: null,
       error: detailedError,
+      providerMessageId: null,
+      messageStatus: null,
+      whapiFlagged: false,
     };
   }
 

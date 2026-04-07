@@ -24,22 +24,67 @@ interface Props {
 
 // ─── Bloc statut du dernier envoi ───────────────────────────────────────────
 
+const STATUS_LABEL: Record<string, string> = {
+    pending: 'En attente (pending)',
+    sent: 'Envoyé (sent)',
+    delivered: 'Livré (delivered)',
+    read: 'Lu (read)',
+};
+
+const STATUS_COLOR: Record<string, string> = {
+    pending: 'text-orange-600',
+    sent: 'text-blue-600',
+    delivered: 'text-green-700',
+    read: 'text-green-700',
+};
+
 function SendResultRow({ r }: { r: AlertSendResult }) {
+    const isRealSuccess = r.success && !r.whapiFlagged;
+    const isFlagged = r.success && r.whapiFlagged;
+
     return (
-        <div className={`flex items-start gap-3 px-3 py-2 rounded-lg ${r.success ? 'bg-green-50' : 'bg-red-50'}`}>
-            {r.success
+        <div className={`flex items-start gap-3 px-3 py-2 rounded-lg ${
+            isRealSuccess ? 'bg-green-50' : isFlagged ? 'bg-orange-50' : 'bg-red-50'
+        }`}>
+            {isRealSuccess
                 ? <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                : <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                : isFlagged
+                    ? <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                    : <XCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
             }
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-0.5">
                 <p className="text-sm font-medium text-gray-800">
                     {r.recipientName} — <span className="font-mono text-xs">{r.recipientPhone}</span>
                 </p>
-                {r.success ? (
-                    <p className="text-xs text-green-700">
-                        Envoyé via canal <span className="font-mono">{r.channelName ?? r.channelId}</span>
+                {isRealSuccess && (
+                    <>
+                        <p className="text-xs text-green-700">
+                            Canal : <span className="font-mono">{r.channelName ?? r.channelId}</span>
+                        </p>
+                        {r.messageStatus && (
+                            <p className={`text-xs font-medium ${STATUS_COLOR[r.messageStatus] ?? 'text-gray-600'}`}>
+                                Statut Whapi : {STATUS_LABEL[r.messageStatus] ?? r.messageStatus}
+                                {r.messageStatus === 'pending' && (
+                                    <span className="font-normal text-gray-500 ml-1">
+                                        — le canal est peut-être déconnecté de WhatsApp
+                                    </span>
+                                )}
+                            </p>
+                        )}
+                        {r.providerMessageId && (
+                            <p className="text-xs text-gray-400 font-mono">
+                                ID Whapi : {r.providerMessageId}
+                            </p>
+                        )}
+                    </>
+                )}
+                {isFlagged && (
+                    <p className="text-xs text-orange-700">
+                        Whapi a répondu HTTP 200 mais <strong>sent=false</strong> — message refusé.
+                        Statut : {r.messageStatus ?? 'inconnu'}. Vérifiez que le canal est connecté à WhatsApp.
                     </p>
-                ) : (
+                )}
+                {!r.success && (
                     <pre className="text-xs text-red-700 whitespace-pre-wrap font-sans">{r.error}</pre>
                 )}
             </div>

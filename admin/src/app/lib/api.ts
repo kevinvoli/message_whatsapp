@@ -975,6 +975,10 @@ export interface AlertSendResult {
     channelId: string | null;
     channelName: string | null;
     error: string | null;
+    providerMessageId: string | null;
+    messageStatus: 'pending' | 'sent' | 'delivered' | 'read' | null;
+    /** true si Whapi a répondu HTTP 200 mais avec sent=false */
+    whapiFlagged: boolean;
 }
 
 export interface LastAlertAttempt {
