@@ -911,6 +911,11 @@ export interface AlertConfig {
     recipients: AlertRecipient[];
     /** Modèle du message. Placeholder : {silenceMin}. null = message par défaut. */
     messageTemplate: string | null;
+    /**
+     * channel_id du canal Whapi préféré pour l'envoi des alertes.
+     * null = essaie tous les canaux Whapi dans l'ordre jusqu'au premier succès.
+     */
+    defaultChannelId: string | null;
 }
 
 export interface AlertSendResult {

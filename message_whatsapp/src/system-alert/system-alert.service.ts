@@ -19,6 +19,11 @@ export interface AlertConfig {
   recipients: AlertRecipient[];
   /** Modèle du message. Placeholder : {silenceMin}. null = message par défaut. */
   messageTemplate: string | null;
+  /**
+   * Canal Whapi prioritaire pour l'envoi des alertes (channel_id externe).
+   * null = essaie tous les canaux Whapi dans l'ordre jusqu'au premier succès.
+   */
+  defaultChannelId: string | null;
 }
 
 /** Résultat d'un envoi pour un destinataire */
@@ -63,6 +68,7 @@ export class SystemAlertService implements OnModuleInit {
     retryAfterMinutes: 15,
     recipients: [],
     messageTemplate: null,
+    defaultChannelId: null,
   };
 
   constructor(
@@ -92,6 +98,7 @@ export class SystemAlertService implements OnModuleInit {
           retryAfterMinutes: row.retryAfterMinutes,
           recipients: row.recipients ?? [],
           messageTemplate: row.messageTemplate ?? null,
+          defaultChannelId: row.defaultChannelId ?? null,
         };
         this.logger.log(
           `Config alerte chargée — seuil: ${this.config.silenceThresholdMinutes} min, ` +
@@ -105,6 +112,7 @@ export class SystemAlertService implements OnModuleInit {
           retryAfterMinutes: this.config.retryAfterMinutes,
           recipients: this.config.recipients,
           messageTemplate: this.config.messageTemplate,
+          defaultChannelId: this.config.defaultChannelId,
         });
         this.logger.warn('Ligne config alerte créée en BDD (première exécution)');
       }
@@ -124,6 +132,7 @@ export class SystemAlertService implements OnModuleInit {
         retryAfterMinutes: this.config.retryAfterMinutes,
         recipients: this.config.recipients,
         messageTemplate: this.config.messageTemplate,
+        defaultChannelId: this.config.defaultChannelId,
       });
     } catch (err) {
       this.logger.error(
@@ -254,11 +263,11 @@ export class SystemAlertService implements OnModuleInit {
     // Les canaux Meta/Messenger/Instagram/Telegram ne peuvent pas envoyer à un
     // numéro WhatsApp brut — ils nécessitent un PSID ou un chat_id spécifique.
     const allChannels = await this.channelRepo.find();
-    const channels = allChannels.filter(
+    const whapiChannels = allChannels.filter(
       (c) => !c.provider || c.provider === 'whapi',
     );
 
-    if (!channels.length) {
+    if (!whapiChannels.length) {
       const msg =
         allChannels.length > 0
           ? `Aucun canal Whapi disponible (${allChannels.length} canal(aux) ignoré(s) : Meta/Messenger/Instagram/Telegram)`
@@ -274,8 +283,33 @@ export class SystemAlertService implements OnModuleInit {
       }));
     }
 
+    // Si un canal par défaut est configuré, le mettre en premier dans la liste.
+    // Les autres canaux Whapi servent de fallback si le canal par défaut échoue.
+    let channels: WhapiChannel[];
+    if (this.config.defaultChannelId) {
+      const preferred = whapiChannels.find(
+        (c) => c.channel_id === this.config.defaultChannelId,
+      );
+      if (preferred) {
+        const rest = whapiChannels.filter(
+          (c) => c.channel_id !== this.config.defaultChannelId,
+        );
+        channels = [preferred, ...rest];
+        this.logger.log(
+          `Canal préféré : ${preferred.label ?? preferred.channel_id} + ${rest.length} fallback(s)`,
+        );
+      } else {
+        this.logger.warn(
+          `Canal par défaut "${this.config.defaultChannelId}" introuvable parmi les canaux Whapi — utilisation de tous les canaux`,
+        );
+        channels = whapiChannels;
+      }
+    } else {
+      channels = whapiChannels;
+    }
+
     this.logger.log(
-      `Canaux Whapi disponibles pour l'alerte (${channels.length}): ${channels.map((c) => c.label ?? c.channel_id).join(', ')}`,
+      `Ordre d'essai (${channels.length} canal(aux)): ${channels.map((c) => c.label ?? c.channel_id).join(' → ')}`,
     );
 
     const text = this.buildMessage(silenceMin);

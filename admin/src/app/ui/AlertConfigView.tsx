@@ -9,10 +9,12 @@ import {
     LastAlertAttempt,
     getAlertConfig,
     getAlertDefaultTemplate,
+    getChannels,
     getSystemHealthStatus,
     sendTestAlert,
     updateAlertConfig,
 } from '@/app/lib/api';
+import { Channel } from '@/app/lib/definitions';
 import { Bell, Plus, Trash2, RotateCcw, Save, Phone, Send, CheckCircle, XCircle, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { formatTime, formatDateShort } from '@/app/lib/dateUtils';
 
@@ -79,6 +81,7 @@ export default function AlertConfigView({ onStatusRefresh }: Props) {
     const [config, setConfig] = useState<AlertConfig | null>(null);
     const [status, setStatus] = useState<AlertStatus | null>(null);
     const [defaultTemplate, setDefaultTemplate] = useState<string>('');
+    const [whapiChannels, setWhapiChannels] = useState<Channel[]>([]);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -92,6 +95,7 @@ export default function AlertConfigView({ onStatusRefresh }: Props) {
     const [recipients, setRecipients] = useState<AlertRecipient[]>([]);
     const [messageTemplate, setMessageTemplate] = useState<string>('');
     const [useDefaultTemplate, setUseDefaultTemplate] = useState(true);
+    const [defaultChannelId, setDefaultChannelId] = useState<string | null>(null);
 
     // Nouveau destinataire
     const [newPhone, setNewPhone] = useState('');
@@ -99,18 +103,22 @@ export default function AlertConfigView({ onStatusRefresh }: Props) {
 
     const loadAll = async () => {
         try {
-            const [cfg, tpl, st] = await Promise.all([
+            const [cfg, tpl, st, channels] = await Promise.all([
                 getAlertConfig(),
                 getAlertDefaultTemplate(),
                 getSystemHealthStatus(),
+                getChannels(),
             ]);
             setConfig(cfg);
             setDefaultTemplate(tpl);
             setStatus(st);
+            // Garder seulement les canaux Whapi (provider null ou 'whapi')
+            setWhapiChannels(channels.filter((c) => !c.provider || c.provider === 'whapi'));
             setEnabled(cfg.enabled);
             setThresholdMin(cfg.silenceThresholdMinutes);
             setRetryMin(cfg.retryAfterMinutes);
             setRecipients(cfg.recipients ?? []);
+            setDefaultChannelId(cfg.defaultChannelId ?? null);
             if (cfg.messageTemplate) {
                 setMessageTemplate(cfg.messageTemplate);
                 setUseDefaultTemplate(false);
@@ -149,6 +157,7 @@ export default function AlertConfigView({ onStatusRefresh }: Props) {
                 retryAfterMinutes: retryMin,
                 recipients,
                 messageTemplate: useDefaultTemplate ? null : (messageTemplate || null),
+                defaultChannelId: defaultChannelId || null,
             });
             setConfig(updated);
             setSaved(true);
@@ -308,6 +317,38 @@ export default function AlertConfigView({ onStatusRefresh }: Props) {
                         <p className="text-xs text-gray-400 mt-1">Recommandé : 15 min</p>
                     </div>
                 </div>
+            </div>
+
+            {/* Canal d'envoi */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+                <h3 className="font-medium text-gray-800">Canal d&apos;envoi</h3>
+                <p className="text-xs text-gray-500">
+                    Choisissez le canal Whapi utilisé pour envoyer les alertes.
+                    Si le canal choisi échoue, le système essaie les autres canaux Whapi automatiquement.
+                </p>
+                <select
+                    value={defaultChannelId ?? ''}
+                    onChange={(e) => setDefaultChannelId(e.target.value || null)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                    <option value="">Automatique — essaie tous les canaux dans l&apos;ordre</option>
+                    {whapiChannels.map((c) => (
+                        <option key={c.channel_id} value={c.channel_id}>
+                            {c.label ? `${c.label} (${c.channel_id})` : c.channel_id}
+                        </option>
+                    ))}
+                </select>
+                {whapiChannels.length === 0 && (
+                    <p className="text-xs text-orange-600">
+                        Aucun canal Whapi trouvé. Les canaux Meta, Messenger, Instagram et Telegram
+                        ne peuvent pas envoyer d&apos;alertes WhatsApp.
+                    </p>
+                )}
+                {defaultChannelId && (
+                    <p className="text-xs text-blue-600">
+                        Canal sélectionné en priorité. Les autres canaux Whapi serviront de fallback si celui-ci échoue.
+                    </p>
+                )}
             </div>
 
             {/* Destinataires */}

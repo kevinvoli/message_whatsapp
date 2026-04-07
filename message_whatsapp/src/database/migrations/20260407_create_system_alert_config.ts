@@ -40,6 +40,13 @@ export class CreateSystemAlertConfig1744070400000 implements MigrationInterface 
             isNullable: true,
             default: null,
           },
+          {
+            name: 'default_channel_id',
+            type: 'varchar',
+            length: '191',
+            isNullable: true,
+            default: null,
+          },
         ],
       }),
       true,
@@ -47,8 +54,8 @@ export class CreateSystemAlertConfig1744070400000 implements MigrationInterface 
 
     // Insérer la ligne singleton avec les valeurs par défaut
     await queryRunner.query(
-      `INSERT INTO system_alert_config (id, enabled, silence_threshold_minutes, retry_after_minutes, recipients, message_template)
-       VALUES (1, 1, 60, 15, '[]', NULL)`,
+      `INSERT INTO system_alert_config (id, enabled, silence_threshold_minutes, retry_after_minutes, recipients, message_template, default_channel_id)
+       VALUES (1, 1, 60, 15, '[]', NULL, NULL)`,
     );
   }
 

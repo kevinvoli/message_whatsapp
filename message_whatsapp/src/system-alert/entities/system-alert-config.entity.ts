@@ -43,4 +43,18 @@ export class SystemAlertConfig {
     default: null,
   })
   messageTemplate: string | null;
+
+  /**
+   * Canal Whapi à utiliser en priorité pour l'envoi des alertes.
+   * Si null → le système essaie tous les canaux Whapi disponibles dans l'ordre.
+   * Valeur : `channel_id` externe (ex: "5c4b..."), pas l'UUID interne.
+   */
+  @Column({
+    name: 'default_channel_id',
+    type: 'varchar',
+    length: 191,
+    nullable: true,
+    default: null,
+  })
+  defaultChannelId: string | null;
 }
