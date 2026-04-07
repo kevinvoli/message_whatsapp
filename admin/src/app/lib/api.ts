@@ -968,6 +968,16 @@ export interface AlertConfig {
     defaultChannelId: string | null;
 }
 
+export interface CronLastReport { report: string; ranAt: string }
+export type CronLastReports = Record<string, CronLastReport>;
+
+export async function getCronLastReports(): Promise<CronLastReports> {
+    const response = await fetch(`${API_BASE_URL}/cron-configs/last-reports`, {
+        credentials: 'include',
+    });
+    return handleResponse<CronLastReports>(response);
+}
+
 export interface AlertSendResult {
     recipientName: string;
     recipientPhone: string;
