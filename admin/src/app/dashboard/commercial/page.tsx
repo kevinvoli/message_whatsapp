@@ -26,6 +26,8 @@ import GoNoGoView from '@/app/ui/GoNoGoView';
 import NotificationsView from '@/app/ui/NotificationsView';
 import SettingsView from '@/app/ui/SettingsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
+import { useSystemHealth } from '@/app/hooks/useSystemHealth';
+import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
 import { ViewMode } from '@/app/lib/definitions';
 import { getAdminProfile } from '@/app/lib/api';
 
@@ -71,6 +73,8 @@ export default function AdminDashboard() {
         markAllAsRead,
         clearAll: clearAllNotifications,
     } = useNotifications();
+
+    const systemHealth = useSystemHealth();
 
     const renderContent = () => {
         switch(viewMode) {
@@ -162,6 +166,8 @@ export default function AdminDashboard() {
                     onMarkAllAsRead={markAllAsRead}
                     onClearNotifications={clearAllNotifications}
                 />
+
+                <SystemHealthBanner status={systemHealth} />
 
                 <div className="flex-1 overflow-y-auto p-6">
                     {renderContent()}

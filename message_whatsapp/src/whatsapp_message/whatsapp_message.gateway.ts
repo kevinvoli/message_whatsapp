@@ -5,6 +5,7 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
@@ -36,6 +37,7 @@ import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { NotificationService } from 'src/notification/notification.service';
+import { SystemAlertService } from 'src/system-alert/system-alert.service';
 
 type AuthPayload = {
   sub: string;
@@ -48,7 +50,7 @@ type AuthPayload = {
   cors: { origin: '*', credentials: true },
 })
 export class WhatsappMessageGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
 {
   @WebSocketServer()
   server: Server;
@@ -87,7 +89,12 @@ export class WhatsappMessageGateway
     private readonly throttle: SocketThrottleGuard,
     private readonly callLogService: CallLogService,
     private readonly notificationService: NotificationService,
+    private readonly systemAlert: SystemAlertService,
   ) {}
+
+  afterInit(server: Server): void {
+    this.systemAlert.setSocketServer(server);
+  }
 
   // ======================================================
   // CONNECTION / DISCONNECTION

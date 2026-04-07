@@ -25,6 +25,7 @@ import { ChannelService } from 'src/channel/channel.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
+import { SystemAlertService } from 'src/system-alert/system-alert.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -49,6 +50,7 @@ export class InboundMessageService {
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly channelService: ChannelService,
     private readonly autoMessageOrchestrator: AutoMessageOrchestrator,
+    private readonly systemAlert: SystemAlertService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -127,6 +129,7 @@ export class InboundMessageService {
           this.logger.log(
             `INCOMING_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
           );
+          this.systemAlert.onInboundMessage();
 
           const medias = this.extractMediaFromUnified(message);
           // OPT-4 : résoudre le channel une seule fois pour tous les médias

@@ -37,6 +37,7 @@ import { MetriquesModule } from './metriques/metriques.module';
 import { LoggingModule } from './logging/logging.module';
 import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
+import { SystemAlertModule } from './system-alert/system-alert.module';
 
 @Module({
   imports: [
@@ -112,6 +113,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
     LoggingModule,
     NotificationModule,
     SystemConfigModule,
+    SystemAlertModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

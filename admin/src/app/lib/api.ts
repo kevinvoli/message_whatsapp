@@ -890,3 +890,42 @@ export async function patchChat(chatId: string, data: Partial<{ read_only: boole
     });
     if (!response.ok) throw new Error('Erreur mise à jour conversation');
 }
+
+// ── System Health Alert ──────────────────────────────────────────────────────
+
+export interface SystemHealthStatus {
+    alerting: boolean;
+    silenceMinutes: number;
+    lastInboundAt: string;
+}
+
+export interface AlertConfig {
+    enabled: boolean;
+    silenceThresholdMinutes: number;
+    retryAfterMinutes: number;
+    recipients: { phone: string; name: string }[];
+}
+
+export async function getSystemHealthStatus(): Promise<SystemHealthStatus> {
+    const response = await fetch(`${API_BASE_URL}/admin/alert-config/status`, {
+        credentials: 'include',
+    });
+    return handleResponse<SystemHealthStatus>(response);
+}
+
+export async function getAlertConfig(): Promise<AlertConfig> {
+    const response = await fetch(`${API_BASE_URL}/admin/alert-config`, {
+        credentials: 'include',
+    });
+    return handleResponse<AlertConfig>(response);
+}
+
+export async function updateAlertConfig(patch: Partial<AlertConfig>): Promise<AlertConfig> {
+    const response = await fetch(`${API_BASE_URL}/admin/alert-config`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+    });
+    return handleResponse<AlertConfig>(response);
+}

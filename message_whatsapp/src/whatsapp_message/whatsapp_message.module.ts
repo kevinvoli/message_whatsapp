@@ -37,6 +37,7 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     CallLogModule,
     JorbsModule,
     NotificationModule,
+    SystemAlertModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

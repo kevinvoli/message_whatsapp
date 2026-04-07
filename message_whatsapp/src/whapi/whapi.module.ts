@@ -55,6 +55,7 @@ import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
 import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 import { NotificationModule } from 'src/notification/notification.module';
+import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     CallLogModule,
     JorbsModule,
     NotificationModule,
+    SystemAlertModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
