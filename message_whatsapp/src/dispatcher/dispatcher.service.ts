@@ -516,12 +516,24 @@ export class DispatcherService {
     });
 
     let dispatched = 0;
+    let stillWaiting = 0;
+
     for (const chat of waitingChats) {
-      if (chat.read_only) continue;
+      // Ignorer les conversations verrouillées (en attente de réaction client)
+      if (chat.read_only) { stillWaiting++; continue; }
+
+      // Ignorer les conversations sur canal dédié — elles ne doivent pas quitter leur poste
+      const dedicatedPosteId = chat.channel_id
+        ? await this.channelService.getDedicatedPosteId(chat.channel_id)
+        : null;
+      if (dedicatedPosteId) { stillWaiting++; continue; }
+
       const lock = this.getChatDispatchLock(chat.chat_id);
       const assigned = await lock.runExclusive(async () => {
         const nextAgent = await this.queueService.getNextInQueue();
         if (!nextAgent) return false;
+
+        const oldPosteId = chat.poste_id;
 
         await this.chatRepository.update(chat.id, {
           poste: nextAgent,
@@ -534,6 +546,11 @@ export class DispatcherService {
           first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
         });
 
+        // Notifier l'ancien poste si la conversation lui était déjà assignée
+        if (oldPosteId && oldPosteId !== nextAgent.id) {
+          await this.messageGateway.emitConversationRemoved(chat.chat_id, oldPosteId);
+        }
+
         await this.messageGateway.emitConversationAssigned(chat.chat_id);
         void this.notificationService.create(
           'info',
@@ -543,17 +560,22 @@ export class DispatcherService {
         return true;
       });
 
-      if (!assigned) break;
-      dispatched++;
+      if (assigned) {
+        dispatched++;
+      } else {
+        // Queue vide pour cette conversation — continuer quand même les suivantes
+        stillWaiting++;
+      }
+
       if (!lock.isLocked()) {
         this.chatDispatchLocks.delete(chat.chat_id);
       }
     }
 
     this.logger.log(
-      `Redispatch manuel: ${dispatched} assignées, ${waitingChats.length - dispatched} toujours en attente`,
+      `Redispatch manuel: ${dispatched} assignée(s), ${stillWaiting} toujours en attente`,
     );
-    return { dispatched, still_waiting: waitingChats.length - dispatched };
+    return { dispatched, still_waiting: stillWaiting };
   }
 
   /**
