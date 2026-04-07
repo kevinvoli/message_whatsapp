@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { SystemAlertService } from './system-alert.service';
 import { SystemAlertController } from './system-alert.controller';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
@@ -14,10 +15,12 @@ import { CommunicationInstagramService } from 'src/communication_whapi/communica
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { MetaTokenService } from 'src/channel/meta-token.service';
-import { AppLogger } from 'src/logging/app-logger.service';
+import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
   imports: [
+    ConfigModule,
+    LoggingModule,
     TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste]),
   ],
   providers: [
@@ -30,7 +33,6 @@ import { AppLogger } from 'src/logging/app-logger.service';
     CommunicationTelegramService,
     ChannelService,
     MetaTokenService,
-    AppLogger,
   ],
   controllers: [SystemAlertController],
   exports: [SystemAlertService],
