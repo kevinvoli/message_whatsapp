@@ -120,13 +120,16 @@ export class AutoMessageOrchestrator {
       const nextStep = chat.auto_message_step + 1;
       const nextMessage = await this.messageAutoService.getAutoMessageByPosition(nextStep);
 
+      // La config globale (panneau admin) est autoritaire.
+      // Le délai du template n'est utilisé que si la config globale n'est pas renseignée.
+      const globalMin = autoConfig.delayMinSeconds;
+      const globalMax = autoConfig.delayMaxSeconds;
       const delaySeconds =
-        nextMessage?.delai && nextMessage.delai > 0
-          ? nextMessage.delai
-          : this.randomBetween(
-              autoConfig.delayMinSeconds ?? 20,
-              autoConfig.delayMaxSeconds ?? 45,
-            );
+        globalMin != null && globalMax != null && globalMin > 0 && globalMax > 0
+          ? this.randomBetween(globalMin, globalMax)
+          : nextMessage?.delai && nextMessage.delai > 0
+            ? nextMessage.delai
+            : this.randomBetween(300, 540);
 
       const delayMs = delaySeconds * 1000;
 

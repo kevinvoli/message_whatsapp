@@ -79,8 +79,8 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     intervalMinutes: null,
     cronExpression: null,
     ttlDays: null,
-    delayMinSeconds: 20,
-    delayMaxSeconds: 45,
+    delayMinSeconds: 300,
+    delayMaxSeconds: 540,
     maxSteps: 3,
   },
   'orphan-checker': {
