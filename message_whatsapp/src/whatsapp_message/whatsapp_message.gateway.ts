@@ -894,6 +894,51 @@ export class WhatsappMessageGateway
     });
   }
 
+  /**
+   * Notification dédiée aux messages automatiques (from_me = true, poste_id = null).
+   * Contrairement à notifyNewMessage :
+   * - Ne touche PAS à chat.read_only (l'orchestrateur le gère lui-même)
+   * - Ne crée PAS de notification admin "Nouveau message" (c'est un message système)
+   * - Préserve le unread_count depuis la colonne DB du chat plutôt que de recalculer
+   *   via countUnreadMessages() — seul le commercial en cliquant peut remettre à 0
+   */
+  async notifyAutoMessage(
+    message: WhatsappMessage,
+    chat: WhatsappChat,
+  ): Promise<void> {
+    if (!chat.poste_id) {
+      this.logger.warn(
+        `Auto message notify skipped: no assigned poste for chat ${chat.chat_id}`,
+      );
+      return;
+    }
+
+    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
+      type: 'MESSAGE_ADD',
+      payload: this.mapMessage(message),
+    });
+
+    // Récupérer le dernier message et le unread_count depuis la DB.
+    // On utilise la colonne unread_count (gérée par le dispatcher + clic commercial)
+    // et non countUnreadMessages (basé sur le status des messages, peut être 0 si
+    // les messages ont été marqués comme lus par l'ouverture de la conversation).
+    const [freshChat, resolvedLastMessage] = await Promise.all([
+      this.chatService.findBychat_id(chat.chat_id),
+      this.messageService.findLastMessageBychat_id(chat.chat_id),
+    ]);
+
+    const unreadCount = freshChat?.unread_count ?? chat.unread_count ?? 0;
+
+    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
+      type: 'CONVERSATION_UPSERT',
+      payload: this.mapConversation(chat, resolvedLastMessage, unreadCount),
+    });
+
+    this.logger.log(
+      `AUTO_MESSAGE_NOTIFY chat_id=${chat.chat_id} unread_count=${unreadCount}`,
+    );
+  }
+
   // ======================================================
   // STATUS UPDATE (delivered / read / failed)
   // ======================================================
