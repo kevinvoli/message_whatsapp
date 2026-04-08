@@ -144,8 +144,8 @@ function GlobalConfigPanel() {
   const [toggling, setToggling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [delayMin, setDelayMin] = useState(20);
-  const [delayMax, setDelayMax] = useState(45);
+  const [delayMin, setDelayMin] = useState(300);
+  const [delayMax, setDelayMax] = useState(540);
   const [maxSteps, setMaxSteps] = useState(3);
 
   const load = useCallback(async () => {
@@ -154,8 +154,8 @@ function GlobalConfigPanel() {
       const found = all.find((c) => c.key === 'auto-message') ?? null;
       if (found) {
         setConfig(found);
-        setDelayMin(found.delayMinSeconds ?? 20);
-        setDelayMax(found.delayMaxSeconds ?? 45);
+        setDelayMin(found.delayMinSeconds ?? 300);
+        setDelayMax(found.delayMaxSeconds ?? 540);
         setMaxSteps(found.maxSteps ?? 3);
       }
     } catch {
@@ -220,7 +220,7 @@ function GlobalConfigPanel() {
             </p>
             <p className="text-xs text-gray-500">
               {enabled
-                ? `Délai : ${config.delayMinSeconds ?? 20}–${config.delayMaxSeconds ?? 45}s · Max ${config.maxSteps ?? 3} étape(s)`
+                ? `Délai : ${config.delayMinSeconds ?? 300}–${config.delayMaxSeconds ?? 540}s · Max ${config.maxSteps ?? 3} étape(s)`
                 : 'Aucun message automatique ne sera envoyé.'
               }
             </p>
@@ -256,7 +256,10 @@ function GlobalConfigPanel() {
 
       {showDetails && (
         <div className="border-t border-gray-200 px-4 py-4 bg-white rounded-b-xl">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Délais & étapes</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Délais & étapes</p>
+          <p className="mb-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+            Ces paramètres sont <strong>autoritaires</strong> : ils s&apos;appliquent à tous les messages auto, même si un délai spécifique est défini sur le template. Le délai est tiré aléatoirement entre Min et Max à chaque envoi.
+          </p>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
               <label className="mb-1 block text-xs text-gray-500">Délai min (s)</label>
@@ -283,6 +286,9 @@ function GlobalConfigPanel() {
               />
             </div>
           </div>
+          <p className="mb-3 text-xs text-gray-400">
+            Note : les messages auto ne se déclenchent que si le commercial n&apos;a jamais répondu sur ce chat.
+          </p>
           <div className="flex justify-end gap-2">
             <button
               type="button"
