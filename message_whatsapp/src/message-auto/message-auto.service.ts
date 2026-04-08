@@ -122,15 +122,11 @@ export class MessageAutoService {
         chat_id: chat.chat_id,
         poste_id: null, // ne pas mettre à jour last_poste_message_at (réservé aux vrais agents)
         text: mes,
-        timestamp: new Date(
-          chat?.last_client_message_at
-            ? chat.last_client_message_at.getTime() + 1000
-            : Date.now(),
-        ),
+        timestamp: new Date(), // heure réelle d'envoi (pas last_client_message_at + 1s)
         channel_id: chat.last_msg_client_channel_id,
       });
 
-      await this.gateway.notifyNewMessage(message, chat);
+      await this.gateway.notifyAutoMessage(message, chat);
 
       await this.chatService.update(chatId, {
         read_only: true,
