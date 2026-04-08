@@ -786,6 +786,20 @@ export class WhatsappMessageService {
         return null;
       }
 
+      // Les mises à jour de statut (delivered, read, failed…) ne s'appliquent
+      // qu'aux messages SORTANTS (from_me = true).
+      // Les messages entrants (from_me = false) ne sont marqués READ que par
+      // l'action explicite du commercial (clic sur la conversation → messages:read).
+      // Si on laissait passer, un webhook Whapi "read" sur un message client
+      // (déclenché automatiquement à l'envoi d'une réponse) marquerait la
+      // conversation comme lue sans que personne ne l'ait ouverte.
+      if (!message.from_me) {
+        this.logger.debug(
+          `Status update ignored for inbound message: ${status.id} (from_me=false)`,
+        );
+        return null;
+      }
+
       message.status = status.status as WhatsappMessageStatus;
 
       if (status.errorCode !== undefined) {
