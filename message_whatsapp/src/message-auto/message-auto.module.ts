@@ -34,6 +34,9 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { AutoMessageScopeConfig } from './entities/auto-message-scope-config.entity';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
+import { AutoMessageKeyword } from './entities/auto-message-keyword.entity';
+import { BusinessHoursConfig } from './entities/business-hours-config.entity';
+import { BusinessHoursService } from './business-hours.service';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
 
@@ -50,6 +53,8 @@ import { NotificationModule } from 'src/notification/notification.module';
     TypeOrmModule.forFeature([
       MessageAuto,
       AutoMessageScopeConfig,
+      AutoMessageKeyword,
+      BusinessHoursConfig,
       WhatsappMessage,
       WhatsappChat,
       WhatsappCommercial,
@@ -63,13 +68,14 @@ import { NotificationModule } from 'src/notification/notification.module';
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
     CallLogModule,
-    JorbsModule,
+    forwardRef(() => JorbsModule),
     NotificationModule,
   ],
   controllers: [MessageAutoController],
   providers: [
     MessageAutoService,
     AutoMessageScopeConfigService,
+    BusinessHoursService,
     WhatsappChatService,
     WhatsappCommercialService,
     WhatsappPosteService,
@@ -86,5 +92,6 @@ import { NotificationModule } from 'src/notification/notification.module';
     MetaTokenService,
     ContactService,
   ],
+  exports: [MessageAutoService, AutoMessageScopeConfigService, BusinessHoursService],
 })
 export class MessageAutoModule {}
