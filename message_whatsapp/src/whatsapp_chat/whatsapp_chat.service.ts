@@ -262,7 +262,15 @@ export class WhatsappChatService {
         .getRawMany();
       const unreadMap = new Map(unreadRows.map((r) => [r.chat_id, parseInt(r.cnt) || 0]));
       for (const chat of data) {
-        chat.unread_count = unreadMap.get(chat.chat_id) ?? 0;
+        // N'écraser la colonne DB que si on a un résultat réel dans la map.
+        // Si la map n'a pas d'entrée (0 messages SENT/DELIVERED trouvés),
+        // on conserve la valeur unread_count de la colonne — seul le commercial
+        // en cliquant sur la conversation a le droit de la remettre à 0.
+        const computed = unreadMap.get(chat.chat_id);
+        if (computed !== undefined) {
+          chat.unread_count = computed;
+        }
+        // Sinon : chat.unread_count reste la valeur lue depuis la DB
       }
     }
 

@@ -556,7 +556,9 @@ export class WhatsappMessageGateway
 
       const lastMessage =
         await this.messageService.findLastMessageBychat_id(chatId);
-      const unreadCount = await this.messageService.countUnreadMessages(chatId);
+      // Utiliser la colonne DB unread_count (source de vérité) plutôt que
+      // countUnreadMessages() qui peut retourner 0 si messages en statut READ.
+      const unreadCount = updatedChat.unread_count ?? 0;
 
       this.server.to(`poste:${updatedChat.poste_id}`).emit('chat:event', {
         type: 'CONVERSATION_UPSERT',
@@ -822,12 +824,14 @@ export class WhatsappMessageGateway
         payload: { ...this.mapMessage(message), tempId: payload.tempId },
       });
 
-      const lastMessage = await this.messageService.findLastMessageBychat_id(
-        chat.chat_id,
-      );
-      const unreadCount = await this.messageService.countUnreadMessages(
-        chat.chat_id,
-      );
+      const [lastMessage, freshChatAfterSend] = await Promise.all([
+        this.messageService.findLastMessageBychat_id(chat.chat_id),
+        this.chatService.findBychat_id(chat.chat_id),
+      ]);
+      // createAgentMessage a mis unread_count = 0 en DB (poste_id non null).
+      // On utilise la colonne DB plutôt que countUnreadMessages() pour éviter
+      // d'émettre 0 à tort si des messages entrants sont en statut READ.
+      const unreadCount = freshChatAfterSend?.unread_count ?? 0;
 
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'CONVERSATION_UPSERT',
@@ -877,13 +881,18 @@ export class WhatsappMessageGateway
     void this.notificationService.create('message', `Nouveau message — ${contactName}`, preview);
 
     // Utiliser le lastMessage fourni (message entrant = dernier message)
-    // Fallback vers la DB pour les autres appelants qui ne le fournissent pas
-    const [resolvedLastMessage, unreadCount] = await Promise.all([
+    // Fallback vers la DB pour les autres appelants qui ne le fournissent pas.
+    // Recharger le chat depuis la DB pour obtenir le unread_count à jour
+    // (le dispatcher vient de l'incrémenter via incrementUnreadCount).
+    // On n'utilise PAS countUnreadMessages() : si les messages sont en statut READ
+    // (webhook provider automatique), cette fonction retournerait 0 à tort.
+    const [resolvedLastMessage, freshChatForUnread] = await Promise.all([
       lastMessage
         ? Promise.resolve(lastMessage)
         : this.messageService.findLastMessageBychat_id(chat.chat_id),
-      this.messageService.countUnreadMessages(chat.chat_id),
+      this.chatService.findBychat_id(chat.chat_id),
     ]);
+    const unreadCount = freshChatForUnread?.unread_count ?? chat.unread_count ?? 0;
     this.logger.debug(
       `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
     );
@@ -1083,12 +1092,10 @@ export class WhatsappMessageGateway
     if (freshChat) {
       const lastMessage =
         await this.messageService.findLastMessageBychat_id(chat.chat_id);
-      const unreadCount =
-        await this.messageService.countUnreadMessages(chat.chat_id);
 
       this.server.to(`poste:${newPosteId}`).emit('chat:event', {
         type: 'CONVERSATION_ASSIGNED',
-        payload: this.mapConversation(freshChat, lastMessage, unreadCount),
+        payload: this.mapConversation(freshChat, lastMessage, freshChat.unread_count ?? 0),
       });
     }
 
@@ -1111,10 +1118,9 @@ export class WhatsappMessageGateway
     const chat = await this.chatService.findBychat_id(chatId);
     if (!chat?.poste_id) return;
     const lastMessage = await this.messageService.findLastMessageBychat_id(chatId);
-    const unreadCount = await this.messageService.countUnreadMessages(chatId);
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_ASSIGNED',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
+      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
     });
     this.logger.log(
       `CONVERSATION_ASSIGNED emitted for new chat ${chatId} → poste:${chat.poste_id}`,
@@ -1133,12 +1139,10 @@ export class WhatsappMessageGateway
     }
     const lastMessage =
       await this.messageService.findLastMessageBychat_id(chatId);
-    const unreadCount =
-      await this.messageService.countUnreadMessages(chatId);
 
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
+      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
     });
   }
 
@@ -1160,13 +1164,10 @@ export class WhatsappMessageGateway
     if (!chat.poste_id) {
       return;
     }
-    const [lastMessage, unreadCount] = await Promise.all([
-      this.messageService.findLastMessageBychat_id(chat.chat_id),
-      this.messageService.countUnreadMessages(chat.chat_id),
-    ]);
+    const lastMessage = await this.messageService.findLastMessageBychat_id(chat.chat_id);
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, unreadCount),
+      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
     });
   }
 
