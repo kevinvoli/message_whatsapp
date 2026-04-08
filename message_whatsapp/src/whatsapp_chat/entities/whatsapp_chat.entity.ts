@@ -233,6 +233,61 @@ export class WhatsappChat {
   })
   last_auto_message_sent_at: Date | null;
 
+  // ─── Trigger A — Sans réponse ─────────────────────────────────────────────
+
+  @Column({ name: 'no_response_auto_step', type: 'int', default: 0 })
+  no_response_auto_step: number;
+
+  @Column({ name: 'last_no_response_auto_sent_at', type: 'timestamp', nullable: true })
+  last_no_response_auto_sent_at: Date | null;
+
+  // ─── Trigger C — Hors horaires ────────────────────────────────────────────
+
+  @Column({ name: 'out_of_hours_auto_sent', type: 'boolean', default: false })
+  out_of_hours_auto_sent: boolean;
+
+  // ─── Trigger D — Réouverture ──────────────────────────────────────────────
+
+  @Column({ name: 'reopened_at', type: 'timestamp', nullable: true })
+  reopened_at: Date | null;
+
+  @Column({ name: 'reopened_auto_sent', type: 'boolean', default: false })
+  reopened_auto_sent: boolean;
+
+  // ─── Trigger E — Attente queue ────────────────────────────────────────────
+
+  @Column({ name: 'queue_wait_auto_step', type: 'int', default: 0 })
+  queue_wait_auto_step: number;
+
+  @Column({ name: 'last_queue_wait_auto_sent_at', type: 'timestamp', nullable: true })
+  last_queue_wait_auto_sent_at: Date | null;
+
+  // ─── Trigger F — Mot-clé ─────────────────────────────────────────────────
+
+  @Column({ name: 'keyword_auto_sent_at', type: 'timestamp', nullable: true })
+  keyword_auto_sent_at: Date | null;
+
+  // ─── Trigger G — Type de client ───────────────────────────────────────────
+
+  @Column({ name: 'client_type_auto_sent', type: 'boolean', default: false })
+  client_type_auto_sent: boolean;
+
+  @Column({ name: 'is_known_client', type: 'boolean', nullable: true })
+  is_known_client: boolean | null;
+
+  // ─── Trigger H — Inactivité totale ───────────────────────────────────────
+
+  @Column({ name: 'inactivity_auto_step', type: 'int', default: 0 })
+  inactivity_auto_step: number;
+
+  @Column({ name: 'last_inactivity_auto_sent_at', type: 'timestamp', nullable: true })
+  last_inactivity_auto_sent_at: Date | null;
+
+  // ─── Trigger I — Après assignation ───────────────────────────────────────
+
+  @Column({ name: 'on_assign_auto_sent', type: 'boolean', default: false })
+  on_assign_auto_sent: boolean;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

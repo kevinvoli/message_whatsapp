@@ -32,6 +32,7 @@ import { AutoMessageScopeConfigService } from 'src/message-auto/auto-message-sco
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { AutoMessageScopeConfig } from 'src/message-auto/entities/auto-message-scope-config.entity';
+import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keyword.entity';
 import { WebhookEventLog } from './entities/webhook-event.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { CallLogModule } from 'src/call-log/call_log.module';
@@ -70,6 +71,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
       WhatsappPoste,
       WhatsappMedia,
       MessageAuto,
+      AutoMessageKeyword,
       AutoMessageScopeConfig,
       WebhookEventLog,
     ]),

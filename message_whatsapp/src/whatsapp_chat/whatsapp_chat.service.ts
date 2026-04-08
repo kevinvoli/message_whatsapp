@@ -389,7 +389,40 @@ export class WhatsappChatService {
   }
 
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
+    // ─── Réinitialisations automatiques des cycles auto-message ──────────────
+
+    // Trigger A : agent répond → cycle no_response repart de zéro
+    if (data.last_poste_message_at !== undefined) {
+      data.no_response_auto_step = 0;
+      data.last_no_response_auto_sent_at = null;
+    }
+
+    // Trigger E : conversation assignée → cycle queue_wait repart de zéro
+    if (data.poste_id !== undefined && data.poste_id !== null) {
+      data.queue_wait_auto_step = 0;
+      data.last_queue_wait_auto_sent_at = null;
+      data.on_assign_auto_sent = false; // réarmer trigger I si ré-assignation
+    }
+
+    // Trigger H : toute activité → cycle inactivity repart de zéro
+    if (data.last_activity_at !== undefined) {
+      data.inactivity_auto_step = 0;
+      data.last_inactivity_auto_sent_at = null;
+    }
+
     await this.chatRepository.update({ chat_id }, data);
+  }
+
+  /**
+   * Marque une conversation comme réouverte (trigger D).
+   * À appeler depuis le handler de message entrant quand status était 'fermé'.
+   */
+  async markReopened(chat_id: string): Promise<void> {
+    await this.chatRepository.update({ chat_id }, {
+      reopened_at: new Date(),
+      reopened_auto_sent: false,
+      out_of_hours_auto_sent: false,
+    });
   }
 
   async lockConversation(id: string) {

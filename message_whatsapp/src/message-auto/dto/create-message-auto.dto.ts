@@ -1,32 +1,43 @@
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
-  IsUUID,
+  MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AutoMessageChannel } from '../entities/message-auto.entity';
+import { AutoMessageChannel, AutoMessageTriggerType } from '../entities/message-auto.entity';
+import { KeywordMatchType } from '../entities/auto-message-keyword.entity';
 
 export class MessageAutoConditionsDto {
-  /** Restreindre ce message à un poste spécifique */
-  @IsOptional()
-  @IsUUID()
-  poste_id?: string;
+  @IsOptional() @IsString()  poste_id?: string;
+  @IsOptional() @IsString()  channel_id?: string;
+  @IsOptional() @IsString()  client_type?: string;
+}
 
-  /** Restreindre ce message à un canal spécifique (channel_id) */
-  @IsOptional()
+export class CreateAutoMessageKeywordDto {
   @IsString()
-  channel_id?: string;
+  @MaxLength(100)
+  keyword: string;
 
-  /** Restreindre ce message à un type de client ('nouveau', 'existant', etc.) */
   @IsOptional()
-  @IsString()
-  client_type?: string;
+  @IsEnum(KeywordMatchType)
+  matchType?: KeywordMatchType;
+
+  @IsOptional()
+  @IsBoolean()
+  caseSensitive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  actif?: boolean;
 }
 
 export class CreateMessageAutoDto {
@@ -50,6 +61,39 @@ export class CreateMessageAutoDto {
   @IsOptional()
   @IsBoolean()
   actif?: boolean;
+
+  /** Critère de déclenchement — défaut : 'sequence' */
+  @IsOptional()
+  @IsEnum(AutoMessageTriggerType)
+  trigger_type?: AutoMessageTriggerType;
+
+  /** Scope de restriction : null = global */
+  @IsOptional()
+  @IsIn(['poste', 'canal'])
+  scope_type?: 'poste' | 'canal';
+
+  /** Obligatoire si scope_type est fourni */
+  @ValidateIf((o) => o.scope_type != null)
+  @IsString()
+  @MaxLength(100)
+  scope_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  scope_label?: string;
+
+  /** Pour trigger_type='client_type' */
+  @IsOptional()
+  @IsIn(['new', 'returning', 'all'])
+  client_type_target?: 'new' | 'returning' | 'all';
+
+  /** Mots-clés déclencheurs (pour trigger_type='keyword') */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateAutoMessageKeywordDto)
+  keywords?: CreateAutoMessageKeywordDto[];
 
   @IsOptional()
   @IsObject()

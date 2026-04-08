@@ -69,9 +69,9 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     maxSteps: null,
   },
   'auto-message': {
-    label: 'Messages automatiques',
+    label: 'Messages automatiques — Séquence',
     description:
-      'Orchestrateur des messages automatiques envoyés après un délai configurable suite à un message entrant client.',
+      'Orchestrateur des messages automatiques de séquence envoyés après un délai configurable suite à un message entrant client.',
     enabled: false,
     scheduleType: 'event',
     intervalMinutes: null,
@@ -80,6 +80,192 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMinSeconds: 300,
     delayMaxSeconds: 540,
     maxSteps: 3,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+
+  // ─── Job maître — seule clé réellement schedulée ─────────────────────────
+
+  'auto-message-master': {
+    label: 'Job maître — Messages automatiques',
+    description:
+      'Job unique qui vérifie séquentiellement tous les triggers de messages automatiques activés. ' +
+      'Toutes les autres clés "auto-message-*" sont des entrées de configuration uniquement.',
+    enabled: false,
+    scheduleType: 'interval',
+    intervalMinutes: 5,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: 5,
+    activeHourEnd: 21,
+  },
+
+  // ─── Clés config-only (scheduleType: 'config') ───────────────────────────
+
+  'no-response-auto-message': {
+    label: 'Config trigger — Sans réponse',
+    description: "Envoie un message si le client attend depuis plus de X minutes sans réponse d'un agent.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: 1,
+    noResponseThresholdMinutes: 60,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: false,
+    applyToClosed: false,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'out-of-hours-auto-message': {
+    label: 'Config trigger — Hors horaires',
+    description: "Envoie un message quand le client contacte en dehors des horaires d'ouverture configurés.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: 1,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'reopened-auto-message': {
+    label: 'Config trigger — Réouverture de conversation',
+    description: "Envoie un message quand le client réécrit après qu'une conversation a été fermée.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: 1,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'queue-wait-auto-message': {
+    label: 'Config trigger — Attente en queue',
+    description: "Envoie un message si le client non assigné attend depuis plus de X minutes.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: 1,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: 30,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'keyword-auto-message': {
+    label: 'Config trigger — Mot-clé détecté',
+    description: "Envoie un message quand le client utilise un mot-clé ou une phrase configurée.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'client-type-auto-message': {
+    label: 'Config trigger — Type de client',
+    description: "Envoie un message différent selon que le client est nouveau ou connu.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'inactivity-auto-message': {
+    label: 'Config trigger — Inactivité totale',
+    description: "Envoie un message si aucune activité des deux côtés depuis plus de X minutes.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: 1,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: 120,
+    applyToReadOnly: false,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
+  },
+  'on-assign-auto-message': {
+    label: "Config trigger — Après assignation d'un agent",
+    description: "Envoie un message automatiquement quand un agent commercial est assigné à la conversation.",
+    enabled: false,
+    scheduleType: 'config',
+    intervalMinutes: null,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+    noResponseThresholdMinutes: null,
+    queueWaitThresholdMinutes: null,
+    inactivityThresholdMinutes: null,
+    applyToReadOnly: null,
+    applyToClosed: null,
+    activeHourStart: null,
+    activeHourEnd: null,
   },
 };
 
@@ -153,12 +339,30 @@ export class CronConfigService implements OnModuleInit {
     return config;
   }
 
+  async findByKeys(keys: string[]): Promise<Map<string, CronConfig>> {
+    const configs = await this.repo.find({ where: keys.map((k) => ({ key: k })) });
+    const map = new Map<string, CronConfig>();
+    for (const c of configs) map.set(c.key, c);
+    return map;
+  }
+
   async update(key: string, dto: UpdateCronConfigDto): Promise<CronConfig> {
     const config = await this.findByKey(key);
 
     // Validation expression cron
     if (dto.cronExpression !== undefined) {
       this.assertValidCron(dto.cronExpression);
+    }
+
+    // Validation croisée plage horaire pour auto-message-master
+    if (key === 'auto-message-master') {
+      const finalStart = dto.activeHourStart ?? config.activeHourStart ?? 5;
+      const finalEnd   = dto.activeHourEnd   ?? config.activeHourEnd   ?? 21;
+      if (finalStart >= finalEnd) {
+        throw new BadRequestException(
+          `activeHourStart (${finalStart}) doit être inférieur à activeHourEnd (${finalEnd})`,
+        );
+      }
     }
 
     // Validation croisée delay_min < delay_max pour auto-message
@@ -172,13 +376,22 @@ export class CronConfigService implements OnModuleInit {
       }
     }
 
-    if (dto.enabled !== undefined) config.enabled = dto.enabled;
-    if (dto.intervalMinutes !== undefined) config.intervalMinutes = dto.intervalMinutes;
-    if (dto.cronExpression !== undefined) config.cronExpression = dto.cronExpression;
-    if (dto.ttlDays !== undefined) config.ttlDays = dto.ttlDays;
-    if (dto.delayMinSeconds !== undefined) config.delayMinSeconds = dto.delayMinSeconds;
-    if (dto.delayMaxSeconds !== undefined) config.delayMaxSeconds = dto.delayMaxSeconds;
-    if (dto.maxSteps !== undefined) config.maxSteps = dto.maxSteps;
+    if (dto.enabled !== undefined)            config.enabled            = dto.enabled;
+    if (dto.intervalMinutes !== undefined)    config.intervalMinutes    = dto.intervalMinutes;
+    if (dto.cronExpression !== undefined)     config.cronExpression     = dto.cronExpression;
+    if (dto.ttlDays !== undefined)            config.ttlDays            = dto.ttlDays;
+    if (dto.delayMinSeconds !== undefined)    config.delayMinSeconds    = dto.delayMinSeconds;
+    if (dto.delayMaxSeconds !== undefined)    config.delayMaxSeconds    = dto.delayMaxSeconds;
+    if (dto.maxSteps !== undefined)           config.maxSteps           = dto.maxSteps;
+
+    // Nouveaux champs multi-triggers
+    if (dto.noResponseThresholdMinutes !== undefined)  config.noResponseThresholdMinutes  = dto.noResponseThresholdMinutes;
+    if (dto.queueWaitThresholdMinutes !== undefined)   config.queueWaitThresholdMinutes   = dto.queueWaitThresholdMinutes;
+    if (dto.inactivityThresholdMinutes !== undefined)  config.inactivityThresholdMinutes  = dto.inactivityThresholdMinutes;
+    if (dto.applyToReadOnly !== undefined)             config.applyToReadOnly             = dto.applyToReadOnly;
+    if (dto.applyToClosed !== undefined)               config.applyToClosed               = dto.applyToClosed;
+    if (dto.activeHourStart !== undefined)             config.activeHourStart             = dto.activeHourStart;
+    if (dto.activeHourEnd !== undefined)               config.activeHourEnd               = dto.activeHourEnd;
 
     const saved = await this.repo.save(config);
     this.scheduleOne(saved);
@@ -242,6 +455,12 @@ export class CronConfigService implements OnModuleInit {
       this.schedulerRegistry.addCronJob(config.key, job);
       job.start();
       this.logger.log(`Cron "${config.key}" scheduled as cron "${config.cronExpression}"`);
+      return;
+    }
+
+    // schedule_type = 'config' → configuration pure, jamais schedulée
+    if (config.scheduleType === 'config') {
+      this.logger.log(`Cron "${config.key}" is config-only — no scheduling needed`);
       return;
     }
 

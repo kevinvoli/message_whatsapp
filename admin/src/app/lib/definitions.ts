@@ -129,6 +129,42 @@ export type Channel = {
   poste?: Poste | null;
 };
 
+export type AutoMessageTriggerType =
+  | 'no_response'
+  | 'sequence'
+  | 'out_of_hours'
+  | 'reopened'
+  | 'queue_wait'
+  | 'keyword'
+  | 'client_type'
+  | 'inactivity'
+  | 'on_assign';
+
+export type KeywordMatchType = 'exact' | 'contains' | 'starts_with';
+
+export type AutoMessageKeyword = {
+  id: string;
+  messageAutoId: string;
+  keyword: string;
+  matchType: KeywordMatchType;
+  caseSensitive: boolean;
+  actif: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type BusinessHoursConfig = {
+  id: string;
+  dayOfWeek: number; // 0=Dim, 1=Lun, ..., 6=Sam
+  openHour: number;
+  openMinute: number;
+  closeHour: number;
+  closeMinute: number;
+  isOpen: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type MessageAuto = {
   id: string;
   body: string;
@@ -136,6 +172,12 @@ export type MessageAuto = {
   canal?: 'whatsapp' | 'sms' | 'email' | null;
   position: number;
   actif: boolean;
+  trigger_type?: AutoMessageTriggerType | null;
+  scope_type?: 'poste' | 'canal' | 'provider' | null;
+  scope_id?: string | null;
+  scope_label?: string | null;
+  client_type_target?: 'all' | 'new' | 'returning' | null;
+  keywords?: AutoMessageKeyword[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -526,7 +568,7 @@ export type FiltreMetriques = {
 // CRON CONFIG
 // ============================================
 
-export type CronScheduleType = 'interval' | 'cron' | 'event';
+export type CronScheduleType = 'interval' | 'cron' | 'event' | 'config';
 
 export type CronConfig = {
   id: string;
@@ -542,6 +584,14 @@ export type CronConfig = {
   delayMaxSeconds: number | null;
   maxSteps: number | null;
   lastRunAt: string | null;
+  // Champs avancés messages auto
+  noResponseThresholdMinutes: number | null;
+  queueWaitThresholdMinutes: number | null;
+  inactivityThresholdMinutes: number | null;
+  applyToReadOnly: boolean | null;
+  applyToClosed: boolean | null;
+  activeHourStart: number | null;
+  activeHourEnd: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -554,6 +604,13 @@ export type UpdateCronConfigPayload = {
   delayMinSeconds?: number;
   delayMaxSeconds?: number;
   maxSteps?: number;
+  noResponseThresholdMinutes?: number;
+  queueWaitThresholdMinutes?: number;
+  inactivityThresholdMinutes?: number;
+  applyToReadOnly?: boolean;
+  applyToClosed?: boolean;
+  activeHourStart?: number;
+  activeHourEnd?: number;
 };
 
 // ============================================

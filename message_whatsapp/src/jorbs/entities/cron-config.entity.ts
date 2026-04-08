@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export type CronScheduleType = 'interval' | 'cron' | 'event';
+export type CronScheduleType = 'interval' | 'cron' | 'event' | 'config';
 
 @Entity('cron_config')
 export class CronConfig {
@@ -33,7 +33,7 @@ export class CronConfig {
   @Column({
     name: 'schedule_type',
     type: 'enum',
-    enum: ['interval', 'cron', 'event'],
+    enum: ['interval', 'cron', 'event', 'config'],
   })
   scheduleType: CronScheduleType;
 
@@ -64,6 +64,38 @@ export class CronConfig {
   /** Nombre maximum d'étapes auto-message avant passage en read_only (key = 'auto-message') */
   @Column({ name: 'max_steps', type: 'int', nullable: true })
   maxSteps: number | null;
+
+  // ──────────── Champs spécifiques no-response-auto-message ────────────────
+
+  /** Seuil sans réponse en minutes avant déclenchement (key = 'no-response-auto-message') */
+  @Column({ name: 'no_response_threshold_minutes', type: 'int', nullable: true })
+  noResponseThresholdMinutes: number | null;
+
+  /** Seuil attente queue en minutes (key = 'queue-wait-auto-message') */
+  @Column({ name: 'queue_wait_threshold_minutes', type: 'int', nullable: true })
+  queueWaitThresholdMinutes: number | null;
+
+  /** Seuil inactivité totale en minutes (key = 'inactivity-auto-message') */
+  @Column({ name: 'inactivity_threshold_minutes', type: 'int', nullable: true })
+  inactivityThresholdMinutes: number | null;
+
+  /** Appliquer aux conversations read_only=true ? */
+  @Column({ name: 'apply_to_read_only', type: 'boolean', nullable: true, default: false })
+  applyToReadOnly: boolean | null;
+
+  /** Appliquer aux conversations fermées ? */
+  @Column({ name: 'apply_to_closed', type: 'boolean', nullable: true, default: false })
+  applyToClosed: boolean | null;
+
+  // ──────────── Plage horaire configurable (key = 'auto-message-master') ───
+
+  /** Heure de début d'activité du job maître (0–23) */
+  @Column({ name: 'active_hour_start', type: 'int', nullable: true, default: 5 })
+  activeHourStart: number | null;
+
+  /** Heure de fin d'activité du job maître (0–23) */
+  @Column({ name: 'active_hour_end', type: 'int', nullable: true, default: 21 })
+  activeHourEnd: number | null;
 
   // ─────────────────────────────── Monitoring ──────────────────────────────
 

@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -200,7 +200,7 @@ export async function getMessageAuto(): Promise<MessageAuto[]> {
     return handleResponse<MessageAuto[]>(response);
 }
 
-export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'createdAt' | 'updatedAt' | 'conditions' >): Promise<MessageAuto> {
+export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'createdAt' | 'updatedAt' | 'keywords'>): Promise<MessageAuto> {
     const response = await fetch(`${API_BASE_URL}/message-auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -267,6 +267,56 @@ export async function deleteScopeConfig(id: string): Promise<void> {
         credentials: 'include',
     });
     return handleResponse<void>(response);
+}
+
+export async function getMessageAutoByTrigger(trigger: AutoMessageTriggerType): Promise<MessageAuto[]> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/by-trigger/${trigger}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<MessageAuto[]>(response);
+}
+
+export async function addKeyword(
+    messageAutoId: string,
+    payload: { keyword: string; matchType: KeywordMatchType; caseSensitive?: boolean; actif?: boolean },
+): Promise<AutoMessageKeyword> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/${messageAutoId}/keywords`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<AutoMessageKeyword>(response);
+}
+
+export async function removeKeyword(messageAutoId: string, keywordId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/${messageAutoId}/keywords/${keywordId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    return handleResponse<void>(response);
+}
+
+export async function getBusinessHours(): Promise<BusinessHoursConfig[]> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/business-hours`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<BusinessHoursConfig[]>(response);
+}
+
+export async function updateBusinessHoursDay(
+    dayOfWeek: number,
+    payload: { openHour?: number; openMinute?: number; closeHour?: number; closeMinute?: number; isOpen?: boolean },
+): Promise<BusinessHoursConfig> {
+    const response = await fetch(`${API_BASE_URL}/message-auto/business-hours/${dayOfWeek}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<BusinessHoursConfig>(response);
 }
 
 export async function getClients(limit = 50, offset = 0): Promise<{ data: Client[]; total: number }> {
