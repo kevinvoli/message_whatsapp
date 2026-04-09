@@ -773,7 +773,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
               </button>
             </div>
             <p className="mb-4 text-xs text-gray-500">
-              Canal : <span className="font-medium text-gray-700">{assignModal.channel.label || assignModal.channel.channel_id}</span>
+              Canal : <span className="font-medium text-gray-700">{assignModal.channel.label || 'Canal sans nom'}</span>
             </p>
             <div className="mb-5">
               <label className="mb-1.5 block text-sm font-bold text-gray-700">Poste</label>

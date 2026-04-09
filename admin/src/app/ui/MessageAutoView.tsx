@@ -576,13 +576,13 @@ function TemplateFormFields({
               onChange={(e) => {
                 const c = channels.find((x) => x.id === e.target.value);
                 onScopeIdChange(e.target.value);
-                onScopeLabelChange(c?.label ?? c?.channel_id ?? '');
+                onScopeLabelChange(c?.label || 'Canal sans nom');
               }}
             >
               <option value="">-- Sélectionner un canal --</option>
               {channels.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.label ? `${c.label} (${c.channel_id})` : c.channel_id}
+                  {c.label || 'Canal sans nom'}
                 </option>
               ))}
             </select>

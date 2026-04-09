@@ -270,9 +270,9 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
                       <span
                         key={ch.id}
                         className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800"
-                        title={ch.channel_id}
+                        title={ch.label || 'Canal sans nom'}
                       >
-                        {ch.label || ch.channel_id.substring(0, 10)}
+                        {ch.label || 'Canal sans nom'}
                       </span>
                     ))}
                   </div>

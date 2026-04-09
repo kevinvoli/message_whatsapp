@@ -451,7 +451,6 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs font-medium text-gray-800 truncate">{displayName}</span>
-                        <span className="text-[10px] text-gray-400">{tenant.substring(0, 18)}</span>
                       </div>
                       <div className="flex flex-col items-end gap-0.5 ml-2 shrink-0">
                         <span className="text-xs font-semibold text-gray-900">{count} msgs</span>
@@ -591,7 +590,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
               <div key={idx} className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-900">
-                    {channel.label ?? channel.channel_id.substring(0, 15) + '...'}
+                    {channel.label || 'Canal sans nom'}
                   </span>
                   <div className={`w-2 h-2 rounded-full ${
                     channel.uptime > 80000 ? 'bg-green-500' : 'bg-yellow-500'

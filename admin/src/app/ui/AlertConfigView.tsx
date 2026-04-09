@@ -59,7 +59,7 @@ function SendResultRow({ r }: { r: AlertSendResult }) {
                 {isRealSuccess && (
                     <>
                         <p className="text-xs text-green-700">
-                            Canal : <span className="font-mono">{r.channelName ?? r.channelId}</span>
+                            Canal : <span className="font-medium">{r.channelName || 'Canal sans nom'}</span>
                         </p>
                         {r.messageStatus && (
                             <p className={`text-xs font-medium ${STATUS_COLOR[r.messageStatus] ?? 'text-gray-600'}`}>
@@ -379,7 +379,7 @@ export default function AlertConfigView({ onStatusRefresh }: Props) {
                     <option value="">Automatique — essaie tous les canaux dans l&apos;ordre</option>
                     {whapiChannels.map((c) => (
                         <option key={c.channel_id} value={c.channel_id}>
-                            {c.label ? `${c.label} (${c.channel_id})` : c.channel_id}
+                            {c.label || 'Canal sans nom'}
                         </option>
                     ))}
                 </select>
