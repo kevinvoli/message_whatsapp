@@ -32,20 +32,18 @@ export class CreateSystemAlertConfig1744070400000 implements MigrationInterface 
           {
             name: 'recipients',
             type: 'json',
-            default: "'[]'",
+            isNullable: false,
           },
           {
             name: 'message_template',
             type: 'text',
             isNullable: true,
-            default: null,
           },
           {
             name: 'default_channel_id',
             type: 'varchar',
             length: '191',
             isNullable: true,
-            default: null,
           },
         ],
       }),

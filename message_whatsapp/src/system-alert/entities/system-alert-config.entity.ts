@@ -29,7 +29,7 @@ export class SystemAlertConfig {
    * Chaque entrée : { phone: "225XXXXXXXXX", name: "Mr X" }
    * Format phone : international sans + ni 00 (ex: 225556789012 pour la CI)
    */
-  @Column({ type: 'json', default: '[]' })
+  @Column({ type: 'json' })
   recipients: AlertRecipient[];
 
   /**
@@ -40,7 +40,6 @@ export class SystemAlertConfig {
     name: 'message_template',
     type: 'text',
     nullable: true,
-    default: null,
   })
   messageTemplate: string | null;
 
@@ -54,7 +53,6 @@ export class SystemAlertConfig {
     type: 'varchar',
     length: 191,
     nullable: true,
-    default: null,
   })
   defaultChannelId: string | null;
 }
