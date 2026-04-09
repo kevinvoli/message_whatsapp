@@ -566,7 +566,7 @@ export class CronConfigService implements OnModuleInit {
 
     return {
       no_reply_reinject_interval_minutes:
-        byKey['sla-checker']?.intervalMinutes ?? 5,
+        byKey['sla-checker']?.intervalMinutes ?? 40,
       read_only_check_interval_minutes:
         byKey['read-only-enforcement']?.intervalMinutes ?? 10,
       offline_reinject_cron:
