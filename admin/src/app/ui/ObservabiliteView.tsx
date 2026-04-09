@@ -164,7 +164,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
             </thead>
             <tbody>
               {tenantMetrics.map((row) => (
-                <tr key={row.tenant} className="border-t">
+                <tr key={row.tenant} className="border-t text-gray-700">
                   <td className="py-2 font-medium text-gray-900">{resolveLabel(row.tenant)}</td>
                   <td className="py-2">{row.received}</td>
                   <td className="py-2">{row.errors}</td>

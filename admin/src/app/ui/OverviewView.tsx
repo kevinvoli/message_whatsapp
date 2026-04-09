@@ -10,6 +10,8 @@ import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, Statut
 import { getOverviewSection, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { formatDate } from '@/app/lib/dateUtils';
+import * as request from 'supertest';
+import { Request } from 'express';
 
 const PERIODE_LABELS: Record<string, string> = {
   today: "Aujourd'hui",
@@ -453,8 +455,8 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
                         <span className="text-xs font-medium text-gray-800 truncate">{displayName}</span>
                       </div>
                       <div className="flex flex-col items-end gap-0.5 ml-2 shrink-0">
-                        <span className="text-xs font-semibold text-gray-900">{count} msgs</span>
-                        <span className="text-[10px] text-blue-600 font-medium">{nbChats} chats</span>
+                        <span className="text-xs font-semibold text-gray-900">{count} request</span>
+                        <span className="text-[10px] text-blue-600 font-medium">{nbChats} Request</span>
                       </div>
                     </div>
                   );
