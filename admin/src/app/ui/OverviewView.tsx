@@ -10,8 +10,6 @@ import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, Statut
 import { getOverviewSection, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { formatDate } from '@/app/lib/dateUtils';
-import * as request from 'supertest';
-import { Request } from 'express';
 
 const PERIODE_LABELS: Record<string, string> = {
   today: "Aujourd'hui",
