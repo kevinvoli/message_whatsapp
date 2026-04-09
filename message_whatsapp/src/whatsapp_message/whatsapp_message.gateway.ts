@@ -178,7 +178,7 @@ export class WhatsappMessageGateway
 
   private async resolveTenantIdsForPoste(posteId: string): Promise<string[]> {
     // On inclut toutes les conversations (même fermées) pour la résolution des tenants
-    const chats = await this.chatService.findByPosteId(posteId, []);
+    const { chats } = await this.chatService.findByPosteId(posteId, []);
     const tenantIds = [
       ...new Set(
         chats.map((chat) => chat.tenant_id).filter(Boolean) as string[],
@@ -263,8 +263,8 @@ export class WhatsappMessageGateway
     );
 
     if (!isPosteStillActive) {
-      const activeChats = await this.chatService.findByPosteId(agent.posteId);
-      const activeCount = activeChats?.filter(
+      const { chats: activeChats } = await this.chatService.findByPosteId(agent.posteId);
+      const activeCount = activeChats.filter(
         (c) => c.status === WhatsappChatStatus.ACTIF || c.status === WhatsappChatStatus.EN_ATTENTE,
       ).length ?? 0;
       void this.notificationService.create(
@@ -311,22 +311,24 @@ export class WhatsappMessageGateway
     client: Socket,
     agent: { posteId: string; tenantIds: string[] },
     searchTerm?: string,
+    cursor?: { activityAt: string; chatId: string },
   ) {
+    const isFirstPage = !cursor;
 
     // Inclure TOUS les statuts (actif, attente, fermé, converti…).
-    // Les conversations non lues remontent toujours en tête de liste (orderBy unread_count DESC)
-    // et s'affichent dans le filtre "non lus" quelle que soit leur statut.
-    // Les conversations fermées / converties sont affichées en lecture seule côté frontend.
-    let chats = await this.chatService.findByPosteId(agent.posteId, []);
-    if (!chats) return;
+    // Limite : 300 conversations par page (keyset pagination).
+    let { chats, hasMore } = await this.chatService.findByPosteId(
+      agent.posteId,
+      [],
+      300,
+      cursor,
+    );
+
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
-      // Inclure les conversations sans tenant_id (créées avant le système multi-tenant)
-      // ET celles dont le tenant est dans la liste autorisée
       chats = chats.filter((c) => !c.tenant_id || tenantSet.has(c.tenant_id));
     }
 
-    // Filtrage textuel côté back
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       chats = chats.filter(
@@ -334,6 +336,8 @@ export class WhatsappMessageGateway
           c.name.toLowerCase().includes(lowerSearch) ||
           c.chat_id.includes(lowerSearch),
       );
+      // En mode recherche la notion de "page suivante" n'a pas de sens
+      hasMore = false;
     }
 
     const chatIds = chats.map((c) => c.chat_id);
@@ -343,53 +347,37 @@ export class WhatsappMessageGateway
       this.contactService.findByChatIds(chatIds),
     ]);
 
-    // Chargement des messages en bulk — limité aux 500 conversations les plus récentes
-    // et plafonné à 50 messages par conversation pour éviter les OOM sur les gros postes.
-    const chatIdsForMessages = chatIds.slice(0, 500);
-    let recentMsgsMap = new Map<string, Record<string, any>[]>();
-    try {
-      recentMsgsMap = await this.messageService.findRecentByChatIds(chatIdsForMessages, 50);
-    } catch (err) {
-      this.logger.error('findRecentByChatIds failed, messages will be empty', err instanceof Error ? err.message : err);
-    }
-
-    const conversations = chats.map((chat) => ({
-      ...this.mapConversationWithContact(
+    const conversations = chats.map((chat) =>
+      this.mapConversationWithContact(
         chat,
         lastMsgMap.get(chat.chat_id) ?? null,
         unreadMap.get(chat.chat_id) ?? chat.unread_count ?? 0,
         contactMap.get(chat.chat_id),
       ),
-      messages: (recentMsgsMap.get(chat.chat_id) ?? []).map((row) => ({
-        id: row.id,
-        chat_id: row.chat_id,
-        text: row.text ?? '',
-        timestamp: row.timestamp ?? row.createdAt,
-        from_me: Boolean(row.from_me),
-        from: row.from ?? '',
-        from_name: row.from_name ?? '',
-        status: row.status,
-        direction: row.direction,
-        type: row.type,
-        poste_id: row.poste_id,
-        commercial_id: row.commercial_id ?? null,
-        message_id: row.message_id,
-        medias: [],
-      })),
-    }));
+    );
+
+    // Cursor pour la page suivante
+    const last = chats.at(-1);
+    const nextCursor = hasMore && last
+      ? {
+          activityAt: (last.last_activity_at ?? last.createdAt).toISOString(),
+          chatId: last.chat_id,
+        }
+      : null;
 
     client.emit('chat:event', {
       type: 'CONVERSATION_LIST',
-      payload: conversations,
+      payload: { conversations, hasMore, nextCursor },
     });
 
-    // Envoie le total de messages non lus global (toutes conv. du poste, y compris fermées)
-    // Indépendant de la liste paginée pour garantir l'exactitude du compteur
-    const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
-    client.emit('chat:event', {
-      type: 'TOTAL_UNREAD_UPDATE',
-      payload: { totalUnread },
-    });
+    // TOTAL_UNREAD_UPDATE seulement sur la première page (évite les doublons)
+    if (isFirstPage) {
+      const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
+      client.emit('chat:event', {
+        type: 'TOTAL_UNREAD_UPDATE',
+        payload: { totalUnread },
+      });
+    }
   }
 
   private async sendContactsToClient(client: Socket) {
@@ -466,12 +454,29 @@ export class WhatsappMessageGateway
   @SubscribeMessage('conversations:get')
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload?: { search?: string },
+    @MessageBody() payload?: {
+      search?: string;
+      cursor?: { activityAt: string; chatId: string };
+    },
   ) {
     if (!this.throttle.allow(client.id, 'conversations:get')) {
       return this.emitRateLimited(client, 'conversations:get');
     }
-    await this.sendConversationsToClient(client, payload?.search);
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+    try {
+      await this.sendConversationsToClientInternal(
+        client,
+        agent,
+        payload?.search,
+        payload?.cursor,
+      );
+    } catch (err) {
+      this.logger.error(
+        `handleGetConversations failed for poste ${agent.posteId}`,
+        err instanceof Error ? err.stack : err,
+      );
+    }
   }
 
   /** Charge le détail complet d'un contact (avec messages) à la demande. */

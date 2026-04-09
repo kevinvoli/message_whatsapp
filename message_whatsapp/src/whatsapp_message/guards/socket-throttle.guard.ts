@@ -19,7 +19,7 @@ export class SocketThrottleGuard {
   private readonly limits: Record<string, ThrottleConfig> = {
     'message:send': { maxRequests: 10, windowMs: 10_000 },
     'messages:get': { maxRequests: 30, windowMs: 10_000 },
-    'conversations:get': { maxRequests: 10, windowMs: 10_000 },
+    'conversations:get': { maxRequests: 20, windowMs: 10_000 },
     'chat:event': { maxRequests: 20, windowMs: 10_000 },
     'messages:read': { maxRequests: 20, windowMs: 10_000 },
     'contacts:get': { maxRequests: 10, windowMs: 10_000 },

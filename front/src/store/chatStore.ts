@@ -16,6 +16,11 @@ function generateUUID(): string {
   });
 }
 
+interface ConversationCursor {
+  activityAt: string;
+  chatId: string;
+}
+
 interface ChatState {
   typingStatus: Record<string, boolean>;
   socket: Socket | null;
@@ -30,9 +35,15 @@ interface ChatState {
   replyToMessage: Message | null;
   totalUnread: number;
 
+  // Pagination conversations (serveur)
+  hasMoreConversations: boolean;
+  isLoadingMoreConversations: boolean;
+  conversationCursor: ConversationCursor | null;
+
   // Actions
   setSocket: (socket: Socket | null) => void;
   loadConversations: () => void;
+  loadMoreConversations: () => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
   setReplyTo: (message: Message) => void;
@@ -43,7 +54,8 @@ interface ChatState {
   loadMoreMessages: () => void;
 
   // Setters for WebSocket events
-  setConversations: (conversations: Conversation[]) => void;
+  setConversations: (conversations: Conversation[], hasMore?: boolean, cursor?: ConversationCursor | null) => void;
+  appendConversations: (conversations: Conversation[], hasMore: boolean, cursor: ConversationCursor | null) => void;
   setMessages: (chat_id: string, messages: Message[]) => void;
   prependMessages: (chat_id: string, older: Message[]) => void;
   addMessage: (message: Message) => void;
@@ -68,11 +80,13 @@ const initialState: Omit<
   ChatState,
   | "setSocket"
   | "loadConversations"
+  | "loadMoreConversations"
   | "selectConversation"
   | "sendMessage"
   | "setReplyTo"
   | "clearReplyTo"
   | "setConversations"
+  | "appendConversations"
   | "setMessages"
   | "prependMessages"
   | "addMessage"
@@ -102,6 +116,9 @@ const initialState: Omit<
   messageIdCache: {},
   replyToMessage: null,
   totalUnread: 0,
+  hasMoreConversations: false,
+  isLoadingMoreConversations: false,
+  conversationCursor: null,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -125,17 +142,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { socket } = get();
     if (!socket) return;
 
-    set({ isLoading: true });
-    socket?.emit("conversations:get");
+    set({ isLoading: true, conversationCursor: null, hasMoreConversations: false });
+    socket.emit("conversations:get");
   },
 
-  
-  selectConversation: (chat_id: string) => {
-    const preloaded = (() => {
-      const conv = get().conversations.find((c) => c.chat_id === chat_id);
-      return conv?.messages && conv.messages.length > 0 ? conv.messages : null;
-    })();
+  loadMoreConversations: () => {
+    const { socket, hasMoreConversations, isLoadingMoreConversations, conversationCursor } = get();
+    if (!socket || !hasMoreConversations || isLoadingMoreConversations || !conversationCursor) return;
 
+    set({ isLoadingMoreConversations: true });
+    socket.emit("conversations:get", { cursor: conversationCursor });
+  },
+
+  selectConversation: (chat_id: string) => {
     set((state) => {
       const conversation = state.conversations.find(
         (c) => c.chat_id === chat_id,
@@ -148,25 +167,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         conversations: state.conversations.map((c) =>
           c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
         ),
-        messages: preloaded ?? [],
-        isLoading: preloaded === null,
+        messages: [],
+        isLoading: true,
         isLoadingMore: false,
         hasMoreMessages: true,
         messageIdCache: {
           ...state.messageIdCache,
-          [chat_id]: preloaded
-            ? new Set(preloaded.map((m) => m.id))
-            : new Set<string>(),
+          [chat_id]: new Set<string>(),
         },
         replyToMessage: null,
       };
     });
 
     const socket = get().socket;
-    // Si les messages sont déjà pré-chargés, pas besoin de les redemander
-    if (!preloaded) {
-      socket?.emit("messages:get", { chat_id });
-    }
+    // Toujours charger les messages depuis le serveur (pas de pré-chargement au connect)
+    socket?.emit("messages:get", { chat_id });
     socket?.emit("messages:read", { chat_id });
   },
 
@@ -284,7 +299,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  setConversations: (conversations) => {
+  setConversations: (conversations, hasMore = false, cursor = null) => {
     set((state) => {
       const selectedChatId = state.selectedConversation?.chat_id;
       const normalized = selectedChatId
@@ -293,15 +308,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
           )
         : conversations;
 
-      // Pré-charger le cache de messages depuis les conversations reçues au connect
-      const newMessageIdCache: Record<string, Set<string>> = { ...state.messageIdCache };
-      for (const conv of normalized) {
-        if (conv.messages && conv.messages.length > 0) {
-          newMessageIdCache[conv.chat_id] = new Set(conv.messages.map((m) => m.id));
-        }
-      }
+      return {
+        conversations: normalized,
+        isLoading: false,
+        hasMoreConversations: hasMore,
+        conversationCursor: cursor ?? null,
+      };
+    });
+  },
 
-      return { conversations: normalized, isLoading: false, messageIdCache: newMessageIdCache };
+  appendConversations: (conversations, hasMore, cursor) => {
+    set((state) => {
+      const selectedChatId = state.selectedConversation?.chat_id;
+      const normalized = selectedChatId
+        ? conversations.map((c) =>
+            c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c,
+          )
+        : conversations;
+
+      // Dédupliquer par chat_id
+      const existingIds = new Set(state.conversations.map((c) => c.chat_id));
+      const newOnes = normalized.filter((c) => !existingIds.has(c.chat_id));
+
+      return {
+        conversations: [...state.conversations, ...newOnes],
+        isLoadingMoreConversations: false,
+        hasMoreConversations: hasMore,
+        conversationCursor: cursor,
+      };
     });
   },
 

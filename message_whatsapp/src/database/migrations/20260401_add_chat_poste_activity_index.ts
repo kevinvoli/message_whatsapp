@@ -1,27 +1,41 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Migration: index hot-path pour la liste des conversations d'un poste
+ * Migration: index hot-path pour la liste des conversations d'un poste.
+ * Keyset pagination — critique pour la performance à l'échelle.
  *
- * ⚠️  ALTER TABLE sur une grande table dépasse le timeout CI/CD.
- *     Cette migration est un no-op volontaire : elle se marque comme
- *     exécutée sans bloquer le déploiement.
- *
- *     Créer l'index MANUELLEMENT sur le serveur (hors déploiement) :
- *
- *       ALTER TABLE `whatsapp_chat`
- *         ADD INDEX `IDX_chat_poste_activity` (`poste_id`, `last_activity_at`);
- *
- *     (opération online InnoDB — pas de lock sur les lectures/écritures)
+ * Opération online InnoDB (ALGORITHM=INPLACE) — pas de lock sur lecture/écriture.
+ * Idempotente : vérifie l'existence avant de créer.
  */
 export class AddChatPosteActivityIndex1743465600001 implements MigrationInterface {
   name = 'AddChatPosteActivityIndex1743465600001';
 
-  public async up(_queryRunner: QueryRunner): Promise<void> {
-    // no-op intentionnel — voir commentaire ci-dessus
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    const [rows] = await queryRunner.query(
+      `SELECT COUNT(*) as cnt FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'whatsapp_chat'
+         AND index_name = 'IDX_chat_poste_activity'`,
+    );
+    if (Number(rows.cnt) > 0) return;
+
+    await queryRunner.query(
+      `ALTER TABLE \`whatsapp_chat\`
+       ADD INDEX \`IDX_chat_poste_activity\` (\`poste_id\`, \`last_activity_at\` DESC, \`chat_id\` DESC)`,
+    );
   }
 
-  public async down(_queryRunner: QueryRunner): Promise<void> {
-    // no-op intentionnel
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    const [rows] = await queryRunner.query(
+      `SELECT COUNT(*) as cnt FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'whatsapp_chat'
+         AND index_name = 'IDX_chat_poste_activity'`,
+    );
+    if (Number(rows.cnt) === 0) return;
+
+    await queryRunner.query(
+      `ALTER TABLE \`whatsapp_chat\` DROP INDEX \`IDX_chat_poste_activity\``,
+    );
   }
 }

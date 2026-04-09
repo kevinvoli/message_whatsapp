@@ -46,25 +46,44 @@ export class WhatsappChatService {
     private readonly posteService: WhatsappPosteService,
   ) {}
 
-  // Dans WhatsappChatService
+  /**
+   * Retourne les conversations d'un poste paginées par keyset.
+   * Exploite l'index IDX_chat_poste_activity (poste_id, last_activity_at DESC, chat_id DESC).
+   *
+   * @param limit   Nombre de conversations à retourner (défaut 300).
+   * @param cursor  Keyset cursor pour la page suivante.
+   *                { activityAt: ISO string, chatId: string }
+   */
   async findByPosteId(
     poste_id: string,
     excludeStatuses: string[] = ['fermé', 'converti'],
-  ): Promise<WhatsappChat[]> {
+    limit = 300,
+    cursor?: { activityAt: string; chatId: string },
+  ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
     const qb = this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
       .where('chat.poste_id = :poste_id', { poste_id })
-      // Conversations non lues en premier, puis tri par activité récente
-      .orderBy('chat.unread_count', 'DESC')
-      .addOrderBy('chat.last_activity_at', 'DESC');
+      .andWhere('chat.deletedAt IS NULL')
+      .orderBy('chat.last_activity_at', 'DESC')
+      .addOrderBy('chat.chat_id', 'DESC')
+      .limit(limit + 1); // +1 pour détecter hasMore
 
     if (excludeStatuses.length > 0) {
       qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });
     }
 
-    return qb.getMany();
+    if (cursor) {
+      qb.andWhere(
+        '(chat.last_activity_at < :activityAt OR (chat.last_activity_at = :activityAt AND chat.chat_id < :chatId))',
+        { activityAt: new Date(cursor.activityAt), chatId: cursor.chatId },
+      );
+    }
+
+    const rows = await qb.getMany();
+    const hasMore = rows.length > limit;
+    return { chats: hasMore ? rows.slice(0, limit) : rows, hasMore };
   }
 
   async getTotalUnreadForPoste(poste_id: string): Promise<number> {

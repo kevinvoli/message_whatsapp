@@ -138,8 +138,25 @@ const WebSocketEvents = () => {
         }
 
         case 'CONVERSATION_LIST': {
-          const conversations: Conversation[] = data.payload.map(transformToConversation);
-          chatState.setConversations(conversations);
+          // Nouveau format : { conversations, hasMore, nextCursor }
+          // Ancien format (compat) : tableau direct
+          const raw = data.payload;
+          const isNewFormat = raw && typeof raw === 'object' && !Array.isArray(raw) && 'conversations' in raw;
+
+          const convArray: Conversation[] = isNewFormat
+            ? raw.conversations.map(transformToConversation)
+            : (raw as Parameters<typeof transformToConversation>[0][]).map(transformToConversation);
+
+          const hasMore: boolean = isNewFormat ? raw.hasMore : false;
+          const nextCursor = isNewFormat ? raw.nextCursor : null;
+
+          if (nextCursor) {
+            // Page suivante — append
+            chatState.appendConversations(convArray, hasMore, nextCursor);
+          } else {
+            // Première page — replace
+            chatState.setConversations(convArray, hasMore, nextCursor);
+          }
           break;
         }
 
