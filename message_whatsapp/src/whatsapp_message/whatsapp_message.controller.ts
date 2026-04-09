@@ -320,7 +320,7 @@ export class WhatsappMessageController {
   @Get(':chat_id')
   @UseGuards(AdminGuard)
   async findByChatId(@Param('chat_id') chat_id: string) {
-    const messages = await this.messageService.findBychat_id(chat_id);
+    const { messages } = await this.messageService.findBychat_id(chat_id);
     return messages.map((msg) => ({
       ...msg,
       medias: msg.medias?.map((m) => ({

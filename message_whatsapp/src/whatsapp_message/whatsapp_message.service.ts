@@ -497,7 +497,7 @@ export class WhatsappMessageService {
     chat_id: string,
     limit = 50,
     before?: Date,
-  ): Promise<WhatsappMessage[]> {
+  ): Promise<{ messages: WhatsappMessage[]; hasMore: boolean }> {
     try {
       const qb = this.messageRepository
         .createQueryBuilder('m')
@@ -508,14 +508,16 @@ export class WhatsappMessageService {
         .where('m.chat_id = :chat_id', { chat_id })
         .orderBy('m.timestamp', 'DESC')
         .addOrderBy('m.createdAt', 'DESC')
-        .take(limit);
+        .take(limit + 1);
 
       if (before) {
         qb.andWhere('m.timestamp < :before', { before });
       }
 
       const rows = await qb.getMany();
-      return rows.reverse();
+      const hasMore = rows.length > limit;
+      if (hasMore) rows.pop();
+      return { messages: rows.reverse(), hasMore };
     } catch (error) {
       throw new NotFoundException(error.message ?? error);
     }

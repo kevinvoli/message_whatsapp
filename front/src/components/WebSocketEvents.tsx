@@ -117,13 +117,13 @@ const WebSocketEvents = () => {
 
         case 'MESSAGE_LIST': {
           const messages: Message[] = data.payload.messages.map(transformToMessage);
-          chatState.setMessages(data.payload.chat_id, messages);
+          chatState.setMessages(data.payload.chat_id, messages, !!data.payload.hasMore);
           break;
         }
 
         case 'MESSAGE_LIST_PREPEND': {
           const older: Message[] = data.payload.messages.map(transformToMessage);
-          chatState.prependMessages(data.payload.chat_id, older);
+          chatState.prependMessages(data.payload.chat_id, older, !!data.payload.hasMore);
           break;
         }
 

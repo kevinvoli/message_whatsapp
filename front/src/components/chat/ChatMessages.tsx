@@ -39,7 +39,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
     if (!sentinel) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0].isIntersecting && !isLoadingMore && hasMoreMessages) {
           handleLoadMore();
         }
       },
@@ -47,7 +47,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [handleLoadMore]);
+  }, [isLoadingMore, hasMoreMessages, handleLoadMore]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

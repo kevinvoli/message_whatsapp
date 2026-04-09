@@ -618,7 +618,7 @@ export class WhatsappMessageGateway
     }
 
     const before = payload.before ? new Date(payload.before) : undefined;
-    const messages = await this.messageService.findBychat_id(
+    const { messages, hasMore } = await this.messageService.findBychat_id(
       payload.chat_id,
       payload.limit ?? 50,
       before,
@@ -640,6 +640,7 @@ export class WhatsappMessageGateway
       payload: {
         chat_id: payload.chat_id,
         messages: filteredMessages.map(this.mapMessage),
+        hasMore,
       },
     });
   }

@@ -56,8 +56,8 @@ interface ChatState {
   // Setters for WebSocket events
   setConversations: (conversations: Conversation[], hasMore?: boolean, cursor?: ConversationCursor | null) => void;
   appendConversations: (conversations: Conversation[], hasMore: boolean, cursor: ConversationCursor | null) => void;
-  setMessages: (chat_id: string, messages: Message[]) => void;
-  prependMessages: (chat_id: string, older: Message[]) => void;
+  setMessages: (chat_id: string, messages: Message[], hasMore?: boolean) => void;
+  prependMessages: (chat_id: string, older: Message[], hasMore?: boolean) => void;
   addMessage: (message: Message) => void;
   updateConversation: (conversation: Conversation) => void;
   addConversation: (conversation: Conversation) => void;
@@ -339,14 +339,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  setMessages: (chat_id, messages) => {
+  setMessages: (chat_id, messages, hasMore = false) => {
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
       const deduped = dedupeMessagesById(messages);
       return {
         messages: deduped,
         isLoading: false,
-        hasMoreMessages: messages.length >= 50,
+        hasMoreMessages: hasMore,
         messageIdCache: {
           ...state.messageIdCache,
           [chat_id]: new Set(deduped.map((m) => m.id)),
@@ -355,14 +355,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  prependMessages: (chat_id, older) => {
+  prependMessages: (chat_id, older, hasMore = false) => {
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
       const merged = dedupeMessagesById([...older, ...state.messages]);
       return {
         messages: merged,
         isLoadingMore: false,
-        hasMoreMessages: older.length >= 50,
+        hasMoreMessages: hasMore,
         messageIdCache: {
           ...state.messageIdCache,
           [chat_id]: new Set(merged.map((m) => m.id)),
