@@ -20,6 +20,7 @@ const WebSocketEvents = () => {
   const { user } = useAuth();
 
   const setSocket = useChatStore((s) => s.setSocket);
+  const setContactSocket = useContactStore((s) => s.setSocket);
   const loadConversations = useChatStore((s) => s.loadConversations);
   const setTotalUnread = useChatStore((s) => s.setTotalUnread);
 
@@ -29,6 +30,7 @@ const WebSocketEvents = () => {
     }
 
     setSocket(socket);
+    setContactSocket(socket);
 
     const refreshAfterConnect = () => {
       loadConversations();
@@ -298,8 +300,9 @@ const WebSocketEvents = () => {
       socket.off('connect', refreshAfterConnect);
       socket.off('queue:updated', handleQueueUpdated);
       setSocket(null);
+      setContactSocket(null);
     };
-  }, [socket, user, setSocket, loadConversations]);
+  }, [socket, user, setSocket, setContactSocket, loadConversations]);
 
   return null;
 };
