@@ -232,22 +232,6 @@ export class StatutChannelDto {
   @IsNumber()
   uptime: number;
 
-  @ApiProperty({ description: 'Version du channel' })
-  @IsString()
-  version: string;
-
-  @ApiProperty({ description: "Version de l'API" })
-  @IsString()
-  api_version: string;
-
-  @ApiProperty({ description: 'Version du core' })
-  @IsString()
-  core_version: string;
-
-  @ApiProperty({ description: 'IP du serveur' })
-  @IsString()
-  ip: string;
-
   @ApiProperty({ description: 'Nombre de chats actifs' })
   @IsNumber()
   nb_chats_actifs: number;

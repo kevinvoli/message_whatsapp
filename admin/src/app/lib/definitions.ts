@@ -458,10 +458,6 @@ export type StatutChannel = {
   label?: string | null;
   is_business: boolean;
   uptime: number;
-  version: string;
-  api_version: string;
-  core_version: string;
-  ip: string;
   nb_chats_actifs: number;
   nb_messages: number;
 };

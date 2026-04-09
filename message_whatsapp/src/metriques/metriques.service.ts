@@ -535,54 +535,44 @@ export class MetriquesService {
   ): Promise<StatutChannelDto[]> {
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
+    // Sous-requêtes scalaires : évite la multiplication de lignes que produirait
+    // un double LEFT JOIN (chats × messages) avant le GROUP BY.
     const channels = await this.channelRepository
       .createQueryBuilder('channel')
-      .leftJoin(
-        'channel.chats',
-        'chat',
-        'chat.deletedAt IS NULL AND chat.last_activity_at >= :dateStart AND chat.last_activity_at <= :dateEnd',
-        { dateStart, dateEnd },
+      .select('channel.id',          'id')
+      .addSelect('channel.channel_id', 'channel_id')
+      .addSelect('channel.label',      'label')
+      .addSelect('channel.is_business','is_business')
+      .addSelect('channel.uptime',     'uptime')
+      .addSelect(
+        `(SELECT COUNT(*) FROM whatsapp_chat c
+           WHERE c.channel_id = channel.channel_id
+             AND c.deletedAt IS NULL
+             AND c.last_activity_at >= :dateStart
+             AND c.last_activity_at <= :dateEnd)`,
+        'nb_chats_actifs',
       )
-      .leftJoin(
-        'channel.messages',
-        'message',
-        'message.deletedAt IS NULL AND message.createdAt >= :dateStart AND message.createdAt <= :dateEnd',
-        { dateStart, dateEnd },
+      .addSelect(
+        `(SELECT COUNT(*) FROM whatsapp_message m
+           WHERE m.channel_id = channel.channel_id
+             AND m.deletedAt IS NULL
+             AND m.createdAt >= :dateStart
+             AND m.createdAt <= :dateEnd)`,
+        'nb_messages',
       )
-      .select([
-        'channel.id           as id',
-        'channel.channel_id   as channel_id',
-        'channel.label        as label',
-        'channel.is_business  as is_business',
-        'channel.uptime       as uptime',
-        'channel.version      as version',
-        'channel.api_version  as api_version',
-        'channel.core_version as core_version',
-        'channel.ip           as ip',
-        'COUNT(DISTINCT chat.id)    as nb_chats_actifs',
-        'COUNT(DISTINCT message.id) as nb_messages',
-      ])
-      .groupBy(
-        'channel.id, channel.channel_id, channel.label, channel.is_business, channel.uptime, channel.version, channel.api_version, channel.core_version, channel.ip',
-      )
+      .setParameters({ dateStart, dateEnd })
       .orderBy('nb_messages', 'DESC')
       .getRawMany();
 
-    const result = channels.map((ch) => ({
-      id:             ch.id,
-      channel_id:     ch.channel_id,
-      label:          ch.label ?? null,
-      is_business:    Boolean(ch.is_business),
-      uptime:         parseInt(ch.uptime)         || 0,
-      version:        ch.version,
-      api_version:    ch.api_version,
-      core_version:   ch.core_version,
-      ip:             ch.ip,
+    return channels.map((ch) => ({
+      id:              ch.id,
+      channel_id:      ch.channel_id,
+      label:           ch.label ?? null,
+      is_business:     Boolean(ch.is_business),
+      uptime:          parseInt(ch.uptime)          || 0,
       nb_chats_actifs: parseInt(ch.nb_chats_actifs) || 0,
-      nb_messages:    parseInt(ch.nb_messages)    || 0,
+      nb_messages:     parseInt(ch.nb_messages)     || 0,
     }));
-
-    return result;
   }
 
   // ---------------------------------------------------------------------------
