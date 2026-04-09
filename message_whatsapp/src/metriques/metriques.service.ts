@@ -540,7 +540,8 @@ export class MetriquesService {
       .leftJoin(
         'channel.chats',
         'chat',
-        'chat.deletedAt IS NULL AND chat.status = "actif"',
+        'chat.deletedAt IS NULL AND chat.last_activity_at >= :dateStart AND chat.last_activity_at <= :dateEnd',
+        { dateStart, dateEnd },
       )
       .leftJoin(
         'channel.messages',

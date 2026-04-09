@@ -441,21 +441,14 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
                   <p className="text-xs text-gray-700">Aucun trafic tenant.</p>
                 )}
                 {webhookSummary.topTenants.map(([tenant, count]) => {
-                  const ch = (statutChannels ?? []).find((c) => c.id === tenant);
-                  const displayName = ch?.label || 'Canal sans nom';
-                  const nbChats = ch?.nb_chats_actifs ?? 0;
+                  const displayName = webhookMetrics?.channel_labels?.[tenant] || tenant;
                   return (
                     <div
                       key={tenant}
                       className="flex items-center justify-between bg-gray-50 rounded-lg p-3"
                     >
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-medium text-gray-800 truncate">{displayName}</span>
-                      </div>
-                      <div className="flex flex-col items-end gap-0.5 ml-2 shrink-0">
-                        <span className="text-xs font-semibold text-gray-900">{count} request</span>
-                        <span className="text-[10px] text-blue-600 font-medium">{nbChats} Request</span>
-                      </div>
+                      <span className="text-xs font-medium text-gray-800 truncate">{displayName}</span>
+                      <span className="text-xs font-semibold text-gray-900">{count}</span>
                     </div>
                   );
                 })}

@@ -522,6 +522,8 @@ export type WebhookMetricsSnapshot = {
   latency: Record<string, { p95: number; p99: number }>;
   generated_at: string;
   window_minutes: number;
+  /** tenantId → label du canal, résolu côté serveur */
+  channel_labels?: Record<string, string>;
 };
 
 export type GoNoGoGateStatus = 'pass' | 'warn' | 'fail' | 'pending';

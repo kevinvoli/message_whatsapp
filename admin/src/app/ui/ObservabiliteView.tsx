@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Channel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
-import { getChannels, getWebhookMetrics } from '@/app/lib/api';
+import { getWebhookMetrics } from '@/app/lib/api';
 
 type Props = {
   onRefresh?: () => void;
@@ -23,20 +23,14 @@ type TenantMetric = {
 
 export default function ObservabiliteView({ onRefresh }: Props) {
   const [metrics, setMetrics] = useState<WebhookMetricsSnapshot | null>(null);
-  const [channels, setChannels] = useState<Channel[]>([]);
 
   const resolveLabel = useCallback((tenant: string): string => {
-    const ch = channels.find((c) => c.tenant_id === tenant || c.id === tenant);
-    return ch?.label || 'Canal sans nom';
-  }, [channels]);
+    return metrics?.channel_labels?.[tenant] || tenant;
+  }, [metrics]);
 
   const fetchData = useCallback(async () => {
-    const [data, chans] = await Promise.allSettled([
-      getWebhookMetrics(),
-      getChannels(),
-    ]);
-    if (data.status === 'fulfilled') setMetrics(data.value);
-    if (chans.status === 'fulfilled') setChannels(chans.value);
+    const data = await getWebhookMetrics();
+    setMetrics(data);
   }, []);
 
   useEffect(() => {
