@@ -14,6 +14,7 @@ import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.se
 
 const MASTER_KEY = 'auto-message-master';
 
+
 export interface MasterPreviewConversation {
   chat_id: string;
   name: string;

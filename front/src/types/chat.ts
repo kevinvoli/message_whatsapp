@@ -9,7 +9,6 @@ export type ConversationStatus =
   | "attente"
   | "converti"
   | "fermé";
-  
 
    export type  ViewMode = 'conversations' | 'contacts'
 

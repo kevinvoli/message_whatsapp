@@ -252,6 +252,7 @@ function extractTenantMetric(
     }, {});
 }
 
+
 function buildTenantMetrics(input: {
   received: Record<string, number>;
   errors: Record<string, number>;
