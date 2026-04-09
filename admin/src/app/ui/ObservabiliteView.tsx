@@ -143,7 +143,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500">
+              <tr className="text-left text-gray-700">
                 <th className="py-2">Tenant</th>
                 <th className="py-2">Received</th>
                 <th className="py-2">Errors</th>
@@ -165,7 +165,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
               ))}
               {tenantMetrics.length === 0 && (
                 <tr>
-                  <td className="py-2 text-gray-500" colSpan={6}>Aucune donnée.</td>
+                  <td className="py-2 text-gray-700" colSpan={6}>Aucune donnée.</td>
                 </tr>
               )}
             </tbody>
@@ -179,7 +179,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-500">
+                <tr className="text-left text-gray-700">
                   <th className="py-2">Tenant</th>
                   <th className="py-2">Received</th>
                 </tr>
@@ -193,7 +193,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
                 ))}
                 {topTenants.length === 0 && (
                   <tr>
-                    <td className="py-2 text-gray-500" colSpan={2}>Aucune donnée.</td>
+                    <td className="py-2 text-gray-700" colSpan={2}>Aucune donnée.</td>
                   </tr>
                 )}
               </tbody>
@@ -206,7 +206,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-500">
+                <tr className="text-left text-gray-700">
                   <th className="py-2">Tenant</th>
                   <th className="py-2">Errors</th>
                 </tr>
@@ -220,7 +220,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
                 ))}
                 {topTenantsErrors.length === 0 && (
                   <tr>
-                    <td className="py-2 text-gray-500" colSpan={2}>Aucune donnée.</td>
+                    <td className="py-2 text-gray-700" colSpan={2}>Aucune donnée.</td>
                   </tr>
                 )}
               </tbody>

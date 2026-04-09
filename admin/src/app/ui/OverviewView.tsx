@@ -397,7 +397,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
         </div>
 
         {!webhookSummary && (
-          <div className="text-sm text-gray-500">Métriques webhook indisponibles.</div>
+          <div className="text-sm9text-gray-500">Métriques webhook indisponibles.</div>
         )}
 
         {webhookSummary && (
@@ -406,7 +406,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="text-left text-gray-500">
+                    <tr className="text-left text-gray-900">
                       <th className="py-2">Provider</th>
                       <th className="py-2">Received</th>
                       <th className="py-2">Duplicates</th>
@@ -438,7 +438,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Top tenants</h4>
               <div className="space-y-2">
                 {webhookSummary.topTenants.length === 0 && (
-                  <p className="text-xs text-gray-500">Aucun trafic tenant.</p>
+                  <p className="text-xs text-gray-700">Aucun trafic tenant.</p>
                 )}
                 {webhookSummary.topTenants.map(([tenant, count]) => {
                   const ch = (statutChannels ?? []).find((c) => c.channel_id === tenant);
@@ -541,7 +541,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
 
           <div className="mt-6 pt-4 border-t border-gray-200">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Total</span>
+              <span className="text-gray-700">Total</span>
               <span className="font-bold text-gray-900">{metriques.totalChats} conversations</span>
             </div>
           </div>
