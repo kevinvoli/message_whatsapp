@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
-import { getWebhookMetrics } from '@/app/lib/api';
+import { getStatutChannels, getWebhookMetrics } from '@/app/lib/api';
 
 type Props = {
   onRefresh?: () => void;
@@ -23,10 +23,20 @@ type TenantMetric = {
 
 export default function ObservabiliteView({ onRefresh }: Props) {
   const [metrics, setMetrics] = useState<WebhookMetricsSnapshot | null>(null);
+  const [channels, setChannels] = useState<StatutChannel[]>([]);
+
+  const resolveLabel = useCallback((tenant: string): string => {
+    const ch = channels.find((c) => c.id === tenant || c.channel_id === tenant);
+    return ch?.label || 'Canal sans nom';
+  }, [channels]);
 
   const fetchData = useCallback(async () => {
-    const data = await getWebhookMetrics();
-    setMetrics(data);
+    const [data, chans] = await Promise.allSettled([
+      getWebhookMetrics(),
+      getStatutChannels(),
+    ]);
+    if (data.status === 'fulfilled') setMetrics(data.value);
+    if (chans.status === 'fulfilled') setChannels(chans.value);
   }, []);
 
   useEffect(() => {
@@ -155,7 +165,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
             <tbody>
               {tenantMetrics.map((row) => (
                 <tr key={row.tenant} className="border-t">
-                  <td className="py-2 font-medium text-gray-900">{row.tenant}</td>
+                  <td className="py-2 font-medium text-gray-900">{resolveLabel(row.tenant)}</td>
                   <td className="py-2">{row.received}</td>
                   <td className="py-2">{row.errors}</td>
                   <td className="py-2">{row.duplicates}</td>
@@ -187,7 +197,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
               <tbody>
                 {topTenants.map(([tenant, count]) => (
                   <tr key={tenant} className="border-t">
-                    <td className="py-2 font-medium text-gray-900">{tenant}</td>
+                    <td className="py-2 font-medium text-gray-900">{resolveLabel(tenant)}</td>
                     <td className="py-2">{count}</td>
                   </tr>
                 ))}
@@ -214,7 +224,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
               <tbody>
                 {topTenantsErrors.map(([tenant, count]) => (
                   <tr key={tenant} className="border-t">
-                    <td className="py-2 font-medium text-gray-900">{tenant}</td>
+                    <td className="py-2 font-medium text-gray-900">{resolveLabel(tenant)}</td>
                     <td className="py-2">{count}</td>
                   </tr>
                 ))}
