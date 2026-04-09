@@ -1,11 +1,13 @@
 # ─────────────────────────────────────────
 # Stage 1 : dépendances
 # ─────────────────────────────────────────
+# syntax=docker/dockerfile:1.4
 FROM node:20-alpine AS deps
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # ─────────────────────────────────────────
 # Stage 2 : build

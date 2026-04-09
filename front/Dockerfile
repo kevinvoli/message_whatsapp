@@ -1,11 +1,13 @@
 # ─────────────────────────────────────────
 # Stage 1 : dépendances
 # ─────────────────────────────────────────
+# syntax=docker/dockerfile:1.4
 FROM node:20-alpine AS deps
 
 WORKDIR /app
 COPY package*.json .npmrc* ./
-RUN npm ci --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --legacy-peer-deps
 
 # ─────────────────────────────────────────
 # Stage 2 : build
