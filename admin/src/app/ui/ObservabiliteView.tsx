@@ -196,7 +196,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
               </thead>
               <tbody>
                 {topTenants.map(([tenant, count]) => (
-                  <tr key={tenant} className="border-t">
+                  <tr key={tenant} className="border-t text-gray-700 ">
                     <td className="py-2 font-medium text-gray-900">{resolveLabel(tenant)}</td>
                     <td className="py-2">{count}</td>
                   </tr>
@@ -225,7 +225,7 @@ export default function ObservabiliteView({ onRefresh }: Props) {
                 {topTenantsErrors.map(([tenant, count]) => (
                   <tr key={tenant} className="border-t">
                     <td className="py-2 font-medium text-gray-900">{resolveLabel(tenant)}</td>
-                    <td className="py-2">{count}</td>
+                    <td className="py-2 text-gray-700">{count}</td>
                   </tr>
                 ))}
                 {topTenantsErrors.length === 0 && (
