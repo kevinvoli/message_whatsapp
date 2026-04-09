@@ -441,7 +441,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
                   <p className="text-xs text-gray-700">Aucun trafic tenant.</p>
                 )}
                 {webhookSummary.topTenants.map(([tenant, count]) => {
-                  const ch = (statutChannels ?? []).find((c) => c.id === tenant || c.channel_id === tenant);
+                  const ch = (statutChannels ?? []).find((c) => c.id === tenant);
                   const displayName = ch?.label || 'Canal sans nom';
                   const nbChats = ch?.nb_chats_actifs ?? 0;
                   return (
