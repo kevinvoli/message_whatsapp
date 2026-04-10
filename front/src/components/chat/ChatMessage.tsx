@@ -5,6 +5,14 @@ import { MediaBubble } from '../helper/mediaBubble';
 import { formatTime } from '@/lib/dateUtils';
 import { resolveMediaUrl } from '@/lib/utils';
 import { useChatStore } from '@/store/chatStore';
+import { getProviderFromChatId } from '../ui/ProviderBadge';
+
+const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
+  whatsapp:  { bg: 'bg-green-100',  text: 'text-green-600'  },
+  messenger: { bg: 'bg-blue-100',   text: 'text-blue-600'   },
+  instagram: { bg: 'bg-purple-100', text: 'text-purple-600' },
+  telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
+};
 
 interface ChatMessageProps {
   msg: Message;
@@ -29,6 +37,8 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const setReplyTo = useChatStore((s) => s.setReplyTo);
+  const provider = getProviderFromChatId(msg.chat_id);
+  const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
   const handlePlay = (audioEl: HTMLAudioElement) => {
     if (currentAudioRef.current && currentAudioRef.current !== audioEl) {
@@ -75,8 +85,8 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
     >
       <div className={`relative max-w-md ${isFromMe ? '' : 'flex items-start gap-2'}`}>
         {!isFromMe && (
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <User className="w-5 h-5 text-green-600" />
+          <div className={`w-8 h-8 ${avatarColor.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
+            <User className={`w-5 h-5 ${avatarColor.text}`} />
           </div>
         )}
 

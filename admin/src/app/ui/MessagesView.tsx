@@ -8,6 +8,7 @@ import { formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
 import { Spinner } from './Spinner';
 import { Pagination } from './Pagination';
 import { getMessages } from '@/app/lib/api';
+import { ProviderBadge } from './ProviderBadge';
 
 interface MessagesViewProps {
     onRefresh?: () => void;
@@ -92,7 +93,12 @@ export default function MessagesView({ onRefresh, selectedPeriod = 'today' }: Me
                         <tbody className="divide-y divide-gray-200">
                             {filtered.map((msg) => (
                                 <tr key={msg.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 font-medium text-gray-900 text-sm">{msg.chat_id}</td>
+                                    <td className="px-6 py-4 font-medium text-gray-900 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <span>{msg.chat_id}</span>
+                                            <ProviderBadge chatId={msg.chat_id} showLabel={false} />
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4 text-gray-700 max-w-xs truncate">{resolveAdminMessageText(msg)}</td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
