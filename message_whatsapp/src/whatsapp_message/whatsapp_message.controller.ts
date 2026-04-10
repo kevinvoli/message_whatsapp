@@ -9,6 +9,8 @@ import {
   UploadedFile,
   BadRequestException,
   UnprocessableEntityException,
+  HttpException,
+  HttpStatus,
   Req,
   Query,
   Res,
@@ -57,13 +59,21 @@ export class WhatsappMessageController {
   @Post()
   @UseGuards(AdminGuard)
   async create(@Body() createMessageDto: CreateWhatsappMessageDto) {
-    return this.messageService.createAgentMessage({
-      chat_id: createMessageDto.chat_id,
-      text: createMessageDto.text,
-      poste_id: createMessageDto.poste_id,
-      timestamp: new Date(),
-      channel_id: createMessageDto.channel_id,
-    });
+    try {
+      return await this.messageService.createAgentMessage({
+        chat_id: createMessageDto.chat_id,
+        text: createMessageDto.text,
+        poste_id: createMessageDto.poste_id,
+        timestamp: new Date(),
+        channel_id: createMessageDto.channel_id,
+      });
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new HttpException(
+        { statusCode: HttpStatus.BAD_REQUEST, message: err instanceof Error ? err.message : 'Erreur lors de l\'envoi du message' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   @Post('media')

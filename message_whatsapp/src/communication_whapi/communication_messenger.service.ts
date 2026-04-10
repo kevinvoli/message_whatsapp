@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
 
@@ -66,12 +66,28 @@ export class CommunicationMessengerService {
       CommunicationMessengerService.name,
     );
 
-    const response = await axios.post(url, payload, {
-      headers: {
-        Authorization: `Bearer ${data.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    let response: Awaited<ReturnType<typeof axios.post>>;
+    try {
+      response = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Bearer ${data.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
+      const apiMsg = axiosErr.response?.data?.error?.message;
+      const apiCode = axiosErr.response?.data?.error?.code;
+      const status = axiosErr.response?.status;
+      const detail = apiMsg
+        ? `Messenger API error ${apiCode ?? status}: ${apiMsg}`
+        : `Messenger API error HTTP ${status ?? 'unknown'}: ${axiosErr.message}`;
+      this.logger.warn(
+        `MESSENGER_SEND_FAILED page=${data.pageId} to=${data.recipientPsid} — ${detail}`,
+        CommunicationMessengerService.name,
+      );
+      throw new Error(detail);
+    }
 
     const messageId: string = response.data?.message_id;
     if (!messageId) {
