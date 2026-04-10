@@ -67,12 +67,14 @@ export class OfflineReinjectionJob implements OnModuleInit {
     this.logger.debug('Offline reinjection cron started');
 
     // 1. Conversations actives sur un poste hors-ligne
+    // take: 50 — évite le burst illimité au démarrage ou à 9h si beaucoup d'agents offline
     const actives = await this.chatRepo.find({
       where: {
         status: WhatsappChatStatus.ACTIF,
         last_poste_message_at: IsNull(),
       },
       relations: ['poste'],
+      take: 50,
     });
 
     let reinjectedOffline = 0;
@@ -85,12 +87,14 @@ export class OfflineReinjectionJob implements OnModuleInit {
     }
 
     // 2. Conversations orphelines (poste_id = null) — jamais assignées ou perdues
+    // take: 20 — même limite que orphan-checker pour cohérence
     const orphelines = await this.chatRepo.find({
       where: {
         poste_id: IsNull(),
         status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         read_only: false,
       },
+      take: 20,
     });
 
     this.logger.debug(`Orphelines trouvées : ${orphelines.length}`);

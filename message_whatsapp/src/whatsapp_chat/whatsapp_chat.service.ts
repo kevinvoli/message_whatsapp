@@ -386,6 +386,23 @@ export class WhatsappChatService {
     return chat ?? null;
   }
 
+  async findBulkByChatIds(chatIds: string[]): Promise<Map<string, WhatsappChat>> {
+    if (chatIds.length === 0) return new Map();
+    const chats = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.poste', 'poste')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndMapOne(
+        'chat.contact',
+        Contact,
+        'contact',
+        'contact.chat_id = chat.chat_id',
+      )
+      .where('chat.chat_id IN (:...chatIds)', { chatIds })
+      .getMany();
+    return new Map(chats.map((c) => [c.chat_id, c]));
+  }
+
   async findOne(id: string): Promise<WhatsappChat | null> {
     const chat = await this.chatRepository
       .createQueryBuilder('chat')

@@ -17,6 +17,8 @@ import { ChannelService } from 'src/channel/channel.service';
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
   private readonly chatDispatchLocks = new Map<string, Mutex>();
+  /** S3 — mutex léger pour éviter l'overlap du cron SLA */
+  private isSlaRunning = false;
 
   private getChatDispatchLock(chatId: string): Mutex {
     let mutex = this.chatDispatchLocks.get(chatId);
@@ -317,12 +319,15 @@ export class DispatcherService {
     return saved;
   }
 
-  async reinjectConversation(chat: WhatsappChat) {
+  async reinjectConversation(
+    chat: WhatsappChat,
+    skipEmit = false,
+  ): Promise<{ oldPosteId: string; newPosteId: string } | null> {
     if (chat.read_only) {
       this.logger.warn(
         `Reinjection ignoree: conversation read_only (${chat.chat_id})`,
       );
-      return;
+      return null;
     }
 
     // Channel dédié : ne jamais réinjecter dans la queue globale.
@@ -337,7 +342,7 @@ export class DispatcherService {
         await this.chatRepository.update(chat.id, {
           first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
         });
-        return;
+        return null;
       }
     }
 
@@ -352,33 +357,29 @@ export class DispatcherService {
         this.logger.debug(
           `Redispatch ignoré (${chat.chat_id}): le poste (${chat.poste_id}) est le seul dans la queue`,
         );
-        // Étendre à 30 min pour éviter de re-trigger le SLA checker (intervalle 5 min)
-        // à chaque cycle sans qu'aucune action ne soit possible.
         await this.chatRepository.update(chat.id, {
           first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
         });
-        return;
+        return null;
       }
     }
 
     // ─── Approche atomique : trouver le prochain poste AVANT d'effacer l'actuel ──
-    // Évite la fenêtre temporaire où poste_id = NULL et où un crash laisserait
-    // la conversation orpheline définitivement.
     const oldPosteId = chat.poste_id ?? null;
 
     const nextPoste = await this.queueService.getNextInQueue();
     if (!nextPoste) {
-      // Aucune alternative : étendre la deadline et garder le poste actuel
       this.logger.warn(
         `Réinjection impossible (${chat.chat_id}): aucun poste alternatif — deadline étendue +30 min`,
       );
       await this.chatRepository.update(chat.id, {
         first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
       });
-      return;
+      return null;
     }
 
     // Un seul UPDATE atomique — poste_id ne passe JAMAIS par NULL
+    // S5 — deadline 30 min (alignée sur l'intervalle minimum cron × 3)
     await this.chatRepository.update(chat.id, {
       poste: nextPoste,
       poste_id: nextPoste.id,
@@ -387,7 +388,7 @@ export class DispatcherService {
         ? WhatsappChatStatus.ACTIF
         : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
-      first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
+      first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
     });
 
     void this.notificationService.create(
@@ -396,11 +397,17 @@ export class DispatcherService {
       `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} a été réassignée au poste ${nextPoste.name}.`,
     );
 
+    // S1 — skipEmit : l'appelant batche les émissions lui-même
+    if (skipEmit) {
+      return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
+    }
+
     await this.messageGateway.emitConversationReassigned(
       { ...chat, poste_id: nextPoste.id, poste: nextPoste } as WhatsappChat,
       oldPosteId ?? '',
       nextPoste.id,
     );
+    return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
   }
 
   /**
@@ -513,29 +520,51 @@ export class DispatcherService {
 
   /** Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé. */
   async jobRunnerAllPostes(): Promise<string> {
-    // LIMIT 50 par cycle — évite le burst de requêtes quand des centaines de
-    // conversations expirent en même temps (commerciaux qui ne répondent pas).
-    // unread_count > 0 : ne cibler que les conversations avec messages non lus
-    const chats = await this.chatRepository.find({
-      where: {
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        unread_count: MoreThan(0),
-      },
-      order: { last_activity_at: 'ASC' },
-      take: 50,
-    });
-    this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) ciblée(s)`);
-
-    let reinjected = 0;
-    for (const chat of chats) {
-      try {
-        await this.reinjectConversation(chat);
-        reinjected++;
-      } catch (err) {
-        this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
-      }
+    // S3 — mutex léger : si le cycle précédent n'est pas terminé, on saute
+    if (this.isSlaRunning) {
+      this.logger.warn('SLA checker déjà en cours — cycle ignoré');
+      return 'Ignoré — cycle précédent encore en cours';
     }
-    return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
+    this.isSlaRunning = true;
+
+    try {
+      // LIMIT 50 par cycle — évite le burst de requêtes quand des centaines de
+      // conversations expirent en même temps (commerciaux qui ne répondent pas).
+      const chats = await this.chatRepository.find({
+        where: {
+          status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
+          unread_count: MoreThan(0),
+        },
+        order: { last_activity_at: 'ASC' },
+        take: 50,
+      });
+      this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) ciblée(s)`);
+
+      // S1 — on collecte les réassignations sans émettre pendant la boucle DB
+      const reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }> = [];
+      let reinjected = 0;
+
+      for (const chat of chats) {
+        try {
+          const result = await this.reinjectConversation(chat, true); // skipEmit
+          if (result) {
+            reassignments.push({ chatId: chat.chat_id, ...result });
+            reinjected++;
+          }
+        } catch (err) {
+          this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
+        }
+      }
+
+      // S1 — une seule vague d'émissions après la boucle, 2 requêtes bulk au lieu de 2N
+      if (reassignments.length > 0) {
+        await this.messageGateway.emitBatchReassignments(reassignments);
+      }
+
+      return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
+    } finally {
+      this.isSlaRunning = false;
+    }
   }
 
   async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {

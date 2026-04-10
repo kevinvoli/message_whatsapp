@@ -1110,6 +1110,40 @@ export class WhatsappMessageGateway
     );
   }
 
+  /**
+   * S1 — Batch emit : charge toutes les chats + derniers messages en 2 requêtes
+   * puis émet les événements sans requête DB dans la boucle.
+   * Remplace N × emitConversationReassigned() pour les cycles SLA.
+   */
+  public async emitBatchReassignments(
+    reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }>,
+  ): Promise<void> {
+    if (reassignments.length === 0) return;
+
+    const chatIds = reassignments.map((r) => r.chatId);
+
+    // 2 requêtes pour N conversations (au lieu de 2N)
+    const chatMap = await this.chatService.findBulkByChatIds(chatIds);
+    const msgMap = await this.messageService.findLastMessagesBulk(chatIds);
+
+    for (const { chatId, oldPosteId, newPosteId } of reassignments) {
+      this.server.to(`poste:${oldPosteId}`).emit('chat:event', {
+        type: 'CONVERSATION_REMOVED',
+        payload: { chat_id: chatId },
+      });
+
+      const chat = chatMap.get(chatId);
+      if (chat) {
+        this.server.to(`poste:${newPosteId}`).emit('chat:event', {
+          type: 'CONVERSATION_ASSIGNED',
+          payload: this.mapConversation(chat, msgMap.get(chatId) ?? null, chat.unread_count ?? 0),
+        });
+      }
+    }
+
+    this.logger.log(`Batch SLA emit: ${reassignments.length} réassignation(s) émises en lot`);
+  }
+
   public emitConversationRemoved(chatId: string, posteId: string): void {
     this.server.to(`poste:${posteId}`).emit('chat:event', {
       type: 'CONVERSATION_REMOVED',
