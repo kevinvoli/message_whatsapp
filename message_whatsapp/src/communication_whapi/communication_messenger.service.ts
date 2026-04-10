@@ -66,30 +66,28 @@ export class CommunicationMessengerService {
       CommunicationMessengerService.name,
     );
 
-    let response: Awaited<ReturnType<typeof axios.post>>;
-    try {
-      response = await axios.post(url, payload, {
+    const response = await axios
+      .post<{ message_id?: string }>(url, payload, {
         headers: {
           Authorization: `Bearer ${data.accessToken}`,
           'Content-Type': 'application/json',
         },
+      })
+      .catch((err: AxiosError<{ error?: { message?: string; code?: number; type?: string } }>) => {
+        const apiMsg = err.response?.data?.error?.message;
+        const apiCode = err.response?.data?.error?.code;
+        const status = err.response?.status;
+        const detail = apiMsg
+          ? `Messenger API error ${apiCode ?? status}: ${apiMsg}`
+          : `Messenger API error HTTP ${status ?? 'unknown'}: ${err.message}`;
+        this.logger.warn(
+          `MESSENGER_SEND_FAILED page=${data.pageId} to=${data.recipientPsid} — ${detail}`,
+          CommunicationMessengerService.name,
+        );
+        throw new Error(detail);
       });
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
-      const apiMsg = axiosErr.response?.data?.error?.message;
-      const apiCode = axiosErr.response?.data?.error?.code;
-      const status = axiosErr.response?.status;
-      const detail = apiMsg
-        ? `Messenger API error ${apiCode ?? status}: ${apiMsg}`
-        : `Messenger API error HTTP ${status ?? 'unknown'}: ${axiosErr.message}`;
-      this.logger.warn(
-        `MESSENGER_SEND_FAILED page=${data.pageId} to=${data.recipientPsid} — ${detail}`,
-        CommunicationMessengerService.name,
-      );
-      throw new Error(detail);
-    }
 
-    const messageId: string = response.data?.message_id;
+    const messageId = response.data?.message_id;
     if (!messageId) {
       throw new Error(
         `Messenger API response missing message_id: ${JSON.stringify(response.data)}`,
