@@ -19,12 +19,12 @@ import { NotificationService } from 'src/notification/notification.service';
 // ─────────────────────────────────────────────────────────────────────────────
 const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
   'sla-checker': {
-    label: 'Vérificateur SLA — réinjection premier message',
+    label: 'Vérificateur SLA — réinjection conversations non lues',
     description:
-      'Vérifie toutes les N minutes si des chats ont dépassé leur deadline de première réponse et les réinjecte dans la queue. Désactivé automatiquement entre 21h et 5h.',
+      'Vérifie toutes les N minutes les conversations avec des messages non lus depuis plus de N minutes et les réinjecte dans la queue. N doit être strictement supérieur à 120. Désactivé automatiquement entre 21h et 5h.',
     enabled: true,
     scheduleType: 'interval',
-    intervalMinutes: 120,
+    intervalMinutes: 121,
     cronExpression: null,
     ttlDays: null,
     delayMinSeconds: null,
@@ -388,6 +388,15 @@ export class CronConfigService implements OnModuleInit {
       if (finalStart >= finalEnd) {
         throw new BadRequestException(
           `activeHourStart (${finalStart}) doit être inférieur à activeHourEnd (${finalEnd})`,
+        );
+      }
+    }
+
+    // Validation intervalle SLA checker — minimum 121 min pour éviter la surcharge socket
+    if (key === 'sla-checker' && dto.intervalMinutes !== undefined) {
+      if (dto.intervalMinutes <= 120) {
+        throw new BadRequestException(
+          `L'intervalle du SLA checker doit être strictement supérieur à 120 minutes (reçu : ${dto.intervalMinutes})`,
         );
       }
     }

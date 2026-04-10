@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { In, IsNull, LessThan, Repository } from 'typeorm';
+import { In, LessThan, MoreThan, Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
 @Injectable()
@@ -28,7 +28,11 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
         );
         return `Ignoré — hors plage horaire (${hour}h, actif 5h–21h)`;
       }
-      return this.dispatcher.jobRunnerAllPostes();
+      // Le seuil de non-lecture est égal à intervalMinutes (configurable depuis le panel admin).
+      // Garantit que le seuil ≥ 121 min (déjà validé à l'écriture dans CronConfigService).
+      const config = await this.cronConfigService.findByKey('sla-checker');
+      const thresholdMinutes = config.intervalMinutes ?? 121;
+      return this.dispatcher.jobRunnerAllPostes(thresholdMinutes);
     });
     this.cronConfigService.registerPreviewHandler('sla-checker', () =>
       this.previewExpiredSla(),
@@ -37,25 +41,31 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
 
   async previewExpiredSla(): Promise<{
     total: number;
-    conversations: { chat_id: string; name: string; status: string; first_response_deadline_at: Date | null; minutes_overdue: number }[];
+    threshold_minutes: number;
+    conversations: { chat_id: string; name: string; status: string; last_client_message_at: Date | null; minutes_waiting: number }[];
   }> {
-    const now = new Date();
+    const config = await this.cronConfigService.findByKey('sla-checker');
+    const thresholdMinutes = config.intervalMinutes ?? 121;
+    const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
+
     const chats = await this.chatRepo.find({
       where: {
         status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        last_poste_message_at: IsNull(),
-        first_response_deadline_at: LessThan(now),
+        unread_count: MoreThan(0),
+        last_client_message_at: LessThan(threshold),
       },
+      order: { last_client_message_at: 'ASC' },
     });
     return {
       total: chats.length,
+      threshold_minutes: thresholdMinutes,
       conversations: chats.map((c) => ({
         chat_id: c.chat_id,
         name: c.name,
         status: c.status,
-        first_response_deadline_at: c.first_response_deadline_at ?? null,
-        minutes_overdue: c.first_response_deadline_at
-          ? Math.floor((Date.now() - new Date(c.first_response_deadline_at).getTime()) / 60_000)
+        last_client_message_at: c.last_client_message_at ?? null,
+        minutes_waiting: c.last_client_message_at
+          ? Math.floor((Date.now() - new Date(c.last_client_message_at).getTime()) / 60_000)
           : 0,
       })),
     };

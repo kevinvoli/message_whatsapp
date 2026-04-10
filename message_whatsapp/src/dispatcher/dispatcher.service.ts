@@ -5,7 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { In, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -518,8 +518,13 @@ export class DispatcherService {
     }
   }
 
-  /** Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé. */
-  async jobRunnerAllPostes(): Promise<string> {
+  /**
+   * Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé.
+   * @param thresholdMinutes Seuil configurable depuis le panel admin (= intervalMinutes du cron).
+   *   Réinjecte uniquement les conversations avec unread_count > 0 dont le dernier message
+   *   client date de plus de N minutes — i.e. le commercial n'a pas LU depuis N minutes.
+   */
+  async jobRunnerAllPostes(thresholdMinutes = 121): Promise<string> {
     // S3 — mutex léger : si le cycle précédent n'est pas terminé, on saute
     if (this.isSlaRunning) {
       this.logger.warn('SLA checker déjà en cours — cycle ignoré');
@@ -528,14 +533,18 @@ export class DispatcherService {
     this.isSlaRunning = true;
 
     try {
-      // LIMIT 50 par cycle — évite le burst de requêtes quand des centaines de
-      // conversations expirent en même temps (commerciaux qui ne répondent pas).
+      // Réinjection si le client attend depuis plus de thresholdMinutes sans que
+      // le commercial ait lu la conversation (unread_count > 0).
+      // On utilise last_client_message_at plutôt que first_response_deadline_at :
+      // on ne se base plus sur une deadline interne mais sur l'attente réelle du client.
+      const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
       const chats = await this.chatRepository.find({
         where: {
           status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
           unread_count: MoreThan(0),
+          last_client_message_at: LessThan(threshold), // pas lu depuis N minutes
         },
-        order: { last_activity_at: 'ASC' },
+        order: { last_client_message_at: 'ASC' },
         take: 50,
       });
       this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) ciblée(s)`);
