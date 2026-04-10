@@ -152,6 +152,27 @@ export class ChannelService {
         }
       }
 
+      // Tenter de dériver un Page Access Token depuis le token long-lived.
+      // Un System User Token ou User Token ne peut pas appeler /{page-id}/messages directement —
+      // il faut un PAT scopé à la page. Si la dérivation réussit, on stocke le PAT.
+      const pat = await this.metaTokenService.getPageAccessToken(externalId, messengerToken);
+      if (pat) {
+        this.logger.log(
+          `Messenger: PAT dérivé avec succès pour la page ${externalId}`,
+          ChannelService.name,
+        );
+        messengerToken = pat;
+        // Le PAT d'un System User est permanent ; sinon on garde l'expiration du long-lived
+        if (!messengerTokenExpiresAt) {
+          messengerTokenExpiresAt = new Date('2099-12-31');
+        }
+      } else {
+        this.logger.warn(
+          `Messenger: PAT non dérivé pour page ${externalId} — token stocké tel quel. Vérifier les permissions pages_messaging.`,
+          ChannelService.name,
+        );
+      }
+
       const messengerChannel = this.channelRepository.create({
         provider: 'messenger',
         external_id: externalId,
@@ -568,6 +589,27 @@ export class ChannelService {
             `Impossible d'échanger le token à la mise à jour (token gardé tel quel): ${message}`,
             ChannelService.name,
           );
+        }
+      }
+
+      // Pour Messenger/Instagram : tenter de dériver un PAT depuis le token obtenu
+      if (['messenger', 'instagram'].includes(channel.provider ?? '')) {
+        const pageId = channel.external_id ?? channel.channel_id;
+        if (pageId) {
+          const pat = await this.metaTokenService.getPageAccessToken(pageId, dto.token);
+          if (pat) {
+            this.logger.log(
+              `Update canal ${id}: PAT dérivé pour la page ${pageId}`,
+              ChannelService.name,
+            );
+            dto.token = pat;
+            (dto as UpdateChannelDto & { tokenExpiresAt?: Date }).tokenExpiresAt = new Date('2099-12-31');
+          } else {
+            this.logger.warn(
+              `Update canal ${id}: PAT non dérivé pour page ${pageId} — token stocké tel quel`,
+              ChannelService.name,
+            );
+          }
         }
       }
     }

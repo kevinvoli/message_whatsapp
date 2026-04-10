@@ -92,6 +92,36 @@ export class MetaTokenService {
   }
 
   /**
+   * Dérive un Page Access Token (PAT) depuis un User Token ou System User Token.
+   * Nécessaire quand le token stocké est un User/System User token et non un PAT direct.
+   *
+   * GET /{page-id}?fields=access_token&access_token={user_token}
+   *
+   * Retourne null si la page n'est pas accessible avec ce token (pas d'erreur lancée).
+   */
+  async getPageAccessToken(
+    pageId: string,
+    userToken: string,
+  ): Promise<string | null> {
+    try {
+      const response = await axios.get<{ access_token?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${pageId}`,
+        { params: { fields: 'access_token', access_token: userToken } },
+      );
+      return response.data?.access_token ?? null;
+    } catch (err: unknown) {
+      const msg = err instanceof AxiosError
+        ? (err.response?.data as any)?.error?.message ?? err.message
+        : err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Impossible de dériver le PAT pour la page ${pageId}: ${msg}`,
+        MetaTokenService.name,
+      );
+      return null;
+    }
+  }
+
+  /**
    * Rafraîchit le token d'un canal Meta spécifique et met à jour la BDD.
    * Déclenche aussi la re-souscription webhook pour éviter la déconnexion silencieuse.
    */

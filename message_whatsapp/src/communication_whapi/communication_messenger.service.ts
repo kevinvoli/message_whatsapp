@@ -64,7 +64,7 @@ export class CommunicationMessengerService {
     }
 
     this.logger.log(
-      `MESSENGER_OUTBOUND_TEXT page=${data.pageId} to=${data.recipientPsid}`,
+      `MESSENGER_OUTBOUND_TEXT url=${url} page=${data.pageId} to=${data.recipientPsid} token_prefix=${data.accessToken?.slice(0, 12)}...`,
       CommunicationMessengerService.name,
     );
 
@@ -75,13 +75,11 @@ export class CommunicationMessengerService {
           'Content-Type': 'application/json',
         },
       })
-      .catch((err: AxiosError<{ error?: { message?: string; code?: number; type?: string } }>) => {
-        const apiMsg = err.response?.data?.error?.message;
-        const apiCode = err.response?.data?.error?.code;
-        const status = err.response?.status;
-        const detail = apiMsg
-          ? `Messenger API error ${apiCode ?? status}: ${apiMsg}`
-          : `Messenger API error HTTP ${status ?? 'unknown'}: ${err.message}`;
+      .catch((err: AxiosError<{ error?: { message?: string; code?: number; type?: string; error_subcode?: number; fbtrace_id?: string } }>) => {
+        const apiErr = err.response?.data?.error;
+        const detail = apiErr
+          ? `Messenger API error ${apiErr.code}/${apiErr.error_subcode ?? '-'}: ${apiErr.message} (fbtrace=${apiErr.fbtrace_id ?? 'n/a'})`
+          : `Messenger API HTTP ${err.response?.status ?? 'unknown'}: ${err.message}`;
         this.logger.warn(
           `MESSENGER_SEND_FAILED page=${data.pageId} to=${data.recipientPsid} — ${detail}`,
           CommunicationMessengerService.name,
