@@ -394,7 +394,13 @@ export class InboundMessageService {
     try {
       const channel = await this.channelService.findByChannelId(channelId);
       if (!channel?.token) return undefined;
-      const name = await this.messengerService.getUserName(psid, channel.token);
+      // Passer external_id comme pageId pour permettre la dérivation PAT transparente
+      // si le token stocké est un System User Token ou User Token
+      const name = await this.messengerService.getUserName(
+        psid,
+        channel.token,
+        channel.external_id ?? undefined,
+      );
       return name ?? undefined;
     } catch {
       return undefined;

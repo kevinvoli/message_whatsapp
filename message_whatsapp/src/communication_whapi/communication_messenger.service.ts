@@ -10,23 +10,60 @@ export class CommunicationMessengerService {
 
   /** Cache TTL 1h : évite un appel Graph API à chaque message du même utilisateur */
   private readonly nameCache = new Map<string, { name: string; expiresAt: number }>();
+  /** Cache PAT dérivés : évite de rappeler /{pageId}?fields=access_token à chaque message */
+  private readonly patCache = new Map<string, { token: string; expiresAt: number }>();
 
   constructor(private readonly logger: AppLogger) {}
 
   /**
+   * Dérive un Page Access Token depuis un User/System User Token.
+   * Nécessaire quand le token stocké n'est pas un PAT direct.
+   * Résultat mis en cache 23h (PAT System User = permanent, PAT User = ~1h mais on garde 23h comme seuil safe).
+   */
+  private async derivePageAccessToken(pageId: string, userToken: string): Promise<string | null> {
+    const cached = this.patCache.get(pageId);
+    if (cached && cached.expiresAt > Date.now()) return cached.token;
+
+    try {
+      const response = await axios.get<{ access_token?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${pageId}`,
+        { params: { fields: 'access_token', access_token: userToken } },
+      );
+      const pat = response.data?.access_token;
+      if (pat) {
+        this.patCache.set(pageId, { token: pat, expiresAt: Date.now() + 23 * 60 * 60_000 });
+        this.logger.log(
+          `MESSENGER_PAT_DERIVED pageId=${pageId}`,
+          CommunicationMessengerService.name,
+        );
+        return pat;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Récupère le nom complet d'un utilisateur Messenger via son PSID.
+   * Si le token fourni est un User/System User Token, tente d'abord de dériver le PAT.
    * Le webhook Messenger ne contient pas le nom — nécessite un appel Graph API.
    * Retourne null en cas d'erreur ou si le nom est absent.
    */
-  async getUserName(psid: string, accessToken: string): Promise<string | null> {
+  async getUserName(psid: string, accessToken: string, pageId?: string): Promise<string | null> {
     // Clé cache = psid seul (le PSID est déjà scopé à la page côté Meta)
     const cached = this.nameCache.get(psid);
     if (cached && cached.expiresAt > Date.now()) return cached.name;
 
+    // Si un pageId est fourni, tenter de dériver un PAT (transparent si déjà un PAT)
+    const effectiveToken = pageId
+      ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+      : accessToken;
+
     try {
       const response = await axios.get<{ name?: string }>(
         `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
-        { params: { fields: 'name', access_token: accessToken } },
+        { params: { fields: 'name', access_token: effectiveToken } },
       );
       const name = response.data?.name;
       if (name) {
