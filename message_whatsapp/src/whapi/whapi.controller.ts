@@ -223,15 +223,12 @@ export class WhapiController {
       return { status: 'ignored', reason: 'missing_page_id' };
     }
 
-    // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
-    const channelRecord = await this.channelService.findByChannelId(pageId);
+    // Résoudre le canal par external_id (= Facebook Page ID envoyé dans entry[0].id)
+    // NE PAS utiliser findByChannelId car channel_id ≠ pageId dans la plupart des configs
+    const channelRecord = await this.channelService.findChannelByExternalId('messenger', pageId);
     this.assertMessengerSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
 
     const tenantId = await this.resolveTenantOrReject('messenger', pageId);
-    const channel = await this.channelService.resolveTenantByProviderExternalId(
-      'messenger',
-      pageId,
-    );
     const channelId = channelRecord?.channel_id ?? pageId;
 
     this.auditLogger.log(
@@ -392,8 +389,8 @@ export class WhapiController {
       return { status: 'ignored', reason: 'missing_ig_account_id' };
     }
 
-    // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
-    const channelRecord = await this.channelService.findByChannelId(igAccountId);
+    // Résoudre le canal par external_id (= IG account ID envoyé dans entry[0].id)
+    const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
     this.assertInstagramSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
 
     const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);

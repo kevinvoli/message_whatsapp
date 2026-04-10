@@ -456,6 +456,16 @@ export class ChannelService {
   }
 
   /**
+   * Recherche un canal par son external_id (Page ID Facebook, Instagram account ID…).
+   * Utilisé quand le webhook fournit l'external_id dans entry[0].id (Messenger, Instagram).
+   */
+  async findChannelByExternalId(provider: string, externalId: string): Promise<WhapiChannel | null> {
+    return this.channelRepository.findOne({
+      where: { provider, external_id: externalId },
+    });
+  }
+
+  /**
    * Vérifie si un verify_token correspond à un canal existant pour ce provider.
    * Utilisé pour le challenge GET des webhooks Meta/Messenger/Instagram.
    */
