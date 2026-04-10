@@ -26,6 +26,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
+import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -51,6 +52,7 @@ export class InboundMessageService {
     private readonly channelService: ChannelService,
     private readonly autoMessageOrchestrator: AutoMessageOrchestrator,
     private readonly systemAlert: SystemAlertService,
+    private readonly messengerService: CommunicationMessengerService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -75,6 +77,11 @@ export class InboundMessageService {
           `INCOMING_IGNORED trace=${traceId} reason=${chatValidation.reason} chat_id=${message.chatId ?? 'unknown'}`,
         );
         continue;
+      }
+
+      // Résolution du nom pour Messenger (le webhook ne contient pas le nom)
+      if (message.provider === 'messenger' && !message.fromName && message.from && message.channelId) {
+        message.fromName = await this.resolveMessengerFromName(message.from, message.channelId);
       }
 
       try {
@@ -374,6 +381,24 @@ export class InboundMessageService {
     chatId?: string,
   ): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+
+  /**
+   * Résout le nom d'un expéditeur Messenger via Graph API.
+   * Fire-and-forget sur erreur : ne bloque jamais le traitement du message.
+   */
+  private async resolveMessengerFromName(
+    psid: string,
+    channelId: string,
+  ): Promise<string | undefined> {
+    try {
+      const channel = await this.channelService.findByChannelId(channelId);
+      if (!channel?.token) return undefined;
+      const name = await this.messengerService.getUserName(psid, channel.token);
+      return name ?? undefined;
+    } catch {
+      return undefined;
+    }
   }
 
 }

@@ -5,6 +5,14 @@ import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 import { useChatStore } from '@/store/chatStore';
+import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
+
+const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
+  whatsapp:  { bg: 'bg-green-100',  text: 'text-green-600'  },
+  messenger: { bg: 'bg-blue-100',   text: 'text-blue-600'   },
+  instagram: { bg: 'bg-purple-100', text: 'text-purple-600' },
+  telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
+};
 
 interface ChatHeaderProps {
     currentConv: Conversation;
@@ -49,6 +57,8 @@ function SlaCountdown({ deadline }: { deadline: Date }) {
 
 export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderProps) {
     const { updateConversation, changeConversationStatus } = useChatStore();
+    const provider = getProviderFromChatId(currentConv.chat_id);
+    const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
     const handleCallStatusChange = (
       _conversationId: string,
@@ -78,13 +88,15 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
         <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-green-600" />
+                    <div className={`w-10 h-10 ${avatarColor.bg} rounded-full flex items-center justify-center`}>
+                        <User className={`w-6 h-6 ${avatarColor.text}`} />
                     </div>
                     <div>
                         <h2 className="font-semibold text-gray-900">{currentConv?.clientName}</h2>
                         <div className="flex items-center gap-2">
                             <p className="text-sm text-gray-500">{currentConv?.clientPhone}</p>
+                            <span className="text-xs text-gray-400">•</span>
+                            <ProviderBadge chatId={currentConv.chat_id} showLabel={true} />
                             <span className="text-xs text-gray-400">•</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(currentConv?.status || 'nouveau')}`}>
                                 {currentConv?.status.replace('_', ' ')}

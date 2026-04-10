@@ -2,7 +2,7 @@ import React from 'react';
 import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
-import { ProviderBadge } from '../ui/ProviderBadge';
+import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
 import { getStatusBadge } from '@/lib/utils';
 import { formatConversationTime } from '@/lib/dateUtils';
 
@@ -85,9 +85,18 @@ interface ConversationItemProps {
   onClick: () => void;
 }
 
+const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
+  whatsapp:  { bg: 'bg-green-100',  text: 'text-green-600'  },
+  messenger: { bg: 'bg-blue-100',   text: 'text-blue-600'   },
+  instagram: { bg: 'bg-purple-100', text: 'text-purple-600' },
+  telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
+};
+
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation, isSelected, isTyping, onClick }) => {
 
+  const provider = getProviderFromChatId(conversation.chat_id);
+  const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
   return (
     <div
@@ -96,8 +105,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         }`}
     >
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 relative">
-          <User className="w-6 h-6 text-green-600" />
+        <div className={`w-12 h-12 ${avatarColor.bg} rounded-full flex items-center justify-center flex-shrink-0 relative`}>
+          <User className={`w-6 h-6 ${avatarColor.text}`} />
           {conversation.priority === 'haute' && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
               <span className="text-white text-xs">!</span>
@@ -125,7 +134,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(conversation.status)}`}>
               {conversation.status.replace('_', ' ')}
             </span>
-            <ProviderBadge chatId={conversation.chat_id} showLabel={false} />
+            <ProviderBadge chatId={conversation.chat_id} showLabel={true} />
             {conversation?.tags?.map((tag, idx) => (
               <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
                 {tag}

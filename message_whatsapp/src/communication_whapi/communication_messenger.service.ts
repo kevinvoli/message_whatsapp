@@ -8,7 +8,37 @@ export class CommunicationMessengerService {
   private readonly META_API_VERSION =
     process.env.META_API_VERSION ?? 'v21.0';
 
+  /** Cache TTL 1h : évite un appel Graph API à chaque message du même utilisateur */
+  private readonly nameCache = new Map<string, { name: string; expiresAt: number }>();
+
   constructor(private readonly logger: AppLogger) {}
+
+  /**
+   * Récupère le nom complet d'un utilisateur Messenger via son PSID.
+   * Le webhook Messenger ne contient pas le nom — nécessite un appel Graph API.
+   * Retourne null en cas d'erreur ou si le nom est absent.
+   */
+  async getUserName(psid: string, accessToken: string): Promise<string | null> {
+    const cached = this.nameCache.get(psid);
+    if (cached && cached.expiresAt > Date.now()) return cached.name;
+
+    try {
+      const url = `https://graph.facebook.com/${this.META_API_VERSION}/${psid}?fields=name&access_token=${accessToken}`;
+      const response = await axios.get(url);
+      const name: string | undefined = response.data?.name;
+      if (name) {
+        this.nameCache.set(psid, { name, expiresAt: Date.now() + 60 * 60_000 });
+        return name;
+      }
+      return null;
+    } catch (err) {
+      this.logger.warn(
+        `MESSENGER_GET_USER_NAME_FAILED psid=${psid}: ${String(err)}`,
+        CommunicationMessengerService.name,
+      );
+      return null;
+    }
+  }
 
   async sendTextMessage(data: {
     text: string;
