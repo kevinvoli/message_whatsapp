@@ -47,7 +47,9 @@ export class CommunicationMessengerService {
     accessToken: string;
     quotedMessageId?: string;
   }): Promise<{ providerMessageId: string }> {
-    const url = `https://graph.facebook.com/${this.META_API_VERSION}/me/messages`;
+    // Utiliser l'ID de page explicite — "me" ne fonctionne qu'avec un Page Access Token pur.
+    // Avec un User Access Token échangé, "me" pointe vers l'utilisateur → erreur 100.
+    const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.pageId}/messages`;
 
     const payload: Record<string, unknown> = {
       recipient: { id: data.recipientPsid },
@@ -109,7 +111,7 @@ export class CommunicationMessengerService {
     const attachmentType = this.toMessengerAttachmentType(data.mediaType);
 
     // Étape 1 — uploader la pièce jointe via l'Attachment Upload API
-    const uploadUrl = `https://graph.facebook.com/${this.META_API_VERSION}/me/message_attachments`;
+    const uploadUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.pageId}/message_attachments`;
     const form = new FormData();
     form.append(
       'message',
@@ -145,7 +147,7 @@ export class CommunicationMessengerService {
     }
 
     // Étape 2 — envoyer le message avec l'attachment_id
-    const sendUrl = `https://graph.facebook.com/${this.META_API_VERSION}/me/messages`;
+    const sendUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.pageId}/messages`;
     const sendPayload = {
       recipient: { id: data.recipientPsid },
       message: {
