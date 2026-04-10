@@ -19,21 +19,30 @@ export class CommunicationMessengerService {
    * Retourne null en cas d'erreur ou si le nom est absent.
    */
   async getUserName(psid: string, accessToken: string): Promise<string | null> {
+    // Clé cache = psid seul (le PSID est déjà scopé à la page côté Meta)
     const cached = this.nameCache.get(psid);
     if (cached && cached.expiresAt > Date.now()) return cached.name;
 
     try {
-      const url = `https://graph.facebook.com/${this.META_API_VERSION}/${psid}?fields=name&access_token=${accessToken}`;
-      const response = await axios.get(url);
-      const name: string | undefined = response.data?.name;
+      const response = await axios.get<{ name?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
+        { params: { fields: 'name', access_token: accessToken } },
+      );
+      const name = response.data?.name;
       if (name) {
         this.nameCache.set(psid, { name, expiresAt: Date.now() + 60 * 60_000 });
+        this.logger.log(
+          `MESSENGER_NAME_RESOLVED psid=${psid} name="${name}"`,
+          CommunicationMessengerService.name,
+        );
         return name;
       }
       return null;
     } catch (err) {
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
+      const detail = axiosErr.response?.data?.error?.message ?? String(err);
       this.logger.warn(
-        `MESSENGER_GET_USER_NAME_FAILED psid=${psid}: ${String(err)}`,
+        `MESSENGER_GET_USER_NAME_FAILED psid=${psid} — ${detail}`,
         CommunicationMessengerService.name,
       );
       return null;

@@ -161,6 +161,10 @@ export class DispatcherService {
       if (tenantId && !conversation.tenant_id) {
         conversation.tenant_id = tenantId;
       }
+      // Mettre à jour le nom si un meilleur nom est disponible (ex: "Client" → vrai nom résolu)
+      if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
+        conversation.name = clientName;
+      }
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
       if (
@@ -202,6 +206,9 @@ export class DispatcherService {
       if (conversation) {
         if (tenantId && !conversation.tenant_id) {
           conversation.tenant_id = tenantId;
+        }
+        if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
+          conversation.name = clientName;
         }
         conversation.poste = null;
         conversation.poste_id = null;
@@ -251,6 +258,9 @@ export class DispatcherService {
       );
       if (tenantId && !conversation.tenant_id) {
         conversation.tenant_id = tenantId;
+      }
+      if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
+        conversation.name = clientName;
       }
       conversation.poste = nextAgent;
       conversation.poste_id = nextAgent.id;
