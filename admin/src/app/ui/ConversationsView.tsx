@@ -10,6 +10,7 @@ import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
 import { formatDate, formatTime, formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
 import { Pagination } from './Pagination';
+import { ProviderBadge, getAvatarColors } from './ProviderBadge';
 
 interface ConversationsViewProps {
     onRefresh?: () => void;
@@ -516,12 +517,13 @@ export default function ConversationsView({
                                 }`}
                                 onClick={() => setSelectedChat(chat)}
                             >
-                                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-blue-800 font-bold">
+                                <div className={`flex-shrink-0 w-10 h-10 rounded-full ${getAvatarColors(chat.chat_id).bg} flex items-center justify-center ${getAvatarColors(chat.chat_id).text} font-bold`}>
                                     {chat.name.charAt(0).toUpperCase()}
                                 </div>
-                                <div className="ml-3 flex-1">
+                                <div className="ml-3 flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5">
-                                        <p className="font-semibold text-slate-800 text-sm">{chat.name}</p>
+                                        <p className="font-semibold text-slate-800 text-sm truncate">{chat.name}</p>
+                                        <ProviderBadge chatId={chat.chat_id} showLabel={true} />
                                         {chat.read_only && (
                                             <span title="Lecture seule"><Lock className="w-3 h-3 text-amber-600 flex-shrink-0" /></span>
                                         )}
@@ -561,11 +563,14 @@ export default function ConversationsView({
                 {selectedChat ? (
                     <>
                         <div className="p-4 border-b border-slate-200 bg-white flex items-center justify-between gap-4 sticky top-0 z-10">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-blue-800 font-bold">
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-full ${getAvatarColors(selectedChat.chat_id).bg} flex items-center justify-center ${getAvatarColors(selectedChat.chat_id).text} font-bold`}>
                                 {selectedChat.name.charAt(0).toUpperCase()}
                             </div>
-                            <div className="ml-3">
-                                <h3 className="font-semibold text-slate-800">{selectedChat.name}</h3>
+                            <div className="ml-3 flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-semibold text-slate-800 truncate">{selectedChat.name}</h3>
+                                    <ProviderBadge chatId={selectedChat.chat_id} showLabel={true} />
+                                </div>
                                 <p className="text-sm text-slate-500">{selectedChat.contact_client}</p>
                                 <div className="mt-1 flex flex-wrap gap-2">
                                     <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
