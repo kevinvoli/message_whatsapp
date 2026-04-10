@@ -16,6 +16,7 @@ function generateUUID(): string {
   });
 }
 
+
 interface ConversationCursor {
   activityAt: string;
   chatId: string;

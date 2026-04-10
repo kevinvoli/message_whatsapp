@@ -57,6 +57,8 @@ export class WhapiController {
 
     // this.assertWhapiSecret(headers, request.rawBody, payload);
 
+    
+    
     this.assertWhapiPayload(payload);
 
     const tenantId = await this.resolveTenantOrReject(

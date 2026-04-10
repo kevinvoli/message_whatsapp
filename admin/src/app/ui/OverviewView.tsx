@@ -458,6 +458,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
         )}
       </div>
 
+
       {/* Performance Temporelle */}
       {performanceTemporelle === null && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
