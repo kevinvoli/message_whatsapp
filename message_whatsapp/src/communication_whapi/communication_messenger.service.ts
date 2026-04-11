@@ -97,6 +97,11 @@ export class CommunicationMessengerService {
     // Avec un User Access Token échangé, "me" pointe vers l'utilisateur → erreur 100.
     const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.pageId}/messages`;
 
+    // Dériver le Page Access Token si le token stocké est un User/System User Token.
+    // Même logique que getUserName — nécessaire pour les auto-messages et les envois depuis l'admin.
+    const effectiveToken =
+      (await this.derivePageAccessToken(data.pageId, data.accessToken)) ?? data.accessToken;
+
     const payload: Record<string, unknown> = {
       recipient: { id: data.recipientPsid },
       message: { text: data.text },
@@ -110,14 +115,14 @@ export class CommunicationMessengerService {
     }
 
     this.logger.log(
-      `MESSENGER_OUTBOUND_TEXT url=${url} page=${data.pageId} to=${data.recipientPsid} token_prefix=${data.accessToken?.slice(0, 12)}...`,
+      `MESSENGER_OUTBOUND_TEXT url=${url} page=${data.pageId} to=${data.recipientPsid} token_prefix=${effectiveToken?.slice(0, 12)}...`,
       CommunicationMessengerService.name,
     );
 
     const response = await axios
       .post<{ message_id?: string }>(url, payload, {
         headers: {
-          Authorization: `Bearer ${data.accessToken}`,
+          Authorization: `Bearer ${effectiveToken}`,
           'Content-Type': 'application/json',
         },
       })
@@ -154,6 +159,10 @@ export class CommunicationMessengerService {
   }): Promise<{ providerMessageId: string; attachmentId: string }> {
     const attachmentType = this.toMessengerAttachmentType(data.mediaType);
 
+    // Dériver le Page Access Token si le token stocké est un User/System User Token.
+    const effectiveToken =
+      (await this.derivePageAccessToken(data.pageId, data.accessToken)) ?? data.accessToken;
+
     // Étape 1 — uploader la pièce jointe via l'Attachment Upload API
     const uploadUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${data.pageId}/message_attachments`;
     const form = new FormData();
@@ -178,7 +187,7 @@ export class CommunicationMessengerService {
 
     const uploadResponse = await axios.post(uploadUrl, form, {
       headers: {
-        Authorization: `Bearer ${data.accessToken}`,
+        Authorization: `Bearer ${effectiveToken}`,
         ...form.getHeaders(),
       },
     });
@@ -205,7 +214,7 @@ export class CommunicationMessengerService {
 
     const sendResponse = await axios.post(sendUrl, sendPayload, {
       headers: {
-        Authorization: `Bearer ${data.accessToken}`,
+        Authorization: `Bearer ${effectiveToken}`,
         'Content-Type': 'application/json',
       },
     });

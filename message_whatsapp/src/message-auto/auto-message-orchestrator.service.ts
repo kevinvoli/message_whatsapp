@@ -140,7 +140,7 @@ export class AutoMessageOrchestrator {
 
       const timeout = setTimeout(() => {
         void this.executeAutoMessage(chatId)
-          .catch((err) => {
+          .catch(async (err) => {
             const msg = err instanceof Error ? err.message : String(err);
             const stack = err instanceof Error ? err.stack : undefined;
             this.logger.error(
@@ -148,6 +148,17 @@ export class AutoMessageOrchestrator {
               stack,
               AutoMessageOrchestrator.name,
             );
+            // Libérer le verrou read_only pour ne pas bloquer la conversation si
+            // executeAutoMessage échoue avant le try-catch interne de sendAutoMessage
+            try {
+              await this.chatService.update(chatId, { read_only: false });
+              const freshChat = await this.chatService.findBychat_id(chatId);
+              if (freshChat) {
+                this.gateway.emitConversationReadonly({ ...freshChat, read_only: false } as typeof freshChat);
+              }
+            } catch {
+              // best-effort
+            }
           })
           .finally(() => {
             this.locks.delete(chatId);
