@@ -392,10 +392,15 @@ export class InboundMessageService {
     channelId: string,
   ): Promise<string | undefined> {
     try {
-      const channel = await this.channelService.findByChannelId(channelId);
+      // Priorité 1 : recherche par channel_id (cas normal)
+      // Priorité 2 : recherche par external_id (page ID) quand channel_id est NULL en BDD
+      //   → dans ce cas channelId = pageId (fallback du webhook controller)
+      const channel =
+        (await this.channelService.findByChannelId(channelId)) ??
+        (await this.channelService.findChannelByExternalId('messenger', channelId));
+
       if (!channel?.token) return undefined;
-      // Passer external_id comme pageId pour permettre la dérivation PAT transparente
-      // si le token stocké est un System User Token ou User Token
+
       const name = await this.messengerService.getUserName(
         psid,
         channel.token,

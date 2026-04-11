@@ -5,7 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { IsNull, LessThan, Not, Repository } from 'typeorm';
+import { LessThan, Not, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 
 export interface ReadOnlyEnforcementPreview {
@@ -14,7 +14,7 @@ export interface ReadOnlyEnforcementPreview {
     chat_id: string;
     name: string;
     status: string;
-    last_poste_message_at: Date | null;
+    last_activity_at: Date;
     idle_hours: number;
   }[];
 }
@@ -50,23 +50,18 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
   /**
    * Conversations éligibles à la fermeture automatique :
    * - status != fermé
-   * - last_poste_message_at < seuil   → commercial a répondu mais c'était il y a longtemps
-   * - OU last_poste_message_at IS NULL ET createdAt < seuil
-   *   → jamais de réponse commerciale et la conversation est vieille
+   * - last_activity_at < seuil → aucune activité (client ou commercial) depuis plus de N heures
+   *
+   * On se base sur last_activity_at plutôt que last_poste_message_at ou createdAt
+   * pour éviter de refermer une conversation que le client vient de rouvrir.
+   * last_activity_at est mis à jour à chaque message entrant (incrementUnreadCount).
    */
   private async findEligible(limit: Date): Promise<WhatsappChat[]> {
     return this.chatRepo.find({
-      where: [
-        {
-          status: Not(WhatsappChatStatus.FERME),
-          last_poste_message_at: LessThan(limit),
-        },
-        {
-          status: Not(WhatsappChatStatus.FERME),
-          last_poste_message_at: IsNull(),
-          createdAt: LessThan(limit),
-        },
-      ],
+      where: {
+        status: Not(WhatsappChatStatus.FERME),
+        last_activity_at: LessThan(limit),
+      },
     });
   }
 
@@ -77,18 +72,15 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
 
     return {
       total: chats.length,
-      conversations: chats.map((c) => {
-        const ref = c.last_poste_message_at ?? c.createdAt;
-        return {
-          chat_id: c.chat_id,
-          name: c.name,
-          status: c.status,
-          last_poste_message_at: c.last_poste_message_at,
-          idle_hours: ref
-            ? Math.floor((Date.now() - new Date(ref).getTime()) / 3_600_000)
-            : 0,
-        };
-      }),
+      conversations: chats.map((c) => ({
+        chat_id: c.chat_id,
+        name: c.name,
+        status: c.status,
+        last_activity_at: c.last_activity_at,
+        idle_hours: Math.floor(
+          (Date.now() - new Date(c.last_activity_at).getTime()) / 3_600_000,
+        ),
+      })),
     };
   }
 
