@@ -74,19 +74,25 @@ export class AutoMessageMasterJob implements OnModuleInit {
     const intervalMs = (masterConfig.intervalMinutes ?? 5) * 2 * 60_000;
     const windowStart = new Date(Date.now() - intervalMs);
 
+    // ÉTAPE 4b — Détecter si l'orchestrateur événementiel est aussi actif
+    // Si oui, exclure les chats déjà pris en charge (auto_message_step > 0 ou
+    // waiting_client_reply = true) pour éviter les doublons de messages.
+    const orchestratorConfig = await this.cronConfigService.findByKey('auto-message').catch(() => null);
+    const orchestratorActive = orchestratorConfig?.enabled === true;
+
     this.logger.debug(
-      `AutoMessageMasterJob run — ${new Date().toISOString()} — fenêtre: ${windowStart.toISOString()}`,
+      `AutoMessageMasterJob run — ${new Date().toISOString()} — fenêtre: ${windowStart.toISOString()} — orchestrateur: ${orchestratorActive ? 'ACTIF (garde-fou ON)' : 'inactif'}`,
       AutoMessageMasterJob.name,
     );
 
     // ÉTAPE 5 — Exécuter chaque trigger (isolés par try/catch)
-    await this.safeRun('A-no_response',  () => this.runTriggerA(allConfigs.get('no-response-auto-message')));
+    await this.safeRun('A-no_response',  () => this.runTriggerA(allConfigs.get('no-response-auto-message'), orchestratorActive));
     await this.safeRun('C-out_of_hours', () => this.runTriggerC(allConfigs.get('out-of-hours-auto-message'), windowStart));
     await this.safeRun('D-reopened',     () => this.runTriggerD(allConfigs.get('reopened-auto-message'), windowStart));
-    await this.safeRun('E-queue_wait',   () => this.runTriggerE(allConfigs.get('queue-wait-auto-message')));
+    await this.safeRun('E-queue_wait',   () => this.runTriggerE(allConfigs.get('queue-wait-auto-message'), orchestratorActive));
     await this.safeRun('F-keyword',      () => this.runTriggerF(allConfigs.get('keyword-auto-message'), windowStart));
     await this.safeRun('G-client_type',  () => this.runTriggerG(allConfigs.get('client-type-auto-message'), windowStart));
-    await this.safeRun('H-inactivity',   () => this.runTriggerH(allConfigs.get('inactivity-auto-message')));
+    await this.safeRun('H-inactivity',   () => this.runTriggerH(allConfigs.get('inactivity-auto-message'), orchestratorActive));
     await this.safeRun('I-on_assign',    () => this.runTriggerI(allConfigs.get('on-assign-auto-message'), windowStart));
 
     const durationMs = Date.now() - runStart;
@@ -106,7 +112,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
   // TRIGGER A — Sans réponse
   // ─────────────────────────────────────────────────────────────────────────
 
-  private async runTriggerA(config: CronConfig | undefined): Promise<void> {
+  private async runTriggerA(config: CronConfig | undefined, orchestratorActive = false): Promise<void> {
     if (!config?.enabled) return;
 
     const thresholdMs = (config.noResponseThresholdMinutes ?? 60) * 60_000;
@@ -114,7 +120,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
     const cutoff      = new Date(Date.now() - thresholdMs);
     const window23h   = new Date(Date.now() - 23 * 60 * 60_000);
 
-    const chats = await this.chatRepo
+    const qb = this.chatRepo
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.channel', 'channel')
       .where('c.last_client_message_at IS NOT NULL')
@@ -135,9 +141,15 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .andWhere(
         config.applyToClosed ? '1=1' : 'c.status != :closed',
         config.applyToClosed ? {} : { closed: WhatsappChatStatus.FERME },
-      )
-      .limit(50)
-      .getMany();
+      );
+
+    // Garde-fou cohabitation : si l'orchestrateur est aussi actif, exclure les
+    // chats qu'il gère déjà (auto_message_step > 0 ou en attente de réponse client)
+    if (orchestratorActive) {
+      qb.andWhere('c.auto_message_step = 0').andWhere('c.waiting_client_reply = false');
+    }
+
+    const chats = await qb.limit(50).getMany();
 
     this.logger.debug(`TriggerA: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
 
@@ -224,7 +236,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
   // TRIGGER E — Attente en queue
   // ─────────────────────────────────────────────────────────────────────────
 
-  private async runTriggerE(config: CronConfig | undefined): Promise<void> {
+  private async runTriggerE(config: CronConfig | undefined, orchestratorActive = false): Promise<void> {
     if (!config?.enabled) return;
 
     const thresholdMs = (config.queueWaitThresholdMinutes ?? 30) * 60_000;
@@ -232,7 +244,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
     const cutoff      = new Date(Date.now() - thresholdMs);
     const window23h   = new Date(Date.now() - 23 * 60 * 60_000);
 
-    const chats = await this.chatRepo
+    const qb = this.chatRepo
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.channel', 'channel')
       .where('c.poste_id IS NULL')
@@ -249,9 +261,13 @@ export class AutoMessageMasterJob implements OnModuleInit {
             AND c.last_queue_wait_auto_sent_at >= c.last_client_message_at)
         )`,
         { cutoff },
-      )
-      .limit(50)
-      .getMany();
+      );
+
+    if (orchestratorActive) {
+      qb.andWhere('c.auto_message_step = 0').andWhere('c.waiting_client_reply = false');
+    }
+
+    const chats = await qb.limit(50).getMany();
 
     this.logger.debug(`TriggerE: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
 
@@ -363,14 +379,14 @@ export class AutoMessageMasterJob implements OnModuleInit {
   // TRIGGER H — Inactivité totale
   // ─────────────────────────────────────────────────────────────────────────
 
-  private async runTriggerH(config: CronConfig | undefined): Promise<void> {
+  private async runTriggerH(config: CronConfig | undefined, orchestratorActive = false): Promise<void> {
     if (!config?.enabled) return;
 
     const thresholdMs = (config.inactivityThresholdMinutes ?? 120) * 60_000;
     const maxSteps    = config.maxSteps ?? 1;
     const cutoff      = new Date(Date.now() - thresholdMs);
 
-    const chats = await this.chatRepo
+    const qb = this.chatRepo
       .createQueryBuilder('c')
       .leftJoinAndSelect('c.channel', 'channel')
       .where('c.status IN (:...statuses)', { statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE] })
@@ -384,9 +400,13 @@ export class AutoMessageMasterJob implements OnModuleInit {
         )`,
         { cutoff },
       )
-      .andWhere(config.applyToReadOnly ? '1=1' : 'c.read_only = false')
-      .limit(50)
-      .getMany();
+      .andWhere(config.applyToReadOnly ? '1=1' : 'c.read_only = false');
+
+    if (orchestratorActive) {
+      qb.andWhere('c.auto_message_step = 0').andWhere('c.waiting_client_reply = false');
+    }
+
+    const chats = await qb.limit(50).getMany();
 
     this.logger.debug(`TriggerH: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
 

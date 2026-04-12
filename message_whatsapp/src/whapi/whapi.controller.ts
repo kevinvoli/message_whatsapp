@@ -218,21 +218,27 @@ export class WhapiController {
 
     const messengerPayload = this.assertMessengerPayload(payload);
 
-    const pageId = messengerPayload.entry?.[0]?.id;
+    const entries = messengerPayload.entry ?? [];
+    const pageId = entries[0]?.id;
     if (!pageId) {
       return { status: 'ignored', reason: 'missing_page_id' };
     }
 
-    // Résoudre le canal par external_id (= Facebook Page ID envoyé dans entry[0].id)
-    // NE PAS utiliser findByChannelId car channel_id ≠ pageId dans la plupart des configs
+    if (entries.length > 1) {
+      this.auditLogger.log(
+        `WEBHOOK_MULTI_ENTRY request_id=${requestId} provider=messenger entries=${entries.length} — chaque entry sera traité avec son propre channelId`,
+      );
+    }
+
+    // HMAC validé sur le payload complet (signature couvre tout le body)
+    // Résolution tenant basée sur entry[0] (tous les entries partagent le même compte)
     const channelRecord = await this.channelService.findChannelByExternalId('messenger', pageId);
     this.assertMessengerSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
 
     const tenantId = await this.resolveTenantOrReject('messenger', pageId);
-    const channelId = channelRecord?.channel_id ?? pageId;
 
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=messenger tenant_id=${tenantId} page_id=${pageId}`,
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=messenger tenant_id=${tenantId} page_id=${pageId} entries=${entries.length}`,
     );
 
     this.rateLimitService.assertRateLimits(provider, null, tenantId);
@@ -257,29 +263,45 @@ export class WhapiController {
     }
 
     try {
-      if (degraded) {
-        const queued = this.enqueueDegradedMessenger(
-          provider,
-          messengerPayload,
-          tenantId,
-          channelId,
-        );
-        if (!queued) {
-          throw new HttpException(
-            'Degraded queue overloaded',
-            HttpStatus.SERVICE_UNAVAILABLE,
+      // Traitement par entry : chaque page Facebook a son propre channelId
+      for (const entry of entries) {
+        const entryPageId = entry.id;
+        if (!entryPageId) continue;
+
+        const entryChannelRecord = entryPageId === pageId
+          ? channelRecord
+          : await this.channelService.findChannelByExternalId('messenger', entryPageId);
+        const entryChannelId = entryChannelRecord?.channel_id ?? entryPageId;
+
+        const singleEntryPayload = { ...messengerPayload, entry: [entry] };
+
+        if (degraded) {
+          const queued = this.enqueueDegradedMessenger(
+            provider,
+            singleEntryPayload,
+            tenantId,
+            entryChannelId,
           );
+          if (!queued) {
+            throw new HttpException(
+              'Degraded queue overloaded',
+              HttpStatus.SERVICE_UNAVAILABLE,
+            );
+          }
+        } else {
+          await this.unifiedIngressService.ingestMessenger(singleEntryPayload, {
+            provider: 'messenger',
+            tenantId,
+            channelId: entryChannelId,
+          });
         }
+      }
+
+      if (degraded) {
         this.healthService.record(provider, true, Date.now() - startedAt);
         this.metricsService.recordLatency(provider, Date.now() - startedAt);
         return { status: 'accepted', mode: 'degraded' };
       }
-
-      await this.unifiedIngressService.ingestMessenger(messengerPayload, {
-        provider: 'messenger',
-        tenantId,
-        channelId,
-      });
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(

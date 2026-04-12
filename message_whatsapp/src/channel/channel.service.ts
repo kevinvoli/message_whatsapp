@@ -2,10 +2,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
@@ -18,7 +19,7 @@ import { CommunicationTelegramService } from 'src/communication_whapi/communicat
 import { AppLogger } from 'src/logging/app-logger.service';
 
 @Injectable()
-export class ChannelService {
+export class ChannelService implements OnModuleInit {
   constructor(
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
@@ -31,6 +32,27 @@ export class ChannelService {
     private readonly telegramService: CommunicationTelegramService,
     private readonly logger: AppLogger,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      const unsecured = await this.channelRepository.find({
+        where: [
+          { provider: 'messenger', meta_app_secret: IsNull() },
+          { provider: 'meta', meta_app_secret: IsNull() },
+        ],
+        select: ['channel_id', 'provider', 'external_id'],
+      });
+      for (const ch of unsecured) {
+        this.logger.error(
+          `CHANNEL_NO_SECRET provider=${ch.provider} channel_id=${ch.channel_id ?? 'n/a'} external_id=${ch.external_id ?? 'n/a'} — les webhooks retourneront 401 en production`,
+          undefined,
+          ChannelService.name,
+        );
+      }
+    } catch {
+      // best-effort : ne pas bloquer le démarrage si la DB n'est pas encore disponible
+    }
+  }
 
   async create(dto: CreateChannelDto) {
     const provider = dto.provider ?? 'whapi';
