@@ -15,7 +15,6 @@ export default function ConversationFilters({ conversations, totalUnread, filter
         all:     conversations.length,
         // "Nouveau" = commercial n'a jamais répondu (last_poste_message_at null).
         nouveau: conversations.filter((c) => !c.last_poste_message_at).length,
-        urgent:  conversations.filter((c) => c.priority === 'haute').length,
     }), [conversations]);
 
     const btn = (key: string, label: string, count?: number) => (
@@ -35,7 +34,6 @@ export default function ConversationFilters({ conversations, totalUnread, filter
                 {btn('all',     'Tous',     counts.all)}
                 {btn('unread',  'Non lus',  totalUnread)}
                 {btn('nouveau', 'Nouveaux', counts.nouveau)}
-                {btn('urgent',  'Urgents',  counts.urgent)}
             </div>
         </div>
     );

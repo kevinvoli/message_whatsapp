@@ -87,6 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
           <ConversationList
             filteredConversations={conversations}
+            filterStatus={filterStatus}
             selectedConversation={selectedConversation}
             onSelectConversation={onSelectConversation}
             selectedConv={''}
