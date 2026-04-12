@@ -43,10 +43,9 @@ export default function ConversationList({
         return () => observer.disconnect();
     }, [hasMoreConversations, isLoadingMoreConversations, loadMoreConversations, conversationCursor]);
 
-    // Auto-load : quand le filtre actif produit peu de résultats, charger les
-    // pages suivantes automatiquement jusqu'à avoir au moins 10 items ou épuiser
-    // les pages. Sans cela, le sentinel sous une liste vide ne se redéclenche pas
-    // si son état d'intersection n'a pas changé depuis la dernière observation.
+    // Auto-load : quand le filtre actif produit peu de résultats et que le sentinel
+    // est visible, charger la page suivante avec un délai de 600 ms pour éviter
+    // d'épuiser le rate-limiter serveur (20 req / 10 s pour conversations:get).
     const filteredCount = filteredConversations.length;
     useEffect(() => {
         if (filteredCount >= 10) return;
@@ -54,9 +53,11 @@ export default function ConversationList({
         const sentinel = sentinelRef.current;
         if (!sentinel) return;
         const rect = sentinel.getBoundingClientRect();
-        if (rect.top < window.innerHeight) {
+        if (rect.top >= window.innerHeight) return; // sentinel hors écran → pas d'auto-load
+        const timer = setTimeout(() => {
             loadMoreConversations();
-        }
+        }, 600);
+        return () => clearTimeout(timer);
     }, [filteredCount, hasMoreConversations, isLoadingMoreConversations, loadMoreConversations]);
 
     return (

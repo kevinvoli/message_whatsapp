@@ -150,11 +150,14 @@ const WebSocketEvents = () => {
           const hasMore: boolean = isNewFormat ? raw.hasMore : false;
           const nextCursor = isNewFormat ? raw.nextCursor : null;
 
-          if (nextCursor) {
-            // Page suivante — append
+          // Critère correct : isLoadingMoreConversations indique que la requête
+          // provenait de loadMoreConversations() → append.
+          // nextCursor seul est insuffisant : la DERNIÈRE page a nextCursor=null
+          // mais doit quand même être appendée, pas remplacer toute la liste.
+          if (chatState.isLoadingMoreConversations) {
             chatState.appendConversations(convArray, hasMore, nextCursor);
           } else {
-            // Première page — replace
+            // Chargement initial (loadConversations) ou recherche — replace
             chatState.setConversations(convArray, hasMore, nextCursor);
           }
           break;

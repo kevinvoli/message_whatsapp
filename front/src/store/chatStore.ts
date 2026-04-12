@@ -319,6 +319,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return {
         conversations: normalized,
         isLoading: false,
+        // Reset défensif : si un CONVERSATION_LIST de chargement initial arrive
+        // alors qu'un loadMore était en vol, on repart d'un état propre.
+        isLoadingMoreConversations: false,
         hasMoreConversations: hasMore,
         conversationCursor: cursor ?? null,
       };
