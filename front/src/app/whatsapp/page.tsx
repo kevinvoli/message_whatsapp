@@ -83,7 +83,10 @@ const WhatsAppPage = () => {
     return conversations.filter((conv) => {
       switch (filterStatus) {
         case 'unread':  return conv.unreadCount > 0;
-        case 'nouveau': return conv.status === 'attente';
+        // "Nouveaux" = le commercial n'a jamais répondu (last_poste_message_at null).
+        // Ne pas se baser sur conv.status === 'attente' qui reflète l'état du poste
+        // au moment du dispatch (online/offline), pas l'état "jamais traité".
+        case 'nouveau': return !conv.last_poste_message_at;
         case 'urgent':  return conv.priority === 'haute';
         default:        return true; // 'all' et tout autre
       }

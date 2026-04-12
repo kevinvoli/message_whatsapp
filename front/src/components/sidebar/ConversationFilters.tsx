@@ -13,7 +13,8 @@ export default function ConversationFilters({ conversations, totalUnread, filter
     // Basés sur les conversations du store — reflètent les pages déjà chargées.
     const counts = useMemo(() => ({
         all:     conversations.length,
-        nouveau: conversations.filter((c) => c.status === 'attente').length,
+        // "Nouveau" = commercial n'a jamais répondu (last_poste_message_at null).
+        nouveau: conversations.filter((c) => !c.last_poste_message_at).length,
         urgent:  conversations.filter((c) => c.priority === 'haute').length,
     }), [conversations]);
 

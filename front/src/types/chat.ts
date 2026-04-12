@@ -720,11 +720,13 @@ const resolveLastMessage = (
 export const transformToConversation = (
   raw: RawConversationData,
 ): Conversation => {
-  // Le backend normalise déjà 'en attente' → 'attente' à la source.
-  // Ce fallback défensif couvre d'éventuels anciens enregistrements.
+  // Le backend normalise déjà 'en attente' → 'attente' à la source (mapConversation).
+  // Ce fallback ne couvre plus le cas !raw.status (null → 'attente' silencieux)
+  // car cela polluait le filtre "Nouveaux". Un statut absent est une anomalie de données :
+  // on le laisse passer tel quel et le bug de données doit être corrigé en amont.
   const normalizedStatus: ConversationStatus =
-    raw.status === "en attente" || !raw.status ? "attente"
-    : (raw.status as ConversationStatus);
+    raw.status === "en attente" ? "attente"
+    : (raw.status as ConversationStatus) ?? "attente";
   const unreadCount = raw.unreadCount ?? raw.unread_count ?? 0;
   const sourceChannel =
     raw.channel_id || raw.last_msg_client_channel_id || "inconnu";
