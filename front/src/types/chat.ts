@@ -772,7 +772,11 @@ export const transformToConversation = (
       : null,
 
     source: sourceChannel,
-    priority: raw.priority || "moyenne",
+    // priority vit sur le Contact, pas sur WhatsappChat.
+    // Le chargement initial (CONVERSATION_LIST) l'envoie via contact_summary.priority.
+    // Les événements UPSERT ultérieurs ne l'incluent pas → on préfère contact_summary
+    // pour éviter que le fallback "moyenne" n'écrase une vraie valeur "haute".
+    priority: (raw.priority ?? raw.contact_summary?.priority ?? "moyenne") as Priority,
     tags: raw.tags || [],
 
     auto_message_status: raw.auto_message_status ?? "scheduled",

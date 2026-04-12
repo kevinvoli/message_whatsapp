@@ -473,7 +473,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
             conversationWithUnread.messages && conversationWithUnread.messages.length > 0
               ? conversationWithUnread.messages
               : c.messages ?? [];
-          return { ...conversationWithUnread, messages: preservedMessages };
+          // Préserver contact_summary et priority : les événements UPSERT (réponse
+          // commerciale, changement statut…) passent par mapConversation qui n'inclut
+          // pas le Contact. Sans cette préservation, chaque UPSERT effacerait la priorité
+          // "haute" définie au chargement initial via mapConversationWithContact.
+          const preservedContactSummary =
+            conversationWithUnread.contact_summary ?? c.contact_summary;
+          const preservedPriority =
+            conversationWithUnread.priority !== 'moyenne'
+              ? conversationWithUnread.priority
+              : (c.priority ?? conversationWithUnread.priority);
+          return {
+            ...conversationWithUnread,
+            messages: preservedMessages,
+            contact_summary: preservedContactSummary,
+            priority: preservedPriority,
+          };
         })
         .sort((a, b) => {
           const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
@@ -488,7 +503,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // 🟢 Conversation active
       // 🟢 Si cette conversation est celle qui est sélectionnée
       if (isSelected) {
-        newState.selectedConversation = conversationWithUnread;
+        // Appliquer les mêmes préservations que pour la liste
+        const selectedContactSummary =
+          conversationWithUnread.contact_summary ?? state.selectedConversation?.contact_summary;
+        const selectedPriority =
+          conversationWithUnread.priority !== 'moyenne'
+            ? conversationWithUnread.priority
+            : (state.selectedConversation?.priority ?? conversationWithUnread.priority);
+        newState.selectedConversation = {
+          ...conversationWithUnread,
+          contact_summary: selectedContactSummary,
+          priority: selectedPriority,
+        };
 
         // 🆕 Le backend envoie messages[] (tableau complet) dans conversation:updated
         // On les utilise directement si présents et non vides
