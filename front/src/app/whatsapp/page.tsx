@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -24,15 +24,7 @@ const WhatsAppPage = () => {
     selectedConversation,
     selectConversation,
     totalUnread: totalUnreadFromStore,
-
-    // messages,
-    // isLoading,
-    // error,
-    // sendMessage,
-    // onTypingStart,
-    // onTypingStop,
-    // loadConversations,
-
+    loadConversations,
   } = useChatStore();
   
   const { isConnected: isWebSocketConnected } = useSocket();
@@ -43,6 +35,9 @@ const WhatsAppPage = () => {
 
    const [viewMode, setViewMode] = useState<ViewMode>('conversations');
     const [searchQuery, setSearchQuery] = useState('');
+
+  // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)
+  const isInitialSearchMount = useRef(true);
 
   // Protection de route
   useEffect(() => {
@@ -68,23 +63,32 @@ const WhatsAppPage = () => {
   // Fallback sur le calcul local si le backend n'a pas encore envoyé TOTAL_UNREAD_UPDATE
   const totalUnread = totalUnreadFromStore || conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
 
+  // Recherche côté serveur : quand searchQuery change, recharger depuis le backend.
+  // Debounce 300 ms pour éviter de spammer à chaque frappe.
+  // On skip le premier render car WebSocketEvents.tsx gère le chargement initial.
+  useEffect(() => {
+    if (isInitialSearchMount.current) {
+      isInitialSearchMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      loadConversations(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, loadConversations]);
+
+  // Le filtre de statut reste côté client : le backend renvoie tous les statuts.
+  // La recherche textuelle est désormais gérée par le serveur.
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
-      const matchesStatus =
-        filterStatus === 'all' ? true :
-        filterStatus === 'unread' ? conv.unreadCount > 0 :
-        filterStatus === 'nouveau' ? conv.status === 'attente' :
-        filterStatus === 'urgent' ? conv.priority === 'haute' : true;
-
-      const matchesSearch = !searchQuery
-        ? true
-        : conv.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          conv.clientPhone?.includes(searchQuery) ||
-          (conv.lastMessage?.text ?? '').toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchesStatus && matchesSearch;
+      switch (filterStatus) {
+        case 'unread':  return conv.unreadCount > 0;
+        case 'nouveau': return conv.status === 'attente';
+        case 'urgent':  return conv.priority === 'haute';
+        default:        return true; // 'all' et tout autre
+      }
     });
-  }, [conversations, filterStatus, searchQuery]);
+  }, [conversations, filterStatus]);
 
     const handleViewModeChange = (mode: ViewMode) => {
         setViewMode(mode);

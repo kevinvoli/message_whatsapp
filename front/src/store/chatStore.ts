@@ -40,10 +40,13 @@ interface ChatState {
   hasMoreConversations: boolean;
   isLoadingMoreConversations: boolean;
   conversationCursor: ConversationCursor | null;
+  /** Terme de recherche actif — transmis au serveur pour filtrer avant pagination */
+  currentSearch: string;
 
   // Actions
   setSocket: (socket: Socket | null) => void;
-  loadConversations: () => void;
+  /** Recharge depuis la page 1. Si search est fourni, le backend filtre côté serveur. */
+  loadConversations: (search?: string) => void;
   loadMoreConversations: () => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
@@ -120,6 +123,7 @@ const initialState: Omit<
   hasMoreConversations: false,
   isLoadingMoreConversations: false,
   conversationCursor: null,
+  currentSearch: '',
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -139,20 +143,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSocket: (socket) => set({ socket }),
 
-  loadConversations: () => {
+  loadConversations: (search?: string) => {
     const { socket } = get();
     if (!socket) return;
-
-    set({ isLoading: true, conversationCursor: null, hasMoreConversations: false });
-    socket.emit("conversations:get");
+    const searchTerm = search ?? '';
+    set({ isLoading: true, conversationCursor: null, hasMoreConversations: false, currentSearch: searchTerm });
+    const payload = searchTerm ? { search: searchTerm } : undefined;
+    socket.emit("conversations:get", payload);
   },
 
   loadMoreConversations: () => {
-    const { socket, hasMoreConversations, isLoadingMoreConversations, conversationCursor } = get();
+    const { socket, hasMoreConversations, isLoadingMoreConversations, conversationCursor, currentSearch } = get();
     if (!socket || !hasMoreConversations || isLoadingMoreConversations || !conversationCursor) return;
 
     set({ isLoadingMoreConversations: true });
-    socket.emit("conversations:get", { cursor: conversationCursor });
+    const payload: { cursor: ConversationCursor; search?: string } = { cursor: conversationCursor };
+    if (currentSearch) payload.search = currentSearch;
+    socket.emit("conversations:get", payload);
   },
 
   selectConversation: (chat_id: string) => {
