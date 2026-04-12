@@ -12,11 +12,24 @@ export class WebhookMetricsService {
   private readonly counters = new Map<CounterKey, number>();
   private readonly latencySamples = new Map<string, LatencySample[]>();
   private readonly latencyWindowMs = 15 * 60 * 1000;
+  private readonly lastReceivedAt = new Map<string, number>();
 
   recordReceived(provider: string, tenantId?: string | null): void {
+    this.lastReceivedAt.set(provider, Date.now());
     this.inc(
       `webhook_received_total|provider=${provider}|tenant=${tenantId ?? 'unknown'}`,
     );
+  }
+
+  getLastReceivedAt(provider: string): number | undefined {
+    return this.lastReceivedAt.get(provider);
+  }
+
+  /** Retourne le nombre de secondes depuis le dernier webhook reçu, ou null si aucun. */
+  getGapSeconds(provider: string): number | null {
+    const last = this.lastReceivedAt.get(provider);
+    if (!last) return null;
+    return Math.floor((Date.now() - last) / 1000);
   }
 
   recordDuplicate(provider: string, tenantId?: string | null): void {
@@ -82,9 +95,15 @@ export class WebhookMetricsService {
       };
     }
 
+    const gaps: Record<string, number | null> = {};
+    for (const provider of this.lastReceivedAt.keys()) {
+      gaps[provider] = this.getGapSeconds(provider);
+    }
+
     return {
       counters,
       latency,
+      gap_since_last_webhook_seconds: gaps,
       generated_at: new Date().toISOString(),
       window_minutes: this.latencyWindowMs / 60000,
     };

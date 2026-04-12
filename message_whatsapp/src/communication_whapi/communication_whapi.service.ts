@@ -76,6 +76,9 @@ export class CommunicationWhapiService {
       });
       if (!channel) return;
 
+      // Ne pas appeler l'API Whapi pour des canaux non-Whapi (Messenger, Meta, etc.)
+      if (channel.provider !== 'whapi') return;
+
       const token = channel.token;
 
       // PAS de messageId ici !

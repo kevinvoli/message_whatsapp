@@ -238,6 +238,7 @@ export class WhapiController {
     this.rateLimitService.assertRateLimits(provider, null, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
+    const degraded = this.healthService.isDegraded(provider);
 
     const idempotency = await this.whapiService.isReplayEvent(
       messengerPayload,
@@ -256,6 +257,24 @@ export class WhapiController {
     }
 
     try {
+      if (degraded) {
+        const queued = this.enqueueDegradedMessenger(
+          provider,
+          messengerPayload,
+          tenantId,
+          channelId,
+        );
+        if (!queued) {
+          throw new HttpException(
+            'Degraded queue overloaded',
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        this.healthService.record(provider, true, Date.now() - startedAt);
+        this.metricsService.recordLatency(provider, Date.now() - startedAt);
+        return { status: 'accepted', mode: 'degraded' };
+      }
+
       await this.unifiedIngressService.ingestMessenger(messengerPayload, {
         provider: 'messenger',
         tenantId,
@@ -1049,6 +1068,23 @@ export class WhapiController {
     };
 
     return this.degradedQueue.enqueue(provider, { run: handler });
+  }
+
+  private enqueueDegradedMessenger(
+    provider: string,
+    payload: MessengerWebhookPayload,
+    tenantId: string,
+    channelId: string,
+  ): boolean {
+    return this.degradedQueue.enqueue(provider, {
+      run: async () => {
+        await this.unifiedIngressService.ingestMessenger(payload, {
+          provider: 'messenger',
+          tenantId,
+          channelId,
+        });
+      },
+    });
   }
 
   private async resolveTenantOrReject(

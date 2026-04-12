@@ -43,17 +43,44 @@ export class WebhookIdempotencyPurgeService implements OnModuleInit {
     const cutoff = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
 
     try {
-      const result = await this.webhookEventRepository.delete({
-        createdAt: LessThan(cutoff),
-      });
-      const affected = typeof result.affected === 'number' ? result.affected : 0;
-      if (affected > 0) {
-        this.metricsService.recordIdempotencyPurge(affected);
+      let total = 0;
+      let deleted: number;
+
+      // Suppression par lots de 500 pour éviter de locker la table trop longtemps.
+      // MySQL ne supporte pas LIMIT dans DELETE avec sous-requête sur la même table,
+      // donc on sélectionne d'abord les IDs puis on supprime par lot.
+      do {
+        const ids = await this.webhookEventRepository
+          .createQueryBuilder('e')
+          .select('e.id')
+          .where('e.createdAt < :cutoff', { cutoff })
+          .limit(500)
+          .getMany();
+
+        if (!ids.length) {
+          deleted = 0;
+          break;
+        }
+
+        const result = await this.webhookEventRepository.delete(
+          ids.map((e) => e.id),
+        );
+        deleted = result.affected ?? ids.length;
+        total += deleted;
+
+        if (deleted > 0) {
+          // Pause de 50ms entre les lots pour ne pas saturer la DB
+          await new Promise<void>((r) => setTimeout(r, 50));
+        }
+      } while (deleted === 500);
+
+      if (total > 0) {
+        this.metricsService.recordIdempotencyPurge(total);
         this.logger.log(
-          `Idempotency purge removed=${affected} before=${cutoff.toISOString()}`,
+          `Idempotency purge removed=${total} before=${cutoff.toISOString()} (par lots de 500)`,
         );
       }
-      return `${affected} événement(s) webhook supprimé(s) (antérieurs au ${cutoff.toLocaleDateString('fr-FR')}, TTL ${ttlDays}j)`;
+      return `${total} événement(s) webhook supprimé(s) (antérieurs au ${cutoff.toLocaleDateString('fr-FR')}, TTL ${ttlDays}j)`;
     } catch (error) {
       const code = (error as { driverError?: { code?: string } })?.driverError?.code;
       if (code === 'ER_NO_SUCH_TABLE') {

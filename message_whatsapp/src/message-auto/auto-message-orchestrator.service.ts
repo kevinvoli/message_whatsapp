@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -9,7 +9,7 @@ import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.ga
 import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
-export class AutoMessageOrchestrator {
+export class AutoMessageOrchestrator implements OnModuleInit {
   private locks = new Set<string>();
   private pendingTimeouts = new Map<string, NodeJS.Timeout>();
 
@@ -23,6 +23,25 @@ export class AutoMessageOrchestrator {
     private readonly gateway: WhatsappMessageGateway,
     private readonly notificationService: NotificationService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      const released = await this.chatService.resetStaleAutoMessageLocks();
+      if (released > 0) {
+        this.logger.warn(
+          `STARTUP: ${released} conversation(s) déverrouillées (read_only bloqué par restart précédent)`,
+          AutoMessageOrchestrator.name,
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `STARTUP: resetStaleAutoMessageLocks failed: ${msg}`,
+        err instanceof Error ? err.stack : undefined,
+        AutoMessageOrchestrator.name,
+      );
+    }
+  }
 
   async handleClientMessage(chat: WhatsappChat): Promise<void> {
     const chatId = chat.chat_id;
@@ -105,6 +124,19 @@ export class AutoMessageOrchestrator {
     // 🔒 Lock immédiat avant le setTimeout
     this.locks.add(chatId);
 
+    // Timeout de sécurité : si executeAutoMessage ne se résout pas en 10 min,
+    // libérer automatiquement le lock pour éviter un blocage permanent
+    const safetyTimeout = setTimeout(() => {
+      if (this.locks.has(chatId)) {
+        this.logger.warn(
+          `AUTO_MESSAGE_LOCK_TIMEOUT chatId=${chatId} — verrou forcé après 10min`,
+          AutoMessageOrchestrator.name,
+        );
+        this.locks.delete(chatId);
+        void this.chatService.update(chatId, { read_only: false }).catch(() => {});
+      }
+    }, 10 * 60 * 1000);
+
     // 🚫 Verrouillage immédiat de la conversation côté commercial
     // Le commercial ne peut pas envoyer de message pendant le délai d'attente.
     await this.chatService.update(chatId, { read_only: true });
@@ -161,6 +193,7 @@ export class AutoMessageOrchestrator {
             }
           })
           .finally(() => {
+            clearTimeout(safetyTimeout);
             this.locks.delete(chatId);
             this.pendingTimeouts.delete(chatId);
           });
@@ -169,6 +202,7 @@ export class AutoMessageOrchestrator {
       this.pendingTimeouts.set(chatId, timeout);
     } catch (err) {
       // Libérer le lock et déverrouiller la conversation si le scheduling échoue
+      clearTimeout(safetyTimeout);
       this.locks.delete(chatId);
       await this.chatService.update(chatId, { read_only: false });
       this.gateway.emitConversationReadonly({ ...chat, read_only: false } as WhatsappChat);

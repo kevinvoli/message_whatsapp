@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Mutex } from 'async-mutex';
+import { Mutex, MutexInterface, withTimeout } from 'async-mutex';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -31,12 +31,14 @@ import { CommunicationMessengerService } from 'src/communication_whapi/communica
 @Injectable()
 export class InboundMessageService {
   private readonly logger = new Logger(InboundMessageService.name);
-  private readonly chatMutexes = new Map<string, Mutex>();
+  private readonly chatMutexes = new Map<string, MutexInterface>();
 
-  private getChatMutex(chatId: string): Mutex {
+  private getChatMutex(chatId: string): MutexInterface {
     let mutex = this.chatMutexes.get(chatId);
     if (!mutex) {
-      mutex = new Mutex();
+      // Timeout de 30s : si le traitement ne se termine pas, lever une erreur
+      // pour éviter qu'un webhook bloque indéfiniment le chat en cas de freeze DB
+      mutex = withTimeout(new Mutex(), 30_000);
       this.chatMutexes.set(chatId, mutex);
     }
     return mutex;

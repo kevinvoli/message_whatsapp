@@ -50,6 +50,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
   // ─────────────────────────────────────────────────────────────────────────
 
   async run(): Promise<void> {
+    const runStart = Date.now();
     // ÉTAPE 1 — Config maître
     const masterConfig = await this.cronConfigService.findByKey(MASTER_KEY);
     if (!masterConfig.enabled) return;
@@ -87,6 +88,18 @@ export class AutoMessageMasterJob implements OnModuleInit {
     await this.safeRun('G-client_type',  () => this.runTriggerG(allConfigs.get('client-type-auto-message'), windowStart));
     await this.safeRun('H-inactivity',   () => this.runTriggerH(allConfigs.get('inactivity-auto-message')));
     await this.safeRun('I-on_assign',    () => this.runTriggerI(allConfigs.get('on-assign-auto-message'), windowStart));
+
+    const durationMs = Date.now() - runStart;
+    this.logger.debug(
+      `AutoMessageMasterJob completed duration=${durationMs}ms`,
+      AutoMessageMasterJob.name,
+    );
+    if (durationMs > 30_000) {
+      this.logger.warn(
+        `AutoMessageMasterJob SLOW run duration=${durationMs}ms — risque de surcharge DB`,
+        AutoMessageMasterJob.name,
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -123,6 +136,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
         config.applyToClosed ? '1=1' : 'c.status != :closed',
         config.applyToClosed ? {} : { closed: WhatsappChatStatus.FERME },
       )
+      .limit(50)
       .getMany();
 
     this.logger.debug(`TriggerA: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
@@ -158,6 +172,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .where('c.last_client_message_at >= :windowStart', { windowStart })
       .andWhere('c.out_of_hours_auto_sent = false')
       .andWhere('c.status != :closed', { closed: WhatsappChatStatus.FERME })
+      .limit(100)
       .getMany();
 
     this.logger.debug(`TriggerC: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
@@ -187,6 +202,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .leftJoinAndSelect('c.channel', 'channel')
       .where('c.reopened_at >= :windowStart', { windowStart })
       .andWhere('c.reopened_auto_sent = false')
+      .limit(100)
       .getMany();
 
     this.logger.debug(`TriggerD: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
@@ -234,6 +250,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
         )`,
         { cutoff },
       )
+      .limit(50)
       .getMany();
 
     this.logger.debug(`TriggerE: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
@@ -272,6 +289,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .where('c.last_client_message_at >= :windowStart', { windowStart })
       .andWhere('(c.keyword_auto_sent_at IS NULL OR c.keyword_auto_sent_at < c.last_client_message_at)')
       .andWhere('c.status != :closed', { closed: WhatsappChatStatus.FERME })
+      .limit(30)
       .getMany();
 
     this.logger.debug(`TriggerF: ${chats.length} conversation(s) à analyser`, AutoMessageMasterJob.name);
@@ -321,6 +339,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .leftJoinAndSelect('c.channel', 'channel')
       .where('c.last_client_message_at >= :windowStart', { windowStart })
       .andWhere('c.client_type_auto_sent = false')
+      .limit(100)
       .getMany();
 
     this.logger.debug(`TriggerG: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
@@ -366,6 +385,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
         { cutoff },
       )
       .andWhere(config.applyToReadOnly ? '1=1' : 'c.read_only = false')
+      .limit(50)
       .getMany();
 
     this.logger.debug(`TriggerH: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);
@@ -396,6 +416,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .where('c.assigned_at >= :windowStart', { windowStart })
       .andWhere('c.poste_id IS NOT NULL')
       .andWhere('c.on_assign_auto_sent = false')
+      .limit(100)
       .getMany();
 
     this.logger.debug(`TriggerI: ${chats.length} conversation(s) ciblée(s)`, AutoMessageMasterJob.name);

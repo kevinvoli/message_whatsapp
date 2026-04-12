@@ -57,31 +57,44 @@ export class WebhookTrafficHealthService {
     const p95 = latencies[p95Index] ?? 0;
 
     const circuit = errorRate >= 0.05;
-    const degrade = p95 >= 800;
+    const degrade = p95 >= 3000; // seuil réaliste pour éviter les faux-positifs
 
-    this.updateState(provider, circuit, degrade);
+    this.updateState(provider, circuit, degrade, { errorRate, p95, sampleCount: list.length });
   }
 
   private updateState(
     provider: string,
     circuit: boolean,
     degrade: boolean,
+    metrics?: { errorRate: number; p95: number; sampleCount: number },
   ): void {
     const prevCircuit = this.circuitOpen.get(provider) ?? false;
     const prevDegraded = this.degraded.get(provider) ?? false;
 
     if (prevCircuit !== circuit) {
       this.circuitOpen.set(provider, circuit);
-      this.logger.warn(
-        `Circuit breaker ${circuit ? 'OPEN' : 'CLOSED'} for ${provider}`,
-      );
+      if (circuit) {
+        this.logger.error(
+          `CIRCUIT_BREAKER_OPEN provider=${provider} errorRate=${((metrics?.errorRate ?? 0) * 100).toFixed(1)}% samples=${metrics?.sampleCount ?? 0}`,
+        );
+      } else {
+        this.logger.warn(
+          `CIRCUIT_BREAKER_CLOSED provider=${provider}`,
+        );
+      }
     }
 
     if (prevDegraded !== degrade) {
       this.degraded.set(provider, degrade);
-      this.logger.warn(
-        `Backpressure ${degrade ? 'ENABLED' : 'DISABLED'} for ${provider}`,
-      );
+      if (degrade) {
+        this.logger.warn(
+          `BACKPRESSURE_ENABLED provider=${provider} p95=${metrics?.p95 ?? 0}ms errorRate=${((metrics?.errorRate ?? 0) * 100).toFixed(1)}% samples=${metrics?.sampleCount ?? 0}`,
+        );
+      } else {
+        this.logger.log(
+          `BACKPRESSURE_DISABLED provider=${provider} p95=${metrics?.p95 ?? 0}ms`,
+        );
+      }
     }
   }
 }

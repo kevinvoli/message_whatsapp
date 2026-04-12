@@ -7,8 +7,8 @@ type QueueTask = {
 @Injectable()
 export class WebhookDegradedQueueService {
   private readonly logger = new Logger(WebhookDegradedQueueService.name);
-  private readonly maxQueueSize = 5000;
-  private readonly concurrency = 5;
+  private readonly maxQueueSize = 50000;
+  private readonly concurrency = 20;
 
   private readonly queues = new Map<string, QueueTask[]>();
   private readonly inFlight = new Map<string, number>();

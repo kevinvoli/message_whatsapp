@@ -191,6 +191,10 @@ export class MessageAutoService {
       return;
     }
 
+    // Marquer le tracking AVANT l'envoi pour rendre l'opération idempotente.
+    // Si l'envoi échoue, le message ne sera PAS renvoyé en double au prochain tick.
+    await this.updateTriggerTracking(chatId, trigger, step);
+
     // Typing WA start (best-effort)
     void this.messageService.typingStart(chatId).catch(() => {});
 
@@ -211,9 +215,13 @@ export class MessageAutoService {
 
       await this.gateway.notifyAutoMessage(message, chat);
 
-      // Mise à jour des champs de suivi propres au trigger
-      await this.updateTriggerTracking(chatId, trigger, step);
-
+    } catch (err) {
+      // Envoi échoué, mais le tracking est déjà mis à jour → pas de double envoi au prochain tick
+      this.logger.error(
+        `sendAutoMessageForTrigger: envoi échoué pour ${chatId} trigger=${trigger} step=${step}: ${(err as Error).message}`,
+        undefined,
+        MessageAutoService.name,
+      );
     } finally {
       void this.messageService.typingStop(chatId).catch(() => {});
     }

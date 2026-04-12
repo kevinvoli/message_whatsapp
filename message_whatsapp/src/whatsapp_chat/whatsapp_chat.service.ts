@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -422,6 +422,22 @@ export class WhatsappChatService {
 
   remove(id: string) {
     return `This action removes a #${id} whatsappChat`;
+  }
+
+  /**
+   * Libère les conversations verrouillées (read_only=true) sans qu'aucun auto-message
+   * n'ait encore été envoyé. Ce cas survient quand le serveur redémarre après que
+   * l'orchestrateur a posé le verrou DB mais avant d'avoir envoyé le message.
+   */
+  async resetStaleAutoMessageLocks(): Promise<number> {
+    const result = await this.chatRepository.update(
+      {
+        read_only: true,
+        last_auto_message_sent_at: IsNull(),
+      },
+      { read_only: false },
+    );
+    return result.affected ?? 0;
   }
 
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
