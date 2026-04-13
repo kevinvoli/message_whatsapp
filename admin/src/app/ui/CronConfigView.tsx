@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Clock, Lock, PauseCircle, Play, RefreshCw, RotateCcw, Timer, X, Zap } from 'lucide-react';
 import { CronConfig, UpdateCronConfigPayload } from '@/app/lib/definitions';
-import { CronLastReport, CronLastReports, getCronConfigs, getCronLastReports, getCronPreview, resetCronConfig, runCronNow, updateCronConfig } from '@/app/lib/api';
+import { CronLastReport, CronLastReports, getCronConfigs, getCronLastReports, getCronPreview, resetCronConfig, runCronNow, updateCronConfig } from '@/app/lib/api/crons.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate, formatRelativeDate } from '@/app/lib/dateUtils';
 

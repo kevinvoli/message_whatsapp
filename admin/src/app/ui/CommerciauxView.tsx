@@ -1,7 +1,9 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial } from '@/app/lib/api';
+import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api/commerciaux.api';
+import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
+import { getPostes } from '@/app/lib/api/postes.api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';

@@ -1,16 +1,12 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import {
-  getOverviewMetriques,
-  getPerformanceCommerciaux,
-  getChats,
-  getMessages,
-  getClients,
-  getPostes,
-  getChannels,
-  getMessageAuto,
-} from './api';
+import { getOverviewMetriques, getPerformanceCommerciaux } from './api/metrics.api';
+import { getChats, getMessages } from './api/conversations.api';
+import { getClients } from './api/clients.api';
+import { getPostes } from './api/postes.api';
+import { getChannels } from './api/channels.api';
+import { getMessageAuto } from './api/automations.api';
 import { formatDateShort } from './dateUtils';
 
 export type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';

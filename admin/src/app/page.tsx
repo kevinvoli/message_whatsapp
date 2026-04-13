@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminDashboard from './dashboard/commercial/page';
 import { Spinner } from './ui/Spinner';
-import { checkAdminAuth } from './lib/api'; // Import checkAdminAuth
+import { checkAdminAuth } from './lib/api/auth.api'; // Import checkAdminAuth
 import { logger } from './lib/logger';
 
 export default function Home() {

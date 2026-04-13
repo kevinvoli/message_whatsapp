@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { FileText, Download, RefreshCw, MessageCircle, Users, BarChart2, Calendar } from 'lucide-react';
-import { getOverviewSection } from '@/app/lib/api';
+import { getOverviewSection } from '@/app/lib/api/metrics.api';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
 import { formatDateShort } from '@/app/lib/dateUtils';

@@ -7,7 +7,7 @@ import { resolveAdminMessageText } from '../lib/utils';
 import { formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
 import { Spinner } from './Spinner';
 import { Pagination } from './Pagination';
-import { getMessages } from '@/app/lib/api';
+import { getMessages } from '@/app/lib/api/conversations.api';
 import { ProviderBadge } from './ProviderBadge';
 
 interface MessagesViewProps {

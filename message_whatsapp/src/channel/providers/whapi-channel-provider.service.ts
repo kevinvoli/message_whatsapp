@@ -4,24 +4,30 @@
  * Crée et met à jour un canal WhatsApp via l'API Whapi.
  * Extrait de `ChannelService.create()` branche `provider === 'whapi'`.
  */
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { ChannelProviderStrategy } from '../domain/channel-provider-strategy.interface';
+import { ChannelProviderRegistry } from '../domain/channel-provider.registry';
 import { ChannelPersistenceHelper } from '../infrastructure/channel-persistence.helper';
 import { CreateChannelDto } from '../dto/create-channel.dto';
 import { UpdateChannelDto } from '../dto/update-channel.dto';
 import { WhapiChannel } from '../entities/channel.entity';
 
 @Injectable()
-export class WhapiChannelProviderService implements ChannelProviderStrategy {
+export class WhapiChannelProviderService implements ChannelProviderStrategy, OnModuleInit {
   readonly provider = 'whapi';
 
   constructor(
     private readonly helper: ChannelPersistenceHelper,
     private readonly communicationService: CommunicationWhapiService,
     private readonly logger: AppLogger,
+    private readonly registry: ChannelProviderRegistry,
   ) {}
+
+  onModuleInit(): void {
+    this.registry.register(this);
+  }
 
   async create(dto: CreateChannelDto): Promise<WhapiChannel> {
     const channel = await this.communicationService.getChannel(dto);
@@ -59,7 +65,7 @@ export class WhapiChannelProviderService implements ChannelProviderStrategy {
       WhapiChannelProviderService.name,
     );
 
-    return this.helper.findById(saved.id);
+    return this.helper.findById(saved.id) as Promise<WhapiChannel>;
   }
 
   async update(channel: WhapiChannel, dto: UpdateChannelDto): Promise<WhapiChannel> {

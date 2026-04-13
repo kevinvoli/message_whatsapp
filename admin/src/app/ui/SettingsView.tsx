@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle, Link, Copy, ExternalLink } from 'lucide-react';
 import { SystemConfigEntry, WebhookEntry } from '@/app/lib/definitions';
-import { bulkUpdateSystemConfig, getSystemConfigs, getWebhookUrls } from '@/app/lib/api';
+import { bulkUpdateSystemConfig, getSystemConfigs, getWebhookUrls } from '@/app/lib/api/system-config.api';
 
 interface AdminProfile {
   id: string;

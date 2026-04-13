@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
-import { getWebhookMetrics } from '@/app/lib/api';
+import { getWebhookMetrics } from '@/app/lib/api/metrics.api';
 
 type Props = {
   onRefresh?: () => void;

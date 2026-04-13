@@ -16,6 +16,8 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AssignPosteDto } from './dto/assign-poste.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
+import { CreateChannelUseCase } from './application/create-channel.use-case';
+import { AssignChannelPosteUseCase } from './application/assign-channel-poste.use-case';
 
 @Controller('channel')
 @UseGuards(AdminGuard) // Use AdminGuard
@@ -25,11 +27,13 @@ export class ChannelController {
   constructor(
     private readonly communicationWhapiService: ChannelService,
     private readonly metaTokenService: MetaTokenService,
+    private readonly createChannelUseCase: CreateChannelUseCase,
+    private readonly assignChannelPosteUseCase: AssignChannelPosteUseCase,
   ) {}
 
   @Post()
   create(@Body() createCommunicationWhapiDto: CreateChannelDto) {
-    return this.communicationWhapiService.create(createCommunicationWhapiDto);
+    return this.createChannelUseCase.execute(createCommunicationWhapiDto);
   }
 
   @Get()
@@ -63,7 +67,7 @@ export class ChannelController {
     @Param('id') channelId: string,
     @Body() dto: AssignPosteDto,
   ) {
-    return this.communicationWhapiService.assignPoste(channelId, dto.poste_id ?? null);
+    return this.assignChannelPosteUseCase.execute(channelId, dto.poste_id ?? null);
   }
 
   @Post(':id/refresh-token')

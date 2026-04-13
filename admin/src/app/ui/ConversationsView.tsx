@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial, patchChat } from '@/app/lib/api';
+import { getMessagesForChat, getMessageCount, sendMessage, getChats, getChatStatsByCommercial, patchChat } from '@/app/lib/api/conversations.api';
+import { getPostes } from '@/app/lib/api/postes.api';
 import { Spinner } from './Spinner';
 import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';

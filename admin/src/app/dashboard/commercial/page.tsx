@@ -14,23 +14,25 @@ import AnalyticsView from '@/app/ui/AnalyticsView';
 import MessagesView from '@/app/ui/MessagesView';
 import ClientsView from '@/app/ui/ClientsView';
 import RapportsView from '@/app/ui/RapportsView';
-import PostesView from '@/app/ui/PostesView';
-import ChannelsView from '@/app/ui/ChannelsView';
-import MessageAutoView from '@/app/ui/MessageAutoView';
+// ── Modules autonomes par domaine (TICKET-09-C) ───────────────────────────────
+import ChannelsView from '@/app/modules/channels/components/ChannelsView';
+import PostesView from '@/app/modules/channels/components/PostesView';
+import DispatchView from '@/app/modules/dispatch/components/DispatchView';
+import QueueView from '@/app/modules/dispatch/components/QueueView';
+import MessageAutoView from '@/app/modules/automations/components/MessageAutoView';
+import CronConfigView from '@/app/modules/automations/components/CronConfigView';
+import NotificationsView from '@/app/modules/notifications/components/NotificationsView';
+import AlertConfigView from '@/app/modules/notifications/components/AlertConfigView';
+import ObservabiliteView from '@/app/modules/observability/components/ObservabiliteView';
+import GoNoGoView from '@/app/modules/observability/components/GoNoGoView';
+import SettingsView from '@/app/modules/settings/components/SettingsView';
+// ── Vues non encore modulées ──────────────────────────────────────────────────
 import ConversationsView from '@/app/ui/ConversationsView';
-import QueueView from '@/app/ui/QueueView';
-import DispatchView from '@/app/ui/DispatchView';
-import CronConfigView from '@/app/ui/CronConfigView';
-import AlertConfigView from '@/app/ui/AlertConfigView';
-import ObservabiliteView from '@/app/ui/ObservabiliteView';
-import GoNoGoView from '@/app/ui/GoNoGoView';
-import NotificationsView from '@/app/ui/NotificationsView';
-import SettingsView from '@/app/ui/SettingsView';
-import { useNotifications } from '@/app/hooks/useNotifications';
+import { useNotifications } from '@/app/modules/notifications/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
 import { ViewMode } from '@/app/lib/definitions';
-import { getAdminProfile } from '@/app/lib/api';
+import { getAdminProfile } from '@/app/lib/api/auth.api';
 
 export default function AdminDashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('today');

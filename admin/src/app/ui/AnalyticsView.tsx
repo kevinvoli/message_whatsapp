@@ -14,7 +14,7 @@ import {
     Line,
 } from 'recharts';
 import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle } from 'lucide-react';
-import { getOverviewSection } from '@/app/lib/api';
+import { getOverviewSection } from '@/app/lib/api/metrics.api';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
 

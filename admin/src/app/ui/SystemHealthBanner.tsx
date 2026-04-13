@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, CheckCircle, Send, XCircle } from 'lucide-react';
-import { AlertStatus } from '@/app/lib/api';
+import { AlertStatus } from '@/app/lib/api/system-config.api';
 import { formatTime } from '@/app/lib/dateUtils';
 
 interface Props {

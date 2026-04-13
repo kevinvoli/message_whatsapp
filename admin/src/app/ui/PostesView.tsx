@@ -3,14 +3,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw, MessageSquare } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
-import {
-  blockPosteFromQueue,
-  createPoste,
-  deletePoste,
-  getPostes,
-  unblockPosteFromQueue,
-  updatePoste,
-} from '@/app/lib/api';
+import { createPoste, deletePoste, getPostes, updatePoste } from '@/app/lib/api/postes.api';
+import { blockPosteFromQueue, unblockPosteFromQueue } from '@/app/lib/api/dispatch.api';
 import { Poste } from '@/app/lib/definitions';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';

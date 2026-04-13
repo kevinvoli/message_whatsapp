@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Settings, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { NavigationGroup, ViewMode, WhatsappMessage } from '@/app/lib/definitions';
 import { useRouter } from 'next/navigation';
-import { logoutAdmin } from '@/app/lib/api';
+import { logoutAdmin } from '@/app/lib/api/auth.api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 

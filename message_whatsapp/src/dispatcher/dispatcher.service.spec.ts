@@ -10,8 +10,6 @@ import { ConversationPublisher } from 'src/realtime/publishers/conversation.publ
 import { DispatchQueryService } from './infrastructure/dispatch-query.service';
 import { AssignConversationUseCase } from './application/assign-conversation.use-case';
 import { ReinjectConversationUseCase } from './application/reinject-conversation.use-case';
-import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
-import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
 
 /**
  * Tests de la façade DispatcherService.
@@ -52,8 +50,6 @@ describe('DispatcherService (façade)', () => {
   };
   const assignUseCase = { execute: jest.fn() };
   const reinjectUseCase = { execute: jest.fn() };
-  const redispatchUseCase = { execute: jest.fn() };
-  const resetStuckUseCase = { execute: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -67,8 +63,6 @@ describe('DispatcherService (façade)', () => {
         { provide: DispatchQueryService, useValue: queryService },
         { provide: AssignConversationUseCase, useValue: assignUseCase },
         { provide: ReinjectConversationUseCase, useValue: reinjectUseCase },
-        { provide: RedispatchWaitingUseCase, useValue: redispatchUseCase },
-        { provide: ResetStuckActiveUseCase, useValue: resetStuckUseCase },
       ],
     }).compile();
 
@@ -77,7 +71,7 @@ describe('DispatcherService (façade)', () => {
 
   // ─── Délégation aux use cases ────────────────────────────────────────────
 
-  it('assignConversation délègue à AssignConversationUseCase.execute()', async () => {
+  it('assignConversation délègue à AssignConversationUseCase via mutex', async () => {
     const fakeChat = { chat_id: 'c@c.us', status: WhatsappChatStatus.ACTIF } as WhatsappChat;
     assignUseCase.execute.mockResolvedValue(fakeChat);
 
@@ -85,34 +79,6 @@ describe('DispatcherService (façade)', () => {
 
     expect(assignUseCase.execute).toHaveBeenCalledWith('c@c.us', 'Client', 'trace-1', 'tenant-1', 'ch-1');
     expect(result).toBe(fakeChat);
-  });
-
-  it('reinjectConversation délègue à ReinjectConversationUseCase.execute()', async () => {
-    const chat = { chat_id: 'c@c.us', read_only: false } as WhatsappChat;
-    reinjectUseCase.execute.mockResolvedValue({ oldPosteId: 'p1', newPosteId: 'p2' });
-
-    const result = await service.reinjectConversation(chat, false);
-
-    expect(reinjectUseCase.execute).toHaveBeenCalledWith(chat, false);
-    expect(result).toEqual({ oldPosteId: 'p1', newPosteId: 'p2' });
-  });
-
-  it('redispatchWaiting délègue à RedispatchWaitingUseCase.execute()', async () => {
-    redispatchUseCase.execute.mockResolvedValue({ dispatched: 3, still_waiting: 1 });
-
-    const result = await service.redispatchWaiting();
-
-    expect(redispatchUseCase.execute).toHaveBeenCalled();
-    expect(result).toEqual({ dispatched: 3, still_waiting: 1 });
-  });
-
-  it('resetStuckActiveToWaiting délègue à ResetStuckActiveUseCase.execute()', async () => {
-    resetStuckUseCase.execute.mockResolvedValue({ reset: 5 });
-
-    const result = await service.resetStuckActiveToWaiting();
-
-    expect(resetStuckUseCase.execute).toHaveBeenCalled();
-    expect(result).toEqual({ reset: 5 });
   });
 
   // ─── jobRunnerAllPostes ──────────────────────────────────────────────────

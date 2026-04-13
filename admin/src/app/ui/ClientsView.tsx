@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Edit, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
 import { Client } from '@/app/lib/definitions';
-import { createClient, deleteClient, updateClient, getClients } from '@/app/lib/api';
+import { createClient, deleteClient, updateClient, getClients } from '@/app/lib/api/clients.api';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 import { Pagination } from '@/app/ui/Pagination';

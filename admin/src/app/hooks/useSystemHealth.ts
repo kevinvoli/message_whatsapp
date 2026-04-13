@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertStatus, getSystemHealthStatus } from '@/app/lib/api';
+import { AlertStatus, getSystemHealthStatus } from '@/app/lib/api/system-config.api';
 
 const POLL_INTERVAL_MS = 30_000; // 30 secondes
 

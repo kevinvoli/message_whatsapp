@@ -13,7 +13,13 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { ConversationReadQueryService } from 'src/conversations/infrastructure/conversation-read-query.service';
 
+/**
+ * TICKET-06-B — ConversationReadQueryService enregistré ici.
+ * Il centralise toutes les requêtes SELECT sur whatsapp_chat.
+ * WhatsappChatService délègue ses méthodes de lecture à ce service.
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -30,9 +36,11 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
   providers: [
     WhatsappChatGateway,
     WhatsappChatService,
+    ConversationReadQueryService,
     WhatsappPosteService,
     WhatsappCommercialService,
     QueueService,
   ],
+  exports: [WhatsappChatService, ConversationReadQueryService],
 })
 export class WhatsappChatModule {}

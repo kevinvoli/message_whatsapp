@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
-import { getOverviewSection } from '@/app/lib/api';
+import { getOverviewSection } from '@/app/lib/api/metrics.api';
 import { Spinner } from './Spinner';
 
 interface PerformanceViewProps {

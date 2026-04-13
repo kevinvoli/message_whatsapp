@@ -4,11 +4,9 @@ import { NotFoundException } from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
-import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
-import { MetaTokenService } from './meta-token.service';
-import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { ChannelProviderRegistry } from './domain/channel-provider.registry';
+import { ResolveTenantUseCase } from './application/resolve-tenant.use-case';
 
 describe('ChannelService', () => {
   let service: ChannelService;
@@ -25,10 +23,15 @@ describe('ChannelService', () => {
   const providerChannelRepository = {
     findOne: jest.fn(),
     save: jest.fn(),
+    create: jest.fn(),
   };
-  const posteRepository = {
-    findOne: jest.fn(),
+  const providerRegistry = {
+    get: jest.fn(),
+    has: jest.fn(),
+    register: jest.fn(),
+    listProviders: jest.fn(),
   };
+  const resolveTenantUseCase = { execute: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -38,11 +41,9 @@ describe('ChannelService', () => {
         ChannelService,
         { provide: getRepositoryToken(WhapiChannel), useValue: channelRepository },
         { provide: getRepositoryToken(ProviderChannel), useValue: providerChannelRepository },
-        { provide: getRepositoryToken(WhatsappPoste), useValue: posteRepository },
-        { provide: CommunicationWhapiService, useValue: {} },
-        { provide: MetaTokenService, useValue: {} },
-        { provide: CommunicationTelegramService, useValue: {} },
         { provide: AppLogger, useValue: { log: jest.fn(), warn: jest.fn(), error: jest.fn() } },
+        { provide: ChannelProviderRegistry, useValue: providerRegistry },
+        { provide: ResolveTenantUseCase, useValue: resolveTenantUseCase },
       ],
     }).compile();
 
@@ -53,57 +54,27 @@ describe('ChannelService', () => {
     expect(service).toBeDefined();
   });
 
-  // ─── Tests assignPoste (AS-01 à AS-03) ─────────────────────────────────────
+  // ─── resolveTenantByProviderExternalId → ResolveTenantUseCase ──────────────
 
-  describe('assignPoste', () => {
-    it('AS-01 : assignation valide → update appelé avec poste_id', async () => {
-      posteRepository.findOne.mockResolvedValue({ id: 'poste-A', name: 'Poste A' });
-      channelRepository.update.mockResolvedValue({ affected: 1 });
-      channelRepository.findOne.mockResolvedValue({
-        id: 'ch-uuid',
-        channel_id: 'channel-1',
-        poste_id: 'poste-A',
-        poste: { id: 'poste-A', name: 'Poste A' },
-      });
+  describe('resolveTenantByProviderExternalId', () => {
+    it('délègue à ResolveTenantUseCase.execute()', async () => {
+      resolveTenantUseCase.execute.mockResolvedValue('tenant-42');
 
-      const result = await service.assignPoste('channel-1', 'poste-A');
+      const result = await service.resolveTenantByProviderExternalId('meta', 'ext-id-1');
 
-      expect(channelRepository.update).toHaveBeenCalledWith(
-        { channel_id: 'channel-1' },
-        { poste_id: 'poste-A' },
-      );
-      expect(result.poste_id).toBe('poste-A');
+      expect(resolveTenantUseCase.execute).toHaveBeenCalledWith('meta', 'ext-id-1');
+      expect(result).toBe('tenant-42');
     });
 
-    it('AS-02 : désassignation (null) → poste_id = null dans update', async () => {
-      channelRepository.update.mockResolvedValue({ affected: 1 });
-      channelRepository.findOne.mockResolvedValue({
-        id: 'ch-uuid',
-        channel_id: 'channel-1',
-        poste_id: null,
-        poste: null,
-      });
+    it('retourne null si aucun mapping trouvé', async () => {
+      resolveTenantUseCase.execute.mockResolvedValue(null);
 
-      await service.assignPoste('channel-1', null);
-
-      expect(posteRepository.findOne).not.toHaveBeenCalled();
-      expect(channelRepository.update).toHaveBeenCalledWith(
-        { channel_id: 'channel-1' },
-        { poste_id: null },
-      );
-    });
-
-    it('AS-03 : poste inexistant → NotFoundException', async () => {
-      posteRepository.findOne.mockResolvedValue(null);
-
-      await expect(service.assignPoste('channel-1', 'poste-inconnu'))
-        .rejects.toThrow(NotFoundException);
-
-      expect(channelRepository.update).not.toHaveBeenCalled();
+      const result = await service.resolveTenantByProviderExternalId('meta', 'unknown');
+      expect(result).toBeNull();
     });
   });
 
-  // ─── Tests getDedicatedPosteId ──────────────────────────────────────────────
+  // ─── getDedicatedPosteId (logique reste dans ChannelService) ────────────────
 
   describe('getDedicatedPosteId', () => {
     it('retourne le poste_id quand le channel a un poste dédié', async () => {

@@ -3,13 +3,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import { QueuePosition, Poste } from "@/app/lib/definitions";
-import {
-  blockPosteFromQueue,
-  getPostes,
-  getQueue,
-  resetQueue,
-  unblockPosteFromQueue,
-} from "@/app/lib/api";
+import { getPostes } from "@/app/lib/api/postes.api";
+import { blockPosteFromQueue, getQueue, resetQueue, unblockPosteFromQueue } from "@/app/lib/api/dispatch.api";
 import { logger } from "@/app/lib/logger";
 import { useToast } from "@/app/ui/ToastProvider";
 import { useRealtimePolling } from "@/app/hooks/useRealtimePolling";

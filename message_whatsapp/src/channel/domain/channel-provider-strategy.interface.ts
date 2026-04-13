@@ -21,8 +21,9 @@ export interface ChannelProviderStrategy {
    * Crée un nouveau canal pour ce provider.
    * Peut valider le token en appelant l'API du provider, créer des entrées
    * `ProviderChannel` ou configurer des webhooks.
+   * Retourne null si le canal ne peut pas être créé (ex : token invalide Whapi).
    */
-  create(dto: CreateChannelDto): Promise<WhapiChannel>;
+  create(dto: CreateChannelDto): Promise<WhapiChannel | null>;
 
   /**
    * Met à jour un canal existant.

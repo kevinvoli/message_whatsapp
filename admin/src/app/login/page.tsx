@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, loginAdmin } from '@/app/lib/api'; // Import loginAdmin
+import { login, loginAdmin } from '@/app/lib/api/auth.api'; // Import loginAdmin
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { ReinjectConversationUseCase } from 'src/dispatcher/application/reinject-conversation.use-case';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -20,6 +21,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
+    private readonly reinjectUseCase: ReinjectConversationUseCase,
     private readonly cronConfigService: CronConfigService,
   ) {}
 
@@ -82,7 +84,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
       const poste = chat.poste;
       if (!poste) continue;
       if (poste.is_active) continue;
-      await this.dispatcher.reinjectConversation(chat);
+      await this.reinjectUseCase.execute(chat);
       reinjectedOffline++;
     }
 

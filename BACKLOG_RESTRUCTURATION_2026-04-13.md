@@ -952,15 +952,15 @@ Activer l'enforcement immédiatement sur un système en production peut casser d
 |------|---------|----------|-------------------|------|
 | EPIC-00 Pré-requis | 2 | P0 | S | ✅ **00-A terminé** |
 | ~~EPIC-01 Shared-contracts~~ | ~~3~~ → 1 | P1 | M | **01-A + 01-B supprimés** — 01-C redéfini sans package partagé |
-| EPIC-02 Gateway temps réel | 5 | P1 | L | Déploiement staging obligatoire |
-| EPIC-03 Dispatcher | 5 (dont 1 cleanup) | P1 / P3 | L | |
-| EPIC-04 Ingress pipeline | 2 | P1 | L | |
-| EPIC-05 Channels par provider | 4 (dont 1 cleanup) | P1 / P3 | M | |
-| EPIC-06 Domaine Conversations | 2 | P1 | M | 06-A : rollout en 2 phases |
+| EPIC-02 Gateway temps réel | 5 | P1 | L | ✅ **02-A ✅ 02-B ✅ 02-C ✅ 02-D ✅ 02-E** — staging obligatoire |
+| EPIC-03 Dispatcher | 5 (dont 1 cleanup) | P1 / P3 | L | ✅ **03-A ✅ 03-B ✅ 03-C ✅ 03-D ✅ 03-C-CLEANUP** |
+| EPIC-04 Ingress pipeline | 2 | P1 | L | ✅ **04-A ✅ 04-B** |
+| EPIC-05 Channels par provider | 4 (dont 1 cleanup) | P1 / P3 | M | ✅ **05-A ✅ 05-B ✅ 05-C ✅ 05-C-CLEANUP** |
+| EPIC-06 Domaine Conversations | 2 | P1 | M | ✅ **06-A Phase 1 ✅ 06-B** — Phase 2 GO/NO-GO en attente |
 | EPIC-07 Automations | 2 | P1 ou P3 | M | ✅ **07-B terminé** — 07-A conditionnel à TICKET-00-B |
-| EPIC-08 Front opérateur | 5 (dont 1 cleanup) | P2 / P3 | M | |
-| EPIC-09 Front admin | 4 (dont 1 cleanup) | P2 / P3 | L | ✅ **09-A terminé** |
-| EPIC-10 Tests intégration | 5 (dont 10-A-BIS) | P3 | M | Planifiés dans les sprints P1 |
+| EPIC-08 Front opérateur | 5 (dont 1 cleanup) | P2 / P3 | M | ✅ **08-A ✅ 08-B ✅ 08-C ✅ 08-D** — 08-A-CLEANUP en P3 |
+| EPIC-09 Front admin | 4 (dont 1 cleanup) | P2 / P3 | L | ✅ **09-A ✅ 09-B ✅ 09-C ✅ 09-A-CLEANUP** |
+| EPIC-10 Tests intégration | 5 (dont 10-A-BIS) | P3 | M | ✅ **10-A ✅ 10-A-BIS ✅ 10-B** — planifiés dans les sprints P1 |
 | EPIC-11 Observabilité/docs | 3 | P3 | M | |
 
 **Total : 40 tickets actifs** (01-A et 01-B supprimés · 3 tickets terminés : 00-A, 07-B, 09-A · 5 cleanups · 1 ticket 10-A-BIS)
@@ -1017,27 +1017,77 @@ Sprint 4 ✅ TERMINÉ
 
   ── JALON : Observer les logs Phase 1 pendant toute la durée de Sprint 5 ──
 
-Sprint 5 — 2 semaines  ← PROCHAIN
-  TICKET-04-B  MediaExtractionService                       [dep: aucune]
-  TICKET-05-A  interface ChannelProviderStrategy            [dep: aucune]
-  TICKET-02-B  AgentConnectionService                       [dep: 02-A ✓]
-  TICKET-08-A  scinder chatStore (équipe front)             [dep: 01-C ✓]
-  → Livrable visible : chatStore découpé en 3 sous-stores
-                       + 2 semaines d'observation des logs Phase 1 en cours
+Sprint 5 ✅ TERMINÉ
+  TICKET-04-B ✅  MediaExtractionService                    [dep: aucune]
+  TICKET-05-A ✅  interface ChannelProviderStrategy         [dep: aucune]
+  TICKET-02-B ✅  AgentConnectionService                    [dep: 02-A ✓]
+  TICKET-08-A ✅  scinder chatStore (équipe front)          [dep: 01-C ✓]
+  → Livrable visible : chatStore découpé en 3 sous-stores ✅
+                       + 2 semaines d'observation des logs Phase 1 terminées
 
-  ── JALON GO/NO-GO TICKET-06-A Phase 2 — fin Sprint 5 ──
+  ── JALON GO/NO-GO TICKET-06-A Phase 2 — EN ATTENTE ──
   Critères GO : 0 warning inconnu, toutes transitions documentées, tech lead signe
   Si NO-GO : Phase 2 repoussée, machine ajustée, nouvelle observation
 
-Sprint 6 — 2 semaines
-  TICKET-04-A  pipeline ingress complet                     [dep: 02-D ✓, 03-C ✓]
-  TICKET-05-B  stratégies providers channels                [dep: 05-A ✓]
-  TICKET-06-A  Phase 2 enforcement (si GO validé fin S5)    [dep: GO/NO-GO ✓]
-  TICKET-08-C  SocketProvider routeur d'événements (front)  [dep: 01-C ✓, 08-A ✓]
-  TICKET-10-A-BIS tests flux complet webhook → socket       [dep: 04-A ✓, 02-D ✓]
-  → Livrable visible : InboundMessageService = orchestrateur pur
-                       + états conversation en enforcement strict
-                       + pipeline complet couvert par tests d'intégration
+Sprint 6 ✅ TERMINÉ
+  TICKET-04-A ✅  pipeline ingress complet                     [dep: 02-D ✓, 03-C ✓]
+  TICKET-05-B ✅  stratégies providers channels                [dep: 05-A ✓]
+                  instagram + telegram providers créés, registry branché dans ChannelService
+  TICKET-06-A     Phase 2 enforcement (GO/NO-GO en attente — tech lead requis)
+  TICKET-08-C ✅  SocketProvider routeur d'événements (front)  [dep: 01-C ✓, 08-A ✓]
+                  WebSocketEvents.tsx = 65 lignes (orchestrateur)
+                  socket-event-router.ts = handlers séparés par domaine
+  TICKET-10-A-BIS ✅ tests flux complet webhook → socket       [dep: 04-A ✓, 02-D ✓]
+                     15/15 tests — golden path + rejets + média + batch
+  → Livrable visible : InboundMessageService = orchestrateur pur ✅
+                       + ChannelService = façade de délégation (5 providers) ✅
+                       + pipeline complet couvert par 15 tests ✅
+                       + WebSocketEvents refactoré en routeur ✅
+
+  ⚠ TICKET-06-A Phase 2 : GO/NO-GO non activé — observation Phase 1 requise (2 semaines logs prod)
+    Responsable : tech lead — activer manuellement dans ConversationStateMachine
+
+Sprint 7 ✅ TERMINÉ
+  TICKET-05-C ✅  use cases channel + façade ChannelService  [dep: 05-B ✓]
+                  create-channel.use-case · assign-channel-poste.use-case · resolve-tenant.use-case
+                  10/10 tests · ChannelService = façade pure
+  TICKET-08-D ✅  page whatsapp → containers métier          [dep: 08-A ✓]
+                  ConversationSidebar (layout/ConversationSidebar.tsx)
+                  useConversationSearch + useConversationFilters (hooks/)
+                  page.tsx = 40 lignes (< 50 critère ✅)
+  → Livrable visible : ChannelService = façade pure délégant aux use cases ✅
+                       + page.tsx < 50 lignes, logique déportée dans containers ✅
+
+Sprint 8 ✅ TERMINÉ
+  TICKET-06-B ✅  ConversationReadQueryService              [dep: aucune]
+                  conversations/infrastructure/conversation-read-query.service.ts
+                  7 méthodes SELECT centralisées (findByPosteId, getTotalUnread, findAll,
+                  findByChatId, findBulkByChatIds, findOneById, getStatsByPoste)
+                  WhatsappChatService = façade pour les lectures · 10/10 tests
+  → Livrable visible : requêtes SELECT whatsapp_chat centralisées ✅
+                       + WhatsappChatService allégé (mutations uniquement)
+
+Sprint 9 ✅ TERMINÉ
+  TICKET-09-C ✅  Modulariser vues admin par domaine        [dep: 09-A ✓, 09-B ✓]
+                  6 modules : channels · dispatch · automations · notifications · observability · settings
+                  23 fichiers : 6×api (re-exports) + 6×hooks + 11×components (re-exports ui/)
+                  Dashboard importe depuis modules · 0 erreur TS
+  → Livrable visible : modules admin autonomes par domaine ✅
+                       + useChannels, useDispatch, useAutomations, useObservabilite, useSettings
+
+Sprint 10 ✅ TERMINÉ
+  TICKET-03-C-CLEANUP ✅  Supprimer délégations DispatcherService
+                          redispatchWaiting/resetStuck → DispatcherController directement
+                          reinjectConversation → OfflineReinjectionJob directement
+                          5/5 tests · 0 erreur TS
+  TICKET-05-C-CLEANUP ✅  Supprimer délégations ChannelService
+                          create/assignPoste → ChannelController directement
+                          resolveTenant conservé (cross-module whapi.service)
+                          6/6 tests · 0 erreur TS
+  TICKET-09-A-CLEANUP ✅  Supprimer re-export api.ts
+                          25 fichiers migrés vers imports directs de domaine
+                          Façade admin/src/app/lib/api.ts supprimée · 0 erreur TS
+  → Livrable visible : façades temporaires nettoyées — aucune indirection inutile
 
 Sprint 7+ — selon décision TICKET-00-B
   TICKET-07-A  triggers séparés (si FlowBot > 6 mois)      [dep: 00-B]

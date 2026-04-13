@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
 import { GoNoGoChecklistItem, GoNoGoGate, GoNoGoGateStatus, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { formatDate } from '@/app/lib/dateUtils';
-import { getWebhookMetrics } from '@/app/lib/api';
+import { getWebhookMetrics } from '@/app/lib/api/metrics.api';
 import { goNoGoChecklist } from '@/app/data/admin-data';
 
 type Props = {

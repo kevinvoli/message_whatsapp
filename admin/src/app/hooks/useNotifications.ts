@@ -6,7 +6,7 @@ import {
   markAllNotificationsRead,
   clearAllNotifications,
   getNotificationStreamUrl,
-} from '@/app/lib/api';
+} from '@/app/lib/api/notifications.api';
 
 export type NotificationType = AdminNotification['type'];
 export type { AdminNotification as Notification };

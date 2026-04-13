@@ -10,7 +10,7 @@ import {
   redispatchAllWaiting,
   resetStuckConversations,
   updateDispatchSettings,
-} from '@/app/lib/api';
+} from '@/app/lib/api/dispatch.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate } from '@/app/lib/dateUtils';
 

@@ -16,9 +16,10 @@ import {
   createMessageAuto, updateMessageAuto, deleteMessageAuto,
   addKeyword, removeKeyword,
   getBusinessHours, updateBusinessHoursDay,
-  getCronConfigs, updateCronConfig,
-  getPostes, getChannels,
-} from '@/app/lib/api';
+} from '@/app/lib/api/automations.api';
+import { getCronConfigs, updateCronConfig } from '@/app/lib/api/crons.api';
+import { getPostes } from '@/app/lib/api/postes.api';
+import { getChannels } from '@/app/lib/api/channels.api';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { useToast } from '@/app/ui/ToastProvider';

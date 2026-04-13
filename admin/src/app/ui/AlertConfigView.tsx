@@ -9,11 +9,11 @@ import {
     LastAlertAttempt,
     getAlertConfig,
     getAlertDefaultTemplate,
-    getChannels,
     getSystemHealthStatus,
     sendTestAlert,
     updateAlertConfig,
-} from '@/app/lib/api';
+} from '@/app/lib/api/system-config.api';
+import { getChannels } from '@/app/lib/api/channels.api';
 import { Channel } from '@/app/lib/definitions';
 import { Bell, Plus, Trash2, RotateCcw, Save, Phone, Send, CheckCircle, XCircle, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { formatTime, formatDateShort } from '@/app/lib/dateUtils';

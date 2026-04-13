@@ -16,6 +16,8 @@ import { DispatcherService } from './dispatcher.service';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { DispatchSettings } from './entities/dispatch-settings.entity';
 import { UpdateDispatchSettingsDto } from './dto/update-dispatch-settings.dto';
+import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
+import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
 
 @ApiTags('Queue')
 @Controller('queue')
@@ -26,6 +28,8 @@ export class DispatcherController {
     private readonly queuePublisher: QueuePublisher,
     private readonly dispatcherService: DispatcherService,
     private readonly dispatchSettingsService: DispatchSettingsService,
+    private readonly redispatchWaitingUseCase: RedispatchWaitingUseCase,
+    private readonly resetStuckActiveUseCase: ResetStuckActiveUseCase,
   ) {}
 
   @Get()
@@ -70,14 +74,14 @@ export class DispatcherController {
   @ApiOperation({ summary: 'Redispatcher manuellement toutes les conversations en attente' })
   @ApiResponse({ status: 200, description: 'Conversations redispatchées' })
   async redispatchAll(): Promise<{ dispatched: number; still_waiting: number }> {
-    return this.dispatcherService.redispatchWaiting();
+    return this.redispatchWaitingUseCase.execute();
   }
 
   @Post('dispatch/reset-stuck')
   @ApiOperation({ summary: 'Remet en EN_ATTENTE les conversations ACTIF dont l\'agent est hors ligne' })
   @ApiResponse({ status: 200, description: 'Conversations réinitialisées' })
   async resetStuck(): Promise<{ reset: number }> {
-    return this.dispatcherService.resetStuckActiveToWaiting();
+    return this.resetStuckActiveUseCase.execute();
   }
 
   @Get('dispatch')

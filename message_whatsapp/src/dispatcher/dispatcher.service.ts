@@ -11,8 +11,6 @@ import { ConversationPublisher } from 'src/realtime/publishers/conversation.publ
 import { DispatchQueryService } from './infrastructure/dispatch-query.service';
 import { AssignConversationUseCase } from './application/assign-conversation.use-case';
 import { ReinjectConversationUseCase } from './application/reinject-conversation.use-case';
-import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
-import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
 
 /**
  * Façade — conserve l'API publique existante et délègue aux use cases.
@@ -37,8 +35,6 @@ export class DispatcherService {
 
     private readonly assignUseCase: AssignConversationUseCase,
     private readonly reinjectUseCase: ReinjectConversationUseCase,
-    private readonly redispatchUseCase: RedispatchWaitingUseCase,
-    private readonly resetStuckUseCase: ResetStuckActiveUseCase,
   ) {}
 
   // ─── Mutex helpers ───────────────────────────────────────────────────────────
@@ -69,13 +65,6 @@ export class DispatcherService {
     } finally {
       if (!lock.isLocked()) this.chatDispatchLocks.delete(clientPhone);
     }
-  }
-
-  async reinjectConversation(
-    chat: WhatsappChat,
-    skipEmit = false,
-  ): Promise<{ oldPosteId: string; newPosteId: string } | null> {
-    return this.reinjectUseCase.execute(chat, skipEmit);
   }
 
   async dispatchOrphanConversation(chat: WhatsappChat): Promise<void> {
@@ -175,14 +164,6 @@ export class DispatcherService {
     } finally {
       this.isSlaRunning = false;
     }
-  }
-
-  async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
-    return this.redispatchUseCase.execute();
-  }
-
-  async resetStuckActiveToWaiting(): Promise<{ reset: number }> {
-    return this.resetStuckUseCase.execute();
   }
 
   async getDispatchSnapshot(): Promise<{

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, StatutChannel, WebhookMetricsSnapshot } from '@/app/lib/definitions';
-import { getOverviewSection, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api';
+import { getOverviewSection, getWebhookMetrics, refreshSnapshots } from '@/app/lib/api/metrics.api';
 import { Spinner } from './Spinner';
 import { formatDate } from '@/app/lib/dateUtils';
 
