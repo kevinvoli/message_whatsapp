@@ -33,6 +33,13 @@ import { DispatcherController } from './dispatcher.controller';
 import { OfflineReinjectionJob } from 'src/jorbs/offline-reinjection.job';
 import { OrphanCheckerJob } from 'src/jorbs/orphan-checker.job';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
+import { DispatchQueryService } from './infrastructure/dispatch-query.service';
+import { DispatchPolicyService } from './domain/dispatch-policy.service';
+import { SlaPolicyService } from './domain/sla-policy.service';
+import { AssignConversationUseCase } from './application/assign-conversation.use-case';
+import { ReinjectConversationUseCase } from './application/reinject-conversation.use-case';
+import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
+import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
 import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
@@ -81,7 +88,23 @@ import { NotificationModule } from 'src/notification/notification.module';
     OrphanCheckerJob,
     ReadOnlyEnforcementJob,
     DispatchSettingsService,
+    DispatchQueryService,
+    DispatchPolicyService,
+    SlaPolicyService,
+    AssignConversationUseCase,
+    ReinjectConversationUseCase,
+    RedispatchWaitingUseCase,
+    ResetStuckActiveUseCase,
   ],
-  exports: [DispatcherService, QueueService, DispatchSettingsService],
+  exports: [
+    DispatcherService,
+    QueueService,
+    DispatchSettingsService,
+    DispatchQueryService,
+    DispatchPolicyService,
+    SlaPolicyService,
+    AssignConversationUseCase,
+    ReinjectConversationUseCase,
+  ],
 })
 export class DispatcherModule {}

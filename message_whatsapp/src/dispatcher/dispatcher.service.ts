@@ -1,24 +1,47 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
-import { NotificationService } from 'src/notification/notification.service';
-import { ChannelService } from 'src/channel/channel.service';
+import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
+import { DispatchQueryService } from './infrastructure/dispatch-query.service';
+import { AssignConversationUseCase } from './application/assign-conversation.use-case';
+import { ReinjectConversationUseCase } from './application/reinject-conversation.use-case';
+import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
+import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
 
+/**
+ * Façade — conserve l'API publique existante et délègue aux use cases.
+ * Gère également les mutex par conversation pour éviter les courses.
+ */
 @Injectable()
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
   private readonly chatDispatchLocks = new Map<string, Mutex>();
-  /** S3 — mutex léger pour éviter l'overlap du cron SLA */
+  /** Mutex léger pour éviter l'overlap du cron SLA */
   private isSlaRunning = false;
+
+  constructor(
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
+
+    private readonly queueService: QueueService,
+
+    private readonly conversationPublisher: ConversationPublisher,
+
+    private readonly queryService: DispatchQueryService,
+
+    private readonly assignUseCase: AssignConversationUseCase,
+    private readonly reinjectUseCase: ReinjectConversationUseCase,
+    private readonly redispatchUseCase: RedispatchWaitingUseCase,
+    private readonly resetStuckUseCase: ResetStuckActiveUseCase,
+  ) {}
+
+  // ─── Mutex helpers ───────────────────────────────────────────────────────────
 
   private getChatDispatchLock(chatId: string): Mutex {
     let mutex = this.chatDispatchLocks.get(chatId);
@@ -28,30 +51,8 @@ export class DispatcherService {
     }
     return mutex;
   }
-  constructor(
-    @InjectRepository(WhatsappChat)
-    private readonly chatRepository: Repository<WhatsappChat>,
 
-    @InjectRepository(WhatsappPoste)
-    private readonly posteRepository: Repository<WhatsappPoste>,
-
-    private readonly queueService: QueueService,
-
-    @Inject(forwardRef(() => WhatsappMessageGateway))
-    private readonly messageGateway: WhatsappMessageGateway,
-
-    private readonly whatsappCommercialService: WhatsappCommercialService,
-
-    private readonly notificationService: NotificationService,
-
-    private readonly channelService: ChannelService,
-  ) {}
-
-  /**
-   * 🎯 Décide si un message peut être assigné à un agent
-   * ❌ N’émet PAS de socket
-   * ❌ Ne sauvegarde PAS le message WhatsApp
-   */
+  // ─── API publique (façade) ───────────────────────────────────────────────────
 
   async assignConversation(
     clientPhone: string,
@@ -63,509 +64,100 @@ export class DispatcherService {
     const lock = this.getChatDispatchLock(clientPhone);
     try {
       return await lock.runExclusive(() =>
-        this.assignConversationInternal(clientPhone, clientName, traceId, tenantId, channelId),
+        this.assignUseCase.execute(clientPhone, clientName, traceId, tenantId, channelId),
       );
     } finally {
-      if (!lock.isLocked()) {
-        this.chatDispatchLocks.delete(clientPhone);
-      }
+      if (!lock.isLocked()) this.chatDispatchLocks.delete(clientPhone);
     }
-  }
-
-  /**
-   * Résout le prochain poste selon la priorité :
-   * 1. Poste dédié au channel (si défini) — même offline → EN_ATTENTE sur ce poste
-   * 2. Queue globale (si channel non assigné à un poste)
-   * Retourne null si aucun poste disponible (mode pool uniquement).
-   */
-  private async resolvePosteForChannel(channelId?: string): Promise<WhatsappPoste | null> {
-    if (channelId) {
-      const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
-      if (dedicatedPosteId) {
-        const poste = await this.posteRepository.findOne({ where: { id: dedicatedPosteId } });
-        if (poste) {
-          this.logger.log(`Channel "${channelId}" → poste dédié "${poste.name}" (mode dédié)`);
-          return poste;
-        }
-        // Poste dédié introuvable (supprimé sans cascade) → fallback pool
-        this.logger.warn(
-          `Poste dédié "${dedicatedPosteId}" introuvable pour channel "${channelId}" — fallback queue globale`,
-        );
-      }
-    }
-    // Mode pool : queue globale
-    return this.queueService.getNextInQueue();
-  }
-
-  private async assignConversationInternal(
-    clientPhone: string,
-    clientName: string,
-    traceId?: string,
-    tenantId?: string,
-    channelId?: string,
-  ): Promise<WhatsappChat | null> {
-    if (traceId) {
-      this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
-    }
-
-    const conversation = await this.chatRepository.findOne({
-      where: { chat_id: clientPhone },
-      relations: ['messages', 'poste', 'channel'],
-    });
-
-    if (conversation?.read_only) {
-      if (conversation.status === WhatsappChatStatus.FERME) {
-        // Réouverture après fermeture manuelle : on lève le verrou et on laisse
-        // le dispatch normal rouvrir et réassigner la conversation.
-        this.logger.log(
-          `DISPATCH_REOPEN trace=${traceId ?? '-'} chat_id=${conversation.chat_id} (fermeture manuelle levée)`,
-        );
-        conversation.read_only = false;
-        // La suite du flux va mettre le bon statut (ACTIF ou EN_ATTENTE)
-      } else {
-        this.logger.warn(
-          `Conversation read_only ignoree (${conversation.chat_id})`,
-        );
-        conversation.unread_count = (conversation.unread_count ?? 0) + 1;
-        conversation.last_activity_at = new Date();
-        await this.chatRepository.save(conversation);
-        return conversation;
-      }
-    }
-
-    // console.log("=========================== conversation", conversation);
-
-    // Vérifier si le channel est dédié à un poste spécifique
-    const dedicatedPosteId = channelId
-      ? await this.channelService.getDedicatedPosteId(channelId)
-      : null;
-
-    // Déterminer si l’agent actuel est connecté ET sur le bon poste
-    const currentPosteId = conversation?.poste?.id;
-    const isOnDedicatedPoste =
-      !dedicatedPosteId || currentPosteId === dedicatedPosteId;
-    const isAgentConnected =
-      currentPosteId && isOnDedicatedPoste
-        ? this.messageGateway.isAgentConnected(currentPosteId)
-        : false;
-
-    /**
-     * Cas 1️⃣ : conversation existante + agent connecté sur le bon poste
-     * → juste mettre à jour l’activité et le compteur de messages non lus
-     */
-    if (conversation && isAgentConnected) {
-      this.logger.debug(
-        `Conversation existante avec agent connecte (${conversation.chat_id})`,
-      );
-
-      if (tenantId && !conversation.tenant_id) {
-        conversation.tenant_id = tenantId;
-      }
-      // Mettre à jour le nom si un meilleur nom est disponible (ex: "Client" → vrai nom résolu)
-      if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
-        conversation.name = clientName;
-      }
-      conversation.unread_count += 1;
-      conversation.last_activity_at = new Date();
-      if (
-        !conversation.first_response_deadline_at &&
-        !conversation.last_poste_message_at
-      ) {
-        conversation.first_response_deadline_at = new Date(
-          Date.now() + 5 * 60 * 1000,
-        );
-      }
-      if (conversation.status === WhatsappChatStatus.FERME) {
-        conversation.status = WhatsappChatStatus.ACTIF;
-      }
-      if (!conversation.poste) {
-        this.logger.warn(
-          `📩 Conversation ${conversation.chat_id} sans commercial (réinjection ou offline)`,
-        );
-      }
-      this.logger.log(
-        `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.name ?? 'NON ASSIGNE'}`,
-      );
-      const saved = await this.chatRepository.save(conversation);
-      await this.messageGateway.emitConversationUpsertByChatId(
-        saved.chat_id,
-      );
-      return saved;
-    }
-
-    const nextAgent = await this.resolvePosteForChannel(channelId);
-    // Aucun agent disponible → message en attente
-    if (!nextAgent) {
-      this.logger.warn(`⏳ Aucun agent disponible, message en attente pour `);
-      const displayName = clientName || clientPhone.split('@')[0];
-      void this.notificationService.create(
-        'queue',
-        `Conversation en attente — ${displayName}`,
-        `Aucun agent disponible. La conversation de ${displayName} est placée en file d'attente.`,
-      );
-      if (conversation) {
-        if (tenantId && !conversation.tenant_id) {
-          conversation.tenant_id = tenantId;
-        }
-        if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
-          conversation.name = clientName;
-        }
-        conversation.poste = null;
-        conversation.poste_id = null;
-        conversation.status = WhatsappChatStatus.EN_ATTENTE;
-        conversation.unread_count += 1;
-        conversation.last_activity_at = new Date();
-        conversation.assigned_at = null;
-        conversation.assigned_mode = null;
-        conversation.first_response_deadline_at = null;
-        conversation.last_client_message_at = new Date();
-        return this.chatRepository.save(conversation);
-      }
-
-      const waitingChat = this.chatRepository.create({
-        chat_id: clientPhone,
-        name: clientName,
-        tenant_id: tenantId ?? null,
-        type: 'private',
-        contact_client: clientPhone.split('@')[0],
-        poste: null,
-        poste_id: null,
-        status: WhatsappChatStatus.EN_ATTENTE,
-        unread_count: 1,
-        last_activity_at: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        assigned_at: null,
-        assigned_mode: null,
-        first_response_deadline_at: null,
-        last_client_message_at: new Date(),
-      });
-
-      this.logger.log(
-        `🆕 Creation conversation en attente (sans agent) pour ${clientPhone}`,
-      );
-      return this.chatRepository.save(waitingChat);
-    }
-
-    /**
-     * Cas 3️⃣ : conversation existante mais poste absent ou réassignation
-     */
-    // console.log('conversation :', conversation);
-
-    if (conversation) {
-      this.logger.log(
-        `🔁 Réassignation conversation (${conversation.chat_id}) de l'agent (${'aucun'}) à (${nextAgent.name})`,
-      );
-      if (tenantId && !conversation.tenant_id) {
-        conversation.tenant_id = tenantId;
-      }
-      if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
-        conversation.name = clientName;
-      }
-      conversation.poste = nextAgent;
-      conversation.poste_id = nextAgent.id;
-      conversation.status = nextAgent.is_active
-        ? WhatsappChatStatus.ACTIF
-        : WhatsappChatStatus.EN_ATTENTE;
-      conversation.unread_count += 1;
-      conversation.last_activity_at = new Date();
-      conversation.assigned_at = new Date();
-      conversation.assigned_mode = nextAgent.is_active ? 'ONLINE' : 'OFFLINE';
-      conversation.first_response_deadline_at = new Date(
-        Date.now() + 5 * 60 * 1000,
-      );
-
-      conversation.last_client_message_at = new Date();
-      const saved = await this.chatRepository.save(conversation);
-      void this.notificationService.create(
-        'info',
-        `Conversation réassignée — ${saved.name || saved.chat_id}`,
-        `La conversation de ${saved.name || saved.contact_client} a été assignée au poste ${nextAgent.name}.`,
-      );
-      await this.messageGateway.emitConversationUpsertByChatId(
-        saved.chat_id,
-      );
-      return saved;
-    }
-
-    /**
-     * Cas 4️⃣ : nouvelle conversation
-     */
-    this.logger.log(
-      `🆕 Création nouvelle conversation pour ${clientPhone} avec agent (${nextAgent.name})`,
-    );
-
-    const newChat = this.chatRepository.create({
-      chat_id: clientPhone,
-      name: clientName,
-      tenant_id: tenantId ?? null,
-      type: 'private',
-      contact_client: clientPhone.split('@')[0],
-      poste: nextAgent,
-      poste_id: nextAgent.id,
-      status: nextAgent.is_active
-        ? WhatsappChatStatus.ACTIF
-        : WhatsappChatStatus.EN_ATTENTE,
-      unread_count: 1,
-      last_activity_at: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      assigned_at: new Date(),
-      assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
-      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-
-      last_client_message_at: new Date(),
-    });
-
-    this.logger.debug(`Nouvelle conversation creee (${newChat.chat_id})`);
-
-    const saved = await this.chatRepository.save(newChat);
-    void this.notificationService.create(
-      'info',
-      `Nouvelle conversation — ${clientName || clientPhone.split('@')[0]}`,
-      `Nouvelle conversation de ${clientName || clientPhone.split('@')[0]} assignée au poste ${nextAgent.name}.`,
-    );
-    await this.messageGateway.emitConversationAssigned(saved.chat_id);
-    return saved;
   }
 
   async reinjectConversation(
     chat: WhatsappChat,
     skipEmit = false,
   ): Promise<{ oldPosteId: string; newPosteId: string } | null> {
-    if (chat.read_only) {
-      this.logger.warn(
-        `Reinjection ignoree: conversation read_only (${chat.chat_id})`,
-      );
-      return null;
-    }
-
-    // Channel dédié : ne jamais réinjecter dans la queue globale.
-    // La conversation doit rester sur le poste dédié — on renouvelle juste la deadline.
-    const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
-    if (channelId) {
-      const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
-      if (dedicatedPosteId) {
-        this.logger.debug(
-          `Reinject ignoré (${chat.chat_id}): channel dédié au poste ${dedicatedPosteId} — deadline étendue`,
-        );
-        await this.chatRepository.update(chat.id, {
-          first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-        });
-        return null;
-      }
-    }
-
-    // Si le poste actuel est le seul dans la queue, un redispatch lui
-    // renverrait la conversation immédiatement — sans aucun bénéfice.
-    // On renouvelle simplement la deadline pour éviter que le job ne
-    // se déclenche en boucle, et on attend qu'un autre poste se connecte.
-    if (chat.poste_id) {
-      const alternatives =
-        await this.queueService.countQueuedPostesExcluding(chat.poste_id);
-      if (alternatives === 0) {
-        this.logger.debug(
-          `Redispatch ignoré (${chat.chat_id}): le poste (${chat.poste_id}) est le seul dans la queue`,
-        );
-        await this.chatRepository.update(chat.id, {
-          first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-        });
-        return null;
-      }
-    }
-
-    // ─── Approche atomique : trouver le prochain poste AVANT d'effacer l'actuel ──
-    const oldPosteId = chat.poste_id ?? null;
-
-    const nextPoste = await this.queueService.getNextInQueue();
-    if (!nextPoste) {
-      this.logger.warn(
-        `Réinjection impossible (${chat.chat_id}): aucun poste alternatif — deadline étendue +30 min`,
-      );
-      await this.chatRepository.update(chat.id, {
-        first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-      });
-      return null;
-    }
-
-    // Un seul UPDATE atomique — poste_id ne passe JAMAIS par NULL
-    // S5 — deadline 30 min (alignée sur l'intervalle minimum cron × 3)
-    await this.chatRepository.update(chat.id, {
-      poste: nextPoste,
-      poste_id: nextPoste.id,
-      assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
-      status: nextPoste.is_active
-        ? WhatsappChatStatus.ACTIF
-        : WhatsappChatStatus.EN_ATTENTE,
-      assigned_at: new Date(),
-      first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-    });
-
-    void this.notificationService.create(
-      'alert',
-      `SLA dépassé — ${chat.name || chat.chat_id}`,
-      `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} a été réassignée au poste ${nextPoste.name}.`,
-    );
-
-    // S1 — skipEmit : l'appelant batche les émissions lui-même
-    if (skipEmit) {
-      return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
-    }
-
-    await this.messageGateway.emitConversationReassigned(
-      { ...chat, poste_id: nextPoste.id, poste: nextPoste } as WhatsappChat,
-      oldPosteId ?? '',
-      nextPoste.id,
-    );
-    return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
+    return this.reinjectUseCase.execute(chat, skipEmit);
   }
 
-  /**
-   * Dispatche une conversation orpheline (poste_id = null, status = en_attente).
-   * Trouve le prochain poste dans la queue et émet CONVERSATION_ASSIGNED.
-   */
   async dispatchOrphanConversation(chat: WhatsappChat): Promise<void> {
     if (chat.read_only) {
       this.logger.warn(`Dispatch orphelin ignoré: conversation read_only (${chat.chat_id})`);
       return;
     }
-
     const nextPoste = await this.queueService.getNextInQueue();
     if (!nextPoste) {
       this.logger.warn(`⏳ Aucun agent disponible pour orphelin (${chat.chat_id}), reste EN_ATTENTE`);
       return;
     }
-
     await this.chatRepository.update(chat.id, {
       poste: nextPoste,
       poste_id: nextPoste.id,
       assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
-      status: nextPoste.is_active
-        ? WhatsappChatStatus.ACTIF
-        : WhatsappChatStatus.EN_ATTENTE,
+      status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
       first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
     });
-
-    await this.messageGateway.emitConversationAssigned(chat.chat_id);
+    await this.conversationPublisher.emitConversationAssigned(chat.chat_id);
     this.logger.log(`Orphelin dispatché (${chat.chat_id}) → poste ${nextPoste.id}`);
   }
 
-  async dispatchExistingConversation(chat: WhatsappChat) {
+  async dispatchExistingConversation(chat: WhatsappChat): Promise<void> {
     const oldPoste = chat.poste_id;
     if (chat.read_only) {
-      this.logger.warn(
-        `Dispatch ignore: conversation read_only (${chat.chat_id})`,
-      );
+      this.logger.warn(`Dispatch ignoré: conversation read_only (${chat.chat_id})`);
       return;
     }
-    if (!oldPoste) {
-      return;
-    }
+    if (!oldPoste) return;
+
     const nextPoste = await this.queueService.getNextInQueue();
     if (!nextPoste) {
-      // Aucun agent disponible : notifier l'ancien poste que la conversation
-      // passe en attente, sinon elle reste visible comme fantôme sur son interface.
-      this.logger.warn(
-        `⏳ Aucun agent disponible pour réinjecter (${chat.chat_id}), passage EN_ATTENTE`,
-      );
-      await this.messageGateway.emitConversationRemoved(chat.chat_id, oldPoste);
+      this.logger.warn(`⏳ Aucun agent disponible pour réinjecter (${chat.chat_id}), passage EN_ATTENTE`);
+      await this.conversationPublisher.emitConversationRemoved(chat.chat_id, oldPoste);
       return;
     }
-
     await this.chatRepository.update(chat.id, {
       poste: nextPoste,
       poste_id: nextPoste.id,
       assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
-      status: nextPoste.is_active
-        ? WhatsappChatStatus.ACTIF
-        : WhatsappChatStatus.EN_ATTENTE,
+      status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
-      // 15 min au lieu de 5 min — évite que toutes les conversations non répondues
-      // reviennent dans le SLA checker à chaque cycle de 5 min (boucle de charge infinie)
       first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
     });
-
     const updatedChat = await this.chatRepository.findOne({
       where: { chat_id: chat.chat_id },
-      relations: ['poste'],  // 'messages' retiré — inutile ici et charge tous les messages en RAM
+      relations: ['poste'],
     });
-
-    if (!updatedChat) {
-      return;
-    }
-    // Notification unique lors d'une réassignation SLA effective
-    void this.notificationService.create(
-      'alert',
-      `SLA dépassé — ${updatedChat.name || updatedChat.chat_id}`,
-      `La conversation de ${updatedChat.name || updatedChat.contact_client || updatedChat.chat_id.split('@')[0]} n'a pas reçu de réponse dans les délais. Réassignée au poste ${nextPoste.name}.`,
-    );
-
-    // 🔥 EVENT CENTRAL
-    await this.messageGateway.emitConversationReassigned(
-      updatedChat,
-      oldPoste,
-      nextPoste.id,
-    );
+    if (!updatedChat) return;
+    await this.conversationPublisher.emitConversationReassigned(updatedChat, oldPoste, nextPoste.id);
   }
 
-  async jobRunnertcheque(poste_id: string) {
-    const now = new Date();
-
-    const chats = await this.chatRepository.find({
-      where: {
-        poste_id: poste_id,
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        unread_count: MoreThan(0),
-      },
-    });
-    this.logger.debug(
-      `Verification SLA reponses (${poste_id}) - ${chats.length} conversations`,
-    );
-
+  async jobRunnertcheque(poste_id: string): Promise<void> {
+    const chats = await this.queryService.findActiveChatsByPoste(poste_id);
+    this.logger.debug(`Vérification SLA réponses (${poste_id}) - ${chats.length} conversations`);
     for (const chat of chats) {
-      await this.reinjectConversation(chat);
+      await this.reinjectUseCase.execute(chat);
     }
   }
 
-  /**
-   * Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé.
-   * @param thresholdMinutes Seuil configurable depuis le panel admin (= intervalMinutes du cron).
-   *   Réinjecte uniquement les conversations avec unread_count > 0 dont le dernier message
-   *   client date de plus de N minutes — i.e. le commercial n'a pas LU depuis N minutes.
-   */
   async jobRunnerAllPostes(thresholdMinutes = 121): Promise<string> {
-    // S3 — mutex léger : si le cycle précédent n'est pas terminé, on saute
     if (this.isSlaRunning) {
       this.logger.warn('SLA checker déjà en cours — cycle ignoré');
       return 'Ignoré — cycle précédent encore en cours';
     }
     this.isSlaRunning = true;
-
     try {
-      // Réinjection si le client attend depuis plus de thresholdMinutes sans que
-      // le commercial ait lu la conversation (unread_count > 0).
-      // On utilise last_client_message_at plutôt que first_response_deadline_at :
-      // on ne se base plus sur une deadline interne mais sur l'attente réelle du client.
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
-      const chats = await this.chatRepository.find({
-        where: {
-          status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-          unread_count: MoreThan(0),
-          last_client_message_at: LessThan(threshold), // pas lu depuis N minutes
-        },
-        order: { last_client_message_at: 'ASC' },
-        take: 50,
-      });
+      const chats = await this.queryService.findChatsByStatus(
+        [WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF],
+        { olderThan: threshold, limit: 50 },
+      );
       this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) ciblée(s)`);
 
-      // S1 — on collecte les réassignations sans émettre pendant la boucle DB
       const reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }> = [];
       let reinjected = 0;
 
       for (const chat of chats) {
         try {
-          const result = await this.reinjectConversation(chat, true); // skipEmit
+          const result = await this.reinjectUseCase.execute(chat, true);
           if (result) {
             reassignments.push({ chatId: chat.chat_id, ...result });
             reinjected++;
@@ -575,9 +167,8 @@ export class DispatcherService {
         }
       }
 
-      // S1 — une seule vague d'émissions après la boucle, 2 requêtes bulk au lieu de 2N
       if (reassignments.length > 0) {
-        await this.messageGateway.emitBatchReassignments(reassignments);
+        await this.conversationPublisher.emitBatchReassignments(reassignments);
       }
 
       return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
@@ -587,108 +178,11 @@ export class DispatcherService {
   }
 
   async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
-    const waitingChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.EN_ATTENTE },
-      relations: ['poste'],
-    });
-
-    let dispatched = 0;
-    let stillWaiting = 0;
-
-    for (const chat of waitingChats) {
-      // Ignorer les conversations verrouillées (en attente de réaction client)
-      if (chat.read_only) { stillWaiting++; continue; }
-
-      // Ignorer les conversations sur canal dédié — elles ne doivent pas quitter leur poste
-      const dedicatedPosteId = chat.channel_id
-        ? await this.channelService.getDedicatedPosteId(chat.channel_id)
-        : null;
-      if (dedicatedPosteId) { stillWaiting++; continue; }
-
-      const lock = this.getChatDispatchLock(chat.chat_id);
-      const assigned = await lock.runExclusive(async () => {
-        const nextAgent = await this.queueService.getNextInQueue();
-        if (!nextAgent) return false;
-
-        const oldPosteId = chat.poste_id;
-
-        await this.chatRepository.update(chat.id, {
-          poste: nextAgent,
-          poste_id: nextAgent.id,
-          status: nextAgent.is_active
-            ? WhatsappChatStatus.ACTIF
-            : WhatsappChatStatus.EN_ATTENTE,
-          assigned_at: new Date(),
-          assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
-          first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-        });
-
-        // Notifier l'ancien poste si la conversation lui était déjà assignée
-        if (oldPosteId && oldPosteId !== nextAgent.id) {
-          await this.messageGateway.emitConversationRemoved(chat.chat_id, oldPosteId);
-        }
-
-        await this.messageGateway.emitConversationAssigned(chat.chat_id);
-        void this.notificationService.create(
-          'info',
-          `Conversation assignée (manuel) — ${chat.name || chat.chat_id}`,
-          `Assignée au poste ${nextAgent.name}.`,
-        );
-        return true;
-      });
-
-      if (assigned) {
-        dispatched++;
-      } else {
-        // Queue vide pour cette conversation — continuer quand même les suivantes
-        stillWaiting++;
-      }
-
-      if (!lock.isLocked()) {
-        this.chatDispatchLocks.delete(chat.chat_id);
-      }
-    }
-
-    this.logger.log(
-      `Redispatch manuel: ${dispatched} assignée(s), ${stillWaiting} toujours en attente`,
-    );
-    return { dispatched, still_waiting: stillWaiting };
+    return this.redispatchUseCase.execute();
   }
 
-  /**
-   * Réinitialise les conversations ACTIF dont l'agent est hors ligne (is_active = false)
-   * vers EN_ATTENTE, sans les réassigner immédiatement.
-   * Les agents les récupèrent naturellement en se connectant via le dispatch normal.
-   */
   async resetStuckActiveToWaiting(): Promise<{ reset: number }> {
-    const activeChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.ACTIF, read_only: false },
-      relations: ['poste'],
-    });
-
-    const stuck = activeChats.filter((c) => !c.poste || !c.poste.is_active);
-
-    if (stuck.length === 0) {
-      return { reset: 0 };
-    }
-
-    for (const chat of stuck) {
-      await this.chatRepository.update(chat.id, {
-        poste: null,
-        poste_id: null,
-        status: WhatsappChatStatus.EN_ATTENTE,
-        assigned_at: null,
-        assigned_mode: null,
-        first_response_deadline_at: null,
-      });
-      // Notifier le socket que la conversation n'est plus sur l'ancien poste
-      if (chat.poste_id) {
-        await this.messageGateway.emitConversationRemoved(chat.chat_id, chat.poste_id);
-      }
-    }
-
-    this.logger.log(`resetStuckActiveToWaiting: ${stuck.length} conversation(s) remises en EN_ATTENTE`);
-    return { reset: stuck.length };
+    return this.resetStuckUseCase.execute();
   }
 
   async getDispatchSnapshot(): Promise<{
@@ -698,23 +192,20 @@ export class DispatcherService {
     waiting_items: WhatsappChat[];
   }> {
     const queue = await this.queueService.getQueuePositions();
-    const waitingChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.EN_ATTENTE },
-      relations: ['poste'],
-      order: { updatedAt: 'DESC' },
-      take: 50,
-    });
-    const activeChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.ACTIF, read_only: false },
-      relations: ['poste'],
-    });
+    const waitingChats = await this.queryService.findWaitingChatsWithPoste();
+    const activeChats = await this.queryService.findActiveChatsWithPoste();
     const stuckActiveCount = activeChats.filter((c) => !c.poste || !c.poste.is_active).length;
+
+    // Limiter la liste des waiting à 50, triée par date de mise à jour
+    const waitingItems = waitingChats
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 50);
 
     return {
       queue_size: queue.length,
       waiting_count: waitingChats.length,
       stuck_active_count: stuckActiveCount,
-      waiting_items: waitingChats,
+      waiting_items: waitingItems,
     };
   }
 }

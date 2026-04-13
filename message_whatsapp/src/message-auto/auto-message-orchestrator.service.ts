@@ -1,4 +1,6 @@
 import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { INBOUND_MESSAGE_PROCESSED_EVENT, InboundMessageProcessedEvent } from 'src/ingress/events/inbound-message-processed.event';
 import { MessageAutoService } from './message-auto.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -40,6 +42,17 @@ export class AutoMessageOrchestrator implements OnModuleInit {
         err instanceof Error ? err.stack : undefined,
         AutoMessageOrchestrator.name,
       );
+    }
+  }
+
+  /**
+   * Point d'entrée de l'orchestrateur — déclenché soit directement (legacy),
+   * soit via l'événement `inbound.message.processed` (pipeline ingress).
+   */
+  @OnEvent(INBOUND_MESSAGE_PROCESSED_EVENT)
+  async onInboundMessageProcessed(event: InboundMessageProcessedEvent): Promise<void> {
+    if (!event.conversation.last_poste_message_at) {
+      await this.handleClientMessage(event.conversation);
     }
   }
 

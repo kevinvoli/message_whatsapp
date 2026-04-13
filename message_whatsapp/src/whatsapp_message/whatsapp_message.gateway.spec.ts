@@ -6,11 +6,19 @@ describe('WhatsappMessageGateway protocol events', () => {
     findBychat_id: jest.fn(),
   };
 
+  const agentConnectionService = {
+    onConnect: jest.fn().mockResolvedValue(true),
+    onDisconnect: jest.fn().mockResolvedValue(undefined),
+    getAgent: jest.fn(),
+    isAgentConnected: jest.fn(),
+    getConnectedPosteIds: jest.fn().mockReturnValue([]),
+    sendConversationsToClient: jest.fn().mockResolvedValue(undefined),
+  };
+
   const makeGateway = () => {
     return new WhatsappMessageGateway(
       {} as any,
       chatService as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -24,11 +32,18 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any, // callLogService
       { create: jest.fn().mockResolvedValue({}) } as any, // notificationService
       {} as any, // systemAlert
+      {} as any, // socketAuthService
+      {} as any, // conversationQueryService
+      { setServer: () => {} } as any, // realtimeServerService
+      {} as any, // conversationPublisher
+      {} as any, // queuePublisher
+      agentConnectionService as any, // agentConnectionService
     );
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    agentConnectionService.getAgent.mockReturnValue(undefined);
   });
 
   it('emits CONTACT_UPSERT on contact:event', async () => {
@@ -44,7 +59,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       chat_id: 'chat-1',
     } as any);
 
-    expect(to).toHaveBeenCalledWith('poste_poste-1');
+    expect(to).toHaveBeenCalledWith('poste:poste-1');
     expect(emit).toHaveBeenCalledWith('contact:event', {
       type: 'CONTACT_UPSERT',
       payload: expect.objectContaining({
@@ -67,7 +82,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       chat_id: 'chat-2',
     } as any);
 
-    expect(to).toHaveBeenCalledWith('poste_poste-2');
+    expect(to).toHaveBeenCalledWith('poste:poste-2');
     expect(emit).toHaveBeenCalledWith('contact:event', {
       type: 'CONTACT_REMOVED',
       payload: {
@@ -91,7 +106,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       call_status: 'appelÃ©',
     } as any);
 
-    expect(to).toHaveBeenCalledWith('poste_poste-3');
+    expect(to).toHaveBeenCalledWith('poste:poste-3');
     expect(emit).toHaveBeenCalledWith('contact:event', {
       type: 'CONTACT_CALL_STATUS_UPDATED',
       payload: expect.objectContaining({
@@ -102,26 +117,24 @@ describe('WhatsappMessageGateway protocol events', () => {
   });
 
   it('broadcasts TYPING_START via chat:event', () => {
+    agentConnectionService.getAgent.mockReturnValue({
+      commercialId: 'commercial-1',
+      posteId: 'poste-9',
+      tenantId: 'tenant-1',
+      tenantIds: ['tenant-1'],
+    });
+
     const gateway = makeGateway();
     const emit = jest.fn();
     const to = jest.fn().mockReturnValue({ emit });
     const client = { id: 'client-1', to } as any;
-
-    const connectedAgents = (gateway as any).connectedAgents as Map<
-      string,
-      { commercialId: string; posteId: string }
-    >;
-    connectedAgents.set('client-1', {
-      commercialId: 'commercial-1',
-      posteId: 'poste-9',
-    });
 
     gateway.handleChatEvent(client, {
       type: 'TYPING_START',
       payload: { chat_id: 'chat-9' },
     });
 
-    expect(to).toHaveBeenCalledWith('poste_poste-9');
+    expect(to).toHaveBeenCalledWith('poste:poste-9');
     expect(emit).toHaveBeenCalledWith('chat:event', {
       type: 'TYPING_START',
       payload: {

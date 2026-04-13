@@ -34,7 +34,13 @@ import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keyword.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
+import { SocketAuthService } from './services/socket-auth.service';
+import { SocketConversationQueryService } from './services/socket-conversation-query.service';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { RealtimeServerService } from 'src/realtime/realtime-server.service';
+import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
+import { QueuePublisher } from 'src/realtime/publishers/queue.publisher';
+import { AgentConnectionService } from 'src/realtime/connections/agent-connection.service';
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
@@ -91,11 +97,21 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     WhatsappPosteService,
     MessageAutoService,
     SocketThrottleGuard,
+    SocketAuthService,
+    SocketConversationQueryService,
+    RealtimeServerService,
+    ConversationPublisher,
+    QueuePublisher,
+    AgentConnectionService,
   ],
   exports: [
     WhatsappMessageGateway,
     WhatsappMessageService,
     FirstResponseTimeoutJob,
+    ConversationPublisher,
+    QueuePublisher,
+    RealtimeServerService,
+    AgentConnectionService,
   ],
 })
 export class WhatsappMessageModule {}

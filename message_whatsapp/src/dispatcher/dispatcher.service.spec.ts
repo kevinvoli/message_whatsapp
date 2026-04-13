@@ -5,14 +5,21 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { QueueService } from './services/queue.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
-import { NotificationService } from 'src/notification/notification.service';
-import { ChannelService } from 'src/channel/channel.service';
+import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
+import { DispatchQueryService } from './infrastructure/dispatch-query.service';
+import { AssignConversationUseCase } from './application/assign-conversation.use-case';
+import { ReinjectConversationUseCase } from './application/reinject-conversation.use-case';
+import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
+import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
 
-describe('DispatcherService', () => {
+/**
+ * Tests de la façade DispatcherService.
+ * La logique métier est couverte dans assign-conversation.use-case.spec.ts
+ * et sla-policy.service.spec.ts.
+ * Ici on vérifie que la façade délègue correctement et gère le mutex.
+ */
+describe('DispatcherService (façade)', () => {
   let service: DispatcherService;
 
   const chatRepository = {
@@ -22,25 +29,31 @@ describe('DispatcherService', () => {
     find: jest.fn(),
     create: jest.fn((data) => data),
   };
-  const posteRepository = {
-    findOne: jest.fn(),
-  };
   const queueService = {
     getNextInQueue: jest.fn(),
     getQueuePositions: jest.fn(),
   };
-  const gateway = {
-    isAgentConnected: jest.fn(),
+  const conversationPublisher = {
     emitConversationReassigned: jest.fn(),
     emitConversationUpsertByChatId: jest.fn(),
     emitConversationAssigned: jest.fn(),
+    emitConversationRemoved: jest.fn(),
+    emitBatchReassignments: jest.fn(),
   };
-  const channelService = {
-    getDedicatedPosteId: jest.fn(),
+  const queryService = {
+    findChatByChatId: jest.fn(),
+    findChatsByStatus: jest.fn(),
+    findActiveChatsByPoste: jest.fn(),
+    findWaitingChatsWithPoste: jest.fn(),
+    findActiveChatsWithPoste: jest.fn(),
+    saveChat: jest.fn(),
+    createChat: jest.fn((data) => data),
+    updateChat: jest.fn(),
   };
-  const notificationService = {
-    create: jest.fn(),
-  };
+  const assignUseCase = { execute: jest.fn() };
+  const reinjectUseCase = { execute: jest.fn() };
+  const redispatchUseCase = { execute: jest.fn() };
+  const resetStuckUseCase = { execute: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -49,186 +62,108 @@ describe('DispatcherService', () => {
       providers: [
         DispatcherService,
         { provide: getRepositoryToken(WhatsappChat), useValue: chatRepository },
-        { provide: getRepositoryToken(WhatsappPoste), useValue: posteRepository },
         { provide: QueueService, useValue: queueService },
-        { provide: WhatsappMessageGateway, useValue: gateway },
-        { provide: WhatsappCommercialService, useValue: {} },
-        { provide: NotificationService, useValue: notificationService },
-        { provide: ChannelService, useValue: channelService },
+        { provide: ConversationPublisher, useValue: conversationPublisher },
+        { provide: DispatchQueryService, useValue: queryService },
+        { provide: AssignConversationUseCase, useValue: assignUseCase },
+        { provide: ReinjectConversationUseCase, useValue: reinjectUseCase },
+        { provide: RedispatchWaitingUseCase, useValue: redispatchUseCase },
+        { provide: ResetStuckActiveUseCase, useValue: resetStuckUseCase },
       ],
     }).compile();
 
     service = module.get<DispatcherService>(DispatcherService);
   });
 
-  // ─── Tests existants (régression) ──────────────────────────────────────────
+  // ─── Délégation aux use cases ────────────────────────────────────────────
 
-  it('ignores read_only conversations', async () => {
-    chatRepository.findOne.mockResolvedValue({
-      chat_id: '123@c.us',
-      read_only: true,
-      unread_count: 0,
-      last_activity_at: null,
-    });
-    chatRepository.save.mockImplementation(async (c) => c);
-    gateway.isAgentConnected.mockReturnValue(false);
+  it('assignConversation délègue à AssignConversationUseCase.execute()', async () => {
+    const fakeChat = { chat_id: 'c@c.us', status: WhatsappChatStatus.ACTIF } as WhatsappChat;
+    assignUseCase.execute.mockResolvedValue(fakeChat);
 
-    const result = await service.assignConversation('123@c.us', 'Client');
-    expect(result).not.toBeNull();
-    expect(queueService.getNextInQueue).not.toHaveBeenCalled();
+    const result = await service.assignConversation('c@c.us', 'Client', 'trace-1', 'tenant-1', 'ch-1');
+
+    expect(assignUseCase.execute).toHaveBeenCalledWith('c@c.us', 'Client', 'trace-1', 'tenant-1', 'ch-1');
+    expect(result).toBe(fakeChat);
   });
 
-  it('sets status and mode based on next agent activity', async () => {
-    const conversation = {
-      chat_id: '123@c.us',
-      read_only: false,
-      unread_count: 0,
-      last_activity_at: null,
-      poste: null,
-      status: WhatsappChatStatus.EN_ATTENTE,
-      assigned_mode: null,
-    };
+  it('reinjectConversation délègue à ReinjectConversationUseCase.execute()', async () => {
+    const chat = { chat_id: 'c@c.us', read_only: false } as WhatsappChat;
+    reinjectUseCase.execute.mockResolvedValue({ oldPosteId: 'p1', newPosteId: 'p2' });
 
-    chatRepository.findOne.mockResolvedValue(conversation);
-    gateway.isAgentConnected.mockReturnValue(false);
-    channelService.getDedicatedPosteId.mockResolvedValue(null);
-    queueService.getNextInQueue.mockResolvedValue({
-      id: 'poste-1',
-      name: 'Poste 1',
-      is_active: false,
-    });
-    chatRepository.save.mockImplementation(async (chat) => chat);
+    const result = await service.reinjectConversation(chat, false);
 
-    const result = await service.assignConversation('123@c.us', 'Client');
-    expect(result?.status).toBe(WhatsappChatStatus.EN_ATTENTE);
-    expect(result?.assigned_mode).toBe('OFFLINE');
+    expect(reinjectUseCase.execute).toHaveBeenCalledWith(chat, false);
+    expect(result).toEqual({ oldPosteId: 'p1', newPosteId: 'p2' });
   });
 
-  // ─── Tests channel dédié (CH-01 à CH-05) ───────────────────────────────────
+  it('redispatchWaiting délègue à RedispatchWaitingUseCase.execute()', async () => {
+    redispatchUseCase.execute.mockResolvedValue({ dispatched: 3, still_waiting: 1 });
 
-  describe('assignConversation avec channel dédié', () => {
-    it('CH-01 : canal dédié actif → assignation directe au poste dédié, queue non utilisée', async () => {
-      chatRepository.findOne.mockResolvedValue(null); // pas de conversation existante
-      channelService.getDedicatedPosteId.mockResolvedValue('poste-A');
-      posteRepository.findOne.mockResolvedValue({
-        id: 'poste-A',
-        name: 'Poste A',
-        is_active: true,
-      });
-      chatRepository.save.mockImplementation(async (c) => c);
-      gateway.emitConversationUpsertByChatId.mockResolvedValue(undefined);
+    const result = await service.redispatchWaiting();
 
-      const result = await service.assignConversation(
-        'client@c.us',
-        'Ahmed',
-        'trace-1',
-        'tenant-1',
-        'channel-1',
-      );
+    expect(redispatchUseCase.execute).toHaveBeenCalled();
+    expect(result).toEqual({ dispatched: 3, still_waiting: 1 });
+  });
 
-      expect(result?.poste_id).toBe('poste-A');
-      expect(result?.status).toBe(WhatsappChatStatus.ACTIF);
-      expect(queueService.getNextInQueue).not.toHaveBeenCalled();
-    });
+  it('resetStuckActiveToWaiting délègue à ResetStuckActiveUseCase.execute()', async () => {
+    resetStuckUseCase.execute.mockResolvedValue({ reset: 5 });
 
-    it('CH-02 : canal dédié offline → EN_ATTENTE sur le poste dédié, queue non utilisée', async () => {
-      chatRepository.findOne.mockResolvedValue(null);
-      channelService.getDedicatedPosteId.mockResolvedValue('poste-A');
-      posteRepository.findOne.mockResolvedValue({
-        id: 'poste-A',
-        name: 'Poste A',
-        is_active: false,
-      });
-      chatRepository.save.mockImplementation(async (c) => c);
-      gateway.emitConversationUpsertByChatId.mockResolvedValue(undefined);
+    const result = await service.resetStuckActiveToWaiting();
 
-      const result = await service.assignConversation(
-        'client@c.us',
-        'Ahmed',
-        'trace-2',
-        'tenant-1',
-        'channel-1',
-      );
+    expect(resetStuckUseCase.execute).toHaveBeenCalled();
+    expect(result).toEqual({ reset: 5 });
+  });
 
-      expect(result?.poste_id).toBe('poste-A');
-      expect(result?.status).toBe(WhatsappChatStatus.EN_ATTENTE);
-      expect(queueService.getNextInQueue).not.toHaveBeenCalled();
-    });
+  // ─── jobRunnerAllPostes ──────────────────────────────────────────────────
 
-    it('CH-03 : canal sans poste dédié → comportement pool (queue globale)', async () => {
-      chatRepository.findOne.mockResolvedValue(null);
-      channelService.getDedicatedPosteId.mockResolvedValue(null);
-      queueService.getNextInQueue.mockResolvedValue({
-        id: 'poste-B',
-        name: 'Poste B',
-        is_active: true,
-      });
-      chatRepository.save.mockImplementation(async (c) => c);
-      gateway.emitConversationUpsertByChatId.mockResolvedValue(undefined);
+  it('jobRunnerAllPostes réinjecte les chats SLA expirés en batch', async () => {
+    const chat1 = { id: '1', chat_id: 'c1@c.us', status: WhatsappChatStatus.ACTIF } as WhatsappChat;
+    const chat2 = { id: '2', chat_id: 'c2@c.us', status: WhatsappChatStatus.EN_ATTENTE } as WhatsappChat;
+    queryService.findChatsByStatus.mockResolvedValue([chat1, chat2]);
+    reinjectUseCase.execute
+      .mockResolvedValueOnce({ oldPosteId: 'p1', newPosteId: 'p2' })
+      .mockResolvedValueOnce(null); // 2e conversation : pas de changement (deadline étendue)
+    conversationPublisher.emitBatchReassignments.mockResolvedValue(undefined);
 
-      await service.assignConversation(
-        'client2@c.us',
-        'Mohamed',
-        'trace-3',
-        'tenant-1',
-        'channel-2',
-      );
+    const result = await service.jobRunnerAllPostes(121);
 
-      expect(queueService.getNextInQueue).toHaveBeenCalledTimes(1);
-    });
+    expect(reinjectUseCase.execute).toHaveBeenCalledTimes(2);
+    expect(conversationPublisher.emitBatchReassignments).toHaveBeenCalledWith([
+      { chatId: 'c1@c.us', oldPosteId: 'p1', newPosteId: 'p2' },
+    ]);
+    expect(result).toContain('1 conversation(s) réinjectée(s)');
+  });
 
-    it('CH-04 : canal dédié mais poste introuvable en DB → fallback queue globale', async () => {
-      chatRepository.findOne.mockResolvedValue(null);
-      channelService.getDedicatedPosteId.mockResolvedValue('poste-inconnu');
-      posteRepository.findOne.mockResolvedValue(null); // poste supprimé
-      queueService.getNextInQueue.mockResolvedValue({
-        id: 'poste-C',
-        name: 'Poste C',
-        is_active: true,
-      });
-      chatRepository.save.mockImplementation(async (c) => c);
-      gateway.emitConversationUpsertByChatId.mockResolvedValue(undefined);
+  it('jobRunnerAllPostes est idempotent si déjà en cours', async () => {
+    queryService.findChatsByStatus.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve([]), 200)),
+    );
 
-      await service.assignConversation(
-        'client3@c.us',
-        'Sara',
-        'trace-4',
-        'tenant-1',
-        'channel-3',
-      );
+    const [r1, r2] = await Promise.all([
+      service.jobRunnerAllPostes(121),
+      service.jobRunnerAllPostes(121),
+    ]);
 
-      expect(queueService.getNextInQueue).toHaveBeenCalledTimes(1);
-    });
+    // L'un des deux doit être ignoré
+    const results = [r1, r2];
+    expect(results.some((r) => r.includes('Ignoré'))).toBe(true);
+  });
 
-    it('CH-05 : conversation existante avec agent actif → incrément seulement, pas de réassignation', async () => {
-      const existingChat = {
-        chat_id: 'client@c.us',
-        read_only: false,
-        unread_count: 2,
-        last_activity_at: new Date(),
-        first_response_deadline_at: new Date(),
-        last_poste_message_at: null,
-        poste: { id: 'poste-A', name: 'Poste A' },
-        poste_id: 'poste-A',
-        status: WhatsappChatStatus.ACTIF,
-      };
-      chatRepository.findOne.mockResolvedValue(existingChat);
-      gateway.isAgentConnected.mockReturnValue(true); // agent connecté
-      chatRepository.save.mockImplementation(async (c) => c);
-      gateway.emitConversationUpsertByChatId.mockResolvedValue(undefined);
+  // ─── getDispatchSnapshot ─────────────────────────────────────────────────
 
-      await service.assignConversation(
-        'client@c.us',
-        'Ahmed',
-        'trace-5',
-        'tenant-1',
-        'channel-1',
-      );
+  it('getDispatchSnapshot retourne les métriques agrégées', async () => {
+    queueService.getQueuePositions.mockResolvedValue([{}, {}]); // 2 postes en queue
+    queryService.findWaitingChatsWithPoste.mockResolvedValue([{ id: 'w1' }]);
+    queryService.findActiveChatsWithPoste.mockResolvedValue([
+      { id: 'a1', poste: { is_active: true } },  // normal
+      { id: 'a2', poste: { is_active: false } },  // stuck
+    ]);
 
-      // Queue non touchée — agent actif sur ce poste
-      expect(queueService.getNextInQueue).not.toHaveBeenCalled();
-      // ChannelService non consulté — court-circuit avant resolvePosteForChannel
-      expect(channelService.getDedicatedPosteId).not.toHaveBeenCalled();
-    });
+    const snapshot = await service.getDispatchSnapshot();
+
+    expect(snapshot.queue_size).toBe(2);
+    expect(snapshot.waiting_count).toBe(1);
+    expect(snapshot.stuck_active_count).toBe(1);
   });
 });

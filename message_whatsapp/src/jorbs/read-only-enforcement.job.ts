@@ -4,7 +4,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
 import { LessThan, Not, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 
@@ -24,7 +24,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly conversationPublisher: ConversationPublisher,
     private readonly cronConfigService: CronConfigService,
   ) {}
 
@@ -94,7 +94,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
       chat.status = WhatsappChatStatus.FERME;
       chat.read_only = false;
       await this.chatRepo.save(chat);
-      await this.gateway.emitConversationClosed(chat);
+      await this.conversationPublisher.emitConversationClosed(chat);
       closed++;
     }
     return `${closed} conversation(s) fermée(s) automatiquement`;

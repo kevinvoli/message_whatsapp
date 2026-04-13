@@ -1,213 +1,104 @@
+/**
+ * TICKET-04-A — Orchestrateur du pipeline ingress entrant.
+ *
+ * Ce service ne contient AUCUNE logique métier inline.
+ * Chaque étape est déléguée à un service spécialisé, testable indépendamment.
+ *
+ * Pipeline complet :
+ *   1. [ChatIdValidationService]          — valider le format du chat_id
+ *   2. [ProviderEnrichmentService]        — enrichir le message (nom Messenger, etc.)
+ *   3. [DispatcherService]                — assigner la conversation à un poste
+ *   4. [IncomingMessagePersistenceService] — persister le message (+ gestion canal inconnu)
+ *   5. [MediaPersistenceService]          — persister les médias attachés
+ *   6. [InboundStateUpdateService]        — mettre à jour l'état DB de la conversation
+ *   7. [ConversationPublisher / gateway]  — notifier le frontend via WebSocket
+ *   8. EventEmitter2 'inbound.message.processed' — déclencher les automatismes
+ */
 import {
   HttpException,
   HttpStatus,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Mutex, MutexInterface, withTimeout } from 'async-mutex';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
-import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import {
-  ExtractedMedia,
-  WhapiRawMedia,
-} from 'src/whapi/interface/whapi-webhook.interface';
-import {
-  WhatsappMedia,
-  WhatsappMediaType,
-} from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { UnifiedMessage } from './normalization/unified-message';
 import { UnifiedStatus } from './normalization/unified-status';
-import { ChannelService } from 'src/channel/channel.service';
-import { WhapiChannel } from 'src/channel/entities/channel.entity';
-import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
-import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
-import { SystemAlertService } from 'src/system-alert/system-alert.service';
-import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { ChatIdValidationService } from 'src/ingress/domain/chat-id-validation.service';
+import { ProviderEnrichmentService } from 'src/ingress/domain/provider-enrichment.service';
+import { IncomingMessagePersistenceService } from 'src/ingress/infrastructure/incoming-message-persistence.service';
+import { InboundStateUpdateService } from 'src/ingress/domain/inbound-state-update.service';
+import { MediaExtractionService } from 'src/ingress/domain/media-extraction.service';
+import { MediaPersistenceService } from 'src/ingress/infrastructure/media-persistence.service';
+import {
+  INBOUND_MESSAGE_PROCESSED_EVENT,
+  InboundMessageProcessedEvent,
+} from 'src/ingress/events/inbound-message-processed.event';
 
 @Injectable()
 export class InboundMessageService {
   private readonly logger = new Logger(InboundMessageService.name);
   private readonly chatMutexes = new Map<string, MutexInterface>();
 
-  private getChatMutex(chatId: string): MutexInterface {
-    let mutex = this.chatMutexes.get(chatId);
-    if (!mutex) {
-      // Timeout de 30s : si le traitement ne se termine pas, lever une erreur
-      // pour éviter qu'un webhook bloque indéfiniment le chat en cas de freeze DB
-      mutex = withTimeout(new Mutex(), 30_000);
-      this.chatMutexes.set(chatId, mutex);
-    }
-    return mutex;
-  }
-
   constructor(
+    // ── Étape 3 ─────────────────────────────────────────────────────────────
     private readonly dispatcherService: DispatcherService,
-    private readonly whatsappMessageService: WhatsappMessageService,
+    // ── Étape 7 ─────────────────────────────────────────────────────────────
     private readonly messageGateway: WhatsappMessageGateway,
-    private readonly chatService: WhatsappChatService,
-    @InjectRepository(WhatsappMedia)
-    private readonly mediaRepository: Repository<WhatsappMedia>,
-    private readonly channelService: ChannelService,
-    private readonly autoMessageOrchestrator: AutoMessageOrchestrator,
+    // ── Observabilité ────────────────────────────────────────────────────────
     private readonly systemAlert: SystemAlertService,
-    private readonly messengerService: CommunicationMessengerService,
+    // ── Statuts sortants ─────────────────────────────────────────────────────
+    private readonly whatsappMessageService: WhatsappMessageService,
+    // ── Étapes du pipeline ───────────────────────────────────────────────────
+    private readonly chatIdValidation: ChatIdValidationService,
+    private readonly providerEnrichment: ProviderEnrichmentService,
+    private readonly messagePersistence: IncomingMessagePersistenceService,
+    private readonly stateUpdate: InboundStateUpdateService,
+    private readonly mediaExtraction: MediaExtractionService,
+    private readonly mediaPersistence: MediaPersistenceService,
+    // ── Étape 8 — découplage via événements ──────────────────────────────────
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  // ─── Messages entrants ────────────────────────────────────────────────────
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
     if (!messages.length) return;
 
     for (const message of messages) {
-      const traceId = this.buildMessageTraceId(
-        message.providerMessageId,
-        message.chatId,
-      );
-      this.logger.log(
-        `INCOMING_RECEIVED trace=${traceId} type=${message.type}`,
-      );
+      const traceId = this.buildTraceId(message.providerMessageId, message.chatId);
+      this.logger.log(`INCOMING_RECEIVED trace=${traceId} type=${message.type}`);
 
-      if (message.direction !== 'in') {
-        continue;
-      }
+      // Ignorer les messages sortants (envoyés par nous)
+      if (message.direction !== 'in') continue;
 
-      const chatValidation = this.validateIncomingChatId(message.chatId);
-      if (!chatValidation.valid) {
+      // ── Étape 1 : validation du chat_id ──────────────────────────────────
+      const validation = this.chatIdValidation.validate(message.chatId);
+      if (!validation.valid) {
         this.logger.warn(
-          `INCOMING_IGNORED trace=${traceId} reason=${chatValidation.reason} chat_id=${message.chatId ?? 'unknown'}`,
+          `INCOMING_IGNORED trace=${traceId} reason=${validation.reason} chat_id=${message.chatId ?? 'unknown'}`,
         );
         continue;
       }
 
-      // Résolution du nom pour Messenger (le webhook ne contient pas le nom)
-      if (message.provider === 'messenger' && !message.fromName && message.from && message.channelId) {
-        message.fromName = await this.resolveMessengerFromName(message.from, message.channelId);
-      }
-
       try {
-        await this.getChatMutex(message.chatId).runExclusive(async () => {
-          const conversation = await this.dispatcherService.assignConversation(
-            message.chatId,
-            message.fromName ?? 'Client',
-            traceId,
-            message.tenantId,
-            message.channelId,
-          );
-
-          if (!conversation) {
-            this.logger.warn(
-              `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`,
-            );
-            return;
-          }
-
-          let savedMessage: Awaited<
-            ReturnType<
-              typeof this.whatsappMessageService.saveIncomingFromUnified
-            >
-          >;
-          try {
-            savedMessage = await this.whatsappMessageService.saveIncomingFromUnified(
-              message,
-              conversation,
-            );
-          } catch (saveErr) {
-            const msg: string = (saveErr as Error)?.message ?? '';
-            // Canal inconnu → le message ne peut pas être sauvegardé.
-            // On retourne silencieusement (HTTP 200 à Meta/Whapi) pour stopper
-            // les retries infinis du provider.
-            if (
-              msg.toLowerCase().includes('channel') ||
-              msg.toLowerCase().includes('canal') ||
-              msg.toLowerCase().includes('non trouve') ||
-              msg.toLowerCase().includes('not found')
-            ) {
-              this.logger.warn(
-                `INCOMING_CHANNEL_NOT_FOUND trace=${traceId} channel=${message.channelId} — message ignoré, provider ne réessaiera pas`,
-              );
-              return;
-            }
-            throw saveErr;
-          }
-
-          if (!savedMessage) {
-            throw new NotFoundException('Message non enregistre');
-          }
-          this.logger.log(
-            `INCOMING_PERSISTED trace=${traceId} db_message_id=${savedMessage.id}`,
-          );
-          this.systemAlert.onInboundMessage();
-
-          const medias = this.extractMediaFromUnified(message);
-          // OPT-4 : résoudre le channel une seule fois pour tous les médias
-          const mediaChannel: WhapiChannel | null =
-            medias.length > 0 && message.channelId
-              ? await this.channelService.findByChannelId(message.channelId)
-              : null;
-
-          for (const media of medias) {
-            await this.saveMedia(media, savedMessage, conversation, {
-              tenantId: message.tenantId,
-              provider: message.provider,
-              providerMediaId: message.media?.id,
-              channelId: message.channelId,
-              resolvedChannel: mediaChannel,
-            });
-          }
-
-          const fullMessage =
-            await this.whatsappMessageService.findOneWithMedias(savedMessage.id);
-
-          if (!fullMessage) return;
-
-          // Persiste last_client_message_at en DB (pas uniquement en mémoire) pour que
-          // executeAutoMessage() puisse recharger la bonne valeur et passer le guard
-          // `lastAuto >= lastClient` aux étapes 2, 3, …
-          const clientMessageAt = savedMessage.timestamp ?? new Date();
-
-          // Réouverture après réponse agent : repart de zéro sur la séquence auto
-          const isReopenedCycle = !!conversation.last_poste_message_at;
-          await this.chatService.update(conversation.chat_id, {
-            read_only: false,
-            last_client_message_at: clientMessageAt,
-            waiting_client_reply: false,
-            ...(isReopenedCycle
-              ? { auto_message_step: 0, last_auto_message_sent_at: null }
-              : {}),
-          });
-          conversation.read_only = false;
-          conversation.last_client_message_at = clientMessageAt;
-          if (isReopenedCycle) {
-            conversation.auto_message_step = 0;
-          }
-
-          // Passer fullMessage comme lastMessage : c'est le message entrant = dernier message
-          // → évite un SELECT supplémentaire dans notifyNewMessage (OPT-2)
-          await this.messageGateway.notifyNewMessage(fullMessage, conversation, fullMessage);
-          this.logger.log(
-            `INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`,
-          );
-
-          // 🤖 Messages automatiques : déclenché uniquement si l'agent
-          // n'a jamais répondu sur ce chat (last_poste_message_at = null).
-          // Fire-and-forget : le setTimeout interne est non-bloquant.
-          if (!conversation.last_poste_message_at) {
-            void this.autoMessageOrchestrator.handleClientMessage(conversation);
-          }
-        });
+        await this.getMutex(message.chatId).runExclusive(() =>
+          this.processOneMessage(message, traceId),
+        );
       } catch (err) {
         throw new HttpException(
-          {
-            status: 'error',
-            message: err.message || 'Webhook processing failed',
-          },
+          { status: 'error', message: (err as Error).message || 'Webhook processing failed' },
           HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
     }
   }
+
+  // ─── Statuts sortants ─────────────────────────────────────────────────────
 
   async handleStatuses(statuses: UnifiedStatus[]): Promise<void> {
     for (const status of statuses) {
@@ -215,8 +106,6 @@ export class InboundMessageService {
       this.logger.log(
         `STATUS_UPDATE provider_message_id=${status.providerMessageId} status=${status.status}`,
       );
-
-      // P1: Broadcast au frontend via WebSocket
       await this.messageGateway.notifyStatusUpdate({
         providerMessageId: status.providerMessageId,
         status: status.status,
@@ -226,192 +115,63 @@ export class InboundMessageService {
     }
   }
 
-  private async saveMedia(
-    media: ExtractedMedia,
-    messageEntity,
-    chatEntity,
-    context?: {
-      tenantId?: string;
-      provider?: string;
-      providerMediaId?: string;
-      channelId?: string;
-      resolvedChannel?: WhapiChannel | null;
-    },
-  ) {
-    const entity = new WhatsappMedia();
+  // ─── Pipeline (cœur) ──────────────────────────────────────────────────────
 
-    entity.media_type = media.type as WhatsappMediaType;
-    entity.tenant_id = context?.tenantId ?? null;
-    entity.provider = context?.provider ?? null;
-    entity.provider_media_id = context?.providerMediaId ?? null;
-    entity.media_id = media.media_id!;
-    entity.whapi_media_id = media.media_id!;
-    entity.mime_type = media.mime_type ?? '';
-    entity.file_name = media.file_name ?? null;
-    entity.file_size = media.file_size?.toString() ?? null;
-    entity.duration_seconds = media.seconds ?? null;
-    entity.caption = media.caption ?? null;
+  private async processOneMessage(message: UnifiedMessage, traceId: string): Promise<void> {
+    // ── Étape 2 : enrichissement provider ────────────────────────────────────
+    await this.providerEnrichment.enrich(message);
 
-    const raw = media.payload as WhapiRawMedia | undefined;
-    entity.sha256 = raw?.sha256 ?? null;
+    // ── Étape 3 : assignation de la conversation ──────────────────────────────
+    const conversation = await this.dispatcherService.assignConversation(
+      message.chatId,
+      message.fromName ?? 'Client',
+      traceId,
+      message.tenantId,
+      message.channelId,
+    );
 
-    // Attach channel — utiliser le channel pré-résolu (OPT-4) sinon charger depuis la DB
-    if (context?.resolvedChannel) {
-      entity.channel = context.resolvedChannel;
-    } else if (context?.channelId) {
-      const ch = await this.channelService.findByChannelId(context.channelId);
-      if (ch) {
-        entity.channel = ch;
-      }
+    if (!conversation) {
+      this.logger.warn(`INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`);
+      return;
     }
 
-    // Resolve media URL
-    let mediaUrl = raw?.link ?? null;
+    // ── Étape 4 : persistance du message ──────────────────────────────────────
+    const persistResult = await this.messagePersistence.persist(message, conversation, traceId);
+    if (!persistResult.ok) return; // canal inconnu — HTTP 200 pour stopper les retries provider
 
-    // Meta provider: no local storage. Use proxy endpoint for streaming.
-    // Chemin relatif : le frontend préfixe avec NEXT_PUBLIC_API_URL
-    if (!mediaUrl && context?.provider === 'meta' && context?.providerMediaId) {
-      const channelQuery = context.channelId
-        ? `?channelId=${encodeURIComponent(context.channelId)}`
-        : '';
-      mediaUrl = `/messages/media/meta/${context.providerMediaId}${channelQuery}`;
-    }
+    this.systemAlert.onInboundMessage();
 
-    // Messenger: les URLs CDN expirent → toujours utiliser le proxy qui re-fetch via Graph API
-    if (context?.provider === 'messenger' && context?.providerMediaId) {
-      const channelQuery = context.channelId
-        ? `?channelId=${encodeURIComponent(context.channelId)}`
-        : '';
-      mediaUrl = `/messages/media/messenger/${context.providerMediaId}${channelQuery}`;
-    }
+    // ── Étape 5 : persistance des médias ─────────────────────────────────────
+    const medias = this.mediaExtraction.extract(message);
+    await this.mediaPersistence.persistAll(medias, persistResult.message, conversation, message);
 
-    entity.url = mediaUrl;
+    // ── Étape 6 : mise à jour état conversation ───────────────────────────────
+    await this.stateUpdate.apply(conversation, persistResult.message);
 
-    entity.chat = chatEntity;
-    entity.message = messageEntity;
-    entity.preview = null;
-    entity.view_once = '0';
+    // ── Étape 7 : notification frontend via WebSocket ────────────────────────
+    await this.messageGateway.notifyNewMessage(persistResult.message, conversation, persistResult.message);
+    this.logger.log(`INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`);
 
-    await this.mediaRepository.save(entity);
+    // ── Étape 8 : déclenchement automatismes (découplé via EventEmitter2) ───
+    this.eventEmitter.emit(INBOUND_MESSAGE_PROCESSED_EVENT, {
+      conversation,
+      message: persistResult.message,
+      traceId,
+    } satisfies InboundMessageProcessedEvent);
   }
 
-  private extractMediaFromUnified(message: UnifiedMessage): ExtractedMedia[] {
-    if (!message.media && !message.location) {
-      return [];
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private getMutex(chatId: string): MutexInterface {
+    let mutex = this.chatMutexes.get(chatId);
+    if (!mutex) {
+      mutex = withTimeout(new Mutex(), 30_000);
+      this.chatMutexes.set(chatId, mutex);
     }
-
-    const mediaType =
-      message.type === 'interactive' || message.type === 'button'
-        ? 'interactive'
-        : message.type;
-    const normalizedType = (
-      [
-        'image',
-        'video',
-        'audio',
-        'voice',
-        'document',
-        'gif',
-        'short',
-        'location',
-        'live_location',
-      ].includes(mediaType)
-        ? mediaType
-        : 'text'
-    ) as ExtractedMedia['type'];
-
-    if (message.location) {
-      return [
-        {
-          type: 'location',
-          latitude: message.location.latitude,
-          longitude: message.location.longitude,
-        },
-      ];
-    }
-
-    if (message.media) {
-      return [
-        {
-          type: normalizedType,
-          media_id: message.media.id,
-          mime_type: message.media.mimeType,
-          caption: message.media.caption,
-          file_name: message.media.fileName,
-          file_size: message.media.fileSize,
-          seconds: message.media.seconds,
-          payload: { link: message.media.link } as WhapiRawMedia,
-        },
-      ];
-    }
-
-    return [];
+    return mutex;
   }
 
-  private validateIncomingChatId(chatId: string | null | undefined): {
-    valid: boolean;
-    reason?: string;
-  } {
-    if (!chatId || typeof chatId !== 'string') {
-      return { valid: false, reason: 'missing_chat_id' };
-    }
-
-    const trimmedChatId = chatId.trim();
-    if (!trimmedChatId.includes('@')) {
-      return { valid: false, reason: 'invalid_chat_id_format' };
-    }
-
-    if (trimmedChatId.endsWith('@g.us')) {
-      return { valid: false, reason: 'group_chat_not_supported' };
-    }
-
-    const phoneCandidate = trimmedChatId.split('@')[0] ?? '';
-    const normalizedPhone = phoneCandidate.replace(/[^\d]/g, '');
-    if (!normalizedPhone) {
-      return { valid: false, reason: 'missing_phone_in_chat_id' };
-    }
-
-    if (normalizedPhone.length < 8 || normalizedPhone.length > 20) {
-      return { valid: false, reason: 'phone_length_out_of_range' };
-    }
-
-    return { valid: true };
-  }
-
-  private buildMessageTraceId(
-    messageId?: string | null,
-    chatId?: string,
-  ): string {
+  private buildTraceId(messageId?: string | null, chatId?: string): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
   }
-
-  /**
-   * Résout le nom d'un expéditeur Messenger via Graph API.
-   * Fire-and-forget sur erreur : ne bloque jamais le traitement du message.
-   */
-  private async resolveMessengerFromName(
-    psid: string,
-    channelId: string,
-  ): Promise<string | undefined> {
-    try {
-      // Priorité 1 : recherche par channel_id (cas normal)
-      // Priorité 2 : recherche par external_id (page ID) quand channel_id est NULL en BDD
-      //   → dans ce cas channelId = pageId (fallback du webhook controller)
-      const channel =
-        (await this.channelService.findByChannelId(channelId)) ??
-        (await this.channelService.findChannelByExternalId('messenger', channelId));
-
-      if (!channel?.token) return undefined;
-
-      const name = await this.messengerService.getUserName(
-        psid,
-        channel.token,
-        channel.external_id ?? undefined,
-      );
-      return name ?? undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
 }

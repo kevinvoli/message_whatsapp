@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { ChannelController } from './channel.controller';
 import { MetaTokenService } from './meta-token.service';
+import { ChannelProviderRegistry } from './domain/channel-provider.registry';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
@@ -19,7 +20,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
     JorbsModule,
   ],
   controllers: [ChannelController],
-  providers: [ChannelService, CommunicationWhapiService, CommunicationTelegramService, MetaTokenService],
-  exports: [ChannelService, MetaTokenService],
+  providers: [ChannelService, CommunicationWhapiService, CommunicationTelegramService, MetaTokenService, ChannelProviderRegistry],
+  exports: [ChannelService, MetaTokenService, ChannelProviderRegistry],
 })
 export class ChannelModule {}

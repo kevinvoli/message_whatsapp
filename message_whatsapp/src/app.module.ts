@@ -21,6 +21,7 @@ import { CommunicationWhapiModule } from './communication_whapi/communication_wh
 import { AuthModule } from './auth/auth.module';
 import { JorbsModule } from './jorbs/jorbs.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TasksService } from './jorbs/tasks.service';
 import { ChannelModule } from './channel/channel.module';
@@ -48,6 +49,7 @@ import { SystemAlertModule } from './system-alert/system-alert.module';
       Admin,
     ]),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot({ wildcard: false, global: true }),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()

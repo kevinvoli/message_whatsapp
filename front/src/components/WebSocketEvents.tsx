@@ -10,10 +10,10 @@ import {
   Conversation,
   Message,
   transformToContact,
-  transformToConversation,
-  transformToMessage,
   transformToCallLog,
 } from '@/types/chat';
+import { transformToMessage } from '@/lib/mappers/message.mapper';
+import { transformToConversation } from '@/lib/mappers/conversation.mapper';
 
 const WebSocketEvents = () => {
   const { socket } = useSocket();

@@ -10,7 +10,7 @@
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { QueueService } from './services/queue.service';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { QueuePublisher } from 'src/realtime/publishers/queue.publisher';
 import { QueuePosition } from './entities/queue-position.entity';
 import { DispatcherService } from './dispatcher.service';
 import { DispatchSettingsService } from './services/dispatch-settings.service';
@@ -23,7 +23,7 @@ import { UpdateDispatchSettingsDto } from './dto/update-dispatch-settings.dto';
 export class DispatcherController {
   constructor(
     private readonly queueService: QueueService,
-    private readonly gateway: WhatsappMessageGateway,
+    private readonly queuePublisher: QueuePublisher,
     private readonly dispatcherService: DispatcherService,
     private readonly dispatchSettingsService: DispatchSettingsService,
   ) {}
@@ -40,7 +40,7 @@ export class DispatcherController {
   @ApiResponse({ status: 200, description: 'Queue reset' })
   async resetQueue(): Promise<{ success: boolean }> {
     await this.queueService.resetQueueState();
-    this.gateway.emitQueueUpdatePublic('admin_reset');
+    this.queuePublisher.emit('admin_reset');
     return { success: true };
   }
 
@@ -51,7 +51,7 @@ export class DispatcherController {
     @Param('posteId') posteId: string,
   ): Promise<{ success: boolean }> {
     await this.queueService.blockPoste(posteId);
-    this.gateway.emitQueueUpdatePublic('admin_block');
+    this.queuePublisher.emit('admin_block');
     return { success: true };
   }
 
@@ -62,7 +62,7 @@ export class DispatcherController {
     @Param('posteId') posteId: string,
   ): Promise<{ success: boolean }> {
     await this.queueService.unblockPoste(posteId);
-    this.gateway.emitQueueUpdatePublic('admin_unblock');
+    this.queuePublisher.emit('admin_unblock');
     return { success: true };
   }
 

@@ -24,6 +24,7 @@ export enum MessageDirection {
   IN = 'IN',
   OUT = 'OUT',
 }
+
 export enum WhatsappMessageStatus {
   FAILED = 'failed',
   PENDING = 'pending',

@@ -12,7 +12,6 @@ import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
 
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -28,23 +27,28 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { last } from 'rxjs';
 import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { ChannelService } from 'src/channel/channel.service';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
+import { SOCKET_CLIENT_EVENTS } from 'src/realtime/events/socket-events.constants';
+import { SocketAuthService } from './services/socket-auth.service';
+import { SocketConversationQueryService } from './services/socket-conversation-query.service';
+import { mapConversation } from 'src/realtime/mappers/socket-conversation.mapper';
+import { RealtimeServerService } from 'src/realtime/realtime-server.service';
+import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
+import { QueuePublisher } from 'src/realtime/publishers/queue.publisher';
+import {
+  mapMessage,
+  resolveMessageText,
+  resolveMediaUrl,
+} from 'src/realtime/mappers/socket-message.mapper';
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
-
-type AuthPayload = {
-  sub: string;
-  email?: string;
-  posteId?: string;
-  tenantId?: string;
-};
+import { AgentConnectionService } from 'src/realtime/connections/agent-connection.service';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -57,15 +61,6 @@ export class WhatsappMessageGateway
 
   private readonly logger = new Logger(WhatsappMessageGateway.name);
 
-  private connectedAgents = new Map<
-    string,
-    {
-      commercialId: string;
-      posteId: string;
-      tenantId: string | null;
-      tenantIds: string[];
-    }
-  >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
   private pendingAgentMessages = new Map<string, NodeJS.Timeout | null>();
   private readonly pendingCooldownMs = 1500; // bloquer les contenus identiques pendant 1,5s
@@ -84,15 +79,21 @@ export class WhatsappMessageGateway
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly contactService: ContactService,
-    private readonly jwtService: JwtService,
     private readonly channelService: ChannelService,
     private readonly throttle: SocketThrottleGuard,
     private readonly callLogService: CallLogService,
     private readonly notificationService: NotificationService,
     private readonly systemAlert: SystemAlertService,
+    private readonly socketAuthService: SocketAuthService,
+    private readonly conversationQueryService: SocketConversationQueryService,
+    private readonly realtimeServerService: RealtimeServerService,
+    private readonly conversationPublisher: ConversationPublisher,
+    private readonly queuePublisher: QueuePublisher,
+    private readonly agentConnectionService: AgentConnectionService,
   ) {}
 
   afterInit(server: Server): void {
+    this.realtimeServerService.setServer(server);
     this.systemAlert.setSocketServer(server);
   }
 
@@ -100,117 +101,16 @@ export class WhatsappMessageGateway
   // CONNECTION / DISCONNECTION
   // ======================================================
   async handleConnection(client: Socket) {
-    const commercialId = await this.resolveCommercialId(client);
-    if (!commercialId) {
-      client.disconnect();
-      return;
-    }
-
-    const commercial =
-      await this.commercialService.findOneWithPoste(commercialId);
-    if (!commercial?.poste) {
-      this.logger.warn(
-        `Socket auth refused: commercial ${commercialId} has no poste (${client.id})`,
-      );
-      client.disconnect();
-      return;
-    }
-
-    const posteId = commercial.poste.id;
-    const tenantIds = await this.resolveTenantIdsForPoste(posteId);
-    if (tenantIds.length === 0) {
-      this.logger.warn(
-        `Socket auth refused: tenant resolution failed (${client.id})`,
-      );
-      client.disconnect();
-      return;
-    }
-
-    const tenantId = tenantIds[0];
-    this.connectedAgents.set(client.id, {
-      commercialId,
-      posteId,
-      tenantId,
-      tenantIds,
-    });
-    for (const tid of tenantIds) {
-      await client.join(`tenant:${tid}`);
-    }
-    await client.join(`poste:${posteId}`);
-    this.logger.log(
-      `Agent ${commercialId} joined ${tenantIds.length} tenant room(s): ${tenantIds.join(', ')} + poste:${posteId}`,
-    );
-
-    await this.commercialService.updateStatus(commercialId, true);
-    await this.posteService.setActive(posteId, true);
-    const poste = await this.posteService.findOneById(posteId);
-    if (poste.is_queue_enabled) {
-      // Retirer les postes offline de la queue (remplie pendant les heures hors-service)
-      // puis ajouter ce poste connecte
-      await this.queueService.purgeOfflinePostes(posteId);
-      await this.queueService.addPosteToQueue(posteId);
-    } else {
-      this.logger.warn(
-        `Queue disabled for poste ${posteId}, skip enqueue on connect`,
-      );
-    }
-    await this.jobRunner.startAgentSlaMonitor(posteId);
-
-    await this.emitQueueUpdate('agent_connected');
-    await this.sendConversationsToClient(client);
-  }
-
-  private async resolveCommercialId(client: Socket): Promise<string | null> {
-    const token = this.extractAuthToken(client);
-    if (!token) {
-      this.logger.warn(`Socket auth refused: missing token (${client.id})`);
-      return null;
-    }
-
-    try {
-      const payload = await this.jwtService.verifyAsync<AuthPayload>(token);
-      return payload.sub ?? null;
-    } catch (error) {
-      this.logger.warn(`Socket auth refused: invalid token (${client.id})`);
-      return null;
-    }
-  }
-
-  private async resolveTenantIdsForPoste(posteId: string): Promise<string[]> {
-    // On inclut toutes les conversations (même fermées) pour la résolution des tenants
-    const { chats } = await this.chatService.findByPosteId(posteId, []);
-    const tenantIds = [
-      ...new Set(
-        chats.map((chat) => chat.tenant_id).filter(Boolean) as string[],
-      ),
-    ];
-
-    if (tenantIds.length === 0) {
-      // Nouveau poste sans chats : fallback sur le premier channel disponible
-      const channels = await this.channelService.findAll();
-      if (channels.length > 0) {
-        const channel = channels[0];
-        const tenantId = await this.channelService.ensureTenantId(channel);
-        this.logger.log(
-          `Tenant resolved from channel for new poste ${posteId}: ${tenantId}`,
-        );
-        return tenantId ? [tenantId] : [];
-      }
-      this.logger.warn(
-        `No tenant resolvable for poste ${posteId}: no chats and no channels`,
-      );
-      return [];
-    }
-
-    return tenantIds;
+    const ok = await this.agentConnectionService.onConnect(client);
+    if (!ok) client.disconnect();
   }
 
   private getTenantId(client: Socket): string | null {
-    return this.connectedAgents.get(client.id)?.tenantId ?? null;
+    return this.agentConnectionService.getAgent(client.id)?.tenantId ?? null;
   }
 
   private getTenantIds(client: Socket): string[] {
-    return this.connectedAgents.get(client.id)?.tenantIds ?? [];
+    return this.agentConnectionService.getAgent(client.id)?.tenantIds ?? [];
   }
 
   private isTenantChat(chat: WhatsappChat, tenantId: string | null): boolean {
@@ -228,160 +128,16 @@ export class WhatsappMessageGateway
     return tenantIds.includes(chat.tenant_id);
   }
 
-  private extractAuthToken(client: Socket): string | null {
-    const authToken = client.handshake.auth?.token;
-    if (typeof authToken === 'string' && authToken.trim().length > 0) {
-      return authToken;
-    }
-
-    const cookieHeader = client.handshake.headers.cookie;
-    if (!cookieHeader) return null;
-
-    const authCookie = cookieHeader
-      .split(';')
-      .map((part) => part.trim())
-      .find((part) => part.startsWith('Authentication='));
-
-    if (!authCookie) return null;
-    const token = authCookie.slice('Authentication='.length);
-    return token ? decodeURIComponent(token) : null;
-  }
-
   async handleDisconnect(client: Socket) {
     this.throttle.removeClient(client.id);
-    const agent = this.connectedAgents.get(client.id);
-    if (!agent) return;
-
-    this.connectedAgents.delete(client.id);
-    await this.commercialService.updateStatus(agent.commercialId, false);
-
-    // Verifier si un autre commercial du MEME poste est encore connecte.
-    // Si oui : le poste reste actif et dans la queue — on ne touche a rien.
-    // Si non : c'etait le dernier socket du poste → on le desactive et on le retire.
-    const isPosteStillActive = Array.from(this.connectedAgents.values()).some(
-      (a) => a.posteId === agent.posteId,
-    );
-
-    if (!isPosteStillActive) {
-      const { chats: activeChats } = await this.chatService.findByPosteId(agent.posteId);
-      const activeCount = activeChats.filter(
-        (c) => c.status === WhatsappChatStatus.ACTIF || c.status === WhatsappChatStatus.EN_ATTENTE,
-      ).length ?? 0;
-      void this.notificationService.create(
-        activeCount > 0 ? 'alert' : 'info',
-        `Commercial déconnecté${activeCount > 0 ? ` — ${activeCount} conv. active(s)` : ''}`,
-        `Le poste ${agent.posteId} s'est déconnecté${activeCount > 0 ? ` avec ${activeCount} conversation(s) en cours. Réinjection automatique en attente.` : '.'}`,
-      );
-      await this.posteService.setActive(agent.posteId, false);
-      await this.queueService.removeFromQueue(agent.posteId);
-      this.jobRunner.stopAgentSlaMonitor(agent.posteId);
-    }
-
-    // Si la queue est vide apres la deconnexion, remplir avec tous les postes
-    // non-bloques ayant au moins un commercial (mode OFFLINE).
-    // On verifie la queue plutot que connectedAgents.size car un commercial
-    // connecte sur un poste BLOQUE occupe connectedAgents sans etre dans la queue.
-    // Dans ce cas connectedAgents.size > 0 alors que la queue est bien vide.
-    const queueIsEmpty =
-      (await this.queueService.getQueuePositions()).length === 0;
-    if (queueIsEmpty) {
-      this.logger.log(
-        'Queue vide apres deconnexion, remplissage mode offline',
-      );
-      await this.queueService.fillQueueWithAllPostes();
-    }
-
-    await this.emitQueueUpdate('agent_disconnected');
+    await this.agentConnectionService.onDisconnect(client);
   }
 
   // ======================================================
   // CLIENT → SERVER
   // ======================================================
-  private async sendConversationsToClient(client: Socket, searchTerm?: string) {
-    const agent = this.connectedAgents.get(client.id);
-    if (!agent) return;
-    try {
-      await this.sendConversationsToClientInternal(client, agent, searchTerm);
-    } catch (err) {
-      this.logger.error(`sendConversationsToClient failed for poste ${agent.posteId}`, err instanceof Error ? err.stack : err);
-    }
-  }
-
-  private async sendConversationsToClientInternal(
-    client: Socket,
-    agent: { posteId: string; tenantIds: string[] },
-    searchTerm?: string,
-    cursor?: { activityAt: string; chatId: string },
-  ) {
-    const isFirstPage = !cursor;
-
-    // Inclure TOUS les statuts (actif, attente, fermé, converti…).
-    // Limite : 300 conversations par page (keyset pagination).
-    let { chats, hasMore } = await this.chatService.findByPosteId(
-      agent.posteId,
-      [],
-      300,
-      cursor,
-    );
-
-    if (agent.tenantIds.length > 0) {
-      const tenantSet = new Set(agent.tenantIds);
-      chats = chats.filter((c) => !c.tenant_id || tenantSet.has(c.tenant_id));
-    }
-
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      chats = chats.filter(
-        (c) =>
-          c.name.toLowerCase().includes(lowerSearch) ||
-          c.chat_id.includes(lowerSearch),
-      );
-      // En mode recherche la notion de "page suivante" n'a pas de sens
-      hasMore = false;
-    }
-
-    const chatIds = chats.map((c) => c.chat_id);
-    const [lastMsgMap, unreadMap, contactMap] = await Promise.all([
-      this.messageService.findLastMessagesBulk(chatIds),
-      this.messageService.countUnreadMessagesBulk(chatIds),
-      this.contactService.findByChatIds(chatIds),
-    ]);
-
-    const conversations = chats.map((chat) =>
-      this.mapConversationWithContact(
-        chat,
-        lastMsgMap.get(chat.chat_id) ?? null,
-        unreadMap.get(chat.chat_id) ?? chat.unread_count ?? 0,
-        contactMap.get(chat.chat_id),
-      ),
-    );
-
-    // Cursor pour la page suivante
-    const last = chats.at(-1);
-    const nextCursor = hasMore && last
-      ? {
-          activityAt: (last.last_activity_at ?? last.createdAt).toISOString(),
-          chatId: last.chat_id,
-        }
-      : null;
-
-    client.emit('chat:event', {
-      type: 'CONVERSATION_LIST',
-      payload: { conversations, hasMore, nextCursor },
-    });
-
-    // TOTAL_UNREAD_UPDATE seulement sur la première page (évite les doublons)
-    if (isFirstPage) {
-      const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
-      client.emit('chat:event', {
-        type: 'TOTAL_UNREAD_UPDATE',
-        payload: { totalUnread },
-      });
-    }
-  }
-
   private async sendContactsToClient(client: Socket) {
-    const agent = this.connectedAgents.get(client.id);
+    const agent = this.agentConnectionService.getAgent(client.id);
     if (!agent) return;
 
     const contacts = await this.contactService.findAllByPosteId(agent.posteId);
@@ -451,7 +207,7 @@ export class WhatsappMessageGateway
     });
   }
 
-  @SubscribeMessage('conversations:get')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.CONVERSATIONS_GET)
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload?: {
@@ -462,25 +218,11 @@ export class WhatsappMessageGateway
     if (!this.throttle.allow(client.id, 'conversations:get')) {
       return this.emitRateLimited(client, 'conversations:get');
     }
-    const agent = this.connectedAgents.get(client.id);
-    if (!agent) return;
-    try {
-      await this.sendConversationsToClientInternal(
-        client,
-        agent,
-        payload?.search,
-        payload?.cursor,
-      );
-    } catch (err) {
-      this.logger.error(
-        `handleGetConversations failed for poste ${agent.posteId}`,
-        err instanceof Error ? err.stack : err,
-      );
-    }
+    await this.agentConnectionService.sendConversationsToClient(client, payload?.search, payload?.cursor);
   }
 
   /** Charge le détail complet d'un contact (avec messages) à la demande. */
-  @SubscribeMessage('contact:get_detail')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.CONTACT_GET_DETAIL)
   async handleGetContactDetail(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
@@ -495,7 +237,7 @@ export class WhatsappMessageGateway
     });
   }
 
-  @SubscribeMessage('contacts:get')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.CONTACTS_GET)
   async handleGetContacts(@ConnectedSocket() client: Socket) {
     if (!this.throttle.allow(client.id, 'contacts:get')) {
       return this.emitRateLimited(client, 'contacts:get');
@@ -505,7 +247,7 @@ export class WhatsappMessageGateway
   }
 
   /** Renvoie l'historique des appels d'un contact au client demandeur (B-05) */
-  @SubscribeMessage('call_logs:get')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.CALL_LOGS_GET)
   async handleGetCallLogs(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { contact_id: string },
@@ -520,7 +262,7 @@ export class WhatsappMessageGateway
     });
   }
 
-  @SubscribeMessage('chat:event')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.CHAT_EVENT)
   async handleChatEvent(
     @ConnectedSocket() client: Socket,
     @MessageBody()
@@ -530,7 +272,7 @@ export class WhatsappMessageGateway
       return this.emitRateLimited(client, 'chat:event');
     }
 
-    const agent = this.connectedAgents.get(client.id);
+    const agent = this.agentConnectionService.getAgent(client.id);
     if (!agent) return;
 
     const chatId = data.payload?.chat_id;
@@ -567,7 +309,7 @@ export class WhatsappMessageGateway
 
       this.server.to(`poste:${updatedChat.poste_id}`).emit('chat:event', {
         type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(updatedChat, lastMessage, unreadCount),
+        payload: mapConversation(updatedChat, lastMessage, unreadCount),
       });
       return;
     }
@@ -593,7 +335,7 @@ export class WhatsappMessageGateway
     });
   }
 
-  @SubscribeMessage('messages:get')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.MESSAGES_GET)
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; limit?: number; before?: string },
@@ -601,7 +343,7 @@ export class WhatsappMessageGateway
     if (!this.throttle.allow(client.id, 'messages:get')) {
       return this.emitRateLimited(client, 'messages:get');
     }
-    const agent = this.connectedAgents.get(client.id);
+    const agent = this.agentConnectionService.getAgent(client.id);
     if (!agent) return;
 
     const tenantIds = this.getTenantIds(client);
@@ -639,13 +381,13 @@ export class WhatsappMessageGateway
       type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
       payload: {
         chat_id: payload.chat_id,
-        messages: filteredMessages.map(this.mapMessage),
+        messages: filteredMessages.map(mapMessage),
         hasMore,
       },
     });
   }
 
-  @SubscribeMessage('messages:read')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.MESSAGES_READ)
   async handleMarkAsRead(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
@@ -673,7 +415,7 @@ export class WhatsappMessageGateway
     }
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, 0),
+      payload: mapConversation(chat, lastMessage, 0),
     });
 
     // Mettre à jour le compteur global non lus pour ce poste
@@ -684,7 +426,7 @@ export class WhatsappMessageGateway
     });
   }
 
-  @SubscribeMessage('message:send')
+  @SubscribeMessage(SOCKET_CLIENT_EVENTS.MESSAGE_SEND)
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; text: string; tempId: string; quotedMessageId?: string },
@@ -694,7 +436,7 @@ export class WhatsappMessageGateway
     }
   
 
-    const agent = this.connectedAgents.get(client.id);
+    const agent = this.agentConnectionService.getAgent(client.id);
     if (!agent) return;
 
     if (payload.tempId && this.recentTempIds.has(payload.tempId)) {
@@ -827,7 +569,7 @@ export class WhatsappMessageGateway
       chat.read_only = true;
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'MESSAGE_ADD',
-        payload: { ...this.mapMessage(message), tempId: payload.tempId },
+        payload: { ...mapMessage(message), tempId: payload.tempId },
       });
 
       const [lastMessage, freshChatAfterSend] = await Promise.all([
@@ -841,7 +583,7 @@ export class WhatsappMessageGateway
 
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'CONVERSATION_UPSERT',
-        payload: this.mapConversation(chat, lastMessage, unreadCount),
+        payload: mapConversation(chat, lastMessage, unreadCount),
       });
     } finally {
       if (sendSucceeded) {
@@ -875,7 +617,7 @@ export class WhatsappMessageGateway
     chat.read_only = false;
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'MESSAGE_ADD',
-      payload: this.mapMessage(message),
+      payload: mapMessage(message),
     });
     this.logger.log(
       `INCOMING_SOCKET_EMIT trace=${message.message_id ?? message.id} chat_id=${chat.chat_id}`,
@@ -905,7 +647,7 @@ export class WhatsappMessageGateway
 
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, resolvedLastMessage, unreadCount),
+      payload: mapConversation(chat, resolvedLastMessage, unreadCount),
     });
   }
 
@@ -930,7 +672,7 @@ export class WhatsappMessageGateway
 
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'MESSAGE_ADD',
-      payload: this.mapMessage(message),
+      payload: mapMessage(message),
     });
 
     // Récupérer le dernier message et le unread_count depuis la DB.
@@ -946,7 +688,7 @@ export class WhatsappMessageGateway
 
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, resolvedLastMessage, unreadCount),
+      payload: mapConversation(chat, resolvedLastMessage, unreadCount),
     });
 
     this.logger.log(
@@ -1072,174 +814,38 @@ export class WhatsappMessageGateway
     });
   }
 
+  // ─── Façade publique → ConversationPublisher ─────────────────────────────
+
   public isAgentConnected(posteId: string): boolean {
-    return Array.from(this.connectedAgents.values()).some(
-      (a) => a.posteId === posteId,
-    );
+    return this.agentConnectionService.isAgentConnected(posteId);
   }
 
-  public async emitConversationReassigned(
-    chat: WhatsappChat,
-    oldPosteId: string,
-    newPosteId: string,
-  ): Promise<void> {
-    this.logger.log(
-      `Conversation ${chat.chat_id} reassigned ${oldPosteId} → ${newPosteId}`,
-    );
-
-    // Chaque poste a sa propre room poste:{posteId}.
-    // REMOVED va uniquement à l'ancien poste, ASSIGNED uniquement au nouveau.
-    this.server.to(`poste:${oldPosteId}`).emit('chat:event', {
-      type: 'CONVERSATION_REMOVED',
-      payload: { chat_id: chat.chat_id },
-    });
-
-    const freshChat = await this.chatService.findBychat_id(chat.chat_id);
-    if (freshChat) {
-      const lastMessage =
-        await this.messageService.findLastMessageBychat_id(chat.chat_id);
-
-      this.server.to(`poste:${newPosteId}`).emit('chat:event', {
-        type: 'CONVERSATION_ASSIGNED',
-        payload: this.mapConversation(freshChat, lastMessage, freshChat.unread_count ?? 0),
-      });
-    }
-
-    this.logger.log(
-      `CONVERSATION_REMOVED → poste:${oldPosteId} | CONVERSATION_ASSIGNED → poste:${newPosteId}`,
-    );
+  public emitConversationReassigned(chat: WhatsappChat, oldPosteId: string, newPosteId: string): Promise<void> {
+    return this.conversationPublisher.emitConversationReassigned(chat, oldPosteId, newPosteId);
   }
 
-  /**
-   * S1 — Batch emit : charge toutes les chats + derniers messages en 2 requêtes
-   * puis émet les événements sans requête DB dans la boucle.
-   * Remplace N × emitConversationReassigned() pour les cycles SLA.
-   */
-  public async emitBatchReassignments(
-    reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }>,
-  ): Promise<void> {
-    if (reassignments.length === 0) return;
-
-    const chatIds = reassignments.map((r) => r.chatId);
-
-    // 2 requêtes pour N conversations (au lieu de 2N)
-    const chatMap = await this.chatService.findBulkByChatIds(chatIds);
-    const msgMap = await this.messageService.findLastMessagesBulk(chatIds);
-
-    for (const { chatId, oldPosteId, newPosteId } of reassignments) {
-      this.server.to(`poste:${oldPosteId}`).emit('chat:event', {
-        type: 'CONVERSATION_REMOVED',
-        payload: { chat_id: chatId },
-      });
-
-      const chat = chatMap.get(chatId);
-      if (chat) {
-        this.server.to(`poste:${newPosteId}`).emit('chat:event', {
-          type: 'CONVERSATION_ASSIGNED',
-          payload: this.mapConversation(chat, msgMap.get(chatId) ?? null, chat.unread_count ?? 0),
-        });
-      }
-    }
-
-    this.logger.log(`Batch SLA emit: ${reassignments.length} réassignation(s) émises en lot`);
+  public emitBatchReassignments(reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }>): Promise<void> {
+    return this.conversationPublisher.emitBatchReassignments(reassignments);
   }
 
   public emitConversationRemoved(chatId: string, posteId: string): void {
-    this.server.to(`poste:${posteId}`).emit('chat:event', {
-      type: 'CONVERSATION_REMOVED',
-      payload: { chat_id: chatId },
-    });
-    this.logger.log(
-      `CONVERSATION_REMOVED emitted for chat ${chatId} → poste:${posteId} (no agent available)`,
-    );
+    this.conversationPublisher.emitConversationRemoved(chatId, posteId);
   }
 
-  public async emitConversationAssigned(chatId: string): Promise<void> {
-    const chat = await this.chatService.findBychat_id(chatId);
-    if (!chat?.poste_id) return;
-    const lastMessage = await this.messageService.findLastMessageBychat_id(chatId);
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_ASSIGNED',
-      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
-    });
-    this.logger.log(
-      `CONVERSATION_ASSIGNED emitted for new chat ${chatId} → poste:${chat.poste_id}`,
-    );
+  public emitConversationAssigned(chatId: string): Promise<void> {
+    return this.conversationPublisher.emitConversationAssigned(chatId);
   }
 
-  public async emitConversationUpsertByChatId(
-    chatId: string,
-  ): Promise<void> {
-    const chat = await this.chatService.findBychat_id(chatId);
-    if (!chat?.poste_id) {
-      this.logger.warn(
-        `Conversation upsert skipped: no assigned poste for chat ${chatId}`,
-      );
-      return;
-    }
-    const lastMessage =
-      await this.messageService.findLastMessageBychat_id(chatId);
-
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
-    });
+  public emitConversationUpsertByChatId(chatId: string): Promise<void> {
+    return this.conversationPublisher.emitConversationUpsertByChatId(chatId);
   }
 
   public emitConversationReadonly(chat: WhatsappChat): void {
-    if (!chat.poste_id) {
-      return;
-    }
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_READONLY',
-      payload: { chat_id: chat.chat_id, read_only: chat.read_only },
-    });
+    this.conversationPublisher.emitConversationReadonly(chat);
   }
 
-  /**
-   * Appelé après fermeture automatique par le cron.
-   * Envoie CONVERSATION_UPSERT avec status=fermé → le frontend retire la conversation de la liste.
-   */
-  public async emitConversationClosed(chat: WhatsappChat): Promise<void> {
-    if (!chat.poste_id) {
-      return;
-    }
-    const lastMessage = await this.messageService.findLastMessageBychat_id(chat.chat_id);
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
-    });
-  }
-
-  // ======================================================
-  // QUEUE
-  // ======================================================
-  public async emitQueueUpdatePublic(reason: string): Promise<void> {
-    await this.emitQueueUpdate(reason);
-  }
-
-  private async emitQueueUpdate(reason: string) {
-    const queue = await this.queueService.getQueuePositions();
-    const postes = new Set(
-      Array.from(this.connectedAgents.values()).map((agent) => agent.posteId),
-    );
-
-    if (postes.size === 0) {
-      this.server.emit('queue:updated', {
-        timestamp: new Date().toISOString(),
-        reason,
-        data: queue,
-      });
-      return;
-    }
-
-    postes.forEach((posteId) => {
-      this.server.to(`poste:${posteId}`).emit('queue:updated', {
-        timestamp: new Date().toISOString(),
-        reason,
-        data: queue,
-      });
-    });
+  public emitConversationClosed(chat: WhatsappChat): Promise<void> {
+    return this.conversationPublisher.emitConversationClosed(chat);
   }
 
   private markPendingKey(key: string) {
@@ -1282,176 +888,4 @@ export class WhatsappMessageGateway
     }
   }
 
-  // ======================================================
-  // MAPPERS
-  // ======================================================
-  private mapMessage = (message: WhatsappMessage) => ({
-    id: message.id,
-    chat_id: message.chat.chat_id,
-    from_me: message.from_me,
-    text: this.resolveMessageText(message) ?? undefined,
-    timestamp: message.timestamp ?? message.createdAt,
-    status: message.status,
-    from: message.from,
-    from_name: message.from_name,
-    poste_id: message.poste_id,
-    direction: message.direction,
-    types: message.type,
-    medias:
-      message.medias?.map((m) => ({
-        id: m.media_id,
-        type: m.media_type,
-        url: this.resolveMediaUrl(message, m, m.url ?? null),
-        mime_type: m.mime_type,
-        caption: m.caption,
-        file_name: m.file_name,
-        file_size: m.file_size,
-        seconds: m.duration_seconds,
-        latitude: m.latitude,
-        longitude: m.longitude,
-      })) ?? [],
-    dedicated_channel_id: message.dedicated_channel_id ?? null,
-    quotedMessage: message.quotedMessage
-      ? {
-          id: message.quotedMessage.id,
-          text: this.resolveMessageText(message.quotedMessage) ?? undefined,
-          from_name: message.quotedMessage.from_name,
-          from_me: message.quotedMessage.from_me,
-        }
-      : undefined,
-  });
-
-  private resolveMediaUrl(
-    message: WhatsappMessage,
-    media: { provider_media_id?: string | null; media_id: string },
-    directUrl: string | null,
-  ): string | null {
-    const channelQuery = message.channel_id
-      ? `?channelId=${encodeURIComponent(message.channel_id)}`
-      : '';
-
-    if (message.provider === 'meta') {
-      const providerMediaId = media.provider_media_id ?? media.media_id;
-      if (!providerMediaId) return null;
-      // Chemin relatif : le frontend préfixe avec NEXT_PUBLIC_API_URL
-      return `/messages/media/meta/${providerMediaId}${channelQuery}`;
-    }
-
-    if (directUrl) {
-      // Si l'URL stockée est déjà relative, la retourner telle quelle
-      if (directUrl.startsWith('/')) return directUrl;
-      // Si c'est une ancienne URL absolue vers notre proxy, extraire le chemin
-      try {
-        const parsed = new URL(directUrl);
-        if (parsed.pathname.startsWith('/messages/media/')) {
-          return `${parsed.pathname}${parsed.search}`;
-        }
-      } catch {
-        // URL invalide → tomber sur le return directUrl ci-dessous
-      }
-    }
-
-    return directUrl ?? null;
-  }
-
-  /** Version enrichie avec les données du contact pour l'envoi initial. */
-  private mapConversationWithContact(
-    chat: WhatsappChat,
-    lastMessage?: WhatsappMessage | null,
-    unreadCount?: number,
-    contact?: Contact,
-  ) {
-    return {
-      ...this.mapConversation(chat, lastMessage, unreadCount),
-      contact_client: chat.contact_client,
-      contact_summary: contact
-        ? {
-            id: contact.id,
-            call_status: contact.call_status,
-            call_count: contact.call_count ?? 0,
-            priority: contact.priority ?? null,
-            source: contact.source ?? null,
-            tags: [],
-            conversion_status: contact.conversion_status ?? null,
-            last_call_date: contact.last_call_date ?? null,
-            is_active: contact.is_active,
-          }
-        : null,
-    };
-  }
-
-  private mapConversation(
-    chat: WhatsappChat,
-    lastMessage?: WhatsappMessage | null,
-    unreadCount?: number,
-  ) {
-    return {
-      id: chat.id,
-      chat_id: chat.chat_id,
-      channel_id: chat.channel_id,
-      last_msg_client_channel_id: chat.last_msg_client_channel_id,
-      name: chat.name,
-      poste_id: chat.poste_id,
-      // Normalise 'en attente' → 'attente' une seule fois à la source
-      // pour éviter que chaque client (front/admin) le fasse de son côté
-      status: chat.status === WhatsappChatStatus.EN_ATTENTE ? 'attente' : chat.status,
-      unreadCount: unreadCount ?? chat.unread_count ?? 0,
-      createdAt: chat.createdAt,
-      auto_message_status: chat.auto_message_status,
-      last_activity_at: chat.last_activity_at,
-      last_client_message_at: chat.last_client_message_at || null,
-      last_poste_message_at: chat.last_poste_message_at || null,
-      updatedAt: chat.updatedAt,
-      poste: chat.poste || null,
-      last_message: lastMessage
-        ? {
-            id: lastMessage.id,
-            text: this.resolveMessageText(lastMessage) ?? '',
-            timestamp: lastMessage.timestamp ?? lastMessage.createdAt,
-            from_me: lastMessage.from_me,
-            status: lastMessage.status,
-            type: lastMessage.type,
-          }
-        : null,
-      read_only: chat.read_only,
-      contact_client: chat.contact_client,
-      first_response_deadline_at: chat.first_response_deadline_at,
-    };
-  }
-
-  private resolveMessageText(message: WhatsappMessage): string | null {
-    const rawText = typeof message.text === 'string' ? message.text.trim() : '';
-    if (rawText) return message.text ?? rawText;
-
-    const media = message.medias?.[0];
-    const type = message.type ?? media?.media_type ?? null;
-
-    if (media?.caption && media.caption.trim().length > 0) {
-      return media.caption;
-    }
-
-    switch (type) {
-      case 'image':
-        return '[Photo]';
-      case 'video':
-      case 'gif':
-      case 'short':
-        return '[Video]';
-      case 'audio':
-      case 'voice':
-        return '[Message vocal]';
-      case 'document':
-        return media?.file_name ?? '[Document]';
-      case 'location':
-      case 'live_location':
-        return '[Localisation]';
-      case 'interactive':
-      case 'buttons':
-      case 'button':
-      case 'list':
-        return '[Message interactif]';
-      default:
-        return media ? '[Media]' : null;
-    }
-  }
 }

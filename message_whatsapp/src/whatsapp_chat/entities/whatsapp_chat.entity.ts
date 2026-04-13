@@ -15,7 +15,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-
 export enum WhatsappChatStatus {
   ACTIF = 'actif',
   EN_ATTENTE = 'en attente',

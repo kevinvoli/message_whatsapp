@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { SlaPolicyService } from 'src/dispatcher/domain/sla-policy.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { In, LessThan, MoreThan, Repository } from 'typeorm';
@@ -14,15 +15,15 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
+    private readonly slaPolicy: SlaPolicyService,
     private readonly messageAutoService: MessageAutoService,
     private readonly cronConfigService: CronConfigService,
   ) {}
 
   onModuleInit(): void {
     this.cronConfigService.registerHandler('sla-checker', async () => {
-      // Désactivé entre 21h et 5h — tous les commerciaux sont hors ligne
-      const hour = new Date().getHours();
-      if (hour >= 21 || hour < 5) {
+      if (!this.slaPolicy.isBusinessHours()) {
+        const hour = new Date().getHours();
         this.logger.debug(
           `SLA checker ignoré — hors plage horaire (${hour}h, plage active : 5h–21h)`,
         );

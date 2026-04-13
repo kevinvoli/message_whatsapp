@@ -53,10 +53,16 @@ import { TelegramAdapter } from 'src/webhooks/adapters/telegram.adapter';
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { InboundMessageService } from 'src/webhooks/inbound-message.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
+import { MediaExtractionService } from 'src/ingress/domain/media-extraction.service';
+import { MediaPersistenceService } from 'src/ingress/infrastructure/media-persistence.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
 import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
+import { ChatIdValidationService } from 'src/ingress/domain/chat-id-validation.service';
+import { ProviderEnrichmentService } from 'src/ingress/domain/provider-enrichment.service';
+import { IncomingMessagePersistenceService } from 'src/ingress/infrastructure/incoming-message-persistence.service';
+import { InboundStateUpdateService } from 'src/ingress/domain/inbound-state-update.service';
 
 @Module({
   imports: [
@@ -118,6 +124,12 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     InboundMessageService,
     UnifiedIngressService,
     WebhookIdempotencyService,
+    MediaExtractionService,
+    MediaPersistenceService,
+    ChatIdValidationService,
+    ProviderEnrichmentService,
+    IncomingMessagePersistenceService,
+    InboundStateUpdateService,
   ],
 })
 export class WhapiModule {}
