@@ -299,16 +299,17 @@ export class MessageAutoService {
       );
     }
 
-    this.logger.debug(
-      `Auto message step ${chat.auto_message_step} for ${chat.chat_id}`,
+    const provider = chat.channel?.provider ?? 'unknown';
+    this.logger.log(
+      `AUTO_MESSAGE_ATTEMPT chatId=${chatId} step=${chat.auto_message_step} provider=${provider} channel=${chat.last_msg_client_channel_id}`,
       MessageAutoService.name,
     );
 
     const template = await this.getAutoMessageByPosition(position);
 
     if (!template) {
-      this.logger.debug(
-        `No active template at position ${position} — skipping auto message for ${chatId}`,
+      this.logger.warn(
+        `AUTO_MESSAGE_NO_TEMPLATE chatId=${chatId} position=${position} provider=${provider} — Aucun template SEQUENCE actif à cette position. Vérifiez la configuration des messages auto dans l'interface admin.`,
         MessageAutoService.name,
       );
       return;

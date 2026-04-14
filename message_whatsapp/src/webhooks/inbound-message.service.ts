@@ -81,7 +81,9 @@ export class InboundMessageService {
         continue;
       }
 
-      // Résolution du nom pour Messenger (le webhook ne contient pas le nom)
+      // Résolution du nom pour Messenger (le webhook ne contient pas le nom).
+      // L'appel est AVANT le mutex pour ne pas bloquer le verrou pendant l'appel Graph API.
+      // Le timeout de 5s (dans getUserName) borne la latence ajoutée.
       if (message.provider === 'messenger' && !message.fromName && message.from && message.channelId) {
         message.fromName = await this.resolveMessengerFromName(message.from, message.channelId);
       }
@@ -388,6 +390,7 @@ export class InboundMessageService {
   /**
    * Résout le nom d'un expéditeur Messenger via Graph API.
    * Fire-and-forget sur erreur : ne bloque jamais le traitement du message.
+   * Timeout de 5s sur l'appel Graph API (configuré dans getUserName).
    */
   private async resolveMessengerFromName(
     psid: string,
@@ -401,7 +404,12 @@ export class InboundMessageService {
         (await this.channelService.findByChannelId(channelId)) ??
         (await this.channelService.findChannelByExternalId('messenger', channelId));
 
-      if (!channel?.token) return undefined;
+      if (!channel?.token) {
+        this.logger.warn(
+          `MESSENGER_NAME_SKIP psid=${psid} channelId=${channelId} — channel introuvable ou token manquant. Vérifiez la configuration du canal Messenger (token, external_id/page_id).`,
+        );
+        return undefined;
+      }
 
       const name = await this.messengerService.getUserName(
         psid,

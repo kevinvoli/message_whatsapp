@@ -61,11 +61,27 @@ export class CommunicationMessengerService {
       : accessToken;
 
     try {
-      const response = await axios.get<{ name?: string }>(
+      // On demande name + first_name + last_name pour couvrir les cas où
+      // le champ "name" est vide (restrictions de confidentialité Facebook).
+      const response = await axios.get<{
+        name?: string;
+        first_name?: string;
+        last_name?: string;
+      }>(
         `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
-        { params: { fields: 'name', access_token: effectiveToken } },
+        {
+          params: { fields: 'name,first_name,last_name', access_token: effectiveToken },
+          timeout: 5_000, // 5s max — évite de bloquer le path webhook trop longtemps
+        },
       );
-      const name = response.data?.name;
+
+      // Priorité : name complet → prénom + nom → prénom seul → null
+      const data = response.data;
+      const name =
+        data?.name?.trim() ||
+        [data?.first_name, data?.last_name].filter(Boolean).join(' ').trim() ||
+        null;
+
       if (name) {
         this.nameCache.set(psid, { name, expiresAt: Date.now() + 60 * 60_000 });
         this.logger.log(
@@ -74,10 +90,19 @@ export class CommunicationMessengerService {
         );
         return name;
       }
+
+      // Aucun champ de nom disponible (privacy settings ou permissions manquantes)
+      this.logger.warn(
+        `MESSENGER_NAME_EMPTY psid=${psid} — Graph API returned no name fields (pages_read_user_content permission may be missing)`,
+        CommunicationMessengerService.name,
+      );
       return null;
     } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
-      const detail = axiosErr.response?.data?.error?.message ?? String(err);
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
+      const apiError = axiosErr.response?.data?.error;
+      const detail = apiError
+        ? `code=${apiError.code} type=${apiError.type ?? '-'}: ${apiError.message}`
+        : String(err);
       this.logger.warn(
         `MESSENGER_GET_USER_NAME_FAILED psid=${psid} — ${detail}`,
         CommunicationMessengerService.name,

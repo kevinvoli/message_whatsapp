@@ -96,19 +96,25 @@ export class AutoMessageOrchestrator implements OnModuleInit {
     }
 
     // 🔍 Activation par scope (poste / canal / provider)
+    const detectedProvider = chat.channel?.provider ?? null;
     const scopeEnabled = await this.scopeConfigService.isEnabledFor(
       chat.poste_id,
       chat.last_msg_client_channel_id,
-      chat.channel?.provider ?? null,
+      detectedProvider,
     );
 
     if (!scopeEnabled) {
-      this.logger.debug(
-        `Auto messages blocked by scope config for ${chatId}`,
+      this.logger.warn(
+        `AUTO_MESSAGE_SCOPE_BLOCKED chatId=${chatId} provider=${detectedProvider ?? 'null'} channel=${chat.last_msg_client_channel_id ?? 'null'} poste=${chat.poste_id ?? 'null'} — Messages auto désactivés par la configuration de scope (admin > Messages auto > Activer par provider/canal/poste)`,
         AutoMessageOrchestrator.name,
       );
       return;
     }
+
+    this.logger.log(
+      `AUTO_MESSAGE_SCOPE_OK chatId=${chatId} provider=${detectedProvider ?? 'null'} — déclenchement messages auto`,
+      AutoMessageOrchestrator.name,
+    );
 
     // 🔐 Double-check du lock APRÈS les awaits (anti race condition)
     // Deux webhooks simultanés peuvent tous les deux passer le premier check
@@ -263,16 +269,16 @@ export class AutoMessageOrchestrator implements OnModuleInit {
 
     // 🔐 Double sécurité DB : un auto-message a déjà été envoyé après le dernier message client
     if (lastAuto && lastAuto >= lastClient) {
-      this.logger.debug(
-        `Auto message already sent after last client message, skipping ${chatId}`,
+      this.logger.log(
+        `AUTO_MESSAGE_ALREADY_SENT chatId=${chatId} provider=${freshChat.channel?.provider ?? 'unknown'} lastAuto=${lastAuto.toISOString()} lastClient=${lastClient.toISOString()} — skip`,
         AutoMessageOrchestrator.name,
       );
       return;
     }
 
     const nextStep = freshChat.auto_message_step + 1;
-    this.logger.debug(
-      `Sending auto message step ${nextStep} for ${chatId}`,
+    this.logger.log(
+      `AUTO_MESSAGE_EXECUTE chatId=${chatId} step=${nextStep} provider=${freshChat.channel?.provider ?? 'unknown'} channel=${freshChat.last_msg_client_channel_id ?? 'null'}`,
       AutoMessageOrchestrator.name,
     );
 
