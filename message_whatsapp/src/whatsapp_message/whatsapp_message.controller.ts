@@ -309,6 +309,7 @@ export class WhatsappMessageController {
     const downloaded = await this.messengerService.downloadMedia(
       messageId,
       channel.token.trim(),
+      channel.external_id ?? undefined,
     );
 
     if (!downloaded) {

@@ -19,6 +19,7 @@ export type WhatsappMediaType =
   | 'audio'
   | 'document'
   | 'voice'
+  | 'sticker'
   | 'gif'
   | 'short'
   | 'location'

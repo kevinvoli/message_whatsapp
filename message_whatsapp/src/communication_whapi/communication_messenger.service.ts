@@ -322,20 +322,52 @@ export class CommunicationMessengerService {
   async downloadMedia(
     messageId: string,
     accessToken: string,
+    pageId?: string,
   ): Promise<{ buffer: Buffer; mimeType: string } | null> {
     try {
+      // Dériver le PAT si un pageId est fourni (même logique que sendTextMessage).
+      // Nécessaire quand le token stocké est un User/System User Token.
+      const effectiveToken = pageId
+        ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+        : accessToken;
+
       const metaUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${messageId}?fields=attachments`;
       const metaResponse = await axios.get(metaUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${effectiveToken}` },
+        timeout: 10_000,
       });
 
-      const attachments: Array<{ payload?: { url?: string } }> =
+      // La Graph API peut retourner l'URL dans payload.url (standard) ou dans
+      // image_data.url / video_data.url / audio_data.url / file_data.url (format alternatif).
+      type GraphAttachment = {
+        payload?: { url?: string };
+        image_data?: { url?: string };
+        video_data?: { url?: string };
+        audio_data?: { url?: string };
+        file_data?: { url?: string };
+      };
+      const attachments: GraphAttachment[] =
         metaResponse.data?.attachments?.data ?? [];
-      const attachmentUrl = attachments[0]?.payload?.url ?? null;
-      if (!attachmentUrl) return null;
+      const att = attachments[0];
+      const attachmentUrl =
+        att?.payload?.url ??
+        att?.image_data?.url ??
+        att?.video_data?.url ??
+        att?.audio_data?.url ??
+        att?.file_data?.url ??
+        null;
+
+      if (!attachmentUrl) {
+        this.logger.warn(
+          `MESSENGER_MEDIA_NO_URL messageId=${messageId} — aucune URL trouvée dans les attachments Graph API`,
+          CommunicationMessengerService.name,
+        );
+        return null;
+      }
 
       const downloadResponse = await axios.get(attachmentUrl, {
         responseType: 'arraybuffer',
+        timeout: 15_000,
       });
 
       const buffer = Buffer.from(downloadResponse.data);
@@ -344,8 +376,12 @@ export class CommunicationMessengerService {
         'application/octet-stream';
       return { buffer, mimeType };
     } catch (error) {
+      const axiosErr = error as AxiosError<{ error?: { message?: string; code?: number } }>;
+      const detail = axiosErr.response?.data?.error
+        ? `code=${axiosErr.response.data.error.code}: ${axiosErr.response.data.error.message}`
+        : String(error);
       this.logger.warn(
-        `MESSENGER_MEDIA_DOWNLOAD_FAILED messageId=${messageId}`,
+        `MESSENGER_MEDIA_DOWNLOAD_FAILED messageId=${messageId} — ${detail}`,
         CommunicationMessengerService.name,
       );
       return null;

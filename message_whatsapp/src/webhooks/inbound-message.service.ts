@@ -312,6 +312,7 @@ export class InboundMessageService {
         'video',
         'audio',
         'voice',
+        'sticker',
         'document',
         'gif',
         'short',
