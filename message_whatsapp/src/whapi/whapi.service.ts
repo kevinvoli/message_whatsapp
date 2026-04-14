@@ -78,6 +78,7 @@ export class WhapiService {
   async handleIncomingMessage(
     payload: WhapiWebhookPayload,
     tenantId?: string,
+    correlationId?: string,
   ): Promise<void> {
     if (!payload?.messages?.length) return;
     if (!tenantId) {
@@ -87,7 +88,7 @@ export class WhapiService {
       );
     }
     if (this.isUnifiedRouterEnabled()) {
-      await this.unifiedIngressService.ingestWhapi(payload, tenantId);
+      await this.unifiedIngressService.ingestWhapi(payload, tenantId, correlationId);
     } else {
       await this.handleIncomingMessageLegacy(payload, tenantId);
       if (this.isShadowUnifiedEnabled()) {
@@ -102,6 +103,7 @@ export class WhapiService {
   async updateStatusMessage(
     payload: WhapiWebhookPayload,
     tenantId?: string,
+    correlationId?: string,
   ): Promise<void> {
     if (!payload?.statuses?.length) return;
     if (!tenantId) {
@@ -111,7 +113,7 @@ export class WhapiService {
       );
     }
     if (this.isUnifiedRouterEnabled()) {
-      await this.unifiedIngressService.ingestWhapi(payload, tenantId);
+      await this.unifiedIngressService.ingestWhapi(payload, tenantId, correlationId);
     } else {
       await this.updateStatusMessageLegacy(payload.statuses ?? []);
       if (this.isShadowUnifiedEnabled()) {
@@ -120,8 +122,8 @@ export class WhapiService {
     }
   }
 
-  async handleMetaWebhook(payload: unknown, tenantId: string): Promise<void> {
-    await this.unifiedIngressService.ingestMeta(payload as any, tenantId);
+  async handleMetaWebhook(payload: unknown, tenantId: string, correlationId?: string): Promise<void> {
+    await this.unifiedIngressService.ingestMeta(payload as any, tenantId, correlationId);
   }
 
   private async handleIncomingMessageLegacy(

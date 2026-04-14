@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
+import { BotProviderAdapterRegistry } from 'src/flowbot/services/bot-provider-adapter-registry.service';
 import { WhapiService } from './whapi.service';
 import { WhapiController } from './whapi.controller';
 // import { WhatsappAgentService } from 'src/whatsapp_agent/whatsapp_agent.service';
@@ -63,6 +64,8 @@ import { ChatIdValidationService } from 'src/ingress/domain/chat-id-validation.s
 import { ProviderEnrichmentService } from 'src/ingress/domain/provider-enrichment.service';
 import { IncomingMessagePersistenceService } from 'src/ingress/infrastructure/incoming-message-persistence.service';
 import { InboundStateUpdateService } from 'src/ingress/domain/inbound-state-update.service';
+import { WhapiProviderAdapter } from './adapters/whapi-provider.adapter';
+import { FlowBotModule } from 'src/flowbot/flowbot.module';
 
 @Module({
   imports: [
@@ -90,6 +93,7 @@ import { InboundStateUpdateService } from 'src/ingress/domain/inbound-state-upda
     JorbsModule,
     NotificationModule,
     SystemAlertModule,
+    FlowBotModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
@@ -130,6 +134,16 @@ import { InboundStateUpdateService } from 'src/ingress/domain/inbound-state-upda
     ProviderEnrichmentService,
     IncomingMessagePersistenceService,
     InboundStateUpdateService,
+    WhapiProviderAdapter,
   ],
 })
-export class WhapiModule {}
+export class WhapiModule implements OnModuleInit {
+  constructor(
+    private readonly whapiAdapter: WhapiProviderAdapter,
+    private readonly botAdapterRegistry: BotProviderAdapterRegistry,
+  ) {}
+
+  onModuleInit(): void {
+    this.botAdapterRegistry.register(this.whapiAdapter);
+  }
+}

@@ -1,0 +1,587 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { FlowNode, FlowNodeType } from '../entities/flow-node.entity';
+import { FlowEdge } from '../entities/flow-edge.entity';
+import { FlowSession, FlowSessionStatus } from '../entities/flow-session.entity';
+import { FlowSessionLog } from '../entities/flow-session-log.entity';
+import { BotConversation, BotConversationStatus } from '../entities/bot-conversation.entity';
+import { BotInboundMessageEvent } from '../events/bot-inbound-message.event';
+import { BOT_ESCALATE_EVENT, BOT_CLOSE_EVENT, BotEscalateRequestEvent, BotCloseRequestEvent } from '../events/bot-outbound.events';
+import { BotProviderAdapterRegistry } from './bot-provider-adapter-registry.service';
+import { BotConversationService } from './bot-conversation.service';
+import { BotMessageService } from './bot-message.service';
+import { FlowSessionService } from './flow-session.service';
+import { FlowTriggerService } from './flow-trigger.service';
+import { FlowAnalyticsService } from './flow-analytics.service';
+import { FlowVariableService, BotExecutionContext } from './flow-variable.service';
+import {
+  BotConversationContext,
+  BotProviderAdapter,
+} from '../interfaces/provider-adapter.interface';
+
+const MAX_STEPS = 50;
+const MAX_LOOP_DETECTION = 3;
+
+@Injectable()
+export class FlowEngineService {
+  private readonly logger = new Logger(FlowEngineService.name);
+
+  constructor(
+    private readonly adapterRegistry: BotProviderAdapterRegistry,
+    private readonly botConvService: BotConversationService,
+    private readonly botMsgService: BotMessageService,
+    private readonly sessionService: FlowSessionService,
+    private readonly triggerService: FlowTriggerService,
+    private readonly analyticsService: FlowAnalyticsService,
+    private readonly variableService: FlowVariableService,
+    private readonly eventEmitter: EventEmitter2,
+    @InjectRepository(FlowNode)
+    private readonly nodeRepo: Repository<FlowNode>,
+    @InjectRepository(FlowEdge)
+    private readonly edgeRepo: Repository<FlowEdge>,
+    @InjectRepository(FlowSession)
+    private readonly sessionRepo: Repository<FlowSession>,
+    @InjectRepository(FlowSessionLog)
+    private readonly logRepo: Repository<FlowSessionLog>,
+  ) {}
+
+  // ─── Point d'entrée principal ─────────────────────────────────────────────
+
+  /** Appelé par BotInboundListener pour chaque message entrant */
+  async handleInbound(event: BotInboundMessageEvent): Promise<void> {
+    const conv = await this.botConvService.upsert(event);
+
+    const execCtx: BotExecutionContext = {
+      provider: event.provider,
+      channelType: event.channelType,
+      externalRef: event.conversationExternalRef,
+      providerChannelRef: event.providerChannelRef,
+      contactName: event.contactName,
+      contactRef: event.contactExternalId,
+      agentRef: event.agentAssignedRef,
+      lastInboundAt: event.receivedAt,
+    };
+
+    // Si une session est en attente de réponse → continuer le flow
+    const activeSession = await this.sessionService.getActiveSession(conv);
+    if (activeSession?.status === FlowSessionStatus.WAITING_REPLY) {
+      activeSession.variables = {
+        ...activeSession.variables,
+        last_message_text: event.messageText ?? '',
+        last_message_type: event.messageType,
+      };
+      activeSession.lastActivityAt = new Date();
+      await this.sessionService.save(activeSession);
+      await this.resumeSession(activeSession.id, 'inbound_reply', execCtx);
+      return;
+    }
+
+    // Chercher un flow dont un trigger correspond
+    const match = await this.triggerService.findMatchingFlow(conv, event);
+    if (!match) {
+      this.logger.debug(
+        `No matching flow for chatRef=${conv.chatRef} provider=${event.provider}`,
+      );
+      return;
+    }
+
+    const session = await this.sessionService.createSession({
+      conversation: conv,
+      flow: match.flow,
+      triggerType: match.triggerType,
+    });
+
+    // Lier la session à la conversation
+    conv.activeSessionId = session.id;
+    conv.status = BotConversationStatus.BOT_ACTIVE;
+    await this.botConvService.save(conv);
+
+    await this.analyticsService.recordSessionStart(match.flow.id);
+
+    // Trouver le nœud d'entrée
+    const entryNode = await this.nodeRepo.findOne({
+      where: { flowId: match.flow.id, isEntryPoint: true },
+    });
+
+    if (!entryNode) {
+      this.logger.warn(`Flow ${match.flow.id} n'a pas de nœud d'entrée — session annulée`);
+      session.status = FlowSessionStatus.CANCELLED;
+      await this.sessionService.save(session);
+      return;
+    }
+
+    await this.executeNode(session, entryNode, conv, execCtx);
+  }
+
+  /** Reprend une session en attente (après délai WAIT ou timeout QUESTION) */
+  async resumeSession(
+    sessionId: string,
+    triggerReason: string,
+    execCtx?: BotExecutionContext,
+  ): Promise<void> {
+    const session = await this.sessionService.findById(sessionId);
+    if (!session) {
+      this.logger.warn(`resumeSession: session ${sessionId} introuvable`);
+      return;
+    }
+
+    if (
+      session.status !== FlowSessionStatus.WAITING_REPLY &&
+      session.status !== FlowSessionStatus.WAITING_DELAY
+    ) {
+      this.logger.debug(
+        `resumeSession: session ${sessionId} n'est pas en attente (status=${session.status})`,
+      );
+      return;
+    }
+
+    session.status = FlowSessionStatus.ACTIVE;
+    await this.sessionService.save(session);
+
+    if (!session.currentNodeId) {
+      this.logger.warn(`resumeSession: session ${sessionId} sans currentNodeId`);
+      return;
+    }
+
+    // Trouver la prochaine arête à partir du nœud courant
+    const edges = await this.edgeRepo.find({
+      where: { sourceNodeId: session.currentNodeId },
+      order: { sortOrder: 'ASC' },
+    });
+
+    if (!execCtx && session.conversation) {
+      // Reconstruire un contexte minimal depuis la conversation (mode job de polling)
+      execCtx = {
+        provider: 'unknown',
+        channelType: 'whatsapp',
+        externalRef: session.conversation.chatRef,
+        contactName: '',
+        contactRef: session.conversation.chatRef,
+      };
+    }
+
+    for (const edge of edges) {
+      const nextNode = await this.nodeRepo.findOne({
+        where: { id: edge.targetNodeId },
+      });
+      if (nextNode && execCtx) {
+        await this.executeNode(session, nextNode, session.conversation, execCtx);
+        return;
+      }
+    }
+
+    // Aucune arête → fin
+    await this.terminateSession(session, FlowSessionStatus.COMPLETED, session.conversation, execCtx);
+  }
+
+  // ─── Moteur d'exécution des nœuds ────────────────────────────────────────
+
+  private async executeNode(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+  ): Promise<void> {
+    // Anti-boucle et limite de pas
+    if (session.stepsCount >= MAX_STEPS) {
+      this.logger.warn(
+        `Session ${session.id} a dépassé MAX_STEPS=${MAX_STEPS} — escalade automatique`,
+      );
+      await this.escalateSession(session, conv, execCtx, 'max_steps');
+      return;
+    }
+
+    const loopCount = session.logs
+      ? 0 // logs not loaded here — boucle vérifiée à l'écriture du log
+      : 0;
+
+    session.stepsCount += 1;
+    session.currentNodeId = node.id;
+    session.lastActivityAt = new Date();
+    await this.sessionService.save(session);
+
+    await this.writeLog(session, node, null, 'execute', null);
+
+    const adapter = this.adapterRegistry.getSafe(execCtx.provider);
+    const ctx: BotConversationContext = {
+      externalRef: execCtx.externalRef,
+      provider: execCtx.provider,
+      channelType: execCtx.channelType,
+      providerChannelRef: execCtx.providerChannelRef,
+    };
+
+    switch (node.type) {
+      case FlowNodeType.MESSAGE:
+        await this.executeMessage(session, node, conv, execCtx, adapter, ctx);
+        break;
+
+      case FlowNodeType.QUESTION:
+        await this.executeQuestion(session, node, conv, execCtx, adapter, ctx);
+        return; // STOP — session passe en waiting_reply
+
+      case FlowNodeType.CONDITION:
+        await this.executeCondition(session, node, conv, execCtx);
+        return; // l'arête choisie est suivie en interne
+
+      case FlowNodeType.WAIT:
+        await this.executeWait(session, node);
+        return; // STOP — session passe en waiting_delay
+
+      case FlowNodeType.ESCALATE:
+        await this.escalateSession(session, conv, execCtx, 'user_request', node.config.agentRef as string | undefined);
+        return;
+
+      case FlowNodeType.END:
+        await this.terminateSession(session, FlowSessionStatus.COMPLETED, conv, execCtx);
+        return;
+
+      case FlowNodeType.ACTION:
+        await this.executeAction(session, node, conv, execCtx, adapter, ctx);
+        break;
+
+      case FlowNodeType.AB_TEST:
+        await this.executeAbTest(session, node, conv, execCtx);
+        return;
+
+      default:
+        this.logger.warn(`Type de nœud inconnu: ${(node as any).type}`);
+    }
+
+    // Suivre l'arête "always" pour les nœuds non-terminaux
+    await this.followAlwaysEdge(session, node, conv, execCtx);
+  }
+
+  // ─── Implémentation des nœuds ────────────────────────────────────────────
+
+  private async executeMessage(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+    adapter: BotProviderAdapter | null,
+    ctx: BotConversationContext,
+  ): Promise<void> {
+    if (!adapter) {
+      this.logger.warn(`executeMessage: pas d'adapter pour provider=${execCtx.provider}`);
+      return;
+    }
+
+    const config = node.config as {
+      body?: string;
+      typingDelaySeconds?: number;
+      mediaUrl?: string;
+    };
+
+    const resolvedText = config.body
+      ? this.variableService.resolve(config.body, session, execCtx)
+      : '';
+
+    const caps = adapter.capabilities();
+
+    // Indicateur de frappe si supporté
+    if (caps.typing && (config.typingDelaySeconds ?? 0) > 0) {
+      await adapter.sendTyping(ctx);
+      await sleep((config.typingDelaySeconds ?? 1) * 1000);
+      await adapter.stopTyping(ctx);
+    }
+
+    const result = await adapter.sendMessage({
+      context: ctx,
+      text: resolvedText,
+      mediaUrl: config.mediaUrl,
+    });
+
+    await this.botMsgService.saveOutbound({
+      sessionId: session.id,
+      flowNodeId: node.id,
+      content: resolvedText,
+      sendResult: result,
+    });
+
+    await this.writeLog(session, node, null, 'message_sent', resolvedText.slice(0, 100));
+  }
+
+  private async executeQuestion(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+    adapter: BotProviderAdapter | null,
+    ctx: BotConversationContext,
+  ): Promise<void> {
+    // Envoyer le message de la question (même logique que MESSAGE)
+    await this.executeMessage(session, node, conv, execCtx, adapter, ctx);
+
+    // Passer en attente de réponse
+    session.status = FlowSessionStatus.WAITING_REPLY;
+    await this.sessionService.save(session);
+    await this.writeLog(session, node, null, 'waiting_reply', null);
+  }
+
+  private async executeCondition(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+  ): Promise<void> {
+    const edges = await this.edgeRepo.find({
+      where: { sourceNodeId: node.id },
+      order: { sortOrder: 'ASC' },
+    });
+
+    const lastText = String(session.variables?.['last_message_text'] ?? '').toLowerCase();
+
+    for (const edge of edges) {
+      const matched = this.evaluateEdgeCondition(edge, session, conv, lastText, execCtx);
+      if (matched) {
+        await this.writeLog(session, node, edge.id, 'condition_match', edge.conditionType);
+        const nextNode = await this.nodeRepo.findOne({ where: { id: edge.targetNodeId } });
+        if (nextNode) {
+          await this.executeNode(session, nextNode, conv, execCtx);
+        }
+        return;
+      }
+    }
+
+    // Aucune condition matchée
+    await this.writeLog(session, node, null, 'condition_no_match', null);
+    await this.escalateSession(session, conv, execCtx, 'no_flow_match');
+  }
+
+  private evaluateEdgeCondition(
+    edge: FlowEdge,
+    session: FlowSession,
+    conv: BotConversation,
+    lastText: string,
+    execCtx: BotExecutionContext,
+  ): boolean {
+    let result: boolean;
+
+    switch (edge.conditionType) {
+      case 'always':
+        result = true;
+        break;
+
+      case 'message_contains':
+        result = lastText.includes((edge.conditionValue ?? '').toLowerCase());
+        break;
+
+      case 'message_equals':
+        result = lastText === (edge.conditionValue ?? '').toLowerCase();
+        break;
+
+      case 'message_matches_regex':
+        try {
+          result = new RegExp(edge.conditionValue ?? '', 'i').test(lastText);
+        } catch {
+          result = false;
+        }
+        break;
+
+      case 'contact_is_new':
+        result = !conv.isKnownContact;
+        break;
+
+      case 'channel_type':
+        result = execCtx.channelType === edge.conditionValue;
+        break;
+
+      case 'agent_assigned':
+        result = !!execCtx.agentRef;
+        break;
+
+      case 'variable_equals': {
+        const [varKey, varVal] = (edge.conditionValue ?? '').split('=');
+        result = String(session.variables?.[varKey] ?? '') === varVal;
+        break;
+      }
+
+      default:
+        result = false;
+    }
+
+    return edge.conditionNegate ? !result : result;
+  }
+
+  private async executeWait(session: FlowSession, node: FlowNode): Promise<void> {
+    // Le polling job se chargera de reprendre la session après le délai
+    session.status = FlowSessionStatus.WAITING_DELAY;
+    await this.sessionService.save(session);
+    await this.writeLog(session, node, null, 'waiting_delay', String(node.config.delaySeconds ?? 0));
+  }
+
+  private async executeAction(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+    adapter: BotProviderAdapter | null,
+    ctx: BotConversationContext,
+  ): Promise<void> {
+    const config = node.config as { actionType?: string; key?: string; value?: unknown };
+
+    switch (config.actionType) {
+      case 'send_typing':
+        if (adapter?.capabilities().typing) await adapter.sendTyping(ctx);
+        break;
+
+      case 'mark_as_read':
+        if (adapter?.capabilities().markAsRead) await adapter?.markAsRead(ctx);
+        break;
+
+      case 'set_contact_known':
+        conv.isKnownContact = true;
+        await this.botConvService.save(conv);
+        break;
+
+      case 'set_variable':
+        if (config.key) {
+          session.variables = { ...session.variables, [config.key]: config.value };
+          await this.sessionService.save(session);
+        }
+        break;
+
+      case 'close_conversation':
+        await adapter?.closeConversation(ctx);
+        this.eventEmitter.emit(BOT_CLOSE_EVENT, {
+          conversationExternalRef: conv.chatRef,
+          provider: execCtx.provider,
+        } satisfies BotCloseRequestEvent);
+        break;
+
+      default:
+        this.logger.warn(`Action inconnue: ${config.actionType}`);
+    }
+
+    await this.writeLog(session, node, null, `action_${config.actionType ?? 'unknown'}`, null);
+  }
+
+  private async executeAbTest(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+  ): Promise<void> {
+    const edges = await this.edgeRepo.find({
+      where: { sourceNodeId: node.id },
+      order: { sortOrder: 'ASC' },
+    });
+
+    if (edges.length === 0) return;
+
+    // Sélectionner une branche par poids (conditionValue = poids relatif)
+    const weights = edges.map((e) => Math.max(1, parseInt(e.conditionValue ?? '1', 10)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let rand = Math.random() * total;
+    let chosen = edges[edges.length - 1];
+    for (let i = 0; i < edges.length; i++) {
+      rand -= weights[i];
+      if (rand <= 0) {
+        chosen = edges[i];
+        break;
+      }
+    }
+
+    await this.writeLog(session, node, chosen.id, 'ab_test_branch', chosen.conditionValue);
+    const nextNode = await this.nodeRepo.findOne({ where: { id: chosen.targetNodeId } });
+    if (nextNode) {
+      await this.executeNode(session, nextNode, conv, execCtx);
+    }
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  private async followAlwaysEdge(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+  ): Promise<void> {
+    const edge = await this.edgeRepo.findOne({
+      where: { sourceNodeId: node.id, conditionType: 'always' },
+    });
+
+    if (!edge) return;
+
+    const nextNode = await this.nodeRepo.findOne({ where: { id: edge.targetNodeId } });
+    if (nextNode) {
+      await this.executeNode(session, nextNode, conv, execCtx);
+    }
+  }
+
+  private async escalateSession(
+    session: FlowSession,
+    conv: BotConversation,
+    execCtx: BotExecutionContext | undefined,
+    reason: BotEscalateRequestEvent['reason'],
+    agentRef?: string,
+  ): Promise<void> {
+    session.status = FlowSessionStatus.ESCALATED;
+    session.escalatedAt = new Date();
+    await this.sessionService.save(session);
+
+    conv.status = BotConversationStatus.ESCALATED;
+    conv.activeSessionId = null;
+    await this.botConvService.save(conv);
+
+    await this.analyticsService.recordEscalation(session);
+
+    this.eventEmitter.emit(BOT_ESCALATE_EVENT, {
+      conversationExternalRef: conv.chatRef,
+      provider: execCtx?.provider ?? 'unknown',
+      agentRef,
+      reason,
+    } satisfies BotEscalateRequestEvent);
+
+    this.logger.log(
+      `Session ${session.id} escalatée — raison: ${reason} chatRef=${conv.chatRef}`,
+    );
+  }
+
+  private async terminateSession(
+    session: FlowSession,
+    status: FlowSessionStatus,
+    conv: BotConversation,
+    execCtx: BotExecutionContext | undefined,
+  ): Promise<void> {
+    session.status = status;
+    session.completedAt = new Date();
+    await this.sessionService.save(session);
+
+    conv.status = BotConversationStatus.COMPLETED;
+    conv.activeSessionId = null;
+    conv.isKnownContact = true;
+    await this.botConvService.save(conv);
+
+    await this.analyticsService.recordCompletion(session);
+
+    this.logger.log(
+      `Session ${session.id} terminée status=${status} chatRef=${conv.chatRef}`,
+    );
+  }
+
+  private async writeLog(
+    session: FlowSession,
+    node: FlowNode,
+    edgeTakenId: string | null,
+    action: string,
+    result: string | null,
+  ): Promise<void> {
+    const log = this.logRepo.create({
+      sessionId: session.id,
+      nodeId: node.id,
+      nodeType: node.type,
+      edgeTakenId,
+      action,
+      result,
+      executedAt: new Date(),
+    });
+    await this.logRepo.save(log);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

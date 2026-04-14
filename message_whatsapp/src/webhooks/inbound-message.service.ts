@@ -71,7 +71,10 @@ export class InboundMessageService {
 
     for (const message of messages) {
       const traceId = this.buildTraceId(message.providerMessageId, message.chatId);
-      this.logger.log(`INCOMING_RECEIVED trace=${traceId} type=${message.type}`);
+      const correlationId = message.correlationId ?? traceId;
+      this.logger.log(
+        `INCOMING_RECEIVED correlationId=${correlationId} provider_msg_id=${message.providerMessageId ?? 'none'} chat_id=${message.chatId} type=${message.type}`,
+      );
 
       // Ignorer les messages sortants (envoyés par nous)
       if (message.direction !== 'in') continue;
@@ -80,14 +83,14 @@ export class InboundMessageService {
       const validation = this.chatIdValidation.validate(message.chatId);
       if (!validation.valid) {
         this.logger.warn(
-          `INCOMING_IGNORED trace=${traceId} reason=${validation.reason} chat_id=${message.chatId ?? 'unknown'}`,
+          `INCOMING_IGNORED correlationId=${correlationId} reason=${validation.reason} chat_id=${message.chatId ?? 'unknown'}`,
         );
         continue;
       }
 
       try {
         await this.getMutex(message.chatId).runExclusive(() =>
-          this.processOneMessage(message, traceId),
+          this.processOneMessage(message, correlationId),
         );
       } catch (err) {
         throw new HttpException(
@@ -117,7 +120,7 @@ export class InboundMessageService {
 
   // ─── Pipeline (cœur) ──────────────────────────────────────────────────────
 
-  private async processOneMessage(message: UnifiedMessage, traceId: string): Promise<void> {
+  private async processOneMessage(message: UnifiedMessage, correlationId: string): Promise<void> {
     // ── Étape 2 : enrichissement provider ────────────────────────────────────
     await this.providerEnrichment.enrich(message);
 
@@ -125,18 +128,18 @@ export class InboundMessageService {
     const conversation = await this.dispatcherService.assignConversation(
       message.chatId,
       message.fromName ?? 'Client',
-      traceId,
+      correlationId,
       message.tenantId,
       message.channelId,
     );
 
     if (!conversation) {
-      this.logger.warn(`INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`);
+      this.logger.warn(`INCOMING_NO_AGENT correlationId=${correlationId} chat_id=${message.chatId}`);
       return;
     }
 
     // ── Étape 4 : persistance du message ──────────────────────────────────────
-    const persistResult = await this.messagePersistence.persist(message, conversation, traceId);
+    const persistResult = await this.messagePersistence.persist(message, conversation, correlationId);
     if (!persistResult.ok) return; // canal inconnu — HTTP 200 pour stopper les retries provider
 
     this.systemAlert.onInboundMessage();
@@ -150,13 +153,13 @@ export class InboundMessageService {
 
     // ── Étape 7 : notification frontend via WebSocket ────────────────────────
     await this.messageGateway.notifyNewMessage(persistResult.message, conversation, persistResult.message);
-    this.logger.log(`INCOMING_DISPATCHED trace=${traceId} poste_id=${conversation.poste_id}`);
+    this.logger.log(`INCOMING_DISPATCHED correlationId=${correlationId} chat_id=${message.chatId} poste_id=${conversation.poste_id}`);
 
     // ── Étape 8 : déclenchement automatismes (découplé via EventEmitter2) ───
     this.eventEmitter.emit(INBOUND_MESSAGE_PROCESSED_EVENT, {
       conversation,
       message: persistResult.message,
-      traceId,
+      traceId: correlationId,
     } satisfies InboundMessageProcessedEvent);
   }
 

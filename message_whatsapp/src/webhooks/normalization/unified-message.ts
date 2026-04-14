@@ -61,4 +61,6 @@ export interface UnifiedMessage {
   /** Provider message ID of the quoted message (Whapi: context.quoted_id) */
   quotedProviderMessageId?: string;
   raw: unknown;
+  /** Identifiant de corrélation généré à l'entrée du webhook HTTP — permet de relier tous les logs du pipeline à la même requête entrante. */
+  correlationId?: string;
 }

@@ -52,13 +52,13 @@ export class WhapiController {
     
     const startedAt = Date.now();
     const provider = 'whapi';
-    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
+    const correlationId = this.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
 
     // this.assertWhapiSecret(headers, request.rawBody, payload);
 
-    
-    
+
+
     this.assertWhapiPayload(payload);
 
     const tenantId = await this.resolveTenantOrReject(
@@ -67,7 +67,7 @@ export class WhapiController {
     );
     const auditEventKey = this.buildAuditEventKey('whapi', payload);
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
+      `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
     );
     this.rateLimit('whapi', request, tenantId);
     this.assertCircuitBreaker(provider);
@@ -111,6 +111,7 @@ export class WhapiController {
           eventType,
           payload,
           tenantId,
+          correlationId,
         );
         if (!queued) {
           throw new HttpException(
@@ -128,10 +129,10 @@ export class WhapiController {
 
       switch (eventType) {
         case 'messages':
-          await this.whapiService.handleIncomingMessage(payload, tenantId);
+          await this.whapiService.handleIncomingMessage(payload, tenantId, correlationId);
           break;
         case 'statuses':
-          await this.whapiService.updateStatusMessage(payload, tenantId);
+          await this.whapiService.updateStatusMessage(payload, tenantId, correlationId);
           break;
         case 'events':
         case 'polls':
@@ -212,7 +213,7 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'messenger';
-    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
+    const correlationId = this.headerValue(headers['x-request-id']) ?? randomUUID();
 
     this.assertPayloadSize(request.rawBody);
 
@@ -226,7 +227,7 @@ export class WhapiController {
 
     if (entries.length > 1) {
       this.auditLogger.log(
-        `WEBHOOK_MULTI_ENTRY request_id=${requestId} provider=messenger entries=${entries.length} — chaque entry sera traité avec son propre channelId`,
+        `WEBHOOK_MULTI_ENTRY correlationId=${correlationId} provider=messenger entries=${entries.length} — chaque entry sera traité avec son propre channelId`,
       );
     }
 
@@ -238,7 +239,7 @@ export class WhapiController {
     const tenantId = await this.resolveTenantOrReject('messenger', pageId);
 
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=messenger tenant_id=${tenantId} page_id=${pageId} entries=${entries.length}`,
+      `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=messenger tenant_id=${tenantId} page_id=${pageId} entries=${entries.length}`,
     );
 
     this.rateLimitService.assertRateLimits(provider, null, tenantId);
@@ -293,7 +294,7 @@ export class WhapiController {
             provider: 'messenger',
             tenantId,
             channelId: entryChannelId,
-          });
+          }, correlationId);
         }
       }
 
@@ -329,6 +330,7 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'telegram';
+    const correlationId = randomUUID();
 
     // Ignorer les updates sans message exploitable (channel_post, edited_message)
     const hasContent = payload.message || payload.callback_query;
@@ -340,7 +342,7 @@ export class WhapiController {
     const channelRecord = await this.channelService.findByChannelId(botId);
     const expectedSecret = channelRecord?.webhook_secret;
     if (expectedSecret && secretToken !== expectedSecret) {
-      this.metricsService.recordSignatureInvalid('telegram');                                                                                                                                                                        
+      this.metricsService.recordSignatureInvalid('telegram');
       throw new ForbiddenException('Invalid Telegram secret token');
     }
 
@@ -348,7 +350,7 @@ export class WhapiController {
     const channelId = channelRecord?.channel_id ?? botId;
 
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED provider=telegram bot_id=${botId} tenant_id=${tenantId} update_id=${payload.update_id}`,
+      `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=telegram bot_id=${botId} tenant_id=${tenantId} update_id=${payload.update_id}`,
     );
 
     this.rateLimitService.assertRateLimits(provider, null, tenantId);
@@ -376,7 +378,7 @@ export class WhapiController {
         provider: 'telegram',
         tenantId,
         channelId,
-      });
+      }, correlationId);
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -419,7 +421,7 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'instagram';
-    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
+    const correlationId = this.headerValue(headers['x-request-id']) ?? randomUUID();
 
     this.assertPayloadSize(request.rawBody);
 
@@ -438,7 +440,7 @@ export class WhapiController {
     const channelId = channelRecord?.channel_id ?? igAccountId;
 
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id=${tenantId} ig_account_id=${igAccountId}`,
+      `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=instagram tenant_id=${tenantId} ig_account_id=${igAccountId}`,
     );
 
     this.rateLimitService.assertRateLimits(provider, null, tenantId);
@@ -466,7 +468,7 @@ export class WhapiController {
         provider: 'instagram',
         tenantId,
         channelId,
-      });
+      }, correlationId);
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -509,7 +511,7 @@ export class WhapiController {
   ) {
     const startedAt = Date.now();
     const provider = 'meta';
-    const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
+    const correlationId = this.headerValue(headers['x-request-id']) ?? randomUUID();
     // console.log("affichage du post:2",request);
 
     this.assertPayloadSize(request.rawBody);
@@ -541,7 +543,7 @@ export class WhapiController {
     const tenantId = await this.resolveTenantForMeta(wabaId, phoneNumberId);
     const auditEventKey = this.buildAuditEventKey('meta', metaPayload);
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=meta tenant_id=${tenantId} event_key=${auditEventKey}`,
+      `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=meta tenant_id=${tenantId} event_key=${auditEventKey}`,
     );
     this.rateLimit('meta', request, tenantId);
     this.assertCircuitBreaker(provider);
@@ -603,7 +605,7 @@ export class WhapiController {
         );
       }
 
-      await this.whapiService.handleMetaWebhook(metaPayload, tenantId);
+      await this.whapiService.handleMetaWebhook(metaPayload, tenantId, correlationId);
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -1050,14 +1052,15 @@ export class WhapiController {
     eventType: string | undefined,
     payload: WhapiWebhookPayload,
     tenantId: string,
+    correlationId?: string,
   ): boolean {
     const handler = async () => {
       switch (eventType) {
         case 'messages':
-          await this.whapiService.handleIncomingMessage(payload, tenantId);
+          await this.whapiService.handleIncomingMessage(payload, tenantId, correlationId);
           break;
         case 'statuses':
-          await this.whapiService.updateStatusMessage(payload, tenantId);
+          await this.whapiService.updateStatusMessage(payload, tenantId, correlationId);
           break;
         case 'events':
         case 'polls':

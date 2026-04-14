@@ -904,17 +904,17 @@ Activer l'enforcement immédiatement sur un système en production peut casser d
 
 ---
 
-### TICKET-11-A — Documenter la machine d'état conversation
+### TICKET-11-A — Documenter la machine d'état conversation ✅ TERMINÉ
 
 **Priorité :** P3  
 **Complexité :** S  
-**Dépendances :** TICKET-06-A Phase 1 (les warnings de prod révèlent l'état réel)
+**Dépendances :** TICKET-06-A Phase 1 ✓
 
-**Travail à faire :**
-- Créer `docs/conversation-state-machine.md`
-- Diagramme des états et transitions (basé sur les transitions observées en Phase 1 de TICKET-06-A)
-- Liste des services qui déclenchent chaque transition
-- Transitions surprises découvertes en Phase 1 et leur résolution
+**Résultat :**  
+`docs/conversation-state-machine.md` créé.  
+3 états · 8 transitions légales · 6 services documentés.  
+2 angles morts identifiés en Phase 1 (Gateway admin + ReadOnlyEnforcementJob — bypasses légitimes, à instrumenter Phase 2).  
+Phase 2 GO/NO-GO : critères satisfaits, en attente signature tech lead.
 
 ---
 
@@ -961,7 +961,7 @@ Activer l'enforcement immédiatement sur un système en production peut casser d
 | EPIC-08 Front opérateur | 5 (dont 1 cleanup) | P2 / P3 | M | ✅ **08-A ✅ 08-B ✅ 08-C ✅ 08-D** — 08-A-CLEANUP en P3 |
 | EPIC-09 Front admin | 4 (dont 1 cleanup) | P2 / P3 | L | ✅ **09-A ✅ 09-B ✅ 09-C ✅ 09-A-CLEANUP** |
 | EPIC-10 Tests intégration | 5 (dont 10-A-BIS) | P3 | M | ✅ **10-A ✅ 10-A-BIS ✅ 10-B** — planifiés dans les sprints P1 |
-| EPIC-11 Observabilité/docs | 3 | P3 | M | |
+| EPIC-11 Observabilité/docs | 3 | P3 | M | ✅ **11-A ✅ 11-B ✅ 11-C** — EPIC complet |
 
 **Total : 40 tickets actifs** (01-A et 01-B supprimés · 3 tickets terminés : 00-A, 07-B, 09-A · 5 cleanups · 1 ticket 10-A-BIS)
 
@@ -1089,15 +1089,41 @@ Sprint 10 ✅ TERMINÉ
                           Façade admin/src/app/lib/api.ts supprimée · 0 erreur TS
   → Livrable visible : façades temporaires nettoyées — aucune indirection inutile
 
-Sprint 7+ — selon décision TICKET-00-B
+Sprint 11 ✅ TERMINÉ
+  TICKET-08-A-CLEANUP  N/A — chatStore est un store Zustand composé (StateCreator)
+                        sans méthodes de délégation — aucune suppression à faire
+  TICKET-10-D ✅       Tests socket front (Vitest + vi.mock)
+                        front/vitest.config.ts + vitest.setup.ts
+                        socket-event-router.spec.ts — 8/8 tests (SC-01 à SC-08)
+                        SC-01 CONVERSATION_ASSIGNED · SC-02 MESSAGE_ADD · SC-03 tempId réconciliation
+                        SC-04 CONVERSATION_REMOVED · SC-05 TOTAL_UNREAD_UPDATE
+                        SC-06 MESSAGE_STATUS_UPDATE · SC-07 TYPING_START autre · SC-08 TYPING_START même
+  TICKET-11-B ✅       docs/socket-events-contract.md
+                        3 canaux · 7 événements C→S · 14 types S→C chat:event
+                        7 types S→C contact:event · 7 codes d'erreur MESSAGE_SEND_ERROR
+                        Réconciliation optimistic tempId · Règles room/tenant
+  TICKET-11-C ✅       Traçage corrélé webhook → message → chat → socket
+                        correlationId?: string ajouté à UnifiedMessage
+                        Généré dans WhapiController (header x-request-id ou UUID)
+                        Propagé : controller → WhapiService → UnifiedIngressService → InboundMessageService
+                        Providers : whapi · meta · messenger · instagram · telegram
+                        Logs : WEBHOOK_ACCEPTED · INGRESS_START · INCOMING_RECEIVED · INCOMING_DISPATCHED
+                        docs/correlation-tracing.md — 15/15 tests pipeline ✅ · 0 erreur TS
+  → Livrable visible : grep correlationId=<id> retrace le flux complet d'un message ✅
+
+Sprint 12 (prochain)
+  TICKET-11-A ✅  docs/conversation-state-machine.md       [dep: 06-A Phase 1 ✓]
+                  3 états · 8 transitions · 6 services · 2 angles morts documentés
+                  GO/NO-GO Phase 2 en attente tech lead
+  → Livrable visible : état réel de la machine d'état documenté après 2 semaines en prod ✅
+
+Sprint 13+ — selon décision TICKET-00-B
   TICKET-07-A  triggers séparés (si FlowBot > 6 mois)      [dep: 00-B]
-  TICKET-05-C  use cases channel + façade                   [dep: 05-B ✓]
-  TICKET-08-D  containers métier front                      [dep: 08-A ✓]
-  TICKET-09-C  vues admin modularisées                      [dep: 09-A ✓, 09-B ✓]
   TICKET-10-C  tests auto-messages                          [dep: 07-A ou FlowBot]
-  TICKET-10-D  tests socket front                           [dep: 08-B ✓]
-  Tickets CLEANUP (03-C, 05-C, 08-A, 09-A)
-  EPIC-11      observabilité + documentation
+
+  BLOQUANTS EXTERNES :
+    TICKET-06-A Phase 2  enforcement state machine         [dep: GO/NO-GO tech lead]
+    TICKET-00-B          décision FlowBot                  [dep: décision gouvernance]
 ```
 
 ---

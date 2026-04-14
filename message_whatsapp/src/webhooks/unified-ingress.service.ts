@@ -19,6 +19,7 @@ export class UnifiedIngressService {
   async ingestWhapi(
     payload: WhapiWebhookPayload,
     tenantId: string,
+    correlationId?: string,
   ): Promise<void> {
     const whapiAdapter =
       this.adapterRegistry.getAdapter<WhapiWebhookPayload>('whapi');
@@ -32,6 +33,14 @@ export class UnifiedIngressService {
       tenantId,
       channelId: payload.channel_id,
     });
+
+    if (correlationId) {
+      unifiedMessages.forEach((m) => (m.correlationId = correlationId));
+    }
+
+    this.logger.log(
+      `INGRESS_START correlationId=${correlationId ?? 'none'} provider=whapi tenant_id=${tenantId} messages=${unifiedMessages.length} statuses=${unifiedStatuses.length}`,
+    );
 
     if (unifiedMessages.length > 0) {
       await this.inboundService.handleMessages(unifiedMessages);
@@ -77,6 +86,7 @@ export class UnifiedIngressService {
   async ingestMeta(
     payload: MetaWebhookPayload,
     tenantId: string,
+    correlationId?: string,
   ): Promise<void> {
     const entry = payload?.entry?.[0];
     const metaValue = entry?.changes?.[0]?.value;
@@ -95,6 +105,14 @@ export class UnifiedIngressService {
       channelId,
     });
 
+    if (correlationId) {
+      unifiedMessages.forEach((m) => (m.correlationId = correlationId));
+    }
+
+    this.logger.log(
+      `INGRESS_START correlationId=${correlationId ?? 'none'} provider=meta tenant_id=${tenantId} messages=${unifiedMessages.length} statuses=${unifiedStatuses.length}`,
+    );
+
     if (unifiedMessages.length > 0) {
       await this.inboundService.handleMessages(unifiedMessages);
     }
@@ -106,11 +124,20 @@ export class UnifiedIngressService {
   async ingestMessenger(
     payload: MessengerWebhookPayload,
     context: AdapterContext,
+    correlationId?: string,
   ): Promise<void> {
     const messengerAdapter =
       this.adapterRegistry.getAdapter<MessengerWebhookPayload>('messenger');
     const unifiedMessages = messengerAdapter.normalizeMessages(payload, context);
     const unifiedStatuses = messengerAdapter.normalizeStatuses(payload, context);
+
+    if (correlationId) {
+      unifiedMessages.forEach((m) => (m.correlationId = correlationId));
+    }
+
+    this.logger.log(
+      `INGRESS_START correlationId=${correlationId ?? 'none'} provider=messenger tenant_id=${context.tenantId} messages=${unifiedMessages.length} statuses=${unifiedStatuses.length}`,
+    );
 
     if (unifiedMessages.length > 0) {
       await this.inboundService.handleMessages(unifiedMessages);
@@ -123,11 +150,20 @@ export class UnifiedIngressService {
   async ingestInstagram(
     payload: InstagramWebhookPayload,
     context: AdapterContext,
+    correlationId?: string,
   ): Promise<void> {
     const instagramAdapter =
       this.adapterRegistry.getAdapter<InstagramWebhookPayload>('instagram');
     const unifiedMessages = instagramAdapter.normalizeMessages(payload, context);
     const unifiedStatuses = instagramAdapter.normalizeStatuses(payload, context);
+
+    if (correlationId) {
+      unifiedMessages.forEach((m) => (m.correlationId = correlationId));
+    }
+
+    this.logger.log(
+      `INGRESS_START correlationId=${correlationId ?? 'none'} provider=instagram tenant_id=${context.tenantId} messages=${unifiedMessages.length} statuses=${unifiedStatuses.length}`,
+    );
 
     if (unifiedMessages.length > 0) {
       await this.inboundService.handleMessages(unifiedMessages);
@@ -140,10 +176,20 @@ export class UnifiedIngressService {
   async ingestTelegram(
     payload: TelegramWebhookPayload,
     context: AdapterContext,
+    correlationId?: string,
   ): Promise<void> {
     const telegramAdapter =
       this.adapterRegistry.getAdapter<TelegramWebhookPayload>('telegram');
     const unifiedMessages = telegramAdapter.normalizeMessages(payload, context);
+
+    if (correlationId) {
+      unifiedMessages.forEach((m) => (m.correlationId = correlationId));
+    }
+
+    this.logger.log(
+      `INGRESS_START correlationId=${correlationId ?? 'none'} provider=telegram tenant_id=${context.tenantId} messages=${unifiedMessages.length}`,
+    );
+
     // Telegram n'a pas de statuts
     if (unifiedMessages.length > 0) {
       await this.inboundService.handleMessages(unifiedMessages);
