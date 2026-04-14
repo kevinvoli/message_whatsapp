@@ -323,7 +323,7 @@ export class CommunicationMessengerService {
     messageId: string,
     accessToken: string,
     pageId?: string,
-  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  ): Promise<{ buffer: Buffer; mimeType: string; apiMimeType?: string } | null> {
     try {
       // Dériver le PAT si un pageId est fourni (même logique que sendTextMessage).
       // Nécessaire quand le token stocké est un User/System User Token.
@@ -337,29 +337,39 @@ export class CommunicationMessengerService {
         timeout: 10_000,
       });
 
-      // La Graph API peut retourner l'URL dans payload.url (standard) ou dans
-      // image_data.url / video_data.url / audio_data.url / file_data.url (format alternatif).
+      // La Graph API peut retourner l'URL dans plusieurs champs selon le type :
+      // - Images/vidéos : payload.url (format webhook standard)
+      // - Audio/fichiers : file_url directement sur l'objet attachment
+      // - Formats alternatifs : image_data.url, video_data.url, etc.
       type GraphAttachment = {
         payload?: { url?: string };
+        file_url?: string;          // audio, documents, fichiers génériques
         image_data?: { url?: string };
         video_data?: { url?: string };
         audio_data?: { url?: string };
         file_data?: { url?: string };
+        mime_type?: string;         // type MIME renvoyé par l'API (plus fiable que le CDN)
       };
       const attachments: GraphAttachment[] =
         metaResponse.data?.attachments?.data ?? [];
       const att = attachments[0];
+
       const attachmentUrl =
         att?.payload?.url ??
+        att?.file_url ??            // audio et documents
         att?.image_data?.url ??
         att?.video_data?.url ??
         att?.audio_data?.url ??
         att?.file_data?.url ??
         null;
 
+      // MIME type déclaré par l'API Graph (ex: "audio/mpeg", "audio/mp4").
+      // Plus fiable que le Content-Type du CDN pour les audios M4A servis en video/mp4.
+      const apiMimeType = att?.mime_type ?? undefined;
+
       if (!attachmentUrl) {
         this.logger.warn(
-          `MESSENGER_MEDIA_NO_URL messageId=${messageId} — aucune URL trouvée dans les attachments Graph API`,
+          `MESSENGER_MEDIA_NO_URL messageId=${messageId} — aucune URL trouvée dans les attachments Graph API. Response: ${JSON.stringify(metaResponse.data)}`,
           CommunicationMessengerService.name,
         );
         return null;
@@ -374,7 +384,7 @@ export class CommunicationMessengerService {
       const mimeType =
         (downloadResponse.headers['content-type'] as string | undefined) ??
         'application/octet-stream';
-      return { buffer, mimeType };
+      return { buffer, mimeType, apiMimeType };
     } catch (error) {
       const axiosErr = error as AxiosError<{ error?: { message?: string; code?: number } }>;
       const detail = axiosErr.response?.data?.error

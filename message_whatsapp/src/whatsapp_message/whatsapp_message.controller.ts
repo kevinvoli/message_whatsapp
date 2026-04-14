@@ -31,7 +31,7 @@ import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
 
@@ -280,6 +280,7 @@ export class WhatsappMessageController {
   async streamMessengerMedia(
     @Param('messageId') messageId: string,
     @Query('channelId') channelId: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     if (!messageId) {
@@ -316,9 +317,53 @@ export class WhatsappMessageController {
       throw new NotFoundException('Média Messenger introuvable');
     }
 
-    res.setHeader('Content-Type', downloaded.mimeType);
+    // Normaliser le MIME type pour l'audio :
+    // Facebook CDN sert les M4A (AAC) avec Content-Type: video/mp4 ou audio/mpeg.
+    // Les browsers refusent de jouer video/mp4 dans un élément <audio>.
+    // On utilise le mime_type retourné par la Graph API en priorité (plus fiable).
+    const storedMediaType = media?.media_type ?? null;
+    let effectiveMime =
+      downloaded.apiMimeType ??    // MIME déclaré par la Graph API (le plus fiable)
+      downloaded.mimeType;         // MIME retourné par le CDN
+
+    if (storedMediaType === 'audio' || storedMediaType === 'voice') {
+      if (
+        !effectiveMime.startsWith('audio/') &&
+        effectiveMime !== 'application/octet-stream'
+      ) {
+        // video/mp4 → audio/mp4 pour les M4A Messenger
+        effectiveMime = effectiveMime === 'video/mp4' ? 'audio/mp4' : 'audio/mpeg';
+      }
+      if (effectiveMime === 'application/octet-stream') {
+        effectiveMime = 'audio/mp4'; // fallback sûr pour M4A Messenger
+      }
+    }
+
+    const buffer = downloaded.buffer;
+    const totalSize = buffer.length;
+
+    res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'private, max-age=300');
-    return res.send(downloaded.buffer);
+    res.setHeader('Content-Type', effectiveMime);
+
+    // Support des requêtes Range (nécessaire pour <audio> sur Safari et Chrome)
+    const rangeHeader = req.headers['range'];
+    if (rangeHeader) {
+      const rangeMatch = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+      if (rangeMatch) {
+        const start = rangeMatch[1] ? parseInt(rangeMatch[1], 10) : 0;
+        const end   = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalSize - 1;
+        const chunkSize = end - start + 1;
+
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+        res.setHeader('Content-Length', chunkSize);
+        return res.send(buffer.subarray(start, end + 1));
+      }
+    }
+
+    res.setHeader('Content-Length', totalSize);
+    return res.send(buffer);
   }
 
   @Get(':chat_id/count')
