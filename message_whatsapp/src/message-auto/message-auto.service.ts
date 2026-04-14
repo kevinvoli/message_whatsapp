@@ -14,6 +14,7 @@ import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.ga
 import { CreateMessageAutoDto, CreateAutoMessageKeywordDto } from './dto/create-message-auto.dto';
 import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { ChannelService } from 'src/channel/channel.service';
 
 @Injectable()
 export class MessageAutoService {
@@ -29,6 +30,7 @@ export class MessageAutoService {
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly gateway: WhatsappMessageGateway,
     private readonly logger: AppLogger,
+    private readonly channelService: ChannelService,
   ) {}
 
   // ─── CRUD de base ─────────────────────────────────────────────────────────
@@ -336,12 +338,18 @@ export class MessageAutoService {
 
       await this.gateway.notifyAutoMessage(message, chat);
 
+      const isDedicated = chat.last_msg_client_channel_id
+        ? await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id)
+        : false;
       await this.chatService.update(chatId, {
-        read_only: true,
+        // Canal dédié → jamais en lecture seule
+        ...(isDedicated ? {} : { read_only: true }),
         auto_message_status: 'sent',
         auto_message_id: template.id,
       });
-      this.gateway.emitConversationReadonly({ ...chat, read_only: true } as typeof chat);
+      if (!isDedicated) {
+        this.gateway.emitConversationReadonly({ ...chat, read_only: true } as typeof chat);
+      }
     } catch (err) {
       await this.chatService.update(chatId, {
         read_only: false,

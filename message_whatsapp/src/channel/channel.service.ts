@@ -480,6 +480,19 @@ export class ChannelService implements OnModuleInit {
     return channels.map((c) => c.channel_id);
   }
 
+  /**
+   * Retourne true si le channel identifié par channelId est dédié à un poste
+   * (poste_id IS NOT NULL). Utilisé pour bloquer le passage en read_only/fermé.
+   */
+  async isChannelDedicated(channelId: string): Promise<boolean> {
+    if (!channelId) return false;
+    const ch = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      select: ['channel_id', 'poste_id'],
+    });
+    return !!ch?.poste_id;
+  }
+
   async findAll() {
     return await this.channelRepository.find({ relations: ['poste'] });
   }

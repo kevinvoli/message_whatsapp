@@ -7,6 +7,7 @@ import {
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { LessThan, Not, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
+import { ChannelService } from 'src/channel/channel.service';
 
 export interface ReadOnlyEnforcementPreview {
   total: number;
@@ -26,6 +27,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly gateway: WhatsappMessageGateway,
     private readonly cronConfigService: CronConfigService,
+    private readonly channelService: ChannelService,
   ) {}
 
   onModuleInit(): void {
@@ -90,13 +92,20 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     const chats = await this.findEligible(limit);
 
     let closed = 0;
+    let skipped = 0;
     for (const chat of chats) {
+      // Ne jamais fermer une conversation sur un canal dédié
+      const channelId = chat.last_msg_client_channel_id ?? null;
+      if (channelId && await this.channelService.isChannelDedicated(channelId)) {
+        skipped++;
+        continue;
+      }
       chat.status = WhatsappChatStatus.FERME;
       chat.read_only = false;
       await this.chatRepo.save(chat);
       await this.gateway.emitConversationClosed(chat);
       closed++;
     }
-    return `${closed} conversation(s) fermée(s) automatiquement`;
+    return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} canal(aux) dédié(s) ignoré(s))` : ''}`;
   }
 }

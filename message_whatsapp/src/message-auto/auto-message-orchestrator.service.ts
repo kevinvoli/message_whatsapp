@@ -7,6 +7,7 @@ import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { NotificationService } from 'src/notification/notification.service';
+import { ChannelService } from 'src/channel/channel.service';
 
 @Injectable()
 export class AutoMessageOrchestrator implements OnModuleInit {
@@ -22,6 +23,7 @@ export class AutoMessageOrchestrator implements OnModuleInit {
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly gateway: WhatsappMessageGateway,
     private readonly notificationService: NotificationService,
+    private readonly channelService: ChannelService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -139,14 +141,25 @@ export class AutoMessageOrchestrator implements OnModuleInit {
           AutoMessageOrchestrator.name,
         );
         this.locks.delete(chatId);
-        void this.chatService.update(chatId, { read_only: false }).catch(() => {});
+        // Ne pas modifier read_only pour les canaux dédiés
+        void this.channelService.isChannelDedicated(chat.last_msg_client_channel_id ?? '').then((dedicated) => {
+          if (!dedicated) {
+            void this.chatService.update(chatId, { read_only: false }).catch(() => {});
+          }
+        }).catch(() => {});
       }
     }, 10 * 60 * 1000);
 
     // 🚫 Verrouillage immédiat de la conversation côté commercial
     // Le commercial ne peut pas envoyer de message pendant le délai d'attente.
-    await this.chatService.update(chatId, { read_only: true });
-    this.gateway.emitConversationReadonly({ ...chat, read_only: true } as WhatsappChat);
+    // Exception : canal dédié → jamais en lecture seule
+    const isDedicatedChannel = chat.last_msg_client_channel_id
+      ? await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id)
+      : false;
+    if (!isDedicatedChannel) {
+      await this.chatService.update(chatId, { read_only: true });
+      this.gateway.emitConversationReadonly({ ...chat, read_only: true } as WhatsappChat);
+    }
 
     this.logger.debug(
       `Conversation ${chatId} locked for auto-message scheduling`,

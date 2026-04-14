@@ -561,6 +561,17 @@ export class WhatsappMessageGateway
       const chat = await this.chatService.findBychat_id(chatId);
       if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) return;
 
+      // Canal dédié → ne jamais fermer la conversation manuellement
+      if (newStatus === WhatsappChatStatus.FERME && chat.last_msg_client_channel_id) {
+        const isDedicated = await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id);
+        if (isDedicated) {
+          this.logger.warn(
+            `CONVERSATION_STATUS_CHANGE blocked: chat=${chatId} is on a dedicated channel — cannot be closed`,
+          );
+          return;
+        }
+      }
+
       await this.chatService.update(chatId, { status: newStatus });
       this.logger.log(`Conversation status changed: ${chatId} → ${newStatus}`);
 
