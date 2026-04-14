@@ -60,9 +60,27 @@ export class CommunicationMessengerService {
       ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
       : accessToken;
 
+    // ── Méthode 1 : Conversations API ────────────────────────────────────────
+    // Nécessite uniquement pages_messaging (déjà requis pour envoyer/recevoir).
+    // Évite d'avoir besoin de pages_read_engagement pour lire le profil direct.
+    // GET /me/conversations?user_id={psid}&fields=participants.fields(name)
+    const nameFromConversations = await this.resolveNameFromConversations(
+      psid,
+      pageId,
+      effectiveToken,
+    );
+    if (nameFromConversations) {
+      this.nameCache.set(psid, { name: nameFromConversations, expiresAt: Date.now() + 60 * 60_000 });
+      this.logger.log(
+        `MESSENGER_NAME_RESOLVED_CONV psid=${psid} name="${nameFromConversations}"`,
+        CommunicationMessengerService.name,
+      );
+      return nameFromConversations;
+    }
+
+    // ── Méthode 2 : Profil direct ─────────────────────────────────────────────
+    // Requiert pages_read_engagement. Utilisé en fallback si la méthode 1 échoue.
     try {
-      // On demande name + first_name + last_name pour couvrir les cas où
-      // le champ "name" est vide (restrictions de confidentialité Facebook).
       const response = await axios.get<{
         name?: string;
         first_name?: string;
@@ -71,11 +89,10 @@ export class CommunicationMessengerService {
         `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
         {
           params: { fields: 'name,first_name,last_name', access_token: effectiveToken },
-          timeout: 5_000, // 5s max — évite de bloquer le path webhook trop longtemps
+          timeout: 5_000,
         },
       );
 
-      // Priorité : name complet → prénom + nom → prénom seul → null
       const data = response.data;
       const name =
         data?.name?.trim() ||
@@ -85,15 +102,14 @@ export class CommunicationMessengerService {
       if (name) {
         this.nameCache.set(psid, { name, expiresAt: Date.now() + 60 * 60_000 });
         this.logger.log(
-          `MESSENGER_NAME_RESOLVED psid=${psid} name="${name}"`,
+          `MESSENGER_NAME_RESOLVED_DIRECT psid=${psid} name="${name}"`,
           CommunicationMessengerService.name,
         );
         return name;
       }
 
-      // Aucun champ de nom disponible (privacy settings ou permissions manquantes)
       this.logger.warn(
-        `MESSENGER_NAME_EMPTY psid=${psid} — Graph API returned no name fields (pages_read_user_content permission may be missing)`,
+        `MESSENGER_NAME_EMPTY psid=${psid} — Aucun champ de nom disponible. Vérifiez que l'app a la permission pages_read_engagement ou pages_messaging.`,
         CommunicationMessengerService.name,
       );
       return null;
@@ -107,6 +123,50 @@ export class CommunicationMessengerService {
         `MESSENGER_GET_USER_NAME_FAILED psid=${psid} — ${detail}`,
         CommunicationMessengerService.name,
       );
+      return null;
+    }
+  }
+
+  /**
+   * Récupère le nom d'un utilisateur Messenger via l'API Conversations.
+   * Requiert uniquement pages_messaging (pas de permission supplémentaire).
+   * Cherche dans les conversations récentes de la page l'entrée correspondant au PSID.
+   */
+  private async resolveNameFromConversations(
+    psid: string,
+    pageId: string | undefined,
+    effectiveToken: string,
+  ): Promise<string | null> {
+    try {
+      // "me" résout automatiquement vers la page avec un PAT.
+      // user_id filtre directement la conversation avec ce PSID.
+      const response = await axios.get<{
+        data?: Array<{
+          participants?: {
+            data?: Array<{ id: string; name?: string }>;
+          };
+        }>;
+      }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/me/conversations`,
+        {
+          params: {
+            user_id: psid,
+            fields: 'participants',
+            access_token: effectiveToken,
+          },
+          timeout: 5_000,
+        },
+      );
+
+      const conversations = response.data?.data ?? [];
+      if (conversations.length === 0) return null;
+
+      const participants = conversations[0].participants?.data ?? [];
+      // L'entrée du participant qui n'est PAS la page Facebook = le client
+      const user = participants.find((p) => p.id !== pageId && p.name?.trim());
+      return user?.name?.trim() ?? null;
+    } catch {
+      // Silencieux : on passe à la méthode 2
       return null;
     }
   }
