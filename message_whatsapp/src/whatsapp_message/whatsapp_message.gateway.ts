@@ -315,14 +315,22 @@ export class WhatsappMessageGateway
   ) {
     const isFirstPage = !cursor;
 
+    // Poste dédié : toutes les conversations viennent d'un seul canal.
+    // On charge tout d'un coup (pas de pagination) et on force hasMore = false.
+    const dedicatedChannelIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
+    const isDedicated = dedicatedChannelIds.length > 0;
+
     // Inclure TOUS les statuts (actif, attente, fermé, converti…).
-    // Limite : 300 conversations par page (keyset pagination).
+    // Limite : 300 conversations par page (keyset pagination) sauf en mode dédié.
     let { chats, hasMore } = await this.chatService.findByPosteId(
       agent.posteId,
       [],
-      300,
-      cursor,
+      isDedicated ? 10_000 : 300,
+      isDedicated ? undefined : cursor, // pas de curseur en mode dédié
     );
+
+    // Poste dédié : pas de scroll infini
+    if (isDedicated) hasMore = false;
 
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
