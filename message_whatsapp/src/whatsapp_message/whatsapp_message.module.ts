@@ -29,9 +29,6 @@ import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { MessageAutoService } from 'src/message-auto/message-auto.service';
-import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
-import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keyword.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { SocketAuthService } from './services/socket-auth.service';
@@ -66,8 +63,6 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
       ProviderChannel,
       Contact,
       WhatsappPoste,
-      MessageAuto,
-      AutoMessageKeyword,
       WhatsappMedia,
     ]),
     WhatsappChatModule,
@@ -95,7 +90,6 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     MetaTokenService,
     ContactService,
     WhatsappPosteService,
-    MessageAutoService,
     SocketThrottleGuard,
     SocketAuthService,
     SocketConversationQueryService,

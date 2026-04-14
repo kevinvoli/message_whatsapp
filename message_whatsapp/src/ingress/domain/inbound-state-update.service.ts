@@ -2,8 +2,7 @@
  * TICKET-04-A — Mise à jour de l'état conversation après réception d'un message entrant.
  *
  * Extrait de `InboundMessageService` : après persistance du message, la conversation
- * doit être mise à jour (last_client_message_at, read_only, waiting_client_reply,
- * et réinitialisation du cycle auto si l'agent avait déjà répondu).
+ * doit être mise à jour (last_client_message_at, read_only).
  */
 import { Injectable } from '@nestjs/common';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
@@ -24,23 +23,13 @@ export class InboundStateUpdateService {
   async apply(conversation: WhatsappChat, savedMessage: WhatsappMessage): Promise<void> {
     const clientMessageAt = savedMessage.timestamp ?? new Date();
 
-    // Si l'agent avait déjà répondu, on repart de zéro sur la séquence auto.
-    const isReopenedCycle = !!conversation.last_poste_message_at;
-
     await this.chatService.update(conversation.chat_id, {
       read_only: false,
       last_client_message_at: clientMessageAt,
-      waiting_client_reply: false,
-      ...(isReopenedCycle
-        ? { auto_message_step: 0, last_auto_message_sent_at: null }
-        : {}),
     });
 
     // Mise à jour en mémoire pour cohérence avec les étapes suivantes du pipeline
     conversation.read_only = false;
     conversation.last_client_message_at = clientMessageAt;
-    if (isReopenedCycle) {
-      conversation.auto_message_step = 0;
-    }
   }
 }

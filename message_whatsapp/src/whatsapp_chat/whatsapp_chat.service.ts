@@ -5,7 +5,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WhatsappChat } from './entities/whatsapp_chat.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import {
@@ -178,57 +178,13 @@ export class WhatsappChatService {
     return `This action removes a #${id} whatsappChat`;
   }
 
-  /**
-   * Libère les conversations verrouillées (read_only=true) sans qu'aucun auto-message
-   * n'ait encore été envoyé. Ce cas survient quand le serveur redémarre après que
-   * l'orchestrateur a posé le verrou DB mais avant d'avoir envoyé le message.
-   */
-  async resetStaleAutoMessageLocks(): Promise<number> {
-    const result = await this.chatRepository.update(
-      {
-        read_only: true,
-        last_auto_message_sent_at: IsNull(),
-      },
-      { read_only: false },
-    );
-    return result.affected ?? 0;
-  }
-
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
-    // ─── Réinitialisations automatiques des cycles auto-message ──────────────
-
-    // Trigger A : agent répond → cycle no_response repart de zéro
-    if (data.last_poste_message_at !== undefined) {
-      data.no_response_auto_step = 0;
-      data.last_no_response_auto_sent_at = null;
-    }
-
-    // Trigger E : conversation assignée → cycle queue_wait repart de zéro
-    if (data.poste_id !== undefined && data.poste_id !== null) {
-      data.queue_wait_auto_step = 0;
-      data.last_queue_wait_auto_sent_at = null;
-      data.on_assign_auto_sent = false; // réarmer trigger I si ré-assignation
-    }
-
-    // Trigger H : toute activité → cycle inactivity repart de zéro
-    if (data.last_activity_at !== undefined) {
-      data.inactivity_auto_step = 0;
-      data.last_inactivity_auto_sent_at = null;
-    }
-
     await this.chatRepository.update({ chat_id }, data);
   }
 
-  /**
-   * Marque une conversation comme réouverte (trigger D).
-   * À appeler depuis le handler de message entrant quand status était 'fermé'.
-   */
+  /** Marque une conversation comme réouverte (utilisé par FlowBot isReopened). */
   async markReopened(chat_id: string): Promise<void> {
-    await this.chatRepository.update({ chat_id }, {
-      reopened_at: new Date(),
-      reopened_auto_sent: false,
-      out_of_hours_auto_sent: false,
-    });
+    await this.chatRepository.update({ chat_id }, { reopened_at: new Date() });
   }
 
   async lockConversation(id: string) {

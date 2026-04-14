@@ -20,8 +20,6 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { QueueService } from '../dispatcher/services/queue.service';
 import { DispatcherService } from '../dispatcher/dispatcher.service';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
-import { MessageAutoService } from 'src/message-auto/message-auto.service';
-
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
 import {
   WhatsappChat,
@@ -76,7 +74,6 @@ export class WhatsappMessageGateway
     private readonly queueService: QueueService,
     private readonly dispatcherService: DispatcherService,
     private readonly jobRunner: FirstResponseTimeoutJob,
-    private readonly autoMessageService: MessageAutoService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
     private readonly contactService: ContactService,

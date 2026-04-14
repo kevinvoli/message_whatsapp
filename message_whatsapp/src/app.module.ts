@@ -26,7 +26,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChannelModule } from './channel/channel.module';
 import { ContactModule } from './contact/contact.module';
 import { WhatsappPosteModule } from './whatsapp_poste/whatsapp_poste.module';
-import { MessageAutoModule } from './message-auto/message-auto.module';
 import { AdminModule } from './admin/admin.module';
 import { Admin } from './admin/entities/admin.entity';
 import { WhatsappCommercial } from './whatsapp_commercial/entities/user.entity'; // Added import
@@ -110,7 +109,6 @@ import { FlowBotModule } from './flowbot/flowbot.module';
     ChannelModule,
     ContactModule,
     WhatsappPosteModule,
-    MessageAutoModule,
     MetriquesModule,
     LoggingModule,
     NotificationModule,
