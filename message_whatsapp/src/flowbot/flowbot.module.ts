@@ -26,6 +26,10 @@ import { FlowAnalyticsService } from './services/flow-analytics.service';
 // Listeners
 import { BotInboundListener } from './listeners/bot-inbound.listener';
 
+// Jobs
+import { FlowPollingJob } from './jobs/flow-polling.job';
+import { FlowSessionCleanerJob } from './jobs/flow-session-cleaner.job';
+
 // Controller
 import { FlowBotController } from './flowbot.controller';
 
@@ -60,7 +64,7 @@ const SERVICES = [
     // ✅ EventEmitterModule est global — pas besoin de l'importer ici
     // ❌ INTERDIT : WhatsappChatModule, WhatsappMessageModule, DispatcherModule
   ],
-  providers: [...SERVICES, BotInboundListener],
+  providers: [...SERVICES, BotInboundListener, FlowPollingJob, FlowSessionCleanerJob],
   controllers: [FlowBotController],
   exports: [
     BotProviderAdapterRegistry,

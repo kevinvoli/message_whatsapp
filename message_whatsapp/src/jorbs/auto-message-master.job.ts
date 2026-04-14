@@ -11,6 +11,7 @@ import { AutoMessageScopeConfigService } from 'src/message-auto/auto-message-sco
 import { BusinessHoursService } from 'src/message-auto/business-hours.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
 const MASTER_KEY = 'auto-message-master';
 
@@ -38,6 +39,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
     private readonly businessHoursService: BusinessHoursService,
     private readonly messageService: WhatsappMessageService,
     private readonly logger: AppLogger,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -51,6 +53,19 @@ export class AutoMessageMasterJob implements OnModuleInit {
 
   async run(): Promise<void> {
     const runStart = Date.now();
+
+    // ÉTAPE 0 — Feature flag FlowBot (migration legacy → FlowBot)
+    // Lorsque FF_FLOWBOT_ACTIVE = 'true', le moteur FlowBot prend en charge les
+    // messages automatiques. AutoMessageMasterJob est désactivé pour éviter les doublons.
+    const flowbotFlag = await this.systemConfigService.get('FF_FLOWBOT_ACTIVE');
+    if (flowbotFlag === 'true') {
+      this.logger.debug(
+        'AutoMessageMasterJob ignoré — FF_FLOWBOT_ACTIVE=true (FlowBot actif)',
+        AutoMessageMasterJob.name,
+      );
+      return;
+    }
+
     // ÉTAPE 1 — Config maître
     const masterConfig = await this.cronConfigService.findByKey(MASTER_KEY);
     if (!masterConfig.enabled) return;

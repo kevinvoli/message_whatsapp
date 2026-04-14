@@ -45,13 +45,13 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     maxSteps: null,
   },
   'offline-reinject': {
-    label: 'Réinjection — agents hors ligne & conversations orphelines',
+    label: 'Réinjection — agents hors ligne',
     description:
-      "Réinjecte dans la queue (1) les chats actifs sur des postes hors ligne sans réponse, et (2) les conversations orphelines (poste_id = null) qui n'ont jamais été assignées.",
+      "Réinjecte dans la queue les chats actifs sur des postes hors ligne sans réponse. Exécuté à minuit et 9h (AM#2/AM#5). Les conversations orphelines (poste_id = null) sont gérées par orphan-checker toutes les 15 min (AM#4).",
     enabled: true,
     scheduleType: 'cron',
     intervalMinutes: null,
-    cronExpression: '0 9 * * *',
+    cronExpression: '0 0,9 * * *',
     ttlDays: null,
     delayMinSeconds: null,
     delayMaxSeconds: null,
@@ -586,6 +586,24 @@ export class CronConfigService implements OnModuleInit {
         await this.repo.save(created);
         this.logger.log(`Created default cron config for key="${key}"`);
       }
+    }
+    // Migrations de valeurs par défaut obsolètes
+    await this.migrateDefaults();
+  }
+
+  /**
+   * Met à jour les entrées DB dont la valeur correspond encore à un ancien défaut connu.
+   * Permet de propager les corrections de défauts sans migration BDD manuelle.
+   * N'écrase PAS les valeurs personnalisées par l'admin (différentes de l'ancien défaut).
+   */
+  private async migrateDefaults(): Promise<void> {
+    // AM#2 + AM#5 : offline-reinject passait de '0 9 * * *' (1×/jour) à '0 0,9 * * *' (2×/jour)
+    const offlineReinject = await this.repo.findOne({ where: { key: 'offline-reinject' } });
+    if (offlineReinject && offlineReinject.cronExpression === '0 9 * * *') {
+      await this.repo.update(offlineReinject.id, { cronExpression: '0 0,9 * * *' });
+      this.logger.log(
+        'Migrated offline-reinject cronExpression: "0 9 * * *" → "0 0,9 * * *" (AM#2+AM#5 fix)',
+      );
     }
   }
 

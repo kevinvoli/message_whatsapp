@@ -38,6 +38,11 @@ import {
   INBOUND_MESSAGE_PROCESSED_EVENT,
   InboundMessageProcessedEvent,
 } from 'src/ingress/events/inbound-message-processed.event';
+import {
+  BOT_INBOUND_EVENT,
+  BotInboundMessageEvent,
+} from 'src/flowbot/events/bot-inbound-message.event';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
 export class InboundMessageService {
@@ -161,6 +166,12 @@ export class InboundMessageService {
       message: persistResult.message,
       traceId: correlationId,
     } satisfies InboundMessageProcessedEvent);
+
+    // ── Étape 9 : déclenchement FlowBot (découplé — fire-and-forget) ────────
+    this.eventEmitter.emit(
+      BOT_INBOUND_EVENT,
+      this.buildBotInboundEvent(message, conversation),
+    );
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -176,5 +187,57 @@ export class InboundMessageService {
 
   private buildTraceId(messageId?: string | null, chatId?: string): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+
+  // ─── FlowBot mapping ──────────────────────────────────────────────────────
+
+  private buildBotInboundEvent(
+    msg: UnifiedMessage,
+    conversation: WhatsappChat,
+  ): BotInboundMessageEvent {
+    const PROVIDER_TO_CHANNEL_TYPE: Record<string, string> = {
+      whapi: 'whatsapp',
+      meta: 'whatsapp',
+      messenger: 'messenger',
+      instagram: 'instagram',
+      telegram: 'telegram',
+    };
+
+    const BOT_MSG_TYPES = new Set<string>([
+      'text', 'image', 'audio', 'video', 'document', 'sticker', 'reaction',
+    ]);
+    const UNIFIED_TO_BOT_TYPE: Record<string, BotInboundMessageEvent['messageType']> = {
+      voice: 'audio',
+      gif: 'video',
+      short: 'video',
+    };
+
+    const rawType = msg.type as string;
+    const messageType: BotInboundMessageEvent['messageType'] =
+      BOT_MSG_TYPES.has(rawType)
+        ? (rawType as BotInboundMessageEvent['messageType'])
+        : (UNIFIED_TO_BOT_TYPE[rawType] ?? 'text');
+
+    const isNewConversation =
+      conversation.createdAt instanceof Date &&
+      Date.now() - conversation.createdAt.getTime() < 10_000;
+
+    const event = new BotInboundMessageEvent();
+    event.provider = msg.provider;
+    event.channelType = PROVIDER_TO_CHANNEL_TYPE[msg.provider] ?? 'whatsapp';
+    event.providerChannelRef = msg.channelId;
+    event.conversationExternalRef = msg.chatId;
+    event.contactExternalId = msg.from;
+    event.contactName = msg.fromName ?? msg.from;
+    event.messageText = msg.text;
+    event.messageType = messageType;
+    event.mediaUrl = msg.media?.link;
+    event.externalMessageRef = msg.providerMessageId;
+    event.receivedAt = new Date(msg.timestamp * 1000);
+    event.isNewConversation = isNewConversation;
+    event.isReopened = conversation.reopened_at !== null;
+    event.isOutOfHours = false; // TODO: brancher BusinessHoursService (TICKET-12-B follow-up)
+    event.agentAssignedRef = conversation.poste_id ?? undefined;
+    return event;
   }
 }

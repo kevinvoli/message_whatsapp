@@ -1,12 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { ReinjectConversationUseCase } from 'src/dispatcher/application/reinject-conversation.use-case';
 import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { In, IsNull, Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
 export interface OfflineReinjectionPreview {
@@ -20,7 +19,6 @@ export class OfflineReinjectionJob implements OnModuleInit {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
-    private readonly dispatcher: DispatcherService,
     private readonly reinjectUseCase: ReinjectConversationUseCase,
     private readonly cronConfigService: CronConfigService,
   ) {}
@@ -35,26 +33,17 @@ export class OfflineReinjectionJob implements OnModuleInit {
   }
 
   async preview(): Promise<OfflineReinjectionPreview> {
-    // Conversations actives sur un poste hors-ligne
+    // AM#4 — Phase 2 supprimée : les orphelins sont gérés par orphan-checker (toutes les 15 min).
+    // Preview = uniquement les conversations actives sur un poste hors-ligne.
     const activesHorsLigne = await this.chatRepo.find({
       where: { status: WhatsappChatStatus.ACTIF, last_poste_message_at: IsNull() },
       relations: ['poste'],
     });
-    const candidatesHorsLigne = activesHorsLigne.filter((c) => c.poste && !c.poste.is_active);
+    const candidates = activesHorsLigne.filter((c) => c.poste && !c.poste.is_active);
 
-    // Conversations orphelines (poste_id = null, pas encore fermées/converties)
-    const orphelines = await this.chatRepo.find({
-      where: {
-        poste_id: IsNull(),
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
-        read_only: false,
-      },
-    });
-
-    const all = [...candidatesHorsLigne, ...orphelines];
     return {
-      total: all.length,
-      conversations: all.map((c) => ({
+      total: candidates.length,
+      conversations: candidates.map((c) => ({
         chat_id: c.chat_id,
         name: c.name,
         poste_id: c.poste_id ?? null,
@@ -68,8 +57,9 @@ export class OfflineReinjectionJob implements OnModuleInit {
   async offlineReinject(): Promise<string> {
     this.logger.debug('Offline reinjection cron started');
 
-    // 1. Conversations actives sur un poste hors-ligne
-    // take: 50 — évite le burst illimité au démarrage ou à 9h si beaucoup d'agents offline
+    // Phase 1 uniquement — Conversations actives sur un poste hors-ligne.
+    // AM#4 — Phase 2 supprimée : les orphelins (poste_id IS NULL) sont gérés exclusivement
+    // par orphan-checker (toutes les 15 min) pour éviter la double-assignation (AM#3).
     const actives = await this.chatRepo.find({
       where: {
         status: WhatsappChatStatus.ACTIF,
@@ -88,24 +78,6 @@ export class OfflineReinjectionJob implements OnModuleInit {
       reinjectedOffline++;
     }
 
-    // 2. Conversations orphelines (poste_id = null) — jamais assignées ou perdues
-    // take: 20 — même limite que orphan-checker pour cohérence
-    const orphelines = await this.chatRepo.find({
-      where: {
-        poste_id: IsNull(),
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
-        read_only: false,
-      },
-      take: 20,
-    });
-
-    this.logger.debug(`Orphelines trouvées : ${orphelines.length}`);
-    let dispatchedOrphans = 0;
-    for (const chat of orphelines) {
-      await this.dispatcher.dispatchOrphanConversation(chat);
-      dispatchedOrphans++;
-    }
-
-    return `${reinjectedOffline} réinjectée(s) hors-ligne, ${dispatchedOrphans} orpheline(s) dispatché(s)`;
+    return `${reinjectedOffline} réinjectée(s) hors-ligne`;
   }
 }

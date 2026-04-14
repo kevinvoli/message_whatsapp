@@ -39,7 +39,11 @@ export class FlowCrudService {
   }
 
   async updateFlow(id: string, dto: Partial<FlowBot>): Promise<FlowBot> {
-    await this.flowRepo.update(id, dto);
+    const flow = await this.findFlowById(id);
+    // N'écraser que les scalaires — les relations (triggers, nodes, edges) sont gérées séparément
+    const { triggers: _t, nodes: _n, edges: _e, ...scalars } = dto;
+    Object.assign(flow, scalars);
+    await this.flowRepo.save(flow);
     return this.findFlowById(id);
   }
 

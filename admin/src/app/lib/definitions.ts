@@ -39,7 +39,72 @@ export type ViewMode =
   | 'go_no_go'
   | 'notifications'
   | 'alert-config'
-  | 'settings';
+  | 'settings'
+  | 'flowbot';
+
+// ─── FlowBot types ────────────────────────────────────────────────────────────
+
+export type FlowNodeType = 'MESSAGE' | 'QUESTION' | 'CONDITION' | 'ACTION' | 'WAIT' | 'ESCALATE' | 'END' | 'AB_TEST';
+export type FlowTriggerType =
+  | 'INBOUND_MESSAGE' | 'CONVERSATION_OPEN' | 'CONVERSATION_REOPEN'
+  | 'OUT_OF_HOURS' | 'ON_ASSIGN' | 'QUEUE_WAIT' | 'NO_RESPONSE'
+  | 'INACTIVITY' | 'KEYWORD' | 'SCHEDULE';
+
+export interface FlowBot {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  priority: number;
+  scopeChannelType?: string;
+  scopeProviderRef?: string;
+  triggers?: FlowTrigger[];
+  nodes?: FlowNode[];
+  edges?: FlowEdge[];
+}
+
+export interface FlowTrigger {
+  id: string;
+  flowId: string;
+  triggerType: FlowTriggerType;
+  config: Record<string, unknown>;
+  isActive: boolean;
+}
+
+export interface FlowNode {
+  id: string;
+  flowId: string;
+  type: FlowNodeType;
+  label: string;
+  positionX: number;
+  positionY: number;
+  config: Record<string, unknown>;
+  timeoutSeconds?: number;
+  isEntryPoint: boolean;
+}
+
+export interface FlowEdge {
+  id: string;
+  flowId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  conditionType: string;
+  conditionValue?: string;
+  conditionNegate: boolean;
+  sortOrder: number;
+}
+
+export interface FlowAnalyticsRow {
+  id: string;
+  flowId: string;
+  periodDate: string;
+  sessionsStarted: number;
+  sessionsCompleted: number;
+  sessionsEscalated: number;
+  sessionsExpired: number;
+  avgSteps?: number;
+  avgDurationSeconds?: number;
+}
 
 export type NavigationItem = {
   id: ViewMode;

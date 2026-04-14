@@ -93,6 +93,19 @@ export class FlowEngineService {
       triggerType: match.triggerType,
     });
 
+    // Stocker le contexte de routage dans les variables pour que le polling job
+    // puisse reconstituer l'adapter lors de la reprise (WAIT / NO_RESPONSE)
+    session.variables = {
+      ...session.variables,
+      __provider: execCtx.provider,
+      __channelType: execCtx.channelType,
+      __externalRef: execCtx.externalRef,
+      __providerChannelRef: execCtx.providerChannelRef ?? null,
+      __contactName: execCtx.contactName ?? '',
+      __contactRef: execCtx.contactRef ?? execCtx.externalRef,
+    };
+    await this.sessionService.save(session);
+
     // Lier la session à la conversation
     conv.activeSessionId = session.id;
     conv.status = BotConversationStatus.BOT_ACTIVE;
@@ -151,14 +164,16 @@ export class FlowEngineService {
       order: { sortOrder: 'ASC' },
     });
 
-    if (!execCtx && session.conversation) {
-      // Reconstruire un contexte minimal depuis la conversation (mode job de polling)
+    if (!execCtx) {
+      // Reconstruire le contexte depuis les variables stockées à la création de session
+      const v = session.variables ?? {};
       execCtx = {
-        provider: 'unknown',
-        channelType: 'whatsapp',
-        externalRef: session.conversation.chatRef,
-        contactName: '',
-        contactRef: session.conversation.chatRef,
+        provider: (v['__provider'] as string) ?? 'unknown',
+        channelType: (v['__channelType'] as string) ?? 'whatsapp',
+        externalRef: (v['__externalRef'] as string) ?? session.conversation?.chatRef ?? '',
+        providerChannelRef: (v['__providerChannelRef'] as string) || undefined,
+        contactName: (v['__contactName'] as string) ?? '',
+        contactRef: (v['__contactRef'] as string) ?? session.conversation?.chatRef ?? '',
       };
     }
 

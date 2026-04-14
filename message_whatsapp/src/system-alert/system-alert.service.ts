@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
 import { Server } from 'socket.io';
 import {
   AlertRecipient,
@@ -83,6 +84,7 @@ export class SystemAlertService implements OnModuleInit {
     @InjectRepository(SystemAlertConfig)
     private readonly configRepo: Repository<SystemAlertConfig>,
     private readonly whapiService: CommunicationWhapiService,
+    private readonly metaService: CommunicationMetaService,
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
@@ -265,18 +267,19 @@ export class SystemAlertService implements OnModuleInit {
       return [];
     }
 
-    // On envoie uniquement via des canaux Whapi (provider = 'whapi' ou null).
-    // Les canaux Meta/Messenger/Instagram/Telegram ne peuvent pas envoyer à un
-    // numéro WhatsApp brut — ils nécessitent un PSID ou un chat_id spécifique.
     const allChannels = await this.channelRepo.find();
-    const whapiChannels = allChannels.filter(
-      (c) => !c.provider || c.provider === 'whapi',
+
+    // Priorité : canaux Whapi d'abord (envoi brut possible), Meta en fallback
+    // (fenêtre 24h requise). Les autres providers (Messenger, Instagram, Telegram)
+    // ne peuvent pas envoyer à un numéro brut — ils sont exclus.
+    const eligible = allChannels.filter(
+      (c) => !c.provider || c.provider === 'whapi' || c.provider === 'meta',
     );
 
-    if (!whapiChannels.length) {
+    if (!eligible.length) {
       const msg =
         allChannels.length > 0
-          ? `Aucun canal Whapi disponible (${allChannels.length} canal(aux) ignoré(s) : Meta/Messenger/Instagram/Telegram)`
+          ? `Aucun canal Whapi/Meta disponible (${allChannels.length} canal(aux) non éligible(s))`
           : 'Aucun canal configuré dans le système';
       this.logger.error(msg);
       return this.config.recipients.map((r) => ({
@@ -292,33 +295,42 @@ export class SystemAlertService implements OnModuleInit {
       }));
     }
 
-    // Si un canal par défaut est configuré, le mettre en premier dans la liste.
-    // Les autres canaux Whapi servent de fallback si le canal par défaut échoue.
+    // Ordonner : canal par défaut en premier, puis Whapi, puis Meta (fallback)
     let channels: WhapiChannel[];
+    const whapiChannels = eligible.filter((c) => !c.provider || c.provider === 'whapi');
+    const metaChannels = eligible.filter((c) => c.provider === 'meta');
+
     if (this.config.defaultChannelId) {
-      const preferred = whapiChannels.find(
-        (c) => c.channel_id === this.config.defaultChannelId,
-      );
+      const preferred = eligible.find((c) => c.channel_id === this.config.defaultChannelId);
       if (preferred) {
-        const rest = whapiChannels.filter(
-          (c) => c.channel_id !== this.config.defaultChannelId,
-        );
-        channels = [preferred, ...rest];
+        const rest = eligible.filter((c) => c.channel_id !== this.config.defaultChannelId);
+        // Remettre Whapi avant Meta dans le reste
+        const restOrdered = [
+          ...rest.filter((c) => !c.provider || c.provider === 'whapi'),
+          ...rest.filter((c) => c.provider === 'meta'),
+        ];
+        channels = [preferred, ...restOrdered];
         this.logger.log(
           `Canal préféré : ${preferred.label ?? preferred.channel_id} + ${rest.length} fallback(s)`,
         );
       } else {
         this.logger.warn(
-          `Canal par défaut "${this.config.defaultChannelId}" introuvable parmi les canaux Whapi — utilisation de tous les canaux`,
+          `Canal par défaut "${this.config.defaultChannelId}" introuvable — utilisation de tous les canaux éligibles`,
         );
-        channels = whapiChannels;
+        channels = [...whapiChannels, ...metaChannels];
       }
     } else {
-      channels = whapiChannels;
+      channels = [...whapiChannels, ...metaChannels];
+    }
+
+    if (metaChannels.length > 0) {
+      this.logger.warn(
+        `⚠️ ${metaChannels.length} canal(aux) Meta inclus — envoi possible uniquement dans la fenêtre de 24h (contact initié par le client).`,
+      );
     }
 
     this.logger.log(
-      `Ordre d'essai (${channels.length} canal(aux)): ${channels.map((c) => c.label ?? c.channel_id).join(' → ')}`,
+      `Ordre d'essai (${channels.length} canal(aux)): ${channels.map((c) => `${c.label ?? c.channel_id}[${c.provider ?? 'whapi'}]`).join(' → ')}`,
     );
 
     const text = this.buildMessage(silenceMin);
@@ -338,23 +350,54 @@ export class SystemAlertService implements OnModuleInit {
     text: string,
   ): Promise<AlertSendResult> {
     const normalizedPhone = SystemAlertService.normalizePhone(recipient.phone);
-
-    // CommunicationWhapiService.validateWhapiRecipient() attend UNIQUEMENT des
-    // chiffres (regex ^\d{8,20}$) — PAS de suffixe @s.whatsapp.net.
-    const to = normalizedPhone;
-
     const channelErrors: string[] = [];
 
     for (const channel of channels) {
       const channelLabel = channel.label ?? channel.channel_id;
+      const provider = channel.provider ?? 'whapi';
+
       try {
         this.logger.log(
-          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channelLabel}`,
+          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via ${channelLabel} [${provider}]`,
         );
 
+        if (provider === 'meta') {
+          // Meta Cloud API — nécessite fenêtre 24h ou template HSM
+          if (!channel.external_id || !channel.token) {
+            const reason = `Canal Meta "${channelLabel}" sans phoneNumberId ou accessToken`;
+            channelErrors.push(`[${channelLabel}] ${reason}`);
+            this.logger.warn(`❌ ${reason}`);
+            continue;
+          }
+
+          const result = await this.metaService.sendTextMessage({
+            text,
+            to: normalizedPhone,
+            phoneNumberId: channel.external_id,
+            accessToken: channel.token,
+          });
+
+          this.logger.log(
+            `✅ Alerte envoyée à ${recipient.name} via Meta ${channelLabel} — id=${result.providerMessageId}`,
+          );
+          return {
+            recipientName: recipient.name,
+            recipientPhone: normalizedPhone,
+            success: true,
+            channelId: channel.channel_id,
+            channelName: channelLabel,
+            error: null,
+            providerMessageId: result.providerMessageId,
+            messageStatus: 'sent',
+            whapiFlagged: false,
+          };
+        }
+
+        // Provider Whapi (par défaut)
         const response = await this.whapiService.sendToWhapiChannel({
           text,
-          to,
+          // CommunicationWhapiService attend uniquement des chiffres (^\d{8,20}$)
+          to: normalizedPhone,
           channelId: channel.channel_id,
         });
 
@@ -367,8 +410,6 @@ export class SystemAlertService implements OnModuleInit {
         );
 
         if (whapiFlagged) {
-          // Whapi a accepté la requête (HTTP 200) mais indique que le message
-          // n'a PAS été envoyé (sent=false). Essayer le canal suivant.
           const reason = `Whapi a retourné sent=false (status=${msgStatus ?? 'inconnu'}, id=${msgId ?? 'none'})`;
           channelErrors.push(`[${channelLabel}] ${reason}`);
           this.logger.warn(`❌ ${channelLabel} refus Whapi: ${reason}`);
@@ -391,12 +432,11 @@ export class SystemAlertService implements OnModuleInit {
         };
       } catch (err) {
         const msg = (err as Error).message;
-        channelErrors.push(`[${channelLabel}] ${msg}`);
+        channelErrors.push(`[${channelLabel}][${provider}] ${msg}`);
         this.logger.warn(`❌ ${channelLabel} erreur pour ${recipient.name}: ${msg}`);
       }
     }
 
-    const errMsg = `Tous les canaux ont échoué (${channels.length} canal(aux) essayé(s))`;
     const detailedError =
       channelErrors.length > 0
         ? `Tous les canaux ont échoué :\n${channelErrors.join('\n')}`

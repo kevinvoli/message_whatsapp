@@ -44,6 +44,10 @@ export class BotConversationService {
     return conv;
   }
 
+  async findById(id: string): Promise<BotConversation | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
   async findByChatRef(chatRef: string): Promise<BotConversation | null> {
     return this.repo.findOne({ where: { chatRef } });
   }

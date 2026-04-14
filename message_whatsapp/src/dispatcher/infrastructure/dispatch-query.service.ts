@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThan, MoreThan, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -30,27 +30,54 @@ export class DispatchQueryService {
     statuses: WhatsappChatStatus[],
     options: { withPoste?: boolean; limit?: number; olderThan?: Date } = {},
   ): Promise<WhatsappChat[]> {
-    const where: Record<string, unknown> = { status: In(statuses) };
-    if (options.olderThan) {
-      where['last_client_message_at'] = LessThan(options.olderThan);
-      where['unread_count'] = MoreThan(0);
+    if (!options.olderThan) {
+      return this.chatRepository.find({
+        where: { status: In(statuses) },
+        relations: options.withPoste ? ['poste'] : [],
+        take: options.limit,
+      });
     }
-    return this.chatRepository.find({
-      where,
-      relations: options.withPoste ? ['poste'] : [],
-      order: options.olderThan ? { last_client_message_at: 'ASC' } : undefined,
-      take: options.limit,
-    });
+
+    // AM#1 fix — Cibler aussi les conversations lues (unread_count = 0) où
+    // le commercial a lu le message sans répondre :
+    //   last_client_message_at < seuil
+    //   ET (unread_count > 0 OU dernier msg poste antérieur au dernier msg client OU jamais répondu)
+    //
+    // AM#3 fix — Exclure les conversations orphelines (poste_id IS NULL) du chemin SLA :
+    // ces conversations sont traitées exclusivement par orphan-checker.
+    // Sans cette condition, sla-checker ET orphan-checker peuvent co-assigner la même conversation.
+    const qb = this.chatRepository
+      .createQueryBuilder('chat')
+      .where('chat.status IN (:...statuses)', { statuses })
+      .andWhere('chat.last_client_message_at < :threshold', { threshold: options.olderThan })
+      .andWhere('chat.poste_id IS NOT NULL')
+      .andWhere(
+        '(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL OR chat.last_client_message_at > chat.last_poste_message_at)',
+      )
+      .orderBy('chat.last_client_message_at', 'ASC');
+
+    if (options.withPoste) {
+      qb.leftJoinAndSelect('chat.poste', 'poste');
+    }
+    if (options.limit) {
+      qb.take(options.limit);
+    }
+
+    return qb.getMany();
   }
 
   findActiveChatsByPoste(posteId: string): Promise<WhatsappChat[]> {
-    return this.chatRepository.find({
-      where: {
-        poste_id: posteId,
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        unread_count: MoreThan(0),
-      },
-    });
+    // AM#1 fix — Inclure les conversations où le commercial a lu sans répondre
+    return this.chatRepository
+      .createQueryBuilder('chat')
+      .where('chat.poste_id = :posteId', { posteId })
+      .andWhere('chat.status IN (:...statuses)', {
+        statuses: [WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF],
+      })
+      .andWhere(
+        '(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL OR chat.last_client_message_at > chat.last_poste_message_at)',
+      )
+      .getMany();
   }
 
   /** Toutes les conversations EN_ATTENTE avec leur poste chargé. */

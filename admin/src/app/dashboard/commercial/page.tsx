@@ -28,6 +28,9 @@ import GoNoGoView from '@/app/modules/observability/components/GoNoGoView';
 import SettingsView from '@/app/modules/settings/components/SettingsView';
 // ── Vues non encore modulées ──────────────────────────────────────────────────
 import ConversationsView from '@/app/ui/ConversationsView';
+// ── FlowBot (TICKET-12-D) ─────────────────────────────────────────────────────
+import FlowListView from '@/app/modules/flowbot/components/FlowListView';
+import FlowBuilderView from '@/app/modules/flowbot/components/FlowBuilderView';
 import { useNotifications } from '@/app/modules/notifications/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -41,6 +44,7 @@ export default function AdminDashboard() {
     const [adminProfile, setAdminProfile] = useState<{ id: string; name: string; email: string } | null>(null);
     const [conversationFilterPosteId, setConversationFilterPosteId] = useState<string | undefined>(undefined);
     const [conversationFilterCommercialId, setConversationFilterCommercialId] = useState<string | undefined>(undefined);
+    const [flowBotEditingId, setFlowBotEditingId] = useState<string | null>(null);
 
     useEffect(() => {
         void getAdminProfile().then(setAdminProfile).catch(() => null);
@@ -140,6 +144,17 @@ export default function AdminDashboard() {
                     <SettingsView
                         adminProfile={adminProfile}
                         onProfileUpdated={setAdminProfile}
+                    />
+                );
+            case 'flowbot':
+                return flowBotEditingId ? (
+                    <FlowBuilderView
+                        flowId={flowBotEditingId}
+                        onBack={() => setFlowBotEditingId(null)}
+                    />
+                ) : (
+                    <FlowListView
+                        onOpenBuilder={(id) => setFlowBotEditingId(id)}
                     />
                 );
             default:

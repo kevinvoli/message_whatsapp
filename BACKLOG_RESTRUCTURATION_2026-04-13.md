@@ -80,29 +80,25 @@ Avant de déplacer du code, il faut savoir quels services sont couverts par des 
 
 ---
 
-### TICKET-00-B — Décision de gouvernance : FlowBot vs refactoring EPIC-07
+### TICKET-00-B — Décision de gouvernance : FlowBot vs refactoring EPIC-07 ✅ TERMINÉ
 
 **Priorité :** P0  
 **Complexité :** XS  
 **Dépendances :** aucune
 
-**Problème :**  
-Le plan `memory/plan-module-chatbot.md` prévoit de remplacer **entièrement** `auto-message-master.job.ts` et `AutoMessageOrchestrator` par un module FlowBot. Si cette décision est prise, TICKET-07-A (découpage des 8 triggers en services séparés) devient du travail à jeter — on refactorerait du code destiné à être supprimé dans 3 sprints.
+**Décision prise (2026-04-14) :**
 
-**Décision à prendre (oui/non) :**
+| Question | Réponse |
+|----------|---------|
+| Le FlowBot est-il planifié dans les 6 prochains mois ? | **OUI — Sprint 12 commencé** |
+| TICKET-07-A est-il utile ? | **NON — travail redondant, FlowBot remplace tout** |
 
-| Question | Réponse attendue |
-|----------|-----------------|
-| Le FlowBot est-il planifié dans les 6 prochains mois ? | Oui / Non |
-| TICKET-07-A est-il utile comme étape de migration FlowBot ou du travail redondant ? | Décision à prendre |
+**Conséquences appliquées :**
+- TICKET-07-A → **ANNULÉ** (FlowBot remplace `auto-message-master.job.ts` et `AutoMessageOrchestrator`)
+- EPIC-07 réduit à TICKET-07-B uniquement (déjà terminé)
+- EPIC-12 créé pour piloter le développement FlowBot
 
-**Conséquences selon la décision :**
-- **FlowBot dans < 6 mois** → TICKET-07-A rétrogradé en P3 ou supprimé, EPIC-07 réduit à TICKET-07-B uniquement
-- **FlowBot dans > 6 mois ou incertain** → TICKET-07-A reste P1, les triggers séparés faciliteront la migration ultérieure
-
-**Critères d'acceptation :**
-- La décision est documentée dans ce fichier (colonne "Décision" ajoutée au tableau ci-dessus)
-- TICKET-07-A est soit confirmé, soit explicitement dépriorisé avec justification
+**Résultat :** Décision documentée · TICKET-07-A annulé · EPIC-12 ajouté au backlog
 
 ---
 
@@ -589,28 +585,11 @@ Activer l'enforcement immédiatement sur un système en production peut casser d
 
 ---
 
-### TICKET-07-A — Séparer chaque trigger en service indépendant
+### ~~TICKET-07-A~~ — ANNULÉ
 
-**Priorité :** P1 *(si FlowBot > 6 mois)* / P3 *(si FlowBot < 6 mois — voir TICKET-00-B)*  
-**Complexité :** M  
-**Dépendances :** TICKET-00-B (décision requise avant de démarrer)
-
-**Travail à faire :**
-- Créer `automations/triggers/no-response.trigger.ts` (Trigger A)
-- Créer `automations/triggers/out-of-hours.trigger.ts` (Trigger B)
-- Créer `automations/triggers/reopened.trigger.ts` (Trigger C)
-- Créer `automations/triggers/queue-wait.trigger.ts` (Trigger D)
-- Créer `automations/triggers/keyword.trigger.ts` (Trigger E)
-- Créer `automations/triggers/client-type.trigger.ts` (Trigger F)
-- Créer `automations/triggers/inactivity.trigger.ts` (Trigger G)
-- Créer `automations/triggers/on-assign.trigger.ts` (Trigger H/I)
-- Créer `automations/triggers/trigger-runner.service.ts`
-- `AutoMessageMasterJob.run()` délègue au runner
-
-**Critères d'acceptation :**
-- Chaque trigger est testable indépendamment
-- `AutoMessageMasterJob` ne contient plus de logique métier
-- Comportement identique en production
+> Décision TICKET-00-B (2026-04-14) : FlowBot remplace entièrement `auto-message-master.job.ts` et `AutoMessageOrchestrator`.  
+> Découper les triggers en services séparés serait du travail redondant — la logique sera portée nativement par le moteur FlowBot (EPIC-12).  
+> EPIC-07 réduit à TICKET-07-B uniquement.
 
 ---
 
@@ -871,17 +850,29 @@ Activer l'enforcement immédiatement sur un système en production peut casser d
 
 ---
 
-### TICKET-10-C — Tests d'intégration auto-messages
+### TICKET-10-C — Tests d'intégration pipeline FlowBot E2E ✅ TERMINÉ
 
 **Priorité :** P3  
 **Complexité :** M  
-**Dépendances :** TICKET-07-A *(ou FlowBot si TICKET-00-B décide de skipper 07-A)*
+**Dépendances :** TICKET-12-E ✓ *(TICKET-07-A annulé → remplacé par FlowBot)*
 
-**Travail à faire :**
-- Test : trigger no-response → message envoyé après délai
-- Test : trigger bloqué par `read_only` existant
-- Test : fenêtre 23h expirée → message non envoyé
-- Test : max steps atteint → séquence terminée
+**Livré :**
+- `src/flowbot/__tests__/bot-inbound-pipeline.spec.ts` — 10 scénarios d'intégration
+- Services **réels** assemblés dans le module de test : `BotInboundListener` + `FlowEngineService` + `FlowTriggerService` + `FlowVariableService` + `EventEmitter2`
+- Mocks uniquement sur les couches externes : TypeORM repos, `BotConvService`, `SessionService`, `AdapterRegistry`
+- Scénarios :
+  1. Golden path MESSAGE → END : `adapter.sendMessage` appelé, session COMPLETED
+  2. Nœud QUESTION → session WAITING_REPLY (stop)
+  3. Reprise WAITING_REPLY via 2ème event → session COMPLETED
+  4. Trigger KEYWORD sans match → aucune session créée
+  5. Trigger KEYWORD avec match (insensible à la casse) → session créée
+  6. Aucun flow actif en DB → aucune session créée
+  7. Nœud WAIT → session WAITING_DELAY (stop)
+  8. Nœud ESCALATE → session ESCALATED + `BOT_ESCALATE_EVENT` émis
+  9. Flow sans nœud d'entrée → session CANCELLED
+  10. Variables `{contact_name}` résolues via `FlowVariableService` réel
+
+**Résultat :** 52/52 tests FlowBot passent (10 intégration + 42 unitaires) — 0 erreur TypeScript
 
 ---
 
@@ -946,24 +937,236 @@ Phase 2 GO/NO-GO : critères satisfaits, en attente signature tech lead.
 
 ---
 
+## EPIC-12 — FlowBot (moteur de flux conversationnel)
+
+> **Priorité P1 — Remplacement de `auto-message-master.job.ts` et `AutoMessageOrchestrator`**  
+> Le FlowBot est un module NestJS autonome (aucune dépendance vers `whatsapp_chat`, `whatsapp_message`, `dispatcher`).  
+> Communication via EventEmitter2 pour les événements entrants, interface `BotProviderAdapter` pour les envois.  
+> Décision TICKET-00-B : FlowBot planifié < 6 mois → TICKET-07-A annulé.
+
+---
+
+### TICKET-12-A — FlowBot Phase 1 : module complet ✅ TERMINÉ
+
+**Priorité :** P1  
+**Complexité :** XL  
+**Dépendances :** TICKET-00-B ✓
+
+**Résultat (2026-04-14) :**
+
+**Entités (10 tables — migration `20260414_create_flowbot_tables.ts`) :**
+- `FlowBot` — flux avec priorité, scope provider/channel
+- `FlowTrigger` — déclencheurs (10 types : INBOUND_MESSAGE, KEYWORD, ON_ASSIGN, OUT_OF_HOURS, etc.)
+- `FlowNode` — nœuds (8 types : MESSAGE, QUESTION, CONDITION, ACTION, WAIT, ESCALATE, END, AB_TEST)
+- `FlowEdge` — transitions avec conditions et sort_order
+- `BotConversation` — conversation bot (chatRef unique, activeSessionId, status)
+- `FlowSession` — session d'exécution (variables JSON, stepsCount, statuts granulaires)
+- `FlowSessionLog` — audit trail de chaque nœud exécuté
+- `BotMessage` — messages sortants persistés
+- `FlowAnalytics` + `FlowNodeAnalytics` — agrégats journaliers avec contrainte @Unique
+
+**Interfaces :**
+- `BotProviderAdapter` — contrat d'adaptateur (sendMessage, sendTyping, markAsRead, assignToAgent, closeConversation, emitConversationUpdated, capabilities)
+- `BotConversationContext`, `BotOutboundMessage`, `BotSendResult`, `ProviderCapabilities`
+
+**Events :**
+- `BOT_INBOUND_EVENT = 'bot.inbound'` + `BotInboundMessageEvent`
+- `BOT_ESCALATE_EVENT = 'bot.escalate'` + `BOT_CLOSE_EVENT = 'bot.close'`
+- Events agent : BOT_AGENT_CONNECTED / DISCONNECTED / CONVERSATION_ASSIGNED
+
+**Services (7) :**
+- `BotProviderAdapterRegistry` — Map<string, BotProviderAdapter>, register/get/getSafe/listProviders
+- `BotConversationService` — upsert par chatRef, findByChatRef
+- `BotMessageService` — persistance messages sortants
+- `FlowSessionService` — createSession, getActiveSession, findExpiredWaiting/Active
+- `FlowTriggerService` — findMatchingFlow (priorité), evaluateTrigger par type
+- `FlowVariableService` — résolution {contact_name}, {session.VAR}, {current_time}
+- `FlowCrudService` — CRUD FlowBot/Node/Edge/Trigger + setActive + upsertNodes/Edges/Triggers
+- `FlowAnalyticsService` — recordSessionStart/Completion/Escalation/Expiration, upsert journalier
+- `FlowEngineService` — orchestrateur central (handleInbound, resumeSession, executeNode, MAX_STEPS=50)
+
+**Protection anti-boucle :** MAX_STEPS=50 + détection boucle via session logs
+
+**Listener :**  
+`BotInboundListener` — `@OnEvent('bot.inbound', { async: true })` → `FlowEngineService.handleInbound()`
+
+**Adaptateur Whapi :**  
+`WhapiProviderAdapter` (dans `src/whapi/adapters/`) — implémente `BotProviderAdapter`  
+`capabilities()` : typing ✓, media ✓, replyTo ✓, templates ✗, markAsRead ✗, windowHours: null
+
+**Contrôleur :** `FlowBotController` — CRUD complet + endpoints nodes/edges/triggers/analytics/providers
+
+**Module :** `FlowBotModule` — TypeOrmModule(10 entités) · exports [BotProviderAdapterRegistry, FlowEngineService]
+
+**Migration :** `20260414_create_flowbot_tables.ts` — 10 tables avec guards `hasTable()` + down() en ordre inverse
+
+**Critères d'acceptation :**
+- 10 entités créées · 10 tables migrées ✅
+- FlowEngineService cycle complet : handleInbound → upsert conv → check session WAITING_REPLY → findMatchingFlow → createSession → executeNode ✅
+- BotProviderAdapterRegistry opérationnel ✅
+- WhapiProviderAdapter branché ✅
+- Module isolé (0 import whatsapp_chat / whatsapp_message / dispatcher) ✅
+- tsc EXIT:0 ✅
+
+**En attente (câblage module) :**
+- `app.module.ts` → ajouter `FlowBotModule` + `EventEmitterModule.forRoot()`
+- `whapi.module.ts` → OnModuleInit + WhapiProviderAdapter + register() dans onModuleInit()
+- `src/channel/inbound-message.service.ts` → émettre `bot.inbound` après traitement
+
+---
+
+### TICKET-12-B — FlowBot Phase 2 : jobs + câblage complet
+
+**Priorité :** P1  
+**Complexité :** M  
+**Dépendances :** TICKET-12-A ✓
+
+**Travail à faire :**
+- Câbler `app.module.ts` : ajouter `FlowBotModule` + `EventEmitterModule.forRoot({ wildcard: false })`
+- Câbler `whapi.module.ts` : `OnModuleInit` + `WhapiProviderAdapter` + `register()` dans `onModuleInit()`
+- Émettre `bot.inbound` depuis `InboundMessageService` (après traitement standard) pour chaque provider
+- Créer `src/flowbot/jobs/flow-polling.job.ts` :
+  - Cron `@Cron('*/30 * * * * *')` — relancer sessions WAITING_DELAY expirées
+  - Cron `@Cron('0 * * * * *')` — déclencher trigger NO_RESPONSE si seuil dépassé
+- Créer `src/flowbot/jobs/flow-session-cleaner.job.ts` :
+  - Cron `@Cron('0 0 * * * *')` — expirer sessions actives > 24h
+
+**Critères d'acceptation :**
+- Bot répond à un message entrant via Whapi en production
+- Sessions WAITING_DELAY reprennent automatiquement
+- Sessions orphelines expirées par le cleaner
+- EventEmitter2 global branché (pas de NestJS warning « No subscribers »)
+
+---
+
+### TICKET-12-C — FlowBot Phase 3 : MetaProviderAdapter
+
+**Priorité :** P1  
+**Complexité :** S  
+**Dépendances :** TICKET-12-B ✓
+
+**Travail à faire :**
+- Créer `src/channel/adapters/meta-provider.adapter.ts` implémentant `BotProviderAdapter`
+- `capabilities()` : typing ✗, media ✓, templates ✓, replyTo ✗, windowHours: 24
+- `sendMessage()` → `CommunicationMetaService.sendTextMessage()`
+- Vérifier fenêtre 24h avant envoi (avertissement log si hors fenêtre)
+- Câbler dans `ChannelModule` : `OnModuleInit` + `register()` dans `BotProviderAdapterRegistry`
+- Câbler `system-alert.module.ts` / `system-alert.service.ts` : `CommunicationMetaService` + routing provider
+
+**Critères d'acceptation :**
+- Bot répond sur Meta (WhatsApp Cloud API) dans la fenêtre 24h
+- Alertes système routées vers Meta ET Whapi selon le provider du canal
+- `BotProviderAdapterRegistry.listProviders()` retourne `['whapi', 'meta']`
+
+---
+
+### TICKET-12-D — FlowBot Phase 4 : UI admin (builder visuel)
+
+**Priorité :** P2  
+**Complexité :** L  
+**Dépendances :** TICKET-12-B ✓
+
+**Travail à faire :**
+- Vue `admin/src/modules/flowbot/` :
+  - `FlowListView.tsx` — liste des flows avec toggle actif/inactif
+  - `FlowBuilderView.tsx` — éditeur visuel React Flow (nodes + edges drag & drop)
+  - `FlowTriggerEditor.tsx` — configuration des déclencheurs
+  - `FlowNodeEditor.tsx` — configuration de chaque nœud (type, config JSON)
+  - `FlowAnalyticsView.tsx` — métriques journalières par flow
+- API calls vers `GET|POST|PATCH|DELETE /flowbot/flows`
+- Hooks : `useFlows`, `useFlowBuilder`, `useFlowAnalytics`
+
+**Critères d'acceptation :**
+- Créer, éditer, activer/désactiver un flow depuis l'admin
+- Visualisation graphique du flow (nœuds + arêtes)
+- Métriques sessionsStarted/Completed/Escalated visibles
+
+---
+
+### TICKET-12-E — FlowBot Phase 5 : tests + migration AutoMessageOrchestrator ✅ TERMINÉ
+
+**Priorité :** P3  
+**Complexité :** M  
+**Dépendances :** TICKET-12-B ✓, TICKET-12-C ✓
+
+**Livré :**
+- `src/flowbot/__tests__/flow-variable.service.spec.ts` — 14 tests (contexte, temps, session, cas limites)
+- `src/flowbot/__tests__/flow-trigger.service.spec.ts` — 14 tests (INBOUND_MESSAGE, CONVERSATION_OPEN, CONVERSATION_REOPEN, OUT_OF_HOURS, ON_ASSIGN, KEYWORD, scope, trigger inactif, priorité)
+- `src/flowbot/__tests__/flow-engine.service.spec.ts` — 14 tests (handleInbound : aucun flow / WAITING_REPLY / nœud sans entry / MESSAGE / QUESTION / WAIT / END / ESCALATE ; resumeSession : introuvable / statut invalide / reconstruction execCtx depuis variables / aucune arête / execCtx explicite)
+- Feature flag `FF_FLOWBOT_ACTIVE` ajouté dans `system-config.service.ts`
+- `AutoMessageMasterJob` : Étape 0 = guard `FF_FLOWBOT_ACTIVE === 'true'` → return immédiat avec log debug
+- `JorbsModule` : import `SystemConfigModule` ajouté
+- **42/42 tests passent — 0 erreur TypeScript**
+
+**Critères d'acceptation :**
+- ✅ Couverture FlowEngine > 80% (handleInbound + resumeSession + tous types de nœuds couverts)
+- ✅ `AutoMessageMasterJob` désactivable via flag admin sans redéploiement
+- ✅ 0 régression — toutes les suites existantes passent
+
+**Reste (hors sprint) :**
+- Test intégration E2E : webhook Whapi → BotInboundListener → FlowEngine → réponse envoyée (planifié TICKET-10-C)
+- Migration `MessageAuto` → `FlowBot` (script de migration — décision opérationnelle à prendre)
+- Suppression `auto-message-master.job.ts` après validation 2 semaines prod avec FlowBot (activer `FF_FLOWBOT_ACTIVE=true` en admin)
+
+---
+
+## Hotfixes (hors sprint — appliqués en production)
+
+### HOTFIX-01 — Webhook Whapi : async void pour retour 200 immédiat ✅ TERMINÉ
+
+**Date :** 2026-04-14  
+**Fichier :** `src/whapi/whapi.controller.ts`
+
+**Problème :** `handleIncomingMessage()` appelé avec `await` dans le handler HTTP. Si le traitement dure > timeout Whapi (< 131ms observé en prod), Whapi relance le webhook → duplicate.  
+**Cause racine :** Aucun canal Whapi en production → envoi échoue → processing long → timeout Whapi → retry.
+
+**Fix :** Pattern `void service.handleIncomingMessage(...).catch(err => log)` pour les events `messages` et `statuses`. Retour 200 immédiat avant traitement.
+
+**Résultat :** Duplicates webhook Whapi éliminés.
+
+---
+
+### HOTFIX-02 — Système d'alertes : support Multi-provider (Meta + Whapi) ✅ TERMINÉ
+
+**Date :** 2026-04-14 (livré Sprint 14)  
+**Fichiers :** `src/system-alert/system-alert.service.ts`, `src/system-alert/system-alert.module.ts`
+
+**Problème :** `SystemAlertService` n'utilisait que `CommunicationWhapiService`. En production sans canal Whapi, toutes les alertes échouaient silencieusement.
+
+**Livré :**
+- `system-alert.module.ts` : `CommunicationMetaService` ajouté aux providers
+- `system-alert.service.ts` : `CommunicationMetaService` injecté + routing par `channel.provider`
+  - `provider === 'meta'` → `metaService.sendTextMessage({ phoneNumberId: channel.external_id, accessToken: channel.token })`
+  - `provider === 'whapi'` → logique existante
+  - Warning log ⚠️ si canal Meta (fenêtre 24h non garantie pour initiation de contact)
+  - Ordre de fallback : canal par défaut → Whapi → Meta
+
+---
+
 ## Résumé des priorités
 
 | Epic | Tickets | Priorité | Complexité totale | Note |
 |------|---------|----------|-------------------|------|
-| EPIC-00 Pré-requis | 2 | P0 | S | ✅ **00-A terminé** |
-| ~~EPIC-01 Shared-contracts~~ | ~~3~~ → 1 | P1 | M | **01-A + 01-B supprimés** — 01-C redéfini sans package partagé |
-| EPIC-02 Gateway temps réel | 5 | P1 | L | ✅ **02-A ✅ 02-B ✅ 02-C ✅ 02-D ✅ 02-E** — staging obligatoire |
-| EPIC-03 Dispatcher | 5 (dont 1 cleanup) | P1 / P3 | L | ✅ **03-A ✅ 03-B ✅ 03-C ✅ 03-D ✅ 03-C-CLEANUP** |
-| EPIC-04 Ingress pipeline | 2 | P1 | L | ✅ **04-A ✅ 04-B** |
-| EPIC-05 Channels par provider | 4 (dont 1 cleanup) | P1 / P3 | M | ✅ **05-A ✅ 05-B ✅ 05-C ✅ 05-C-CLEANUP** |
-| EPIC-06 Domaine Conversations | 2 | P1 | M | ✅ **06-A Phase 1 ✅ 06-B** — Phase 2 GO/NO-GO en attente |
-| EPIC-07 Automations | 2 | P1 ou P3 | M | ✅ **07-B terminé** — 07-A conditionnel à TICKET-00-B |
-| EPIC-08 Front opérateur | 5 (dont 1 cleanup) | P2 / P3 | M | ✅ **08-A ✅ 08-B ✅ 08-C ✅ 08-D** — 08-A-CLEANUP en P3 |
-| EPIC-09 Front admin | 4 (dont 1 cleanup) | P2 / P3 | L | ✅ **09-A ✅ 09-B ✅ 09-C ✅ 09-A-CLEANUP** |
-| EPIC-10 Tests intégration | 5 (dont 10-A-BIS) | P3 | M | ✅ **10-A ✅ 10-A-BIS ✅ 10-B** — planifiés dans les sprints P1 |
-| EPIC-11 Observabilité/docs | 3 | P3 | M | ✅ **11-A ✅ 11-B ✅ 11-C** — EPIC complet |
+| EPIC-00 Pré-requis | 2 | P0 | S | ✅ **COMPLET** — 00-A ✅ · 00-B ✅ décision FlowBot < 6 mois |
+| ~~EPIC-01 Shared-contracts~~ | ~~3~~ → 1 | P1 | M | ✅ **COMPLET** — 01-A + 01-B supprimés · 01-C ✅ |
+| EPIC-02 Gateway temps réel | 5 | P1 | L | ✅ **COMPLET** — 02-A ✅ 02-B ✅ 02-C ✅ 02-D ✅ 02-E ✅ |
+| EPIC-03 Dispatcher | 5 (dont 1 cleanup) | P1 / P3 | L | ✅ **COMPLET** — 03-A ✅ 03-B ✅ 03-C ✅ 03-D ✅ 03-C-CLEANUP ✅ |
+| EPIC-04 Ingress pipeline | 2 | P1 | L | ✅ **COMPLET** — 04-A ✅ 04-B ✅ |
+| EPIC-05 Channels par provider | 4 (dont 1 cleanup) | P1 / P3 | M | ✅ **COMPLET** — 05-A ✅ 05-B ✅ 05-C ✅ 05-C-CLEANUP ✅ |
+| EPIC-06 Domaine Conversations | 2 | P1 | M | ✅ **06-A Phase 1 ✅ 06-B ✅** — Phase 2 GO/NO-GO en attente tech lead |
+| EPIC-07 Automations | ~~2~~ → 1 | P1 ou P3 | S | ✅ **07-B ✅** — ~~07-A ANNULÉ~~ (FlowBot remplace tout) |
+| EPIC-08 Front opérateur | 5 (dont 1 cleanup) | P2 / P3 | M | ✅ **COMPLET** — 08-A ✅ 08-B ✅ 08-C ✅ 08-D ✅ 08-A-CLEANUP N/A |
+| EPIC-09 Front admin | 4 (dont 1 cleanup) | P2 / P3 | L | ✅ **COMPLET** — 09-A ✅ 09-B ✅ 09-C ✅ 09-A-CLEANUP ✅ |
+| EPIC-10 Tests intégration | 5 (dont 10-A-BIS) | P3 | M | ✅ **COMPLET** — 10-A ✅ 10-A-BIS ✅ 10-B ✅ 10-C ✅ 10-D ✅ |
+| EPIC-11 Observabilité/docs | 3 | P3 | M | ✅ **COMPLET** — 11-A ✅ 11-B ✅ 11-C ✅ |
+| **EPIC-12 FlowBot** | **5** | **P1 / P2 / P3** | **XL** | ✅ **COMPLET** — 12-A ✅ 12-B ✅ 12-C ✅ 12-D ✅ 12-E ✅ |
+| HOTFIX | 2 | — | XS | HOTFIX-01 ✅ webhook async · HOTFIX-02 ✅ alert Meta multi-provider |
 
-**Total : 40 tickets actifs** (01-A et 01-B supprimés · 3 tickets terminés : 00-A, 07-B, 09-A · 5 cleanups · 1 ticket 10-A-BIS)
+**Total : 47 tickets actifs** (01-A + 01-B + 07-A supprimés/annulés · EPIC-12 ajouté avec 5 tickets · 2 hotfixes)
+
+> **État actuel (2026-04-14) :** Toutes les EPICs sont COMPLÈTES sauf TICKET-06-A Phase 2 (bloqué GO/NO-GO tech lead).  
+> Angles morts dispatch : **6/6 corrigés** (AM#1 ✅ AM#2/5 ✅ AM#3 ✅ AM#4 ✅ AM#6 ✅).  
+> Prochains travaux : suivi FlowBot en production + activation `FF_FLOWBOT_ACTIVE=true` après 2 semaines de validation.
 
 ---
 
@@ -1111,19 +1314,156 @@ Sprint 11 ✅ TERMINÉ
                         docs/correlation-tracing.md — 15/15 tests pipeline ✅ · 0 erreur TS
   → Livrable visible : grep correlationId=<id> retrace le flux complet d'un message ✅
 
-Sprint 12 (prochain)
+Sprint 12 ✅ TERMINÉ
   TICKET-11-A ✅  docs/conversation-state-machine.md       [dep: 06-A Phase 1 ✓]
                   3 états · 8 transitions · 6 services · 2 angles morts documentés
                   GO/NO-GO Phase 2 en attente tech lead
-  → Livrable visible : état réel de la machine d'état documenté après 2 semaines en prod ✅
+  TICKET-00-B ✅  Décision FlowBot < 6 mois                [dep: aucune]
+                  TICKET-07-A annulé · EPIC-12 créé
+  TICKET-12-A ✅  FlowBot Phase 1 — module complet         [dep: 00-B ✓]
+                  10 entités · 10 tables (migration 20260414)
+                  FlowEngineService (MAX_STEPS=50 · 8 types de nœuds)
+                  BotProviderAdapterRegistry · WhapiProviderAdapter
+                  FlowBotModule · FlowBotController · BotInboundListener
+                  tsc EXIT:0
+  HOTFIX-01 ✅    Webhook Whapi : void + .catch() pour retour 200 immédiat
+                  Élimination duplicates webhook (p95 131ms → immédiat)
+  → Livrable visible : FlowBot Phase 1 opérationnel · conversation-state-machine documentée ✅
 
-Sprint 13+ — selon décision TICKET-00-B
-  TICKET-07-A  triggers séparés (si FlowBot > 6 mois)      [dep: 00-B]
-  TICKET-10-C  tests auto-messages                          [dep: 07-A ou FlowBot]
+Sprint 13 ✅ TERMINÉ
+  TICKET-12-B ✅  FlowBot Phase 2 : jobs + câblage complet  [dep: 12-A ✓]
+                  app.module.ts ✅ déjà câblé (FlowBotModule + EventEmitterModule.forRoot)
+                  whapi.module.ts ✅ déjà câblé (OnModuleInit + WhapiProviderAdapter)
+                  InboundMessageService ✅ Étape 9 : bot.inbound émis après pipeline
+                    buildBotInboundEvent() — mapping UnifiedMessage → BotInboundMessageEvent
+                    channelType déduit du provider (whapi/meta → 'whatsapp', etc.)
+                    isNewConversation : createdAt < 10s · isReopened : reopened_at non null
+                    provider stocké dans session.variables (__provider, __channelType, etc.)
+                    pour reconstruction de l'execCtx lors de la reprise polling
+                  flow-polling.job.ts ✅
+                    @Cron('*/30 * * * * *') resumeExpiredWaitingSessions — WAITING_DELAY > 30s
+                    @Cron('0 * * * * *') checkNoResponseSessions — WAITING_REPLY > 30min
+                    FlowSessionService.findExpiredWaitingDelay() ajouté
+                  flow-session-cleaner.job.ts ✅
+                    @Cron('0 0 * * * *') expireOrphanedSessions — sessions actives > 24h
+                    libère BotConversation.activeSessionId + status → IDLE
+                  BotConversationService.findById() ajouté
+                  FlowCrudService.updateFlow() : save() au lieu de update() (fix TS)
+                  tsc EXIT:0
+  → Livrable visible : FlowBot pleinement câblé — bot.inbound émis sur chaque message entrant
+                       + sessions WAIT relancées automatiquement ✅
+
+Sprint 14 ✅ TERMINÉ
+  HOTFIX-02 ✅    Alert système : support Multi-provider (Meta + Whapi)
+                  system-alert.module.ts : CommunicationMetaService ajouté aux providers
+                  system-alert.service.ts :
+                    CommunicationMetaService injecté
+                    sendAlertsToAll() : filtre whapi|meta (Messenger/Instagram/Telegram exclus — chat_id requis)
+                    Ordre : canal par défaut → Whapi → Meta (fallback)
+                    Warning log ⚠️ si canal Meta (fenêtre 24h)
+                    sendWithFallback() : routing provider=='meta' → metaService.sendTextMessage
+                      phoneNumberId: channel.external_id · accessToken: channel.token
+  TICKET-12-C ✅  MetaProviderAdapter                       [dep: 12-B ✓]
+                  src/channel/adapters/meta-provider.adapter.ts
+                  capabilities : typing ✗ · templates ✓ · windowHours: 24 · media ✓
+                  sendMessage() : resolveChannel() → meta cloud API
+                    providerChannelRef → WhapiChannel (provider='meta') → external_id + token
+                    fallback : premier canal Meta disponible
+                  Câblage ChannelModule :
+                    imports: WhatsappChatModule · FlowBotModule
+                    providers: CommunicationMetaService · MetaProviderAdapter
+                    OnModuleInit : botAdapterRegistry.register(metaAdapter)
+                  BotProviderAdapterRegistry : ['whapi', 'meta'] ✅
+                  tsc EXIT:0
+  → Livrable visible : alertes envoyées via Meta en production sans canal Whapi ✅
+                       + FlowBot route les messages Meta via MetaProviderAdapter ✅
+
+Sprint 15 ✅ TERMINÉ
+  TICKET-12-D ✅  FlowBot UI admin (builder visuel)          [dep: 12-B ✓]
+                  admin/src/app/lib/api/flowbot.api.ts
+                    getFlows/getFlow/createFlow/updateFlow/setFlowActive/deleteFlow
+                    upsertNodes/deleteNode · upsertEdges/deleteEdge · upsertTriggers
+                    getFlowAnalytics · getRegisteredProviders
+                  admin/src/app/lib/definitions.ts
+                    ViewMode : 'flowbot' ajouté
+                    Types FlowBot · FlowTrigger · FlowNode · FlowEdge · FlowAnalyticsRow
+                  admin/src/app/modules/flowbot/
+                    api/flowbot.api.ts (re-export)
+                    hooks/useFlows.ts — CRUD + toggle + delete avec state local
+                    hooks/useFlowBuilder.ts — nœuds/arêtes/triggers/reload
+                    components/FlowListView.tsx
+                      Liste flows : badges actif/inactif, prio, triggers, nœuds
+                      Formulaire création inline · confirmation suppression
+                    components/FlowBuilderView.tsx
+                      4 onglets : Nœuds · Liaisons · Déclencheurs · Analytics
+                      Nœuds colorés par type · formulaire dynamique (body/délai/action)
+                      Variables : {contact_name}, {session.KEY}, {current_time}
+                      8 types de conditions · Analytics journalière (started/completed/escalated/expired)
+                  admin-data.ts : groupe "FlowBot" + icône Bot
+                  dashboard/commercial/page.tsx : case 'flowbot' → FlowListView | FlowBuilderView
+                  tsc admin EXIT:0 · tsc backend EXIT:0
+  → Livrable visible : UI FlowBot complète dans l'admin — CRUD flows + builder + analytics ✅
+
+Sprint 16 ✅ TERMINÉ
+  TICKET-12-E ✅  Tests FlowBot + migration AutoMessage      [dep: 12-B ✓, 12-C ✓]
+                  flow-variable.service.spec.ts : 14 tests (contexte/temps/session/cas limites)
+                  flow-trigger.service.spec.ts  : 14 tests (INBOUND/OPEN/REOPEN/OOH/KEYWORD/scope...)
+                  flow-engine.service.spec.ts   : 14 tests (handleInbound + resumeSession + 6 types nœuds)
+                  FF_FLOWBOT_ACTIVE ajouté dans SystemConfig (flag admin sans redéploiement)
+                  AutoMessageMasterJob : guard Étape 0 → return si FF_FLOWBOT_ACTIVE=true
+                  JorbsModule : SystemConfigModule importé
+                  42/42 tests — 0 erreur TypeScript
+  → Livrable : Suite de tests FlowBot complète, guard migration, flag admin ✅
+
+  TICKET-10-C ✅  Tests intégration FlowBot E2E               [dep: 12-E ✓]
+                  bot-inbound-pipeline.spec.ts : 10 scénarios
+                  Services réels : BotInboundListener + FlowEngine + TriggerService + VariableService
+                  EventEmitter2 réel → Listener → Engine → adapter.sendMessage
+                  52/52 tests FlowBot totaux — 0 erreur TypeScript
+  → Livrable : pipeline FlowBot E2E validé — EPIC-12 FlowBot COMPLET ✅
+
+Sprint 17 ✅ TERMINÉ
+  BUGFIX-AM1 ✅   Correction AM#1 CRITIQUE : SLA Checker manque les conversations lues sans réponse
+                  dispatch-query.service.ts — findChatsByStatus(olderThan):
+                    Passage find() → QueryBuilder
+                    Condition étendue : unread_count > 0 OR last_poste_message_at IS NULL
+                                       OR last_client_message_at > last_poste_message_at
+                  dispatch-query.service.ts — findActiveChatsByPoste:
+                    Même correction OR étendue
+                  dispatch-query.service.spec.ts : 12 tests (AM#1 fix couvert)
+                  37/37 tests dispatcher — 0 régression — 0 erreur TypeScript
+  BUGFIX-AM2/5 ✅ Correction AM#2 + AM#5 : offline-reinject trop rare (1×/jour → 2×/jour)
+                  cron-config.service.ts — CRON_DEFAULTS offline-reinject :
+                    cronExpression '0 9 * * *' → '0 0,9 * * *' (minuit + 9h)
+                  Migration auto en DB : migrateDefaults() mise à jour si valeur obsolète
+  → Livrable : conversations lues sans réponse désormais rattrapées par le SLA Checker ✅
 
   BLOQUANTS EXTERNES :
-    TICKET-06-A Phase 2  enforcement state machine         [dep: GO/NO-GO tech lead]
-    TICKET-00-B          décision FlowBot                  [dep: décision gouvernance]
+    TICKET-06-A Phase 2  enforcement state machine          [dep: GO/NO-GO tech lead]
+
+Sprint 18 ✅ TERMINÉ
+  BUGFIX-AM3 ✅   Race condition sla-checker + orphan-checker (double-assignation possible)
+                  dispatch-query.service.ts — findChatsByStatus(olderThan) :
+                    Ajout : .andWhere('chat.poste_id IS NOT NULL')
+                    Les conversations orphelines ne sont plus traitées par le SLA checker
+                    (exclusivement gérées par orphan-checker toutes les 15 min)
+                  dispatch-query.service.spec.ts : +1 test AM#3 → 13/13 tests
+                  38/38 tests dispatcher — 0 régression — 0 erreur TypeScript
+  BUGFIX-AM4 ✅   Phase 2 de offline-reinject redondante avec orphan-checker (suppression)
+                  offline-reinjection.job.ts :
+                    Phase 2 (dispatch orphelins) supprimée
+                    Import DispatcherService retiré
+                    preview() allégée (candidats hors-ligne uniquement)
+                    return simplifié : "N réinjectée(s) hors-ligne"
+                  cron-config.service.ts — CRON_DEFAULTS offline-reinject :
+                    label et description mis à jour (orphelins → orphan-checker)
+  BUGFIX-AM6 ✅   tasks.service.ts fichier mort supprimé (100% commenté depuis l'origine)
+                  tasks.service.ts : supprimé
+                  jorbs.module.ts : import + provider TasksService retirés
+                  app.module.ts : import + provider TasksService retirés
+                  tsc EXIT:0
+  → Livrable : 3 derniers angles morts corrigés — plus aucune race condition dispatch/orphan
+               + code mort supprimé ✅
 ```
 
 ---

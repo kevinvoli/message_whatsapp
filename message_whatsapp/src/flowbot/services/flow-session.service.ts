@@ -55,6 +55,17 @@ export class FlowSessionService {
     return this.repo.findOne({ where: { id }, relations: ['currentNode', 'conversation'] });
   }
 
+  /** Sessions en attente de délai (nœud WAIT) dont le délai est dépassé */
+  async findExpiredWaitingDelay(thresholdSeconds: number): Promise<FlowSession[]> {
+    const cutoff = new Date(Date.now() - thresholdSeconds * 1000);
+    return this.repo
+      .createQueryBuilder('s')
+      .where('s.status = :status', { status: FlowSessionStatus.WAITING_DELAY })
+      .andWhere('s.lastActivityAt < :cutoff', { cutoff })
+      .leftJoinAndSelect('s.conversation', 'conversation')
+      .getMany();
+  }
+
   /** Sessions en attente de réponse depuis plus de X secondes */
   async findExpiredWaitingReply(thresholdSeconds: number): Promise<FlowSession[]> {
     const cutoff = new Date(Date.now() - thresholdSeconds * 1000);
