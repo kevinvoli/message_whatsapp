@@ -1,10 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
+import { DispatchQueryService } from 'src/dispatcher/infrastructure/dispatch-query.service';
 import { SlaPolicyService } from 'src/dispatcher/domain/sla-policy.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { In, LessThan, MoreThan, Repository } from 'typeorm';
+import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CronConfigService } from './cron-config.service';
 
 @Injectable()
@@ -12,9 +11,8 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
   private readonly logger = new Logger(FirstResponseTimeoutJob.name);
 
   constructor(
-    @InjectRepository(WhatsappChat)
-    private readonly chatRepo: Repository<WhatsappChat>,
     private readonly dispatcher: DispatcherService,
+    private readonly queryService: DispatchQueryService,
     private readonly slaPolicy: SlaPolicyService,
     private readonly messageAutoService: MessageAutoService,
     private readonly cronConfigService: CronConfigService,
@@ -49,14 +47,13 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     const thresholdMinutes = config.intervalMinutes ?? 121;
     const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
 
-    const chats = await this.chatRepo.find({
-      where: {
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        unread_count: MoreThan(0),
-        last_client_message_at: LessThan(threshold),
-      },
-      order: { last_client_message_at: 'ASC' },
-    });
+    // AM#1 fix — même condition que le SLA checker réel (via DispatchQueryService)
+    // pour que la preview reflète exactement ce qui serait traité en production.
+    const chats = await this.queryService.findChatsByStatus(
+      [WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF],
+      { olderThan: threshold },
+    );
+
     return {
       total: chats.length,
       threshold_minutes: thresholdMinutes,

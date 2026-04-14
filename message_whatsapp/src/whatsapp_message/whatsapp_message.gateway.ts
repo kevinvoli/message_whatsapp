@@ -49,6 +49,7 @@ import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { AgentConnectionService } from 'src/realtime/connections/agent-connection.service';
+import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -295,6 +296,7 @@ export class WhatsappMessageGateway
       const chat = await this.chatService.findBychat_id(chatId);
       if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) return;
 
+      transitionStatus(chatId, chat.status, newStatus, 'Gateway/CONVERSATION_STATUS_CHANGE');
       await this.chatService.update(chatId, { status: newStatus });
       this.logger.log(`Conversation status changed: ${chatId} → ${newStatus}`);
 

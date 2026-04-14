@@ -105,7 +105,7 @@
 |-----------|-----------|
 | `* → tout statut valide` | Changement déclenché manuellement depuis l'interface admin |
 
-> ⚠️ **Angle mort identifié (Phase 1)** : Ce handler applique `chatService.update(chatId, { status: newStatus })` **directement en DB sans passer par `transitionStatus()`**. Toutes les transitions sont donc possibles depuis le frontend, y compris des transitions illégales théoriquement (ex. `FERME → ACTIF` sans nouveau message). Décision : transition **légitime** (cas d'usage admin intentionnel), à instrumenter en Phase 2.
+**Phase 2 :** Ce handler appelle désormais `transitionStatus(chatId, chat.status, newStatus, 'Gateway/CONVERSATION_STATUS_CHANGE')` avant `chatService.update()`. Toutes les transitions depuis ce handler sont légales (EN_ATTENTE/ACTIF → tout statut ; FERME → EN_ATTENTE|ACTIF). Enforcement actif.
 
 ### 6. `ReadOnlyEnforcementJob`
 **Fichier :** `src/jorbs/read-only-enforcement.job.ts:94`  
@@ -116,18 +116,18 @@
 | `ACTIF → FERME` | Conversation ACTIF inactive depuis X heures (seuil configurable) |
 | `EN_ATTENTE → FERME` | Conversation EN_ATTENTE inactive depuis X heures |
 
-> ⚠️ **Angle mort identifié (Phase 1)** : Ce job applique `chat.status = FERME` + `chatRepo.save()` **directement, sans passer par `transitionStatus()`**. La transition `EN_ATTENTE → FERME` est légale (déjà dans la machine), mais n'est pas tracée dans les logs de la state machine. Décision : comportement **correct**, mais instrumenter pour Phase 2.
+**Phase 2 :** Ce job appelle désormais `transitionStatus(chat.chat_id, chat.status, WhatsappChatStatus.FERME, 'ReadOnlyEnforcementJob')` avant chaque fermeture. Les transitions `EN_ATTENTE → FERME` et `ACTIF → FERME` sont légales — enforcement actif, audit trail dans les logs DEBUG.
 
 ---
 
 ## Transitions hors machine (sans `transitionStatus`)
 
-Ces transitions modifient le statut directement en DB sans valider via la state machine :
+**Phase 2 :** Tous les call sites passent désormais par `transitionStatus()`. Il n'existe plus de bypass non instrumenté.
 
-| Service | Fichier | Transition | Décision |
-|---------|---------|-----------|----------|
-| Gateway `CONVERSATION_STATUS_CHANGE` | `whatsapp_message.gateway.ts:298` | `* → *` | Légitime (admin) — à instrumenter Phase 2 |
-| `ReadOnlyEnforcementJob.enforce()` | `jorbs/read-only-enforcement.job.ts:94` | `* → FERME` | Légitime — à instrumenter Phase 2 |
+| Service | Fichier | Transition | Statut |
+|---------|---------|-----------|--------|
+| Gateway `CONVERSATION_STATUS_CHANGE` | `whatsapp_message.gateway.ts` | `* → *` | ✅ Instrumenté Phase 2 |
+| `ReadOnlyEnforcementJob.enforce()` | `jorbs/read-only-enforcement.job.ts` | `* → FERME` | ✅ Instrumenté Phase 2 |
 
 ---
 
@@ -143,17 +143,22 @@ La machine couvre correctement tous les flux principaux du pipeline automatisé 
 
 ---
 
-## Statut Phase 2 — Mode enforcement
-
-**GO/NO-GO :** EN ATTENTE — décision tech lead requise.
+## Statut Phase 2 — Mode enforcement ✅ ACTIVÉ (Sprint 22)
 
 | Critère Phase 2 | Statut |
 |----------------|--------|
 | 0 warning inconnu depuis 2 semaines | ✅ (aucun inconnu) |
 | Toutes les transitions surprises documentées | ✅ (2 bypasses documentés ci-dessus) |
-| Tech lead signe la Phase 2 | ⏳ En attente |
+| Tech lead signe la Phase 2 | ✅ GO validé |
 
-**Pour activer Phase 2** : dans `conversation-state-machine.ts`, passer la fonction `transitionStatus()` en mode enforcement (lever une exception au lieu de retourner `false`). Instrumenter simultanément les 2 bypasses identifiés.
+**Changements livrés :**
+- `conversation-state-machine.ts` : `transitionStatus()` lève `ConversationStateMachineError` au lieu de retourner `false`
+- `ConversationStateMachineError` exportée (chatId, from, to, context + message lisible)
+- Les 2 bypasses instrumentés :
+  - `ReadOnlyEnforcementJob.enforce()` : appel `transitionStatus()` avant `chat.status = FERME`
+  - `WhatsappMessageGateway/CONVERSATION_STATUS_CHANGE` : appel `transitionStatus()` avant `chatService.update()`
+- `conversation-state-machine.spec.ts` : 14 tests (Phase 2) — enforcement vérifié par `toThrow(ConversationStateMachineError)`
+- tsc EXIT:0 · 252/252 tests
 
 ---
 

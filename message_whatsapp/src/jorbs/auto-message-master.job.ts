@@ -156,7 +156,10 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .andWhere(
         config.applyToClosed ? '1=1' : 'c.status != :closed',
         config.applyToClosed ? {} : { closed: WhatsappChatStatus.FERME },
-      );
+      )
+      // Guard A+E — §5.3 : Trigger E gère déjà les conversations orphelines EN_ATTENTE.
+      // Si E a déjà envoyé un message (queue_wait_auto_step > 0), A ne double-envoie pas.
+      .andWhere('c.queue_wait_auto_step = 0');
 
     // Garde-fou cohabitation : si l'orchestrateur est aussi actif, exclure les
     // chats qu'il gère déjà (auto_message_step > 0 ou en attente de réponse client)
@@ -415,6 +418,11 @@ export class AutoMessageMasterJob implements OnModuleInit {
         )`,
         { cutoff },
       )
+      // Guard A+H — §5.2 : Trigger H cible uniquement les vraies inactivités bilatérales.
+      // Si l'agent n'a jamais répondu (last_poste_message_at IS NULL) ET Trigger A n'a pas encore
+      // envoyé (no_response_auto_step = 0), c'est le domaine de A, pas de H.
+      // H intervient seulement quand l'agent a déjà répondu OU quand A a déjà agi.
+      .andWhere('(c.last_poste_message_at IS NOT NULL OR c.no_response_auto_step > 0)')
       .andWhere(config.applyToReadOnly ? '1=1' : 'c.read_only = false');
 
     if (orchestratorActive) {

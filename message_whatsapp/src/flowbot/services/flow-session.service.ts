@@ -76,7 +76,7 @@ export class FlowSessionService {
       .getMany();
   }
 
-  /** Sessions actives depuis plus de 24h → expiration */
+  /** Sessions ACTIVE ou WAITING_DELAY depuis plus de N heures → expiration */
   async findExpiredActive(maxDurationHours = 24): Promise<FlowSession[]> {
     const cutoff = new Date(Date.now() - maxDurationHours * 3_600_000);
     return this.repo
@@ -85,6 +85,22 @@ export class FlowSessionService {
         statuses: [FlowSessionStatus.ACTIVE, FlowSessionStatus.WAITING_DELAY],
       })
       .andWhere('s.startedAt < :cutoff', { cutoff })
+      .getMany();
+  }
+
+  /**
+   * Sessions WAITING_REPLY sans activité depuis plus de N heures.
+   *
+   * Complémentaire à findExpiredActive : WAITING_REPLY n'est pas couverte par
+   * cette méthode car une session peut entrer en WAITING_REPLY tardivement
+   * (lastActivityAt est plus représentatif que startedAt pour ce statut).
+   */
+  async findStaleWaitingReply(maxIdleHours = 24): Promise<FlowSession[]> {
+    const cutoff = new Date(Date.now() - maxIdleHours * 3_600_000);
+    return this.repo
+      .createQueryBuilder('s')
+      .where('s.status = :status', { status: FlowSessionStatus.WAITING_REPLY })
+      .andWhere('s.lastActivityAt < :cutoff', { cutoff })
       .getMany();
   }
 }

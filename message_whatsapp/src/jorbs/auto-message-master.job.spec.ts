@@ -160,6 +160,20 @@ describe('AutoMessageMasterJob', () => {
       await (job as any).runTriggerA(makeConfig({ enabled: true }));
       expect(chatRepo.createQueryBuilder).toHaveBeenCalled();
     });
+
+    it('Guard A+E : contient la condition queue_wait_auto_step = 0', async () => {
+      const qbMock = chatRepo.createQueryBuilder() as any;
+      chatRepo.createQueryBuilder.mockClear();
+      chatRepo.createQueryBuilder.mockReturnValue(qbMock);
+
+      await (job as any).runTriggerA(makeConfig({ enabled: true }));
+
+      const andWhereCalls = qbMock.andWhere.mock.calls.map(([arg]: [string]) => arg);
+      const guardPresent = andWhereCalls.some((arg: string) =>
+        arg.includes('queue_wait_auto_step = 0'),
+      );
+      expect(guardPresent).toBe(true);
+    });
   });
 
   // ─── Trigger C — guard conditions ───────────────────────────────────────────
@@ -275,6 +289,21 @@ describe('AutoMessageMasterJob', () => {
     it('ne fait rien quand config.enabled = false', async () => {
       await (job as any).runTriggerH(makeConfig({ enabled: false }));
       expect(chatRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('Guard A+H : contient la condition last_poste_message_at IS NOT NULL OR no_response_auto_step > 0', async () => {
+      const qbMock = chatRepo.createQueryBuilder() as any;
+      chatRepo.createQueryBuilder.mockClear();
+      chatRepo.createQueryBuilder.mockReturnValue(qbMock);
+
+      await (job as any).runTriggerH(makeConfig({ enabled: true }));
+
+      // Vérifier que la condition de garde est présente dans un des andWhere
+      const andWhereCalls = qbMock.andWhere.mock.calls.map(([arg]: [string]) => arg);
+      const guardPresent = andWhereCalls.some((arg: string) =>
+        arg.includes('last_poste_message_at IS NOT NULL') && arg.includes('no_response_auto_step > 0'),
+      );
+      expect(guardPresent).toBe(true);
     });
   });
 

@@ -64,7 +64,12 @@ const SERVICES = [
     // ✅ EventEmitterModule est global — pas besoin de l'importer ici
     // ❌ INTERDIT : WhatsappChatModule, WhatsappMessageModule, DispatcherModule
   ],
-  providers: [...SERVICES, BotInboundListener, FlowPollingJob, FlowSessionCleanerJob],
+  providers: [
+    ...SERVICES,
+    BotInboundListener,
+    FlowPollingJob,
+    FlowSessionCleanerJob,
+  ],
   controllers: [FlowBotController],
   exports: [
     BotProviderAdapterRegistry,

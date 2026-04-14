@@ -7,6 +7,7 @@ import {
 import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
 import { LessThan, Not, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
+import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
 
 export interface ReadOnlyEnforcementPreview {
   total: number;
@@ -91,6 +92,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
 
     let closed = 0;
     for (const chat of chats) {
+      transitionStatus(chat.chat_id, chat.status, WhatsappChatStatus.FERME, 'ReadOnlyEnforcementJob');
       chat.status = WhatsappChatStatus.FERME;
       chat.read_only = false;
       await this.chatRepo.save(chat);

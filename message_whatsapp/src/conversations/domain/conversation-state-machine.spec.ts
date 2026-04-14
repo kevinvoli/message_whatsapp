@@ -1,13 +1,11 @@
 import {
   transitionStatus,
   legalTransitionsFrom,
+  ConversationStateMachineError,
 } from './conversation-state-machine';
 import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
-describe('ConversationStateMachine — Phase 1 détection', () => {
-  beforeEach(() => jest.spyOn(console, 'warn').mockImplementation(() => {}));
-  afterEach(() => jest.restoreAllMocks());
-
+describe('ConversationStateMachine — Phase 2 enforcement', () => {
   // ─── Transitions légales ───────────────────────────────────────────────────
 
   it('EN_ATTENTE → ACTIF est légal', () => {
@@ -28,6 +26,12 @@ describe('ConversationStateMachine — Phase 1 détection', () => {
     ).toBe(true);
   });
 
+  it('EN_ATTENTE → FERME est légal (read_only enforcement)', () => {
+    expect(
+      transitionStatus('chat-1', WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME, 'test'),
+    ).toBe(true);
+  });
+
   it('FERME → EN_ATTENTE est légal (réouverture agent offline)', () => {
     expect(
       transitionStatus('chat-1', WhatsappChatStatus.FERME, WhatsappChatStatus.EN_ATTENTE, 'test'),
@@ -42,24 +46,51 @@ describe('ConversationStateMachine — Phase 1 détection', () => {
 
   // ─── Transition identique = no-op ─────────────────────────────────────────
 
-  it('même statut → no-op, retourne true sans warning', () => {
-    const warnSpy = jest.spyOn(require('./conversation-state-machine'), 'transitionStatus');
-    const result = transitionStatus('chat-1', WhatsappChatStatus.ACTIF, WhatsappChatStatus.ACTIF, 'test');
-    expect(result).toBe(true);
+  it('même statut → no-op, retourne true sans lever d\'exception', () => {
+    expect(
+      transitionStatus('chat-1', WhatsappChatStatus.ACTIF, WhatsappChatStatus.ACTIF, 'test'),
+    ).toBe(true);
   });
 
-  // ─── Transitions illégales — Phase 1 : log warning, ne bloque pas ─────────
+  it('FERME → FERME (no-op) ne lève pas d\'exception', () => {
+    expect(
+      transitionStatus('chat-1', WhatsappChatStatus.FERME, WhatsappChatStatus.FERME, 'test'),
+    ).toBe(true);
+  });
 
-  it('status inconnu comme source → retourne false (warning emission, pas d\'exception)', () => {
-    // Simule un statut inconnu/hors-machine pour vérifier le chemin d'alerte
-    const result = transitionStatus(
-      'chat-1',
-      'INCONNU' as any,
-      WhatsappChatStatus.ACTIF,
-      'test-illégal',
-    );
-    // Phase 1 : pas d'exception levée, mais retourne false
-    expect(result).toBe(false);
+  // ─── Transitions illégales — Phase 2 : lève ConversationStateMachineError ─
+
+  it('statut source inconnu → lève ConversationStateMachineError', () => {
+    expect(() =>
+      transitionStatus(
+        'chat-1',
+        'INCONNU' as any,
+        WhatsappChatStatus.ACTIF,
+        'test-illégal',
+      ),
+    ).toThrow(ConversationStateMachineError);
+  });
+
+  it('l\'erreur contient chatId, from, to et context', () => {
+    let caught: ConversationStateMachineError | null = null;
+    try {
+      transitionStatus('chat-42', 'INCONNU' as any, WhatsappChatStatus.FERME, 'ctx-test');
+    } catch (e) {
+      caught = e as ConversationStateMachineError;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.chatId).toBe('chat-42');
+    expect(caught!.from).toBe('INCONNU');
+    expect(caught!.to).toBe(WhatsappChatStatus.FERME);
+    expect(caught!.context).toBe('ctx-test');
+    expect(caught!.message).toContain('INCONNU');
+    expect(caught!.message).toContain(WhatsappChatStatus.FERME);
+  });
+
+  it('le nom de l\'erreur est ConversationStateMachineError', () => {
+    expect(() =>
+      transitionStatus('chat-1', 'INVALID' as any, WhatsappChatStatus.ACTIF, 'ctx'),
+    ).toThrow(expect.objectContaining({ name: 'ConversationStateMachineError' }));
   });
 
   // ─── legalTransitionsFrom ─────────────────────────────────────────────────
@@ -75,6 +106,13 @@ describe('ConversationStateMachine — Phase 1 détection', () => {
     it('FERME ne peut pas aller vers FERME', () => {
       const transitions = legalTransitionsFrom(WhatsappChatStatus.FERME);
       expect(transitions).not.toContain(WhatsappChatStatus.FERME);
+    });
+
+    it('ACTIF peut aller vers les 3 statuts', () => {
+      const transitions = legalTransitionsFrom(WhatsappChatStatus.ACTIF);
+      expect(transitions).toContain(WhatsappChatStatus.EN_ATTENTE);
+      expect(transitions).toContain(WhatsappChatStatus.ACTIF);
+      expect(transitions).toContain(WhatsappChatStatus.FERME);
     });
   });
 });

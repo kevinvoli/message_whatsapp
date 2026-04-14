@@ -26,7 +26,7 @@ Sources : `RAPPORT_ARCHITECTURE_CODE_2026-04-13.md` + `PLAN_RESTRUCTURATION_BACK
 
 ## Avertissement sur la durée
 
-Ce backlog contient **42 tickets** répartis sur 12 epics. L'estimation honnête :
+Ce backlog contient **47 tickets actifs** répartis sur 13 epics. L'estimation honnête :
 
 - **Théorique (4 sprints de 2 semaines)** : 2 mois
 - **Réaliste (production active, tests à maintenir, régressions à investiguer)** : **4 à 6 mois**
@@ -541,9 +541,10 @@ Activer l'enforcement immédiatement sur un système en production peut casser d
 > La Phase 2 ne peut pas commencer sous pression calendaire si un NO-GO est actif.  
 > **Responsable du GO/NO-GO : tech lead — décision documentée dans la PR Phase 2.**
 
-**Phase 2 — Mode enforcement (après GO validé) :**
-- Activer l'exception sur transition interdite
-- Mettre à jour les call sites si des transitions surprises de Phase 1 étaient légitimes
+**Phase 2 — Mode enforcement ✅ TERMINÉ (Sprint 22) :**
+- `ConversationStateMachineError` levée sur transition interdite
+- 2 bypasses instrumentés (Gateway admin + ReadOnlyEnforcementJob)
+- 14 tests enforcement — tsc EXIT:0 · 252/252 tests
 
 **Travail à faire (Phase 1) :**
 - Créer la state machine avec les transitions connues
@@ -1153,7 +1154,7 @@ Phase 2 GO/NO-GO : critères satisfaits, en attente signature tech lead.
 | EPIC-03 Dispatcher | 5 (dont 1 cleanup) | P1 / P3 | L | ✅ **COMPLET** — 03-A ✅ 03-B ✅ 03-C ✅ 03-D ✅ 03-C-CLEANUP ✅ |
 | EPIC-04 Ingress pipeline | 2 | P1 | L | ✅ **COMPLET** — 04-A ✅ 04-B ✅ |
 | EPIC-05 Channels par provider | 4 (dont 1 cleanup) | P1 / P3 | M | ✅ **COMPLET** — 05-A ✅ 05-B ✅ 05-C ✅ 05-C-CLEANUP ✅ |
-| EPIC-06 Domaine Conversations | 2 | P1 | M | ✅ **06-A Phase 1 ✅ 06-B ✅** — Phase 2 GO/NO-GO en attente tech lead |
+| EPIC-06 Domaine Conversations | 2 | P1 | M | ✅ **COMPLET** — 06-A Phase 1 ✅ Phase 2 ✅ 06-B ✅ |
 | EPIC-07 Automations | ~~2~~ → 1 | P1 ou P3 | S | ✅ **07-B ✅** — ~~07-A ANNULÉ~~ (FlowBot remplace tout) |
 | EPIC-08 Front opérateur | 5 (dont 1 cleanup) | P2 / P3 | M | ✅ **COMPLET** — 08-A ✅ 08-B ✅ 08-C ✅ 08-D ✅ 08-A-CLEANUP N/A |
 | EPIC-09 Front admin | 4 (dont 1 cleanup) | P2 / P3 | L | ✅ **COMPLET** — 09-A ✅ 09-B ✅ 09-C ✅ 09-A-CLEANUP ✅ |
@@ -1164,9 +1165,13 @@ Phase 2 GO/NO-GO : critères satisfaits, en attente signature tech lead.
 
 **Total : 47 tickets actifs** (01-A + 01-B + 07-A supprimés/annulés · EPIC-12 ajouté avec 5 tickets · 2 hotfixes)
 
-> **État actuel (2026-04-14) :** Toutes les EPICs sont COMPLÈTES sauf TICKET-06-A Phase 2 (bloqué GO/NO-GO tech lead).  
+> **État actuel (2026-04-14) :** ✅ **TOUTES LES EPICs SONT COMPLÈTES** — aucun ticket ouvert.  
 > Angles morts dispatch : **6/6 corrigés** (AM#1 ✅ AM#2/5 ✅ AM#3 ✅ AM#4 ✅ AM#6 ✅).  
-> Prochains travaux : suivi FlowBot en production + activation `FF_FLOWBOT_ACTIVE=true` après 2 semaines de validation.
+> Guards double-envoi : **GUARD-AH ✅ GUARD-AE ✅** (Sprints 20–21 — triggers A/H et A/E mutuellement exclusifs).  
+> FlowBot robustesse : **FLOWBOT-GAP1 ✅ FLOWBOT-GAP2 ✅ FLOWBOT-GAP3 ✅** (Sprint 21 — expiration WAITING_REPLY + scan boot + audit trail).  
+> ConversationStateMachine Phase 2 : **enforcement actif** — `ConversationStateMachineError` levée sur transition illégale (Sprint 22).  
+> Tests : **57/57 suites · 252/252 tests · 0 erreur TypeScript**.  
+> Prochains travaux : suivi FlowBot en production + activation `FF_FLOWBOT_ACTIVE=true` après 2 semaines de validation (éligible ~2026-04-28).
 
 ---
 
@@ -1464,6 +1469,85 @@ Sprint 18 ✅ TERMINÉ
                   tsc EXIT:0
   → Livrable : 3 derniers angles morts corrigés — plus aucune race condition dispatch/orphan
                + code mort supprimé ✅
+
+Sprint 19 ✅ TERMINÉ
+  BUGFIX-TESTS ✅  Correction des 4 échecs de tests pré-existants
+                   auto-message-master.job.spec.ts :
+                     Mock QueryBuilder incomplet (manquait .limit() + .orderBy() + .take())
+                     → ajoutés dans le mock factory
+                   webhook-idempotency-purge.service.spec.ts :
+                     Test écrit pour l'ancienne API delete() — service refactorisé vers createQueryBuilder
+                     → réécriture complète du test avec mock createQueryBuilder + getMany + delete
+                     → +2 nouveaux cas : "aucun événement à purger" + previewPurge()
+                     3 tests → 3 passed
+  BUGFIX-PREVIEW ✅ previewExpiredSla inconsistante avec AM#1 fix
+                   first-response-timeout.job.ts :
+                     previewExpiredSla() utilisait encore unread_count > 0 (ancien critère pré-AM#1)
+                     → migré vers DispatchQueryService.findChatsByStatus() — même condition que le SLA checker réel
+                     → @InjectRepository(WhatsappChat) retiré, DispatchQueryService injecté à la place
+                   Preview admin désormais identique à ce que le SLA checker traite réellement
+  → Livrable : 57/57 suites · 245/245 tests · 0 échec · 0 erreur TypeScript ✅
+               Preview SLA fidèle à la logique de production
+
+Sprint 20 ✅ TERMINÉ
+  GUARD-AH ✅  Guard A+H : Trigger H n'envoie plus si Trigger A couvre déjà la conversation
+               auto-message-master.job.ts — runTriggerH() :
+                 Ajout : .andWhere('(c.last_poste_message_at IS NOT NULL OR c.no_response_auto_step > 0)')
+                 H cible uniquement les vraies inactivités bilatérales (agent déjà intervenu OU A déjà agi)
+                 Cas exclu : conversation orpheline où l'agent n'a jamais répondu → domaine de A seul
+  GUARD-AE ✅  Guard A+E : Trigger A n'envoie plus si Trigger E a déjà traité la conversation
+               auto-message-master.job.ts — runTriggerA() :
+                 Ajout : .andWhere('c.queue_wait_auto_step = 0')
+                 A respecte E : si E a déjà envoyé un message queue-wait, A ne double-envoie pas
+                 Cas exclu : conversation EN_ATTENTE orpheline à 60min+ traitée par E à 30min
+               auto-message-master.job.spec.ts :
+                 +1 test Guard A+E (queue_wait_auto_step = 0 présent dans la query)
+                 +1 test Guard A+H (condition last_poste_message_at OR no_response_auto_step présente)
+                 33/33 tests
+  → Livrable : 57/57 suites · 247/247 tests · 0 erreur TypeScript ✅
+               Triggers A/H et A/E désormais mutuellement exclusifs — 0 double-envoi possible
+
+Sprint 21 ✅ TERMINÉ
+  FLOWBOT-GAP1 ✅  findExpiredActive ne couvrait pas WAITING_REPLY (sessions bloquées jamais expirées)
+                   flow-session.service.ts :
+                     Nouvelle méthode findStaleWaitingReply(maxIdleHours) :
+                       status = WAITING_REPLY AND lastActivityAt < cutoff
+                     Distinct de findExpiredActive (startedAt) car WAITING_REPLY
+                     peut être atteinte tardivement dans une session longue
+  FLOWBOT-GAP2 ✅  Scan au démarrage manquant (§13.4 plan-module-chatbot.md)
+                   flow-session-cleaner.job.ts :
+                     Implémente OnApplicationBootstrap → runCleanup() immédiat au boot
+                     Protège contre les sessions orphelines persistantes après restart
+                     expireOrphanedSessions() + startup scan → même runCleanup()
+                     runCleanup() : findExpiredActive + findStaleWaitingReply en parallèle
+                     Log warn si sessions trouvées (active/delay count + waiting_reply count)
+  FLOWBOT-GAP3 ✅  Pas de log d'audit lors de l'expiration d'une session
+                   flow-session-cleaner.job.ts :
+                     expireOne() : crée une entrée FlowSessionLog action='SESSION_EXPIRED'
+                     previousStatus + expiredAt dans metadata
+                     @InjectRepository(FlowSessionLog) ajouté au constructeur
+                     flowbot.module.ts : providers reformaté (fonctionnel inchangé)
+  → Livrable : 57/57 suites · 247/247 tests · 0 erreur TypeScript ✅
+               FlowBot robuste post-restart · audit trail expiration complet
+
+Sprint 22 ✅ TERMINÉ
+  TICKET-06-A Phase 2 ✅  ConversationStateMachine — mode enforcement
+                           conversation-state-machine.ts :
+                             ConversationStateMachineError exportée (chatId/from/to/context)
+                             transitionStatus() : lève ConversationStateMachineError au lieu de return false
+                             Log DEBUG sur chaque transition légale (audit trail)
+                           Bypasses instrumentés :
+                             read-only-enforcement.job.ts : transitionStatus() avant chat.status = FERME
+                             whatsapp_message.gateway.ts (CONVERSATION_STATUS_CHANGE) :
+                               transitionStatus() avant chatService.update()
+                           conversation-state-machine.spec.ts : 14 tests (Phase 2)
+                             Transitions légales × 6 + no-op × 2
+                             toThrow(ConversationStateMachineError) × 3 (inconnu, payload, nom)
+                           tsc EXIT:0
+  → Livrable : 57/57 suites · 252/252 tests · 0 erreur TypeScript ✅
+               Toute transition illégale interrompt immédiatement l'opération
+               Plus aucun bypass non instrumenté — machine d'état = source de vérité absolue
+               ▶ BACKLOG ENTIÈREMENT COMPLÉTÉ — 0 ticket ouvert
 ```
 
 ---
