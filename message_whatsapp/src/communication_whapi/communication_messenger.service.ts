@@ -319,6 +319,53 @@ export class CommunicationMessengerService {
     return { providerMessageId: messageId, attachmentId };
   }
 
+  /**
+   * Résout l'URL CDN d'un attachment Messenger sans télécharger le fichier.
+   * Utilisé par le proxy streaming pour les vidéos (forward Range → CDN direct).
+   */
+  async resolveMediaCdnUrl(
+    messageId: string,
+    accessToken: string,
+    pageId?: string,
+  ): Promise<{ url: string; apiMimeType?: string } | null> {
+    try {
+      const effectiveToken = pageId
+        ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+        : accessToken;
+
+      const metaResponse = await axios.get(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${messageId}?fields=attachments`,
+        { headers: { Authorization: `Bearer ${effectiveToken}` }, timeout: 10_000 },
+      );
+
+      type GraphAttachment = {
+        payload?: { url?: string };
+        file_url?: string;
+        image_data?: { url?: string };
+        video_data?: { url?: string };
+        audio_data?: { url?: string };
+        file_data?: { url?: string };
+        mime_type?: string;
+      };
+      const att: GraphAttachment | undefined =
+        (metaResponse.data?.attachments?.data ?? [])[0];
+
+      const url =
+        att?.payload?.url ??
+        att?.file_url ??
+        att?.image_data?.url ??
+        att?.video_data?.url ??
+        att?.audio_data?.url ??
+        att?.file_data?.url ??
+        null;
+
+      if (!url) return null;
+      return { url, apiMimeType: att?.mime_type ?? undefined };
+    } catch {
+      return null;
+    }
+  }
+
   async downloadMedia(
     messageId: string,
     accessToken: string,

@@ -307,6 +307,60 @@ export class WhatsappMessageController {
       throw new NotFoundException('Token du canal Messenger introuvable');
     }
 
+    const storedMediaType = media?.media_type ?? null;
+    const isStreamable = storedMediaType === 'video';
+
+    if (isStreamable) {
+      // ── VIDÉO : proxy streaming direct vers le CDN Facebook ──────────────────
+      // On résout l'URL CDN puis on la proxie en forwardant le header Range.
+      // Cela évite de charger tout le fichier en mémoire (vidéos de 50-100 MB).
+      const resolved = await this.messengerService.resolveMediaCdnUrl(
+        messageId,
+        channel.token.trim(),
+        channel.external_id ?? undefined,
+      );
+
+      if (!resolved) {
+        throw new NotFoundException('Vidéo Messenger introuvable (CDN URL non résolue)');
+      }
+
+      const rangeHeader = req.headers['range'];
+      const cdnHeaders: Record<string, string> = {};
+      if (rangeHeader) cdnHeaders['Range'] = rangeHeader;
+
+      let cdnRes: import('axios').AxiosResponse;
+      try {
+        const { default: axios } = await import('axios');
+        cdnRes = await axios.get(resolved.url, {
+          responseType: 'stream',
+          headers: cdnHeaders,
+          timeout: 30_000,
+          validateStatus: (s) => s < 500,
+        });
+      } catch {
+        throw new NotFoundException('Vidéo Messenger : échec du téléchargement CDN');
+      }
+
+      const status = cdnRes.status === 206 ? 206 : 200;
+      const mimeType =
+        resolved.apiMimeType ??
+        (cdnRes.headers['content-type'] as string | undefined) ??
+        'video/mp4';
+
+      res.status(status);
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      if (cdnRes.headers['content-length'])
+        res.setHeader('Content-Length', cdnRes.headers['content-length'] as string);
+      if (cdnRes.headers['content-range'])
+        res.setHeader('Content-Range', cdnRes.headers['content-range'] as string);
+
+      (cdnRes.data as NodeJS.ReadableStream).pipe(res);
+      return;
+    }
+
+    // ── AUDIO / IMAGE / STICKER / DOCUMENT : téléchargement complet + Range ──
     const downloaded = await this.messengerService.downloadMedia(
       messageId,
       channel.token.trim(),
@@ -317,25 +371,17 @@ export class WhatsappMessageController {
       throw new NotFoundException('Média Messenger introuvable');
     }
 
-    // Normaliser le MIME type pour l'audio :
-    // Facebook CDN sert les M4A (AAC) avec Content-Type: video/mp4 ou audio/mpeg.
-    // Les browsers refusent de jouer video/mp4 dans un élément <audio>.
-    // On utilise le mime_type retourné par la Graph API en priorité (plus fiable).
-    const storedMediaType = media?.media_type ?? null;
+    // Normaliser le MIME type pour les audios M4A servis en video/mp4 par le CDN.
     let effectiveMime =
-      downloaded.apiMimeType ??    // MIME déclaré par la Graph API (le plus fiable)
-      downloaded.mimeType;         // MIME retourné par le CDN
+      downloaded.apiMimeType ??
+      downloaded.mimeType;
 
     if (storedMediaType === 'audio' || storedMediaType === 'voice') {
-      if (
-        !effectiveMime.startsWith('audio/') &&
-        effectiveMime !== 'application/octet-stream'
-      ) {
-        // video/mp4 → audio/mp4 pour les M4A Messenger
+      if (!effectiveMime.startsWith('audio/')) {
         effectiveMime = effectiveMime === 'video/mp4' ? 'audio/mp4' : 'audio/mpeg';
       }
       if (effectiveMime === 'application/octet-stream') {
-        effectiveMime = 'audio/mp4'; // fallback sûr pour M4A Messenger
+        effectiveMime = 'audio/mp4';
       }
     }
 
@@ -346,19 +392,20 @@ export class WhatsappMessageController {
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.setHeader('Content-Type', effectiveMime);
 
-    // Support des requêtes Range (nécessaire pour <audio> sur Safari et Chrome)
+    // Support Range pour <audio> (Safari exige 206, Chrome le préfère)
     const rangeHeader = req.headers['range'];
     if (rangeHeader) {
       const rangeMatch = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
       if (rangeMatch) {
         const start = rangeMatch[1] ? parseInt(rangeMatch[1], 10) : 0;
         const end   = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalSize - 1;
-        const chunkSize = end - start + 1;
+        const clampedEnd = Math.min(end, totalSize - 1);
+        const chunkSize = clampedEnd - start + 1;
 
         res.status(206);
-        res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+        res.setHeader('Content-Range', `bytes ${start}-${clampedEnd}/${totalSize}`);
         res.setHeader('Content-Length', chunkSize);
-        return res.send(buffer.subarray(start, end + 1));
+        return res.send(buffer.subarray(start, clampedEnd + 1));
       }
     }
 
