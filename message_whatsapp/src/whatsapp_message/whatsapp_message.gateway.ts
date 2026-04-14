@@ -843,7 +843,13 @@ export class WhatsappMessageGateway
 
       sendSucceeded = true;
 
-      chat.read_only = true;
+      // Canal dédié → jamais en lecture seule après envoi commercial
+      const isDedicatedAfterSend = chat.last_msg_client_channel_id
+        ? await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id)
+        : false;
+      if (!isDedicatedAfterSend) {
+        chat.read_only = true;
+      }
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'MESSAGE_ADD',
         payload: { ...this.mapMessage(message), tempId: payload.tempId },
@@ -1433,6 +1439,7 @@ export class WhatsappMessageGateway
           }
         : null,
       read_only: chat.read_only,
+      channel_dedicated: !!(chat.channel?.poste_id),
       contact_client: chat.contact_client,
       first_response_deadline_at: chat.first_response_deadline_at,
     };

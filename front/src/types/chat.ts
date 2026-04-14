@@ -288,6 +288,7 @@ export interface Conversation {
 
   auto_message_status: "scheduled" | "sending" | "sent";
   readonly?: boolean;
+  channel_dedicated?: boolean;
 
   lastMessage: Message | null;
   unreadCount: number;
@@ -522,6 +523,7 @@ interface RawConversationData {
   converted_at?: string | number | Date | null;
   closed_by?: string;
   read_only?: boolean;
+  channel_dedicated?: boolean;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
   contact_summary?: {
@@ -781,6 +783,7 @@ export const transformToConversation = (
 
     auto_message_status: raw.auto_message_status ?? "scheduled",
     readonly: raw.read_only ?? undefined,
+    channel_dedicated: raw.channel_dedicated ?? false,
 
     first_response_deadline_at: raw.first_response_deadline_at
       ? new Date(raw.first_response_deadline_at)

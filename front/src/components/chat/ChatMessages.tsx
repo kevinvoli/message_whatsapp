@@ -34,7 +34,9 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
   }, [loadMoreMessages]);
 
   // Scroll infini — observer le sentinel en haut de la liste
+  // Désactivé pour les canaux dédiés (historique non pertinent)
   useEffect(() => {
+    if (currentConv.channel_dedicated) return;
     const sentinel = topSentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
@@ -47,7 +49,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [isLoadingMore, hasMoreMessages, handleLoadMore]);
+  }, [currentConv.channel_dedicated, isLoadingMore, hasMoreMessages, handleLoadMore]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,7 +73,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
       <div className="max-w-4xl mx-auto space-y-3">
         {/* Sentinel pour le scroll infini (chargement des anciens messages) */}
-        {hasMoreMessages && (
+        {!currentConv.channel_dedicated && hasMoreMessages && (
           <div ref={topSentinelRef} className="flex justify-center py-2">
             {isLoadingMore && (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400" />
