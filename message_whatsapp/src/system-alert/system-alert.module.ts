@@ -7,6 +7,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemAlertConfig } from './entities/system-alert-config.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
 import { LoggingModule } from 'src/logging/logging.module';
 import { NotificationModule } from 'src/notification/notification.module';
 
@@ -20,6 +21,7 @@ import { NotificationModule } from 'src/notification/notification.module';
   providers: [
     SystemAlertService,
     CommunicationWhapiService,
+    CommunicationMetaService,
   ],
   controllers: [SystemAlertController],
   exports: [SystemAlertService],

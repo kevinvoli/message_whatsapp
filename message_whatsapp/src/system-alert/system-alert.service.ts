@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
 import { Server } from 'socket.io';
 import {
   AlertRecipient,
@@ -83,6 +84,7 @@ export class SystemAlertService implements OnModuleInit {
     @InjectRepository(SystemAlertConfig)
     private readonly configRepo: Repository<SystemAlertConfig>,
     private readonly whapiService: CommunicationWhapiService,
+    private readonly metaService: CommunicationMetaService,
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
@@ -265,19 +267,10 @@ export class SystemAlertService implements OnModuleInit {
       return [];
     }
 
-    // On envoie uniquement via des canaux Whapi (provider = 'whapi' ou null).
-    // Les canaux Meta/Messenger/Instagram/Telegram ne peuvent pas envoyer à un
-    // numéro WhatsApp brut — ils nécessitent un PSID ou un chat_id spécifique.
     const allChannels = await this.channelRepo.find();
-    const whapiChannels = allChannels.filter(
-      (c) => !c.provider || c.provider === 'whapi',
-    );
 
-    if (!whapiChannels.length) {
-      const msg =
-        allChannels.length > 0
-          ? `Aucun canal Whapi disponible (${allChannels.length} canal(aux) ignoré(s) : Meta/Messenger/Instagram/Telegram)`
-          : 'Aucun canal configuré dans le système';
+    if (!allChannels.length) {
+      const msg = 'Aucun canal configuré dans le système';
       this.logger.error(msg);
       return this.config.recipients.map((r) => ({
         recipientName: r.name,
@@ -292,33 +285,35 @@ export class SystemAlertService implements OnModuleInit {
       }));
     }
 
-    // Si un canal par défaut est configuré, le mettre en premier dans la liste.
-    // Les autres canaux Whapi servent de fallback si le canal par défaut échoue.
+    // Priorité : canal par défaut configuré → fallback sur les canaux Whapi → fallback Meta
     let channels: WhapiChannel[];
     if (this.config.defaultChannelId) {
-      const preferred = whapiChannels.find(
+      const preferred = allChannels.find(
         (c) => c.channel_id === this.config.defaultChannelId,
       );
       if (preferred) {
-        const rest = whapiChannels.filter(
+        const rest = allChannels.filter(
           (c) => c.channel_id !== this.config.defaultChannelId,
         );
         channels = [preferred, ...rest];
         this.logger.log(
-          `Canal préféré : ${preferred.label ?? preferred.channel_id} + ${rest.length} fallback(s)`,
+          `Canal préféré : ${preferred.label ?? preferred.channel_id} (${preferred.provider ?? 'whapi'}) + ${rest.length} fallback(s)`,
         );
       } else {
         this.logger.warn(
-          `Canal par défaut "${this.config.defaultChannelId}" introuvable parmi les canaux Whapi — utilisation de tous les canaux`,
+          `Canal par défaut "${this.config.defaultChannelId}" introuvable — fallback sur tous les canaux`,
         );
-        channels = whapiChannels;
+        channels = allChannels;
       }
     } else {
-      channels = whapiChannels;
+      // Sans canal par défaut : Whapi en premier (plus fiable pour alertes sans 24h window)
+      const whapiFirst = allChannels.filter((c) => !c.provider || c.provider === 'whapi');
+      const others = allChannels.filter((c) => c.provider && c.provider !== 'whapi');
+      channels = [...whapiFirst, ...others];
     }
 
     this.logger.log(
-      `Ordre d'essai (${channels.length} canal(aux)): ${channels.map((c) => c.label ?? c.channel_id).join(' → ')}`,
+      `Ordre d'essai (${channels.length} canal(aux)): ${channels.map((c) => `${c.label ?? c.channel_id}(${c.provider ?? 'whapi'})`).join(' → ')}`,
     );
 
     const text = this.buildMessage(silenceMin);
@@ -338,23 +333,50 @@ export class SystemAlertService implements OnModuleInit {
     text: string,
   ): Promise<AlertSendResult> {
     const normalizedPhone = SystemAlertService.normalizePhone(recipient.phone);
-
-    // CommunicationWhapiService.validateWhapiRecipient() attend UNIQUEMENT des
-    // chiffres (regex ^\d{8,20}$) — PAS de suffixe @s.whatsapp.net.
-    const to = normalizedPhone;
-
     const channelErrors: string[] = [];
 
     for (const channel of channels) {
       const channelLabel = channel.label ?? channel.channel_id;
+      const provider = channel.provider ?? 'whapi';
       try {
         this.logger.log(
-          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via canal ${channelLabel}`,
+          `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via ${channelLabel} [${provider}]`,
         );
 
+        if (provider === 'meta') {
+          // ⚠️ Meta ne permet d'envoyer que si une conversation est active (<24h)
+          // ou avec un template HSM. Pour des alertes admin, privilégier un canal Whapi.
+          if (!channel.external_id) {
+            const reason = 'Canal Meta sans external_id (phone_number_id manquant)';
+            channelErrors.push(`[${channelLabel}] ${reason}`);
+            this.logger.warn(`❌ ${channelLabel}: ${reason}`);
+            continue;
+          }
+          const result = await this.metaService.sendTextMessage({
+            text,
+            to: normalizedPhone,
+            phoneNumberId: channel.external_id,
+            accessToken: channel.token?.trim() ?? '',
+          });
+          const msgId = result.providerMessageId;
+          this.logger.log(`✅ Alerte Meta envoyée à ${recipient.name} via ${channelLabel} — id=${msgId}`);
+          return {
+            recipientName: recipient.name,
+            recipientPhone: normalizedPhone,
+            success: true,
+            channelId: channel.channel_id,
+            channelName: channelLabel,
+            error: null,
+            providerMessageId: msgId,
+            messageStatus: 'sent',
+            whapiFlagged: false,
+          };
+        }
+
+        // Whapi (provider = 'whapi' ou null)
         const response = await this.whapiService.sendToWhapiChannel({
           text,
-          to,
+          to: normalizedPhone,
           channelId: channel.channel_id,
         });
 
@@ -362,14 +384,8 @@ export class SystemAlertService implements OnModuleInit {
         const msgStatus = response.message?.status ?? null;
         const whapiFlagged = response.sent === false;
 
-        this.logger.log(
-          `Whapi response — sent=${response.sent}, status=${msgStatus}, messageId=${msgId}`,
-        );
-
         if (whapiFlagged) {
-          // Whapi a accepté la requête (HTTP 200) mais indique que le message
-          // n'a PAS été envoyé (sent=false). Essayer le canal suivant.
-          const reason = `Whapi a retourné sent=false (status=${msgStatus ?? 'inconnu'}, id=${msgId ?? 'none'})`;
+          const reason = `Whapi sent=false (status=${msgStatus ?? 'inconnu'}, id=${msgId ?? 'none'})`;
           channelErrors.push(`[${channelLabel}] ${reason}`);
           this.logger.warn(`❌ ${channelLabel} refus Whapi: ${reason}`);
           continue;
@@ -396,11 +412,10 @@ export class SystemAlertService implements OnModuleInit {
       }
     }
 
-    const errMsg = `Tous les canaux ont échoué (${channels.length} canal(aux) essayé(s))`;
     const detailedError =
       channelErrors.length > 0
         ? `Tous les canaux ont échoué :\n${channelErrors.join('\n')}`
-        : `Aucun canal essayé`;
+        : 'Aucun canal essayé';
 
     this.logger.error(detailedError);
     return {

@@ -128,10 +128,25 @@ export class WhapiController {
 
       switch (eventType) {
         case 'messages':
-          await this.whapiService.handleIncomingMessage(payload, tenantId);
+          // Retourner 200 à Whapi IMMÉDIATEMENT — ne pas await le traitement.
+          // Si on attend, Whapi peut timeout et renvoyer le webhook (duplicates).
+          void this.whapiService
+            .handleIncomingMessage(payload, tenantId)
+            .catch((err: Error) => {
+              this.auditLogger.error(
+                `WEBHOOK_ASYNC_ERROR provider=whapi event=messages tenant_id=${tenantId} error=${err.message}`,
+              );
+              this.metricsService.recordError(provider, tenantId, 'async_exception');
+            });
           break;
         case 'statuses':
-          await this.whapiService.updateStatusMessage(payload, tenantId);
+          void this.whapiService
+            .updateStatusMessage(payload, tenantId)
+            .catch((err: Error) => {
+              this.auditLogger.error(
+                `WEBHOOK_ASYNC_ERROR provider=whapi event=statuses tenant_id=${tenantId} error=${err.message}`,
+              );
+            });
           break;
         case 'events':
         case 'polls':
