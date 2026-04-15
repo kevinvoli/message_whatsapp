@@ -561,12 +561,12 @@ export class WhatsappMessageGateway
       const chat = await this.chatService.findBychat_id(chatId);
       if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) return;
 
-      // Canal dédié → ne jamais fermer la conversation manuellement
+      // no_close activé → ne jamais fermer la conversation manuellement
       if (newStatus === WhatsappChatStatus.FERME && chat.last_msg_client_channel_id) {
-        const isDedicated = await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id);
-        if (isDedicated) {
+        const closeBlocked = await this.channelService.isCloseBlocked(chat.last_msg_client_channel_id);
+        if (closeBlocked) {
           this.logger.warn(
-            `CONVERSATION_STATUS_CHANGE blocked: chat=${chatId} is on a dedicated channel — cannot be closed`,
+            `CONVERSATION_STATUS_CHANGE blocked: chat=${chatId} — no_close activé sur le canal`,
           );
           return;
         }
@@ -843,11 +843,11 @@ export class WhatsappMessageGateway
 
       sendSucceeded = true;
 
-      // Canal dédié → jamais en lecture seule après envoi commercial
-      const isDedicatedAfterSend = chat.last_msg_client_channel_id
-        ? await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id)
+      // no_read_only activé → jamais en lecture seule après envoi commercial
+      const readOnlyBlocked = chat.last_msg_client_channel_id
+        ? await this.channelService.isReadOnlyBlocked(chat.last_msg_client_channel_id)
         : false;
-      if (!isDedicatedAfterSend) {
+      if (!readOnlyBlocked) {
         chat.read_only = true;
       }
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {

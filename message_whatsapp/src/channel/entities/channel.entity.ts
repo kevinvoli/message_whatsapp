@@ -111,6 +111,22 @@ export class WhapiChannel {
   @Column({ name: 'poste_id', type: 'char', length: 36, nullable: true, default: null })
   poste_id: string | null;
 
+  /**
+   * Bloque le passage en lecture seule des conversations de ce channel.
+   * true  = jamais read_only (ni après envoi commercial, ni par l'orchestrateur auto-message).
+   * false = comportement par défaut.
+   */
+  @Column({ name: 'no_read_only', type: 'boolean', default: false })
+  no_read_only: boolean;
+
+  /**
+   * Bloque la fermeture automatique ou manuelle des conversations de ce channel.
+   * true  = jamais fermé (cron inactivité, action manuelle commercial).
+   * false = comportement par défaut.
+   */
+  @Column({ name: 'no_close', type: 'boolean', default: false })
+  no_close: boolean;
+
   @ManyToOne(() => WhatsappPoste, (poste) => poste.channels, {
     nullable: true,
     onDelete: 'SET NULL',

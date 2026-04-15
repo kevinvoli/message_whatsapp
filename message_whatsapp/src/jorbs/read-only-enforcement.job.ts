@@ -94,9 +94,9 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     let closed = 0;
     let skipped = 0;
     for (const chat of chats) {
-      // Ne jamais fermer une conversation sur un canal dédié
+      // Ne jamais fermer une conversation si no_close est activé sur le canal
       const channelId = chat.last_msg_client_channel_id ?? null;
-      if (channelId && await this.channelService.isChannelDedicated(channelId)) {
+      if (channelId && await this.channelService.isCloseBlocked(channelId)) {
         skipped++;
         continue;
       }

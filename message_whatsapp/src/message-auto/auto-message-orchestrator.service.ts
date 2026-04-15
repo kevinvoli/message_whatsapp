@@ -141,9 +141,9 @@ export class AutoMessageOrchestrator implements OnModuleInit {
           AutoMessageOrchestrator.name,
         );
         this.locks.delete(chatId);
-        // Ne pas modifier read_only pour les canaux dédiés
-        void this.channelService.isChannelDedicated(chat.last_msg_client_channel_id ?? '').then((dedicated) => {
-          if (!dedicated) {
+        // Ne pas modifier read_only si no_read_only est activé sur le canal
+        void this.channelService.isReadOnlyBlocked(chat.last_msg_client_channel_id ?? '').then((blocked) => {
+          if (!blocked) {
             void this.chatService.update(chatId, { read_only: false }).catch(() => {});
           }
         }).catch(() => {});
@@ -152,11 +152,11 @@ export class AutoMessageOrchestrator implements OnModuleInit {
 
     // 🚫 Verrouillage immédiat de la conversation côté commercial
     // Le commercial ne peut pas envoyer de message pendant le délai d'attente.
-    // Exception : canal dédié → jamais en lecture seule
-    const isDedicatedChannel = chat.last_msg_client_channel_id
-      ? await this.channelService.isChannelDedicated(chat.last_msg_client_channel_id)
+    // Exception : no_read_only activé sur le canal → jamais en lecture seule
+    const readOnlyBlocked = chat.last_msg_client_channel_id
+      ? await this.channelService.isReadOnlyBlocked(chat.last_msg_client_channel_id)
       : false;
-    if (!isDedicatedChannel) {
+    if (!readOnlyBlocked) {
       await this.chatService.update(chatId, { read_only: true });
       this.gateway.emitConversationReadonly({ ...chat, read_only: true } as WhatsappChat);
     }

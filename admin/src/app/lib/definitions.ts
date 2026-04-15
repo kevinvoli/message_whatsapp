@@ -128,6 +128,8 @@ export type Channel = {
   updatedAt: string;
   poste_id?: string | null;
   poste?: Poste | null;
+  no_read_only?: boolean;
+  no_close?: boolean;
 };
 
 export type AutoMessageTriggerType =

@@ -450,11 +450,15 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [postesLoading, setPostesLoading] = useState(false);
   const [assignModal, setAssignModal] = useState<{ channel: Channel } | null>(null);
   const [assigningPosteId, setAssigningPosteId] = useState<string>('');
+  const [assignNoReadOnly, setAssignNoReadOnly] = useState(false);
+  const [assignNoClose, setAssignNoClose] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
 
   const openAssignModal = async (channel: Channel) => {
     setAssignModal({ channel });
     setAssigningPosteId(channel.poste_id ?? '');
+    setAssignNoReadOnly(channel.no_read_only ?? false);
+    setAssignNoClose(channel.no_close ?? false);
     setPostesLoading(true);
     try {
       const data = await getPostes();
@@ -470,15 +474,16 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     if (!assignModal) return;
     setAssignLoading(true);
     try {
-      const updated = await assignChannelToPoste(
-        assignModal.channel.channel_id,
-        assigningPosteId || null,
-      );
-      setItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      addToast({ type: 'success', message: assigningPosteId ? 'Canal assigné au poste.' : 'Assignation retirée (mode pool).' });
+      const [assigned, flagsUpdated] = await Promise.all([
+        assignChannelToPoste(assignModal.channel.channel_id, assigningPosteId || null),
+        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose }),
+      ]);
+      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close };
+      setItems((prev) => prev.map((c) => (c.id === merged.id ? merged : c)));
+      addToast({ type: 'success', message: 'Paramètres du canal enregistrés.' });
       setAssignModal(null);
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Erreur lors de l\'assignation.' });
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement.' });
     } finally {
       setAssignLoading(false);
     }
@@ -677,7 +682,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
             {
               header: 'Poste dédié',
               render: (channel) => (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {channel.poste_id && channel.poste ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
                       {channel.poste.name}
@@ -685,10 +690,16 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                   ) : (
                     <span className="text-xs text-gray-400 italic">Pool global</span>
                   )}
+                  {channel.no_read_only && (
+                    <span title="Jamais en lecture seule" className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">RO</span>
+                  )}
+                  {channel.no_close && (
+                    <span title="Jamais fermée" className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">FC</span>
+                  )}
                   <button
                     onClick={() => void openAssignModal(channel)}
                     className="rounded p-1 text-indigo-500 hover:bg-indigo-50"
-                    title="Changer l'assignation"
+                    title="Configurer le canal"
                   >
                     <Link className="h-3.5 w-3.5" />
                   </button>
@@ -800,6 +811,36 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                 <p className="mt-1.5 text-xs text-indigo-600">Toutes les nouvelles conversations de ce canal iront uniquement à ce poste.</p>
               )}
             </div>
+
+            {/* ── Options de comportement ── */}
+            <div className="mb-5 space-y-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Comportement des conversations</p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={assignNoReadOnly}
+                  onChange={(e) => setAssignNoReadOnly(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600"
+                />
+                <span className="text-sm text-gray-700">
+                  <span className="font-medium">Jamais en lecture seule</span>
+                  <span className="block text-xs text-gray-400 mt-0.5">Le commercial peut toujours répondre, même après un message auto ou son propre envoi.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={assignNoClose}
+                  onChange={(e) => setAssignNoClose(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600"
+                />
+                <span className="text-sm text-gray-700">
+                  <span className="font-medium">Jamais fermée</span>
+                  <span className="block text-xs text-gray-400 mt-0.5">La conversation ne peut pas être fermée manuellement ni par le cron d&apos;inactivité.</span>
+                </span>
+              </label>
+            </div>
+
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setAssignModal(null)}
