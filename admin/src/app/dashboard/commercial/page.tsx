@@ -30,6 +30,8 @@ import ConversationsView from '@/app/ui/ConversationsView';
 // ── FlowBot (TICKET-12-D) ─────────────────────────────────────────────────────
 import FlowListView from '@/app/modules/flowbot/components/FlowListView';
 import FlowBuilderView from '@/app/modules/flowbot/components/FlowBuilderView';
+// ── Contexts (CTX-E1) ──────────────────────────────────────────────────────────
+import ContextsView from '@/app/modules/contexts/components/ContextsView';
 import { useNotifications } from '@/app/modules/notifications/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -154,6 +156,8 @@ export default function AdminDashboard() {
                         onOpenBuilder={(id) => setFlowBotEditingId(id)}
                     />
                 );
+            case 'contexts':
+                return <ContextsView />;
             default:
                 return null;
         }

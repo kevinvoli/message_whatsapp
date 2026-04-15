@@ -33,6 +33,7 @@ import { FlowSessionCleanerJob } from './jobs/flow-session-cleaner.job';
 
 // Controller
 import { FlowBotController } from './flowbot.controller';
+import { ContextModule } from 'src/context/context.module';
 
 const ENTITIES = [
   BotConversation,
@@ -64,6 +65,7 @@ const SERVICES = [
 @Module({
   imports: [
     TypeOrmModule.forFeature(ENTITIES),
+    ContextModule,
     // ✅ EventEmitterModule est global — pas besoin de l'importer ici
     // ❌ INTERDIT : WhatsappChatModule, WhatsappMessageModule, DispatcherModule
   ],

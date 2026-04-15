@@ -144,17 +144,18 @@ export class WhapiService {
       }
       const traceId = message.id ?? `chat:${chatId}:${Date.now()}`;
       try {
-        const conversation = await this.dispatcherService.assignConversation(
+        const assignResult = await this.dispatcherService.assignConversation(
           chatId,
           message.from_name ?? message.from ?? 'Client',
           traceId,
         );
-        if (!conversation) {
+        if (!assignResult) {
           this.logger.warn(
             `LEGACY_NO_AGENT trace=${traceId} chat_id=${chatId}`,
           );
           continue;
         }
+        const conversation = assignResult.chat;
         const saved = await this.whatsappMessageService.saveIncomingFromWhapi(
           message,
           conversation,

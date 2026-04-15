@@ -62,6 +62,7 @@ import { WhapiProviderAdapter } from './adapters/whapi-provider.adapter';
 import { FlowBotModule } from 'src/flowbot/flowbot.module';
 import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
+import { ContextModule } from 'src/context/context.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use
     NotificationModule,
     SystemAlertModule,
     FlowBotModule,
+    ContextModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

@@ -25,4 +25,10 @@ export class BotInboundMessageEvent {
   isReopened: boolean;             // Conversation précédemment fermée
   isOutOfHours: boolean;           // Hors horaires d'ouverture
   agentAssignedRef?: string;       // Agent déjà assigné s'il y en a un
+
+  // ─── CTX-D2 — Isolation de contexte ──────────────────────────────────────
+  /** ID du Context résolu pour ce message (null si aucun contexte configuré) */
+  contextId?: string | null;
+  /** ID du ChatContext isolé pour ce (chatId × contextId) */
+  chatContextId?: string | null;
 }

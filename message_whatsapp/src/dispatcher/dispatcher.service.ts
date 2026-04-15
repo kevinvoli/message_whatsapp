@@ -9,7 +9,10 @@ import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
 import { DispatchQueryService } from './infrastructure/dispatch-query.service';
-import { AssignConversationUseCase } from './application/assign-conversation.use-case';
+import {
+  AssignConversationResult,
+  AssignConversationUseCase,
+} from './application/assign-conversation.use-case';
 import { ReinjectConversationUseCase } from './application/reinject-conversation.use-case';
 
 /**
@@ -56,7 +59,7 @@ export class DispatcherService {
     traceId?: string,
     tenantId?: string,
     channelId?: string,
-  ): Promise<WhatsappChat | null> {
+  ): Promise<AssignConversationResult | null> {
     const lock = this.getChatDispatchLock(clientPhone);
     try {
       return await lock.runExclusive(() =>

@@ -7,6 +7,8 @@ import { ChannelService } from 'src/channel/channel.service';
 import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
 import { NotificationService } from 'src/notification/notification.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { ContextResolverService } from 'src/context/services/context-resolver.service';
+import { ContextService } from 'src/context/services/context.service';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -27,6 +29,7 @@ describe('AssignConversationUseCase', () => {
   };
   const channelService = {
     getDedicatedPosteId: jest.fn(),
+    findByChannelId: jest.fn().mockResolvedValue(null),
   };
   const conversationPublisher = {
     emitConversationAssigned: jest.fn(),
@@ -39,10 +42,17 @@ describe('AssignConversationUseCase', () => {
   const gateway = {
     isAgentConnected: jest.fn(),
   };
+  const contextResolver = {
+    resolveForChannel: jest.fn().mockResolvedValue(null),
+  };
+  const contextService = {
+    findOrCreateChatContext: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     queryService.saveChat.mockImplementation(async (c) => c);
+    contextResolver.resolveForChannel.mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -54,6 +64,8 @@ describe('AssignConversationUseCase', () => {
         { provide: NotificationService, useValue: notificationService },
         { provide: SlaPolicyService, useValue: slaPolicy },
         { provide: WhatsappMessageGateway, useValue: gateway },
+        { provide: ContextResolverService, useValue: contextResolver },
+        { provide: ContextService, useValue: contextService },
       ],
     }).compile();
 
@@ -74,8 +86,8 @@ describe('AssignConversationUseCase', () => {
 
     const result = await useCase.execute('client@c.us', 'Ahmed');
 
-    expect(result?.status).toBe(WhatsappChatStatus.ACTIF);
-    expect(result?.poste_id).toBe('poste-1');
+    expect(result?.chat.status).toBe(WhatsappChatStatus.ACTIF);
+    expect(result?.chat.poste_id).toBe('poste-1');
     expect(conversationPublisher.emitConversationAssigned).toHaveBeenCalledWith('client@c.us');
   });
 
@@ -93,8 +105,8 @@ describe('AssignConversationUseCase', () => {
 
     const result = await useCase.execute('client@c.us', 'Ahmed');
 
-    expect(result?.status).toBe(WhatsappChatStatus.EN_ATTENTE);
-    expect(result?.assigned_mode).toBe('OFFLINE');
+    expect(result?.chat.status).toBe(WhatsappChatStatus.EN_ATTENTE);
+    expect(result?.chat.assigned_mode).toBe('OFFLINE');
   });
 
   // ─── UC-03 : aucun agent → mise en attente sans poste ────────────────────
@@ -108,8 +120,8 @@ describe('AssignConversationUseCase', () => {
 
     const result = await useCase.execute('client@c.us', 'Ahmed');
 
-    expect(result?.status).toBe(WhatsappChatStatus.EN_ATTENTE);
-    expect(result?.poste_id).toBeNull();
+    expect(result?.chat.status).toBe(WhatsappChatStatus.EN_ATTENTE);
+    expect(result?.chat.poste_id).toBeNull();
     expect(conversationPublisher.emitConversationAssigned).not.toHaveBeenCalled();
     expect(notificationService.create).toHaveBeenCalledWith(
       'queue',
@@ -158,8 +170,8 @@ describe('AssignConversationUseCase', () => {
 
     const result = await useCase.execute('c@c.us', 'Sara', undefined, undefined, 'channel-A');
 
-    expect(result?.poste_id).toBe('poste-ded');
-    expect(result?.status).toBe(WhatsappChatStatus.ACTIF);
+    expect(result?.chat.poste_id).toBe('poste-ded');
+    expect(result?.chat.status).toBe(WhatsappChatStatus.ACTIF);
     expect(dispatchPolicy.resolvePosteForChannel).toHaveBeenCalledWith('channel-A');
   });
 
@@ -177,7 +189,7 @@ describe('AssignConversationUseCase', () => {
 
     const result = await useCase.execute('locked@c.us', 'Client');
 
-    expect(result?.unread_count).toBe(2);
+    expect(result?.chat.unread_count).toBe(2);
     expect(dispatchPolicy.resolvePosteForChannel).not.toHaveBeenCalled();
   });
 
@@ -197,7 +209,7 @@ describe('AssignConversationUseCase', () => {
     const result = await useCase.execute('new@c.us', 'New');
     const after = Date.now();
 
-    const deadline = result?.first_response_deadline_at?.getTime() ?? 0;
+    const deadline = result?.chat.first_response_deadline_at?.getTime() ?? 0;
     expect(deadline).toBeGreaterThanOrEqual(before + 4 * 60_000);
     expect(deadline).toBeLessThanOrEqual(after + 6 * 60_000);
   });

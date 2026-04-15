@@ -5,6 +5,7 @@ import { FlowBot } from '../entities/flow-bot.entity';
 import { FlowNode } from '../entities/flow-node.entity';
 import { FlowEdge } from '../entities/flow-edge.entity';
 import { FlowTrigger } from '../entities/flow-trigger.entity';
+import { ContextService } from 'src/context/services/context.service';
 
 @Injectable()
 export class FlowCrudService {
@@ -17,6 +18,7 @@ export class FlowCrudService {
     private readonly edgeRepo: Repository<FlowEdge>,
     @InjectRepository(FlowTrigger)
     private readonly triggerRepo: Repository<FlowTrigger>,
+    private readonly contextService: ContextService,
   ) {}
 
   // ─── FlowBot ──────────────────────────────────────────────────────────────
@@ -88,5 +90,12 @@ export class FlowCrudService {
 
   async deleteTrigger(id: string): Promise<void> {
     await this.triggerRepo.delete(id);
+  }
+
+  // ─── CTX-D3 : liste des contextes disponibles ────────────────────────────
+
+  async listContextSummaries(): Promise<{ id: string; label: string | null; contextType: string }[]> {
+    const contexts = await this.contextService.findAll();
+    return contexts.map((c) => ({ id: c.id, label: c.label ?? null, contextType: c.contextType }));
   }
 }

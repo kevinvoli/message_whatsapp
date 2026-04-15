@@ -128,6 +128,13 @@ export async function getRegisteredProviders(): Promise<string[]> {
     return data.providers;
 }
 
+// ─── Contextes disponibles (CTX-D3) ──────────────────────────────────────────
+
+export async function getAvailableContexts(): Promise<{ id: string; label: string | null; contextType: string }[]> {
+    const res = await fetch(`${BASE}/contexts`, { credentials: 'include' });
+    return handleResponse<{ id: string; label: string | null; contextType: string }[]>(res);
+}
+
 // ─── Monitoring sessions ──────────────────────────────────────────────────────
 
 export async function getFlowSessions(flowId: string, limit = 20): Promise<FlowSession[]> {

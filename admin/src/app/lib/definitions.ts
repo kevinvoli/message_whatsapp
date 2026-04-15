@@ -39,7 +39,51 @@ export type ViewMode =
   | 'notifications'
   | 'alert-config'
   | 'settings'
-  | 'flowbot';
+  | 'flowbot'
+  | 'contexts';
+
+// ─── Context types ────────────────────────────────────────────────────────────
+
+export type ContextType = 'CHANNEL' | 'POSTE' | 'PROVIDER' | 'POOL';
+
+export interface Context {
+  id: string;
+  tenantId?: string | null;
+  label?: string | null;
+  contextType: ContextType;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  bindings?: ContextBinding[];
+}
+
+export interface ContextBinding {
+  id: string;
+  contextId: string;
+  bindingType: ContextType;
+  refValue: string;
+  createdAt: string;
+}
+
+export interface ChatContext {
+  id: string;
+  chatId: string;
+  contextId: string;
+  posteId?: string | null;
+  unreadCount: number;
+  readOnly: boolean;
+  lastClientMessageAt: string | null;
+  lastPosteMessageAt: string | null;
+  lastActivityAt: string | null;
+  whatsappChatId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatContextsPage {
+  items: ChatContext[];
+  nextCursor: string | null;
+}
 
 // ─── FlowBot types ────────────────────────────────────────────────────────────
 
@@ -57,6 +101,7 @@ export interface FlowBot {
   priority: number;
   scopeChannelType?: string;
   scopeProviderRef?: string;
+  scopeContextId?: string | null;
   triggers?: FlowTrigger[];
   nodes?: FlowNode[];
   edges?: FlowEdge[];

@@ -32,9 +32,12 @@ export class FlowTriggerService {
     });
 
     for (const flow of flows) {
-      // Vérifier le scope provider/channel si défini
+      // Vérifier le scope provider/channel/context si défini
       if (flow.scopeChannelType && flow.scopeChannelType !== event.channelType) continue;
       if (flow.scopeProviderRef && flow.scopeProviderRef !== event.provider) continue;
+      // CTX-D1 — filtre par contexte : si le flux est restreint à un contexte,
+      // l'événement doit provenir de ce contexte (contextId propagé par CTX-D2)
+      if (flow.scopeContextId && flow.scopeContextId !== event.contextId) continue;
 
       for (const trigger of flow.triggers) {
         if (!trigger.isActive) continue;

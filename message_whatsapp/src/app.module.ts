@@ -39,6 +39,8 @@ import { SystemConfigModule } from './system-config/system-config.module';
 import { SystemAlertModule } from './system-alert/system-alert.module';
 import { FlowBotModule } from './flowbot/flowbot.module';
 import { MessageAutoCompatModule } from './message-auto-compat/message-auto-compat.module';
+import { ContextModule } from './context/context.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -51,6 +53,7 @@ import { MessageAutoCompatModule } from './message-auto-compat/message-auto-comp
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ wildcard: false, global: true }),
     ConfigModule.forRoot({
+      isGlobal: true,
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()
           .valid('development', 'production', 'test')
@@ -72,6 +75,9 @@ import { MessageAutoCompatModule } from './message-auto-compat/message-auto-comp
         WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
         FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
         FF_SHADOW_UNIFIED: Joi.string().optional(),
+        REDIS_HOST: Joi.string().optional(),
+        REDIS_PORT: Joi.number().default(6379).optional(),
+        REDIS_PASSWORD: Joi.string().allow('').optional(),
         MESSAGE_RESPONSE_TIMEOUT_HOURS: Joi.number()
           .min(1)
           .max(240)
@@ -117,6 +123,8 @@ import { MessageAutoCompatModule } from './message-auto-compat/message-auto-comp
     SystemAlertModule,
     FlowBotModule,
     MessageAutoCompatModule,
+    RedisModule,
+    ContextModule,
   ],
   controllers: [AppController],
   providers: [AppService],

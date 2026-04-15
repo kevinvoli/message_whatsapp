@@ -135,4 +135,11 @@ export class FlowBotController {
   listProviders() {
     return { providers: this.adapterRegistry.listProviders() };
   }
+
+  // ─── CTX-D3 : Contexts disponibles pour un flux ───────────────────────────
+
+  @Get('contexts')
+  async listContextsForFlow() {
+    return this.crudService.listContextSummaries();
+  }
 }

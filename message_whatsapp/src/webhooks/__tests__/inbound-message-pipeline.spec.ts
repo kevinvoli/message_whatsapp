@@ -26,6 +26,8 @@ import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { ChannelService } from 'src/channel/channel.service';
+import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { UnifiedMessage } from '../normalization/unified-message';
 import {
   WhatsappChat,
@@ -78,6 +80,8 @@ function makeSavedMessage(): WhatsappMessage {
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 const dispatcherMock = { assignConversation: jest.fn() };
+const channelServiceMock = { findByChannelId: jest.fn().mockResolvedValue(null), findChannelByExternalId: jest.fn().mockResolvedValue(null) };
+const messengerServiceMock = { getUserName: jest.fn() };
 const gatewayMock = {
   notifyNewMessage: jest.fn(),
   notifyStatusUpdate: jest.fn(),
@@ -103,7 +107,7 @@ describe('InboundMessageService — pipeline ingress (TICKET-10-A-BIS)', () => {
     // Defaults : golden path
     chatIdValidationMock.validate.mockReturnValue({ valid: true });
     providerEnrichmentMock.enrich.mockResolvedValue(undefined);
-    dispatcherMock.assignConversation.mockResolvedValue(makeConversation());
+    dispatcherMock.assignConversation.mockResolvedValue({ chat: makeConversation(), chatContext: null });
     messagePersistenceMock.persist.mockResolvedValue({
       ok: true,
       message: makeSavedMessage(),
@@ -127,6 +131,8 @@ describe('InboundMessageService — pipeline ingress (TICKET-10-A-BIS)', () => {
         { provide: MediaExtractionService, useValue: mediaExtractionMock },
         { provide: MediaPersistenceService, useValue: mediaPersistenceMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
+        { provide: ChannelService, useValue: channelServiceMock },
+        { provide: CommunicationMessengerService, useValue: messengerServiceMock },
       ],
     }).compile();
 

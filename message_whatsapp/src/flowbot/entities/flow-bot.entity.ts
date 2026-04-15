@@ -37,6 +37,13 @@ export class FlowBot {
   @Column({ name: 'scope_provider_ref', type: 'varchar', length: 36, nullable: true })
   scopeProviderRef: string | null;
 
+  /**
+   * CTX-D1 — Optionnel : restreindre ce flux à un contexte spécifique.
+   * null = ce flux peut s'exécuter dans n'importe quel contexte.
+   */
+  @Column({ name: 'scope_context_id', type: 'char', length: 36, nullable: true })
+  scopeContextId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

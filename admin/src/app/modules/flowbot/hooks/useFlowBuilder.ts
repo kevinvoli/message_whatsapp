@@ -10,13 +10,21 @@ import {
     deleteEdge,
     upsertTriggers,
     deleteTrigger,
+    getAvailableContexts,
 } from '../api/flowbot.api';
+
+export interface ContextSummary {
+    id: string;
+    label: string | null;
+    contextType: string;
+}
 
 export interface UseFlowBuilderReturn {
     flow: FlowBot | null;
     loading: boolean;
     error: string | null;
     saving: boolean;
+    availableContexts: ContextSummary[];
     reload: () => Promise<void>;
     saveNodes: (nodes: Partial<FlowNode>[]) => Promise<FlowNode[]>;
     removeNode: (nodeId: string) => Promise<void>;
@@ -31,6 +39,7 @@ export function useFlowBuilder(flowId: string | null): UseFlowBuilderReturn {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [availableContexts, setAvailableContexts] = useState<ContextSummary[]>([]);
 
     const reload = useCallback(async () => {
         if (!flowId) return;
@@ -48,6 +57,7 @@ export function useFlowBuilder(flowId: string | null): UseFlowBuilderReturn {
 
     useEffect(() => {
         void reload();
+        void getAvailableContexts().then(setAvailableContexts).catch(() => null);
     }, [reload]);
 
     const saveNodes = useCallback(async (nodes: Partial<FlowNode>[]): Promise<FlowNode[]> => {
@@ -116,5 +126,5 @@ export function useFlowBuilder(flowId: string | null): UseFlowBuilderReturn {
         }
     }, [reload]);
 
-    return { flow, loading, error, saving, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers, removeTrigger };
+    return { flow, loading, error, saving, availableContexts, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers, removeTrigger };
 }

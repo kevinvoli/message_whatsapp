@@ -47,6 +47,7 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { ConversationReadQueryService } from 'src/conversations/infrastructure/conversation-read-query.service';
 import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
+import { ContextModule } from 'src/context/context.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use
     CallLogModule,
     JorbsModule,
     NotificationModule,
+    ContextModule,
   ],
   controllers: [DispatcherController],
   providers: [

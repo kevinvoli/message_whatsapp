@@ -45,6 +45,7 @@ import {
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { ChatContext } from 'src/context/entities/chat-context.entity';
 
 @Injectable()
 export class InboundMessageService {
@@ -142,7 +143,7 @@ export class InboundMessageService {
     await this.providerEnrichment.enrich(message);
 
     // ── Étape 3 : assignation de la conversation ──────────────────────────────
-    const conversation = await this.dispatcherService.assignConversation(
+    const assignResult = await this.dispatcherService.assignConversation(
       message.chatId,
       message.fromName ?? 'Client',
       correlationId,
@@ -150,10 +151,13 @@ export class InboundMessageService {
       message.channelId,
     );
 
-    if (!conversation) {
+    if (!assignResult) {
       this.logger.warn(`INCOMING_NO_AGENT correlationId=${correlationId} chat_id=${message.chatId}`);
       return;
     }
+
+    const conversation = assignResult.chat;
+    const chatContext = assignResult.chatContext;
 
     // ── Étape 4 : persistance du message ──────────────────────────────────────
     const persistResult = await this.messagePersistence.persist(message, conversation, correlationId);
@@ -166,7 +170,7 @@ export class InboundMessageService {
     await this.mediaPersistence.persistAll(medias, persistResult.message, conversation, message);
 
     // ── Étape 6 : mise à jour état conversation ───────────────────────────────
-    await this.stateUpdate.apply(conversation, persistResult.message);
+    await this.stateUpdate.apply(conversation, persistResult.message, chatContext ?? undefined);
 
     // ── Étape 7 : notification frontend via WebSocket ────────────────────────
     await this.messageGateway.notifyNewMessage(persistResult.message, conversation, persistResult.message);
@@ -182,7 +186,7 @@ export class InboundMessageService {
     // ── Étape 9 : déclenchement FlowBot (découplé — fire-and-forget) ────────
     this.eventEmitter.emit(
       BOT_INBOUND_EVENT,
-      this.buildBotInboundEvent(message, conversation),
+      this.buildBotInboundEvent(message, conversation, chatContext ?? undefined),
     );
   }
 
@@ -206,6 +210,7 @@ export class InboundMessageService {
   private buildBotInboundEvent(
     msg: UnifiedMessage,
     conversation: WhatsappChat,
+    chatContext?: ChatContext,
   ): BotInboundMessageEvent {
     const PROVIDER_TO_CHANNEL_TYPE: Record<string, string> = {
       whapi: 'whatsapp',
@@ -250,6 +255,8 @@ export class InboundMessageService {
     event.isReopened = conversation.reopened_at !== null;
     event.isOutOfHours = false; // TODO: brancher BusinessHoursService (TICKET-12-B follow-up)
     event.agentAssignedRef = conversation.poste_id ?? undefined;
+    event.contextId = chatContext?.contextId ?? null;
+    event.chatContextId = chatContext?.id ?? null;
     return event;
   }
 

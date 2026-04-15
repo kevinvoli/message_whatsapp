@@ -11,6 +11,14 @@ import { DispatchPolicyService } from '../domain/dispatch-policy.service';
 import { DispatchQueryService } from '../infrastructure/dispatch-query.service';
 import { SlaPolicyService } from '../domain/sla-policy.service';
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
+import { ContextResolverService } from 'src/context/services/context-resolver.service';
+import { ContextService } from 'src/context/services/context.service';
+import { ChatContext } from 'src/context/entities/chat-context.entity';
+
+export interface AssignConversationResult {
+  chat: WhatsappChat;
+  chatContext: ChatContext | null;
+}
 
 /**
  * TICKET-03-C — Cas d'usage : assigner une conversation entrante à un poste.
@@ -30,6 +38,8 @@ export class AssignConversationUseCase {
     private readonly conversationPublisher: ConversationPublisher,
     private readonly notificationService: NotificationService,
     private readonly slaPolicy: SlaPolicyService,
+    private readonly contextResolver: ContextResolverService,
+    private readonly contextService: ContextService,
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
@@ -41,7 +51,7 @@ export class AssignConversationUseCase {
     traceId?: string,
     tenantId?: string,
     channelId?: string,
-  ): Promise<WhatsappChat | null> {
+  ): Promise<AssignConversationResult | null> {
     if (traceId) {
       this.logger.log(`DISPATCH_START trace=${traceId} chat_id=${clientPhone}`);
     }
@@ -60,7 +70,7 @@ export class AssignConversationUseCase {
         this.logger.warn(`Conversation read_only ignorée (${conversation.chat_id})`);
         conversation.unread_count = (conversation.unread_count ?? 0) + 1;
         conversation.last_activity_at = new Date();
-        return this.queryService.saveChat(conversation);
+        return this.buildResult(await this.queryService.saveChat(conversation), channelId);
       }
     }
 
@@ -98,7 +108,7 @@ export class AssignConversationUseCase {
       );
       const saved = await this.queryService.saveChat(conversation);
       await this.conversationPublisher.emitConversationUpsertByChatId(saved.chat_id);
-      return saved;
+      return this.buildResult(saved, channelId);
     }
 
     // ── Résolution du prochain poste ─────────────────────────────────────────
@@ -130,7 +140,7 @@ export class AssignConversationUseCase {
         conversation.assigned_mode = null;
         conversation.first_response_deadline_at = null;
         conversation.last_client_message_at = new Date();
-        return this.queryService.saveChat(conversation);
+        return this.buildResult(await this.queryService.saveChat(conversation), channelId);
       }
 
       const waitingChat = this.queryService.createChat({
@@ -152,7 +162,7 @@ export class AssignConversationUseCase {
         last_client_message_at: new Date(),
       });
       this.logger.log(`🆕 Création conversation en attente (sans agent) pour ${clientPhone}`);
-      return this.queryService.saveChat(waitingChat);
+      return this.buildResult(await this.queryService.saveChat(waitingChat), channelId);
     }
 
     // ── Cas 3 : conversation existante → réassignation ───────────────────────
@@ -184,7 +194,7 @@ export class AssignConversationUseCase {
         `La conversation de ${saved.name || saved.contact_client} a été assignée au poste ${nextAgent.name}.`,
       );
       await this.conversationPublisher.emitConversationUpsertByChatId(saved.chat_id);
-      return saved;
+      return this.buildResult(saved, channelId);
     }
 
     // ── Cas 4 : nouvelle conversation ────────────────────────────────────────
@@ -217,6 +227,43 @@ export class AssignConversationUseCase {
       `Nouvelle conversation de ${clientName || clientPhone.split('@')[0]} assignée au poste ${nextAgent.name}.`,
     );
     await this.conversationPublisher.emitConversationAssigned(saved.chat_id);
-    return saved;
+    return this.buildResult(saved, channelId);
+  }
+
+  // ─── Context helper ───────────────────────────────────────────────────────
+
+  /**
+   * CTX-C4 — Résout le ChatContext pour la conversation sauvegardée.
+   * Si aucun contexte n'est configuré, retourne chatContext: null sans erreur
+   * (fallback gracieux — le pipeline continue comme avant).
+   */
+  private async buildResult(
+    chat: WhatsappChat,
+    channelId?: string,
+  ): Promise<AssignConversationResult> {
+    let chatContext: ChatContext | null = null;
+    try {
+      if (channelId) {
+        const channel = await this.channelService.findByChannelId(channelId);
+        const provider = channel?.provider ?? undefined;
+        const context = await this.contextResolver.resolveForChannel(
+          channelId,
+          chat.poste_id ?? null,
+          provider ?? null,
+        );
+        if (context) {
+          chatContext = await this.contextService.findOrCreateChatContext(
+            chat.chat_id,
+            context.id,
+            { posteId: chat.poste_id ?? null, whatsappChatId: chat.id },
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `CTX buildResult failed for chat_id=${chat.chat_id}: ${(err as Error).message}`,
+      );
+    }
+    return { chat, chatContext };
   }
 }

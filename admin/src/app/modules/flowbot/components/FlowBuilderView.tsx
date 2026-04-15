@@ -60,7 +60,7 @@ const SESSION_STATUS_LABELS: Record<string, string> = {
 type Tab = 'nodes' | 'edges' | 'triggers' | 'analytics' | 'sessions';
 
 export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps) {
-    const { flow, loading, error, saving, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers, removeTrigger } = useFlowBuilder(flowId);
+    const { flow, loading, error, saving, availableContexts, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers, removeTrigger } = useFlowBuilder(flowId);
     const { update } = useFlows();
     const [tab, setTab] = useState<Tab>('nodes');
     const [analytics, setAnalytics] = useState<FlowAnalyticsRow[]>([]);
@@ -84,6 +84,7 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
     const [metaPriority, setMetaPriority] = useState(0);
     const [metaChannel, setMetaChannel] = useState('');
     const [metaProvider, setMetaProvider] = useState('');
+    const [metaContextId, setMetaContextId] = useState<string>('');
 
     const loadAnalytics = useCallback(async () => {
         setAnalyticsLoading(true);
@@ -166,6 +167,7 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
                 description: metaDesc || undefined,
                 scopeChannelType: metaChannel || undefined,
                 scopeProviderRef: metaProvider || undefined,
+                scopeContextId: metaContextId || null,
             });
             await reload();
             setEditMeta(false);
@@ -181,6 +183,7 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
         setMetaPriority(flow.priority);
         setMetaChannel(flow.scopeChannelType ?? '');
         setMetaProvider(flow.scopeProviderRef ?? '');
+        setMetaContextId(flow.scopeContextId ?? '');
         setEditMeta(true);
     };
 
@@ -244,6 +247,17 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
                                     {PROVIDER_OPTIONS.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Contexte d&apos;isolation</label>
+                                <select className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" value={metaContextId} onChange={e => setMetaContextId(e.target.value)}>
+                                    <option value="">Tous les contextes</option>
+                                    {availableContexts.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.label ?? c.id} ({c.contextType})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                         <div className="flex justify-end gap-2">
                             <button onClick={() => setEditMeta(false)} className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg">Annuler</button>
@@ -261,6 +275,7 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
                                 {flow.priority > 0 && <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">Prio {flow.priority}</span>}
                                 {flow.scopeChannelType && <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">📡 {flow.scopeChannelType}</span>}
                                 {flow.scopeProviderRef && <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">🔌 {flow.scopeProviderRef}</span>}
+                                {flow.scopeContextId && <span className="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">🔒 {availableContexts.find(c => c.id === flow.scopeContextId)?.label ?? flow.scopeContextId}</span>}
                             </div>
                             {flow.description && <p className="text-sm text-gray-500 mt-0.5">{flow.description}</p>}
                         </div>
