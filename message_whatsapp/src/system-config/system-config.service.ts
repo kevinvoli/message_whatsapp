@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SystemConfig } from './entities/system-config.entity';
@@ -54,6 +54,7 @@ export class SystemConfigService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(SystemConfig)
     private readonly repo: Repository<SystemConfig>,
+    @Inject(forwardRef(() => ChannelService))
     private readonly channelService: ChannelService,
   ) {}
 
