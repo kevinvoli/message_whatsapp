@@ -145,10 +145,21 @@ export class WhatsappMessageGateway
     await this.posteService.setActive(posteId, true);
     const poste = await this.posteService.findOneById(posteId);
     if (poste.is_queue_enabled) {
-      // Retirer les postes offline de la queue (remplie pendant les heures hors-service)
-      // puis ajouter ce poste connecte
-      await this.queueService.purgeOfflinePostes(posteId);
-      await this.queueService.addPosteToQueue(posteId);
+      // Un poste dédié ne participe pas à la queue pool.
+      // Il ne doit PAS déclencher purgeOfflinePostes car ça viderait la queue pool
+      // (tous les pool postes offline seraient retirés sans être remplacés).
+      const isDedicatedPoste =
+        (await this.channelService.getDedicatedChannelIdsForPoste(posteId)).length > 0;
+      if (!isDedicatedPoste) {
+        // Retirer les postes offline de la queue (remplie pendant les heures hors-service)
+        // puis ajouter ce poste connecté
+        await this.queueService.purgeOfflinePostes(posteId);
+        await this.queueService.addPosteToQueue(posteId);
+      } else {
+        this.logger.log(
+          `Poste dédié ${posteId} connecté — skip purgeOfflinePostes + addPosteToQueue (hors pool)`,
+        );
+      }
     } else {
       this.logger.warn(
         `Queue disabled for poste ${posteId}, skip enqueue on connect`,

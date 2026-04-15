@@ -403,12 +403,17 @@ export class QueueService implements OnModuleInit {
   }
 
   /**
-   * Verifie s'il reste au moins un agent actif.
+   * Vérifie s'il reste au moins un poste pool actif (hors postes dédiés).
+   * Un poste dédié ne doit pas faire croire que la queue pool est alimentée.
    */
   async hasActivePostes(): Promise<boolean> {
-    const count = await this.posteRepository.count({
-      where: { is_active: true },
-    });
+    const count = await this.posteRepository
+      .createQueryBuilder('p')
+      .where('p.is_active = :active', { active: true })
+      .andWhere(
+        `p.id NOT IN (SELECT DISTINCT poste_id FROM whapi_channels WHERE poste_id IS NOT NULL)`,
+      )
+      .getCount();
     return count > 0;
   }
 
