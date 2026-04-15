@@ -38,6 +38,7 @@ import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { SystemAlertModule } from './system-alert/system-alert.module';
 import { FlowBotModule } from './flowbot/flowbot.module';
+import { MessageAutoCompatModule } from './message-auto-compat/message-auto-compat.module';
 
 @Module({
   imports: [
@@ -115,6 +116,7 @@ import { FlowBotModule } from './flowbot/flowbot.module';
     SystemConfigModule,
     SystemAlertModule,
     FlowBotModule,
+    MessageAutoCompatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
