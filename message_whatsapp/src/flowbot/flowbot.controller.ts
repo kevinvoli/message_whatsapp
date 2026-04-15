@@ -15,8 +15,10 @@ import { FlowBot } from './entities/flow-bot.entity';
 import { FlowNode } from './entities/flow-node.entity';
 import { FlowEdge } from './entities/flow-edge.entity';
 import { FlowTrigger } from './entities/flow-trigger.entity';
+import { AdminGuard } from 'src/auth/admin.guard';
 
 @Controller('flowbot')
+@UseGuards(AdminGuard)
 export class FlowBotController {
   constructor(
     private readonly crudService: FlowCrudService,
@@ -85,6 +87,11 @@ export class FlowBotController {
   @Post('flows/:flowId/triggers')
   upsertTriggers(@Param('flowId') flowId: string, @Body() triggers: Partial<FlowTrigger>[]) {
     return this.crudService.upsertTriggers(flowId, triggers);
+  }
+
+  @Delete('triggers/:id')
+  removeTrigger(@Param('id') id: string) {
+    return this.crudService.deleteTrigger(id);
   }
 
   // ─── Analytics ────────────────────────────────────────────────────────────

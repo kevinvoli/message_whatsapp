@@ -30,7 +30,6 @@ export type ViewMode =
   | 'rapports'
   | 'postes'
   | 'canaux'
-  | 'automessages'
   | 'conversations'
   | 'queue'
   | 'dispatch'

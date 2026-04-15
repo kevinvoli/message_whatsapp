@@ -85,4 +85,8 @@ export class FlowCrudService {
     const entities = triggers.map((t) => this.triggerRepo.create({ ...t, flowId }));
     return this.triggerRepo.save(entities);
   }
+
+  async deleteTrigger(id: string): Promise<void> {
+    await this.triggerRepo.delete(id);
+  }
 }

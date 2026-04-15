@@ -19,7 +19,6 @@ import ChannelsView from '@/app/modules/channels/components/ChannelsView';
 import PostesView from '@/app/modules/channels/components/PostesView';
 import DispatchView from '@/app/modules/dispatch/components/DispatchView';
 import QueueView from '@/app/modules/dispatch/components/QueueView';
-import MessageAutoView from '@/app/modules/automations/components/MessageAutoView';
 import CronConfigView from '@/app/modules/automations/components/CronConfigView';
 import NotificationsView from '@/app/modules/notifications/components/NotificationsView';
 import AlertConfigView from '@/app/modules/notifications/components/AlertConfigView';
@@ -105,8 +104,6 @@ export default function AdminDashboard() {
                 return <GoNoGoView />;
             case 'canaux':
                 return <ChannelsView />;
-            case 'automessages':
-                return <MessageAutoView />;
             case 'conversations':
                 return (
                     <ConversationsView

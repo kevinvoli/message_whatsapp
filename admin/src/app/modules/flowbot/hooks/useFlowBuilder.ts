@@ -9,6 +9,7 @@ import {
     upsertEdges,
     deleteEdge,
     upsertTriggers,
+    deleteTrigger,
 } from '../api/flowbot.api';
 
 export interface UseFlowBuilderReturn {
@@ -22,6 +23,7 @@ export interface UseFlowBuilderReturn {
     saveEdges: (edges: Partial<FlowEdge>[]) => Promise<FlowEdge[]>;
     removeEdge: (edgeId: string) => Promise<void>;
     saveTriggers: (triggers: Partial<FlowTrigger>[]) => Promise<FlowTrigger[]>;
+    removeTrigger: (triggerId: string) => Promise<void>;
 }
 
 export function useFlowBuilder(flowId: string | null): UseFlowBuilderReturn {
@@ -104,5 +106,15 @@ export function useFlowBuilder(flowId: string | null): UseFlowBuilderReturn {
         }
     }, [flowId, reload]);
 
-    return { flow, loading, error, saving, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers };
+    const removeTrigger = useCallback(async (triggerId: string) => {
+        setSaving(true);
+        try {
+            await deleteTrigger(triggerId);
+            await reload();
+        } finally {
+            setSaving(false);
+        }
+    }, [reload]);
+
+    return { flow, loading, error, saving, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers, removeTrigger };
 }

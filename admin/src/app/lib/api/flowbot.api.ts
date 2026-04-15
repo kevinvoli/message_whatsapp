@@ -105,6 +105,14 @@ export async function upsertTriggers(flowId: string, triggers: Partial<FlowTrigg
     return handleResponse<FlowTrigger[]>(res);
 }
 
+export async function deleteTrigger(id: string): Promise<void> {
+    const res = await fetch(`${BASE}/triggers/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) await handleResponse<void>(res);
+}
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export async function getFlowAnalytics(flowId: string): Promise<FlowAnalyticsRow[]> {

@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -24,7 +24,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'conversations', name: 'Conversations', icon: MessageSquare, badge: null },
       { id: 'messages', name: 'Messages', icon: MessageCircle, badge: null },
-      { id: 'automessages', name: 'Messages auto', icon: MessageSquareText, badge: null },
+      { id: 'flowbot', name: 'Automatisations', icon: Bot, badge: null },
     ],
   },
   {
@@ -60,13 +60,6 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'notifications', name: 'Notifications', icon: Bell, badge: null },
       { id: 'alert-config', name: 'Alertes système', icon: Bell, badge: null },
-    ],
-  },
-  {
-    label: 'FlowBot',
-    icon: Bot,
-    items: [
-      { id: 'flowbot', name: 'Flux conversationnels', icon: Bot, badge: 'NEW' },
     ],
   },
 ];

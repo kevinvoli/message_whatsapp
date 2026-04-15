@@ -29,7 +29,7 @@ const NODE_COLORS: Record<string, string> = {
 type Tab = 'nodes' | 'edges' | 'triggers' | 'analytics';
 
 export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps) {
-    const { flow, loading, error, saving, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers } = useFlowBuilder(flowId);
+    const { flow, loading, error, saving, reload, saveNodes, removeNode, saveEdges, removeEdge, saveTriggers, removeTrigger } = useFlowBuilder(flowId);
     const { update } = useFlows();
     const [tab, setTab] = useState<Tab>('nodes');
     const [analytics, setAnalytics] = useState<FlowAnalyticsRow[]>([]);
@@ -297,7 +297,7 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
                     )}
                     <div className="space-y-2">
                         {triggers.map(trigger => (
-                            <TriggerCard key={trigger.id} trigger={trigger} onEdit={() => setEditingTrigger({ ...trigger })} onDelete={() => { /* pas d'endpoint delete trigger — re-save sans lui */ }} />
+                            <TriggerCard key={trigger.id} trigger={trigger} onEdit={() => setEditingTrigger({ ...trigger })} onDelete={() => void removeTrigger(trigger.id)} />
                         ))}
                     </div>
                     {editingTrigger && (
@@ -413,7 +413,7 @@ function EdgeCard({ edge, nodes, onEdit, onDelete }: { edge: FlowEdge; nodes: Fl
     );
 }
 
-function TriggerCard({ trigger, onEdit }: { trigger: FlowTrigger; onEdit: () => void; onDelete: () => void }) {
+function TriggerCard({ trigger, onEdit, onDelete }: { trigger: FlowTrigger; onEdit: () => void; onDelete: () => void }) {
     return (
         <div className="bg-white border border-purple-100 rounded-lg px-4 py-3 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 text-sm">
@@ -421,7 +421,10 @@ function TriggerCard({ trigger, onEdit }: { trigger: FlowTrigger; onEdit: () => 
                 <span className="font-medium text-purple-800">{TRIGGER_LABELS[trigger.triggerType] ?? trigger.triggerType}</span>
                 {!!trigger.config?.keyword && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-100">&quot;{String(trigger.config.keyword)}&quot;</span>}
             </div>
-            <button onClick={onEdit} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Éditer</button>
+            <div className="flex gap-1.5">
+                <button onClick={onEdit} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Éditer</button>
+                <button onClick={onDelete} className="px-2 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100">×</button>
+            </div>
         </div>
     );
 }
