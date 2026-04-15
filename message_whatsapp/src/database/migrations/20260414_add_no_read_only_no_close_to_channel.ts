@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddNoReadOnlyNoCloseToChannel20260414 implements MigrationInterface {
-  name = 'AddNoReadOnlyNoCloseToChannel20260414';
+export class AddNoReadOnlyNoCloseToChannel1776211200000 implements MigrationInterface {
+  name = 'AddNoReadOnlyNoCloseToChannel1776211200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

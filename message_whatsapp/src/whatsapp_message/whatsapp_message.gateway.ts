@@ -643,16 +643,23 @@ export class WhatsappMessageGateway
       before,
     );
 
-    // Filtrage par canal dédié : isoler les messages selon le contexte du poste
-    const dedicatedChannelIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
-    const filteredMessages = messages.filter((m) => {
-      if (dedicatedChannelIds.length > 0) {
-        // Poste dédié : afficher uniquement les messages de ses canaux dédiés
-        return dedicatedChannelIds.includes(m.dedicated_channel_id ?? '');
-      }
-      // Poste normal (pool) : afficher uniquement les messages hors canal dédié
-      return !m.dedicated_channel_id;
-    });
+    // Filtrage par canal dédié : isoler les messages selon le contexte du poste.
+    // Si le chat est directement assigné au poste de l'agent (isOwnPosteChat),
+    // tous les messages lui appartiennent — pas de filtre (évite d'exclure les
+    // messages historiques dont dedicated_channel_id est NULL car reçus avant
+    // que le channel soit dédié).
+    let filteredMessages = messages;
+    if (!isOwnPosteChat) {
+      const dedicatedChannelIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
+      filteredMessages = messages.filter((m) => {
+        if (dedicatedChannelIds.length > 0) {
+          // Poste dédié (tenant) : afficher uniquement les messages de ses canaux dédiés
+          return dedicatedChannelIds.includes(m.dedicated_channel_id ?? '');
+        }
+        // Poste normal (pool) : afficher uniquement les messages hors canal dédié
+        return !m.dedicated_channel_id;
+      });
+    }
 
     client.emit('chat:event', {
       type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
