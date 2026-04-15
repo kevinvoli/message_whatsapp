@@ -76,6 +76,18 @@ export class QueueService implements OnModuleInit {
       return null;
     }
 
+    // Un poste avec au moins un canal dédié ne doit jamais entrer dans la queue pool.
+    // Cette vérification est volontairement au niveau le plus bas pour couvrir
+    // tous les chemins d'appel (connexion agent, fillQueue, syncQueue, unblock…).
+    const dedicatedChannel = await this.channelRepository.findOne({
+      where: { poste_id: posteId },
+      select: ['channel_id'],
+    });
+    if (dedicatedChannel) {
+      this.logQueueEvent('skip_add_dedicated', { poste_id: posteId });
+      return null;
+    }
+
     const existing = await this.queueRepository.findOne({
       where: { poste_id: posteId },
     });
