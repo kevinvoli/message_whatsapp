@@ -43,6 +43,8 @@ import {
   BotInboundMessageEvent,
 } from 'src/flowbot/events/bot-inbound-message.event';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { ChannelService } from 'src/channel/channel.service';
+import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -67,6 +69,9 @@ export class InboundMessageService {
     private readonly mediaPersistence: MediaPersistenceService,
     // ── Étape 8 — découplage via événements ──────────────────────────────────
     private readonly eventEmitter: EventEmitter2,
+    // ── Résolution nom Messenger ─────────────────────────────────────────────
+    private readonly channelService: ChannelService,
+    private readonly messengerService: CommunicationMessengerService,
   ) {}
 
   // ─── Messages entrants ────────────────────────────────────────────────────
@@ -209,29 +214,6 @@ export class InboundMessageService {
       instagram: 'instagram',
       telegram: 'telegram',
     };
-  /**
-   * Résout le nom d'un expéditeur Messenger via Graph API.
-   * Fire-and-forget sur erreur : ne bloque jamais le traitement du message.
-   * Timeout de 5s sur l'appel Graph API (configuré dans getUserName).
-   */
-  private async resolveMessengerFromName(
-    psid: string,
-    channelId: string,
-  ): Promise<string | undefined> {
-    try {
-      // Priorité 1 : recherche par channel_id (cas normal)
-      // Priorité 2 : recherche par external_id (page ID) quand channel_id est NULL en BDD
-      //   → dans ce cas channelId = pageId (fallback du webhook controller)
-      const channel =
-        (await this.channelService.findByChannelId(channelId)) ??
-        (await this.channelService.findChannelByExternalId('messenger', channelId));
-
-      if (!channel?.token) {
-        this.logger.warn(
-          `MESSENGER_NAME_SKIP psid=${psid} channelId=${channelId} — channel introuvable ou token manquant. Vérifiez la configuration du canal Messenger (token, external_id/page_id).`,
-        );
-        return undefined;
-      }
 
     const BOT_MSG_TYPES = new Set<string>([
       'text', 'image', 'audio', 'video', 'document', 'sticker', 'reaction',
@@ -269,5 +251,40 @@ export class InboundMessageService {
     event.isOutOfHours = false; // TODO: brancher BusinessHoursService (TICKET-12-B follow-up)
     event.agentAssignedRef = conversation.poste_id ?? undefined;
     return event;
+  }
+
+  /**
+   * Résout le nom d'un expéditeur Messenger via Graph API.
+   * Fire-and-forget sur erreur : ne bloque jamais le traitement du message.
+   * Timeout de 5s sur l'appel Graph API (configuré dans getUserName).
+   */
+  private async resolveMessengerFromName(
+    psid: string,
+    channelId: string,
+  ): Promise<string | undefined> {
+    try {
+      // Priorité 1 : recherche par channel_id (cas normal)
+      // Priorité 2 : recherche par external_id (page ID) quand channel_id est NULL en BDD
+      //   → dans ce cas channelId = pageId (fallback du webhook controller)
+      const channel =
+        (await this.channelService.findByChannelId(channelId)) ??
+        (await this.channelService.findChannelByExternalId('messenger', channelId));
+
+      if (!channel?.token) {
+        this.logger.warn(
+          `MESSENGER_NAME_SKIP psid=${psid} channelId=${channelId} — channel introuvable ou token manquant. Vérifiez la configuration du canal Messenger (token, external_id/page_id).`,
+        );
+        return undefined;
+      }
+
+      const name = await this.messengerService.getUserName(
+        psid,
+        channel.token,
+        channel.external_id ?? undefined,
+      );
+      return name ?? undefined;
+    } catch {
+      return undefined;
+    }
   }
 }

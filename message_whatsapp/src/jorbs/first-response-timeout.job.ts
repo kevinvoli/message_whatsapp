@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { DispatchQueryService } from 'src/dispatcher/infrastructure/dispatch-query.service';
 import { SlaPolicyService } from 'src/dispatcher/domain/sla-policy.service';
-import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CronConfigService } from './cron-config.service';
 
@@ -14,7 +13,6 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     private readonly dispatcher: DispatcherService,
     private readonly queryService: DispatchQueryService,
     private readonly slaPolicy: SlaPolicyService,
-    private readonly messageAutoService: MessageAutoService,
     private readonly cronConfigService: CronConfigService,
   ) {}
 

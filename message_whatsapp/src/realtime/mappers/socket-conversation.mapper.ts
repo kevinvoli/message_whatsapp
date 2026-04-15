@@ -23,7 +23,6 @@ export function mapConversation(
       chat.status === WhatsappChatStatus.EN_ATTENTE ? 'attente' : chat.status,
     unreadCount,
     createdAt: chat.createdAt,
-    auto_message_status: chat.auto_message_status,
     last_activity_at: chat.last_activity_at,
     last_client_message_at: chat.last_client_message_at || null,
     last_poste_message_at: chat.last_poste_message_at || null,
