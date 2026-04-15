@@ -39,10 +39,12 @@ export class ContactController {
   findAll(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('search') search?: string,
   ) {
     return this.service.findAll(
       limit ? Math.min(parseInt(limit, 10), 200) : 50,
       offset ? parseInt(offset, 10) : 0,
+      search,
     );
   }
 

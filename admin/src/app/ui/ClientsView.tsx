@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, Trash2, UserPlus, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Edit, Trash2, UserPlus, RefreshCw, Search, X } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
 import { Client } from '@/app/lib/definitions';
 import { createClient, deleteClient, updateClient, getClients } from '@/app/lib/api';
@@ -20,6 +20,10 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
@@ -28,10 +32,10 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [formChatId, setFormChatId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
 
-  const loadPage = useCallback(async (l: number, o: number) => {
+  const loadPage = useCallback(async (l: number, o: number, s?: string) => {
     setLoading(true);
     try {
-      const result = await getClients(l, o);
+      const result = await getClients(l, o, s);
       setClients(result.data);
       setTotal(result.total);
     } finally {
@@ -39,7 +43,22 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
     }
   }, []);
 
-  useEffect(() => { void loadPage(limit, offset); }, [loadPage, limit, offset]);
+  useEffect(() => { void loadPage(limit, offset, searchQuery); }, [loadPage, limit, offset, searchQuery]);
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setOffset(0);
+      setSearchQuery(value);
+    }, 300);
+  }
+
+  function clearSearch() {
+    setSearchInput('');
+    setSearchQuery('');
+    setOffset(0);
+  }
 
   const openAddModal = () => {
     setFormName(''); setFormPhone(''); setFormChatId(''); setFormIsActive(true);
@@ -94,21 +113,40 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        <button type="button" onClick={() => void loadPage(limit, offset)}
-          title="Rafraîchir" aria-label="Rafraîchir"
-          className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800">
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
-
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Clients</h2>
-        <button onClick={openAddModal} disabled={loading}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
-          <UserPlus className="h-4 w-4" />
-          Ajouter un client
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Champ de recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Rechercher par nom, téléphone…"
+              className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Effacer la recherche"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <button type="button" onClick={() => void loadPage(limit, offset, searchQuery)}
+            title="Rafraîchir" aria-label="Rafraîchir"
+            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button onClick={openAddModal} disabled={loading}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50">
+            <UserPlus className="h-4 w-4" />
+            Ajouter un client
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
