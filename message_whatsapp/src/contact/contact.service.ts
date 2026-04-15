@@ -73,12 +73,23 @@ export class ContactService {
     });
   }
 
-  async findAll(limit = 50, offset = 0): Promise<{ data: unknown[]; total: number }> {
-    const [contacts, total] = await this.repo.findAndCount({
-      order: { createdAt: 'DESC' },
-      take: limit,
-      skip: offset,
-    });
+  async findAll(limit = 50, offset = 0, search?: string): Promise<{ data: unknown[]; total: number }> {
+    const qb = this.repo.createQueryBuilder('contact');
+
+    if (search?.trim()) {
+      const term = `%${search.trim()}%`;
+      qb.where(
+        'contact.name LIKE :term OR contact.phone LIKE :term OR contact.chat_id LIKE :term',
+        { term },
+      );
+    }
+
+    const [contacts, total] = await qb
+      .orderBy('contact.createdAt', 'DESC')
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
+
     return { data: contacts, total };
   }
 

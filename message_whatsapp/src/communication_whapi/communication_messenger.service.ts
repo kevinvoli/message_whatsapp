@@ -60,28 +60,113 @@ export class CommunicationMessengerService {
       ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
       : accessToken;
 
-    try {
-      const response = await axios.get<{ name?: string }>(
-        `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
-        { params: { fields: 'name', access_token: effectiveToken } },
+    // ── Méthode 1 : Conversations API ────────────────────────────────────────
+    // Nécessite uniquement pages_messaging (déjà requis pour envoyer/recevoir).
+    // Évite d'avoir besoin de pages_read_engagement pour lire le profil direct.
+    // GET /me/conversations?user_id={psid}&fields=participants.fields(name)
+    const nameFromConversations = await this.resolveNameFromConversations(
+      psid,
+      pageId,
+      effectiveToken,
+    );
+    if (nameFromConversations) {
+      this.nameCache.set(psid, { name: nameFromConversations, expiresAt: Date.now() + 60 * 60_000 });
+      this.logger.log(
+        `MESSENGER_NAME_RESOLVED_CONV psid=${psid} name="${nameFromConversations}"`,
+        CommunicationMessengerService.name,
       );
-      const name = response.data?.name;
+      return nameFromConversations;
+    }
+
+    // ── Méthode 2 : Profil direct ─────────────────────────────────────────────
+    // Requiert pages_read_engagement. Utilisé en fallback si la méthode 1 échoue.
+    try {
+      const response = await axios.get<{
+        name?: string;
+        first_name?: string;
+        last_name?: string;
+      }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
+        {
+          params: { fields: 'name,first_name,last_name', access_token: effectiveToken },
+          timeout: 5_000,
+        },
+      );
+
+      const data = response.data;
+      const name =
+        data?.name?.trim() ||
+        [data?.first_name, data?.last_name].filter(Boolean).join(' ').trim() ||
+        null;
+
       if (name) {
         this.nameCache.set(psid, { name, expiresAt: Date.now() + 60 * 60_000 });
         this.logger.log(
-          `MESSENGER_NAME_RESOLVED psid=${psid} name="${name}"`,
+          `MESSENGER_NAME_RESOLVED_DIRECT psid=${psid} name="${name}"`,
           CommunicationMessengerService.name,
         );
         return name;
       }
+
+      this.logger.warn(
+        `MESSENGER_NAME_EMPTY psid=${psid} — Aucun champ de nom disponible. Vérifiez que l'app a la permission pages_read_engagement ou pages_messaging.`,
+        CommunicationMessengerService.name,
+      );
       return null;
     } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
-      const detail = axiosErr.response?.data?.error?.message ?? String(err);
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
+      const apiError = axiosErr.response?.data?.error;
+      const detail = apiError
+        ? `code=${apiError.code} type=${apiError.type ?? '-'}: ${apiError.message}`
+        : String(err);
       this.logger.warn(
         `MESSENGER_GET_USER_NAME_FAILED psid=${psid} — ${detail}`,
         CommunicationMessengerService.name,
       );
+      return null;
+    }
+  }
+
+  /**
+   * Récupère le nom d'un utilisateur Messenger via l'API Conversations.
+   * Requiert uniquement pages_messaging (pas de permission supplémentaire).
+   * Cherche dans les conversations récentes de la page l'entrée correspondant au PSID.
+   */
+  private async resolveNameFromConversations(
+    psid: string,
+    pageId: string | undefined,
+    effectiveToken: string,
+  ): Promise<string | null> {
+    try {
+      // "me" résout automatiquement vers la page avec un PAT.
+      // user_id filtre directement la conversation avec ce PSID.
+      const response = await axios.get<{
+        data?: Array<{
+          participants?: {
+            data?: Array<{ id: string; name?: string }>;
+          };
+        }>;
+      }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/me/conversations`,
+        {
+          params: {
+            user_id: psid,
+            fields: 'participants',
+            access_token: effectiveToken,
+          },
+          timeout: 5_000,
+        },
+      );
+
+      const conversations = response.data?.data ?? [];
+      if (conversations.length === 0) return null;
+
+      const participants = conversations[0].participants?.data ?? [];
+      // L'entrée du participant qui n'est PAS la page Facebook = le client
+      const user = participants.find((p) => p.id !== pageId && p.name?.trim());
+      return user?.name?.trim() ?? null;
+    } catch {
+      // Silencieux : on passe à la méthode 2
       return null;
     }
   }
@@ -234,33 +319,126 @@ export class CommunicationMessengerService {
     return { providerMessageId: messageId, attachmentId };
   }
 
+  /**
+   * Résout l'URL CDN d'un attachment Messenger sans télécharger le fichier.
+   * Utilisé par le proxy streaming pour les vidéos (forward Range → CDN direct).
+   */
+  async resolveMediaCdnUrl(
+    messageId: string,
+    accessToken: string,
+    pageId?: string,
+  ): Promise<{ url: string; apiMimeType?: string } | null> {
+    try {
+      const effectiveToken = pageId
+        ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+        : accessToken;
+
+      const metaResponse = await axios.get(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${messageId}?fields=attachments`,
+        { headers: { Authorization: `Bearer ${effectiveToken}` }, timeout: 10_000 },
+      );
+
+      type GraphAttachment = {
+        payload?: { url?: string };
+        file_url?: string;
+        image_data?: { url?: string };
+        video_data?: { url?: string };
+        audio_data?: { url?: string };
+        file_data?: { url?: string };
+        mime_type?: string;
+      };
+      const att: GraphAttachment | undefined =
+        (metaResponse.data?.attachments?.data ?? [])[0];
+
+      const url =
+        att?.payload?.url ??
+        att?.file_url ??
+        att?.image_data?.url ??
+        att?.video_data?.url ??
+        att?.audio_data?.url ??
+        att?.file_data?.url ??
+        null;
+
+      if (!url) return null;
+      return { url, apiMimeType: att?.mime_type ?? undefined };
+    } catch {
+      return null;
+    }
+  }
+
   async downloadMedia(
     messageId: string,
     accessToken: string,
-  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    pageId?: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; apiMimeType?: string } | null> {
     try {
+      // Dériver le PAT si un pageId est fourni (même logique que sendTextMessage).
+      // Nécessaire quand le token stocké est un User/System User Token.
+      const effectiveToken = pageId
+        ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+        : accessToken;
+
       const metaUrl = `https://graph.facebook.com/${this.META_API_VERSION}/${messageId}?fields=attachments`;
       const metaResponse = await axios.get(metaUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${effectiveToken}` },
+        timeout: 10_000,
       });
 
-      const attachments: Array<{ payload?: { url?: string } }> =
+      // La Graph API peut retourner l'URL dans plusieurs champs selon le type :
+      // - Images/vidéos : payload.url (format webhook standard)
+      // - Audio/fichiers : file_url directement sur l'objet attachment
+      // - Formats alternatifs : image_data.url, video_data.url, etc.
+      type GraphAttachment = {
+        payload?: { url?: string };
+        file_url?: string;          // audio, documents, fichiers génériques
+        image_data?: { url?: string };
+        video_data?: { url?: string };
+        audio_data?: { url?: string };
+        file_data?: { url?: string };
+        mime_type?: string;         // type MIME renvoyé par l'API (plus fiable que le CDN)
+      };
+      const attachments: GraphAttachment[] =
         metaResponse.data?.attachments?.data ?? [];
-      const attachmentUrl = attachments[0]?.payload?.url ?? null;
-      if (!attachmentUrl) return null;
+      const att = attachments[0];
+
+      const attachmentUrl =
+        att?.payload?.url ??
+        att?.file_url ??            // audio et documents
+        att?.image_data?.url ??
+        att?.video_data?.url ??
+        att?.audio_data?.url ??
+        att?.file_data?.url ??
+        null;
+
+      // MIME type déclaré par l'API Graph (ex: "audio/mpeg", "audio/mp4").
+      // Plus fiable que le Content-Type du CDN pour les audios M4A servis en video/mp4.
+      const apiMimeType = att?.mime_type ?? undefined;
+
+      if (!attachmentUrl) {
+        this.logger.warn(
+          `MESSENGER_MEDIA_NO_URL messageId=${messageId} — aucune URL trouvée dans les attachments Graph API. Response: ${JSON.stringify(metaResponse.data)}`,
+          CommunicationMessengerService.name,
+        );
+        return null;
+      }
 
       const downloadResponse = await axios.get(attachmentUrl, {
         responseType: 'arraybuffer',
+        timeout: 15_000,
       });
 
       const buffer = Buffer.from(downloadResponse.data);
       const mimeType =
         (downloadResponse.headers['content-type'] as string | undefined) ??
         'application/octet-stream';
-      return { buffer, mimeType };
+      return { buffer, mimeType, apiMimeType };
     } catch (error) {
+      const axiosErr = error as AxiosError<{ error?: { message?: string; code?: number } }>;
+      const detail = axiosErr.response?.data?.error
+        ? `code=${axiosErr.response.data.error.code}: ${axiosErr.response.data.error.message}`
+        : String(error);
       this.logger.warn(
-        `MESSENGER_MEDIA_DOWNLOAD_FAILED messageId=${messageId}`,
+        `MESSENGER_MEDIA_DOWNLOAD_FAILED messageId=${messageId} — ${detail}`,
         CommunicationMessengerService.name,
       );
       return null;

@@ -94,6 +94,45 @@ export class ChannelService implements OnModuleInit {
     return channels.map((c) => c.channel_id);
   }
 
+  /**
+   * Retourne true si le channel identifié par channelId est dédié à un poste
+   * (poste_id IS NOT NULL). Utilisé par le dispatcher pour le routage.
+   */
+  async isChannelDedicated(channelId: string): Promise<boolean> {
+    if (!channelId) return false;
+    const ch = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      select: ['channel_id', 'poste_id'],
+    });
+    return !!ch?.poste_id;
+  }
+
+  /**
+   * Retourne true si les conversations de ce channel ne doivent jamais passer
+   * en lecture seule (flag no_read_only activé par l'admin).
+   */
+  async isReadOnlyBlocked(channelId: string): Promise<boolean> {
+    if (!channelId) return false;
+    const ch = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      select: ['channel_id', 'no_read_only'],
+    });
+    return !!ch?.no_read_only;
+  }
+
+  /**
+   * Retourne true si les conversations de ce channel ne doivent jamais être
+   * fermées (flag no_close activé par l'admin).
+   */
+  async isCloseBlocked(channelId: string): Promise<boolean> {
+    if (!channelId) return false;
+    const ch = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      select: ['channel_id', 'no_close'],
+    });
+    return !!ch?.no_close;
+  }
+
   async findAll() {
     return this.channelRepository.find({ relations: ['poste'] });
   }

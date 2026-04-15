@@ -76,6 +76,18 @@ export class QueueService implements OnModuleInit {
       return null;
     }
 
+    // Un poste avec au moins un canal dédié ne doit jamais entrer dans la queue pool.
+    // Cette vérification est volontairement au niveau le plus bas pour couvrir
+    // tous les chemins d'appel (connexion agent, fillQueue, syncQueue, unblock…).
+    const dedicatedChannel = await this.channelRepository.findOne({
+      where: { poste_id: posteId },
+      select: ['channel_id'],
+    });
+    if (dedicatedChannel) {
+      this.logQueueEvent('skip_add_dedicated', { poste_id: posteId });
+      return null;
+    }
+
     const existing = await this.queueRepository.findOne({
       where: { poste_id: posteId },
     });
@@ -223,6 +235,8 @@ export class QueueService implements OnModuleInit {
       }
 
       // ─── ÉTAPE 2 : fallback BDD (queue vide ou tous exclus par canaux dédiés) ─
+      // On exclut toujours les postes dédiés : un poste avec canal dédié ne doit
+      // jamais recevoir de conversations provenant d'autres canaux (pool).
       this.logger.warn(
         `Queue vide ou tous exclus — fallback BDD vers le poste le moins chargé`,
       );
@@ -231,6 +245,9 @@ export class QueueService implements OnModuleInit {
         .createQueryBuilder('p')
         .innerJoin('p.commercial', 'c')
         .where('p.is_queue_enabled = :enabled', { enabled: true })
+        .andWhere(
+          `p.id NOT IN (SELECT DISTINCT poste_id FROM whapi_channels WHERE poste_id IS NOT NULL)`,
+        )
         .getMany();
 
       if (allPostes.length === 0) {
@@ -331,13 +348,22 @@ export class QueueService implements OnModuleInit {
    */
   async fillQueueWithAllPostes(): Promise<void> {
     await this.queueLock.runExclusive(async () => {
+      // Récupérer les IDs de postes dédiés (canaux exclusifs) à exclure de la queue pool
+      const dedicatedRows = await this.channelRepository
+        .createQueryBuilder('c')
+        .select('DISTINCT c.poste_id', 'poste_id')
+        .where('c.poste_id IS NOT NULL')
+        .getRawMany<{ poste_id: string }>();
+      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
+
       const postes = await this.posteRepository.find({
         where: { is_queue_enabled: true },
         relations: ['commercial'],
       });
 
+      // Exclure les postes dédiés : ils ne doivent jamais recevoir de conversations pool
       const postesWithCommercial = postes.filter(
-        (p) => (p.commercial?.length ?? 0) > 0,
+        (p) => (p.commercial?.length ?? 0) > 0 && !dedicatedSet.has(p.id),
       );
 
       for (const poste of postesWithCommercial) {
@@ -377,22 +403,38 @@ export class QueueService implements OnModuleInit {
   }
 
   /**
-   * Verifie s'il reste au moins un agent actif.
+   * Vérifie s'il reste au moins un poste pool actif (hors postes dédiés).
+   * Un poste dédié ne doit pas faire croire que la queue pool est alimentée.
    */
   async hasActivePostes(): Promise<boolean> {
-    const count = await this.posteRepository.count({
-      where: { is_active: true },
-    });
+    const count = await this.posteRepository
+      .createQueryBuilder('p')
+      .where('p.is_active = :active', { active: true })
+      .andWhere(
+        `p.id NOT IN (SELECT DISTINCT poste_id FROM whapi_channels WHERE poste_id IS NOT NULL)`,
+      )
+      .getCount();
     return count > 0;
   }
 
   async syncQueueWithActivePostes(): Promise<void> {
     await this.queueLock.runExclusive(async () => {
+      // Exclure les postes dédiés de la queue pool
+      const dedicatedRows = await this.channelRepository
+        .createQueryBuilder('c')
+        .select('DISTINCT c.poste_id', 'poste_id')
+        .where('c.poste_id IS NOT NULL')
+        .getRawMany<{ poste_id: string }>();
+      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
+
       const activePostes = await this.posteRepository.find({
         where: { is_active: true, is_queue_enabled: true },
       });
 
-      const activeIds = activePostes.map((p) => p.id);
+      // Ne garder que les postes non dédiés dans la queue pool
+      const activeIds = activePostes
+        .filter((p) => !dedicatedSet.has(p.id))
+        .map((p) => p.id);
       const queue = await this.queueRepository.find();
 
       for (const qp of queue) {
@@ -402,6 +444,7 @@ export class QueueService implements OnModuleInit {
       }
 
       for (const poste of activePostes) {
+        if (dedicatedSet.has(poste.id)) continue; // jamais dans la queue pool
         const exists = queue.some((q) => q.poste_id === poste.id);
         if (!exists) {
           await this.addPosteToQueueInternal(poste.id);

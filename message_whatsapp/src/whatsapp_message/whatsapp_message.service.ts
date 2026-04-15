@@ -212,7 +212,8 @@ export class WhatsappMessageService {
           // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
           ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),
           // Le commercial vient de répondre → lecture seule jusqu'à la prochaine réponse client
-          ...(data.poste_id ? { read_only: true } : {}),
+          // Exception : canal dédié → jamais en lecture seule
+          ...(data.poste_id && !channel.poste_id ? { read_only: true } : {}),
           last_activity_at: new Date(),
         },
       );
@@ -376,7 +377,8 @@ export class WhatsappMessageService {
         {
           unread_count: 0,
           last_poste_message_at: messageEntity.createdAt,
-          read_only: true,
+          // Canal dédié → jamais en lecture seule
+          ...(channel.poste_id ? {} : { read_only: true }),
           last_activity_at: new Date(),
         },
       );

@@ -137,12 +137,25 @@ export class MessengerAdapter
   private resolveMedia(
     message: MessengerMessaging['message'],
   ): UnifiedMessage['media'] | undefined {
-    if (!message?.attachments?.length) return undefined;
+    if (!message) return undefined;
+
+    // Cas 1 : sticker (built-in Facebook) — sticker_id présent, pas d'attachment dans le webhook.
+    // On utilise le `mid` comme identifiant : le proxy appellera GET /{mid}?fields=attachments
+    // pour récupérer l'image du sticker via Graph API (accessible avec pages_messaging).
+    if (message.sticker_id && !message.attachments?.length) {
+      return { id: message.mid };
+    }
+
+    if (!message.attachments?.length) return undefined;
+
     const attachment = message.attachments[0];
-    if (!attachment.payload?.url) return undefined;
+
+    // Cas 2 : sticker avec attachment (custom sticker packs) ou image/vidéo.
+    // On passe l'URL CDN si disponible (optimisation : évite un appel Graph API).
+    // Si l'URL est absente, le proxy re-fetche via GET /{mid}?fields=attachments.
     return {
       id: message.mid,
-      link: attachment.payload.url,
+      link: attachment.payload?.url ?? undefined,
     };
   }
 

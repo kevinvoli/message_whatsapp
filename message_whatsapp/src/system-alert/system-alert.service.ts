@@ -311,7 +311,7 @@ export class SystemAlertService implements OnModuleInit {
         ];
         channels = [preferred, ...restOrdered];
         this.logger.log(
-          `Canal préféré : ${preferred.label ?? preferred.channel_id} + ${rest.length} fallback(s)`,
+          `Canal préféré : ${preferred.label ?? preferred.channel_id} (${preferred.provider ?? 'whapi'}) + ${rest.length} fallback(s)`,
         );
       } else {
         this.logger.warn(
@@ -355,7 +355,6 @@ export class SystemAlertService implements OnModuleInit {
     for (const channel of channels) {
       const channelLabel = channel.label ?? channel.channel_id;
       const provider = channel.provider ?? 'whapi';
-
       try {
         this.logger.log(
           `Tentative envoi alerte → ${recipient.name} (${normalizedPhone}) via ${channelLabel} [${provider}]`,
@@ -374,11 +373,12 @@ export class SystemAlertService implements OnModuleInit {
             text,
             to: normalizedPhone,
             phoneNumberId: channel.external_id,
-            accessToken: channel.token,
+            accessToken: channel.token?.trim() ?? '',
           });
 
+          const msgId = result.providerMessageId;
           this.logger.log(
-            `✅ Alerte envoyée à ${recipient.name} via Meta ${channelLabel} — id=${result.providerMessageId}`,
+            `✅ Alerte envoyée à ${recipient.name} via Meta ${channelLabel} — id=${msgId}`,
           );
           return {
             recipientName: recipient.name,
@@ -387,16 +387,15 @@ export class SystemAlertService implements OnModuleInit {
             channelId: channel.channel_id,
             channelName: channelLabel,
             error: null,
-            providerMessageId: result.providerMessageId,
+            providerMessageId: msgId,
             messageStatus: 'sent',
             whapiFlagged: false,
           };
         }
 
-        // Provider Whapi (par défaut)
+        // Provider Whapi (par défaut) — CommunicationWhapiService attend uniquement des chiffres (^\d{8,20}$)
         const response = await this.whapiService.sendToWhapiChannel({
           text,
-          // CommunicationWhapiService attend uniquement des chiffres (^\d{8,20}$)
           to: normalizedPhone,
           channelId: channel.channel_id,
         });
@@ -404,10 +403,6 @@ export class SystemAlertService implements OnModuleInit {
         const msgId = response.message?.id ?? null;
         const msgStatus = response.message?.status ?? null;
         const whapiFlagged = response.sent === false;
-
-        this.logger.log(
-          `Whapi response — sent=${response.sent}, status=${msgStatus}, messageId=${msgId}`,
-        );
 
         if (whapiFlagged) {
           const reason = `Whapi a retourné sent=false (status=${msgStatus ?? 'inconnu'}, id=${msgId ?? 'none'})`;
@@ -440,7 +435,7 @@ export class SystemAlertService implements OnModuleInit {
     const detailedError =
       channelErrors.length > 0
         ? `Tous les canaux ont échoué :\n${channelErrors.join('\n')}`
-        : `Aucun canal essayé`;
+        : 'Aucun canal essayé';
 
     this.logger.error(detailedError);
     return {
