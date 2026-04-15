@@ -51,7 +51,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
     searchTimer.current = setTimeout(() => {
       setOffset(0);
       setSearchQuery(value);
-    }, 300);
+    }, 1000);
   }
 
   function clearSearch() {
