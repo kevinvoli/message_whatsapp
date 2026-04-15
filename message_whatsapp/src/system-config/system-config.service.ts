@@ -1,4 +1,5 @@
-import { forwardRef, Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SystemConfig } from './entities/system-config.entity';
@@ -51,12 +52,20 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
 export class SystemConfigService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SystemConfigService.name);
 
+  private channelService: ChannelService | null = null;
+
   constructor(
     @InjectRepository(SystemConfig)
     private readonly repo: Repository<SystemConfig>,
-    @Inject(forwardRef(() => ChannelService))
-    private readonly channelService: ChannelService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private getChannelService(): ChannelService {
+    if (!this.channelService) {
+      this.channelService = this.moduleRef.get(ChannelService, { strict: false });
+    }
+    return this.channelService!;
+  }
 
   async onApplicationBootstrap() {
     await this.seedFromEnv();
@@ -195,7 +204,7 @@ export class SystemConfigService implements OnApplicationBootstrap {
     ];
 
     // Telegram : une URL par bot enregistré dans whapi_channels
-    const allChannels = await this.channelService.findAll();
+    const allChannels = await this.getChannelService().findAll();
     const telegramChannels = allChannels.filter((c) => c.provider === 'telegram');
 
     if (telegramChannels.length === 0) {
