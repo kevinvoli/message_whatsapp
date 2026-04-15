@@ -60,6 +60,8 @@ import { IncomingMessagePersistenceService } from 'src/ingress/infrastructure/in
 import { InboundStateUpdateService } from 'src/ingress/domain/inbound-state-update.service';
 import { WhapiProviderAdapter } from './adapters/whapi-provider.adapter';
 import { FlowBotModule } from 'src/flowbot/flowbot.module';
+import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
+import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 
 @Module({
   imports: [
@@ -123,6 +125,8 @@ import { FlowBotModule } from 'src/flowbot/flowbot.module';
     IncomingMessagePersistenceService,
     InboundStateUpdateService,
     WhapiProviderAdapter,
+    ChannelProviderRegistry,
+    ResolveTenantUseCase,
   ],
 })
 export class WhapiModule implements OnModuleInit {

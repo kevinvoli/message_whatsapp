@@ -45,6 +45,8 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { ConversationReadQueryService } from 'src/conversations/infrastructure/conversation-read-query.service';
+import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
+import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 
 @Module({
   imports: [
@@ -97,6 +99,8 @@ import { ConversationReadQueryService } from 'src/conversations/infrastructure/c
     RedispatchWaitingUseCase,
     ResetStuckActiveUseCase,
     ConversationReadQueryService,
+    ChannelProviderRegistry,
+    ResolveTenantUseCase,
   ],
   exports: [
     DispatcherService,
