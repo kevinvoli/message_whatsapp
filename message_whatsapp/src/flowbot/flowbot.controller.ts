@@ -6,10 +6,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { FlowCrudService } from './services/flow-crud.service';
 import { FlowAnalyticsService } from './services/flow-analytics.service';
+import { FlowMonitorService } from './services/flow-monitor.service';
 import { BotProviderAdapterRegistry } from './services/bot-provider-adapter-registry.service';
 import { FlowBot } from './entities/flow-bot.entity';
 import { FlowNode } from './entities/flow-node.entity';
@@ -23,6 +25,7 @@ export class FlowBotController {
   constructor(
     private readonly crudService: FlowCrudService,
     private readonly analyticsService: FlowAnalyticsService,
+    private readonly monitorService: FlowMonitorService,
     private readonly adapterRegistry: BotProviderAdapterRegistry,
   ) {}
 
@@ -99,6 +102,31 @@ export class FlowBotController {
   @Get('flows/:flowId/analytics')
   getAnalytics(@Param('flowId') flowId: string) {
     return this.analyticsService.findByFlow(flowId);
+  }
+
+  // ─── Monitoring sessions ──────────────────────────────────────────────────
+
+  @Get('flows/:flowId/sessions')
+  getFlowSessions(
+    @Param('flowId') flowId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.monitorService.findRecentByFlow(flowId, limit ? parseInt(limit, 10) : 20);
+  }
+
+  @Get('flows/:flowId/sessions/active')
+  getFlowActiveSessions(@Param('flowId') flowId: string) {
+    return this.monitorService.findActiveByFlow(flowId);
+  }
+
+  @Get('sessions/:sessionId/logs')
+  getSessionLogs(@Param('sessionId') sessionId: string) {
+    return this.monitorService.findSessionLogs(sessionId);
+  }
+
+  @Delete('sessions/:sessionId')
+  cancelSession(@Param('sessionId') sessionId: string) {
+    return this.monitorService.cancelSession(sessionId);
   }
 
   // ─── Providers enregistrés ────────────────────────────────────────────────

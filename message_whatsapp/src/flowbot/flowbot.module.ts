@@ -22,6 +22,7 @@ import { FlowSessionService } from './services/flow-session.service';
 import { FlowTriggerService } from './services/flow-trigger.service';
 import { FlowVariableService } from './services/flow-variable.service';
 import { FlowAnalyticsService } from './services/flow-analytics.service';
+import { FlowMonitorService } from './services/flow-monitor.service';
 
 // Listeners
 import { BotInboundListener } from './listeners/bot-inbound.listener';
@@ -46,6 +47,7 @@ const ENTITIES = [
   FlowNodeAnalytics,
 ];
 
+
 const SERVICES = [
   BotProviderAdapterRegistry,
   BotConversationService,
@@ -56,6 +58,7 @@ const SERVICES = [
   FlowTriggerService,
   FlowVariableService,
   FlowAnalyticsService,
+  FlowMonitorService,
 ];
 
 @Module({

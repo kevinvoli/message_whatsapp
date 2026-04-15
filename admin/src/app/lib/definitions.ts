@@ -105,6 +105,37 @@ export interface FlowAnalyticsRow {
   avgDurationSeconds?: number;
 }
 
+export type FlowSessionStatus =
+  | 'active' | 'waiting_reply' | 'waiting_delay'
+  | 'completed' | 'escalated' | 'expired' | 'cancelled';
+
+export interface FlowSession {
+  id: string;
+  conversationId: string;
+  flowId: string;
+  currentNodeId: string | null;
+  status: FlowSessionStatus;
+  variables: Record<string, unknown>;
+  stepsCount: number;
+  triggerType: string | null;
+  startedAt: string;
+  lastActivityAt: string | null;
+  completedAt: string | null;
+  escalatedAt: string | null;
+}
+
+export interface FlowSessionLog {
+  id: string;
+  sessionId: string;
+  nodeId: string | null;
+  nodeType: string | null;
+  edgeTakenId: string | null;
+  action: string | null;
+  result: string | null;
+  metadata: Record<string, unknown> | null;
+  executedAt: string;
+}
+
 export type NavigationItem = {
   id: ViewMode;
   name: string;

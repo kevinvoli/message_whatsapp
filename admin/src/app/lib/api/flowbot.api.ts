@@ -1,4 +1,4 @@
-import type { FlowBot, FlowNode, FlowEdge, FlowTrigger, FlowAnalyticsRow } from '../definitions';
+import type { FlowBot, FlowNode, FlowEdge, FlowTrigger, FlowAnalyticsRow, FlowSession, FlowSessionLog } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 const BASE = `${API_BASE_URL}/flowbot`;
@@ -126,4 +126,29 @@ export async function getRegisteredProviders(): Promise<string[]> {
     const res = await fetch(`${BASE}/providers`, { credentials: 'include' });
     const data = await handleResponse<{ providers: string[] }>(res);
     return data.providers;
+}
+
+// ─── Monitoring sessions ──────────────────────────────────────────────────────
+
+export async function getFlowSessions(flowId: string, limit = 20): Promise<FlowSession[]> {
+    const res = await fetch(`${BASE}/flows/${flowId}/sessions?limit=${limit}`, { credentials: 'include' });
+    return handleResponse<FlowSession[]>(res);
+}
+
+export async function getFlowActiveSessions(flowId: string): Promise<FlowSession[]> {
+    const res = await fetch(`${BASE}/flows/${flowId}/sessions/active`, { credentials: 'include' });
+    return handleResponse<FlowSession[]>(res);
+}
+
+export async function getSessionLogs(sessionId: string): Promise<FlowSessionLog[]> {
+    const res = await fetch(`${BASE}/sessions/${sessionId}/logs`, { credentials: 'include' });
+    return handleResponse<FlowSessionLog[]>(res);
+}
+
+export async function cancelSession(sessionId: string): Promise<void> {
+    const res = await fetch(`${BASE}/sessions/${sessionId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) await handleResponse<void>(res);
 }
