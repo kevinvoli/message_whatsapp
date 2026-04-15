@@ -54,4 +54,14 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   permanent_token?: boolean;
+
+  /** Bloque le passage en lecture seule des conversations de ce channel */
+  @IsOptional()
+  @IsBoolean()
+  no_read_only?: boolean;
+
+  /** Bloque la fermeture automatique ou manuelle des conversations de ce channel */
+  @IsOptional()
+  @IsBoolean()
+  no_close?: boolean;
 }

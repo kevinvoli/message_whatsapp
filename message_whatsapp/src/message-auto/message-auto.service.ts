@@ -307,11 +307,21 @@ export class MessageAutoService {
       MessageAutoService.name,
     );
 
-    const template = await this.getAutoMessageByPosition(position);
+    // Utilise getTemplateForTrigger pour respecter le scope (canal/poste/global).
+    // getAutoMessageByPosition ignorait le scope → les templates scopés sur un canal
+    // étaient envoyés à tous les clients indépendamment de leur canal.
+    const template = await this.getTemplateForTrigger(
+      AutoMessageTriggerType.SEQUENCE,
+      position,
+      {
+        posteId: chat.poste_id,
+        channelId: chat.last_msg_client_channel_id,
+      },
+    );
 
     if (!template) {
       this.logger.warn(
-        `AUTO_MESSAGE_NO_TEMPLATE chatId=${chatId} position=${position} provider=${provider} — Aucun template SEQUENCE actif à cette position. Vérifiez la configuration des messages auto dans l'interface admin.`,
+        `AUTO_MESSAGE_NO_TEMPLATE chatId=${chatId} position=${position} provider=${provider} channel=${chat.last_msg_client_channel_id} poste=${chat.poste_id ?? 'null'} — Aucun template SEQUENCE actif pour ce scope. Vérifiez la configuration des messages auto dans l'interface admin.`,
         MessageAutoService.name,
       );
       return;
