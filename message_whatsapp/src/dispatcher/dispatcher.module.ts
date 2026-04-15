@@ -44,6 +44,7 @@ import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { ConversationReadQueryService } from 'src/conversations/infrastructure/conversation-read-query.service';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     ReinjectConversationUseCase,
     RedispatchWaitingUseCase,
     ResetStuckActiveUseCase,
+    ConversationReadQueryService,
   ],
   exports: [
     DispatcherService,
