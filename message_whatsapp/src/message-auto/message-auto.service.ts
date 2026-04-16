@@ -149,14 +149,22 @@ export class MessageAutoService {
     const poolCanal = options?.channelId
       ? filtered.filter((t) => t.scope_type === 'canal' && t.scope_id === options.channelId)
       : [];
-    const poolGlobal = filtered.filter((t) => {
-      if (t.scope_type) return false;
-      const excChannels: string[] = t.conditions?.excluded_channel_ids ?? [];
-      const excPostes: string[] = t.conditions?.excluded_poste_ids ?? [];
-      if (options?.channelId && excChannels.includes(options.channelId)) return false;
-      if (options?.posteId && excPostes.includes(options.posteId)) return false;
-      return true;
-    });
+
+    // Isolation des canaux : si des templates canal-scopés existent dans `filtered`
+    // (pour n'importe quel canal), le canal courant qui n'a PAS son propre template scopé
+    // ne doit PAS recevoir le template global en fallback — sinon le même message partirait
+    // vers tous les canaux non ciblés.
+    const anyCanalScoped = filtered.some((t) => t.scope_type === 'canal' && t.scope_id);
+    const poolGlobal = anyCanalScoped && poolCanal.length === 0
+      ? []
+      : filtered.filter((t) => {
+          if (t.scope_type) return false;
+          const excChannels: string[] = t.conditions?.excluded_channel_ids ?? [];
+          const excPostes: string[] = t.conditions?.excluded_poste_ids ?? [];
+          if (options?.channelId && excChannels.includes(options.channelId)) return false;
+          if (options?.posteId && excPostes.includes(options.posteId)) return false;
+          return true;
+        });
 
     const pool = poolPoste.length ? poolPoste : poolCanal.length ? poolCanal : poolGlobal;
 
