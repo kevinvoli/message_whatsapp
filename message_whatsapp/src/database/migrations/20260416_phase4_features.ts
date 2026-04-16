@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   - whatsapp_broadcast          (P4.3 — Broadcasts)
  *   - whatsapp_broadcast_recipient (P4.3 — Destinataires)
  */
-export class Phase4Features20260416 implements MigrationInterface {
-  name = 'Phase4Features20260416';
+export class Phase4Features1744761600002 implements MigrationInterface {
+  name = 'Phase4Features1744761600002';
 
   async up(qr: QueryRunner): Promise<void> {
     // ── whatsapp_template ─────────────────────────────────────────────────────

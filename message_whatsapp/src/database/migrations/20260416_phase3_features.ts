@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Phase 3 — Migrations pour les nouvelles fonctionnalités :
@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
  *   - chat_label_assignment  (P3.3 — assignations)
  *   - gdpr_optout       (P3.5 — opt-out RGPD)
  */
-export class Phase3Features20260416 implements MigrationInterface {
-  name = 'Phase3Features20260416';
+export class Phase3Features1744761600001 implements MigrationInterface {
+  name = 'Phase3Features1744761600001';
 
   async up(qr: QueryRunner): Promise<void> {
     // ── canned_response ────────────────────────────────────────────────────────
