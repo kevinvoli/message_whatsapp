@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import type {
-  MessageAuto, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig,
+  MessageAuto, MessageAutoConditions, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig,
   CronConfig, UpdateCronConfigPayload, Poste, Channel, KeywordMatchType,
 } from '@/app/lib/definitions';
 import {
@@ -493,6 +493,8 @@ interface TemplateFormFieldsProps {
   scopeId: string; onScopeIdChange: (v: string) => void;
   scopeLabel: string; onScopeLabelChange: (v: string) => void;
   clientTypeTarget: string; onClientTypeTargetChange: (v: string) => void;
+  excludedChannelIds: string[]; onExcludedChannelIdsChange: (v: string[]) => void;
+  excludedPosteIds: string[]; onExcludedPosteIdsChange: (v: string[]) => void;
   showClientType: boolean;
   postes: Poste[]; channels: Channel[];
   idPrefix: string;
@@ -503,6 +505,8 @@ function TemplateFormFields({
   position, onPositionChange, actif, onActifChange,
   scopeType, onScopeTypeChange, scopeId, onScopeIdChange,
   scopeLabel, onScopeLabelChange, clientTypeTarget, onClientTypeTargetChange,
+  excludedChannelIds, onExcludedChannelIdsChange,
+  excludedPosteIds, onExcludedPosteIdsChange,
   showClientType, postes, channels, idPrefix,
 }: TemplateFormFieldsProps) {
   return (
@@ -574,14 +578,14 @@ function TemplateFormFields({
               className="w-full rounded border px-2 py-1.5 text-sm text-gray-700 focus:outline-none bg-white"
               value={scopeId}
               onChange={(e) => {
-                const c = channels.find((x) => x.id === e.target.value);
+                const c = channels.find((x) => x.channel_id === e.target.value);
                 onScopeIdChange(e.target.value);
                 onScopeLabelChange(c?.label || 'Canal sans nom');
               }}
             >
               <option value="">-- Sélectionner un canal --</option>
               {channels.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.channel_id}>
                   {c.label || 'Canal sans nom'}
                 </option>
               ))}
@@ -603,6 +607,57 @@ function TemplateFormFields({
             <option value="new">Nouveau contact uniquement</option>
             <option value="returning">Client fidèle uniquement</option>
           </select>
+        </div>
+      )}
+
+      {/* Exclusions (global seulement) */}
+      {!scopeType && (
+        <div className="mb-4 rounded border border-orange-200 bg-orange-50 p-3">
+          <p className="mb-2 text-xs font-bold text-orange-700">Exclusions (scope global uniquement)</p>
+          <div className="mb-2">
+            <label className="mb-1 block text-xs text-gray-600">Canaux exclus</label>
+            <div className="flex flex-col gap-1">
+              {channels.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={excludedChannelIds.includes(c.channel_id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onExcludedChannelIdsChange([...excludedChannelIds, c.channel_id]);
+                      } else {
+                        onExcludedChannelIdsChange(excludedChannelIds.filter((id) => id !== c.channel_id));
+                      }
+                    }}
+                  />
+                  {c.label || 'Canal sans nom'}
+                </label>
+              ))}
+              {channels.length === 0 && <span className="text-xs text-gray-400">Aucun canal disponible</span>}
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-600">Postes exclus</label>
+            <div className="flex flex-col gap-1">
+              {postes.map((p) => (
+                <label key={p.id} className="flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={excludedPosteIds.includes(p.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onExcludedPosteIdsChange([...excludedPosteIds, p.id]);
+                      } else {
+                        onExcludedPosteIdsChange(excludedPosteIds.filter((id) => id !== p.id));
+                      }
+                    }}
+                  />
+                  {p.name}
+                </label>
+              ))}
+              {postes.length === 0 && <span className="text-xs text-gray-400">Aucun poste disponible</span>}
+            </div>
+          </div>
         </div>
       )}
 
@@ -644,6 +699,8 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
   const [fScopeId, setFScopeId] = useState('');
   const [fScopeLabel, setFScopeLabel] = useState('');
   const [fClientType, setFClientType] = useState('all');
+  const [fExcludedChannelIds, setFExcludedChannelIds] = useState<string[]>([]);
+  const [fExcludedPosteIds, setFExcludedPosteIds] = useState<string[]>([]);
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
@@ -680,6 +737,8 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
     setFScopeId(msg?.scope_id ?? '');
     setFScopeLabel(msg?.scope_label ?? '');
     setFClientType(msg?.client_type_target ?? 'all');
+    setFExcludedChannelIds(msg?.conditions?.excluded_channel_ids ?? []);
+    setFExcludedPosteIds(msg?.conditions?.excluded_poste_ids ?? []);
   };
 
   const openAdd = () => { resetForm(); setShowAddModal(true); };
@@ -689,6 +748,9 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
     e.preventDefault();
     setFormLoading(true);
     try {
+      const conditions: MessageAutoConditions | null = !fScopeType && (fExcludedChannelIds.length > 0 || fExcludedPosteIds.length > 0)
+        ? { excluded_channel_ids: fExcludedChannelIds, excluded_poste_ids: fExcludedPosteIds }
+        : null;
       const created = await createMessageAuto({
         body: fBody, delai: fDelai, position: fPosition, actif: fActif,
         trigger_type: trigger,
@@ -696,6 +758,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
         scope_id: fScopeId || null,
         scope_label: fScopeLabel || null,
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
+        conditions,
       });
       setTemplates((prev) => [...prev, created]);
       addToast({ type: 'success', message: 'Template ajouté.' });
@@ -710,12 +773,16 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
     if (!current) return;
     setFormLoading(true);
     try {
+      const conditions: MessageAutoConditions | null = !fScopeType && (fExcludedChannelIds.length > 0 || fExcludedPosteIds.length > 0)
+        ? { excluded_channel_ids: fExcludedChannelIds, excluded_poste_ids: fExcludedPosteIds }
+        : null;
       const updated = await updateMessageAuto(current.id, {
         body: fBody, delai: fDelai, position: fPosition, actif: fActif,
         scope_type: fScopeType as MessageAuto['scope_type'] || null,
         scope_id: fScopeId || null,
         scope_label: fScopeLabel || null,
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
+        conditions,
       });
       setTemplates((prev) => prev.map((t) => t.id === updated.id ? updated : t));
       addToast({ type: 'success', message: 'Template mis à jour.' });
@@ -756,6 +823,8 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
       scopeId={fScopeId} onScopeIdChange={setFScopeId}
       scopeLabel={fScopeLabel} onScopeLabelChange={setFScopeLabel}
       clientTypeTarget={fClientType} onClientTypeTargetChange={setFClientType}
+      excludedChannelIds={fExcludedChannelIds} onExcludedChannelIdsChange={setFExcludedChannelIds}
+      excludedPosteIds={fExcludedPosteIds} onExcludedPosteIdsChange={setFExcludedPosteIds}
       showClientType={showClientType}
       postes={postes} channels={channels}
     />

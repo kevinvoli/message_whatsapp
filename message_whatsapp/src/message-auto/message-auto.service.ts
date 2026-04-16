@@ -149,7 +149,14 @@ export class MessageAutoService {
     const poolCanal = options?.channelId
       ? filtered.filter((t) => t.scope_type === 'canal' && t.scope_id === options.channelId)
       : [];
-    const poolGlobal = filtered.filter((t) => !t.scope_type);
+    const poolGlobal = filtered.filter((t) => {
+      if (t.scope_type) return false;
+      const excChannels: string[] = t.conditions?.excluded_channel_ids ?? [];
+      const excPostes: string[] = t.conditions?.excluded_poste_ids ?? [];
+      if (options?.channelId && excChannels.includes(options.channelId)) return false;
+      if (options?.posteId && excPostes.includes(options.posteId)) return false;
+      return true;
+    });
 
     const pool = poolPoste.length ? poolPoste : poolCanal.length ? poolCanal : poolGlobal;
 

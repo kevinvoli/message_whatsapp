@@ -168,6 +168,15 @@ export type BusinessHoursConfig = {
   updatedAt?: string;
 };
 
+export type MessageAutoConditions = {
+  poste_id?: string;
+  channel_id?: string;
+  client_type?: string;
+  excluded_channel_ids?: string[];
+  excluded_poste_ids?: string[];
+  [key: string]: unknown;
+};
+
 export type MessageAuto = {
   id: string;
   body: string;
@@ -180,6 +189,7 @@ export type MessageAuto = {
   scope_id?: string | null;
   scope_label?: string | null;
   client_type_target?: 'all' | 'new' | 'returning' | null;
+  conditions?: MessageAutoConditions | null;
   keywords?: AutoMessageKeyword[];
   createdAt?: string;
   updatedAt?: string;

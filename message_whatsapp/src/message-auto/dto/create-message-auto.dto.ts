@@ -20,6 +20,8 @@ export class MessageAutoConditionsDto {
   @IsOptional() @IsString()  poste_id?: string;
   @IsOptional() @IsString()  channel_id?: string;
   @IsOptional() @IsString()  client_type?: string;
+  @IsOptional() @IsArray() @IsString({ each: true })  excluded_channel_ids?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true })  excluded_poste_ids?: string[];
 }
 
 export class CreateAutoMessageKeywordDto {
