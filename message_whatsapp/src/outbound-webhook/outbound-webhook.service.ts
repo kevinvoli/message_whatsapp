@@ -9,24 +9,78 @@ import { Repository, LessThanOrEqual } from 'typeorm';
 import { createHmac } from 'crypto';
 import { OutboundWebhook } from './entities/outbound-webhook.entity';
 import { OutboundWebhookLog, WebhookDeliveryStatus } from './entities/outbound-webhook-log.entity';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsUrl,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class CreateWebhookDto {
+  @IsString()
   tenant_id: string;
+
+  @IsString()
   name: string;
+
+  @IsUrl()
   url: string;
+
+  @IsArray()
+  @IsString({ each: true })
   events: string[];
+
+  @IsOptional()
+  @IsString()
   secret?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
   max_retries?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
   retry_delay_seconds?: number;
 }
 
 export class UpdateWebhookDto {
+  @IsOptional()
+  @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsUrl()
   url?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   events?: string[];
+
+  @IsOptional()
+  @IsString()
   secret?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
   max_retries?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
   retry_delay_seconds?: number;
+
+  @IsOptional()
+  @IsBoolean()
   is_active?: boolean;
 }
 

@@ -11,21 +11,59 @@ import { Role, Permission } from './entities/role.entity';
 import { CommercialRole } from './entities/commercial-role.entity';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
 
 const CACHE_TTL = 300; // 5 minutes
 const permCacheKey = (commercialId: string, tenantId: string) =>
   `rbac:perms:${tenantId}:${commercialId}`;
 
 export class CreateRoleDto {
+  @IsString()
   tenant_id: string;
+
+  @IsString()
   name: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
+
+  @IsArray()
+  @IsEnum(
+    ['chat:view','chat:reply','chat:close','chat:transfer','chat:merge',
+     'contact:view','contact:edit','contact:delete','contact:export',
+     'crm:view','crm:edit','label:view','label:manage',
+     'analytics:view','analytics:export','canned:view','canned:manage',
+     'admin:panel','user:manage','channel:manage'],
+    { each: true },
+  )
   permissions: Permission[];
 }
 
 export class UpdateRoleDto {
+  @IsOptional()
+  @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsEnum(
+    ['chat:view','chat:reply','chat:close','chat:transfer','chat:merge',
+     'contact:view','contact:edit','contact:delete','contact:export',
+     'crm:view','crm:edit','label:view','label:manage',
+     'analytics:view','analytics:export','canned:view','canned:manage',
+     'admin:panel','user:manage','channel:manage'],
+    { each: true },
+  )
   permissions?: Permission[];
 }
 

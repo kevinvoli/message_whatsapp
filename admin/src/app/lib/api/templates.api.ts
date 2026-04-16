@@ -8,14 +8,14 @@ export async function getTemplates(tenantId: string): Promise<WhatsappTemplate[]
 
 export async function createTemplate(data: {
   tenant_id: string;
-  channel_id: string;
+  channel_id?: string;
   name: string;
   category: string;
   language: string;
-  body: string;
+  body_text: string;
   header_type?: string;
   header_content?: string;
-  footer?: string;
+  footer_text?: string;
 }): Promise<WhatsappTemplate> {
   const r = await fetch(`${API_BASE_URL}/admin/templates`, {
     method: 'POST',
@@ -26,12 +26,12 @@ export async function createTemplate(data: {
   return handleResponse<WhatsappTemplate>(r);
 }
 
-export async function disableTemplate(id: string, tenantId: string): Promise<WhatsappTemplate> {
-  const r = await fetch(`${API_BASE_URL}/admin/templates/${id}/disable?tenant_id=${tenantId}`, {
-    method: 'PATCH',
+export async function disableTemplate(id: string, tenantId: string): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/admin/templates/${id}?tenant_id=${tenantId}`, {
+    method: 'DELETE',
     credentials: 'include',
   });
-  return handleResponse<WhatsappTemplate>(r);
+  if (!r.ok) throw new Error(`Erreur ${r.status}`);
 }
 
 export async function deleteTemplate(id: string, tenantId: string): Promise<void> {

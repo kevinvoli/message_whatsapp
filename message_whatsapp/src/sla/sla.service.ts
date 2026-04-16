@@ -8,21 +8,58 @@ import { Repository } from 'typeorm';
 import { SlaRule, SlaMetric, SlaSeverity } from './entities/sla-rule.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  Min,
+} from 'class-validator';
 
 export class CreateSlaRuleDto {
+  @IsString()
   tenant_id: string;
+
+  @IsString()
   name: string;
+
+  @IsEnum(['first_response', 'resolution', 'reengagement'])
   metric: SlaMetric;
+
+  @IsNumber()
+  @Min(1)
   threshold_seconds: number;
+
+  @IsOptional()
+  @IsEnum(['warning', 'breach'])
   severity?: SlaSeverity;
+
+  @IsOptional()
+  @IsBoolean()
   notify_admin?: boolean;
 }
 
 export class UpdateSlaRuleDto {
+  @IsOptional()
+  @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
   threshold_seconds?: number;
+
+  @IsOptional()
+  @IsEnum(['warning', 'breach'])
   severity?: SlaSeverity;
+
+  @IsOptional()
+  @IsBoolean()
   notify_admin?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   is_active?: boolean;
 }
 
