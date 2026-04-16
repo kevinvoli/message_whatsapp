@@ -32,6 +32,14 @@ import FlowListView from '@/app/modules/flowbot/components/FlowListView';
 import FlowBuilderView from '@/app/modules/flowbot/components/FlowBuilderView';
 // ── Contexts (CTX-E1) ──────────────────────────────────────────────────────────
 import ContextsView from '@/app/modules/contexts/components/ContextsView';
+// ── Phase 5-6 modules ─────────────────────────────────────────────────────────
+import CrmView from '@/app/modules/crm/components/CrmView';
+import SlaView from '@/app/modules/sla/components/SlaView';
+import AuditView from '@/app/modules/audit/components/AuditView';
+import RolesView from '@/app/modules/rbac/components/RolesView';
+import WebhooksView from '@/app/modules/webhooks/components/WebhooksView';
+import BroadcastsView from '@/app/modules/broadcasts/components/BroadcastsView';
+import TemplatesView from '@/app/modules/templates/components/TemplatesView';
 import { useNotifications } from '@/app/modules/notifications/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -158,6 +166,20 @@ export default function AdminDashboard() {
                 );
             case 'contexts':
                 return <ContextsView />;
+            case 'crm':
+                return <CrmView />;
+            case 'sla-rules':
+                return <SlaView />;
+            case 'audit-logs':
+                return <AuditView />;
+            case 'roles':
+                return <RolesView />;
+            case 'outbound-webhooks':
+                return <WebhooksView />;
+            case 'broadcasts':
+                return <BroadcastsView />;
+            case 'templates':
+                return <TemplatesView />;
             default:
                 return null;
         }

@@ -32,6 +32,14 @@ export type ViewMode =
   | 'canaux'
   | 'conversations'
   | 'queue'
+  // Phase 5-6
+  | 'crm'
+  | 'sla-rules'
+  | 'audit-logs'
+  | 'roles'
+  | 'outbound-webhooks'
+  | 'broadcasts'
+  | 'templates'
   | 'dispatch'
   | 'crons'
   | 'observabilite'
@@ -809,3 +817,187 @@ export const COULEURS_STATUT = {
   online: 'green',
   offline: 'gray',
 } as const;
+
+// ============================================
+// PHASE 5 — CRM Custom Fields
+// ============================================
+
+export type FieldType = 'text' | 'number' | 'date' | 'boolean' | 'select' | 'multiselect';
+
+export interface ContactFieldDefinition {
+  id: string;
+  tenant_id: string;
+  name: string;
+  field_key: string;
+  field_type: FieldType;
+  options: string[] | null;
+  required: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactFieldValue {
+  id: string;
+  contact_id: string;
+  field_id: string;
+  value_text: string | null;
+  value_number: number | null;
+  value_date: string | null;
+  value_boolean: number | null;
+  value_json: string[] | null;
+}
+
+export interface ContactCrmField {
+  definition: ContactFieldDefinition;
+  value: ContactFieldValue | null;
+}
+
+// ============================================
+// PHASE 5 — SLA Rules
+// ============================================
+
+export type SlaMetric = 'first_response' | 'resolution' | 'reengagement';
+export type SlaSeverity = 'warning' | 'breach';
+
+export interface SlaRule {
+  id: string;
+  tenant_id: string;
+  name: string;
+  metric: SlaMetric;
+  threshold_seconds: number;
+  severity: SlaSeverity;
+  notify_admin: boolean;
+  is_active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// PHASE 5 — Audit Log
+// ============================================
+
+export type AuditAction =
+  | 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT'
+  | 'SEND_MESSAGE' | 'ASSIGN' | 'TRANSFER' | 'CLOSE' | 'REOPEN' | 'EXPORT';
+
+export interface AuditLog {
+  id: string;
+  tenant_id: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  actor_type: string | null;
+  action: AuditAction;
+  entity_type: string | null;
+  entity_id: string | null;
+  diff: Record<string, unknown> | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditLogPage {
+  items: AuditLog[];
+  total: number;
+}
+
+// ============================================
+// PHASE 5 — RBAC Roles
+// ============================================
+
+export type Permission =
+  | 'chat:view' | 'chat:reply' | 'chat:close' | 'chat:transfer' | 'chat:merge'
+  | 'contact:view' | 'contact:edit' | 'contact:delete' | 'contact:export'
+  | 'crm:view' | 'crm:edit'
+  | 'label:view' | 'label:manage'
+  | 'analytics:view' | 'analytics:export'
+  | 'canned:view' | 'canned:manage'
+  | 'admin:panel' | 'user:manage' | 'channel:manage';
+
+export interface Role {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  permissions: Permission[];
+  is_system: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// PHASE 4 — Templates HSM
+// ============================================
+
+export type TemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'IN_APPEAL' | 'FLAGGED' | 'DELETED';
+export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+
+export interface WhatsappTemplate {
+  id: string;
+  tenant_id: string;
+  channel_id: string;
+  name: string;
+  meta_template_id: string | null;
+  category: TemplateCategory;
+  language: string;
+  status: TemplateStatus;
+  header_type: string | null;
+  header_content: string | null;
+  body: string;
+  footer: string | null;
+  buttons: Record<string, unknown>[] | null;
+  rejection_reason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// PHASE 4 — Broadcasts
+// ============================================
+
+export type BroadcastStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+
+export interface Broadcast {
+  id: string;
+  tenant_id: string;
+  name: string;
+  status: BroadcastStatus;
+  template_id: string | null;
+  scheduled_at: string | null;
+  total_recipients: number;
+  sent_count: number;
+  delivered_count: number;
+  read_count: number;
+  failed_count: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// PHASE 6 — Outbound Webhooks
+// ============================================
+
+export type WebhookDeliveryStatus = 'pending' | 'success' | 'failed' | 'retrying';
+
+export interface OutboundWebhook {
+  id: string;
+  tenant_id: string;
+  name: string;
+  url: string;
+  events: string[];
+  max_retries: number;
+  retry_delay_seconds: number;
+  is_active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OutboundWebhookLog {
+  id: string;
+  webhook_id: string;
+  event: string;
+  status: WebhookDeliveryStatus;
+  response_status: number | null;
+  error: string | null;
+  attempt: number;
+  createdAt: string;
+}

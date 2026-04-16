@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -61,6 +61,31 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'notifications', name: 'Notifications', icon: Bell, badge: null },
       { id: 'alert-config', name: 'Alertes système', icon: Bell, badge: null },
+    ],
+  },
+  {
+    label: 'CRM & Contacts',
+    icon: Database,
+    items: [
+      { id: 'crm', name: 'Champs CRM', icon: Database, badge: null },
+    ],
+  },
+  {
+    label: 'Diffusion',
+    icon: Send,
+    items: [
+      { id: 'broadcasts', name: 'Broadcasts', icon: Send, badge: null },
+      { id: 'templates', name: 'Templates HSM', icon: FileCode2, badge: null },
+    ],
+  },
+  {
+    label: 'Gouvernance',
+    icon: Shield,
+    items: [
+      { id: 'sla-rules', name: 'Règles SLA', icon: Shield, badge: null },
+      { id: 'roles', name: 'Rôles & Permissions', icon: ShieldCheck, badge: null },
+      { id: 'audit-logs', name: 'Journal d\'audit', icon: ClipboardList, badge: null },
+      { id: 'outbound-webhooks', name: 'Webhooks sortants', icon: Webhook, badge: null },
     ],
   },
 ];
