@@ -430,6 +430,32 @@ export class DispatcherService {
       return;
     }
 
+    // Canal dédié : toujours router vers le poste dédié, jamais vers la queue globale.
+    const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
+    if (channelId) {
+      const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
+      if (dedicatedPosteId) {
+        const dedicatedPoste = await this.posteRepository.findOne({ where: { id: dedicatedPosteId } });
+        if (dedicatedPoste) {
+          await this.chatRepository.update(chat.id, {
+            poste: dedicatedPoste,
+            poste_id: dedicatedPoste.id,
+            assigned_mode: dedicatedPoste.is_active ? 'ONLINE' : 'OFFLINE',
+            status: dedicatedPoste.is_active
+              ? WhatsappChatStatus.ACTIF
+              : WhatsappChatStatus.EN_ATTENTE,
+            assigned_at: new Date(),
+            first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+          });
+          await this.messageGateway.emitConversationAssigned(chat.chat_id);
+          this.logger.log(`Orphelin dédié dispatché (${chat.chat_id}) → poste dédié ${dedicatedPoste.name}`);
+          return;
+        }
+        // Poste dédié introuvable (supprimé sans cascade) → fallback queue globale
+        this.logger.warn(`Poste dédié "${dedicatedPosteId}" introuvable pour orphelin (${chat.chat_id}) — fallback queue globale`);
+      }
+    }
+
     const nextPoste = await this.queueService.getNextInQueue();
     if (!nextPoste) {
       this.logger.warn(`⏳ Aucun agent disponible pour orphelin (${chat.chat_id}), reste EN_ATTENTE`);
@@ -672,7 +698,25 @@ export class DispatcherService {
       return { reset: 0 };
     }
 
+    let reset = 0;
     for (const chat of stuck) {
+      // Canal dédié : ne jamais effacer le poste_id — la conversation doit rester
+      // sur son poste dédié en EN_ATTENTE jusqu'au retour du poste.
+      const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
+      if (channelId) {
+        const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
+        if (dedicatedPosteId) {
+          await this.chatRepository.update(chat.id, {
+            status: WhatsappChatStatus.EN_ATTENTE,
+            assigned_mode: 'OFFLINE',
+            first_response_deadline_at: null,
+          });
+          this.logger.debug(`resetStuckActive: canal dédié — (${chat.chat_id}) → EN_ATTENTE sur poste ${dedicatedPosteId} (poste_id conservé)`);
+          reset++;
+          continue;
+        }
+      }
+
       await this.chatRepository.update(chat.id, {
         poste: null,
         poste_id: null,
@@ -685,10 +729,11 @@ export class DispatcherService {
       if (chat.poste_id) {
         await this.messageGateway.emitConversationRemoved(chat.chat_id, chat.poste_id);
       }
+      reset++;
     }
 
-    this.logger.log(`resetStuckActiveToWaiting: ${stuck.length} conversation(s) remises en EN_ATTENTE`);
-    return { reset: stuck.length };
+    this.logger.log(`resetStuckActiveToWaiting: ${reset} conversation(s) remises en EN_ATTENTE`);
+    return { reset };
   }
 
   async getDispatchSnapshot(): Promise<{
