@@ -48,6 +48,8 @@ import { ConversationTransferModule } from './conversation-transfer/conversation
 import { LabelModule } from './label/label.module';
 import { GdprOptoutModule } from './gdpr-optout/gdpr-optout.module';
 import { ConversationMergeModule } from './conversation-merge/conversation-merge.module';
+import { WhatsappTemplateModule } from './whatsapp-template/whatsapp-template.module';
+import { BroadcastModule } from './broadcast/broadcast.module';
 
 @Module({
   imports: [
@@ -151,6 +153,9 @@ import { ConversationMergeModule } from './conversation-merge/conversation-merge
     LabelModule,
     GdprOptoutModule,
     ConversationMergeModule,
+    // Phase 4 — Meta Webhook + Templates + Broadcasts
+    WhatsappTemplateModule,
+    BroadcastModule,
   ],
   controllers: [AppController],
   providers: [

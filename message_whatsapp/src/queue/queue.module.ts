@@ -14,6 +14,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
  */
 
 export const WEBHOOK_PROCESSING_QUEUE = 'webhook-processing';
+export const BROADCAST_QUEUE = 'broadcast-sending';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ export const WEBHOOK_PROCESSING_QUEUE = 'webhook-processing';
       },
     }),
     BullModule.registerQueue({ name: WEBHOOK_PROCESSING_QUEUE }),
+    BullModule.registerQueue({ name: BROADCAST_QUEUE }),
   ],
   exports: [BullModule],
 })

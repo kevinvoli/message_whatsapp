@@ -543,4 +543,25 @@ export class SystemAlertService implements OnModuleInit {
   getDefaultMessageTemplate(): string {
     return DEFAULT_MESSAGE_TEMPLATE;
   }
+
+  /**
+   * P4.1 — Événements de sécurité / alertes Meta injectés par les handlers.
+   * Ne bloque pas le pipeline — log + notification best-effort.
+   */
+  onSecurityEvent(event: {
+    source: string;
+    tenantId: string;
+    channelId: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+  }): Promise<void> {
+    this.logger.warn(
+      `SECURITY_EVENT source=${event.source} tenant=${event.tenantId} severity=${event.severity}: ${event.message}`,
+    );
+    // Émettre vers le dashboard admin via Socket.io si disponible
+    if (this.io) {
+      this.io.to('admin').emit('system:security_event', event);
+    }
+    return Promise.resolve();
+  }
 }

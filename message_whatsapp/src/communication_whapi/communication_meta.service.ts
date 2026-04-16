@@ -478,6 +478,55 @@ export class CommunicationMetaService {
     return body;
   }
 
+  /**
+   * P4.2/P4.3 — Envoi d'un template HSM via l'API Meta.
+   * Utilisé pour les broadcasts et les réponses hors-fenêtre.
+   */
+  async sendTemplateMessage(data: {
+    to: string;
+    phoneNumberId: string;
+    accessToken: string;
+    templateName: string;
+    language: string;
+    variables?: Record<string, string>;
+  }): Promise<{ providerMessageId: string }> {
+    const to = this.validateRecipient(data.to);
+    const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
+
+    // Construire les composants body (paramètres positionnels)
+    const bodyParams = Object.values(data.variables ?? {}).map((value) => ({
+      type: 'text',
+      text: String(value),
+    }));
+
+    const payload: Record<string, any> = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'template',
+      template: {
+        name: data.templateName,
+        language: { code: data.language },
+        components: bodyParams.length > 0
+          ? [{ type: 'body', parameters: bodyParams }]
+          : [],
+      },
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${data.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const messageId = response.data?.messages?.[0]?.id;
+    if (!messageId) {
+      throw new WhapiOutboundError('Meta template response missing message id', 'permanent');
+    }
+    return { providerMessageId: messageId };
+  }
+
   private classifyFailure(error: AxiosError): WhapiFailureKind {
     const statusCode = error.response?.status;
     if (!statusCode) return 'transient';

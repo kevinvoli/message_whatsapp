@@ -66,6 +66,11 @@ import { ContextModule } from 'src/context/context.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { QueueModule } from 'src/queue/queue.module';
 import { WebhookWorker } from 'src/queue/workers/webhook.worker';
+import { SecurityEventHandler } from 'src/webhooks/adapters/meta-event-handlers/security.handler';
+import { AccountAlertsHandler } from 'src/webhooks/adapters/meta-event-handlers/account-alerts.handler';
+import { TemplateStatusHandler } from 'src/webhooks/adapters/meta-event-handlers/template-status.handler';
+import { AccountUpdateHandler } from 'src/webhooks/adapters/meta-event-handlers/account-update.handler';
+import { MetaNonMessageHandler } from 'src/webhooks/adapters/meta-event-handlers/meta-non-message.handler';
 
 @Module({
   imports: [
@@ -135,6 +140,12 @@ import { WebhookWorker } from 'src/queue/workers/webhook.worker';
     ChannelProviderRegistry,
     ResolveTenantUseCase,
     WebhookWorker,
+    // P4.1 — Handlers Meta non-message
+    SecurityEventHandler,
+    AccountAlertsHandler,
+    TemplateStatusHandler,
+    AccountUpdateHandler,
+    MetaNonMessageHandler,
   ],
 })
 export class WhapiModule implements OnModuleInit {

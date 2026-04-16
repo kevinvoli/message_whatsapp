@@ -26,6 +26,8 @@ import { CreateChannelUseCase } from './application/create-channel.use-case';
 import { AssignChannelPosteUseCase } from './application/assign-channel-poste.use-case';
 import { ResolveTenantUseCase } from './application/resolve-tenant.use-case';
 import { MetaProviderAdapter } from './adapters/meta-provider.adapter';
+import { ChannelHealthService } from './channel-health.service';
+import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 
 /**
  * TICKET-05-B/C — Tous les providers sont enregistrés dans le module.
@@ -41,6 +43,7 @@ import { MetaProviderAdapter } from './adapters/meta-provider.adapter';
     JorbsModule,
     WhatsappChatModule,
     FlowBotModule,
+    SystemAlertModule,
   ],
   controllers: [ChannelController],
   providers: [
@@ -63,8 +66,10 @@ import { MetaProviderAdapter } from './adapters/meta-provider.adapter';
     TelegramChannelProviderService,
     // ── BotProviderAdapter (FlowBot outbound routing) ──────────────────────
     MetaProviderAdapter,
+    // ── P4.4 — Health check ────────────────────────────────────────────────
+    ChannelHealthService,
   ],
-  exports: [ChannelService, MetaTokenService, ChannelProviderRegistry],
+  exports: [ChannelService, MetaTokenService, ChannelProviderRegistry, ChannelHealthService],
 })
 export class ChannelModule implements OnModuleInit {
   constructor(
