@@ -41,6 +41,8 @@ import { FlowBotModule } from './flowbot/flowbot.module';
 import { MessageAutoCompatModule } from './message-auto-compat/message-auto-compat.module';
 import { ContextModule } from './context/context.module';
 import { RedisModule } from './redis/redis.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -49,6 +51,19 @@ import { RedisModule } from './redis/redis.module';
       WhapiChannel,
       WhatsappChat,
       Admin,
+    ]),
+    // P1.4 — Rate-limiting global (brute force protection)
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,
+        limit: 20,   // 20 req/s max par IP (anti-flood)
+      },
+      {
+        name: 'medium',
+        ttl: 60_000,
+        limit: 300,  // 300 req/min par IP
+      },
     ]),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ wildcard: false, global: true }),
@@ -127,6 +142,10 @@ import { RedisModule } from './redis/redis.module';
     ContextModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // P1.4 — Activer le guard throttler globalement
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

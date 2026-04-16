@@ -28,6 +28,7 @@ import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { UnifiedMessage } from '../normalization/unified-message';
 import {
   WhatsappChat,
@@ -95,6 +96,9 @@ const stateUpdateMock = { apply: jest.fn() };
 const mediaExtractionMock = { extract: jest.fn() };
 const mediaPersistenceMock = { persistAll: jest.fn() };
 const eventEmitterMock = { emit: jest.fn() };
+const distributedLockMock = {
+  withLock: jest.fn().mockImplementation((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
+};
 
 // ─── Suite ───────────────────────────────────────────────────────────────────
 
@@ -133,6 +137,7 @@ describe('InboundMessageService — pipeline ingress (TICKET-10-A-BIS)', () => {
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: ChannelService, useValue: channelServiceMock },
         { provide: CommunicationMessengerService, useValue: messengerServiceMock },
+        { provide: DistributedLockService, useValue: distributedLockMock },
       ],
     }).compile();
 

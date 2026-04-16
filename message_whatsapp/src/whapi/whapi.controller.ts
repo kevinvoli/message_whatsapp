@@ -13,6 +13,7 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { WhapiService } from './whapi.service';
@@ -23,12 +24,18 @@ import { InstagramWebhookPayload } from './interface/instagram-webhook.interface
 import { TelegramWebhookPayload } from './interface/telegram-webhook.interface';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { ChannelService } from 'src/channel/channel.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { WEBHOOK_PROCESSING_QUEUE } from 'src/queue/queue.module';
+import { WebhookJobData } from 'src/queue/jobs/webhook-processing.job';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { json } from 'stream/consumers';
 
+// Les webhooks reçoivent un volume légitime élevé — exemptés du throttler global
+@SkipThrottle()
 @Controller('webhooks')
 export class WhapiController {
   private readonly auditLogger = new Logger('WebhookAudit');
@@ -41,6 +48,8 @@ export class WhapiController {
     private readonly metricsService: WebhookMetricsService,
     private readonly unifiedIngressService: UnifiedIngressService,
     private readonly channelService: ChannelService,
+    @InjectQueue(WEBHOOK_PROCESSING_QUEUE)
+    private readonly webhookQueue: Queue<WebhookJobData>,
   ) {}
 
   @Post('whapi')
@@ -55,7 +64,7 @@ export class WhapiController {
     const correlationId = this.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
 
-    // this.assertWhapiSecret(headers, request.rawBody, payload);
+    this.assertWhapiSecret(headers, request.rawBody, payload);
 
 
 
@@ -129,25 +138,17 @@ export class WhapiController {
 
       switch (eventType) {
         case 'messages':
-          // Retourner 200 à Whapi IMMÉDIATEMENT — ne pas await le traitement.
-          // Si on attend, Whapi peut timeout et renvoyer le webhook (duplicates).
-          void this.whapiService
-            .handleIncomingMessage(payload, tenantId, correlationId)
-            .catch((err: Error) => {
-              this.auditLogger.error(
-                `WEBHOOK_ASYNC_ERROR provider=whapi event=messages tenant_id=${tenantId} error=${err.message}`,
-              );
-              this.metricsService.recordError(provider, tenantId, 'async_exception');
-            });
-          break;
         case 'statuses':
-          void this.whapiService
-            .updateStatusMessage(payload, tenantId, correlationId)
-            .catch((err: Error) => {
-              this.auditLogger.error(
-                `WEBHOOK_ASYNC_ERROR provider=whapi event=statuses tenant_id=${tenantId} error=${err.message}`,
-              );
-            });
+          // P2.1 — Enqueue dans BullMQ → retour 202 immédiat (< 50ms)
+          await this.webhookQueue.add('process', {
+            provider: 'whapi',
+            payload,
+            tenantId,
+            channelId: payload.channel_id,
+            correlationId,
+            eventType,
+            enqueuedAt: Date.now(),
+          });
           break;
         case 'events':
         case 'polls':
@@ -305,11 +306,16 @@ export class WhapiController {
             );
           }
         } else {
-          await this.unifiedIngressService.ingestMessenger(singleEntryPayload, {
+          // P2.1 — Enqueue BullMQ
+          await this.webhookQueue.add('process', {
             provider: 'messenger',
+            payload: singleEntryPayload,
             tenantId,
             channelId: entryChannelId,
-          }, correlationId);
+            correlationId,
+            eventType: 'messages',
+            enqueuedAt: Date.now(),
+          });
         }
       }
 
@@ -389,11 +395,16 @@ export class WhapiController {
     }
 
     try {
-      await this.unifiedIngressService.ingestTelegram(payload, {
+      // P2.1 — Enqueue BullMQ
+      await this.webhookQueue.add('process', {
         provider: 'telegram',
+        payload,
         tenantId,
         channelId,
-      }, correlationId);
+        correlationId,
+        eventType: 'messages',
+        enqueuedAt: Date.now(),
+      });
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -479,11 +490,16 @@ export class WhapiController {
     }
 
     try {
-      await this.unifiedIngressService.ingestInstagram(igPayload, {
+      // P2.1 — Enqueue BullMQ
+      await this.webhookQueue.add('process', {
         provider: 'instagram',
+        payload: igPayload,
         tenantId,
         channelId,
-      }, correlationId);
+        correlationId,
+        eventType: 'messages',
+        enqueuedAt: Date.now(),
+      });
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -620,7 +636,16 @@ export class WhapiController {
         );
       }
 
-      await this.whapiService.handleMetaWebhook(metaPayload, tenantId, correlationId);
+      // P2.1 — Enqueue BullMQ → retour immédiat
+      await this.webhookQueue.add('process', {
+        provider: 'meta',
+        payload: metaPayload,
+        tenantId,
+        channelId: phoneNumberId ?? wabaId ?? '',
+        correlationId,
+        eventType: field ?? 'messages',
+        enqueuedAt: Date.now(),
+      });
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(

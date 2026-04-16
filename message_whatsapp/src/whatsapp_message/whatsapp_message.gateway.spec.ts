@@ -37,6 +37,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any, // conversationPublisher
       {} as any, // queuePublisher
       agentConnectionService as any, // agentConnectionService
+      null, // redis (optionnel)
     );
   };
 

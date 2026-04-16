@@ -12,11 +12,14 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // P1.4 — Brute force protection : max 10 tentatives / 15 min par IP
+  @Throttle({ default: { ttl: 900_000, limit: 10 } })
   @Post('login')
   async login(
     @Body() loginDto: LoginDto,

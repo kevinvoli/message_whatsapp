@@ -8,8 +8,11 @@ import {
   OnGatewayInit,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, Optional } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -88,9 +91,23 @@ export class WhatsappMessageGateway
     private readonly conversationPublisher: ConversationPublisher,
     private readonly queuePublisher: QueuePublisher,
     private readonly agentConnectionService: AgentConnectionService,
+    @Optional() @Inject(REDIS_CLIENT)
+    private readonly redis: Redis | null,
   ) {}
 
   afterInit(server: Server): void {
+    // P2.3 — Redis adapter pour Socket.io cross-instance
+    if (this.redis) {
+      try {
+        // Créer deux connexions dédiées : pub + sub
+        const pubClient = this.redis.duplicate();
+        const subClient = this.redis.duplicate();
+        server.adapter(createAdapter(pubClient, subClient));
+        this.logger.log('Socket.io Redis adapter activé (broadcasts cross-instance)');
+      } catch (err) {
+        this.logger.warn(`Socket.io Redis adapter échec : ${(err as Error).message} — fallback in-memory`);
+      }
+    }
     this.realtimeServerService.setServer(server);
     this.systemAlert.setSocketServer(server);
   }

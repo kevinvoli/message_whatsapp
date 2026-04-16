@@ -63,6 +63,9 @@ import { FlowBotModule } from 'src/flowbot/flowbot.module';
 import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 import { ContextModule } from 'src/context/context.module';
+import { RedisModule } from 'src/redis/redis.module';
+import { QueueModule } from 'src/queue/queue.module';
+import { WebhookWorker } from 'src/queue/workers/webhook.worker';
 
 @Module({
   imports: [
@@ -89,6 +92,8 @@ import { ContextModule } from 'src/context/context.module';
     SystemAlertModule,
     FlowBotModule,
     ContextModule,
+    RedisModule,
+    QueueModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
@@ -129,6 +134,7 @@ import { ContextModule } from 'src/context/context.module';
     WhapiProviderAdapter,
     ChannelProviderRegistry,
     ResolveTenantUseCase,
+    WebhookWorker,
   ],
 })
 export class WhapiModule implements OnModuleInit {

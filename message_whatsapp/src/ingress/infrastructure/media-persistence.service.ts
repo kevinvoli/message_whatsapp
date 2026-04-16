@@ -115,20 +115,85 @@ export class MediaPersistenceService {
   ): Promise<void> {
     if (medias.length === 0) return;
 
-    // Résolution channel unique pour tous les médias du message
+    // P2.4.1 — Résolution channel unique + batch insert (au lieu de N inserts séquentiels)
     const resolvedChannel: WhapiChannel | null =
       unifiedMessage.channelId
         ? await this.channelService.findByChannelId(unifiedMessage.channelId)
         : null;
 
-    for (const media of medias) {
-      await this.persist(media, message, chat, {
-        tenantId: unifiedMessage.tenantId,
-        provider: unifiedMessage.provider,
-        providerMediaId: unifiedMessage.media?.id,
-        channelId: unifiedMessage.channelId,
-        resolvedChannel,
-      });
+    const context = {
+      tenantId: unifiedMessage.tenantId,
+      provider: unifiedMessage.provider,
+      providerMediaId: unifiedMessage.media?.id,
+      channelId: unifiedMessage.channelId,
+      resolvedChannel,
+    };
+
+    // Construire toutes les entités en mémoire
+    const entities = await Promise.all(
+      medias.map((media) => this.buildEntity(media, message, chat, context)),
+    );
+
+    // Un seul INSERT pour tous les médias du message
+    await this.mediaRepository.save(entities);
+  }
+
+  /**
+   * Construit l'entité WhatsappMedia sans la persister.
+   * Utilisé par persistAll() pour le batch insert.
+   */
+  private async buildEntity(
+    media: ExtractedMedia,
+    message: { id: string },
+    chat: { id?: string },
+    context: MediaPersistContext = {},
+  ): Promise<WhatsappMedia> {
+    const entity = new WhatsappMedia();
+
+    entity.media_type = media.type as WhatsappMediaType;
+    entity.tenant_id = context.tenantId ?? null;
+    entity.provider = context.provider ?? null;
+    entity.provider_media_id = context.providerMediaId ?? null;
+    entity.media_id = media.media_id!;
+    entity.whapi_media_id = media.media_id!;
+    entity.mime_type = media.mime_type ?? '';
+    entity.file_name = media.file_name ?? null;
+    entity.file_size = media.file_size?.toString() ?? null;
+    entity.duration_seconds = media.seconds ?? null;
+    entity.caption = media.caption ?? null;
+
+    const raw = media.payload as WhapiRawMedia | undefined;
+    entity.sha256 = raw?.sha256 ?? null;
+
+    if (context.resolvedChannel) {
+      entity.channel = context.resolvedChannel;
+    } else if (context.channelId) {
+      const ch = await this.channelService.findByChannelId(context.channelId);
+      if (ch) entity.channel = ch;
     }
+
+    let mediaUrl = raw?.link ?? null;
+
+    if (!mediaUrl && context.provider === 'meta' && context.providerMediaId) {
+      const channelQuery = context.channelId
+        ? `?channelId=${encodeURIComponent(context.channelId)}`
+        : '';
+      mediaUrl = `/messages/media/meta/${context.providerMediaId}${channelQuery}`;
+    }
+
+    if (context.provider === 'messenger' && context.providerMediaId) {
+      const channelQuery = context.channelId
+        ? `?channelId=${encodeURIComponent(context.channelId)}`
+        : '';
+      mediaUrl = `/messages/media/messenger/${context.providerMediaId}${channelQuery}`;
+    }
+
+    entity.url = mediaUrl;
+    entity.chat = chat as any;
+    entity.message = message as any;
+    entity.preview = null;
+    entity.view_once = '0';
+
+    return entity;
   }
 }

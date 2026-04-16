@@ -15,6 +15,7 @@ const buildController = () =>
     new WebhookMetricsService(),
     {} as any,
     {} as any,
+    { add: jest.fn().mockResolvedValue({}) } as any, // webhookQueue
   );
 
 describe('Webhook payload validation', () => {

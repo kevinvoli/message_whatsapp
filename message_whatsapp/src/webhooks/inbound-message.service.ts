@@ -21,7 +21,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Mutex, MutexInterface, withTimeout } from 'async-mutex';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
@@ -50,8 +50,6 @@ import { ChatContext } from 'src/context/entities/chat-context.entity';
 @Injectable()
 export class InboundMessageService {
   private readonly logger = new Logger(InboundMessageService.name);
-  private readonly chatMutexes = new Map<string, MutexInterface>();
-
   constructor(
     // ── Étape 3 ─────────────────────────────────────────────────────────────
     private readonly dispatcherService: DispatcherService,
@@ -73,6 +71,8 @@ export class InboundMessageService {
     // ── Résolution nom Messenger ─────────────────────────────────────────────
     private readonly channelService: ChannelService,
     private readonly messengerService: CommunicationMessengerService,
+    // P2.2 — Distributed locking cross-instance
+    private readonly distributedLock: DistributedLockService,
   ) {}
 
   // ─── Messages entrants ────────────────────────────────────────────────────
@@ -107,7 +107,9 @@ export class InboundMessageService {
       }
 
       try {
-        await this.getMutex(message.chatId).runExclusive(() =>
+        // P2.2 — Lock distribué par chat_id (cross-instance safe)
+        const lockKey = `chat:${message.tenantId ?? 'global'}:${message.chatId}`;
+        await this.distributedLock.withLock(lockKey, 30_000, () =>
           this.processOneMessage(message, correlationId),
         );
       } catch (err) {
@@ -191,15 +193,6 @@ export class InboundMessageService {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-
-  private getMutex(chatId: string): MutexInterface {
-    let mutex = this.chatMutexes.get(chatId);
-    if (!mutex) {
-      mutex = withTimeout(new Mutex(), 30_000);
-      this.chatMutexes.set(chatId, mutex);
-    }
-    return mutex;
-  }
 
   private buildTraceId(messageId?: string | null, chatId?: string): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;

@@ -4,7 +4,8 @@ import { EventEmitter } from 'events';
 import { ValidationPipe } from '@nestjs/common';
 import { AdminService } from './admin/admin.service';
 import { AppLogger } from './logging/app-logger.service';
-import * as cookieParser from 'cookie-parser'; // Import cookie-parser
+import * as cookieParser from 'cookie-parser';
+import * as helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 
@@ -26,6 +27,14 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+
+  // Security headers (P1.5)
+  app.use(
+    (helmet as any)({
+      contentSecurityPolicy: false, // désactivé car l'API est JSON — à activer côté Nginx
+      crossOriginEmbedderPolicy: false,
     }),
   );
 
