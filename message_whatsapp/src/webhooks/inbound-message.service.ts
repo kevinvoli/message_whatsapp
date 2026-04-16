@@ -154,6 +154,7 @@ export class InboundMessageService {
               tenantId: message.tenantId,
               provider: message.provider,
               providerMediaId: message.media?.id,
+              providerMessageId: message.providerMessageId,
               channelId: message.channelId,
               resolvedChannel: mediaChannel,
             });
@@ -236,6 +237,7 @@ export class InboundMessageService {
       tenantId?: string;
       provider?: string;
       providerMediaId?: string;
+      providerMessageId?: string;
       channelId?: string;
       resolvedChannel?: WhapiChannel | null;
     },
@@ -268,23 +270,34 @@ export class InboundMessageService {
     }
 
     // Resolve media URL
-    let mediaUrl = raw?.link ?? null;
+    // Stratégie : toujours stocker une URL proxy relative pour les providers
+    // dont le CDN expire (Whapi, Messenger) ou n'expose pas d'URL directe (Meta).
+    // Le frontend préfixe les chemins relatifs avec NEXT_PUBLIC_API_URL.
+    let mediaUrl: string | null = null;
 
-    // Meta provider: no local storage. Use proxy endpoint for streaming.
-    // Chemin relatif : le frontend préfixe avec NEXT_PUBLIC_API_URL
-    if (!mediaUrl && context?.provider === 'meta' && context?.providerMediaId) {
+    if (context?.provider === 'whapi' && context?.providerMessageId) {
+      // Whapi: les URLs CDN expirent → proxy qui re-fetch via GET /messages/{id}
+      // On stocke le messageId Whapi dans whapi_media_id pour la résolution channelId
+      entity.whapi_media_id = context.providerMessageId;
+      const channelQuery = context.channelId
+        ? `?channelId=${encodeURIComponent(context.channelId)}`
+        : '';
+      mediaUrl = `/messages/media/whapi/${context.providerMessageId}${channelQuery}`;
+    } else if (context?.provider === 'meta' && context?.providerMediaId) {
+      // Meta: pas d'URL directe, proxy obligatoire
       const channelQuery = context.channelId
         ? `?channelId=${encodeURIComponent(context.channelId)}`
         : '';
       mediaUrl = `/messages/media/meta/${context.providerMediaId}${channelQuery}`;
-    }
-
-    // Messenger: les URLs CDN expirent → toujours utiliser le proxy qui re-fetch via Graph API
-    if (context?.provider === 'messenger' && context?.providerMediaId) {
+    } else if (context?.provider === 'messenger' && context?.providerMediaId) {
+      // Messenger: URLs CDN expirent → proxy qui re-fetch via Graph API
       const channelQuery = context.channelId
         ? `?channelId=${encodeURIComponent(context.channelId)}`
         : '';
       mediaUrl = `/messages/media/messenger/${context.providerMediaId}${channelQuery}`;
+    } else {
+      // Fallback: stocker le lien brut s'il existe (autre provider, ou cas dégradé)
+      mediaUrl = raw?.link ?? null;
     }
 
     entity.url = mediaUrl;

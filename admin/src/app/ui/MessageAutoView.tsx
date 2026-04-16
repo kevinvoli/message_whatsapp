@@ -614,49 +614,97 @@ function TemplateFormFields({
       {!scopeType && (
         <div className="mb-4 rounded border border-orange-200 bg-orange-50 p-3">
           <p className="mb-2 text-xs font-bold text-orange-700">Exclusions (scope global uniquement)</p>
-          <div className="mb-2">
+
+          {/* Canaux exclus */}
+          <div className="mb-3">
             <label className="mb-1 block text-xs text-gray-600">Canaux exclus</label>
-            <div className="flex flex-col gap-1">
-              {channels.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-xs text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={excludedChannelIds.includes(c.channel_id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onExcludedChannelIdsChange([...excludedChannelIds, c.channel_id]);
-                      } else {
-                        onExcludedChannelIdsChange(excludedChannelIds.filter((id) => id !== c.channel_id));
-                      }
-                    }}
-                  />
-                  {c.label || 'Canal sans nom'}
-                </label>
-              ))}
-              {channels.length === 0 && <span className="text-xs text-gray-400">Aucun canal disponible</span>}
-            </div>
+            {/* Tags des canaux déjà sélectionnés */}
+            {excludedChannelIds.length > 0 && (
+              <div className="mb-1 flex flex-wrap gap-1">
+                {excludedChannelIds.map((cid) => {
+                  const ch = channels.find((c) => c.channel_id === cid);
+                  return (
+                    <span key={cid} className="flex items-center gap-1 rounded-full bg-orange-200 px-2 py-0.5 text-xs text-orange-800">
+                      {ch?.label || cid}
+                      <button
+                        type="button"
+                        onClick={() => onExcludedChannelIdsChange(excludedChannelIds.filter((id) => id !== cid))}
+                        className="ml-0.5 text-orange-600 hover:text-orange-900"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {/* Select pour ajouter un canal */}
+            <select
+              className="w-full rounded border border-orange-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-300"
+              value=""
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && !excludedChannelIds.includes(val)) {
+                  onExcludedChannelIdsChange([...excludedChannelIds, val]);
+                }
+              }}
+            >
+              <option value="">-- Ajouter un canal --</option>
+              {channels
+                .filter((c) => !excludedChannelIds.includes(c.channel_id))
+                .map((c) => (
+                  <option key={c.id} value={c.channel_id}>
+                    {c.label || 'Canal sans nom'}
+                  </option>
+                ))}
+            </select>
+            {channels.length === 0 && <p className="mt-1 text-xs text-gray-400">Aucun canal disponible</p>}
           </div>
+
+          {/* Postes exclus */}
           <div>
             <label className="mb-1 block text-xs text-gray-600">Postes exclus</label>
-            <div className="flex flex-col gap-1">
-              {postes.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-xs text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={excludedPosteIds.includes(p.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onExcludedPosteIdsChange([...excludedPosteIds, p.id]);
-                      } else {
-                        onExcludedPosteIdsChange(excludedPosteIds.filter((id) => id !== p.id));
-                      }
-                    }}
-                  />
-                  {p.name}
-                </label>
-              ))}
-              {postes.length === 0 && <span className="text-xs text-gray-400">Aucun poste disponible</span>}
-            </div>
+            {/* Tags des postes déjà sélectionnés */}
+            {excludedPosteIds.length > 0 && (
+              <div className="mb-1 flex flex-wrap gap-1">
+                {excludedPosteIds.map((pid) => {
+                  const po = postes.find((p) => p.id === pid);
+                  return (
+                    <span key={pid} className="flex items-center gap-1 rounded-full bg-orange-200 px-2 py-0.5 text-xs text-orange-800">
+                      {po?.name || pid}
+                      <button
+                        type="button"
+                        onClick={() => onExcludedPosteIdsChange(excludedPosteIds.filter((id) => id !== pid))}
+                        className="ml-0.5 text-orange-600 hover:text-orange-900"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {/* Select pour ajouter un poste */}
+            <select
+              className="w-full rounded border border-orange-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-300"
+              value=""
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && !excludedPosteIds.includes(val)) {
+                  onExcludedPosteIdsChange([...excludedPosteIds, val]);
+                }
+              }}
+            >
+              <option value="">-- Ajouter un poste --</option>
+              {postes
+                .filter((p) => !excludedPosteIds.includes(p.id))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+            {postes.length === 0 && <p className="mt-1 text-xs text-gray-400">Aucun poste disponible</p>}
           </div>
         </div>
       )}

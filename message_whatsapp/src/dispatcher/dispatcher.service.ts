@@ -210,13 +210,19 @@ export class DispatcherService {
         if (clientName && clientName !== 'Client' && clientName !== conversation.name) {
           conversation.name = clientName;
         }
-        conversation.poste = null;
-        conversation.poste_id = null;
+        // Ne pas effacer le poste_id si la conversation était déjà assignée :
+        // un poste hors ligne ou une queue vide n'est pas une raison de couper le lien.
+        // Le poste est conservé — la conversation reste EN_ATTENTE sur lui.
+        if (!conversation.poste_id) {
+          conversation.poste = null;
+          conversation.assigned_at = null;
+          conversation.assigned_mode = null;
+        } else {
+          conversation.assigned_mode = 'OFFLINE';
+        }
         conversation.status = WhatsappChatStatus.EN_ATTENTE;
         conversation.unread_count += 1;
         conversation.last_activity_at = new Date();
-        conversation.assigned_at = null;
-        conversation.assigned_mode = null;
         conversation.first_response_deadline_at = null;
         conversation.last_client_message_at = new Date();
         return this.chatRepository.save(conversation);
@@ -698,42 +704,25 @@ export class DispatcherService {
       return { reset: 0 };
     }
 
-    let reset = 0;
-    for (const chat of stuck) {
-      // Canal dédié : ne jamais effacer le poste_id — la conversation doit rester
-      // sur son poste dédié en EN_ATTENTE jusqu'au retour du poste.
-      const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
-      if (channelId) {
-        const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
-        if (dedicatedPosteId) {
-          await this.chatRepository.update(chat.id, {
-            status: WhatsappChatStatus.EN_ATTENTE,
-            assigned_mode: 'OFFLINE',
-            first_response_deadline_at: null,
-          });
-          this.logger.debug(`resetStuckActive: canal dédié — (${chat.chat_id}) → EN_ATTENTE sur poste ${dedicatedPosteId} (poste_id conservé)`);
-          reset++;
-          continue;
-        }
-      }
-
-      await this.chatRepository.update(chat.id, {
-        poste: null,
-        poste_id: null,
+    // Un poste hors ligne n'est pas une raison de couper l'assignation.
+    // On passe juste le statut en EN_ATTENTE — le poste_id est conservé.
+    // Quand le poste se reconnecte, la conversation est déjà visible dans sa file.
+    const ids = stuck.map((c) => c.id);
+    await this.chatRepository
+      .createQueryBuilder()
+      .update()
+      .set({
         status: WhatsappChatStatus.EN_ATTENTE,
-        assigned_at: null,
-        assigned_mode: null,
+        assigned_mode: 'OFFLINE',
         first_response_deadline_at: null,
-      });
-      // Notifier le socket que la conversation n'est plus sur l'ancien poste
-      if (chat.poste_id) {
-        await this.messageGateway.emitConversationRemoved(chat.chat_id, chat.poste_id);
-      }
-      reset++;
-    }
+      })
+      .whereInIds(ids)
+      .execute();
 
-    this.logger.log(`resetStuckActiveToWaiting: ${reset} conversation(s) remises en EN_ATTENTE`);
-    return { reset };
+    this.logger.log(
+      `resetStuckActiveToWaiting: ${stuck.length} conversation(s) → EN_ATTENTE (poste_id conservé)`,
+    );
+    return { reset: stuck.length };
   }
 
   async getDispatchSnapshot(): Promise<{
