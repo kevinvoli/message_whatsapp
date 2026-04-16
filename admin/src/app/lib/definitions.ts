@@ -95,11 +95,16 @@ export interface ChatContextsPage {
 
 // ─── FlowBot types ────────────────────────────────────────────────────────────
 
-export type FlowNodeType = 'MESSAGE' | 'QUESTION' | 'CONDITION' | 'ACTION' | 'WAIT' | 'ESCALATE' | 'END' | 'AB_TEST';
+export type FlowNodeType =
+  | 'MESSAGE' | 'QUESTION' | 'CONDITION' | 'ACTION' | 'WAIT' | 'ESCALATE' | 'END' | 'AB_TEST'
+  // P6.2
+  | 'DELAY' | 'HTTP_REQUEST' | 'SEND_TEMPLATE' | 'ASSIGN_LABEL';
 export type FlowTriggerType =
   | 'INBOUND_MESSAGE' | 'CONVERSATION_OPEN' | 'CONVERSATION_REOPEN'
   | 'OUT_OF_HOURS' | 'ON_ASSIGN' | 'QUEUE_WAIT' | 'NO_RESPONSE'
-  | 'INACTIVITY' | 'KEYWORD' | 'SCHEDULE';
+  | 'INACTIVITY' | 'KEYWORD' | 'SCHEDULE'
+  // P6.2
+  | 'LABEL_ADDED' | 'SLA_BREACH';
 
 export interface FlowBot {
   id: string;

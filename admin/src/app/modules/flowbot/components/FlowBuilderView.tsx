@@ -18,10 +18,16 @@ interface FlowBuilderViewProps {
     onBack: () => void;
 }
 
-const NODE_TYPE_OPTIONS: FlowNodeType[] = ['MESSAGE', 'QUESTION', 'CONDITION', 'ACTION', 'WAIT', 'ESCALATE', 'END', 'AB_TEST'];
+const NODE_TYPE_OPTIONS: FlowNodeType[] = [
+    'MESSAGE', 'QUESTION', 'CONDITION', 'ACTION', 'WAIT', 'ESCALATE', 'END', 'AB_TEST',
+    // P6.2
+    'DELAY', 'HTTP_REQUEST', 'SEND_TEMPLATE', 'ASSIGN_LABEL',
+];
 const TRIGGER_TYPE_OPTIONS: FlowTriggerType[] = [
     'INBOUND_MESSAGE', 'CONVERSATION_OPEN', 'CONVERSATION_REOPEN', 'OUT_OF_HOURS',
     'ON_ASSIGN', 'QUEUE_WAIT', 'NO_RESPONSE', 'INACTIVITY', 'KEYWORD', 'SCHEDULE',
+    // P6.2
+    'LABEL_ADDED', 'SLA_BREACH',
 ];
 const CHANNEL_TYPE_OPTIONS = ['', 'whatsapp', 'telegram', 'messenger', 'instagram'];
 const PROVIDER_OPTIONS = ['', 'whapi', 'meta'];
@@ -35,6 +41,11 @@ const NODE_COLORS: Record<string, string> = {
     ESCALATE: 'bg-red-50 border-red-200 text-red-800',
     END: 'bg-gray-100 border-gray-300 text-gray-700',
     AB_TEST: 'bg-purple-50 border-purple-200 text-purple-800',
+    // P6.2
+    DELAY: 'bg-amber-50 border-amber-200 text-amber-800',
+    HTTP_REQUEST: 'bg-cyan-50 border-cyan-200 text-cyan-800',
+    SEND_TEMPLATE: 'bg-violet-50 border-violet-200 text-violet-800',
+    ASSIGN_LABEL: 'bg-lime-50 border-lime-200 text-lime-800',
 };
 
 const SESSION_STATUS_STYLE: Record<string, string> = {
@@ -574,6 +585,8 @@ function TriggerCard({ trigger, onEdit, onDelete }: { trigger: FlowTrigger; onEd
         if (trigger.triggerType === 'QUEUE_WAIT') return `après ${String(cfg.waitSeconds ?? '?')}s`;
         if (trigger.triggerType === 'INACTIVITY') return `après ${String(cfg.inactivitySeconds ?? '?')}s`;
         if (trigger.triggerType === 'SCHEDULE') return String(cfg.cronExpression ?? '');
+        if (trigger.triggerType === 'LABEL_ADDED') return cfg.labelId ? `label: ${String(cfg.labelId)}` : 'tout label';
+        if (trigger.triggerType === 'SLA_BREACH') return cfg.metric ? `${String(cfg.metric)} > ${String(cfg.thresholdSeconds ?? '?')}s` : '';
         return '';
     };
     const summary = configSummary();
@@ -833,6 +846,146 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
                     </div>
                 )}
 
+                {/* ── P6.2 : DELAY ── */}
+                {node.type === 'DELAY' && (
+                    <>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Délai (secondes)</label>
+                            <input
+                                type="number"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { delaySeconds?: number }).delaySeconds ?? 5}
+                                onChange={e => onChange({ ...node, config: { ...config, delaySeconds: Number(e.target.value), delayMs: undefined } })}
+                                min={1}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Pause avant de passer au nœud suivant</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Délai fin (millisecondes, prioritaire)</label>
+                            <input
+                                type="number"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { delayMs?: number }).delayMs ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, delayMs: e.target.value ? Number(e.target.value) : undefined } })}
+                                min={100}
+                                placeholder="Vide = utiliser les secondes"
+                            />
+                        </div>
+                    </>
+                )}
+
+                {/* ── P6.2 : HTTP_REQUEST ── */}
+                {node.type === 'HTTP_REQUEST' && (
+                    <>
+                        <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">URL *</label>
+                            <input
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                value={(config as { url?: string }).url ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, url: e.target.value } })}
+                                placeholder="https://api.example.com/endpoint"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Variables supportées : {'{session.CLE}'}, {'{contact_name}'}</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Méthode HTTP</label>
+                            <select
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { method?: string }).method ?? 'GET'}
+                                onChange={e => onChange({ ...node, config: { ...config, method: e.target.value } })}
+                            >
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Variable de réponse</label>
+                            <input
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                value={(config as { responseVariable?: string }).responseVariable ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, responseVariable: e.target.value || undefined } })}
+                                placeholder="Ex: api_response"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Stocke la réponse JSON dans {'{session.api_response}'}</p>
+                        </div>
+                        <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Corps (JSON, optionnel)</label>
+                            <textarea
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                rows={3}
+                                value={(config as { body?: string }).body ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, body: e.target.value || undefined } })}
+                                placeholder={`{"phone": "{session.phone}"}`}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Timeout (ms)</label>
+                            <input
+                                type="number"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { timeoutMs?: number }).timeoutMs ?? 10000}
+                                onChange={e => onChange({ ...node, config: { ...config, timeoutMs: Number(e.target.value) } })}
+                                min={1000}
+                            />
+                        </div>
+                    </>
+                )}
+
+                {/* ── P6.2 : SEND_TEMPLATE ── */}
+                {node.type === 'SEND_TEMPLATE' && (
+                    <>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Nom du template *</label>
+                            <input
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                value={(config as { templateName?: string }).templateName ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, templateName: e.target.value } })}
+                                placeholder="Ex: welcome_message"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Langue</label>
+                            <input
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { language?: string }).language ?? 'fr'}
+                                onChange={e => onChange({ ...node, config: { ...config, language: e.target.value } })}
+                                placeholder="fr"
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Variables du template (une par ligne)
+                                <span className="font-normal text-gray-400 ml-1">— Ex: {'{contact_name}'}, {'{session.order_id}'}</span>
+                            </label>
+                            <textarea
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                rows={3}
+                                value={((config as { variables?: string[] }).variables ?? []).join('\n')}
+                                onChange={e => onChange({ ...node, config: { ...config, variables: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) } })}
+                                placeholder={'{contact_name}\n{session.order_id}'}
+                            />
+                        </div>
+                    </>
+                )}
+
+                {/* ── P6.2 : ASSIGN_LABEL ── */}
+                {node.type === 'ASSIGN_LABEL' && (
+                    <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">IDs des labels (un par ligne)</label>
+                        <textarea
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                            rows={3}
+                            value={((config as { labelIds?: string[] }).labelIds ?? []).join('\n')}
+                            onChange={e => onChange({ ...node, config: { ...config, labelIds: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) } })}
+                            placeholder={'uuid-label-1\nuuid-label-2'}
+                        />
+                        <p className="text-xs text-gray-400 mt-1">UUID des labels à assigner à la conversation</p>
+                    </div>
+                )}
+
                 <div className="flex items-center gap-3">
                     <input
                         type="checkbox"
@@ -1032,6 +1185,48 @@ function TriggerForm({ trigger, onChange, onSave, onCancel, error, saving }: {
                             — Ex: <code>0 9 * * 1-5</code> = lun-ven à 9h00
                         </p>
                     </div>
+                )}
+
+                {/* ── P6.2 : LABEL_ADDED ── */}
+                {trigger.triggerType === 'LABEL_ADDED' && (
+                    <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">ID du label (optionnel)</label>
+                        <input
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                            value={(cfg.labelId as string | undefined) ?? ''}
+                            onChange={e => setConfig('labelId', e.target.value || undefined)}
+                            placeholder="UUID du label — vide = déclenche pour tout label ajouté"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                            Se déclenche quand ce label est ajouté à une conversation (via l&apos;événement <code>label.added</code>)
+                        </p>
+                    </div>
+                )}
+
+                {/* ── P6.2 : SLA_BREACH ── */}
+                {trigger.triggerType === 'SLA_BREACH' && (
+                    <>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Métrique SLA (optionnel)</label>
+                            <input
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                value={(cfg.metric as string | undefined) ?? ''}
+                                onChange={e => setConfig('metric', e.target.value || undefined)}
+                                placeholder="Ex: first_response_time — vide = toute métrique"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Seuil (secondes, optionnel)</label>
+                            <input
+                                type="number"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(cfg.thresholdSeconds as number | undefined) ?? ''}
+                                onChange={e => setConfig('thresholdSeconds', e.target.value ? Number(e.target.value) : undefined)}
+                                min={0}
+                                placeholder="Vide = tout dépassement"
+                            />
+                        </div>
+                    </>
                 )}
 
                 <div className="flex items-center gap-3">

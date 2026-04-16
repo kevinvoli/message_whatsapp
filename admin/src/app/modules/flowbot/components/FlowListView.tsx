@@ -12,6 +12,9 @@ const NODE_TYPE_LABELS: Record<string, string> = {
     MESSAGE: 'Message', QUESTION: 'Question', CONDITION: 'Condition',
     ACTION: 'Action', WAIT: 'Attente', ESCALATE: 'Escalade',
     END: 'Fin', AB_TEST: 'A/B Test',
+    // P6.2
+    DELAY: 'Délai', HTTP_REQUEST: 'Requête HTTP',
+    SEND_TEMPLATE: 'Envoyer Template', ASSIGN_LABEL: 'Assigner Label',
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -20,6 +23,8 @@ const TRIGGER_LABELS: Record<string, string> = {
     ON_ASSIGN: 'Assignation', QUEUE_WAIT: 'Attente queue',
     NO_RESPONSE: 'Sans réponse', INACTIVITY: 'Inactivité',
     KEYWORD: 'Mot-clé', SCHEDULE: 'Planifié',
+    // P6.2
+    LABEL_ADDED: 'Label ajouté', SLA_BREACH: 'Dépassement SLA',
 };
 
 export default function FlowListView({ onOpenBuilder }: FlowListViewProps) {
