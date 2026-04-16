@@ -50,6 +50,11 @@ import { GdprOptoutModule } from './gdpr-optout/gdpr-optout.module';
 import { ConversationMergeModule } from './conversation-merge/conversation-merge.module';
 import { WhatsappTemplateModule } from './whatsapp-template/whatsapp-template.module';
 import { BroadcastModule } from './broadcast/broadcast.module';
+import { CrmModule } from './crm/crm.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { SlaModule } from './sla/sla.module';
+import { AuditModule } from './audit/audit.module';
+import { RbacModule } from './rbac/rbac.module';
 
 @Module({
   imports: [
@@ -156,6 +161,12 @@ import { BroadcastModule } from './broadcast/broadcast.module';
     // Phase 4 — Meta Webhook + Templates + Broadcasts
     WhatsappTemplateModule,
     BroadcastModule,
+    // Phase 5 — CRM, Analytics, SLA, Audit, RBAC
+    CrmModule,
+    AnalyticsModule,
+    SlaModule,
+    AuditModule,
+    RbacModule,
   ],
   controllers: [AppController],
   providers: [
