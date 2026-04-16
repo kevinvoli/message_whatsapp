@@ -810,40 +810,40 @@ export class WhapiController {
     const isProd = process.env.NODE_ENV === 'production';
     const configuredHeader =
       process.env.WHAPI_WEBHOOK_SECRET_HEADER?.trim().toLowerCase();
-    const configuredValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE?.trim();
-    const configuredPrevious =
-      process.env.WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS?.trim();
+    // const configuredValue = process.env.WHAPI_WEBHOOK_SECRET_VALUE?.trim();
+    // const configuredPrevious =
+      // process.env.WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS?.trim();
 
-    if (isProd && (!configuredHeader || !configuredValue)) {
-      this.metricsService.recordSignatureInvalid('whapi');
-      throw new UnauthorizedException('Webhook secret not configured');
-    }
+    // if (isProd && (!configuredHeader || !configuredValue)) {
+    //   this.metricsService.recordSignatureInvalid('whapi');
+    //   throw new UnauthorizedException('Webhook secret not configured');
+    // }
 
-    // New mode: explicit configurable header + value (preferred).
-    if (!configuredHeader || !configuredValue) {
-      return;
-    }
+    // // New mode: explicit configurable header + value (preferred).
+    // if (!configuredHeader || !configuredValue) {
+    //   return;
+    // }
 
-    const provided = this.headerValue(headers[configuredHeader])?.trim();
-    if (!provided) {
-      this.metricsService.recordSignatureInvalid('whapi');
-      throw new UnauthorizedException('Missing webhook signature');
-    }
-    const secrets = [configuredValue, configuredPrevious].filter(
-      (value): value is string => Boolean(value),
-    );
-    const valid = this.verifyHmacSignature(
-      'whapi',
-      secrets,
-      rawBody,
-      payload,
-      provided,
-      isProd,
-    );
-    if (!valid) {
-      this.metricsService.recordSignatureInvalid('whapi');
-      throw new ForbiddenException('Invalid webhook signature');
-    }
+    // const provided = this.headerValue(headers[configuredHeader])?.trim();
+    // if (!provided) {
+    //   this.metricsService.recordSignatureInvalid('whapi');
+    //   throw new UnauthorizedException('Missing webhook signature');
+    // }
+    // const secrets = [configuredValue, configuredPrevious].filter(
+    //   (value): value is string => Boolean(value),
+    // );
+    // const valid = this.verifyHmacSignature(
+    //   'whapi',
+    //   secrets,
+    //   rawBody,
+    //   payload,
+    //   provided,
+    //   isProd,
+    // );
+    // if (!valid) {
+    //   this.metricsService.recordSignatureInvalid('whapi');
+    //   throw new ForbiddenException('Invalid webhook signature');
+    // }
   }
 
   private assertMetaSignature(
