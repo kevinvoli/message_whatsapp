@@ -86,6 +86,24 @@ export class WhatsappChatService {
     return { chats: hasMore ? rows.slice(0, limit) : rows, hasMore };
   }
 
+  /**
+   * Conversations EN_ATTENTE sans poste assigné, pour les tenants donnés.
+   * Permet aux agents de voir les conversations orphelines (pool vide, postes dédiés, etc.).
+   */
+  async findUnassignedForTenants(tenantIds: string[]): Promise<WhatsappChat[]> {
+    if (tenantIds.length === 0) return [];
+    return this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.channel', 'channel')
+      .where('chat.poste_id IS NULL')
+      .andWhere('chat.status = :status', { status: 'en attente' })
+      .andWhere('chat.deletedAt IS NULL')
+      .andWhere('chat.tenant_id IN (:...tenantIds)', { tenantIds })
+      .orderBy('chat.last_activity_at', 'DESC')
+      .limit(100)
+      .getMany();
+  }
+
   async getTotalUnreadForPoste(poste_id: string): Promise<number> {
     // Compte le nombre de CONVERSATIONS ayant au moins un message entrant non lu
     // (status SENT ou DELIVERED) — même logique que countUnreadMessagesBulk du gateway

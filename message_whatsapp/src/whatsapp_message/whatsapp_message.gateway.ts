@@ -348,6 +348,18 @@ export class WhatsappMessageGateway
       chats = chats.filter((c) => !c.tenant_id || tenantSet.has(c.tenant_id));
     }
 
+    // Conversations EN_ATTENTE sans poste (pool vide, postes dédiés, etc.) :
+    // les inclure sur la première page seulement pour que les agents puissent
+    // les voir et les prendre en charge.
+    if (isFirstPage && agent.tenantIds.length > 0) {
+      const unassigned = await this.chatService.findUnassignedForTenants(agent.tenantIds);
+      const existingChatIds = new Set(chats.map((c) => c.chat_id));
+      const newUnassigned = unassigned.filter((c) => !existingChatIds.has(c.chat_id));
+      if (newUnassigned.length > 0) {
+        chats = [...newUnassigned, ...chats];
+      }
+    }
+
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       chats = chats.filter(
@@ -909,12 +921,32 @@ export class WhatsappMessageGateway
       setTimeout(() => void this.emitTyping(chat.chat_id, false), 2000);
     }
 
+    // Conversation sans poste assigné (pool vide, postes tous dédiés, etc.)
+    // → diffuser à tous les agents du tenant via la room tenant:${tenantId}
     if (!chat.poste_id) {
       this.logger.warn(
-        `Inbound message skipped: no assigned poste for chat ${chat.chat_id}`,
+        `Inbound message: no assigned poste for chat ${chat.chat_id} — broadcasting to tenant room`,
       );
+      if (chat.tenant_id) {
+        const resolvedLast = lastMessage
+          ?? await this.messageService.findLastMessageBychat_id(chat.chat_id);
+        const unreadCount = chat.unread_count ?? 0;
+        void this.notificationService.create(
+          'queue',
+          `Nouveau message en attente — ${chat.name || chat.chat_id}`,
+          message.text ? message.text.substring(0, 80) : '(média)',
+        );
+        this.server.to(`tenant:${chat.tenant_id}`).emit('chat:event', {
+          type: 'CONVERSATION_UPSERT',
+          payload: this.mapConversation(chat, resolvedLast, unreadCount),
+        });
+        this.logger.log(
+          `INCOMING_TENANT_EMIT chat_id=${chat.chat_id} tenant=${chat.tenant_id}`,
+        );
+      }
       return;
     }
+
     chat.read_only = false;
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'MESSAGE_ADD',
