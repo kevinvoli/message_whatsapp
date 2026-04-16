@@ -1,5 +1,6 @@
 import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { MessageAutoService } from './message-auto.service';
+import { AutoMessageTriggerType } from './entities/message-auto.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
@@ -169,17 +170,27 @@ export class AutoMessageOrchestrator implements OnModuleInit {
     // ⏱️ Calcul du délai — dans un try/catch pour libérer le lock si erreur DB
     try {
       const nextStep = chat.auto_message_step + 1;
-      const nextMessage = await this.messageAutoService.getAutoMessageByPosition(nextStep);
 
-      // La config globale (panneau admin) est autoritaire.
-      // Le délai du template n'est utilisé que si la config globale n'est pas renseignée.
+      // Récupère le template scope-aware (même logique que l'envoi réel)
+      // pour lire le délai exact défini sur ce message.
+      const nextTemplate = await this.messageAutoService.getTemplateForTrigger(
+        AutoMessageTriggerType.SEQUENCE,
+        nextStep,
+        {
+          posteId: chat.poste_id,
+          channelId: chat.last_msg_client_channel_id,
+        },
+      );
+
+      // Priorité : délai du message > config globale > fallback aléatoire
+      // Le délai défini lors de la création/modification du message auto est prioritaire.
       const globalMin = autoConfig.delayMinSeconds;
       const globalMax = autoConfig.delayMaxSeconds;
       const delaySeconds =
-        globalMin != null && globalMax != null && globalMin > 0 && globalMax > 0
-          ? this.randomBetween(globalMin, globalMax)
-          : nextMessage?.delai && nextMessage.delai > 0
-            ? nextMessage.delai
+        nextTemplate?.delai && nextTemplate.delai > 0
+          ? nextTemplate.delai
+          : globalMin != null && globalMax != null && globalMin > 0 && globalMax > 0
+            ? this.randomBetween(globalMin, globalMax)
             : this.randomBetween(300, 540);
 
       const delayMs = delaySeconds * 1000;
