@@ -43,6 +43,11 @@ import { ContextModule } from './context/context.module';
 import { RedisModule } from './redis/redis.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { CannedResponseModule } from './canned-response/canned-response.module';
+import { ConversationTransferModule } from './conversation-transfer/conversation-transfer.module';
+import { LabelModule } from './label/label.module';
+import { GdprOptoutModule } from './gdpr-optout/gdpr-optout.module';
+import { ConversationMergeModule } from './conversation-merge/conversation-merge.module';
 
 @Module({
   imports: [
@@ -140,6 +145,12 @@ import { APP_GUARD } from '@nestjs/core';
     MessageAutoCompatModule,
     RedisModule,
     ContextModule,
+    // Phase 3 — Fonctionnalités de base
+    CannedResponseModule,
+    ConversationTransferModule,
+    LabelModule,
+    GdprOptoutModule,
+    ConversationMergeModule,
   ],
   controllers: [AppController],
   providers: [
