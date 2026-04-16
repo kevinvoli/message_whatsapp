@@ -942,8 +942,8 @@ export interface WhatsappTemplate {
   status: TemplateStatus;
   header_type: string | null;
   header_content: string | null;
-  body: string;
-  footer: string | null;
+  body_text: string;
+  footer_text: string | null;
   buttons: Record<string, unknown>[] | null;
   rejection_reason: string | null;
   createdAt: string;

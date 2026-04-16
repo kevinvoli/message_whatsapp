@@ -39,10 +39,10 @@ const DEFAULT_FORM = {
   name: '',
   category: 'UTILITY' as TemplateCategory,
   language: 'fr',
-  body: '',
+  body_text: '',
   header_type: '',
   header_content: '',
-  footer: '',
+  footer_text: '',
 };
 
 export default function TemplatesView() {
@@ -72,10 +72,10 @@ export default function TemplatesView() {
         name: form.name.toLowerCase().replace(/\s+/g, '_'),
         category: form.category,
         language: form.language,
-        body: form.body,
+        body_text: form.body_text,
         header_type: form.header_type || undefined,
         header_content: form.header_content || undefined,
-        footer: form.footer || undefined,
+        footer_text: form.footer_text || undefined,
       });
       addToast({ message: 'Template créé', type: 'success' });
       setShowForm(false);
@@ -167,7 +167,7 @@ export default function TemplatesView() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Corps du message *</label>
-              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Bonjour {{1}}, votre commande {{2}} est prête..." />
+              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} value={form.body_text} onChange={e => setForm(f => ({ ...f, body_text: e.target.value }))} placeholder="Bonjour {{1}}, votre commande {{2}} est prête..." />
               <p className="text-xs text-gray-400 mt-1">Utilisez {`{{1}}`}, {`{{2}}`}... pour les variables dynamiques</p>
             </div>
 
@@ -192,12 +192,12 @@ export default function TemplatesView() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Pied de page</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.footer} onChange={e => setForm(f => ({ ...f, footer: e.target.value }))} placeholder="Répondez STOP pour vous désabonner" />
+              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.footer_text} onChange={e => setForm(f => ({ ...f, footer_text: e.target.value }))} placeholder="Répondez STOP pour vous désabonner" />
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Annuler</button>
-              <button onClick={handleCreate} disabled={saving || !form.name || !form.body || !form.channel_id} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={handleCreate} disabled={saving || !form.name || !form.body_text} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {saving ? 'Création...' : 'Créer'}
               </button>
             </div>
@@ -230,8 +230,8 @@ export default function TemplatesView() {
                       {t.header_type && (
                         <p className="text-xs text-gray-400 mb-1">Entête: {t.header_type} {t.header_content ? `— ${t.header_content.slice(0, 40)}` : ''}</p>
                       )}
-                      <p className="text-sm text-gray-600 line-clamp-2 mb-1">{t.body}</p>
-                      {t.footer && <p className="text-xs text-gray-400 italic">{t.footer}</p>}
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-1">{t.body_text}</p>
+                      {t.footer_text && <p className="text-xs text-gray-400 italic">{t.footer_text}</p>}
                       {t.rejection_reason && <p className="text-xs text-red-500 mt-1">Motif rejet: {t.rejection_reason}</p>}
                       <p className="text-xs text-gray-400 mt-2">{formatDateShort(t.createdAt)}</p>
                     </div>
