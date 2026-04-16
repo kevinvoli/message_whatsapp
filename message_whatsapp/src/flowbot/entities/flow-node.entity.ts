@@ -18,6 +18,11 @@ export enum FlowNodeType {
   ESCALATE = 'ESCALATE',
   END = 'END',
   AB_TEST = 'AB_TEST',
+  // P6.2 — Nouveaux types de nœuds
+  DELAY = 'DELAY',
+  HTTP_REQUEST = 'HTTP_REQUEST',
+  SEND_TEMPLATE = 'SEND_TEMPLATE',
+  ASSIGN_LABEL = 'ASSIGN_LABEL',
 }
 
 @Entity('flow_node')

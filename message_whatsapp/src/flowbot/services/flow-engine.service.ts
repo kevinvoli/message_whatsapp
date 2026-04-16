@@ -260,6 +260,23 @@ export class FlowEngineService {
         await this.executeAbTest(session, node, conv, execCtx);
         return;
 
+      // P6.2 — Nouveaux types de nœuds
+      case FlowNodeType.DELAY:
+        await this.executeDelay(session, node);
+        return; // STOP — session passe en waiting_delay
+
+      case FlowNodeType.HTTP_REQUEST:
+        await this.executeHttpRequest(session, node, execCtx);
+        break;
+
+      case FlowNodeType.SEND_TEMPLATE:
+        await this.executeSendTemplate(session, node, execCtx);
+        break;
+
+      case FlowNodeType.ASSIGN_LABEL:
+        await this.executeAssignLabel(session, node, conv);
+        break;
+
       default:
         this.logger.warn(`Type de nœud inconnu: ${(node as any).type}`);
     }
@@ -471,6 +488,149 @@ export class FlowEngineService {
     }
 
     await this.writeLog(session, node, null, `action_${config.actionType ?? 'unknown'}`, null);
+  }
+
+  // ─── P6.2 — Nouveaux handlers de nœuds ──────────────────────────────────
+
+  /**
+   * DELAY — Pause configurable (secondes ou millisecondes).
+   * Identique à WAIT mais avec config.delayMs pour granularité fine.
+   * Le polling job reprendra la session après l'écoulement du délai.
+   */
+  private async executeDelay(session: FlowSession, node: FlowNode): Promise<void> {
+    const config = node.config as { delaySeconds?: number; delayMs?: number };
+    const delayMs = config.delayMs ?? (config.delaySeconds ?? 1) * 1000;
+    session.status = FlowSessionStatus.WAITING_DELAY;
+    // Stocker le délai réel pour que le polling job sache quand reprendre
+    session.variables = { ...session.variables, __delay_until: Date.now() + delayMs };
+    await this.sessionService.save(session);
+    await this.writeLog(session, node, null, 'delay_start', String(delayMs));
+  }
+
+  /**
+   * HTTP_REQUEST — Appel HTTP sortant, stocke la réponse dans une variable.
+   * config: { url, method, headers, body, responseVariable }
+   */
+  private async executeHttpRequest(
+    session: FlowSession,
+    node: FlowNode,
+    execCtx: BotExecutionContext,
+  ): Promise<void> {
+    const config = node.config as {
+      url?: string;
+      method?: string;
+      headers?: Record<string, string>;
+      body?: string;
+      responseVariable?: string;
+      timeoutMs?: number;
+    };
+
+    if (!config.url) {
+      await this.writeLog(session, node, null, 'http_request_error', 'url manquante');
+      return;
+    }
+
+    const resolvedUrl = this.variableService.resolve(config.url, session, execCtx);
+    const resolvedBody = config.body
+      ? this.variableService.resolve(config.body, session, execCtx)
+      : undefined;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 10_000);
+
+      const res = await fetch(resolvedUrl, {
+        method: config.method ?? 'GET',
+        headers: { 'Content-Type': 'application/json', ...(config.headers ?? {}) },
+        body: resolvedBody,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      let responseData: unknown;
+      const ct = res.headers.get('content-type') ?? '';
+      if (ct.includes('application/json')) {
+        responseData = await res.json();
+      } else {
+        responseData = await res.text();
+      }
+
+      if (config.responseVariable) {
+        session.variables = { ...session.variables, [config.responseVariable]: responseData };
+        await this.sessionService.save(session);
+      }
+
+      await this.writeLog(session, node, null, 'http_request_ok', String(res.status));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await this.writeLog(session, node, null, 'http_request_error', msg.slice(0, 200));
+      if (config.responseVariable) {
+        session.variables = { ...session.variables, [config.responseVariable]: null };
+        await this.sessionService.save(session);
+      }
+    }
+  }
+
+  /**
+   * SEND_TEMPLATE — Envoie un template HSM Meta.
+   * config: { templateName, language, variables[] }
+   * Utilise CommunicationMetaService via EventEmitter2 pour rester découplé.
+   */
+  private async executeSendTemplate(
+    session: FlowSession,
+    node: FlowNode,
+    execCtx: BotExecutionContext,
+  ): Promise<void> {
+    const config = node.config as {
+      templateName?: string;
+      language?: string;
+      variables?: string[];
+    };
+
+    if (!config.templateName) {
+      await this.writeLog(session, node, null, 'send_template_error', 'templateName manquant');
+      return;
+    }
+
+    // Émettre l'événement — le WhatsappTemplateModule l'écoute si configuré
+    this.eventEmitter.emit('flowbot.send_template', {
+      sessionId: session.id,
+      to: execCtx.externalRef,
+      providerChannelRef: execCtx.providerChannelRef,
+      templateName: config.templateName,
+      language: config.language ?? 'fr',
+      variables: (config.variables ?? []).map((v) =>
+        this.variableService.resolve(v, session, execCtx),
+      ),
+    });
+
+    await this.writeLog(session, node, null, 'send_template_queued', config.templateName);
+  }
+
+  /**
+   * ASSIGN_LABEL — Assigne un ou plusieurs labels à la conversation.
+   * config: { labelIds: string[] }
+   * Utilise EventEmitter2 pour rester découplé du LabelModule.
+   */
+  private async executeAssignLabel(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+  ): Promise<void> {
+    const config = node.config as { labelIds?: string[] };
+    const labelIds = config.labelIds ?? [];
+
+    if (labelIds.length === 0) {
+      await this.writeLog(session, node, null, 'assign_label_skipped', 'aucun labelId');
+      return;
+    }
+
+    this.eventEmitter.emit('flowbot.assign_labels', {
+      chatId: conv.chatRef,
+      labelIds,
+    });
+
+    await this.writeLog(session, node, null, 'assign_label_queued', labelIds.join(','));
   }
 
   private async executeAbTest(

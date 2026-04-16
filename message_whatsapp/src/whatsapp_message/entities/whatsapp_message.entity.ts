@@ -259,6 +259,18 @@ export class WhatsappMessage {
   @JoinColumn({ name: 'quoted_message_id' })
   quotedMessage?: WhatsappMessage | null;
 
+  // P6.1 — Analyse de sentiment (nullable : non encore analysé ou non textuel)
+  @Column({ name: 'sentiment_score', type: 'float', nullable: true })
+  sentiment_score: number | null;
+
+  @Column({
+    name: 'sentiment_label',
+    type: 'enum',
+    enum: ['positive', 'neutral', 'negative'],
+    nullable: true,
+  })
+  sentiment_label: 'positive' | 'neutral' | 'negative' | null;
+
   @CreateDateColumn({
     name: 'createdAt',
     type: 'timestamp',

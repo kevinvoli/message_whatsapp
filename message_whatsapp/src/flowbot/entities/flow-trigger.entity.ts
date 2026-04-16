@@ -18,6 +18,9 @@ export enum FlowTriggerType {
   INACTIVITY = 'INACTIVITY',
   KEYWORD = 'KEYWORD',
   SCHEDULE = 'SCHEDULE',
+  // P6.2 — Nouveaux triggers
+  LABEL_ADDED = 'LABEL_ADDED',
+  SLA_BREACH = 'SLA_BREACH',
 }
 
 @Entity('flow_trigger')

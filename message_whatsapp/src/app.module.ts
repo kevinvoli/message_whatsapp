@@ -55,6 +55,9 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { SlaModule } from './sla/sla.module';
 import { AuditModule } from './audit/audit.module';
 import { RbacModule } from './rbac/rbac.module';
+import { SentimentModule } from './sentiment/sentiment.module';
+import { OutboundWebhookModule } from './outbound-webhook/outbound-webhook.module';
+import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
 
 @Module({
   imports: [
@@ -167,6 +170,10 @@ import { RbacModule } from './rbac/rbac.module';
     SlaModule,
     AuditModule,
     RbacModule,
+    // Phase 6 — Intelligence & Automatisation
+    SentimentModule,
+    OutboundWebhookModule,
+    AiAssistantModule,
   ],
   controllers: [AppController],
   providers: [

@@ -26,6 +26,7 @@ import { FlowMonitorService } from './services/flow-monitor.service';
 
 // Listeners
 import { BotInboundListener } from './listeners/bot-inbound.listener';
+import { FlowBotExtensionListener } from './listeners/flowbot-extension.listener';
 
 // Jobs
 import { FlowPollingJob } from './jobs/flow-polling.job';
@@ -72,6 +73,7 @@ const SERVICES = [
   providers: [
     ...SERVICES,
     BotInboundListener,
+    FlowBotExtensionListener,
     FlowPollingJob,
     FlowSessionCleanerJob,
   ],
