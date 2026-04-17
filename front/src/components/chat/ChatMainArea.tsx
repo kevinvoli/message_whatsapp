@@ -6,7 +6,7 @@ import { useSocket } from "@/contexts/SocketProvider";
 import { useChatStore } from "@/store/chatStore";
 import { Phone } from "lucide-react";
 
-export default function ChatMainArea() {
+export default function ChatMainArea({ onOpenContact }: { onOpenContact?: () => void }) {
   const { isConnected: isWebSocketConnected } = useSocket();
   const {
     conversations,
@@ -45,6 +45,7 @@ export default function ChatMainArea() {
               <ChatHeader
                 currentConv={selectedConversation}
                 totalMessages={totalMessages || 0}
+                onOpenContact={onOpenContact}
               />
               <ClientInfoBanner currentConv={selectedConversation} />
               <ChatMessages

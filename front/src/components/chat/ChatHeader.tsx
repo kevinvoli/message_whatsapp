@@ -5,6 +5,7 @@ import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 import { useChatStore } from '@/store/chatStore';
+import { useContactStore } from '@/store/contactStore';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
 
 const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
@@ -17,6 +18,7 @@ const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
 interface ChatHeaderProps {
     currentConv: Conversation;
     totalMessages: number;
+    onOpenContact?: () => void;
 }
 
 function SlaCountdown({ deadline }: { deadline: Date }) {
@@ -55,9 +57,15 @@ function SlaCountdown({ deadline }: { deadline: Date }) {
     );
 }
 
-export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderProps) {
+export default function ChatHeader({ currentConv, totalMessages, onOpenContact }: ChatHeaderProps) {
     const { updateConversation, changeConversationStatus } = useChatStore();
+    const { selectContactByChatId } = useContactStore();
     const provider = getProviderFromChatId(currentConv.chat_id);
+
+    function handleOpenContact() {
+        selectContactByChatId(currentConv.chat_id);
+        onOpenContact?.();
+    }
     const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
     const handleCallStatusChange = (
@@ -92,7 +100,9 @@ export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderPro
                         <User className={`w-6 h-6 ${avatarColor.text}`} />
                     </div>
                     <div>
-                        <h2 className="font-semibold text-gray-900">{currentConv?.clientName}</h2>
+                        <button onClick={handleOpenContact} className="font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left transition-colors">
+                            {currentConv?.clientName}
+                        </button>
                         <div className="flex items-center gap-2">
                             <p className="text-sm text-gray-500">{currentConv?.clientPhone}</p>
                             <span className="text-xs text-gray-400">•</span>

@@ -2,7 +2,7 @@
 
 // Données provenant du backend via WebSocket (useContactStore)
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Phone,
   PhoneCall,
@@ -10,6 +10,9 @@ import {
   MessageSquare,
   PhoneMissed,
   User,
+  Edit2,
+  Check,
+  X as XIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useContactStore } from '@/store/contactStore';
@@ -18,8 +21,10 @@ import { CallStatus, convToContact, getCallStatusColor, getCallStatusLabel } fro
 import { formatDate, formatDateShort, formatTime, formatRelativeDate } from '@/lib/dateUtils';
 import { ContactTimeline } from './ContactTimeline';
 import { CallLogHistory } from './CallLogHistory';
-import { updateContactCallStatus } from '@/lib/contactApi';
+import { updateContactCallStatus, getCrmFields, setCrmFields, CrmFieldEntry, CrmRawValue } from '@/lib/contactApi';
 import { logger } from '@/lib/logger';
+
+const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID ?? 'default';
 
 // ─── Modal modification ───────────────────────────────────────────────────────
 
@@ -172,6 +177,76 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
   const { selectedContactDetail: selectedContact, isLoadingDetail, upsertContact } = useContactStore();
   const { selectConversation, conversations } = useChatStore();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [crmFields, setCrmFieldsState] = useState<CrmFieldEntry[]>([]);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<CrmRawValue>(null);
+  const [crmSaving, setCrmSaving] = useState(false);
+
+  const loadCrm = useCallback(async (contactId: string) => {
+    try {
+      const entries = await getCrmFields(contactId, TENANT_ID);
+      setCrmFieldsState(entries);
+    } catch { /* silently ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (selectedContact?.id) void loadCrm(selectedContact.id);
+    else setCrmFieldsState([]);
+  }, [selectedContact?.id, loadCrm]);
+
+  function getCrmDisplayValue(entry: CrmFieldEntry): string {
+    const v = entry.value;
+    if (!v) return '—';
+    const def = entry.definition;
+    switch (def.field_type) {
+      case 'text':
+      case 'select':
+        return v.value_text ?? '—';
+      case 'number':
+        return v.value_number != null ? String(v.value_number) : '—';
+      case 'date':
+        return v.value_date ?? '—';
+      case 'boolean':
+        return v.value_boolean != null ? (v.value_boolean ? 'Oui' : 'Non') : '—';
+      case 'multiselect':
+        return v.value_json?.join(', ') ?? '—';
+      default:
+        return '—';
+    }
+  }
+
+  function getCrmEditDefault(entry: CrmFieldEntry): CrmRawValue {
+    const v = entry.value;
+    if (!v) {
+      if (entry.definition.field_type === 'boolean') return false;
+      if (entry.definition.field_type === 'multiselect') return [];
+      return '';
+    }
+    switch (entry.definition.field_type) {
+      case 'text': case 'select': return v.value_text ?? '';
+      case 'number': return v.value_number ?? '';
+      case 'date': return v.value_date ?? '';
+      case 'boolean': return v.value_boolean != null ? Boolean(v.value_boolean) : false;
+      case 'multiselect': return v.value_json ?? [];
+      default: return '';
+    }
+  }
+
+  function startEditField(entry: CrmFieldEntry) {
+    setEditingField(entry.definition.field_key);
+    setEditValue(getCrmEditDefault(entry));
+  }
+
+  async function saveField(entry: CrmFieldEntry) {
+    if (!selectedContact) return;
+    setCrmSaving(true);
+    try {
+      await setCrmFields(selectedContact.id, TENANT_ID, [{ field_key: entry.definition.field_key, value: editValue }]);
+      await loadCrm(selectedContact.id);
+      setEditingField(null);
+    } catch { /* ignore */ }
+    finally { setCrmSaving(false); }
+  }
 
   // Contacts similaires dérivés des conversations (même source ou tags communs)
   const allContacts = useMemo(
@@ -404,6 +479,90 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
           </div>
         </div>
       </div>
+
+      {/* ── Champs CRM ── */}
+      {crmFields.length > 0 && (
+        <div style={{ background: 'white', borderRadius: 16, padding: 18, border: '1px solid #e5e7eb', marginTop: 16 }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 700, color: '#111827' }}>Champs CRM</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {crmFields.map((entry) => {
+              const key = entry.definition.field_key;
+              const isEditing = editingField === key;
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
+                  <div style={{ width: 140, flexShrink: 0 }}>
+                    <strong style={{ fontSize: 13, color: '#374151' }}>{entry.definition.name}</strong>
+                    {entry.definition.required && <span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>}
+                  </div>
+                  {isEditing ? (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {entry.definition.field_type === 'boolean' ? (
+                        <select
+                          value={editValue === true ? 'true' : 'false'}
+                          onChange={e => setEditValue(e.target.value === 'true')}
+                          style={{ flex: 1, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13 }}
+                        >
+                          <option value="true">Oui</option>
+                          <option value="false">Non</option>
+                        </select>
+                      ) : entry.definition.field_type === 'select' ? (
+                        <select
+                          value={editValue as string}
+                          onChange={e => setEditValue(e.target.value)}
+                          style={{ flex: 1, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13 }}
+                        >
+                          <option value="">—</option>
+                          {(entry.definition.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : entry.definition.field_type === 'multiselect' ? (
+                        <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {(entry.definition.options ?? []).map(o => {
+                            const sel = Array.isArray(editValue) && (editValue as string[]).includes(o);
+                            return (
+                              <button key={o}
+                                onClick={() => {
+                                  const cur = Array.isArray(editValue) ? (editValue as string[]) : [];
+                                  setEditValue(sel ? cur.filter(x => x !== o) : [...cur, o]);
+                                }}
+                                style={{ padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer',
+                                  background: sel ? '#2563eb' : '#f3f4f6', color: sel ? 'white' : '#374151', borderColor: sel ? '#2563eb' : '#d1d5db' }}>
+                                {o}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <input
+                          type={entry.definition.field_type === 'number' ? 'number' : entry.definition.field_type === 'date' ? 'date' : 'text'}
+                          value={editValue as string}
+                          onChange={e => setEditValue(entry.definition.field_type === 'number' ? Number(e.target.value) : e.target.value)}
+                          style={{ flex: 1, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13 }}
+                        />
+                      )}
+                      <button onClick={() => saveField(entry)} disabled={crmSaving} style={{ padding: '4px 8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                        <Check style={{ width: 14, height: 14 }} />
+                      </button>
+                      <button onClick={() => setEditingField(null)} style={{ padding: '4px 8px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                        <XIcon style={{ width: 14, height: 14 }} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 13, color: getCrmDisplayValue(entry) === '—' ? '#9ca3af' : '#111827' }}>
+                        {getCrmDisplayValue(entry)}
+                      </span>
+                      <button onClick={() => startEditField(entry)}
+                        style={{ padding: '3px 6px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+                        <Edit2 style={{ width: 13, height: 13 }} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Historique ── */}
       <div style={{ background: 'white', borderRadius: 16, padding: 18, border: '1px solid #e5e7eb', marginTop: 16 }}>

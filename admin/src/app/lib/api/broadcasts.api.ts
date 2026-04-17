@@ -49,3 +49,11 @@ export async function getBroadcastStats(id: string): Promise<Broadcast> {
   const r = await fetch(`${API_BASE_URL}/admin/broadcasts/${id}/stats`, { credentials: 'include' });
   return handleResponse<Broadcast>(r);
 }
+
+export async function resumeBroadcast(id: string, tenantId: string): Promise<Broadcast> {
+  const r = await fetch(`${API_BASE_URL}/admin/broadcasts/${id}/launch?tenant_id=${tenantId}`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  return handleResponse<Broadcast>(r);
+}

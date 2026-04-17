@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { PlusCircle, Trash2, Edit, GripVertical } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef, KeyboardEvent } from 'react';
+import { PlusCircle, Trash2, Edit, GripVertical, X } from 'lucide-react';
 import { ContactFieldDefinition, FieldType } from '@/app/lib/definitions';
 import { getCrmFields, createCrmField, updateCrmField, deleteCrmField } from '@/app/lib/api/crm.api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -32,7 +32,8 @@ export default function CrmView() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ContactFieldDefinition | null>(null);
-  const [form, setForm] = useState({ name: '', field_key: '', field_type: 'text' as FieldType, options: '', required: false, position: 0 });
+  const [form, setForm] = useState({ name: '', field_key: '', field_type: 'text' as FieldType, options: [] as string[], required: false, position: 0 });
+  const [optionInput, setOptionInput] = useState('');
   const [saving, setSaving] = useState(false);
   const { addToast } = useToast();
 
@@ -48,13 +49,15 @@ export default function CrmView() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', field_key: '', field_type: 'text', options: '', required: false, position: fields.length });
+    setForm({ name: '', field_key: '', field_type: 'text', options: [], required: false, position: fields.length });
+    setOptionInput('');
     setShowForm(true);
   };
 
   const openEdit = (f: ContactFieldDefinition) => {
     setEditing(f);
-    setForm({ name: f.name, field_key: f.field_key, field_type: f.field_type, options: (f.options ?? []).join(', '), required: f.required, position: f.position });
+    setForm({ name: f.name, field_key: f.field_key, field_type: f.field_type, options: f.options ?? [], required: f.required, position: f.position });
+    setOptionInput('');
     setShowForm(true);
   };
 
@@ -62,7 +65,7 @@ export default function CrmView() {
     setSaving(true);
     try {
       const options = ['select', 'multiselect'].includes(form.field_type)
-        ? form.options.split(',').map(o => o.trim()).filter(Boolean)
+        ? form.options
         : null;
 
       if (editing) {
@@ -131,8 +134,32 @@ export default function CrmView() {
 
             {['select', 'multiselect'].includes(form.field_type) && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Options (séparées par virgule)</label>
-                <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.options} onChange={e => setForm(f => ({ ...f, options: e.target.value }))} placeholder="Bronze, Silver, Gold" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Options</label>
+                <div className="border rounded-lg px-3 py-2 flex flex-wrap gap-1.5 min-h-[42px]">
+                  {form.options.map(opt => (
+                    <span key={opt} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                      {opt}
+                      <button type="button" onClick={() => setForm(f => ({ ...f, options: f.options.filter(o => o !== opt) }))} className="text-blue-500 hover:text-blue-800">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    className="text-sm outline-none flex-1 min-w-[100px]"
+                    value={optionInput}
+                    onChange={e => setOptionInput(e.target.value)}
+                    onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                      if ((e.key === 'Enter' || e.key === ',') && optionInput.trim()) {
+                        e.preventDefault();
+                        const val = optionInput.trim();
+                        if (!form.options.includes(val)) setForm(f => ({ ...f, options: [...f.options, val] }));
+                        setOptionInput('');
+                      }
+                    }}
+                    placeholder={form.options.length === 0 ? 'Taper une option, puis Entrée' : ''}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Appuyer sur Entrée ou virgule pour ajouter une option</p>
               </div>
             )}
 

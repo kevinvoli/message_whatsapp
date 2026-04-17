@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PlusCircle, Trash2, FileText, EyeOff } from 'lucide-react';
+import { PlusCircle, Trash2, FileText, EyeOff, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as DocIcon } from 'lucide-react';
 import { WhatsappTemplate, TemplateStatus, TemplateCategory } from '@/app/lib/definitions';
 import { getTemplates, createTemplate, disableTemplate, deleteTemplate } from '@/app/lib/api/templates.api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -45,6 +45,88 @@ const DEFAULT_FORM = {
   footer_text: '',
 };
 
+function renderBodyPreview(body: string): string {
+  return body.replace(/\{\{(\d+)\}\}/g, (_, n) => `[var${n}]`);
+}
+
+function TemplatePreviewModal({ template, onClose }: { template: WhatsappTemplate; onClose: () => void }) {
+  const previewText = renderBodyPreview(template.body_text);
+  const hasHeader = template.header_type && template.header_type !== '';
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-semibold text-gray-900">Aperçu — <span className="font-mono text-sm text-blue-600">{template.name}</span></h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_CONFIG[template.status].className}`}>
+                {STATUS_CONFIG[template.status].label}
+              </span>
+              <span className="text-xs text-gray-400">{CATEGORY_LABELS[template.category]} · {template.language.toUpperCase()}</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Phone mockup */}
+        <div className="bg-[#ECE5DD] px-6 py-8 min-h-[300px] flex items-start justify-end">
+          <div className="bg-white rounded-xl rounded-tr-none shadow-sm max-w-[85%] overflow-hidden">
+            {/* Header */}
+            {hasHeader && (
+              <div className="bg-gray-100">
+                {template.header_type === 'TEXT' ? (
+                  <div className="px-3 pt-3 pb-1 font-semibold text-sm text-gray-900">{template.header_content || 'Entête'}</div>
+                ) : template.header_type === 'IMAGE' ? (
+                  <div className="flex items-center justify-center h-32 bg-gray-200 gap-2 text-gray-400 text-xs">
+                    <ImageIcon className="w-6 h-6" /> {template.header_content ? 'Image' : 'Image'}
+                  </div>
+                ) : template.header_type === 'VIDEO' ? (
+                  <div className="flex items-center justify-center h-32 bg-gray-800 gap-2 text-gray-400 text-xs">
+                    <VideoIcon className="w-6 h-6 text-white" /> <span className="text-white">Vidéo</span>
+                  </div>
+                ) : template.header_type === 'DOCUMENT' ? (
+                  <div className="flex items-center gap-2 px-3 py-3 bg-blue-50 border-b border-blue-100">
+                    <DocIcon className="w-5 h-5 text-blue-600" />
+                    <span className="text-sm text-blue-700">{template.header_content || 'Document'}</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+            {/* Body */}
+            <div className="px-3 py-2.5">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{previewText}</p>
+            </div>
+            {/* Footer */}
+            {template.footer_text && (
+              <div className="px-3 pb-2.5">
+                <p className="text-xs text-gray-400 italic">{template.footer_text}</p>
+              </div>
+            )}
+            {/* Timestamp */}
+            <div className="px-3 pb-2 text-right">
+              <span className="text-[10px] text-gray-400">10:30</span>
+            </div>
+          </div>
+        </div>
+
+        {template.rejection_reason && (
+          <div className="px-5 py-3 bg-red-50 border-t border-red-100">
+            <p className="text-xs text-red-700"><strong>Motif de rejet :</strong> {template.rejection_reason}</p>
+          </div>
+        )}
+
+        <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex justify-between">
+          <span>Créé le {formatDateShort(template.createdAt)}</span>
+          <span className="font-mono">{template.meta_template_id ? `Meta ID: ${template.meta_template_id}` : 'Non soumis à Meta'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TemplatesView() {
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +134,7 @@ export default function TemplatesView() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<TemplateStatus | ''>('');
+  const [previewTemplate, setPreviewTemplate] = useState<WhatsappTemplate | null>(null);
   const { addToast } = useToast();
 
   const load = useCallback(async () => {
@@ -236,6 +319,13 @@ export default function TemplatesView() {
                       <p className="text-xs text-gray-400 mt-2">{formatDateShort(t.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setPreviewTemplate(t)}
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50"
+                        title="Aperçu"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Aperçu
+                      </button>
                       {t.status === 'APPROVED' && (
                         <button onClick={() => handleDisable(t)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600 px-2 py-1 rounded hover:bg-orange-50">
                           <EyeOff className="w-3.5 h-3.5" /> Désactiver
@@ -250,6 +340,10 @@ export default function TemplatesView() {
           </div>
         )}
       </div>
+
+      {previewTemplate && (
+        <TemplatePreviewModal template={previewTemplate} onClose={() => setPreviewTemplate(null)} />
+      )}
     </div>
   );
 }

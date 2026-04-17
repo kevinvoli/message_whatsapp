@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Send, Pause, X, BarChart3, PlusCircle, PlayCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Send, Pause, X, PlusCircle, PlayCircle, RotateCcw } from 'lucide-react';
 import { Broadcast, BroadcastStatus } from '@/app/lib/definitions';
-import { getBroadcasts, createBroadcast, launchBroadcast, pauseBroadcast, cancelBroadcast } from '@/app/lib/api/broadcasts.api';
+import { getBroadcasts, createBroadcast, launchBroadcast, pauseBroadcast, cancelBroadcast, getBroadcastStats, resumeBroadcast } from '@/app/lib/api/broadcasts.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { Spinner } from '@/app/ui/Spinner';
 import { formatDateShort } from '@/app/lib/dateUtils';
@@ -36,6 +36,29 @@ export default function BroadcastsView() {
   }, [addToast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Polling 5s pour les broadcasts RUNNING
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    pollRef.current = setInterval(() => {
+      setBroadcasts(prev => {
+        const running = prev.filter(b => b.status === 'RUNNING');
+        if (running.length === 0) return prev;
+        running.forEach(b => {
+          getBroadcastStats(b.id).then(updated => {
+            setBroadcasts(cur => cur.map(c => c.id === updated.id ? updated : c));
+          }).catch(() => {});
+        });
+        return prev;
+      });
+    }, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const handleResume = async (id: string) => {
+    try { await resumeBroadcast(id, TENANT_ID); addToast({ message: 'Broadcast repris', type: 'success' }); void load(); }
+    catch { addToast({ message: 'Erreur reprise', type: 'error' }); }
+  };
 
   const handleCreate = async () => {
     setSaving(true);
@@ -118,16 +141,24 @@ export default function BroadcastsView() {
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${s.className}`}>{s.label}</span>
                       </div>
                       {b.total_recipients > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span>Total : {b.total_recipients}</span>
-                            <span>Envoyés : {b.sent_count} ({pct(b.sent_count, b.total_recipients)}%)</span>
-                            <span>Livrés : {b.delivered_count} ({pct(b.delivered_count, b.total_recipients)}%)</span>
-                            <span>Lus : {b.read_count} ({pct(b.read_count, b.total_recipients)}%)</span>
-                            {b.failed_count > 0 && <span className="text-red-500">Échecs : {b.failed_count}</span>}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                            <span className="font-medium text-gray-700">Total : {b.total_recipients}</span>
+                            <span>Envoyés : <strong className="text-blue-600">{b.sent_count}</strong> ({pct(b.sent_count, b.total_recipients)}%)</span>
+                            <span>Livrés : <strong className="text-emerald-600">{b.delivered_count}</strong> ({pct(b.delivered_count, b.total_recipients)}%)</span>
+                            <span>Lus : <strong className="text-purple-600">{b.read_count}</strong> ({pct(b.read_count, b.total_recipients)}%)</span>
+                            {b.failed_count > 0 && <span className="text-red-500">Échecs : <strong>{b.failed_count}</strong></span>}
                           </div>
-                          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct(b.sent_count, b.total_recipients)}%` }} />
+                          {/* Barre multi-segment : lus | livrés | envoyés */}
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden relative">
+                            <div className="absolute inset-y-0 left-0 bg-blue-300 rounded-full" style={{ width: `${pct(b.sent_count, b.total_recipients)}%` }} />
+                            <div className="absolute inset-y-0 left-0 bg-emerald-400 rounded-full" style={{ width: `${pct(b.delivered_count, b.total_recipients)}%` }} />
+                            <div className="absolute inset-y-0 left-0 bg-purple-500 rounded-full" style={{ width: `${pct(b.read_count, b.total_recipients)}%` }} />
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-300 inline-block" />Envoyé</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Livré</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-purple-500 inline-block" />Lu</span>
                           </div>
                         </div>
                       )}
@@ -137,6 +168,11 @@ export default function BroadcastsView() {
                       {b.status === 'DRAFT' && (
                         <button onClick={() => handleLaunch(b.id)} className="flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700">
                           <PlayCircle className="w-3.5 h-3.5" /> Lancer
+                        </button>
+                      )}
+                      {b.status === 'PAUSED' && (
+                        <button onClick={() => handleResume(b.id)} className="flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700">
+                          <RotateCcw className="w-3.5 h-3.5" /> Reprendre
                         </button>
                       )}
                       {b.status === 'RUNNING' && (
