@@ -81,8 +81,11 @@ const capitalize = (value: string) => {
 interface ConversationItemProps {
   conversation: Conversation;
   isSelected: boolean;
-  isTyping?: boolean; // 👈 AJOUT
+  isTyping?: boolean;
   onClick: () => void;
+  bulkMode?: boolean;
+  isChecked?: boolean;
+  onToggleCheck?: (chatId: string) => void;
 }
 
 const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
@@ -93,18 +96,45 @@ const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
-  conversation, isSelected, isTyping, onClick }) => {
+  conversation, isSelected, isTyping, onClick,
+  bulkMode = false, isChecked = false, onToggleCheck,
+}) => {
 
   const provider = getProviderFromChatId(conversation.chat_id);
   const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (bulkMode && onToggleCheck) {
+      e.preventDefault();
+      onToggleCheck(conversation.chat_id);
+    } else {
+      onClick();
+    }
+  };
+
   return (
     <div
-      onClick={onClick}
-      className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? 'bg-green-50 border-l-4 border-l-green-600' : 'hover:bg-gray-50'
-        }`}
+      onClick={handleClick}
+      className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
+        isChecked
+          ? 'bg-blue-50 border-l-4 border-l-blue-500'
+          : isSelected
+          ? 'bg-green-50 border-l-4 border-l-green-600'
+          : 'hover:bg-gray-50'
+      }`}
     >
       <div className="flex items-start gap-3">
+        {bulkMode ? (
+          <div className="flex items-center justify-center w-12 h-12 flex-shrink-0">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => onToggleCheck?.(conversation.chat_id)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+          </div>
+        ) : (
         <div className={`w-12 h-12 ${avatarColor.bg} rounded-full flex items-center justify-center flex-shrink-0 relative`}>
           <User className={`w-6 h-6 ${avatarColor.text}`} />
           {conversation.priority === 'haute' && (
@@ -113,6 +143,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             </div>
           )}
         </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-gray-800 truncate">{conversation.clientName}</h3>

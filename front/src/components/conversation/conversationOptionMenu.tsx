@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Check, X, MoreVertical, Tag, AlertCircle, ArrowRight } from 'lucide-react';
+import { Check, X, MoreVertical, Tag, AlertCircle, ArrowRight, Merge } from 'lucide-react';
 import { Conversation, ConversationStatus } from '@/types/chat';
 import { TransferModal } from './TransferModal';
 import { LabelMenu } from './LabelMenu';
+import { MergeModal } from './MergeModal';
 
 interface ConversationOptionsMenuProps {
   conversation: Conversation;
@@ -19,6 +20,7 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   const [showConfirmation, setShowConfirmation] = useState<ConversationStatus | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
+  const [showMerge, setShowMerge] = useState(false);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
     if (newStatus === 'fermé' || newStatus === 'converti') {
@@ -149,6 +151,15 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
               <span className="flex-1 text-left text-sm font-medium">Transférer</span>
             </button>
 
+            {/* Fusion */}
+            <button
+              onClick={() => { setShowMerge(true); setIsOpen(false); }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
+            >
+              <Merge className="w-4 h-4" />
+              <span className="flex-1 text-left text-sm font-medium">Fusionner</span>
+            </button>
+
             {/* Labels */}
             <div className="relative">
               <button
@@ -232,6 +243,13 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
           chatId={conversation.chat_id}
           currentPosteId={conversation.poste_id}
           onClose={() => setShowTransfer(false)}
+        />
+      )}
+
+      {showMerge && (
+        <MergeModal
+          sourceConversation={conversation}
+          onClose={() => setShowMerge(false)}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, LogOut, Wifi, WifiOff, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, LogOut, Wifi, WifiOff, User, Plus } from 'lucide-react';
 import { Commercial, Conversation, Stats, ViewMode } from '@/types/chat';
 import ConversationItem from './ConversationItem';
 import { useChatStore } from '@/store/chatStore';
@@ -9,6 +9,7 @@ import ConversationList from './ConversationList';
 import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
 import { ContactSidebarPanel } from '@/components/contacts/ContactSidebarPanel';
+import { OutboundModal } from '@/components/conversation/OutboundModal';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -46,17 +47,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   filterStatus,
   onSearchChange,
   onSelectConversation,
-  // onLogout,
   setShowStats,
   viewMode,
   onViewModeChange,
   searchQuery,
-
 }) => {
-
-
-  const { logout } = useAuth()
+  const { logout } = useAuth();
   const typingStatus = useChatStore((state) => state.typingStatus);
+  const [showOutbound, setShowOutbound] = useState(false);
 
   // Handlers
 
@@ -79,12 +77,23 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {viewMode === 'conversations' ? (
         <>
-          <ConversationFilters
-            conversations={allConversations ?? conversations}
-            totalUnread={totalUnread}
-            filterStatus={filterStatus}
-            setFilterStatus={setFilterStatus}
-          />
+          <div className="flex items-center border-b border-gray-100">
+            <div className="flex-1">
+              <ConversationFilters
+                conversations={allConversations ?? conversations}
+                totalUnread={totalUnread}
+                filterStatus={filterStatus}
+                setFilterStatus={setFilterStatus}
+              />
+            </div>
+            <button
+              onClick={() => setShowOutbound(true)}
+              className="flex-shrink-0 mr-2 p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              title="Nouvelle conversation"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
           <ConversationList
             filteredConversations={conversations}
             filterStatus={filterStatus}
@@ -95,6 +104,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         </>
       ) : (
         <ContactSidebarPanel searchQuery={searchQuery ?? ''} />
+      )}
+
+      {showOutbound && (
+        <OutboundModal onClose={() => setShowOutbound(false)} />
       )}
     </div>
 

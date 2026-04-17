@@ -6,9 +6,11 @@ import {
   Body,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ConversationTransferService } from './conversation-transfer.service';
 import { TransferConversationDto } from './dto/transfer-conversation.dto';
+import { OutboundConversationService } from './outbound-conversation.service';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -16,6 +18,7 @@ import { AuthGuard } from '@nestjs/passport';
  * POST /conversations/:chat_id/transfer  (JWT agent)
  * GET  /conversations/:chat_id/transfer/targets  (JWT agent)
  * POST /admin/conversations/:chat_id/transfer  (AdminGuard)
+ * POST /conversations/outbound  (JWT agent) — démarre une conversation outbound
  */
 
 @Controller('conversations/:chat_id/transfer')
@@ -51,5 +54,23 @@ export class ConversationTransferAdminController {
     @Body() dto: TransferConversationDto,
   ) {
     return this.service.transfer(chatId, dto.target_poste_id, dto.reason);
+  }
+}
+
+@Controller('conversations/outbound')
+@UseGuards(AuthGuard('jwt'))
+export class OutboundConversationController {
+  constructor(private readonly service: OutboundConversationService) {}
+
+  @Post()
+  create(
+    @Body() body: { phone: string; text: string },
+    @Request() req: any,
+  ) {
+    return this.service.create({
+      phone: body.phone,
+      text: body.text,
+      agentPosteId: req.user?.posteId ?? null,
+    });
   }
 }

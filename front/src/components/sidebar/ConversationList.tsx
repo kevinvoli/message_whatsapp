@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ConversationItem from './ConversationItem';
+import { BulkActionBar } from './BulkActionBar';
 import { Conversation } from '@/types/chat';
 import { useChatStore } from '@/store/chatStore';
 
@@ -19,6 +20,18 @@ export default function ConversationList({
     selectedConv,
 }: ConversationListProps) {
     const typingStatus               = useChatStore((state) => state.typingStatus);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const toggleCheck = useCallback((chatId: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(chatId)) next.delete(chatId);
+            else next.add(chatId);
+            return next;
+        });
+    }, []);
+
+    const bulkMode = selectedIds.size > 0;
     const hasMoreConversations       = useChatStore((state) => state.hasMoreConversations);
     const isLoadingMoreConversations = useChatStore((state) => state.isLoadingMoreConversations);
     const loadMoreConversations      = useChatStore((state) => state.loadMoreConversations);
@@ -76,7 +89,20 @@ export default function ConversationList({
     }, [filteredCount, hasMoreConversations, isLoadingMoreConversations, loadMoreConversations]);
 
     return (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto relative">
+            {bulkMode && (
+                <div className="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 px-3 py-1.5 flex items-center gap-2">
+                    <span className="text-xs text-blue-700 font-medium flex-1">
+                        {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''} — cliquez pour (dé)sélectionner
+                    </span>
+                    <button
+                        onClick={() => setSelectedIds(new Set())}
+                        className="text-xs text-blue-600 underline hover:no-underline"
+                    >
+                        Annuler
+                    </button>
+                </div>
+            )}
             {filteredConversations.map((conv) => (
                 <ConversationItem
                     key={conv.id}
@@ -84,12 +110,21 @@ export default function ConversationList({
                     isSelected={selectedConversation?.id === conv.id}
                     isTyping={!!typingStatus[conv.chat_id]}
                     onClick={() => onSelectConversation(conv)}
+                    bulkMode={bulkMode}
+                    isChecked={selectedIds.has(conv.chat_id)}
+                    onToggleCheck={toggleCheck}
                 />
             ))}
             {hasMoreConversations && (
                 <div ref={sentinelRef} className="h-8 flex items-center justify-center text-xs text-gray-400">
                     {isLoadingMoreConversations ? 'Chargement…' : ''}
                 </div>
+            )}
+            {bulkMode && (
+                <BulkActionBar
+                    selectedIds={selectedIds}
+                    onClear={() => setSelectedIds(new Set())}
+                />
             )}
         </div>
     );
