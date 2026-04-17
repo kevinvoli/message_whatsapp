@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PlusCircle, Trash2, Edit, Webhook, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Webhook, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Play, RotateCcw } from 'lucide-react';
 import { OutboundWebhook, OutboundWebhookLog, WebhookDeliveryStatus } from '@/app/lib/definitions';
-import { getWebhooks, createWebhook, updateWebhook, deleteWebhook, getWebhookLogs, testWebhook } from '@/app/lib/api/outbound-webhooks.api';
+import { getWebhooks, createWebhook, updateWebhook, deleteWebhook, getWebhookLogs, testWebhook, retryWebhookLog } from '@/app/lib/api/outbound-webhooks.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { Spinner } from '@/app/ui/Spinner';
 import { formatDateShort } from '@/app/lib/dateUtils';
@@ -37,6 +37,7 @@ export default function WebhooksView() {
   const [expandedLogs, setExpandedLogs] = useState<string | null>(null);
   const [logs, setLogs] = useState<OutboundWebhookLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [retryingLogId, setRetryingLogId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const load = useCallback(async () => {
@@ -108,6 +109,23 @@ export default function WebhooksView() {
     try { setLogs(await getWebhookLogs(id)); }
     catch { addToast({ message: 'Erreur chargement logs', type: 'error' }); }
     finally { setLogsLoading(false); }
+  };
+
+  const handleRetryLog = async (log: OutboundWebhookLog) => {
+    setRetryingLogId(log.id);
+    try {
+      await retryWebhookLog(log.id);
+      addToast({ message: 'Retry lancé', type: 'success' });
+      // Refresh logs
+      if (expandedLogs) {
+        const refreshed = await getWebhookLogs(expandedLogs);
+        setLogs(refreshed);
+      }
+    } catch {
+      addToast({ message: 'Erreur retry', type: 'error' });
+    } finally {
+      setRetryingLogId(null);
+    }
   };
 
   return (
@@ -223,13 +241,23 @@ export default function WebhooksView() {
                       <p className="text-xs text-gray-400">Aucun envoi enregistré</p>
                     ) : (
                       <div className="space-y-1">
-                        {logs.slice(0, 10).map(log => (
+                        {logs.slice(0, 20).map(log => (
                           <div key={log.id} className="flex items-center gap-3 text-xs">
                             {STATUS_ICON[log.status]}
                             <span className="font-mono text-gray-600">{log.event}</span>
                             <span className="text-gray-400">{log.response_status ? `HTTP ${log.response_status}` : '—'}</span>
-                            {log.error && <span className="text-red-500 truncate max-w-[200px]">{log.error}</span>}
+                            {log.error && <span className="text-red-500 truncate max-w-[160px]">{log.error}</span>}
                             <span className="text-gray-300 ml-auto">{formatDateShort(log.createdAt)}</span>
+                            {(log.status === 'failed' || log.status === 'retrying') && (
+                              <button
+                                onClick={() => void handleRetryLog(log)}
+                                disabled={retryingLogId === log.id}
+                                className="flex items-center gap-1 text-orange-600 hover:text-orange-700 disabled:opacity-40"
+                                title="Relancer"
+                              >
+                                <RotateCcw className={`w-3 h-3 ${retryingLogId === log.id ? 'animate-spin' : ''}`} />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>

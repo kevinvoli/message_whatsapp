@@ -240,6 +240,31 @@ export class OutboundWebhookService {
     }
   }
 
+  // ─── Retry manuel d'un log échoué ────────────────────────────────────────
+
+  async retryLog(logId: string): Promise<{ queued: boolean }> {
+    const log = await this.logRepo.findOne({ where: { id: logId } });
+    if (!log) throw new NotFoundException(`Log ${logId} introuvable`);
+
+    const wh = await this.webhookRepo
+      .createQueryBuilder('wh')
+      .addSelect('wh.secret')
+      .where('wh.id = :id', { id: log.webhook_id })
+      .getOne();
+    if (!wh) throw new NotFoundException(`Webhook introuvable`);
+
+    const payload = (log.payload ?? {}) as Record<string, unknown>;
+    log.status = WebhookDeliveryStatus.RETRYING;
+    log.attempt = 0;
+    await this.logRepo.save(log);
+
+    this.deliverWithRetry(wh, log, payload).catch((err) => {
+      this.logger.error(`retryLog unhandled: ${err}`);
+    });
+
+    return { queued: true };
+  }
+
   // ─── Test manuel ──────────────────────────────────────────────────────────
 
   async testWebhook(id: string, tenantId: string): Promise<{ status: number | null; error: string | null }> {

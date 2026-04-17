@@ -53,3 +53,11 @@ export async function testWebhook(id: string, tenantId: string): Promise<{ statu
   });
   return handleResponse(r);
 }
+
+export async function retryWebhookLog(logId: string): Promise<{ queued: boolean }> {
+  const r = await fetch(`${API_BASE_URL}/admin/outbound-webhooks/logs/${logId}/retry`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  return handleResponse(r);
+}

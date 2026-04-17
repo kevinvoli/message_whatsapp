@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ClipboardList, Download } from 'lucide-react';
 import { AuditLog, AuditAction } from '@/app/lib/definitions';
 import { getAuditLogs } from '@/app/lib/api/audit.api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -30,7 +30,8 @@ export default function AuditView() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState({ actor_id: '', entity_type: '', action: '' });
+  const [filters, setFilters] = useState({ actor_id: '', entity_type: '', action: '', from: '', to: '' });
+  const [exporting, setExporting] = useState(false);
   const { addToast } = useToast();
 
   const load = useCallback(async (p: number) => {
@@ -41,6 +42,8 @@ export default function AuditView() {
         actor_id: filters.actor_id || undefined,
         entity_type: filters.entity_type || undefined,
         action: filters.action || undefined,
+        from: filters.from || undefined,
+        to: filters.to || undefined,
         limit: PAGE_SIZE,
         offset: p * PAGE_SIZE,
       });
@@ -50,6 +53,41 @@ export default function AuditView() {
       addToast({ message: 'Erreur chargement audit', type: 'error' });
     } finally { setLoading(false); }
   }, [addToast, filters]);
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await getAuditLogs({
+        tenant_id: TENANT_ID,
+        actor_id: filters.actor_id || undefined,
+        entity_type: filters.entity_type || undefined,
+        action: filters.action || undefined,
+        from: filters.from || undefined,
+        to: filters.to || undefined,
+        limit: 5000,
+        offset: 0,
+      });
+      const headers = ['Date', 'Acteur', 'Type acteur', 'Action', 'Entité', 'ID entité', 'Diff'];
+      const escape = (v: string) => { const s = String(v ?? '').replace(/"/g, '""'); return s.includes(';') || s.includes('\n') ? `"${s}"` : s; };
+      const rows = res.items.map(l => [
+        formatDateShort(l.createdAt),
+        l.actor_name ?? '',
+        l.actor_type ?? '',
+        l.action ?? '',
+        l.entity_type ?? '',
+        l.entity_id ?? '',
+        l.diff ? JSON.stringify(l.diff).slice(0, 200) : '',
+      ].map(escape).join(';'));
+      const csv = [headers.map(escape).join(';'), ...rows].join('\r\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `audit_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      addToast({ message: 'Erreur export', type: 'error' });
+    } finally { setExporting(false); }
+  };
 
   useEffect(() => {
     setPage(0);
@@ -67,7 +105,17 @@ export default function AuditView() {
           <h2 className="text-xl font-bold text-gray-900">Journal d'audit</h2>
           <p className="text-sm text-gray-500 mt-1">Historique immuable de toutes les actions</p>
         </div>
-        <span className="text-sm text-gray-400">{total} entrée{total !== 1 ? 's' : ''}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-400">{total} entrée{total !== 1 ? 's' : ''}</span>
+          <button
+            onClick={() => void handleExportCsv()}
+            disabled={exporting || total === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-40"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {exporting ? 'Export...' : 'CSV'}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -76,7 +124,7 @@ export default function AuditView() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm"
-            placeholder="Acteur (ID)"
+            placeholder="Acteur (nom)"
             value={filters.actor_id}
             onChange={e => setFilters(f => ({ ...f, actor_id: e.target.value }))}
           />
@@ -97,6 +145,20 @@ export default function AuditView() {
             <option key={a} value={a}>{ACTION_CONFIG[a as AuditAction].label}</option>
           ))}
         </select>
+        <input
+          type="date"
+          className="border rounded-lg px-3 py-2 text-sm"
+          value={filters.from}
+          onChange={e => setFilters(f => ({ ...f, from: e.target.value }))}
+          title="Depuis"
+        />
+        <input
+          type="date"
+          className="border rounded-lg px-3 py-2 text-sm"
+          value={filters.to}
+          onChange={e => setFilters(f => ({ ...f, to: e.target.value }))}
+          title="Jusqu'au"
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">

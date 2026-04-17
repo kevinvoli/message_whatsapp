@@ -56,4 +56,9 @@ export class OutboundWebhookController {
   test(@Param('id') id: string, @Query('tenant_id') tenantId: string) {
     return this.service.testWebhook(id, tenantId);
   }
+
+  @Post('logs/:logId/retry')
+  retryLog(@Param('logId') logId: string) {
+    return this.service.retryLog(logId);
+  }
 }

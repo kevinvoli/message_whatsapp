@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PlusCircle, Trash2, Edit, ShieldCheck } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, ShieldCheck, LayoutGrid, List, Check } from 'lucide-react';
 import { Role, Permission } from '@/app/lib/definitions';
 import { getRoles, createRole, updateRole, deleteRole } from '@/app/lib/api/rbac.api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -39,6 +39,7 @@ export default function RolesView() {
   const [editing, setEditing] = useState<Role | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'matrix'>('list');
   const { addToast } = useToast();
 
   const load = useCallback(async () => {
@@ -103,9 +104,27 @@ export default function RolesView() {
           <h2 className="text-xl font-bold text-gray-900">Rôles & Permissions</h2>
           <p className="text-sm text-gray-500 mt-1">Contrôle d'accès basé sur les rôles (RBAC)</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
-          <PlusCircle className="w-4 h-4" /> Nouveau rôle
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              title="Vue liste"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('matrix')}
+              className={`p-2 ${viewMode === 'matrix' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              title="Vue matrice"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+          <button onClick={openCreate} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+            <PlusCircle className="w-4 h-4" /> Nouveau rôle
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -157,15 +176,60 @@ export default function RolesView() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        {loading ? (
-          <div className="flex justify-center py-12"><Spinner /></div>
-        ) : roles.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-            <p className="font-medium">Aucun rôle défini</p>
-          </div>
-        ) : (
+      {loading ? (
+        <div className="flex justify-center py-12"><Spinner /></div>
+      ) : roles.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 text-center py-12 text-gray-500">
+          <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium">Aucun rôle défini</p>
+        </div>
+      ) : viewMode === 'matrix' ? (
+        /* ── Matrice permissions × rôles ── */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-48 sticky left-0 bg-white z-10">Permission</th>
+                {roles.map(r => (
+                  <th key={r.id} className="px-3 py-3 text-center text-xs font-semibold text-gray-700 min-w-[100px]">
+                    <div>{r.name}</div>
+                    {r.is_system && <div className="text-gray-400 font-normal normal-case text-[10px]">Système</div>}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ALL_PERMISSIONS.map(group => (
+                <React.Fragment key={group.group}>
+                  <tr className="bg-gray-50">
+                    <td colSpan={roles.length + 1} className="px-4 py-1.5 text-xs font-semibold text-gray-500 uppercase sticky left-0 bg-gray-50">
+                      {group.group}
+                    </td>
+                  </tr>
+                  {group.permissions.map(perm => (
+                    <tr key={perm} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-4 py-2.5 sticky left-0 bg-white text-xs text-gray-700 font-mono">
+                        {perm}
+                      </td>
+                      {roles.map(r => (
+                        <td key={r.id} className="px-3 py-2.5 text-center">
+                          {r.permissions.includes(perm) ? (
+                            <Check className="w-4 h-4 text-green-500 mx-auto" />
+                          ) : (
+                            <span className="w-4 h-4 block mx-auto text-gray-200">—</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* ── Vue liste ── */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="divide-y divide-gray-100">
             {roles.map(r => (
               <div key={r.id} className="p-5 hover:bg-gray-50">
@@ -196,8 +260,8 @@ export default function RolesView() {
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
