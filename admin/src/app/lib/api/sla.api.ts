@@ -1,4 +1,4 @@
-import { SlaRule } from '../definitions';
+import { SlaRule, SlaViolation } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 export async function getSlaRules(tenantId: string): Promise<SlaRule[]> {
@@ -39,4 +39,9 @@ export async function deleteSlaRule(id: string, tenantId: string): Promise<void>
     credentials: 'include',
   });
   if (!r.ok) throw new Error(`Erreur ${r.status}`);
+}
+
+export async function getSlaViolations(tenantId: string): Promise<SlaViolation[]> {
+  const r = await fetch(`${API_BASE_URL}/admin/sla-rules/violations?tenant_id=${tenantId}`, { credentials: 'include' });
+  return handleResponse<SlaViolation[]>(r);
 }

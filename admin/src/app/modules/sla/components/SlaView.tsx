@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PlusCircle, Trash2, Edit, AlertTriangle, Shield } from 'lucide-react';
-import { SlaRule, SlaMetric, SlaSeverity } from '@/app/lib/definitions';
-import { getSlaRules, createSlaRule, updateSlaRule, deleteSlaRule } from '@/app/lib/api/sla.api';
+import { PlusCircle, Trash2, Edit, AlertTriangle, Shield, Clock, RefreshCw } from 'lucide-react';
+import { SlaRule, SlaMetric, SlaSeverity, SlaViolation } from '@/app/lib/definitions';
+import { getSlaRules, createSlaRule, updateSlaRule, deleteSlaRule, getSlaViolations } from '@/app/lib/api/sla.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { Spinner } from '@/app/ui/Spinner';
 
@@ -41,7 +41,16 @@ export default function SlaView() {
   const [editing, setEditing] = useState<SlaRule | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  const [violations, setViolations] = useState<SlaViolation[]>([]);
+  const [violationsLoading, setViolationsLoading] = useState(false);
   const { addToast } = useToast();
+
+  const loadViolations = useCallback(async () => {
+    setViolationsLoading(true);
+    try { setViolations(await getSlaViolations(TENANT_ID)); }
+    catch { setViolations([]); }
+    finally { setViolationsLoading(false); }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +59,7 @@ export default function SlaView() {
     finally { setLoading(false); }
   }, [addToast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); void loadViolations(); }, [load, loadViolations]);
 
   const openCreate = () => {
     setEditing(null);
@@ -161,6 +170,67 @@ export default function SlaView() {
         </div>
       )}
 
+      {/* Violations en cours */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-red-500" />
+            <h3 className="text-sm font-semibold text-gray-900">Violations en cours</h3>
+            {violations.length > 0 && (
+              <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                {violations.length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => void loadViolations()}
+            disabled={violationsLoading}
+            className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400"
+            title="Rafraîchir"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${violationsLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        {violationsLoading ? (
+          <div className="flex justify-center py-6"><Spinner /></div>
+        ) : violations.length === 0 ? (
+          <div className="text-center py-6 text-sm text-gray-400">Aucune violation SLA active</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Chat</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Règle</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sévérité</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Durée</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Seuil</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {violations.map((v, i) => {
+                  const sv = SEVERITY_CONFIG[v.rule.severity];
+                  return (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600 truncate max-w-[140px]">{v.chatId}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{v.rule.name}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${sv.className}`}>
+                          <AlertTriangle className="w-3 h-3" /> {sv.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-red-600 font-semibold">{fmtDuration(v.currentValueSeconds)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-500">{fmtDuration(v.rule.threshold_seconds)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Règles SLA */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {loading ? (
           <div className="flex justify-center py-12"><Spinner /></div>

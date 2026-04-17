@@ -878,6 +878,13 @@ export interface SlaRule {
   updatedAt: string;
 }
 
+export interface SlaViolation {
+  rule: SlaRule;
+  chatId: string;
+  currentValueSeconds: number;
+  breached: boolean;
+}
+
 // ============================================
 // PHASE 5 — Audit Log
 // ============================================

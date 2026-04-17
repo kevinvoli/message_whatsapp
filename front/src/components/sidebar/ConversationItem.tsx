@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
@@ -95,6 +95,17 @@ const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
   telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
 };
 
+const SLA_WARNING_MS = 30 * 60 * 1000; // 30 minutes
+
+function hasSlaWarning(conv: Conversation): boolean {
+  if (conv.status !== 'actif') return false;
+  const clientAt = conv.last_client_message_at ? new Date(conv.last_client_message_at).getTime() : 0;
+  if (!clientAt) return false;
+  const posteAt = conv.last_poste_message_at ? new Date(conv.last_poste_message_at).getTime() : 0;
+  if (posteAt >= clientAt) return false;
+  return Date.now() - clientAt > SLA_WARNING_MS;
+}
+
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation, isSelected, isTyping, onClick,
   bulkMode = false, isChecked = false, onToggleCheck,
@@ -102,6 +113,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const provider = getProviderFromChatId(conversation.chat_id);
   const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
+  const slaAlert = hasSlaWarning(conversation);
 
   const handleClick = (e: React.MouseEvent) => {
     if (bulkMode && onToggleCheck) {
@@ -165,6 +177,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(conversation.status)}`}>
               {conversation.status.replace('_', ' ')}
             </span>
+            {slaAlert && (
+              <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full" title="Client en attente depuis plus de 30 min">
+                <Clock className="w-3 h-3" /> SLA
+              </span>
+            )}
             <ProviderBadge chatId={conversation.chat_id} showLabel={true} />
             {conversation?.tags?.map((tag, idx) => (
               <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
