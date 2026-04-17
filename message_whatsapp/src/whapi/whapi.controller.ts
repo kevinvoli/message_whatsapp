@@ -806,7 +806,6 @@ export class WhapiController {
     if (process.env.WHAPI_WEBHOOK_SKIP_SIGNATURE === 'true') {
       return;
     }
-
     
     const isProd = process.env.NODE_ENV === 'production';
     const configuredHeader =
