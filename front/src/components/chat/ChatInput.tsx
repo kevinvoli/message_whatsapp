@@ -108,6 +108,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   const cannedPrefix = message.startsWith('/') ? message.slice(1) : null;
 
+  // Raccourcis clavier globaux
+  useEffect(() => {
+    const onOpenCanned = () => { if (!disabled) setMessage(prev => prev.startsWith('/') ? prev : '/' + prev); };
+    const onSendMsg = () => { handleSubmit(); };
+    document.addEventListener('app:open-canned', onOpenCanned);
+    document.addEventListener('app:send-message', onSendMsg);
+    return () => {
+      document.removeEventListener('app:open-canned', onOpenCanned);
+      document.removeEventListener('app:send-message', onSendMsg);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, message]);
+
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
     setShowEmojiPicker(false);

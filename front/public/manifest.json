@@ -1,0 +1,18 @@
+{
+  "name": "CRM WhatsApp — Agent",
+  "short_name": "CRM Agent",
+  "description": "Plateforme de messagerie multi-canal pour agents commerciaux",
+  "start_url": "/whatsapp",
+  "display": "standalone",
+  "background_color": "#16a34a",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/globe.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

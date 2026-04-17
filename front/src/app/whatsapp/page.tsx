@@ -7,11 +7,13 @@ import { ConversationSidebar } from '@/components/layout/ConversationSidebar';
 import ChatMainArea from '@/components/chat/ChatMainArea';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
 import { ViewMode } from '@/types/chat';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('conversations');
+  useKeyboardShortcuts();
 
   useEffect(() => {
     if (initialized && !user) {
