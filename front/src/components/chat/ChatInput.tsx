@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Mic, MicOff, Paperclip, Send, Smile, X } from 'lucide-react';
+import { AlertCircle, Mic, Paperclip, Send, Smile, X } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
 import { Message } from '@/types/chat';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import { CannedResponseMenu } from './CannedResponseMenu';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -102,6 +104,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const avgResponseTime = useMemo(() => computeAvgResponseTime(storeMessages), [storeMessages]);
   const replyToMessage = useChatStore((s) => s.replyToMessage);
   const clearReplyTo = useChatStore((s) => s.clearReplyTo);
+  const { user } = useAuth();
+
+  const cannedPrefix = message.startsWith('/') ? message.slice(1) : null;
 
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
@@ -340,9 +345,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
-        </div>
-
         {isRecording ? (
           <div className="flex items-center gap-3">
             <button
@@ -367,7 +369,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           </div>
         ) : (
-          <div className="flex items-end gap-3">
+          <div className="relative flex items-end gap-3">
+            {cannedPrefix !== null && (
+              <CannedResponseMenu
+                prefix={cannedPrefix}
+                posteId={user?.poste_id ?? user?.posteId ?? undefined}
+                onSelect={(body) => {
+                  setMessage(body);
+                }}
+                onClose={() => setMessage('')}
+              />
+            )}
             <input
               ref={fileInputRef}
               type="file"

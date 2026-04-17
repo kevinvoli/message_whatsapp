@@ -49,10 +49,24 @@ export function handleChatEvent(
 
       if (typeof document !== 'undefined' && document.hidden && !message.from_me) {
         if (Notification.permission === 'granted') {
-          new Notification('Nouveau message', {
-            body: message.text || 'Media recu',
+          const conv = chatState.conversations.find((c) => c.chat_id === message.chat_id);
+          const senderName = conv?.clientName || message.from_name || 'Client';
+          const body = message.text
+            ? message.text.length > 80
+              ? message.text.slice(0, 80) + '…'
+              : message.text
+            : '📎 Média reçu';
+          const notif = new Notification(senderName, {
+            body,
             icon: '/favicon.ico',
+            tag: `msg-${message.chat_id}`,
           });
+          notif.onclick = () => {
+            window.focus();
+            notif.close();
+          };
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission();
         }
       }
       break;

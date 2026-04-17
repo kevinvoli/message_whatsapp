@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Check, X, MoreVertical, Archive, Tag, AlertCircle } from 'lucide-react';
+import { Check, X, MoreVertical, Tag, AlertCircle, ArrowRight } from 'lucide-react';
 import { Conversation, ConversationStatus } from '@/types/chat';
+import { TransferModal } from './TransferModal';
+import { LabelMenu } from './LabelMenu';
 
 interface ConversationOptionsMenuProps {
   conversation: Conversation;
@@ -15,6 +17,8 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState<ConversationStatus | null>(null);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
     if (newStatus === 'fermé' || newStatus === 'converti') {
@@ -99,9 +103,10 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
         <>
           <div
             className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
+            onClick={() => { setIsOpen(false); setShowLabels(false); }}
           />
           <div className="absolute right-0 top-12 z-20 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2">
+            {/* Statut */}
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Changer le statut
@@ -127,6 +132,39 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
                 )}
               </button>
             ))}
+
+            {/* Actions supplémentaires */}
+            <div className="px-3 py-2 border-t border-gray-100 mt-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </p>
+            </div>
+
+            {/* Transfert */}
+            <button
+              onClick={() => { setShowTransfer(true); setIsOpen(false); }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-blue-600 hover:bg-blue-50 transition-colors"
+            >
+              <ArrowRight className="w-4 h-4" />
+              <span className="flex-1 text-left text-sm font-medium">Transférer</span>
+            </button>
+
+            {/* Labels */}
+            <div className="relative">
+              <button
+                onClick={() => setShowLabels((v) => !v)}
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
+              >
+                <Tag className="w-4 h-4" />
+                <span className="flex-1 text-left text-sm font-medium">Labels</span>
+              </button>
+              {showLabels && (
+                <LabelMenu
+                  chatId={conversation.chat_id}
+                  onClose={() => setShowLabels(false)}
+                />
+              )}
+            </div>
           </div>
         </>
       )}
@@ -187,6 +225,14 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
             </div>
           </div>
         </div>
+      )}
+
+      {showTransfer && (
+        <TransferModal
+          chatId={conversation.chat_id}
+          currentPosteId={conversation.poste_id}
+          onClose={() => setShowTransfer(false)}
+        />
       )}
     </div>
   );
