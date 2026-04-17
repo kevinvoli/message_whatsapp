@@ -807,6 +807,7 @@ export class WhapiController {
       return;
     }
 
+    
     const isProd = process.env.NODE_ENV === 'production';
     const configuredHeader =
       process.env.WHAPI_WEBHOOK_SECRET_HEADER?.trim().toLowerCase();
