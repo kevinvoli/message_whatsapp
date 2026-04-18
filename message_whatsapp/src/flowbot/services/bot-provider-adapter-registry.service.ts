@@ -25,9 +25,10 @@ export class BotProviderAdapterRegistry {
     return adapter;
   }
 
-  /** Retourne null au lieu de throw — pour les contextes dégradés */
+  /** Retourne null au lieu de throw — pour les contextes dégradés.
+   *  Tente d'abord le match exact, puis le fallback universel '*'. */
   getSafe(provider: string): BotProviderAdapter | null {
-    return this.adapters.get(provider) ?? null;
+    return this.adapters.get(provider) ?? this.adapters.get('*') ?? null;
   }
 
   listProviders(): string[] {

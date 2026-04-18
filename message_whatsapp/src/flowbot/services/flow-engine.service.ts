@@ -360,7 +360,10 @@ export class FlowEngineService {
       sendResult: result,
     });
 
-    await this.writeLog(session, node, null, 'message_sent', resolvedText.slice(0, 100));
+    const logResult = result.channelLabel
+      ? `[${result.channelLabel}] ${resolvedText.slice(0, 80)}`
+      : resolvedText.slice(0, 100);
+    await this.writeLog(session, node, null, 'message_sent', logResult);
   }
 
   private async executeQuestion(

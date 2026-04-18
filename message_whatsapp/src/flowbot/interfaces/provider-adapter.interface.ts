@@ -25,6 +25,7 @@ export interface BotOutboundMessage {
 export interface BotSendResult {
   externalMessageRef: string;  // ID du message créé côté provider
   sentAt: Date;
+  channelLabel?: string;       // Nom du canal utilisé pour l'envoi (affiché dans le journal)
 }
 
 /** Capacités déclarées par un provider */

@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
+import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import {
@@ -15,13 +16,19 @@ import {
 
 @Injectable()
 export class WhapiProviderAdapter implements BotProviderAdapter {
-  readonly provider = 'whapi';
-  readonly channelType = 'whatsapp';
+  /**
+   * Adaptateur universel FlowBot — s'enregistre comme '*' dans le registry.
+   * Pour tout provider (meta, whapi, messenger, telegram, instagram),
+   * l'envoi passe par OutboundRouterService, exactement comme les messages agents.
+   */
+  readonly provider = '*';
+  readonly channelType = 'universal';
 
   private readonly logger = new Logger(WhapiProviderAdapter.name);
 
   constructor(
     private readonly commService: CommunicationWhapiService,
+    private readonly outboundRouter: OutboundRouterService,
     private readonly chatService: WhatsappChatService,
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(WhapiChannel)
@@ -33,51 +40,59 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
   capabilities(): ProviderCapabilities {
     return {
       typing: true,
-      markAsRead: false,  // non implémenté côté Whapi pour l'instant
+      markAsRead: false,
       media: true,
-      templates: false,   // Whapi ne gère pas les templates HSM
+      templates: false,
       replyTo: true,
-      windowHours: null,  // Pas de fenêtre 24h sur Whapi
+      windowHours: null,
     };
   }
 
   async sendMessage(msg: BotOutboundMessage): Promise<BotSendResult> {
+    // Résoudre le channel_id (Whapi external ID, utilisé par OutboundRouterService)
     const channelId = await this.resolveChannelId(
       msg.context.providerChannelRef,
       msg.context.externalRef,
     );
 
-    const result = await this.commService.sendToWhapiChannel({
+    // Récupérer le label pour l'afficher dans le journal
+    const channel = await this.channelRepo.findOne({ where: { channel_id: channelId } });
+
+    // Le destinataire : OutboundRouterService gère le format selon le provider.
+    // On passe le chat_id brut — chaque sous-service strips '@...' si nécessaire.
+    const to = msg.context.externalRef;
+
+    const result = await this.outboundRouter.sendTextMessage({
       text: msg.text ?? '',
-      to: msg.context.externalRef,
+      to,
       channelId,
     });
 
     return {
-      externalMessageRef: result.message.id,
+      externalMessageRef: result.providerMessageId,
       sentAt: new Date(),
+      channelLabel: channel?.label ?? channelId,
     };
   }
 
   /**
-   * Résout le channel_id Whapi à utiliser pour l'envoi.
+   * Résout le channel_id Whapi (externe) à utiliser pour l'envoi.
    *
-   * Règle : le message doit toujours partir via le canal sur lequel
-   * la conversation est arrivée (whatsapp_chat.channel_id).
+   * Le message doit partir via le canal sur lequel la conversation est arrivée
+   * (whatsapp_chat.channel_id). OutboundRouterService.sendTextMessage
+   * attend ce même channel_id pour router vers le bon provider.
    *
    * Priorité :
-   *  1. providerChannelRef fourni dans le contexte (webhook entrant — déjà le bon channel)
-   *  2. Lecture directe de whatsapp_chat.channel_id via chat_id (polling jobs)
-   *  3. Fallback ultime : premier channel disponible en base (avec warning)
+   *  1. providerChannelRef fourni dans le contexte (cas webhook entrant)
+   *  2. Lecture directe de whatsapp_chat.channel_id (cas polling jobs)
+   *  3. Fallback ultime : premier channel disponible (avec warning)
    */
   private async resolveChannelId(
     providerChannelRef: string | undefined,
     chatId: string,
   ): Promise<string> {
-    // Cas 1 — channel connu depuis le webhook entrant
     if (providerChannelRef) return providerChannelRef;
 
-    // Cas 2 — retrouver le channel via whatsapp_chat (polling jobs)
     const rows: Array<{ channel_id: string | null }> = await this.dataSource.query(
       'SELECT channel_id FROM `whatsapp_chat` WHERE chat_id = ? AND channel_id IS NOT NULL LIMIT 1',
       [chatId],
@@ -85,24 +100,25 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
     const channelIdFromChat = rows[0]?.channel_id;
     if (channelIdFromChat) {
       this.logger.debug(
-        `resolveChannelId: channel_id=${channelIdFromChat} récupéré depuis whatsapp_chat pour chatId=${chatId}`,
+        `resolveChannelId: channel_id=${channelIdFromChat} depuis whatsapp_chat pour chatId=${chatId}`,
       );
       return channelIdFromChat;
     }
 
-    // Cas 3 — fallback ultime (ne devrait pas arriver en production)
     const fallback = await this.channelRepo.findOne({ where: {} });
     if (fallback) {
       this.logger.warn(
-        `resolveChannelId: channel_id introuvable pour chatId=${chatId}, fallback sur channel_id=${fallback.channel_id}`,
+        `resolveChannelId: channel_id introuvable pour chatId=${chatId}, fallback channel_id=${fallback.channel_id}`,
       );
       return fallback.channel_id;
     }
 
     throw new Error(
-      `WhapiProviderAdapter: aucun channel Whapi disponible pour envoyer à chatId=${chatId}`,
+      `WhapiProviderAdapter: aucun channel disponible pour envoyer à chatId=${chatId}`,
     );
   }
+
+  // ─── Typing (Whapi uniquement — best-effort pour les autres providers) ─────
 
   async sendTyping(ctx: BotConversationContext): Promise<void> {
     try {
@@ -121,26 +137,20 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
   }
 
   async markAsRead(_ctx: BotConversationContext): Promise<void> {
-    // Non supporté via Whapi pour l'instant — no-op
+    // Non supporté via OutboundRouterService pour l'instant — no-op
   }
 
   async assignToAgent(ctx: BotConversationContext, agentRef?: string): Promise<void> {
-    // L'assignation est gérée par l'événement BOT_ESCALATE_EVENT émis par le FlowEngine.
-    // Le DispatcherService doit ajouter un listener sur 'bot.escalate' pour déclencher l'assignation.
-    // Cette méthode peut directement forcer un poste si agentRef est fourni.
     if (agentRef) {
       try {
         await this.chatService.update(ctx.externalRef, { poste_id: agentRef } as any);
-        this.logger.log(
-          `assignToAgent: conversation ${ctx.externalRef} → agent ${agentRef}`,
-        );
+        this.logger.log(`assignToAgent: ${ctx.externalRef} → agent ${agentRef}`);
       } catch (err) {
         this.logger.warn(
           `assignToAgent: impossible d'assigner ${ctx.externalRef} à ${agentRef}: ${(err as Error).message}`,
         );
       }
     }
-    // Pas d'agentRef → l'assignation automatique se fera via bot.escalate → DispatcherService
   }
 
   async closeConversation(ctx: BotConversationContext): Promise<void> {
