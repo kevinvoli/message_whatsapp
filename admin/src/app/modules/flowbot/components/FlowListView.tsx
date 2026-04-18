@@ -181,78 +181,88 @@ function FlowCard({ flow, onOpen, onToggle, onDelete }: {
     const nodes = flow.nodes ?? [];
 
     return (
-        <div className={`bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${flow.isActive ? 'border-green-200' : 'border-gray-200'}`}>
+        <div className={`bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${flow.isActive ? 'border-green-300' : 'border-gray-200'}`}>
             <div className="p-5">
-                <div className="flex items-start justify-between gap-4">
+                {/* En-tête : nom + badges */}
+                <div className="flex items-start gap-3 mb-2">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-semibold text-gray-900 truncate">{flow.name}</h3>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${flow.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                {flow.isActive ? '● Actif' : '○ Inactif'}
-                            </span>
-                            {flow.priority > 0 && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
-                                    Prio {flow.priority}
-                                </span>
-                            )}
-                        </div>
+                        <h3 className="font-semibold text-gray-900 truncate">{flow.name}</h3>
                         {flow.description && (
-                            <p className="text-sm text-gray-500 truncate">{flow.description}</p>
+                            <p className="text-sm text-gray-500 truncate mt-0.5">{flow.description}</p>
                         )}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {triggers.slice(0, 3).map(t => (
-                                <span key={t.id} className="inline-flex items-center px-2 py-0.5 text-xs bg-purple-50 text-purple-700 rounded-full border border-purple-100">
-                                    {TRIGGER_LABELS[t.triggerType] ?? t.triggerType}
-                                    {t.triggerType === 'KEYWORD' && t.config?.keyword ? ` "${t.config.keyword as string}"` : ''}
-                                </span>
-                            ))}
-                            {triggers.length > 3 && (
-                                <span className="text-xs text-gray-400">+{triggers.length - 3}</span>
-                            )}
-                        </div>
                     </div>
-
                     <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs text-gray-400">{nodes.length} nœud{nodes.length > 1 ? 's' : ''}</span>
-                        <button
-                            onClick={onOpen}
-                            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                            Éditer
-                        </button>
-                        <button
-                            onClick={onToggle}
-                            className={`px-3 py-1.5 text-xs border rounded-lg transition-colors ${flow.isActive ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}
-                        >
-                            {flow.isActive ? 'Désactiver' : 'Activer'}
-                        </button>
-                        <button
-                            onClick={onDelete}
-                            className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                        >
-                            Suppr.
-                        </button>
+                        {flow.priority > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
+                                Prio {flow.priority}
+                            </span>
+                        )}
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${flow.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {flow.isActive ? '● Actif' : '○ Inactif'}
+                        </span>
                     </div>
                 </div>
 
-                {/* Aperçu des nœuds */}
-                {nodes.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                        <div className="flex flex-wrap gap-1.5">
-                            {nodes.slice(0, 8).map(n => (
-                                <span
-                                    key={n.id}
-                                    className={`inline-flex items-center px-2 py-0.5 text-xs rounded border ${n.isEntryPoint ? 'bg-blue-100 border-blue-300 text-blue-800 font-medium' : 'bg-gray-50 border-gray-200 text-gray-600'}`}
-                                >
-                                    {n.isEntryPoint ? '▶ ' : ''}{NODE_TYPE_LABELS[n.type] ?? n.type}{n.label ? ` — ${n.label}` : ''}
-                                </span>
-                            ))}
-                            {nodes.length > 8 && (
-                                <span className="text-xs text-gray-400 self-center">+{nodes.length - 8}</span>
-                            )}
-                        </div>
+                {/* Triggers */}
+                {triggers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                        {triggers.slice(0, 4).map(t => (
+                            <span key={t.id} className="inline-flex items-center px-2 py-0.5 text-xs bg-purple-50 text-purple-700 rounded-full border border-purple-100">
+                                {TRIGGER_LABELS[t.triggerType] ?? t.triggerType}
+                                {t.triggerType === 'KEYWORD' && t.config?.keyword ? ` "${t.config.keyword as string}"` : ''}
+                            </span>
+                        ))}
+                        {triggers.length > 4 && (
+                            <span className="text-xs text-gray-400 self-center">+{triggers.length - 4}</span>
+                        )}
                     </div>
                 )}
+
+                {/* Aperçu des nœuds */}
+                {nodes.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                        {nodes.slice(0, 6).map(n => (
+                            <span
+                                key={n.id}
+                                className={`inline-flex items-center px-2 py-0.5 text-xs rounded border ${n.isEntryPoint ? 'bg-blue-100 border-blue-300 text-blue-800 font-medium' : 'bg-gray-50 border-gray-200 text-gray-600'}`}
+                            >
+                                {n.isEntryPoint ? '▶ ' : ''}{NODE_TYPE_LABELS[n.type] ?? n.type}{n.label ? ` — ${n.label}` : ''}
+                            </span>
+                        ))}
+                        {nodes.length > 6 && (
+                            <span className="text-xs text-gray-400 self-center">+{nodes.length - 6} nœuds</span>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Barre d'actions — toujours visible en bas */}
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl flex items-center justify-between gap-3">
+                <span className="text-xs text-gray-400">{nodes.length} nœud{nodes.length > 1 ? 's' : ''} · {triggers.length} déclencheur{triggers.length > 1 ? 's' : ''}</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onOpen}
+                        className="px-4 py-1.5 text-sm font-medium bg-white text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                    >
+                        Éditer
+                    </button>
+                    <button
+                        onClick={onToggle}
+                        className={`px-4 py-1.5 text-sm font-medium border rounded-lg transition-colors shadow-sm ${
+                            flow.isActive
+                                ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
+                                : 'bg-green-500 text-white border-green-500 hover:bg-green-600'
+                        }`}
+                    >
+                        {flow.isActive ? 'Désactiver' : 'Activer'}
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        className="px-3 py-1.5 text-sm font-medium bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors shadow-sm"
+                    >
+                        Supprimer
+                    </button>
+                </div>
             </div>
         </div>
     );
