@@ -228,58 +228,74 @@ export class FlowEngineService {
       providerChannelRef: execCtx.providerChannelRef,
     };
 
-    switch (node.type) {
-      case FlowNodeType.MESSAGE:
-        await this.executeMessage(session, node, conv, execCtx, adapter, ctx);
-        break;
+    try {
+      switch (node.type) {
+        case FlowNodeType.MESSAGE:
+          await this.executeMessage(session, node, conv, execCtx, adapter, ctx);
+          break;
 
-      case FlowNodeType.QUESTION:
-        await this.executeQuestion(session, node, conv, execCtx, adapter, ctx);
-        return; // STOP — session passe en waiting_reply
+        case FlowNodeType.QUESTION:
+          await this.executeQuestion(session, node, conv, execCtx, adapter, ctx);
+          return; // STOP — session passe en waiting_reply
 
-      case FlowNodeType.CONDITION:
-        await this.executeCondition(session, node, conv, execCtx);
-        return; // l'arête choisie est suivie en interne
+        case FlowNodeType.CONDITION:
+          await this.executeCondition(session, node, conv, execCtx);
+          return; // l'arête choisie est suivie en interne
 
-      case FlowNodeType.WAIT:
-        await this.executeWait(session, node);
-        return; // STOP — session passe en waiting_delay
+        case FlowNodeType.WAIT:
+          await this.executeWait(session, node);
+          return; // STOP — session passe en waiting_delay
 
-      case FlowNodeType.ESCALATE:
-        await this.escalateSession(session, conv, execCtx, 'user_request', node.config.agentRef as string | undefined);
-        return;
+        case FlowNodeType.ESCALATE:
+          await this.escalateSession(session, conv, execCtx, 'user_request', node.config.agentRef as string | undefined);
+          return;
 
-      case FlowNodeType.END:
-        await this.terminateSession(session, FlowSessionStatus.COMPLETED, conv, execCtx);
-        return;
+        case FlowNodeType.END:
+          await this.terminateSession(session, FlowSessionStatus.COMPLETED, conv, execCtx);
+          return;
 
-      case FlowNodeType.ACTION:
-        await this.executeAction(session, node, conv, execCtx, adapter, ctx);
-        break;
+        case FlowNodeType.ACTION:
+          await this.executeAction(session, node, conv, execCtx, adapter, ctx);
+          break;
 
-      case FlowNodeType.AB_TEST:
-        await this.executeAbTest(session, node, conv, execCtx);
-        return;
+        case FlowNodeType.AB_TEST:
+          await this.executeAbTest(session, node, conv, execCtx);
+          return;
 
-      // P6.2 — Nouveaux types de nœuds
-      case FlowNodeType.DELAY:
-        await this.executeDelay(session, node);
-        return; // STOP — session passe en waiting_delay
+        // P6.2 — Nouveaux types de nœuds
+        case FlowNodeType.DELAY:
+          await this.executeDelay(session, node);
+          return; // STOP — session passe en waiting_delay
 
-      case FlowNodeType.HTTP_REQUEST:
-        await this.executeHttpRequest(session, node, execCtx);
-        break;
+        case FlowNodeType.HTTP_REQUEST:
+          await this.executeHttpRequest(session, node, execCtx);
+          break;
 
-      case FlowNodeType.SEND_TEMPLATE:
-        await this.executeSendTemplate(session, node, execCtx);
-        break;
+        case FlowNodeType.SEND_TEMPLATE:
+          await this.executeSendTemplate(session, node, execCtx);
+          break;
 
-      case FlowNodeType.ASSIGN_LABEL:
-        await this.executeAssignLabel(session, node, conv);
-        break;
+        case FlowNodeType.ASSIGN_LABEL:
+          await this.executeAssignLabel(session, node, conv);
+          break;
 
-      default:
-        this.logger.warn(`Type de nœud inconnu: ${(node as any).type}`);
+        default:
+          this.logger.warn(`Type de nœud inconnu: ${(node as any).type}`);
+      }
+    } catch (err) {
+      this.logger.error(
+        `executeNode: erreur sur nœud type=${node.type} id=${node.id} session=${session.id} — ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      await this.writeLog(session, node, null, 'node_error', (err as Error).message.slice(0, 200));
+      // Terminer proprement la session pour éviter qu'elle reste bloquée en ACTIVE
+      session.status = FlowSessionStatus.CANCELLED;
+      session.completedAt = new Date();
+      await this.sessionService.save(session);
+      conv.status = BotConversationStatus.IDLE;
+      conv.activeSessionId = null;
+      await this.botConvService.save(conv);
+      return;
     }
 
     // Suivre l'arête "always" pour les nœuds non-terminaux

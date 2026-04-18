@@ -40,13 +40,10 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
   }
 
   async sendMessage(msg: BotOutboundMessage): Promise<BotSendResult> {
-    const channelId = msg.context.providerChannelRef;
-
-    if (!channelId) {
-      throw new Error(
-        `WhapiProviderAdapter.sendMessage: providerChannelRef manquant pour externalRef=${msg.context.externalRef}`,
-      );
-    }
+    const channelId = await this.resolveChannelId(
+      msg.context.providerChannelRef,
+      msg.context.externalRef,
+    );
 
     const result = await this.commService.sendToWhapiChannel({
       text: msg.text ?? '',
@@ -58,6 +55,46 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
       externalMessageRef: result.message.id,
       sentAt: new Date(),
     };
+  }
+
+  /**
+   * Résout l'identifiant du channel Whapi à utiliser pour l'envoi.
+   * Priorité :
+   *  1. providerChannelRef fourni dans le contexte (cas normal — message déclenché par webhook entrant)
+   *  2. Fallback : recherche du channel actif par chat_id dans whatsapp_chat (polling jobs)
+   *  3. Fallback final : premier channel Whapi actif en base
+   */
+  private async resolveChannelId(
+    providerChannelRef: string | undefined,
+    chatId: string,
+  ): Promise<string> {
+    if (providerChannelRef) return providerChannelRef;
+
+    // Fallback 1 — chercher le canal via la conversation (pour les polling jobs)
+    const chatChannel = await this.channelRepo
+      .createQueryBuilder('ch')
+      .innerJoin('whatsapp_chat', 'wc', 'wc.channel_id = ch.channel_id')
+      .where('wc.chat_id = :chatId', { chatId })
+      .getOne();
+    if (chatChannel) {
+      this.logger.debug(
+        `resolveChannelId: channel trouvé via whatsapp_chat pour chatId=${chatId} → channel_id=${chatChannel.channel_id}`,
+      );
+      return chatChannel.channel_id;
+    }
+
+    // Fallback 2 — premier channel actif disponible
+    const fallback = await this.channelRepo.findOne({ where: {} });
+    if (fallback) {
+      this.logger.warn(
+        `resolveChannelId: aucun channel trouvé pour chatId=${chatId}, utilisation du fallback channel_id=${fallback.channel_id}`,
+      );
+      return fallback.channel_id;
+    }
+
+    throw new Error(
+      `WhapiProviderAdapter.sendMessage: aucun channel Whapi disponible pour envoyer à ${chatId}`,
+    );
   }
 
   async sendTyping(ctx: BotConversationContext): Promise<void> {
