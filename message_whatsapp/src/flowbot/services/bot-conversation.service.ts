@@ -52,6 +52,11 @@ export class BotConversationService {
     return this.repo.findOne({ where: { chatRef } });
   }
 
+  async createForChatRef(chatRef: string): Promise<BotConversation> {
+    const conv = this.repo.create({ chatRef, status: BotConversationStatus.IDLE, isKnownContact: false, isReopened: false });
+    return this.repo.save(conv);
+  }
+
   async save(conv: BotConversation): Promise<BotConversation> {
     return this.repo.save(conv);
   }

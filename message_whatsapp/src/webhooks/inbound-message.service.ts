@@ -46,6 +46,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { ChatContext } from 'src/context/entities/chat-context.entity';
+import { BusinessHoursService } from 'src/flowbot/services/business-hours.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -73,6 +74,7 @@ export class InboundMessageService {
     private readonly messengerService: CommunicationMessengerService,
     // P2.2 — Distributed locking cross-instance
     private readonly distributedLock: DistributedLockService,
+    private readonly businessHours: BusinessHoursService,
   ) {}
 
   // ─── Messages entrants ────────────────────────────────────────────────────
@@ -186,9 +188,10 @@ export class InboundMessageService {
     } satisfies InboundMessageProcessedEvent);
 
     // ── Étape 9 : déclenchement FlowBot (découplé — fire-and-forget) ────────
+    const isOutOfHours = !(await this.businessHours.isCurrentlyOpen());
     this.eventEmitter.emit(
       BOT_INBOUND_EVENT,
-      this.buildBotInboundEvent(message, conversation, chatContext ?? undefined),
+      this.buildBotInboundEvent(message, conversation, chatContext ?? undefined, isOutOfHours),
     );
   }
 
@@ -204,6 +207,7 @@ export class InboundMessageService {
     msg: UnifiedMessage,
     conversation: WhatsappChat,
     chatContext?: ChatContext,
+    isOutOfHours = false,
   ): BotInboundMessageEvent {
     const PROVIDER_TO_CHANNEL_TYPE: Record<string, string> = {
       whapi: 'whatsapp',
@@ -246,7 +250,7 @@ export class InboundMessageService {
     event.receivedAt = new Date(msg.timestamp * 1000);
     event.isNewConversation = isNewConversation;
     event.isReopened = conversation.reopened_at !== null;
-    event.isOutOfHours = false; // TODO: brancher BusinessHoursService (TICKET-12-B follow-up)
+    event.isOutOfHours = isOutOfHours;
     event.agentAssignedRef = conversation.poste_id ?? undefined;
     event.contextId = chatContext?.contextId ?? null;
     event.chatContextId = chatContext?.id ?? null;

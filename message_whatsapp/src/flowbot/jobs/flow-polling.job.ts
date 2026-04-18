@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { FlowEngineService } from '../services/flow-engine.service';
 import { FlowSessionService } from '../services/flow-session.service';
 import { FlowTriggerService } from '../services/flow-trigger.service';
@@ -10,11 +12,20 @@ import { BotConversationStatus } from '../entities/bot-conversation.entity';
 import { BotInboundMessageEvent, BOT_INBOUND_EVENT } from '../events/bot-inbound-message.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-/** Seuil au-delà duquel une session WAITING_DELAY est considérée expirée (secondes) */
+/** Seuil WAITING_DELAY expiré (secondes) */
 const WAIT_DELAY_THRESHOLD_SECONDS = 30;
 
-/** Seuil au-delà duquel une session WAITING_REPLY peut déclencher NO_RESPONSE (secondes, ~30 min) */
+/** Seuil WAITING_REPLY → NO_RESPONSE (secondes, ~30 min) */
 const NO_RESPONSE_THRESHOLD_SECONDS = 1800;
+
+/** Seuil QUEUE_WAIT — conversation sans agent depuis N minutes */
+const QUEUE_WAIT_THRESHOLD_MINUTES = 30;
+
+/** Seuil INACTIVITY — aucune activité depuis N minutes */
+const INACTIVITY_THRESHOLD_MINUTES = 120;
+
+/** Fenêtre 23h WhatsApp — au-delà, l'envoi sera refusé par le provider */
+const WHATSAPP_WINDOW_MS = 23 * 60 * 60 * 1000;
 
 @Injectable()
 export class FlowPollingJob {
@@ -26,6 +37,7 @@ export class FlowPollingJob {
     private readonly triggerService: FlowTriggerService,
     private readonly convService: BotConversationService,
     private readonly eventEmitter: EventEmitter2,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -89,6 +101,140 @@ export class FlowPollingJob {
         );
       }
     }
+  }
+
+  // ─── QUEUE_WAIT polling ────────────────────────────────────────────────────
+
+  /**
+   * Toutes les 5 minutes — déclenche QUEUE_WAIT pour les conversations
+   * non assignées en attente depuis plus de QUEUE_WAIT_THRESHOLD_MINUTES.
+   * Respecte la fenêtre 23h WhatsApp.
+   */
+  @Cron('0 */5 * * * *')
+  async pollQueueWait(): Promise<void> {
+    const match = await this.triggerService.findActiveFlowForTriggerType(FlowTriggerType.QUEUE_WAIT);
+    if (!match) return;
+
+    const thresholdDate = new Date(Date.now() - QUEUE_WAIT_THRESHOLD_MINUTES * 60_000);
+    const window23hDate = new Date(Date.now() - WHATSAPP_WINDOW_MS);
+
+    const chats: Array<{ chat_id: string; last_client_message_at: Date | null }> =
+      await this.dataSource.query(
+        `SELECT chat_id, last_client_message_at
+         FROM whatsapp_chat
+         WHERE status = 'en attente'
+           AND poste_id IS NULL
+           AND last_client_message_at IS NOT NULL
+           AND last_client_message_at <= ?
+           AND last_client_message_at >= ?
+           AND deleted_at IS NULL`,
+        [thresholdDate, window23hDate],
+      );
+
+    if (!chats.length) return;
+    this.logger.log(`FlowPollingJob: ${chats.length} chat(s) QUEUE_WAIT à traiter`);
+
+    for (const chat of chats) {
+      try {
+        await this.triggerPollingFlow(
+          chat.chat_id,
+          FlowTriggerType.QUEUE_WAIT,
+          match.flow.id,
+          chat.last_client_message_at ?? new Date(),
+        );
+      } catch (err) {
+        this.logger.error(`FlowPollingJob QUEUE_WAIT ${chat.chat_id}: ${(err as Error).message}`);
+      }
+    }
+  }
+
+  // ─── INACTIVITY polling ────────────────────────────────────────────────────
+
+  /**
+   * Toutes les 5 minutes — déclenche INACTIVITY pour les conversations actives
+   * sans aucune activité depuis plus de INACTIVITY_THRESHOLD_MINUTES.
+   */
+  @Cron('30 */5 * * * *')
+  async pollInactivity(): Promise<void> {
+    const match = await this.triggerService.findActiveFlowForTriggerType(FlowTriggerType.INACTIVITY);
+    if (!match) return;
+
+    const thresholdDate = new Date(Date.now() - INACTIVITY_THRESHOLD_MINUTES * 60_000);
+
+    const chats: Array<{ chat_id: string; last_client_message_at: Date | null; last_activity_at: Date | null }> =
+      await this.dataSource.query(
+        `SELECT chat_id, last_client_message_at, last_activity_at
+         FROM whatsapp_chat
+         WHERE status IN ('actif', 'en attente')
+           AND last_activity_at IS NOT NULL
+           AND last_activity_at <= ?
+           AND deleted_at IS NULL`,
+        [thresholdDate],
+      );
+
+    if (!chats.length) return;
+    this.logger.log(`FlowPollingJob: ${chats.length} chat(s) INACTIVITY à traiter`);
+
+    for (const chat of chats) {
+      try {
+        // Vérifier fenêtre 23h avant d'envoyer
+        const lastMsg = chat.last_client_message_at;
+        if (lastMsg && Date.now() - lastMsg.getTime() > WHATSAPP_WINDOW_MS) continue;
+
+        await this.triggerPollingFlow(
+          chat.chat_id,
+          FlowTriggerType.INACTIVITY,
+          match.flow.id,
+          chat.last_client_message_at ?? new Date(),
+        );
+      } catch (err) {
+        this.logger.error(`FlowPollingJob INACTIVITY ${chat.chat_id}: ${(err as Error).message}`);
+      }
+    }
+  }
+
+  // ─── Helper commun pour les triggers de polling ────────────────────────────
+
+  private async triggerPollingFlow(
+    chatId: string,
+    triggerType: FlowTriggerType,
+    flowId: string,
+    lastInboundAt: Date,
+  ): Promise<void> {
+    // Trouver ou créer la BotConversation associée
+    let conv = await this.convService.findByChatRef(chatId);
+    if (!conv) {
+      conv = await this.convService.createForChatRef(chatId);
+    }
+
+    // Ne pas relancer si une session est déjà active sur cette conv
+    const active = await this.sessionService.getActiveSession(conv);
+    if (active && active.status === FlowSessionStatus.ACTIVE) return;
+
+    const event = this.buildPollingEvent(chatId, triggerType, flowId, lastInboundAt);
+    this.eventEmitter.emit(BOT_INBOUND_EVENT, event);
+  }
+
+  private buildPollingEvent(
+    chatId: string,
+    triggerType: FlowTriggerType,
+    _flowId: string,
+    lastInboundAt: Date,
+  ): BotInboundMessageEvent {
+    const event = new BotInboundMessageEvent();
+    event.provider = 'whapi';
+    event.channelType = 'whatsapp';
+    event.conversationExternalRef = chatId;
+    event.contactExternalId = chatId;
+    event.contactName = '';
+    event.messageText = undefined;
+    event.messageType = 'text';
+    event.externalMessageRef = `polling:${triggerType}:${chatId}:${Date.now()}`;
+    event.receivedAt = lastInboundAt;
+    event.isNewConversation = false;
+    event.isReopened = triggerType === FlowTriggerType.INACTIVITY ? false : false;
+    event.isOutOfHours = false;
+    return event;
   }
 
   private buildNoResponseEvent(

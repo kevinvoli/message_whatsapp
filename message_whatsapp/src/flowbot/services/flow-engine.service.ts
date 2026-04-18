@@ -103,6 +103,7 @@ export class FlowEngineService {
       __providerChannelRef: execCtx.providerChannelRef ?? null,
       __contactName: execCtx.contactName ?? '',
       __contactRef: execCtx.contactRef ?? execCtx.externalRef,
+      __lastInboundAt: execCtx.lastInboundAt?.getTime() ?? Date.now(),
     };
     await this.sessionService.save(session);
 
@@ -297,6 +298,17 @@ export class FlowEngineService {
   ): Promise<void> {
     if (!adapter) {
       this.logger.warn(`executeMessage: pas d'adapter pour provider=${execCtx.provider}`);
+      return;
+    }
+
+    // Fenêtre 23h WhatsApp — refuser l'envoi si le dernier message entrant est trop ancien
+    const lastInboundTs = execCtx.lastInboundAt?.getTime()
+      ?? (session.variables?.['__lastInboundAt'] as number | undefined);
+    if (lastInboundTs && Date.now() - lastInboundTs > 23 * 60 * 60 * 1000) {
+      this.logger.warn(
+        `executeMessage: fenêtre 23h expirée pour session=${session.id} chatRef=${conv.chatRef} — message ignoré`,
+      );
+      await this.terminateSession(session, FlowSessionStatus.COMPLETED, conv, execCtx);
       return;
     }
 

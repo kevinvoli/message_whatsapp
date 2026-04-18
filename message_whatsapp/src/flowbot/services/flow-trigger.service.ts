@@ -73,17 +73,74 @@ export class FlowTriggerService {
         return event.isOutOfHours;
 
       case FlowTriggerType.KEYWORD: {
-        const keywords = (trigger.config.keywords as string[]) ?? [];
-        const text = (event.messageText ?? '').toLowerCase();
-        return keywords.some((kw) => text.includes(kw.toLowerCase()));
+        const rawText = event.messageText ?? '';
+        const kwList = trigger.config.keywords as Array<
+          string | { keyword: string; matchType?: string; caseSensitive?: boolean }
+        > ?? [];
+        return kwList.some((entry) => this.matchKeyword(rawText, entry));
       }
 
       case FlowTriggerType.ON_ASSIGN:
         return !!event.agentAssignedRef;
 
+      case FlowTriggerType.INBOUND_MESSAGE: {
+        // Peut filtrer par client_type_target (new / returning / all)
+        const target = (trigger.config.clientTypeTarget as string | undefined) ?? 'all';
+        if (target === 'all') return true;
+        if (target === 'new')       return !conv.isKnownContact;
+        if (target === 'returning') return conv.isKnownContact;
+        return true;
+      }
+
       default:
         // QUEUE_WAIT, NO_RESPONSE, INACTIVITY, SCHEDULE → gérés par les jobs de polling
         return false;
+    }
+  }
+
+  /**
+   * Recherche un flow actif ayant un trigger du type donné.
+   * Utilisé par les polling jobs (QUEUE_WAIT, INACTIVITY) qui ne passent pas
+   * par l'événement inbound classique.
+   */
+  async findActiveFlowForTriggerType(
+    triggerType: FlowTriggerType,
+    contextId?: string | null,
+  ): Promise<{ flow: FlowBot; trigger: FlowTrigger } | null> {
+    const flows = await this.flowRepo.find({
+      where: { isActive: true },
+      relations: ['triggers'],
+      order: { priority: 'DESC' },
+    });
+
+    for (const flow of flows) {
+      if (contextId && flow.scopeContextId && flow.scopeContextId !== contextId) continue;
+      for (const trigger of flow.triggers) {
+        if (trigger.isActive && trigger.triggerType === triggerType) {
+          return { flow, trigger };
+        }
+      }
+    }
+    return null;
+  }
+
+  private matchKeyword(
+    text: string,
+    entry: string | { keyword: string; matchType?: string; caseSensitive?: boolean },
+  ): boolean {
+    if (typeof entry === 'string') {
+      return text.toLowerCase().includes(entry.toLowerCase());
+    }
+
+    const { keyword, matchType = 'contains', caseSensitive = false } = entry;
+    const haystack = caseSensitive ? text : text.toLowerCase();
+    const needle   = caseSensitive ? keyword : keyword.toLowerCase();
+
+    switch (matchType) {
+      case 'exact':       return haystack === needle;
+      case 'starts_with': return haystack.startsWith(needle);
+      case 'contains':
+      default:            return haystack.includes(needle);
     }
   }
 }

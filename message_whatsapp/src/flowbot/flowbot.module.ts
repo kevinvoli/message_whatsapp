@@ -23,6 +23,7 @@ import { FlowTriggerService } from './services/flow-trigger.service';
 import { FlowVariableService } from './services/flow-variable.service';
 import { FlowAnalyticsService } from './services/flow-analytics.service';
 import { FlowMonitorService } from './services/flow-monitor.service';
+import { BusinessHoursService } from './services/business-hours.service';
 
 // Listeners
 import { BotInboundListener } from './listeners/bot-inbound.listener';
@@ -61,6 +62,7 @@ const SERVICES = [
   FlowVariableService,
   FlowAnalyticsService,
   FlowMonitorService,
+  BusinessHoursService,
 ];
 
 @Module({
@@ -81,6 +83,7 @@ const SERVICES = [
   exports: [
     BotProviderAdapterRegistry,
     FlowEngineService,
+    BusinessHoursService,
   ],
 })
 export class FlowBotModule {}
