@@ -722,12 +722,6 @@ export default function ConversationsView({
                                                 <DetailItem label="Conversion" value={selectedChat.contact?.conversion_status ?? '—'} badge />
                                                 <DetailItem label="Not spam" value={formatBool(selectedChat.not_spam)} badge />
                                             </div>
-                                            <div className="pt-2 space-y-2">
-                                                <DetailItem label="Auto-msg status" value={selectedChat.auto_message_status ?? '—'} badge />
-                                                <DetailItem label="Auto-msg step" value={String(selectedChat.auto_message_step ?? 0)} />
-                                                <DetailItem label="En attente réponse" value={formatBool(selectedChat.waiting_client_reply)} badge />
-                                                <DetailItem label="Dernier auto-msg" value={formatDateTime(selectedChat.last_auto_message_sent_at)} />
-                                            </div>
                                         </div>
                                     </InfoCard>
 

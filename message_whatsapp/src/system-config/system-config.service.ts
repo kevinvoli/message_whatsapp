@@ -43,7 +43,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'FF_UNIFIED_WEBHOOK_ROUTER', label: 'Activer le routeur webhook unifié', category: 'feature_flags', description: 'true / false' },
   { key: 'FF_SHADOW_UNIFIED', label: 'Mode shadow (routing parallèle)', category: 'feature_flags', description: 'true / false' },
   { key: 'FF_UNIFIED_WHAPI_PCT', label: 'Pourcentage trafic Whapi unifié', category: 'feature_flags', description: '0–100' },
-  { key: 'FF_FLOWBOT_ACTIVE', label: 'FlowBot actif (désactive AutoMessageMasterJob)', category: 'feature_flags', description: 'true / false — mettre true pour activer le moteur FlowBot et désactiver les messages automatiques legacy' },
+  { key: 'FF_FLOWBOT_ACTIVE', label: 'FlowBot actif', category: 'feature_flags', description: 'true / false — active le moteur FlowBot' },
 
 ];
 

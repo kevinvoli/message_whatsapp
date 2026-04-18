@@ -66,7 +66,6 @@ const FAKE_CONVERSATION: Conversation = {
   poste_id: 'poste-1',
   clientName: 'Client Test',
   clientPhone: '+33600000001',
-  auto_message_status: 'sent',
   lastMessage: null,
   unreadCount: 0,
   status: 'actif',

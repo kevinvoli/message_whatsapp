@@ -285,58 +285,6 @@ export type Channel = {
   no_close?: boolean;
 };
 
-export type AutoMessageTriggerType =
-  | 'no_response'
-  | 'sequence'
-  | 'out_of_hours'
-  | 'reopened'
-  | 'queue_wait'
-  | 'keyword'
-  | 'client_type'
-  | 'inactivity'
-  | 'on_assign';
-
-export type KeywordMatchType = 'exact' | 'contains' | 'starts_with';
-
-export type AutoMessageKeyword = {
-  id: string;
-  messageAutoId: string;
-  keyword: string;
-  matchType: KeywordMatchType;
-  caseSensitive: boolean;
-  actif: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type BusinessHoursConfig = {
-  id: string;
-  dayOfWeek: number; // 0=Dim, 1=Lun, ..., 6=Sam
-  openHour: number;
-  openMinute: number;
-  closeHour: number;
-  closeMinute: number;
-  isOpen: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type MessageAuto = {
-  id: string;
-  body: string;
-  delai?: number | null;
-  canal?: 'whatsapp' | 'sms' | 'email' | null;
-  position: number;
-  actif: boolean;
-  trigger_type?: AutoMessageTriggerType | null;
-  scope_type?: 'poste' | 'canal' | 'provider' | null;
-  scope_id?: string | null;
-  scope_label?: string | null;
-  client_type_target?: 'all' | 'new' | 'returning' | null;
-  keywords?: AutoMessageKeyword[];
-  createdAt?: string;
-  updatedAt?: string;
-};
 
 export type Client = {
   id: string;
@@ -425,12 +373,6 @@ export type WhatsappChat = {
   first_response_deadline_at?: string | null;
   last_client_message_at?: string | null;
   last_poste_message_at?: string | null;
-  auto_message_id?: string | null;
-  current_auto_message_id?: string | null;
-  auto_message_status?: string | null;
-  auto_message_step?: number;
-  waiting_client_reply?: boolean;
-  last_auto_message_sent_at?: string | null;
   last_activity_at: string;
   createdAt: string;
   updatedAt: string;
@@ -471,23 +413,8 @@ export type DispatchSettings = {
   no_reply_reinject_interval_minutes: number;
   read_only_check_interval_minutes: number;
   offline_reinject_cron: string;
-  auto_message_enabled: boolean;
-  auto_message_delay_min_seconds: number;
-  auto_message_delay_max_seconds: number;
-  auto_message_max_steps: number;
 };
 
-export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';
-
-export type AutoMessageScopeConfig = {
-  id: string;
-  scope_type: AutoMessageScopeType;
-  scope_id: string;
-  label?: string | null;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type DispatchSettingsAudit = {
   id: string;

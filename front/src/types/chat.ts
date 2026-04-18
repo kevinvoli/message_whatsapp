@@ -286,7 +286,6 @@ export interface Conversation {
   clientName: string;
   clientPhone: string;
 
-  auto_message_status: "scheduled" | "sending" | "sent";
   readonly?: boolean;
   channel_dedicated?: boolean;
 
@@ -492,8 +491,6 @@ interface RawConversationData {
   client_phone?: string;
   contact_client?: string;
   last_msg_client_channel_id?: string;
-
-  auto_message_status?: "scheduled" | "sending" | "sent";
 
   last_message?: RawMessageData | string | null;
   messages?: RawMessageData[];
@@ -781,7 +778,6 @@ export const transformToConversation = (
     priority: (raw.priority ?? raw.contact_summary?.priority ?? "moyenne") as Priority,
     tags: raw.tags || [],
 
-    auto_message_status: raw.auto_message_status ?? "scheduled",
     readonly: raw.read_only ?? undefined,
     channel_dedicated: raw.channel_dedicated ?? false,
 

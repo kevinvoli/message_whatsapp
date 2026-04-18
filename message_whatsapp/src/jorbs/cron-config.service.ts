@@ -457,10 +457,6 @@ export class CronConfigService implements OnModuleInit {
     no_reply_reinject_interval_minutes?: number;
     read_only_check_interval_minutes?: number;
     offline_reinject_cron?: string;
-    auto_message_enabled?: boolean;
-    auto_message_delay_min_seconds?: number;
-    auto_message_delay_max_seconds?: number;
-    auto_message_max_steps?: number;
   }): Promise<void> {
     const updates: Array<{ key: string; dto: UpdateCronConfigDto }> = [];
 
@@ -481,22 +477,6 @@ export class CronConfigService implements OnModuleInit {
         key: 'offline-reinject',
         dto: { cronExpression: patch.offline_reinject_cron },
       });
-    }
-    if (
-      patch.auto_message_enabled !== undefined ||
-      patch.auto_message_delay_min_seconds !== undefined ||
-      patch.auto_message_delay_max_seconds !== undefined ||
-      patch.auto_message_max_steps !== undefined
-    ) {
-      const dto: UpdateCronConfigDto = {};
-      if (patch.auto_message_enabled !== undefined) dto.enabled = patch.auto_message_enabled;
-      if (patch.auto_message_delay_min_seconds !== undefined)
-        dto.delayMinSeconds = patch.auto_message_delay_min_seconds;
-      if (patch.auto_message_delay_max_seconds !== undefined)
-        dto.delayMaxSeconds = patch.auto_message_delay_max_seconds;
-      if (patch.auto_message_max_steps !== undefined)
-        dto.maxSteps = patch.auto_message_max_steps;
-      updates.push({ key: 'auto-message', dto });
     }
 
     for (const { key, dto } of updates) {

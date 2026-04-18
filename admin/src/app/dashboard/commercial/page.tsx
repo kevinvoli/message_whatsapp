@@ -19,7 +19,7 @@ import ChannelsView from '@/app/modules/channels/components/ChannelsView';
 import PostesView from '@/app/modules/channels/components/PostesView';
 import DispatchView from '@/app/modules/dispatch/components/DispatchView';
 import QueueView from '@/app/modules/dispatch/components/QueueView';
-import CronConfigView from '@/app/modules/automations/components/CronConfigView';
+import CronConfigView from '@/app/ui/CronConfigView';
 import NotificationsView from '@/app/modules/notifications/components/NotificationsView';
 import AlertConfigView from '@/app/modules/notifications/components/AlertConfigView';
 import ObservabiliteView from '@/app/modules/observability/components/ObservabiliteView';

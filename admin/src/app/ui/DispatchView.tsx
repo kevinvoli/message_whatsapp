@@ -1,65 +1,28 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, ListChecks, RefreshCw, Bot, History } from 'lucide-react';
-import { DispatchSettings, DispatchSettingsAudit, DispatchSnapshot } from '@/app/lib/definitions';
+import { AlertTriangle, Clock, ListChecks, RefreshCw, History } from 'lucide-react';
+import { DispatchSettingsAudit, DispatchSnapshot } from '@/app/lib/definitions';
 import {
-  getDispatchSettings,
   getDispatchSettingsAudit,
   getDispatchSnapshot,
   redispatchAllWaiting,
   resetStuckConversations,
-  updateDispatchSettings,
 } from '@/app/lib/api/dispatch.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate } from '@/app/lib/dateUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'queue' | 'automessages' | 'historique';
+type Tab = 'queue' | 'historique';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'queue',        label: 'File d\'attente',  icon: ListChecks },
-  { id: 'automessages', label: 'Messages auto',    icon: Bot        },
-  { id: 'historique',   label: 'Historique',       icon: History    },
+  { id: 'queue',      label: 'File d\'attente', icon: ListChecks },
+  { id: 'historique', label: 'Historique',      icon: History    },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function SettingsActions({
-  saving,
-  hasSettings,
-  onSave,
-  onReset,
-}: {
-  saving: boolean;
-  hasSettings: boolean;
-  onSave: () => void;
-  onReset?: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {onReset && (
-        <button
-          type="button"
-          onClick={onReset}
-          disabled={saving || !hasSettings}
-          className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
-        >
-          Reset defaut
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving || !hasSettings}
-        className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
-      >
-        {saving ? 'Sauvegarde...' : 'Sauvegarder'}
-      </button>
-    </div>
-  );
-}
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
@@ -67,7 +30,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [activeTab, setActiveTab] = useState<Tab>('queue');
 
   const [snapshot, setSnapshot] = useState<DispatchSnapshot | null>(null);
-  const [settings, setSettings] = useState<DispatchSettings | null>(null);
   const [audit, setAudit] = useState<DispatchSettingsAudit[]>([]);
   const [auditOffset, setAuditOffset] = useState(0);
   const [auditResetOnly, setAuditResetOnly] = useState(false);
@@ -76,7 +38,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [auditTo, setAuditTo] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [savingAuto, setSavingAuto] = useState(false);
   const [redispatching, setRedispatching] = useState(false);
   const [resettingStuck, setResettingStuck] = useState(false);
 
@@ -105,13 +66,11 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const refresh = async () => {
     try {
       setLoading(true);
-      const [snapshotData, settingsData, auditData] = await Promise.all([
+      const [snapshotData, auditData] = await Promise.all([
         getDispatchSnapshot(),
-        getDispatchSettings(),
         loadAudit({ offset: 0 }),
       ]);
       setSnapshot(snapshotData);
-      setSettings(settingsData);
       setAudit(auditData);
       setAuditOffset(0);
     } catch (error) {
@@ -179,33 +138,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     }
   };
 
-  // ── Sauvegarde Messages auto ───────────────────────────────────────────────
-
-  const handleSaveAutoMessages = async () => {
-    if (!settings) return;
-    try {
-      setSavingAuto(true);
-      const saved = await updateDispatchSettings({
-        auto_message_enabled: settings.auto_message_enabled,
-        auto_message_delay_min_seconds: settings.auto_message_delay_min_seconds,
-        auto_message_delay_max_seconds: settings.auto_message_delay_max_seconds,
-        auto_message_max_steps: settings.auto_message_max_steps,
-      });
-      setSettings(saved);
-      const auditData = await loadAudit({ offset: 0 });
-      setAudit(auditData);
-      setAuditOffset(0);
-      addToast({ type: 'success', message: 'Parametres messages auto sauvegardes.' });
-    } catch (error) {
-      addToast({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Erreur sauvegarde messages auto.',
-      });
-    } finally {
-      setSavingAuto(false);
-    }
-  };
-
   // ── Rendu ──────────────────────────────────────────────────────────────────
 
   return (
@@ -216,7 +148,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Dispatch & Queue</h2>
           <p className="text-sm text-gray-500">
-            Suivi des conversations, crons et parametres d&apos;envoi automatique.
+            Suivi des conversations et gestion de la file d&apos;attente.
           </p>
         </div>
         <button
@@ -359,125 +291,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
               </p>
             )}
           </div>
-          </div>
-        )}
-
-        {/* ── Onglet : Messages auto ── */}
-        {activeTab === 'automessages' && (
-          <div className="p-5">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Parametres des messages automatiques</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Activation globale et configuration des delais d&apos;envoi.
-                </p>
-              </div>
-              <SettingsActions
-                saving={savingAuto}
-                hasSettings={!!settings}
-                onSave={handleSaveAutoMessages}
-              />
-            </div>
-
-            {settings ? (
-              <div className="space-y-6">
-                {/* Toggle activation */}
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">Activer les messages automatiques</p>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      Lorsque desactive, aucun message auto ne sera envoye, quel que soit le scope.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={settings.auto_message_enabled}
-                    onClick={() =>
-                      setSettings({ ...settings, auto_message_enabled: !settings.auto_message_enabled })
-                    }
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                      settings.auto_message_enabled ? 'bg-emerald-500' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
-                        settings.auto_message_enabled ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Delais et etapes */}
-                <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Delais et etapes
-                  </p>
-                  <div className="grid gap-5 md:grid-cols-3">
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Delai minimum (secondes)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={3600}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                        value={settings.auto_message_delay_min_seconds}
-                        onChange={(e) =>
-                          setSettings({ ...settings, auto_message_delay_min_seconds: Number(e.target.value) })
-                        }
-                      />
-                      <p className="mt-1 text-[11px] text-gray-400">Min: 1s — Max: 3600s</p>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Delai maximum (secondes)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={3600}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                        value={settings.auto_message_delay_max_seconds}
-                        onChange={(e) =>
-                          setSettings({ ...settings, auto_message_delay_max_seconds: Number(e.target.value) })
-                        }
-                      />
-                      <p className="mt-1 text-[11px] text-gray-400">Doit etre superieur au min.</p>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Nombre d&apos;etapes max
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                        value={settings.auto_message_max_steps}
-                        onChange={(e) =>
-                          setSettings({ ...settings, auto_message_max_steps: Number(e.target.value) })
-                        }
-                      />
-                      <p className="mt-1 text-[11px] text-gray-400">
-                        Au-dela, le chat passe en lecture seule.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Info */}
-                {!settings.auto_message_enabled && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                    Les messages automatiques sont actuellement <strong>desactives</strong>.
-                    Activez-les et sauvegardez pour commencer l&apos;envoi automatique.
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">Chargement...</p>
-            )}
           </div>
         )}
 

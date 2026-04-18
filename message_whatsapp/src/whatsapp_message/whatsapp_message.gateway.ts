@@ -691,51 +691,6 @@ export class WhatsappMessageGateway
     });
   }
 
-  /**
-   * Notification dédiée aux messages automatiques (from_me = true, poste_id = null).
-   * Contrairement à notifyNewMessage :
-   * - Ne touche PAS à chat.read_only (l'orchestrateur le gère lui-même)
-   * - Ne crée PAS de notification admin "Nouveau message" (c'est un message système)
-   * - Préserve le unread_count depuis la colonne DB du chat plutôt que de recalculer
-   *   via countUnreadMessages() — seul le commercial en cliquant peut remettre à 0
-   */
-  async notifyAutoMessage(
-    message: WhatsappMessage,
-    chat: WhatsappChat,
-  ): Promise<void> {
-    if (!chat.poste_id) {
-      this.logger.warn(
-        `Auto message notify skipped: no assigned poste for chat ${chat.chat_id}`,
-      );
-      return;
-    }
-
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'MESSAGE_ADD',
-      payload: mapMessage(message),
-    });
-
-    // Récupérer le dernier message et le unread_count depuis la DB.
-    // On utilise la colonne unread_count (gérée par le dispatcher + clic commercial)
-    // et non countUnreadMessages (basé sur le status des messages, peut être 0 si
-    // les messages ont été marqués comme lus par l'ouverture de la conversation).
-    const [freshChat, resolvedLastMessage] = await Promise.all([
-      this.chatService.findBychat_id(chat.chat_id),
-      this.messageService.findLastMessageBychat_id(chat.chat_id),
-    ]);
-
-    const unreadCount = freshChat?.unread_count ?? chat.unread_count ?? 0;
-
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: mapConversation(chat, resolvedLastMessage, unreadCount),
-    });
-
-    this.logger.log(
-      `AUTO_MESSAGE_NOTIFY chat_id=${chat.chat_id} unread_count=${unreadCount}`,
-    );
-  }
-
   // ======================================================
   // STATUS UPDATE (delivered / read / failed)
   // ======================================================
@@ -779,45 +734,6 @@ export class WhatsappMessageGateway
     this.logger.log(
       `STATUS_UPDATE_EMITTED external_id=${data.providerMessageId} status=${data.status}`,
     );
-  }
-
-  // ======================================================
-  // AUTO-MESSAGE avec Typing
-  // ======================================================
-  sendAutoMessageWithTyping(chatId: string, text: string) {
-    if (this.typingChats.has(chatId)) return; // déjà en typing
-    this.typingChats.add(chatId);
-
-    void this.emitTyping(chatId, true);
-    const typingTime = Math.min(3000, text.length * 100);
-
-    setTimeout(() => {
-      void (async () => {
-        const chat = await this.chatService.findBychat_id(chatId);
-        if (!chat) return;
-        if (!chat.poste) return;
-        const resolvedChannelId = await this.resolveChannelIdForChat(chat);
-        if (!resolvedChannelId) {
-          this.logger.warn(
-            `Auto message skipped: channel not resolved for chat ${chat.chat_id}`,
-          );
-          return;
-        }
-
-        const message = await this.messageService.createAgentMessage({
-          chat_id: chat.chat_id,
-          poste_id: chat.poste?.id,
-          text,
-          channel_id: resolvedChannelId,
-          timestamp: new Date(),
-        });
-
-        await this.notifyNewMessage(message, chat);
-      })().finally(() => {
-        void this.emitTyping(chatId, false);
-        this.typingChats.delete(chatId);
-      });
-    }, typingTime);
   }
 
   private async resolveChannelIdForChat(

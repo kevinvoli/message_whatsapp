@@ -6,7 +6,6 @@ import { getChats, getMessages } from './api/conversations.api';
 import { getClients } from './api/clients.api';
 import { getPostes } from './api/postes.api';
 import { getChannels } from './api/channels.api';
-import { getMessageAuto } from './api/automations.api';
 import { formatDateShort } from './dateUtils';
 
 export type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
@@ -244,21 +243,6 @@ const EXPORT_VIEWS: Partial<Record<string, ExportDef>> = {
         Version: safe(ch.version),
         IP: safe(ch.ip),
         'Créé le': ch.createdAt ? formatDateShort(ch.createdAt) : '',
-      }));
-    },
-  },
-  automessages: {
-    title: 'Messages Automatiques',
-    columns: ['ID', 'Canal', 'Position', 'Actif', 'Délai (s)', 'Contenu'],
-    fetchData: async () => {
-      const data = await getMessageAuto();
-      return data.map((m) => ({
-        ID: safe(m.id),
-        Canal: safe(m.canal),
-        Position: m.position,
-        Actif: m.actif ? 'Oui' : 'Non',
-        'Délai (s)': m.delai ?? 0,
-        Contenu: safe(m.body).substring(0, 150),
       }));
     },
   },

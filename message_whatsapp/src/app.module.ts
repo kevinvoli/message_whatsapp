@@ -38,7 +38,6 @@ import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { SystemAlertModule } from './system-alert/system-alert.module';
 import { FlowBotModule } from './flowbot/flowbot.module';
-import { MessageAutoCompatModule } from './message-auto-compat/message-auto-compat.module';
 import { ContextModule } from './context/context.module';
 import { RedisModule } from './redis/redis.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -152,7 +151,6 @@ import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
     SystemConfigModule,
     SystemAlertModule,
     FlowBotModule,
-    MessageAutoCompatModule,
     RedisModule,
     ContextModule,
     // Phase 3 — Fonctionnalités de base
