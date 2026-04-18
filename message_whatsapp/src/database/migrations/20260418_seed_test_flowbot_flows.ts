@@ -49,7 +49,7 @@ export class SeedTestFlowbotFlows1744900000000 implements MigrationInterface {
       messageBody:
         "Bonjour {contact_name} ! Vous nous contactez en dehors de nos horaires d'ouverture. " +
         "Nous avons bien reçu votre message et un agent vous répondra dès notre prochaine ouverture. " +
-        "Merci pour votre patience. 🕐 [TRIGGER: OUT_OF_HOURS]",
+        "Merci pour votre patience. [TRIGGER: OUT_OF_HOURS]",
     });
 
     // ── 2. Mot-clé ────────────────────────────────────────────────────────────
