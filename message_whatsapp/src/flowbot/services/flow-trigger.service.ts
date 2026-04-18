@@ -60,8 +60,12 @@ export class FlowTriggerService {
     event: BotInboundMessageEvent,
   ): boolean {
     switch (trigger.triggerType) {
-      case FlowTriggerType.INBOUND_MESSAGE:
-        return true;
+      case FlowTriggerType.INBOUND_MESSAGE: {
+        const target = (trigger.config.clientTypeTarget as string | undefined) ?? 'all';
+        if (target === 'new')       return !conv.isKnownContact;
+        if (target === 'returning') return conv.isKnownContact;
+        return true; // 'all'
+      }
 
       case FlowTriggerType.CONVERSATION_OPEN:
         return event.isNewConversation;
@@ -74,23 +78,14 @@ export class FlowTriggerService {
 
       case FlowTriggerType.KEYWORD: {
         const rawText = event.messageText ?? '';
-        const kwList = trigger.config.keywords as Array<
+        const kwList = (trigger.config.keywords as Array<
           string | { keyword: string; matchType?: string; caseSensitive?: boolean }
-        > ?? [];
+        >) ?? [];
         return kwList.some((entry) => this.matchKeyword(rawText, entry));
       }
 
       case FlowTriggerType.ON_ASSIGN:
         return !!event.agentAssignedRef;
-
-      case FlowTriggerType.INBOUND_MESSAGE: {
-        // Peut filtrer par client_type_target (new / returning / all)
-        const target = (trigger.config.clientTypeTarget as string | undefined) ?? 'all';
-        if (target === 'all') return true;
-        if (target === 'new')       return !conv.isKnownContact;
-        if (target === 'returning') return conv.isKnownContact;
-        return true;
-      }
 
       default:
         // QUEUE_WAIT, NO_RESPONSE, INACTIVITY, SCHEDULE → gérés par les jobs de polling
