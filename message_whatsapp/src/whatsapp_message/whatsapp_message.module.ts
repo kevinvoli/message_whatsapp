@@ -33,6 +33,7 @@ import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { SocketAuthService } from './services/socket-auth.service';
 import { SocketConversationQueryService } from './services/socket-conversation-query.service';
+import { FlowbotOutboundListener } from './listeners/flowbot-outbound.listener';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { RealtimeServerService } from 'src/realtime/realtime-server.service';
 import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
@@ -101,6 +102,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     AgentConnectionService,
     ChannelProviderRegistry,
     ResolveTenantUseCase,
+    FlowbotOutboundListener,
   ],
   exports: [
     WhatsappMessageGateway,

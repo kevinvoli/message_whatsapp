@@ -9,6 +9,7 @@ import { FlowSessionLog } from '../entities/flow-session-log.entity';
 import { BotConversation, BotConversationStatus } from '../entities/bot-conversation.entity';
 import { BotInboundMessageEvent } from '../events/bot-inbound-message.event';
 import { BOT_ESCALATE_EVENT, BOT_CLOSE_EVENT, BotEscalateRequestEvent, BotCloseRequestEvent } from '../events/bot-outbound.events';
+import { FLOWBOT_OUTBOUND_SENT, FlowbotOutboundSentEvent } from '../events/flowbot-outbound-sent.event';
 import { BotProviderAdapterRegistry } from './bot-provider-adapter-registry.service';
 import { BotConversationService } from './bot-conversation.service';
 import { BotMessageService } from './bot-message.service';
@@ -352,6 +353,15 @@ export class FlowEngineService {
       text: resolvedText,
       mediaUrl: config.mediaUrl,
     });
+
+    // Persister le message dans whatsapp_message (affiché dans l'UI conversation)
+    const outboundEvent = new FlowbotOutboundSentEvent();
+    outboundEvent.chatRef = execCtx.externalRef;
+    outboundEvent.text = resolvedText;
+    outboundEvent.providerMessageId = result.externalMessageRef ?? `bot_${Date.now()}`;
+    outboundEvent.provider = execCtx.provider;
+    outboundEvent.sentAt = result.sentAt ?? new Date();
+    this.eventEmitter.emit(FLOWBOT_OUTBOUND_SENT, outboundEvent);
 
     await this.botMsgService.saveOutbound({
       sessionId: session.id,
