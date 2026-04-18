@@ -42,20 +42,25 @@ export class MetaProviderAdapter implements BotProviderAdapter {
   async sendMessage(msg: BotOutboundMessage): Promise<BotSendResult> {
     const channel = await this.resolveChannel(msg.context);
 
+    // Meta attend un numéro pur (chiffres uniquement).
+    // Le chat_id est au format "22556056396@s.whatsapp.net" — on extrait la partie avant "@".
+    const to = msg.context.externalRef.split('@')[0];
+
     const result = await this.metaService.sendTextMessage({
       text: msg.text ?? '',
-      to: msg.context.externalRef,
+      to,
       phoneNumberId: channel.external_id!,
       accessToken: channel.token,
     });
 
     this.logger.log(
-      `MetaProviderAdapter.sendMessage → ${msg.context.externalRef} id=${result.providerMessageId}`,
+      `MetaProviderAdapter.sendMessage → ${to} via channel=${channel.channel_id} id=${result.providerMessageId}`,
     );
 
     return {
       externalMessageRef: result.providerMessageId,
       sentAt: new Date(),
+      channelLabel: channel.label ?? channel.channel_id,
     };
   }
 

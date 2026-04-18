@@ -58,9 +58,9 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
     // Récupérer le label pour l'afficher dans le journal
     const channel = await this.channelRepo.findOne({ where: { channel_id: channelId } });
 
-    // Le destinataire : OutboundRouterService gère le format selon le provider.
-    // On passe le chat_id brut — chaque sous-service strips '@...' si nécessaire.
-    const to = msg.context.externalRef;
+    // Le chat_id est au format "33612345678@s.whatsapp.net".
+    // On extrait la partie avant "@" — chaque service provider attend des chiffres purs.
+    const to = msg.context.externalRef.split('@')[0];
 
     const result = await this.outboundRouter.sendTextMessage({
       text: msg.text ?? '',

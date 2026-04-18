@@ -126,8 +126,7 @@ export class FlowPollingJob {
            AND poste_id IS NULL
            AND last_client_message_at IS NOT NULL
            AND last_client_message_at <= ?
-           AND last_client_message_at >= ?
-           AND deleted_at IS NULL`,
+           AND last_client_message_at >= ?`,
         [thresholdDate, window23hDate],
       );
 
@@ -167,8 +166,7 @@ export class FlowPollingJob {
          FROM whatsapp_chat
          WHERE status IN ('actif', 'en attente')
            AND last_activity_at IS NOT NULL
-           AND last_activity_at <= ?
-           AND deleted_at IS NULL`,
+           AND last_activity_at <= ?`,
         [thresholdDate],
       );
 
