@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
@@ -26,6 +26,8 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(WhapiChannel)
     private readonly channelRepo: Repository<WhapiChannel>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   capabilities(): ProviderCapabilities {
@@ -58,42 +60,47 @@ export class WhapiProviderAdapter implements BotProviderAdapter {
   }
 
   /**
-   * Résout l'identifiant du channel Whapi à utiliser pour l'envoi.
+   * Résout le channel_id Whapi à utiliser pour l'envoi.
+   *
+   * Règle : le message doit toujours partir via le canal sur lequel
+   * la conversation est arrivée (whatsapp_chat.channel_id).
+   *
    * Priorité :
-   *  1. providerChannelRef fourni dans le contexte (cas normal — message déclenché par webhook entrant)
-   *  2. Fallback : recherche du channel actif par chat_id dans whatsapp_chat (polling jobs)
-   *  3. Fallback final : premier channel Whapi actif en base
+   *  1. providerChannelRef fourni dans le contexte (webhook entrant — déjà le bon channel)
+   *  2. Lecture directe de whatsapp_chat.channel_id via chat_id (polling jobs)
+   *  3. Fallback ultime : premier channel disponible en base (avec warning)
    */
   private async resolveChannelId(
     providerChannelRef: string | undefined,
     chatId: string,
   ): Promise<string> {
+    // Cas 1 — channel connu depuis le webhook entrant
     if (providerChannelRef) return providerChannelRef;
 
-    // Fallback 1 — chercher le canal via la conversation (pour les polling jobs)
-    const chatChannel = await this.channelRepo
-      .createQueryBuilder('ch')
-      .innerJoin('whatsapp_chat', 'wc', 'wc.channel_id = ch.channel_id')
-      .where('wc.chat_id = :chatId', { chatId })
-      .getOne();
-    if (chatChannel) {
+    // Cas 2 — retrouver le channel via whatsapp_chat (polling jobs)
+    const rows: Array<{ channel_id: string | null }> = await this.dataSource.query(
+      'SELECT channel_id FROM `whatsapp_chat` WHERE chat_id = ? AND channel_id IS NOT NULL LIMIT 1',
+      [chatId],
+    );
+    const channelIdFromChat = rows[0]?.channel_id;
+    if (channelIdFromChat) {
       this.logger.debug(
-        `resolveChannelId: channel trouvé via whatsapp_chat pour chatId=${chatId} → channel_id=${chatChannel.channel_id}`,
+        `resolveChannelId: channel_id=${channelIdFromChat} récupéré depuis whatsapp_chat pour chatId=${chatId}`,
       );
-      return chatChannel.channel_id;
+      return channelIdFromChat;
     }
 
-    // Fallback 2 — premier channel actif disponible
+    // Cas 3 — fallback ultime (ne devrait pas arriver en production)
     const fallback = await this.channelRepo.findOne({ where: {} });
     if (fallback) {
       this.logger.warn(
-        `resolveChannelId: aucun channel trouvé pour chatId=${chatId}, utilisation du fallback channel_id=${fallback.channel_id}`,
+        `resolveChannelId: channel_id introuvable pour chatId=${chatId}, fallback sur channel_id=${fallback.channel_id}`,
       );
       return fallback.channel_id;
     }
 
     throw new Error(
-      `WhapiProviderAdapter.sendMessage: aucun channel Whapi disponible pour envoyer à ${chatId}`,
+      `WhapiProviderAdapter: aucun channel Whapi disponible pour envoyer à chatId=${chatId}`,
     );
   }
 
