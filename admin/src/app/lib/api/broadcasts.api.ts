@@ -45,8 +45,8 @@ export async function cancelBroadcast(id: string, tenantId: string): Promise<voi
   if (!r.ok) throw new Error(`Erreur ${r.status}`);
 }
 
-export async function getBroadcastStats(id: string): Promise<Broadcast> {
-  const r = await fetch(`${API_BASE_URL}/admin/broadcasts/${id}/stats`, { credentials: 'include' });
+export async function getBroadcastStats(id: string, tenantId: string): Promise<Broadcast> {
+  const r = await fetch(`${API_BASE_URL}/admin/broadcasts/${id}/stats?tenant_id=${tenantId}`, { credentials: 'include' });
   return handleResponse<Broadcast>(r);
 }
 

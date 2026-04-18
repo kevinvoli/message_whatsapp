@@ -45,8 +45,8 @@ export default function BroadcastsView() {
         const running = prev.filter(b => b.status === 'RUNNING');
         if (running.length === 0) return prev;
         running.forEach(b => {
-          getBroadcastStats(b.id).then(updated => {
-            setBroadcasts(cur => cur.map(c => c.id === updated.id ? updated : c));
+          getBroadcastStats(b.id, TENANT_ID).then(stats => {
+            setBroadcasts(cur => cur.map(c => c.id === b.id ? { ...c, ...stats } : c));
           }).catch(() => {});
         });
         return prev;
@@ -140,20 +140,20 @@ export default function BroadcastsView() {
                         <span className="font-semibold text-gray-900">{b.name}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${s.className}`}>{s.label}</span>
                       </div>
-                      {b.total_recipients > 0 && (
+                      {b.total_count > 0 && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-                            <span className="font-medium text-gray-700">Total : {b.total_recipients}</span>
-                            <span>Envoyés : <strong className="text-blue-600">{b.sent_count}</strong> ({pct(b.sent_count, b.total_recipients)}%)</span>
-                            <span>Livrés : <strong className="text-emerald-600">{b.delivered_count}</strong> ({pct(b.delivered_count, b.total_recipients)}%)</span>
-                            <span>Lus : <strong className="text-purple-600">{b.read_count}</strong> ({pct(b.read_count, b.total_recipients)}%)</span>
+                            <span className="font-medium text-gray-700">Total : {b.total_count}</span>
+                            <span>Envoyés : <strong className="text-blue-600">{b.sent_count}</strong> ({pct(b.sent_count, b.total_count)}%)</span>
+                            <span>Livrés : <strong className="text-emerald-600">{b.delivered_count}</strong> ({pct(b.delivered_count, b.total_count)}%)</span>
+                            <span>Lus : <strong className="text-purple-600">{b.read_count}</strong> ({pct(b.read_count, b.total_count)}%)</span>
                             {b.failed_count > 0 && <span className="text-red-500">Échecs : <strong>{b.failed_count}</strong></span>}
                           </div>
                           {/* Barre multi-segment : lus | livrés | envoyés */}
                           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden relative">
-                            <div className="absolute inset-y-0 left-0 bg-blue-300 rounded-full" style={{ width: `${pct(b.sent_count, b.total_recipients)}%` }} />
-                            <div className="absolute inset-y-0 left-0 bg-emerald-400 rounded-full" style={{ width: `${pct(b.delivered_count, b.total_recipients)}%` }} />
-                            <div className="absolute inset-y-0 left-0 bg-purple-500 rounded-full" style={{ width: `${pct(b.read_count, b.total_recipients)}%` }} />
+                            <div className="absolute inset-y-0 left-0 bg-blue-300 rounded-full" style={{ width: `${pct(b.sent_count, b.total_count)}%` }} />
+                            <div className="absolute inset-y-0 left-0 bg-emerald-400 rounded-full" style={{ width: `${pct(b.delivered_count, b.total_count)}%` }} />
+                            <div className="absolute inset-y-0 left-0 bg-purple-500 rounded-full" style={{ width: `${pct(b.read_count, b.total_count)}%` }} />
                           </div>
                           <div className="flex items-center gap-3 text-[10px] text-gray-400">
                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-300 inline-block" />Envoyé</span>

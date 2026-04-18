@@ -975,7 +975,8 @@ export interface Broadcast {
   status: BroadcastStatus;
   template_id: string | null;
   scheduled_at: string | null;
-  total_recipients: number;
+  /** total_count dans l'entité backend */
+  total_count: number;
   sent_count: number;
   delivered_count: number;
   read_count: number;
