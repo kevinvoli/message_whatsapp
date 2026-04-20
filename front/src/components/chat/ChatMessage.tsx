@@ -237,40 +237,58 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             );
           })}
 
-          {/* Location */}
+          {/* Location — aperçu style WhatsApp */}
           {locationMedias.map((loc, i) => {
             const hasCoords = loc.latitude != null && loc.longitude != null;
             const lat = hasCoords ? Number(loc.latitude) : null;
             const lng = hasCoords ? Number(loc.longitude) : null;
-            const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+            const mapsUrl = hasCoords
+              ? `https://www.google.com/maps?q=${lat},${lng}`
+              : null;
+            const tileUrl = hasCoords
+              ? `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=280x130&maptype=mapnik&markers=${lat},${lng},red-pushpin`
+              : null;
             return (
-              <MediaBubble key={`loc-${messageId}-${i}`} fromMe={isFromMe}>
-                {mapsUrl ? (
-                  <a
-                    href={mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 transition-colors hover:opacity-90"
-                  >
-                    <div className={`p-2 rounded-lg ${isFromMe ? 'bg-green-500/30' : 'bg-red-50'}`}>
-                      <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
+              <div key={`loc-${messageId}-${i}`} className="overflow-hidden rounded-lg w-64 shadow-sm">
+                {/* Miniature carte */}
+                <div className="relative h-32 bg-gray-200 overflow-hidden">
+                  {tileUrl && (
+                    <img
+                      src={tileUrl}
+                      alt="Carte"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  {/* Pin centré par-dessus la carte */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-white rounded-full p-1 shadow-md">
+                      <MapPin className="w-5 h-5 text-red-500" />
                     </div>
-                    <div>
-                      <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
-                        Localisation partagée
-                      </p>
-                      <p className={`text-xs ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
-                        {lat!.toFixed(5)}, {lng!.toFixed(5)}
-                      </p>
-                    </div>
-                  </a>
-                ) : (
-                  <div className="flex items-center gap-2 p-3">
-                    <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
-                    <span className={`text-sm ${isFromMe ? 'text-white' : 'text-gray-700'}`}>Localisation</span>
                   </div>
-                )}
-              </MediaBubble>
+                  {/* Overlay cliquable */}
+                  {mapsUrl && (
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute inset-0"
+                      aria-label="Ouvrir dans Google Maps"
+                    />
+                  )}
+                </div>
+                {/* Légende */}
+                <div className={`px-3 py-2 ${isFromMe ? 'bg-green-600' : 'bg-white border border-gray-100'}`}>
+                  <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
+                    Localisation partagée
+                  </p>
+                  {hasCoords && (
+                    <p className={`text-xs mt-0.5 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
+                      {lat!.toFixed(5)}, {lng!.toFixed(5)}
+                    </p>
+                  )}
+                </div>
+              </div>
             );
           })}
 

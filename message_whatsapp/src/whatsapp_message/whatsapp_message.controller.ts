@@ -106,7 +106,11 @@ export class WhatsappMessageController {
         name: body.name,
         address: body.address,
       });
-      return message;
+
+      // Notifier le frontend via WebSocket (même pattern que uploadMedia)
+      await this.gateway.notifyNewMessage(message, chat);
+
+      return { success: true, message_id: message.id };
     } catch (err) {
       if (err instanceof HttpException) throw err;
       throw new HttpException(

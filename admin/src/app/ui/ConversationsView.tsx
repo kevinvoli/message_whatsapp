@@ -830,18 +830,31 @@ export default function ConversationsView({
                                                             const lat = hasCoords ? Number(media.latitude) : null;
                                                             const lng = hasCoords ? Number(media.longitude) : null;
                                                             const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-                                                            return mapsUrl ? (
-                                                                <a key={idx} href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors">
-                                                                    <MapPin className="w-4 h-4 flex-shrink-0 text-red-400" />
-                                                                    <div>
-                                                                        <p className="text-xs font-medium underline">Localisation partagée</p>
-                                                                        <p className="text-[10px] opacity-70">{lat!.toFixed(5)}, {lng!.toFixed(5)}</p>
+                                                            const tileUrl = hasCoords
+                                                              ? `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=280x130&maptype=mapnik&markers=${lat},${lng},red-pushpin`
+                                                              : null;
+                                                            const isOut = msg.direction === 'OUT';
+                                                            return (
+                                                                <div key={idx} className="overflow-hidden rounded-lg w-56 shadow-sm">
+                                                                    <div className="relative h-28 bg-gray-200 overflow-hidden">
+                                                                        {tileUrl && (
+                                                                            <img src={tileUrl} alt="Carte" className="w-full h-full object-cover" loading="lazy" />
+                                                                        )}
+                                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                                            <div className="bg-white rounded-full p-1 shadow-md">
+                                                                                <MapPin className="w-4 h-4 text-red-500" />
+                                                                            </div>
+                                                                        </div>
+                                                                        {mapsUrl && (
+                                                                            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="absolute inset-0" aria-label="Ouvrir dans Google Maps" />
+                                                                        )}
                                                                     </div>
-                                                                </a>
-                                                            ) : (
-                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
-                                                                    <MapPin className="w-4 h-4 flex-shrink-0" />
-                                                                    <span className="text-xs">Localisation</span>
+                                                                    <div className={`px-2 py-1.5 ${isOut ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                                                                        <p className={`text-xs font-medium ${isOut ? 'text-white' : 'text-gray-900'}`}>Localisation partagée</p>
+                                                                        {hasCoords && (
+                                                                            <p className={`text-[10px] mt-0.5 ${isOut ? 'text-blue-200' : 'text-gray-500'}`}>{lat!.toFixed(5)}, {lng!.toFixed(5)}</p>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             );
                                                         }
