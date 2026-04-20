@@ -8,8 +8,9 @@ WORKDIR /app
 
 COPY package*.json ./
 # Cache mount : réutilise le cache npm entre les builds
+# npm cache verify nettoie les entrées corrompues (race condition entre builds parallèles)
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm cache verify && npm ci || (npm cache clean --force && npm ci)
 
 # ─────────────────────────────────────────
 # Stage 2 : build
