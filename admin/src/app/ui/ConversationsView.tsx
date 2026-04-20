@@ -5,7 +5,7 @@ import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Act
 import { getMessagesForChat, getMessageCount, sendMessage, getChats, getChatStatsByCommercial, patchChat } from '@/app/lib/api/conversations.api';
 import { getPostes } from '@/app/lib/api/postes.api';
 import { Spinner } from './Spinner';
-import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import { CommercialStats, ConversationResult, CONVERSATION_RESULT_LABELS, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
@@ -46,11 +46,12 @@ export default function ConversationsView({
     const { addToast } = useToast();
     const loadingToastRef = useRef(false);
 
-    // Filtres poste / commercial
+    // Filtres poste / commercial / résultat
     const [postes, setPostes] = useState<Poste[]>([]);
     const [commerciaux, setCommerciaux] = useState<CommercialStats[]>([]);
     const [selectedPosteId, setSelectedPosteId] = useState<string>(initialPosteId ?? '');
     const [selectedCommercialId, setSelectedCommercialId] = useState<string>(initialCommercialId ?? '');
+    const [selectedResult, setSelectedResult] = useState<string>('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +74,7 @@ export default function ConversationsView({
 
     const selectedPoste = postes.find((p) => p.id === selectedPosteId);
     const selectedCommercial = commerciaux.find((c) => c.commercial_id === selectedCommercialId);
-    const hasFilter = !!(selectedPosteId || selectedCommercialId);
+    const hasFilter = !!(selectedPosteId || selectedCommercialId || selectedResult);
 
     const contextTitle = useMemo(() => {
         if (selectedCommercial && selectedPoste) {
@@ -97,6 +98,7 @@ export default function ConversationsView({
                 periodeEffective,
                 selectedPosteId || undefined,
                 selectedCommercialId || undefined,
+                selectedResult || undefined,
             );
             setChats(result.data);
             setTotal(result.total);
@@ -108,7 +110,7 @@ export default function ConversationsView({
         } finally {
             setLoadingChats(false);
         }
-    }, [selectedPeriod, selectedPosteId, selectedCommercialId]);
+    }, [selectedPeriod, selectedPosteId, selectedCommercialId, selectedResult]);
 
     useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
 
@@ -416,6 +418,7 @@ export default function ConversationsView({
                                 onClick={() => {
                                     setSelectedPosteId('');
                                     setSelectedCommercialId('');
+                                    setSelectedResult('');
                                 }}
                                 className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-full"
                                 title="Réinitialiser les filtres"
@@ -462,6 +465,18 @@ export default function ConversationsView({
                             ))}
                         </select>
                     )}
+
+                    {/* Filtre par résultat de conversation */}
+                    <select
+                        value={selectedResult}
+                        onChange={(e) => { setSelectedResult(e.target.value); setOffset(0); }}
+                        className="w-full text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                    >
+                        <option value="">Tous les résultats</option>
+                        {(Object.keys(CONVERSATION_RESULT_LABELS) as ConversationResult[]).map((r) => (
+                            <option key={r} value={r}>{CONVERSATION_RESULT_LABELS[r]}</option>
+                        ))}
+                    </select>
 
                     {/* Compteurs de contexte */}
                     {hasFilter && (

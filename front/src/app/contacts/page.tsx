@@ -1,8 +1,6 @@
 'use client';
 
-// Données chargées depuis le backend via WebSocket (useContactStore)
-
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Phone,
   PhoneCall,
@@ -12,6 +10,7 @@ import {
   PhoneMissed,
   User,
   Archive,
+  RefreshCw,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useContactStore } from '@/store/contactStore';
@@ -19,16 +18,12 @@ import { useChatStore } from '@/store/chatStore';
 import {
   Contact,
   CallStatus,
-  ContactFilters,
-  convToContact,
   getCallStatusColor,
   getCallStatusLabel,
 } from '@/types/chat';
 import { formatDate, formatDateShort, formatTime } from '@/lib/dateUtils';
-import { ContactFilters as ContactFiltersPanel } from '@/components/contacts/ContactFilters';
-import { ContactCard } from '@/components/contacts/ContactCard';
 import { ContactTimeline } from '@/components/contacts/ContactTimeline';
-import { updateContactCallStatus } from '@/lib/contactApi';
+import { updateContactCallStatus, searchClients, ClientSummary } from '@/lib/contactApi';
 import { logger } from '@/lib/logger';
 
 // ─── Badges ──────────────────────────────────────────────────────────────────
@@ -311,72 +306,34 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
 export default function ContactsPage() {
   const router = useRouter();
 
-  // Contacts dérivés des conversations déjà chargées
-  const { conversations } = useChatStore();
-  const contacts = useMemo(
-    () => conversations.map(convToContact).filter(Boolean) as Contact[],
-    [conversations],
-  );
   const { selectedContactDetail: selectedContact, isLoadingDetail: isLoading, selectContactByChatId, upsertContact } =
     useContactStore();
   const { selectConversation } = useChatStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<ContactFilters>({
-    call_status:        [],
-    priority:           [],
-    conversion_status:  [],
-    sort_by:            'last_call',
-    sort_order:         'desc',
-  });
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Filtrage + tri
-  const filteredContacts = useMemo(() => {
-    let result = [...contacts];
+  // ── Liste clients depuis l'API ──
+  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [clientsTotal, setClientsTotal] = useState(0);
+  const [clientsLoading, setClientsLoading] = useState(false);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.contact.includes(q) ||
-          c.call_notes?.toLowerCase().includes(q),
-      );
-    }
-    if (filters.call_status?.length)
-      result = result.filter((c) => filters.call_status!.includes(c.call_status));
-    if (filters.priority?.length)
-      result = result.filter((c) => filters.priority!.includes(c.priority ?? 'moyenne'));
-    if (filters.conversion_status?.length)
-      result = result.filter((c) =>
-        filters.conversion_status!.includes(c.conversion_status ?? ''),
-      );
+  const loadClients = useCallback(async () => {
+    setClientsLoading(true);
+    try {
+      const res = await searchClients({ search: searchQuery.trim() || undefined, limit: 100 });
+      setClients(res.data);
+      setClientsTotal(res.total);
+    } catch { /* ignore */ }
+    finally { setClientsLoading(false); }
+  }, [searchQuery]);
 
-    const pOrder: Record<string, number> = { haute: 0, moyenne: 1, basse: 2 };
-    result.sort((a, b) => {
-      let cmp = 0;
-      switch (filters.sort_by) {
-        case 'name':       cmp = a.name.localeCompare(b.name); break;
-        case 'last_call':  cmp = (b.last_call_date?.getTime() ?? 0) - (a.last_call_date?.getTime() ?? 0); break;
-        case 'next_call':  cmp = (a.next_call_date?.getTime() ?? Infinity) - (b.next_call_date?.getTime() ?? Infinity); break;
-        case 'priority':   cmp = (pOrder[a.priority ?? 'moyenne'] ?? 1) - (pOrder[b.priority ?? 'moyenne'] ?? 1); break;
-        case 'created_at': cmp = b.createdAt.getTime() - a.createdAt.getTime(); break;
-      }
-      return filters.sort_order === 'asc' ? cmp : -cmp;
-    });
-
-    return result;
-  }, [contacts, searchQuery, filters]);
+  useEffect(() => { void loadClients(); }, [loadClients]);
 
   function handleViewConversation() {
     if (!selectedContact?.chat_id) return;
     selectConversation(selectedContact.chat_id);
     router.push('/whatsapp');
-  }
-
-  function handleSelectContact(contact: Contact) {
-    selectContactByChatId(contact.chat_id);
   }
 
   async function handleConfirmEdit(status: CallStatus, notes: string) {
@@ -421,43 +378,65 @@ export default function ContactsPage() {
 
         {/* ── Volet gauche sticky ── */}
         <div className="sticky top-5 self-start flex flex-col gap-4">
-          {/* Filtres */}
+          {/* Recherche */}
           <div
             className="bg-white rounded-[18px] p-5"
             style={{ boxShadow: '0 12px 40px rgba(15,23,42,0.08)' }}
           >
-            <ContactFiltersPanel
-              contacts={contacts}
-              filters={filters}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onFiltersChange={setFilters}
-            />
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher un client…"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <button onClick={loadClients} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                <RefreshCw className={`w-4 h-4 ${clientsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            {clientsTotal > 0 && (
+              <p className="text-xs text-gray-400">{clientsTotal} client{clientsTotal > 1 ? 's' : ''}</p>
+            )}
           </div>
 
-          {/* Contacts rapides */}
+          {/* Liste clients */}
           <div
             className="bg-white rounded-[18px] p-5"
             style={{ boxShadow: '0 12px 40px rgba(15,23,42,0.08)' }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-gray-900">Contacts rapides</h2>
-            </div>
+            <h2 className="text-base font-bold text-gray-900 mb-3">Clients</h2>
 
-            {filteredContacts.length === 0 ? (
+            {clientsLoading && clients.length === 0 ? (
+              <div className="text-center py-6">
+                <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              </div>
+            ) : clients.length === 0 ? (
               <div className="text-center py-6">
                 <User className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                <p className="text-xs text-gray-400">Aucun contact trouvé</p>
+                <p className="text-xs text-gray-400">Aucun client trouvé</p>
               </div>
             ) : (
               <div className="flex flex-col gap-1 max-h-[420px] overflow-y-auto pr-0.5">
-                {filteredContacts.map((contact) => (
-                  <ContactCard
-                    key={contact.id}
-                    contact={contact}
-                    isSelected={selectedContact?.chat_id === contact.chat_id}
-                    onClick={() => handleSelectContact(contact)}
-                  />
+                {clients.map((client) => (
+                  <button
+                    key={client.id}
+                    onClick={() => selectContactByChatId(client.chat_id)}
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors ${
+                      selectedContact?.id === client.id ? 'bg-green-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
+                      {(client.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{client.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{client.phone}</p>
+                    </div>
+                    {client.next_follow_up && (
+                      <span className="text-xs bg-orange-100 text-orange-600 rounded-full px-1.5 py-0.5">Relance</span>
+                    )}
+                  </button>
                 ))}
               </div>
             )}

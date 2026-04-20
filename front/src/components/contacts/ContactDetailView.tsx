@@ -22,7 +22,25 @@ import { formatDate, formatDateShort, formatTime, formatRelativeDate } from '@/l
 import { ContactTimeline } from './ContactTimeline';
 import { CallLogHistory } from './CallLogHistory';
 import { updateContactCallStatus, getCrmFields, setCrmFields, CrmFieldEntry, CrmRawValue } from '@/lib/contactApi';
+import { getFollowUpsByContact } from '@/lib/followUpApi';
+import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
 import { logger } from '@/lib/logger';
+import dynamic from 'next/dynamic';
+
+const CreateFollowUpModal = dynamic(() => import('@/components/chat/CreateFollowUpModal'), { ssr: false });
+
+const FOLLOWUP_STATUS_LABELS: Record<FollowUpStatus, string> = {
+  planifiee: 'Planifiée',
+  en_retard: 'En retard',
+  effectuee: 'Effectuée',
+  annulee:   'Annulée',
+};
+const FOLLOWUP_STATUS_COLORS: Record<FollowUpStatus, { bg: string; text: string }> = {
+  planifiee: { bg: '#eff6ff', text: '#2563eb' },
+  en_retard: { bg: '#fef2f2', text: '#dc2626' },
+  effectuee: { bg: '#ecfdf5', text: '#059669' },
+  annulee:   { bg: '#f9fafb', text: '#6b7280' },
+};
 
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID ?? 'default';
 
@@ -177,6 +195,8 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
   const { selectedContactDetail: selectedContact, isLoadingDetail, upsertContact } = useContactStore();
   const { selectConversation, conversations } = useChatStore();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [contactFollowUps, setContactFollowUps] = useState<FollowUp[]>([]);
   const [crmFields, setCrmFieldsState] = useState<CrmFieldEntry[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<CrmRawValue>(null);
@@ -189,10 +209,22 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
     } catch { /* silently ignore */ }
   }, []);
 
+  const loadFollowUps = useCallback(async (contactId: string) => {
+    try {
+      const data = await getFollowUpsByContact(contactId);
+      setContactFollowUps(data);
+    } catch { /* silently ignore */ }
+  }, []);
+
   useEffect(() => {
-    if (selectedContact?.id) void loadCrm(selectedContact.id);
-    else setCrmFieldsState([]);
-  }, [selectedContact?.id, loadCrm]);
+    if (selectedContact?.id) {
+      void loadCrm(selectedContact.id);
+      void loadFollowUps(selectedContact.id);
+    } else {
+      setCrmFieldsState([]);
+      setContactFollowUps([]);
+    }
+  }, [selectedContact?.id, loadCrm, loadFollowUps]);
 
   function getCrmDisplayValue(entry: CrmFieldEntry): string {
     const v = entry.value;
@@ -606,6 +638,37 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
       {/* ── Historique des appels (F-03) ── */}
       <CallLogHistory />
 
+      {/* ── Relances ── */}
+      <div style={{ background: 'white', borderRadius: 16, padding: 18, border: '1px solid #e5e7eb', marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>Relances</h3>
+          <button
+            onClick={() => setShowFollowUpModal(true)}
+            style={{ fontSize: 12, fontWeight: 600, color: '#059669', background: '#ecfdf5', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
+          >
+            + Planifier
+          </button>
+        </div>
+        {contactFollowUps.length === 0 ? (
+          <p style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>Aucune relance planifiée</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {contactFollowUps.slice(0, 5).map((fu) => {
+              const sc = FOLLOWUP_STATUS_COLORS[fu.status];
+              return (
+                <div key={fu.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ background: sc.bg, color: sc.text, borderRadius: 999, fontSize: 11, fontWeight: 600, padding: '2px 8px', flexShrink: 0 }}>
+                    {FOLLOWUP_STATUS_LABELS[fu.status]}
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, color: '#374151' }}>{FOLLOW_UP_TYPE_LABELS[fu.type]}</span>
+                  <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{formatDateShort(fu.scheduled_at)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* ── 3. Score d'engagement ── */}
       {(() => {
         const level =
@@ -784,7 +847,7 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal appel */}
       {showEditModal && (
         <EditModal
           name={c.name}
@@ -795,6 +858,15 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
           onConfirm={(status, notes, outcome, durationSec) =>
             handleConfirmEdit(status, notes, outcome, durationSec)
           }
+        />
+      )}
+
+      {/* Modal relance */}
+      {showFollowUpModal && (
+        <CreateFollowUpModal
+          contactId={selectedContact?.id}
+          onClose={() => setShowFollowUpModal(false)}
+          onCreated={() => selectedContact?.id && void loadFollowUps(selectedContact.id)}
         />
       )}
     </div>

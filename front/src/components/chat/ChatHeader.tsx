@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock } from 'lucide-react';
-import { CallStatus, Conversation, ConversationStatus } from '@/types/chat';
+import { MessageCircle, User, Clock, Tag, Bell } from 'lucide-react';
+import {
+  CallStatus,
+  Conversation,
+  ConversationStatus,
+  ConversationResult,
+  CONVERSATION_RESULT_LABELS,
+  CONVERSATION_RESULT_COLORS,
+} from '@/types/chat';
+import dynamic from 'next/dynamic';
+
+const ConversationOutcomeModal = dynamic(() => import('./ConversationOutcomeModal'), { ssr: false });
+const CreateFollowUpModal = dynamic(() => import('./CreateFollowUpModal'), { ssr: false });
 import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
@@ -61,6 +72,11 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
     const { updateConversation, changeConversationStatus } = useChatStore();
     const { selectContactByChatId } = useContactStore();
     const provider = getProviderFromChatId(currentConv.chat_id);
+    const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+    const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+    const [localResult, setLocalResult] = useState<ConversationResult | null>(
+      currentConv.conversation_result ?? null,
+    );
 
     function handleOpenContact() {
         selectContactByChatId(currentConv.chat_id);
@@ -93,6 +109,7 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
     };
 
     return (
+        <>
         <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -103,7 +120,7 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                         <button onClick={handleOpenContact} className="font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left transition-colors">
                             {currentConv?.clientName}
                         </button>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center flex-wrap gap-2">
                             <p className="text-sm text-gray-500">{currentConv?.clientPhone}</p>
                             <span className="text-xs text-gray-400">•</span>
                             <ProviderBadge chatId={currentConv.chat_id} showLabel={true} />
@@ -111,6 +128,11 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(currentConv?.status || 'nouveau')}`}>
                                 {currentConv?.status.replace('_', ' ')}
                             </span>
+                            {localResult && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONVERSATION_RESULT_COLORS[localResult]}`}>
+                                    {CONVERSATION_RESULT_LABELS[localResult]}
+                                </span>
+                            )}
                             {currentConv?.readonly && (
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
                                     Lecture seule
@@ -122,7 +144,25 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                    {/* Bouton qualifier */}
+                    <button
+                        onClick={() => setShowOutcomeModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        title="Qualifier la conversation"
+                    >
+                        <Tag className="w-3.5 h-3.5" />
+                        Qualifier
+                    </button>
+                    {/* Bouton relance */}
+                    <button
+                        onClick={() => setShowFollowUpModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        title="Planifier une relance"
+                    >
+                        <Bell className="w-3.5 h-3.5" />
+                        Relance
+                    </button>
                     <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">
                         <MessageCircle className="w-4 h-4" />
                         <span className="font-medium">{totalMessages} messages</span>
@@ -133,5 +173,26 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                 </div>
             </div>
         </div>
+
+        {showOutcomeModal && (
+            <ConversationOutcomeModal
+                conversationId={currentConv.id}
+                currentResult={localResult}
+                onClose={() => setShowOutcomeModal(false)}
+                onSaved={(result) => {
+                    setLocalResult(result);
+                    updateConversation({ ...currentConv, conversation_result: result });
+                }}
+            />
+        )}
+
+        {showFollowUpModal && (
+            <CreateFollowUpModal
+                contactId={currentConv.contact_summary?.id}
+                conversationId={currentConv.id}
+                onClose={() => setShowFollowUpModal(false)}
+            />
+        )}
+        </>
     );
 }

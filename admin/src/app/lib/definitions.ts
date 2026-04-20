@@ -48,7 +48,10 @@ export type ViewMode =
   | 'alert-config'
   | 'settings'
   | 'flowbot'
-  | 'contexts';
+  | 'contexts'
+  // Phase 1 — CRM commercial
+  | 'follow-ups'
+  | 'portfolio';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -529,6 +532,9 @@ export type PerformanceCommercial = {
   tauxReponse: number;
   tempsReponseMoyen: number;
   lastConnectionAt: string | null;
+  portfolio_count?: number;
+  follow_ups_pending?: number;
+  follow_ups_overdue?: number;
 };
 
 /**
@@ -940,4 +946,142 @@ export interface OutboundWebhookLog {
   error: string | null;
   attempt: number;
   createdAt: string;
+}
+
+// ============================================
+// PHASE 1 — CRM Commercial
+// ============================================
+
+export type ConversationResult =
+  | 'commande_confirmee'
+  | 'commande_a_saisir'
+  | 'a_relancer'
+  | 'rappel_programme'
+  | 'pas_interesse'
+  | 'sans_reponse'
+  | 'infos_incompletes'
+  | 'deja_client'
+  | 'annule';
+
+export const CONVERSATION_RESULT_LABELS: Record<ConversationResult, string> = {
+  commande_confirmee:  'Commande confirmée',
+  commande_a_saisir:   'Commande à saisir',
+  a_relancer:          'À relancer',
+  rappel_programme:    'Rappel programmé',
+  pas_interesse:       'Pas intéressé',
+  sans_reponse:        'Sans réponse',
+  infos_incompletes:   'Infos incomplètes',
+  deja_client:         'Déjà client',
+  annule:              'Annulé',
+};
+
+export const CONVERSATION_RESULT_COLORS: Record<ConversationResult, string> = {
+  commande_confirmee:  'bg-green-100 text-green-700',
+  commande_a_saisir:   'bg-blue-100 text-blue-700',
+  a_relancer:          'bg-orange-100 text-orange-700',
+  rappel_programme:    'bg-sky-100 text-sky-700',
+  pas_interesse:       'bg-gray-100 text-gray-600',
+  sans_reponse:        'bg-yellow-100 text-yellow-700',
+  infos_incompletes:   'bg-purple-100 text-purple-700',
+  deja_client:         'bg-teal-100 text-teal-700',
+  annule:              'bg-red-100 text-red-700',
+};
+
+export type FollowUpType =
+  | 'rappel'
+  | 'relance_post_conversation'
+  | 'relance_sans_commande'
+  | 'relance_post_annulation'
+  | 'relance_fidelisation'
+  | 'relance_sans_reponse';
+
+export type FollowUpStatus = 'planifiee' | 'en_retard' | 'effectuee' | 'annulee';
+
+export const FOLLOW_UP_TYPE_LABELS: Record<FollowUpType, string> = {
+  rappel:                    'Rappel',
+  relance_post_conversation: 'Relance post-conversation',
+  relance_sans_commande:     'Relance sans commande',
+  relance_post_annulation:   'Relance post-annulation',
+  relance_fidelisation:      'Relance fidélisation',
+  relance_sans_reponse:      'Relance sans réponse',
+};
+
+export const FOLLOW_UP_STATUS_LABELS: Record<FollowUpStatus, string> = {
+  planifiee:  'Planifiée',
+  en_retard:  'En retard',
+  effectuee:  'Effectuée',
+  annulee:    'Annulée',
+};
+
+export const FOLLOW_UP_STATUS_COLORS: Record<FollowUpStatus, string> = {
+  planifiee:  'bg-blue-100 text-blue-700',
+  en_retard:  'bg-red-100 text-red-700',
+  effectuee:  'bg-green-100 text-green-700',
+  annulee:    'bg-gray-100 text-gray-500',
+};
+
+export interface FollowUp {
+  id: string;
+  contact_id?: string | null;
+  conversation_id?: string | null;
+  commercial_id?: string | null;
+  commercial_name?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  type: FollowUpType;
+  status: FollowUpStatus;
+  scheduled_at: string;
+  completed_at?: string | null;
+  result?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientSummary {
+  id: string;
+  chat_id?: string | null;
+  name: string;
+  phone: string;
+  source?: string | null;
+  client_category?: string | null;
+  portfolio_owner_id?: string | null;
+  portfolio_owner_name?: string | null;
+  call_status?: string | null;
+  last_call_date?: string | null;
+  total_messages?: number;
+  call_count?: number;
+  conversation_count?: number;
+  next_follow_up?: string | null;
+  is_active: boolean;
+  createdAt: string;
+}
+
+export interface OutcomeStats {
+  result: ConversationResult;
+  count: number;
+}
+
+export interface TimelineEvent {
+  id: string;
+  type: 'message' | 'follow_up' | 'conversation_result' | 'note';
+  direction?: 'IN' | 'OUT';
+  text?: string | null;
+  timestamp: string;
+  actor_name?: string | null;
+  meta?: Record<string, unknown>;
+}
+
+export interface ClientDossier {
+  client: ClientSummary;
+  crm_fields?: Array<{ key: string; label: string; value: string | null }>;
+  recent_conversations?: Array<{
+    id: string;
+    chat_id: string;
+    status: string;
+    result?: ConversationResult | null;
+    last_activity_at: string;
+  }>;
+  follow_ups?: FollowUp[];
+  timeline?: TimelineEvent[];
 }

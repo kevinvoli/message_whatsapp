@@ -3,6 +3,94 @@ import { CallStatus } from '@/types/chat';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
+// ── Client / Dossier ───────────────────────────────────────────────────────────
+
+export interface ClientSummary {
+  id: string;
+  chat_id: string;
+  name: string;
+  phone: string;
+  source?: string | null;
+  client_category?: string | null;
+  portfolio_owner_id?: string | null;
+  call_status?: string | null;
+  last_call_date?: string | null;
+  total_messages?: number;
+  call_count?: number;
+  conversation_count?: number;
+  next_follow_up?: {
+    id: string;
+    type: string;
+    scheduled_at: string;
+    status: string;
+  } | null;
+}
+
+export interface DossierStats {
+  total_conversations: number;
+  total_messages: number;
+  total_calls: number;
+  last_contact_at?: string | null;
+  next_follow_up?: ClientSummary['next_follow_up'];
+}
+
+export interface ClientDossier {
+  contact: ClientSummary;
+  stats: DossierStats;
+  follow_ups: import('@/types/chat').FollowUp[];
+  call_logs: Array<{
+    id: string;
+    status: string;
+    notes?: string | null;
+    outcome?: string | null;
+    duration_sec?: number | null;
+    createdAt: string;
+  }>;
+  conversations: Array<{
+    id: string;
+    status: string;
+    conversation_result?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+export interface TimelineEvent {
+  type: 'call' | 'follow_up' | 'conversation_opened' | 'conversation_closed';
+  date: string;
+  detail: Record<string, unknown>;
+}
+
+export async function searchClients(params: {
+  search?: string;
+  my_portfolio?: boolean;
+  client_category?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: ClientSummary[]; total: number }> {
+  if (!apiBaseUrl) throw new Error('NEXT_PUBLIC_API_URL is not configured');
+  const query = new URLSearchParams();
+  if (params.search)        query.set('search', params.search);
+  if (params.my_portfolio)  query.set('my_portfolio', 'true');
+  if (params.client_category) query.set('client_category', params.client_category);
+  if (params.limit != null) query.set('limit', String(params.limit));
+  if (params.offset != null) query.set('offset', String(params.offset));
+  const r = await axios.get(`${apiBaseUrl}/clients?${query}`, { withCredentials: true });
+  return r.data;
+}
+
+export async function getClientDossier(contactId: string): Promise<ClientDossier> {
+  if (!apiBaseUrl) throw new Error('NEXT_PUBLIC_API_URL is not configured');
+  const r = await axios.get(`${apiBaseUrl}/clients/${contactId}/dossier`, { withCredentials: true });
+  return r.data;
+}
+
+export async function getClientTimeline(contactId: string, limit = 30): Promise<TimelineEvent[]> {
+  if (!apiBaseUrl) throw new Error('NEXT_PUBLIC_API_URL is not configured');
+  const r = await axios.get(`${apiBaseUrl}/clients/${contactId}/timeline?limit=${limit}`, { withCredentials: true });
+  return r.data;
+}
+
 export interface CrmFieldDef {
   id: string;
   name: string;

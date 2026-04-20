@@ -1,8 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { User, Search, BarChart3, Wifi, WifiOff, LogOut, MessageSquare, Users } from 'lucide-react';
-import { Commercial, Conversation } from '@/types/chat';
-
-type ViewMode = 'conversations' | 'contacts';
+import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell } from 'lucide-react';
+import { Commercial, Conversation, ViewMode } from '@/types/chat';
 
 interface UserHeaderProps {
     conversation: Conversation[];
@@ -85,25 +83,36 @@ export default function UserHeader({
                 <div className="mb-3 bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
                     <button
                         onClick={() => handleViewChange('conversations')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md transition-all ${
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
                             viewMode === 'conversations'
                                 ? 'bg-white text-green-700 shadow-md font-medium'
                                 : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
                         }`}
                     >
                         <MessageSquare className="w-4 h-4" />
-                        <span className="text-sm">Conversations</span>
+                        <span className="text-xs">Conv.</span>
                     </button>
                     <button
                         onClick={() => handleViewChange('contacts')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md transition-all ${
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
                             viewMode === 'contacts'
                                 ? 'bg-white text-green-700 shadow-md font-medium'
                                 : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
                         }`}
                     >
                         <Users className="w-4 h-4" />
-                        <span className="text-sm">Contacts</span>
+                        <span className="text-xs">Contacts</span>
+                    </button>
+                    <button
+                        onClick={() => handleViewChange('relances')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
+                            viewMode === 'relances'
+                                ? 'bg-white text-green-700 shadow-md font-medium'
+                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                        }`}
+                    >
+                        <Bell className="w-4 h-4" />
+                        <span className="text-xs">Relances</span>
                     </button>
                 </div>
             )}

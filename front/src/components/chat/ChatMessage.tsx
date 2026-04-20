@@ -1,5 +1,11 @@
 import React, { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle, Reply } from 'lucide-react';
+
+const LocationMapThumb = dynamic(() => import('./LocationMapThumb'), {
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-gray-100 flex items-center justify-center"><MapPin className="w-6 h-6 text-gray-400" /></div>,
+});
 import { Message } from '@/types/chat';
 import { MediaBubble } from '../helper/mediaBubble';
 import { formatTime } from '@/lib/dateUtils';
@@ -33,6 +39,25 @@ function formatDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function LocationCard({ lat, lng, isFromMe }: { lat: number; lng: number; isFromMe: boolean }) {
+  const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+  return (
+    <div className="overflow-hidden rounded-lg w-64 shadow-sm">
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="block" style={{ height: 130 }}>
+        <LocationMapThumb lat={lat} lng={lng} />
+      </a>
+      <div className={`px-3 py-2 ${isFromMe ? 'bg-green-600' : 'bg-white border border-gray-100'}`}>
+        <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
+          Localisation partagée
+        </p>
+        <p className={`text-xs mt-0.5 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
+          {lat.toFixed(5)}, {lng.toFixed(5)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -64,8 +89,10 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
     }
   };
 
-  const messageText = msg.text && msg.text.trim().length > 0 ? msg.text : null;
   const hasMedia = Array.isArray(msg.medias) && msg.medias.length > 0;
+  const hasLocationMedia = msg.medias?.some((m) => m.type === 'location' || m.type === 'live_location') ?? false;
+  // Ne pas afficher le texte fallback si le message a un média location (évite "[Localisation]" en doublon)
+  const messageText = msg.text && msg.text.trim().length > 0 && !hasLocationMedia ? msg.text : null;
   const isFromMe = msg.from_me;
   const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : null;
   const messageId = msg.id || `msg-fallback-${index}`;
@@ -74,7 +101,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const imageMedias = msg.medias?.filter((m) => m.type === 'image') ?? [];
   const videoMedias = msg.medias?.filter((m) => m.type === 'video') ?? [];
   const documentMedias = msg.medias?.filter((m) => m.type === 'document') ?? [];
-  const locationMedias = msg.medias?.filter((m) => m.type === 'location') ?? [];
+  const locationMedias = msg.medias?.filter((m) => m.type === 'location' || m.type === 'live_location') ?? [];
   const stickerMedias = msg.medias?.filter((m) => m.type === 'sticker') ?? [];
 
   return (
@@ -237,22 +264,22 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             );
           })}
 
-          {/* Location */}
-          {locationMedias.map((loc, i) => (
-            <MediaBubble key={`loc-${messageId}-${i}`} fromMe={isFromMe}>
-              <a
-                href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-3 transition-colors hover:opacity-90"
-              >
-                <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
-                <span className={`text-sm ${isFromMe ? 'text-white' : 'text-gray-700'}`}>
-                  Position: {Number(loc.latitude).toFixed(4)}, {Number(loc.longitude).toFixed(4)}
-                </span>
-              </a>
-            </MediaBubble>
-          ))}
+          {/* Location — aperçu style WhatsApp */}
+          {locationMedias.map((loc, i) => {
+            const lat = loc.latitude != null ? Number(loc.latitude) : null;
+            const lng = loc.longitude != null ? Number(loc.longitude) : null;
+            if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+              return (
+                <div key={`loc-${messageId}-${i}`} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm">Localisation</span>
+                </div>
+              );
+            }
+            return (
+              <LocationCard key={`loc-${messageId}-${i}`} lat={lat} lng={lng} isFromMe={isFromMe} />
+            );
+          })}
 
           {/* Text */}
           {messageText && <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>}

@@ -34,6 +34,7 @@ import FlowBuilderView from '@/app/modules/flowbot/components/FlowBuilderView';
 import ContextsView from '@/app/modules/contexts/components/ContextsView';
 // ── Phase 5-6 modules ─────────────────────────────────────────────────────────
 import CrmView from '@/app/modules/crm/components/CrmView';
+import FollowUpsView from '@/app/ui/FollowUpsView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -166,6 +167,8 @@ export default function AdminDashboard() {
                 );
             case 'contexts':
                 return <ContextsView />;
+            case 'follow-ups':
+                return <FollowUpsView />;
             case 'crm':
                 return <CrmView />;
             case 'sla-rules':

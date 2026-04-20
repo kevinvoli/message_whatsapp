@@ -1,4 +1,16 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Fix: Tailwind resets max-width on images, ce qui casse les tuiles Leaflet */
+.leaflet-container img {
+  max-width: none !important;
+}
+/* Fix: z-index des popups Leaflet au-dessus du reste de l'UI */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 400;
+}
 
 :root {
   --background: #ffffff;

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Edit, Trash2, UserPlus, RefreshCw, Search, X } from 'lucide-react';
-import { formatDate } from '@/app/lib/dateUtils';
-import { Client } from '@/app/lib/definitions';
-import { createClient, deleteClient, updateClient, getClients } from '@/app/lib/api/clients.api';
+import { Edit, Trash2, UserPlus, RefreshCw, Search, X, Briefcase, UserCheck, UserX } from 'lucide-react';
+import { formatDate, formatDateShort } from '@/app/lib/dateUtils';
+import { Client, ClientSummary, Commercial } from '@/app/lib/definitions';
+import { createClient, deleteClient, updateClient, getClients, searchClientsAdmin, assignPortfolio, unassignPortfolio } from '@/app/lib/api/clients.api';
+import { getCommerciaux } from '@/app/lib/api/commerciaux.api';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 import { Pagination } from '@/app/ui/Pagination';
@@ -14,6 +15,9 @@ interface ClientsViewProps {
 }
 
 export default function ClientsView({ onRefresh }: ClientsViewProps) {
+  const [activeTab, setActiveTab] = useState<'annuaire' | 'portefeuille'>('annuaire');
+
+  // ── Annuaire tab ─────────────────────────────────────────────────────────────
   const [clients, setClients] = useState<Client[]>([]);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(50);
@@ -32,6 +36,17 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [formChatId, setFormChatId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
 
+  // ── Portefeuille tab ─────────────────────────────────────────────────────────
+  const [portfolio, setPortfolio] = useState<ClientSummary[]>([]);
+  const [portfolioTotal, setPortfolioTotal] = useState(0);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [portfolioSearch, setPortfolioSearch] = useState('');
+  const [filterCommercialId, setFilterCommercialId] = useState('');
+  const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
+  const [assigningClient, setAssigningClient] = useState<ClientSummary | null>(null);
+  const [assignTarget, setAssignTarget] = useState('');
+  const portfolioOffset = useRef(0);
+
   const loadPage = useCallback(async (l: number, o: number, s?: string) => {
     setLoading(true);
     try {
@@ -44,6 +59,44 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   }, []);
 
   useEffect(() => { void loadPage(limit, offset, searchQuery); }, [loadPage, limit, offset, searchQuery]);
+
+  const loadPortfolio = useCallback(async () => {
+    setPortfolioLoading(true);
+    try {
+      const result = await searchClientsAdmin({
+        search: portfolioSearch || undefined,
+        portfolio_owner_id: filterCommercialId || undefined,
+        limit: 50,
+        offset: portfolioOffset.current,
+      });
+      setPortfolio(result.data);
+      setPortfolioTotal(result.total);
+    } finally {
+      setPortfolioLoading(false);
+    }
+  }, [portfolioSearch, filterCommercialId]);
+
+  useEffect(() => {
+    if (activeTab === 'portefeuille') {
+      void loadPortfolio();
+      getCommerciaux().then(setCommerciaux).catch(() => {});
+    }
+  }, [activeTab, loadPortfolio]);
+
+  const handleAssign = async () => {
+    if (!assigningClient || !assignTarget) return;
+    try {
+      await assignPortfolio(assigningClient.id, assignTarget);
+    } catch { /* ignore */ }
+    setAssigningClient(null);
+    setAssignTarget('');
+    void loadPortfolio();
+  };
+
+  const handleUnassign = async (contactId: string) => {
+    try { await unassignPortfolio(contactId); } catch { /* ignore */ }
+    void loadPortfolio();
+  };
 
   function handleSearchChange(value: string) {
     setSearchInput(value);
@@ -113,6 +166,154 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {([['annuaire', 'Annuaire clients'], ['portefeuille', 'Portefeuille']] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'portefeuille' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-blue-600" />
+                Portefeuille clients
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">{portfolioTotal} client{portfolioTotal !== 1 ? 's' : ''}</p>
+            </div>
+            <button onClick={loadPortfolio} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm hover:bg-gray-50">
+              <RefreshCw className="w-4 h-4" />
+              Actualiser
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-3 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={portfolioSearch}
+                onChange={(e) => setPortfolioSearch(e.target.value)}
+                placeholder="Rechercher..."
+                className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 w-56"
+              />
+            </div>
+            <select
+              value={filterCommercialId}
+              onChange={(e) => setFilterCommercialId(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Tous les commerciaux</option>
+              <option value="none">Sans responsable</option>
+              {commerciaux.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Portfolio table */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3">Téléphone</th>
+                  <th className="px-4 py-3">Responsable</th>
+                  <th className="px-4 py-3">Prochaine relance</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {portfolioLoading ? (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Chargement...</td></tr>
+                ) : portfolio.length === 0 ? (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Aucun client trouvé</td></tr>
+                ) : portfolio.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
+                    <td className="px-4 py-3 text-gray-600">{c.phone}</td>
+                    <td className="px-4 py-3">
+                      {c.portfolio_owner_name ? (
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                          {c.portfolio_owner_name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Non assigné</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      {c.next_follow_up ? formatDateShort(c.next_follow_up) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setAssigningClient(c); setAssignTarget(c.portfolio_owner_id ?? ''); }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs hover:bg-blue-100"
+                        >
+                          <UserCheck className="w-3 h-3" />
+                          Assigner
+                        </button>
+                        {c.portfolio_owner_id && (
+                          <button
+                            onClick={() => handleUnassign(c.id)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-xs hover:bg-gray-200"
+                          >
+                            <UserX className="w-3 h-3" />
+                            Retirer
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Assign modal */}
+      {assigningClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-4">
+            <h3 className="font-semibold text-gray-800">Assigner un responsable</h3>
+            <p className="text-sm text-gray-600">Client : <strong>{assigningClient.name}</strong></p>
+            <select
+              value={assignTarget}
+              onChange={(e) => setAssignTarget(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Choisir un commercial</option>
+              {commerciaux.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setAssigningClient(null)} className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50">
+                Annuler
+              </button>
+              <button onClick={handleAssign} disabled={!assignTarget} className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50">
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'annuaire' && (<>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Clients</h2>
         <div className="flex items-center gap-3">
@@ -230,6 +431,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
           <label className="text-sm font-bold text-gray-700">Actif</label>
         </div>
       </EntityFormModal>
+      </>)}
     </div>
   );
 }

@@ -32,9 +32,9 @@ const WhatsAppPage = () => {
   return (
     <div className="flex h-screen bg-gray-100">
       <ConversationSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
-      {viewMode === 'conversations'
-        ? <ChatMainArea onOpenContact={() => setViewMode('contacts')} />
-        : <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />}
+      {viewMode === 'contacts'
+        ? <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />
+        : <ChatMainArea onOpenContact={() => setViewMode('contacts')} />}
     </div>
   );
 };

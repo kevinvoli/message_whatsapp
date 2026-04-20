@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Mic, Paperclip, Send, Smile, X } from 'lucide-react';
+import { AlertCircle, MapPin, Mic, Paperclip, Send, Smile, X } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
 import { Message } from '@/types/chat';
@@ -7,6 +8,8 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { CannedResponseMenu } from './CannedResponseMenu';
 import { useAuth } from '@/contexts/AuthProvider';
+
+const LocationPickerModal = dynamic(() => import('./LocationPickerModal'), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -57,6 +60,20 @@ function computeAvgResponseTime(messages: Message[]): string | null {
   return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
 }
 
+async function sendLocation(chatId: string, latitude: number, longitude: number) {
+  const response = await fetch(`${API_URL}/messages/location`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ chat_id: chatId, latitude, longitude }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || 'Erreur envoi localisation');
+  }
+  return response.json();
+}
+
 async function uploadMedia(chatId: string, file: File | Blob, fileName: string, caption?: string) {
   const formData = new FormData();
   formData.append('file', file, fileName);
@@ -91,6 +108,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSendingLocation, setIsSendingLocation] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -174,6 +193,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
       handleSubmit();
     }
   };
+
+  // --- Location sharing ---
+  const handleConfirmLocation = useCallback(async (lat: number, lng: number) => {
+    if (!chat_id) return;
+    setIsSendingLocation(true);
+    try {
+      await sendLocation(chat_id, lat, lng);
+      logger.debug('Location sent', { chat_id });
+    } catch (err) {
+      logger.error('Location send failed', { error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setIsSendingLocation(false);
+    }
+  }, [chat_id]);
 
   // --- File upload (Paperclip) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -334,6 +367,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }
 
   return (
+    <>
+    {showLocationPicker && (
+      <LocationPickerModal
+        onClose={() => setShowLocationPicker(false)}
+        onConfirm={(lat, lng) => void handleConfirmLocation(lat, lng)}
+      />
+    )}
     <div className="bg-white border-t border-gray-200 p-3">
       <div className="max-w-4xl mx-auto">
         {/* Bannière "En réponse à..." */}
@@ -402,6 +442,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
             />
             <button
               type="button"
+              onClick={() => setShowLocationPicker(true)}
+              disabled={isSendingLocation || disabled || !isConnected}
+              title="Partager une localisation"
+              className="p-3 text-gray-500 hover:text-green-600 disabled:opacity-50"
+            >
+              {isSendingLocation ? (
+                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MapPin className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || disabled || !isConnected}
               className="p-3 text-gray-500 hover:text-green-600 disabled:opacity-50"
@@ -468,6 +521,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         )}
       </div>
     </div>
+    </>
   );
 };
 

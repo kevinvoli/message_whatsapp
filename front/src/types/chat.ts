@@ -10,7 +10,77 @@ export type ConversationStatus =
   | "converti"
   | "fermé";
 
-   export type  ViewMode = 'conversations' | 'contacts'
+export type ConversationResult =
+  | 'commande_confirmee'
+  | 'commande_a_saisir'
+  | 'a_relancer'
+  | 'rappel_programme'
+  | 'pas_interesse'
+  | 'sans_reponse'
+  | 'infos_incompletes'
+  | 'deja_client'
+  | 'annule';
+
+export const CONVERSATION_RESULT_LABELS: Record<ConversationResult, string> = {
+  commande_confirmee:  'Commande confirmée',
+  commande_a_saisir:   'Commande à saisir',
+  a_relancer:          'À relancer',
+  rappel_programme:    'Rappel programmé',
+  pas_interesse:       'Pas intéressé',
+  sans_reponse:        'Sans réponse',
+  infos_incompletes:   'Infos incomplètes',
+  deja_client:         'Déjà client',
+  annule:              'Annulé',
+};
+
+export const CONVERSATION_RESULT_COLORS: Record<ConversationResult, string> = {
+  commande_confirmee:  'bg-green-100 text-green-700',
+  commande_a_saisir:   'bg-blue-100 text-blue-700',
+  a_relancer:          'bg-orange-100 text-orange-700',
+  rappel_programme:    'bg-sky-100 text-sky-700',
+  pas_interesse:       'bg-gray-100 text-gray-600',
+  sans_reponse:        'bg-yellow-100 text-yellow-700',
+  infos_incompletes:   'bg-purple-100 text-purple-700',
+  deja_client:         'bg-teal-100 text-teal-700',
+  annule:              'bg-red-100 text-red-700',
+};
+
+export type FollowUpType =
+  | 'rappel'
+  | 'relance_post_conversation'
+  | 'relance_sans_commande'
+  | 'relance_post_annulation'
+  | 'relance_fidelisation'
+  | 'relance_sans_reponse';
+
+export type FollowUpStatus = 'planifiee' | 'en_retard' | 'effectuee' | 'annulee';
+
+export const FOLLOW_UP_TYPE_LABELS: Record<FollowUpType, string> = {
+  rappel:                    'Rappel',
+  relance_post_conversation: 'Relance post-conversation',
+  relance_sans_commande:     'Relance sans commande',
+  relance_post_annulation:   'Relance post-annulation',
+  relance_fidelisation:      'Relance fidélisation',
+  relance_sans_reponse:      'Relance sans réponse',
+};
+
+export interface FollowUp {
+  id: string;
+  contact_id?: string | null;
+  conversation_id?: string | null;
+  commercial_id?: string | null;
+  commercial_name?: string | null;
+  type: FollowUpType;
+  status: FollowUpStatus;
+  scheduled_at: string;
+  completed_at?: string | null;
+  result?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ViewMode = 'conversations' | 'contacts' | 'relances'
 
 export type Priority = "haute" | "moyenne" | "basse";
 
@@ -148,7 +218,7 @@ export interface Message {
   // 🔊 VOCAL (optionnel)
   medias?: Array<{
     id?: string;
-    type: "audio" | "voice" | "image" | "video" | "document" | "location" | "sticker";
+    type: "audio" | "voice" | "image" | "video" | "document" | "location" | "live_location" | "sticker";
     url: string;
     mime_type?: string;
     caption?: string;
@@ -319,6 +389,10 @@ export interface Conversation {
   converted_at?: Date | null;
   closed_by?: string;
 
+  // P7 — Statut métier
+  conversation_result?: ConversationResult | null;
+  conversation_result_at?: Date | null;
+
   /** Données du contact associé, chargées en batch avec les conversations. */
   contact_summary?: ContactSummary | null;
 
@@ -454,7 +528,7 @@ interface RawMessageData {
   audio?: RawAudioData;
   medias?: Array<{
     id?: string;
-    type: "audio" | "voice" | "image" | "video" | "document" | "location" | "sticker";
+    type: "audio" | "voice" | "image" | "video" | "document" | "location" | "live_location" | "sticker";
     url: string;
     mime_type?: string;
     caption?: string;
@@ -520,6 +594,8 @@ interface RawConversationData {
   converted_at?: string | number | Date | null;
   closed_by?: string;
   read_only?: boolean;
+  conversation_result?: string | null;
+  conversation_result_at?: string | number | Date | null;
   channel_dedicated?: boolean;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
@@ -787,6 +863,9 @@ export const transformToConversation = (
     closed_at: raw.closed_at ? new Date(raw.closed_at) : null,
     converted_at: raw.converted_at ? new Date(raw.converted_at) : null,
     closed_by: raw.closed_by,
+
+    conversation_result: (raw.conversation_result as ConversationResult) ?? null,
+    conversation_result_at: raw.conversation_result_at ? new Date(raw.conversation_result_at) : null,
 
     contact_summary: raw.contact_summary
       ? {

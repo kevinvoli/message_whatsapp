@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api/commerciaux.api';
 import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
@@ -311,13 +311,15 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux réponse</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temps moy.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Portefeuille</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Relances</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {dataLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                       <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -329,7 +331,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </tr>
               ) : commerciauxFiltres.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
                   </td>
                 </tr>
@@ -421,6 +423,34 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                       <span className="text-sm text-gray-600">
                         {formatDate(commercial.lastConnectionAt)}
                       </span>
+                    </td>
+
+                    {/* Portefeuille */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <Briefcase className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm font-medium text-gray-900">
+                          {commercial.portfolio_count != null ? commercial.portfolio_count : '—'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Relances en attente */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        {(commercial.follow_ups_overdue ?? 0) > 0 ? (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium flex items-center gap-1">
+                            <Bell className="w-3 h-3" />
+                            {commercial.follow_ups_overdue} retard
+                          </span>
+                        ) : commercial.follow_ups_pending != null ? (
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs">
+                            {commercial.follow_ups_pending} planif.
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Actions */}
