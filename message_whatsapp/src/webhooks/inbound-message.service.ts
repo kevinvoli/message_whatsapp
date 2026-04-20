@@ -248,8 +248,12 @@ export class InboundMessageService {
     entity.tenant_id = context?.tenantId ?? null;
     entity.provider = context?.provider ?? null;
     entity.provider_media_id = context?.providerMediaId ?? null;
-    entity.media_id = media.media_id!;
-    entity.whapi_media_id = media.media_id!;
+    entity.media_id = media.media_id ?? `loc_${Date.now()}`;
+    entity.whapi_media_id = media.media_id ?? `loc_${Date.now()}`;
+
+    // Coordonnées géographiques (location / live_location)
+    entity.latitude = media.latitude ?? null;
+    entity.longitude = media.longitude ?? null;
     entity.mime_type = media.mime_type ?? '';
     entity.file_name = media.file_name ?? null;
     entity.file_size = media.file_size?.toString() ?? null;
