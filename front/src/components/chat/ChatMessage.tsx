@@ -33,6 +33,61 @@ function formatDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function buildTileUrl(lat: number, lng: number): string {
+  const zoom = 15;
+  const x = Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * Math.pow(2, zoom),
+  );
+  return `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}.png`;
+}
+
+function LocationCard({ lat, lng, isFromMe }: { lat: number; lng: number; isFromMe: boolean }) {
+  const [tileErr, setTileErr] = React.useState(false);
+  const tileUrl = buildTileUrl(lat, lng);
+  const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+  return (
+    <div className="overflow-hidden rounded-lg w-64 shadow-sm">
+      <div className="relative h-32 bg-gray-200 overflow-hidden">
+        {!tileErr ? (
+          <img
+            src={tileUrl}
+            alt="Carte"
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={() => setTileErr(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <MapPin className="w-8 h-8 text-gray-400" />
+          </div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-full p-1 shadow-md">
+            <MapPin className="w-5 h-5 text-red-500" />
+          </div>
+        </div>
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute inset-0"
+          aria-label="Ouvrir dans Google Maps"
+        />
+      </div>
+      <div className={`px-3 py-2 ${isFromMe ? 'bg-green-600' : 'bg-white border border-gray-100'}`}>
+        <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
+          Localisation partagée
+        </p>
+        <p className={`text-xs mt-0.5 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
+          {lat.toFixed(5)}, {lng.toFixed(5)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -239,55 +294,18 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
 
           {/* Location — aperçu style WhatsApp */}
           {locationMedias.map((loc, i) => {
-            const hasCoords = loc.latitude != null && loc.longitude != null;
-            const lat = hasCoords ? Number(loc.latitude) : null;
-            const lng = hasCoords ? Number(loc.longitude) : null;
-            const mapsUrl = hasCoords
-              ? `https://www.google.com/maps?q=${lat},${lng}`
-              : null;
-            const embedUrl = hasCoords
-              ? `https://www.openstreetmap.org/export/embed.html?bbox=${lng! - 0.005},${lat! - 0.005},${lng! + 0.005},${lat! + 0.005}&layer=mapnik&marker=${lat},${lng}`
-              : null;
+            const lat = loc.latitude != null ? Number(loc.latitude) : null;
+            const lng = loc.longitude != null ? Number(loc.longitude) : null;
+            if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+              return (
+                <div key={`loc-${messageId}-${i}`} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm">Localisation</span>
+                </div>
+              );
+            }
             return (
-              <div key={`loc-${messageId}-${i}`} className="overflow-hidden rounded-lg w-64 shadow-sm">
-                {/* Miniature carte */}
-                <div className="relative h-32 bg-gray-200 overflow-hidden">
-                  {embedUrl ? (
-                    <iframe
-                      src={embedUrl}
-                      className="w-full h-full"
-                      style={{ border: 0, pointerEvents: 'none' }}
-                      loading="lazy"
-                      title="Localisation"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <MapPin className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                  {/* Overlay cliquable transparent par-dessus l'iframe */}
-                  {mapsUrl && (
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute inset-0"
-                      aria-label="Ouvrir dans Google Maps"
-                    />
-                  )}
-                </div>
-                {/* Légende */}
-                <div className={`px-3 py-2 ${isFromMe ? 'bg-green-600' : 'bg-white border border-gray-100'}`}>
-                  <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
-                    Localisation partagée
-                  </p>
-                  {hasCoords && (
-                    <p className={`text-xs mt-0.5 ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
-                      {lat!.toFixed(5)}, {lng!.toFixed(5)}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <LocationCard key={`loc-${messageId}-${i}`} lat={lat} lng={lng} isFromMe={isFromMe} />
             );
           })}
 

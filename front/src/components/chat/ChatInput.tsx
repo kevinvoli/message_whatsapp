@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, MapPin, Mic, MicOff, Paperclip, Send, Smile, X } from 'lucide-react';
+import LocationPickerModal from './LocationPickerModal';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
 import { Message } from '@/types/chat';
@@ -104,6 +105,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -190,14 +192,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   // --- Location sharing ---
-  const handleSendLocation = useCallback(async () => {
-    if (!chat_id || !navigator.geolocation) return;
+  const handleConfirmLocation = useCallback(async (lat: number, lng: number) => {
+    if (!chat_id) return;
     setIsSendingLocation(true);
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
-      );
-      await sendLocation(chat_id, position.coords.latitude, position.coords.longitude);
+      await sendLocation(chat_id, lat, lng);
       logger.debug('Location sent', { chat_id });
     } catch (err) {
       logger.error('Location send failed', { error: err instanceof Error ? err.message : String(err) });
@@ -348,6 +347,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }
 
   return (
+    <>
+    {showLocationPicker && (
+      <LocationPickerModal
+        onClose={() => setShowLocationPicker(false)}
+        onConfirm={(lat, lng) => void handleConfirmLocation(lat, lng)}
+      />
+    )}
     <div className="bg-white border-t border-gray-200 p-3">
       <div className="max-w-4xl mx-auto">
         {/* Bannière "En réponse à..." */}
@@ -409,9 +415,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
             />
             <button
               type="button"
-              onClick={() => void handleSendLocation()}
-              disabled={isSendingLocation || disabled || !isConnected || !navigator.geolocation}
-              title="Partager ma position"
+              onClick={() => setShowLocationPicker(true)}
+              disabled={isSendingLocation || disabled || !isConnected}
+              title="Partager une localisation"
               className="p-3 text-gray-500 hover:text-green-600 disabled:opacity-50"
             >
               {isSendingLocation ? (
@@ -488,6 +494,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         )}
       </div>
     </div>
+    </>
   );
 };
 
