@@ -830,9 +830,13 @@ export default function ConversationsView({
                                                             const lat = hasCoords ? Number(media.latitude) : null;
                                                             const lng = hasCoords ? Number(media.longitude) : null;
                                                             const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-                                                            const tileUrl = hasCoords
-                                                              ? `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=280x130&maptype=mapnik&markers=${lat},${lng},red-pushpin`
-                                                              : null;
+                                                            const tileUrl = hasCoords ? (() => {
+                                                              const zoom = 15;
+                                                              const x = Math.floor((lng! + 180) / 360 * Math.pow(2, zoom));
+                                                              const latRad = lat! * Math.PI / 180;
+                                                              const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, zoom));
+                                                              return `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
+                                                            })() : null;
                                                             const isOut = msg.direction === 'OUT';
                                                             return (
                                                                 <div key={idx} className="overflow-hidden rounded-lg w-56 shadow-sm">
