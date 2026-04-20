@@ -454,6 +454,80 @@ export class CommunicationMetaService {
     });
   }
 
+  async sendLocationMessage(data: {
+    to: string;
+    phoneNumberId: string;
+    accessToken: string;
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  }): Promise<{ providerMessageId: string }> {
+    const to = this.validateRecipient(data.to);
+    const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
+
+    let attempt = 0;
+    while (attempt <= this.maxRetries) {
+      try {
+        const payload = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to,
+          type: 'location',
+          location: {
+            latitude: data.latitude,
+            longitude: data.longitude,
+            ...(data.name ? { name: data.name } : {}),
+            ...(data.address ? { address: data.address } : {}),
+          },
+        };
+
+        const response = await axios.post(url, payload, {
+          headers: {
+            Authorization: `Bearer ${data.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const messageId = response.data?.messages?.[0]?.id;
+        if (!messageId) {
+          throw new WhapiOutboundError('Meta response missing message id', 'permanent');
+        }
+        return { providerMessageId: messageId };
+      } catch (error) {
+        if (error instanceof WhapiOutboundError) throw error;
+
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status;
+        const kind = this.classifyFailure(axiosError);
+        const lastAttempt = attempt >= this.maxRetries;
+
+        if (kind === 'transient' && !lastAttempt) {
+          const delayMs = 250 * Math.pow(2, attempt);
+          this.logger.warn(
+            `Meta location transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) phone_number_id=${data.phoneNumberId} status=${statusCode ?? 'unknown'}`,
+            CommunicationMetaService.name,
+          );
+          await this.delay(delayMs);
+          attempt += 1;
+          continue;
+        }
+
+        this.logger.error(
+          `Meta location outbound failed (phone_number_id=${data.phoneNumberId}, status=${statusCode ?? 'unknown'})`,
+          axiosError.stack,
+          CommunicationMetaService.name,
+        );
+        throw new WhapiOutboundError(
+          `Meta location delivery failed`,
+          kind,
+          statusCode,
+        );
+      }
+    }
+    throw new WhapiOutboundError('Meta location delivery failed', 'transient');
+  }
+
   private validateRecipient(to: string): string {
     const candidate = typeof to === 'string' ? to.trim() : '';
     if (!candidate) {

@@ -76,6 +76,46 @@ export class WhatsappMessageController {
     }
   }
 
+  @Post('location')
+  @UseGuards(AuthGuard('jwt'))
+  async sendLocation(
+    @Body() body: { chat_id: string; latitude: number; longitude: number; name?: string; address?: string },
+    @Req() req: any,
+  ) {
+    if (!body.chat_id) throw new BadRequestException('chat_id is required');
+    if (body.latitude == null || body.longitude == null) {
+      throw new BadRequestException('latitude et longitude sont requis');
+    }
+
+    const chat = await this.chatService.findBychat_id(body.chat_id);
+    if (!chat) throw new BadRequestException(`Chat ${body.chat_id} not found`);
+
+    const channelId = chat.last_msg_client_channel_id ?? chat.channel_id
+      ?? (await this.messageService.findLastMessageBychat_id(chat.chat_id))?.channel_id;
+    if (!channelId) throw new BadRequestException('Cannot resolve channel for this chat');
+
+    const user = req.user;
+    try {
+      const message = await this.messageService.createAgentLocationMessage({
+        chat_id: body.chat_id,
+        poste_id: user?.posteId ?? null,
+        commercial_id: user?.userId ?? null,
+        channel_id: channelId,
+        latitude: Number(body.latitude),
+        longitude: Number(body.longitude),
+        name: body.name,
+        address: body.address,
+      });
+      return message;
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new HttpException(
+        { statusCode: HttpStatus.BAD_REQUEST, message: err instanceof Error ? err.message : 'Erreur envoi localisation' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
   @Post('media')
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(FileInterceptor('file'))

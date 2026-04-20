@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Mic, MicOff, Paperclip, Send, Smile, X } from 'lucide-react';
+import { AlertCircle, MapPin, Mic, MicOff, Paperclip, Send, Smile, X } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
 import { Message } from '@/types/chat';
@@ -55,6 +55,20 @@ function computeAvgResponseTime(messages: Message[]): string | null {
   return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
 }
 
+async function sendLocation(chatId: string, latitude: number, longitude: number) {
+  const response = await fetch(`${API_URL}/messages/location`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ chat_id: chatId, latitude, longitude }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || 'Erreur envoi localisation');
+  }
+  return response.json();
+}
+
 async function uploadMedia(chatId: string, file: File | Blob, fileName: string, caption?: string) {
   const formData = new FormData();
   formData.append('file', file, fileName);
@@ -89,6 +103,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -173,6 +188,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  // --- Location sharing ---
+  const handleSendLocation = useCallback(async () => {
+    if (!chat_id || !navigator.geolocation) return;
+    setIsSendingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
+      );
+      await sendLocation(chat_id, position.coords.latitude, position.coords.longitude);
+      logger.debug('Location sent', { chat_id });
+    } catch (err) {
+      logger.error('Location send failed', { error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setIsSendingLocation(false);
+    }
+  }, [chat_id]);
 
   // --- Voice recording (Mic) ---
   const startRecording = async () => {
@@ -375,6 +407,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
               accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
               onChange={handleFileSelect}
             />
+            <button
+              type="button"
+              onClick={() => void handleSendLocation()}
+              disabled={isSendingLocation || disabled || !isConnected || !navigator.geolocation}
+              title="Partager ma position"
+              className="p-3 text-gray-500 hover:text-green-600 disabled:opacity-50"
+            >
+              {isSendingLocation ? (
+                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MapPin className="w-5 h-5" />
+              )}
+            </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}

@@ -825,15 +825,23 @@ export default function ConversationsView({
                                                                 </div>
                                                             );
                                                         }
-                                                        if (mediaType === 'location') {
-                                                            return (
+                                                        if (mediaType === 'location' || mediaType === 'live_location') {
+                                                            const hasCoords = media.latitude != null && media.longitude != null;
+                                                            const lat = hasCoords ? Number(media.latitude) : null;
+                                                            const lng = hasCoords ? Number(media.longitude) : null;
+                                                            const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+                                                            return mapsUrl ? (
+                                                                <a key={idx} href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors">
+                                                                    <MapPin className="w-4 h-4 flex-shrink-0 text-red-400" />
+                                                                    <div>
+                                                                        <p className="text-xs font-medium underline">Localisation partagée</p>
+                                                                        <p className="text-[10px] opacity-70">{lat!.toFixed(5)}, {lng!.toFixed(5)}</p>
+                                                                    </div>
+                                                                </a>
+                                                            ) : (
                                                                 <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
                                                                     <MapPin className="w-4 h-4 flex-shrink-0" />
-                                                                    <span className="text-xs">
-                                                                        {media.latitude && media.longitude
-                                                                            ? `${media.latitude.toFixed(4)}, ${media.longitude.toFixed(4)}`
-                                                                            : 'Position'}
-                                                                    </span>
+                                                                    <span className="text-xs">Localisation</span>
                                                                 </div>
                                                             );
                                                         }

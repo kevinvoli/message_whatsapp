@@ -398,6 +398,106 @@ export class WhatsappMessageService {
     }
   }
 
+  async createAgentLocationMessage(data: {
+    chat_id: string;
+    poste_id: string | null;
+    commercial_id?: string | null;
+    channel_id: string;
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  }): Promise<WhatsappMessage> {
+    const traceId = this.buildTraceId(undefined, data.chat_id);
+    const chat = await this.chatService.findBychat_id(data.chat_id);
+    if (!chat) throw new Error('Chat not found');
+
+    let commercial: WhatsappCommercial | null = null;
+    if (data.commercial_id) {
+      commercial = await this.commercialRepository.findOne({ where: { id: data.commercial_id } });
+    }
+
+    const lastInbound = await this.findLastInboundMessageBychat_id(data.chat_id);
+    if (lastInbound) {
+      const diffHours = Math.ceil((Date.now() - new Date(lastInbound.timestamp).getTime()) / 3_600_000);
+      if (diffHours > this.getResponseTimeoutHours()) {
+        throw new Error(`RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${this.getResponseTimeoutHours()}h) est expirée`);
+      }
+    }
+
+    const phone = chat.chat_id.split('@')[0];
+
+    const sendResponse = await this.outboundRouter.sendLocationMessage({
+      to: phone,
+      channelId: data.channel_id,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      name: data.name,
+      address: data.address,
+    });
+
+    this.logger.log(`OUTBOUND_LOCATION_OK trace=${traceId} provider=${sendResponse.provider}`);
+
+    const channel = await this.channelService.findOne(data.channel_id);
+    if (!channel) throw new NotFoundException('Channel not found');
+
+    const messageEntity = this.messageRepository.create({
+      message_id: sendResponse.providerMessageId ?? `agent_loc_${Date.now()}`,
+      external_id: sendResponse.providerMessageId,
+      provider: sendResponse.provider,
+      provider_message_id: sendResponse.providerMessageId,
+      chat_id: chat.chat_id,
+      channel_id: channel.channel_id,
+      poste_id: data.poste_id,
+      direction: MessageDirection.OUT,
+      from_me: true,
+      timestamp: new Date(),
+      status: WhatsappMessageStatus.SENT,
+      source: 'agent_web',
+      text: '[Localisation]',
+      type: 'location',
+      chat,
+      poste: chat.poste ?? undefined,
+      from: phone,
+      from_name: chat.name,
+      channel,
+      commercial,
+      contact: null,
+      dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
+    });
+
+    const savedMessage = await this.messageRepository.save(messageEntity);
+
+    const mediaEntity = this.mediaRepository.create({
+      media_id: `agent_loc_${Date.now()}`,
+      media_type: 'location' as WhatsappMediaType,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      url: null,
+      message: savedMessage,
+      chat,
+      channel,
+      tenant_id: chat.tenant_id,
+      provider: sendResponse.provider,
+    });
+    await this.mediaRepository.save(mediaEntity);
+
+    await this.chatRepository.update(
+      { chat_id: chat.chat_id },
+      {
+        ...(data.poste_id ? { unread_count: 0, last_poste_message_at: messageEntity.createdAt } : {}),
+        ...(data.poste_id && !channel.poste_id ? { read_only: true } : {}),
+        last_activity_at: new Date(),
+      },
+    );
+
+    const result = await this.messageRepository.findOne({
+      where: { id: savedMessage.id },
+      relations: ['chat', 'medias', 'channel', 'poste', 'commercial'],
+    });
+    return result!;
+  }
+
   private async persistFailedAgentMessage(
     data: {
       chat_id: string;

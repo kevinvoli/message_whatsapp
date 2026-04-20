@@ -259,6 +259,74 @@ export class CommunicationWhapiService {
     );
   }
 
+  async sendLocationToWhapiChannel(data: {
+    to: string;
+    channelId: string;
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  }): Promise<WhapiSendMessageResponse> {
+    const to = this.validateWhapiRecipient(data.to);
+
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: data.channelId },
+    });
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+    const token = channel.token;
+
+    let attempt = 0;
+    while (attempt <= this.maxRetries) {
+      try {
+        const payload: Record<string, any> = {
+          to,
+          lat: data.latitude,
+          lng: data.longitude,
+        };
+        if (data.name) payload.name = data.name;
+        if (data.address) payload.address = data.address;
+
+        const response = await axios.post<WhapiSendMessageResponse>(
+          'https://gate.whapi.cloud/messages/location',
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+        return response.data;
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status;
+        const kind = this.classifyFailure(axiosError);
+        const lastAttempt = attempt >= this.maxRetries;
+
+        if (kind === 'transient' && !lastAttempt) {
+          const delayMs = 250 * Math.pow(2, attempt);
+          this.logger.warn(
+            `Whapi location transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) channel=${data.channelId} status=${statusCode ?? 'unknown'}`,
+            CommunicationWhapiService.name,
+          );
+          await this.delay(delayMs);
+          attempt += 1;
+          continue;
+        }
+
+        this.logger.error(
+          `Whapi location outbound failed (channel=${data.channelId}, kind=${kind}, status=${statusCode ?? 'unknown'})`,
+          axiosError.stack,
+          CommunicationWhapiService.name,
+        );
+        throw new WhapiOutboundError('Whapi location delivery failed', kind, statusCode);
+      }
+    }
+    throw new WhapiOutboundError('Whapi location delivery failed', 'transient');
+  }
+
   private validateWhapiRecipient(to: string): string {
     const candidate = typeof to === 'string' ? to.trim() : '';
     if (!candidate) {

@@ -160,6 +160,59 @@ export class OutboundRouterService {
     };
   }
 
+  async sendLocationMessage(data: {
+    to: string;
+    channelId: string;
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  }): Promise<OutboundSendResponse> {
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+    channel.token = channel.token?.trim();
+    const provider = channel.provider ?? 'whapi';
+
+    if (provider === 'meta') {
+      if (!channel.external_id) {
+        throw new NotFoundException(
+          `Channel ${data.channelId} missing external_id for Meta`,
+        );
+      }
+      this.logger.log(
+        `OUTBOUND_LOCATION_ROUTE provider=meta channel=${data.channelId}`,
+        OutboundRouterService.name,
+      );
+      const result = await this.metaService.sendLocationMessage({
+        to: data.to,
+        phoneNumberId: channel.external_id,
+        accessToken: channel.token,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        name: data.name,
+        address: data.address,
+      });
+      return { providerMessageId: result.providerMessageId, provider: 'meta' };
+    }
+
+    // Default: Whapi (messenger/instagram/telegram ne supportent pas les locations WhatsApp)
+    this.logger.log(
+      `OUTBOUND_LOCATION_ROUTE provider=whapi channel=${data.channelId}`,
+      OutboundRouterService.name,
+    );
+    const result = await this.whapiService.sendLocationToWhapiChannel({
+      to: data.to,
+      channelId: data.channelId,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      name: data.name,
+      address: data.address,
+    });
+    return { providerMessageId: result.message.id, provider: 'whapi' };
+  }
+
   async sendMediaMessage(data: {
     to: string;
     channelId: string;

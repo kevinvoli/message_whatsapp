@@ -74,7 +74,7 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const imageMedias = msg.medias?.filter((m) => m.type === 'image') ?? [];
   const videoMedias = msg.medias?.filter((m) => m.type === 'video') ?? [];
   const documentMedias = msg.medias?.filter((m) => m.type === 'document') ?? [];
-  const locationMedias = msg.medias?.filter((m) => m.type === 'location') ?? [];
+  const locationMedias = msg.medias?.filter((m) => m.type === 'location' || m.type === 'live_location') ?? [];
   const stickerMedias = msg.medias?.filter((m) => m.type === 'sticker') ?? [];
 
   return (
@@ -238,21 +238,41 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
           })}
 
           {/* Location */}
-          {locationMedias.map((loc, i) => (
-            <MediaBubble key={`loc-${messageId}-${i}`} fromMe={isFromMe}>
-              <a
-                href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-3 transition-colors hover:opacity-90"
-              >
-                <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
-                <span className={`text-sm ${isFromMe ? 'text-white' : 'text-gray-700'}`}>
-                  Position: {Number(loc.latitude).toFixed(4)}, {Number(loc.longitude).toFixed(4)}
-                </span>
-              </a>
-            </MediaBubble>
-          ))}
+          {locationMedias.map((loc, i) => {
+            const hasCoords = loc.latitude != null && loc.longitude != null;
+            const lat = hasCoords ? Number(loc.latitude) : null;
+            const lng = hasCoords ? Number(loc.longitude) : null;
+            const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
+            return (
+              <MediaBubble key={`loc-${messageId}-${i}`} fromMe={isFromMe}>
+                {mapsUrl ? (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 transition-colors hover:opacity-90"
+                  >
+                    <div className={`p-2 rounded-lg ${isFromMe ? 'bg-green-500/30' : 'bg-red-50'}`}>
+                      <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
+                        Localisation partagée
+                      </p>
+                      <p className={`text-xs ${isFromMe ? 'text-green-200' : 'text-gray-400'}`}>
+                        {lat!.toFixed(5)}, {lng!.toFixed(5)}
+                      </p>
+                    </div>
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-2 p-3">
+                    <MapPin className={`w-5 h-5 ${isFromMe ? 'text-white' : 'text-red-500'}`} />
+                    <span className={`text-sm ${isFromMe ? 'text-white' : 'text-gray-700'}`}>Localisation</span>
+                  </div>
+                )}
+              </MediaBubble>
+            );
+          })}
 
           {/* Text */}
           {messageText && <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>}
