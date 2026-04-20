@@ -245,32 +245,27 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             const mapsUrl = hasCoords
               ? `https://www.google.com/maps?q=${lat},${lng}`
               : null;
-            const tileUrl = hasCoords ? (() => {
-              const zoom = 15;
-              const x = Math.floor((lng! + 180) / 360 * Math.pow(2, zoom));
-              const latRad = lat! * Math.PI / 180;
-              const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, zoom));
-              return `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
-            })() : null;
+            const embedUrl = hasCoords
+              ? `https://www.openstreetmap.org/export/embed.html?bbox=${lng! - 0.005},${lat! - 0.005},${lng! + 0.005},${lat! + 0.005}&layer=mapnik&marker=${lat},${lng}`
+              : null;
             return (
               <div key={`loc-${messageId}-${i}`} className="overflow-hidden rounded-lg w-64 shadow-sm">
                 {/* Miniature carte */}
                 <div className="relative h-32 bg-gray-200 overflow-hidden">
-                  {tileUrl && (
-                    <img
-                      src={tileUrl}
-                      alt="Carte"
-                      className="w-full h-full object-cover"
+                  {embedUrl ? (
+                    <iframe
+                      src={embedUrl}
+                      className="w-full h-full"
+                      style={{ border: 0, pointerEvents: 'none' }}
                       loading="lazy"
+                      title="Localisation"
                     />
-                  )}
-                  {/* Pin centré par-dessus la carte */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="bg-white rounded-full p-1 shadow-md">
-                      <MapPin className="w-5 h-5 text-red-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <MapPin className="w-8 h-8 text-gray-400" />
                     </div>
-                  </div>
-                  {/* Overlay cliquable */}
+                  )}
+                  {/* Overlay cliquable transparent par-dessus l'iframe */}
                   {mapsUrl && (
                     <a
                       href={mapsUrl}

@@ -830,25 +830,26 @@ export default function ConversationsView({
                                                             const lat = hasCoords ? Number(media.latitude) : null;
                                                             const lng = hasCoords ? Number(media.longitude) : null;
                                                             const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-                                                            const tileUrl = hasCoords ? (() => {
-                                                              const zoom = 15;
-                                                              const x = Math.floor((lng! + 180) / 360 * Math.pow(2, zoom));
-                                                              const latRad = lat! * Math.PI / 180;
-                                                              const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, zoom));
-                                                              return `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`;
-                                                            })() : null;
+                                                            const embedUrl = hasCoords
+                                                              ? `https://www.openstreetmap.org/export/embed.html?bbox=${lng! - 0.005},${lat! - 0.005},${lng! + 0.005},${lat! + 0.005}&layer=mapnik&marker=${lat},${lng}`
+                                                              : null;
                                                             const isOut = msg.direction === 'OUT';
                                                             return (
                                                                 <div key={idx} className="overflow-hidden rounded-lg w-56 shadow-sm">
                                                                     <div className="relative h-28 bg-gray-200 overflow-hidden">
-                                                                        {tileUrl && (
-                                                                            <img src={tileUrl} alt="Carte" className="w-full h-full object-cover" loading="lazy" />
-                                                                        )}
-                                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                                            <div className="bg-white rounded-full p-1 shadow-md">
-                                                                                <MapPin className="w-4 h-4 text-red-500" />
+                                                                        {embedUrl ? (
+                                                                            <iframe
+                                                                                src={embedUrl}
+                                                                                className="w-full h-full"
+                                                                                style={{ border: 0, pointerEvents: 'none' }}
+                                                                                loading="lazy"
+                                                                                title="Localisation"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-full h-full flex items-center justify-center">
+                                                                                <MapPin className="w-6 h-6 text-gray-400" />
                                                                             </div>
-                                                                        </div>
+                                                                        )}
                                                                         {mapsUrl && (
                                                                             <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="absolute inset-0" aria-label="Ouvrir dans Google Maps" />
                                                                         )}
