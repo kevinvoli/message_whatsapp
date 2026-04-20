@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, MapPin, Mic, MicOff, Paperclip, Send, Smile, X } from 'lucide-react';
-import LocationPickerModal from './LocationPickerModal';
+import dynamic from 'next/dynamic';
+
+const LocationPickerModal = dynamic(() => import('./LocationPickerModal'), { ssr: false });
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
 import { Message } from '@/types/chat';

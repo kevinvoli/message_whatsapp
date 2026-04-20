@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle, Reply } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MediaBubble } from '../helper/mediaBubble';
@@ -6,6 +7,11 @@ import { formatTime } from '@/lib/dateUtils';
 import { resolveMediaUrl } from '@/lib/utils';
 import { useChatStore } from '@/store/chatStore';
 import { getProviderFromChatId } from '../ui/ProviderBadge';
+
+const LocationMapThumb = dynamic(() => import('./LocationMapThumb'), {
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-gray-100 flex items-center justify-center"><MapPin className="w-6 h-6 text-gray-400" /></div>,
+});
 
 const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
   whatsapp:  { bg: 'bg-green-100',  text: 'text-green-600'  },
@@ -33,49 +39,15 @@ function formatDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function buildTileUrl(lat: number, lng: number): string {
-  const zoom = 15;
-  const x = Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
-  const latRad = (lat * Math.PI) / 180;
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * Math.pow(2, zoom),
-  );
-  return `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}.png`;
-}
-
 function LocationCard({ lat, lng, isFromMe }: { lat: number; lng: number; isFromMe: boolean }) {
-  const [tileErr, setTileErr] = React.useState(false);
-  const tileUrl = buildTileUrl(lat, lng);
   const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
   return (
     <div className="overflow-hidden rounded-lg w-64 shadow-sm">
-      <div className="relative h-32 bg-gray-200 overflow-hidden">
-        {!tileErr ? (
-          <img
-            src={tileUrl}
-            alt="Carte"
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={() => setTileErr(true)}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-100">
-            <MapPin className="w-8 h-8 text-gray-400" />
-          </div>
-        )}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-full p-1 shadow-md">
-            <MapPin className="w-5 h-5 text-red-500" />
-          </div>
-        </div>
-        <a
-          href={mapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute inset-0"
-          aria-label="Ouvrir dans Google Maps"
-        />
-      </div>
+      {/* Miniature carte Leaflet */}
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="block" style={{ height: 130 }}>
+        <LocationMapThumb lat={lat} lng={lng} />
+      </a>
+      {/* Légende */}
       <div className={`px-3 py-2 ${isFromMe ? 'bg-green-600' : 'bg-white border border-gray-100'}`}>
         <p className={`text-sm font-medium ${isFromMe ? 'text-white' : 'text-gray-900'}`}>
           Localisation partagée
