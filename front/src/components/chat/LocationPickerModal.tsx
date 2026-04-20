@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Navigation, X, Send, AlertCircle, MapPin } from 'lucide-react';
 
 // Custom SVG pin icon — avoids webpack image import issues
