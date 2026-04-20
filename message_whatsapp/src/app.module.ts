@@ -59,6 +59,9 @@ import { OutboundWebhookModule } from './outbound-webhook/outbound-webhook.modul
 import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
 import { FollowUpModule } from './follow-up/follow_up.module';
 import { ClientDossierModule } from './client-dossier/client-dossier.module';
+import { TargetsModule } from './targets/targets.module';
+import { CommercialSessionModule } from './commercial-session/commercial_session.module';
+import { GeoAccessModule } from './geo-access/geo_access.module';
 
 @Module({
   imports: [
@@ -177,6 +180,10 @@ import { ClientDossierModule } from './client-dossier/client-dossier.module';
     // Phase 7 — Suivi client : dossier, statuts métier, relances, portefeuille
     FollowUpModule,
     ClientDossierModule,
+    // Phase 8 — Ranking, Objectifs, Sessions, Restriction géo
+    TargetsModule,
+    CommercialSessionModule,
+    GeoAccessModule,
   ],
   controllers: [AppController],
   providers: [

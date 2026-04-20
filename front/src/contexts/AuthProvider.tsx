@@ -77,19 +77,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     setError(null);
 
+    // 4.10 — Obtenir la position GPS avant d'envoyer le login
+    let latitude: number | undefined;
+    let longitude: number | undefined;
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 8000,
+            maximumAge: 60_000,
+          }),
+        );
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+      } catch {
+        // Géoloc refusée ou indisponible — on tente quand même le login.
+        // Si une restriction est configurée côté backend, il renverra une 403.
+      }
+    }
+
     try {
       const response = await axios.post<{ user: User; accessToken: string }>(
         `${apiBaseUrl}/auth/login`,
-        { email, password },
+        { email, password, latitude, longitude },
         { withCredentials: true },
       );
 
       setUser(normalizeUser(response.data.user));
       setToken(response.data.accessToken ?? null);
     } catch (err) {
-      let errorMessage = 'Login failed due to an unexpected error';
+      let errorMessage = 'Connexion échouée';
       if (axios.isAxiosError(err)) {
-        errorMessage = err.response?.data?.message || 'Login failed';
+        const status = err.response?.status;
+        if (status === 403) {
+          // Restriction géographique ou accès refusé
+          errorMessage =
+            err.response?.data?.message ||
+            'Connexion refusée : vous ne vous trouvez pas dans une zone autorisée. Activez la localisation et réessayez.';
+        } else {
+          errorMessage = err.response?.data?.message || 'Login failed';
+        }
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }

@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -69,6 +69,15 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'crm', name: 'Champs CRM', icon: Database, badge: null },
       { id: 'follow-ups', name: 'Relances', icon: PhoneCall, badge: null },
+      { id: 'targets', name: 'Objectifs', icon: Target, badge: null },
+    ],
+  },
+  {
+    label: 'Accès & Sécurité',
+    icon: Lock,
+    items: [
+      { id: 'ip-access', name: 'Restriction géo.', icon: Lock, badge: null },
+      { id: 'sessions', name: 'Heures travail', icon: Clock, badge: null },
     ],
   },
   {

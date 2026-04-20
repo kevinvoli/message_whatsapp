@@ -5,6 +5,8 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { CallLog } from 'src/call-log/entities/call_log.entity';
+import { FollowUp } from 'src/follow-up/entities/follow_up.entity';
 
 export interface AnalyticsSummaryDto {
   totalConversations: number;
@@ -34,6 +36,20 @@ export interface AgentPerformanceDto {
   avgResponseSeconds: number;
 }
 
+export interface CommercialRankingDto {
+  rank: number;
+  commercialId: string;
+  commercialName: string;
+  posteName: string;
+  conversations: number;
+  orders: number;
+  calls: number;
+  followUpsCompleted: number;
+  transformationRate: number;
+  qualificationRate: number;
+  avgFirstResponseSeconds: number;
+}
+
 export interface ChannelBreakdownDto {
   channelId: string;
   label: string | null;
@@ -58,6 +74,12 @@ export class AnalyticsService {
 
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+
+    @InjectRepository(CallLog)
+    private readonly callLogRepo: Repository<CallLog>,
+
+    @InjectRepository(FollowUp)
+    private readonly followUpRepo: Repository<FollowUp>,
   ) {}
 
   private dateRange(from?: string, to?: string): { dateStart: Date; dateEnd: Date } {
@@ -313,5 +335,125 @@ export class AnalyticsService {
         totalConversations: parseInt(r.nb_chats) || 0,
       };
     });
+  }
+
+  // ─── Ranking commercial (4.7) ─────────────────────────────────────────────
+
+  async getCommercialRanking(
+    from?: string,
+    to?: string,
+  ): Promise<CommercialRankingDto[]> {
+    const { dateStart, dateEnd } = this.dateRange(from, to);
+
+    // 1. Conversations + commandes + qualification par commercial
+    const chatRows = await this.chatRepo
+      .createQueryBuilder('c')
+      .select('c.poste_id', 'poste_id')
+      .addSelect('COUNT(*)', 'conversations')
+      .addSelect(
+        `SUM(CASE WHEN c.conversation_result IN ('commande_confirmee','commande_a_saisir') THEN 1 ELSE 0 END)`,
+        'orders',
+      )
+      .addSelect(
+        `SUM(CASE WHEN c.conversation_result IS NOT NULL THEN 1 ELSE 0 END)`,
+        'qualified',
+      )
+      .innerJoin(
+        'whatsapp_message',
+        'msg',
+        'msg.chat_id = c.chat_id AND msg.direction = "OUT" AND msg.commercial_id IS NOT NULL AND msg.deletedAt IS NULL',
+      )
+      .addSelect('msg.commercial_id', 'commercial_id')
+      .where('c.deletedAt IS NULL')
+      .andWhere('c.createdAt >= :dateStart', { dateStart })
+      .andWhere('c.createdAt <= :dateEnd', { dateEnd })
+      .groupBy('msg.commercial_id')
+      .getRawMany();
+
+    if (chatRows.length === 0) return [];
+
+    const commercialIds = chatRows.map((r) => r.commercial_id).filter(Boolean);
+
+    // 2. Appels par commercial
+    const callRows = await this.callLogRepo
+      .createQueryBuilder('cl')
+      .select('cl.commercial_id', 'commercial_id')
+      .addSelect('COUNT(*)', 'calls')
+      .where('cl.commercial_id IN (:...commercialIds)', { commercialIds })
+      .andWhere('cl.called_at >= :dateStart', { dateStart })
+      .andWhere('cl.called_at <= :dateEnd', { dateEnd })
+      .groupBy('cl.commercial_id')
+      .getRawMany();
+    const callMap = new Map(callRows.map((r) => [r.commercial_id, parseInt(r.calls) || 0]));
+
+    // 3. Relances effectuées par commercial
+    const fuRows = await this.followUpRepo
+      .createQueryBuilder('fu')
+      .select('fu.commercial_id', 'commercial_id')
+      .addSelect('COUNT(*)', 'completed')
+      .where('fu.commercial_id IN (:...commercialIds)', { commercialIds })
+      .andWhere("fu.status = 'effectuee'")
+      .andWhere('fu.completed_at >= :dateStart', { dateStart })
+      .andWhere('fu.completed_at <= :dateEnd', { dateEnd })
+      .groupBy('fu.commercial_id')
+      .getRawMany();
+    const fuMap = new Map(fuRows.map((r) => [r.commercial_id, parseInt(r.completed) || 0]));
+
+    // 4. Temps première réponse par commercial
+    const respRows = await this.messageRepo
+      .createQueryBuilder('msg_out')
+      .innerJoin(
+        'whatsapp_message',
+        'msg_in',
+        `msg_out.chat_id = msg_in.chat_id
+         AND msg_in.direction = "IN"
+         AND msg_out.direction = "OUT"
+         AND msg_in.timestamp < msg_out.timestamp
+         AND msg_in.timestamp >= msg_out.timestamp - INTERVAL 2 HOUR`,
+      )
+      .select('msg_out.commercial_id', 'commercial_id')
+      .addSelect('AVG(TIMESTAMPDIFF(SECOND, msg_in.timestamp, msg_out.timestamp))', 'avg_resp')
+      .where('msg_out.deletedAt IS NULL AND msg_in.deletedAt IS NULL')
+      .andWhere('msg_out.commercial_id IN (:...commercialIds)', { commercialIds })
+      .andWhere('msg_out.createdAt >= :dateStart', { dateStart })
+      .andWhere('msg_out.createdAt <= :dateEnd', { dateEnd })
+      .groupBy('msg_out.commercial_id')
+      .getRawMany();
+    const respMap = new Map(respRows.map((r) => [r.commercial_id, parseInt(r.avg_resp) || 0]));
+
+    // 5. Info commerciaux (nom, poste)
+    const commercials = await this.commercialRepo
+      .createQueryBuilder('co')
+      .leftJoin('co.poste', 'p')
+      .select(['co.id', 'co.name'])
+      .addSelect('p.name', 'poste_name')
+      .where('co.id IN (:...commercialIds)', { commercialIds })
+      .getMany();
+    const coMap = new Map(commercials.map((c) => [c.id, c]));
+
+    const rows = chatRows.map((r) => {
+      const conversations = parseInt(r.conversations) || 0;
+      const orders = parseInt(r.orders) || 0;
+      const qualified = parseInt(r.qualified) || 0;
+      const co = coMap.get(r.commercial_id);
+      return {
+        rank: 0,
+        commercialId:           r.commercial_id,
+        commercialName:         co?.name ?? 'Inconnu',
+        posteName:              (co as any)?.poste_name ?? 'Non assigné',
+        conversations,
+        orders,
+        calls:                  callMap.get(r.commercial_id) ?? 0,
+        followUpsCompleted:     fuMap.get(r.commercial_id) ?? 0,
+        transformationRate:     conversations > 0 ? Math.round((orders / conversations) * 100) : 0,
+        qualificationRate:      conversations > 0 ? Math.round((qualified / conversations) * 100) : 0,
+        avgFirstResponseSeconds: respMap.get(r.commercial_id) ?? 0,
+      };
+    });
+
+    // Tri : commandes desc, puis conversations desc
+    rows.sort((a, b) => b.orders - a.orders || b.conversations - a.conversations);
+    rows.forEach((r, i) => (r.rank = i + 1));
+    return rows;
   }
 }

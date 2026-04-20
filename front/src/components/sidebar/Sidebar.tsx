@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
 import { ContactSidebarPanel } from '@/components/contacts/ContactSidebarPanel';
 import FollowUpPanel from '@/components/chat/FollowUpPanel';
+import ObjectifsPanel from '@/components/chat/ObjectifsPanel';
 import { OutboundModal } from '@/components/conversation/OutboundModal';
 
 interface SidebarProps {
@@ -105,6 +106,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         </>
       ) : viewMode === 'contacts' ? (
         <ContactSidebarPanel searchQuery={searchQuery ?? ''} />
+      ) : viewMode === 'objectifs' ? (
+        <ObjectifsPanel />
       ) : (
         <FollowUpPanel />
       )}

@@ -51,4 +51,13 @@ export class AnalyticsController {
   ) {
     return this.analytics.getChannelBreakdown(tenantId, from, to);
   }
+
+  /** Classement des commerciaux (4.7) */
+  @Get('ranking')
+  getCommercialRanking(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.analytics.getCommercialRanking(from, to);
+  }
 }

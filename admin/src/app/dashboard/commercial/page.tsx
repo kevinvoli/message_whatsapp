@@ -35,6 +35,9 @@ import ContextsView from '@/app/modules/contexts/components/ContextsView';
 // ── Phase 5-6 modules ─────────────────────────────────────────────────────────
 import CrmView from '@/app/modules/crm/components/CrmView';
 import FollowUpsView from '@/app/ui/FollowUpsView';
+import TargetsView from '@/app/ui/TargetsView';
+import IpAccessView from '@/app/ui/IpAccessView';
+import SessionsView from '@/app/ui/SessionsView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -183,6 +186,12 @@ export default function AdminDashboard() {
                 return <BroadcastsView />;
             case 'templates':
                 return <TemplatesView />;
+            case 'targets':
+                return <TargetsView />;
+            case 'ip-access':
+                return <IpAccessView />;
+            case 'sessions':
+                return <SessionsView />;
             default:
                 return null;
         }

@@ -51,7 +51,11 @@ export type ViewMode =
   | 'contexts'
   // Phase 1 — CRM commercial
   | 'follow-ups'
-  | 'portfolio';
+  | 'portfolio'
+  // Phase 2 — Ranking, Objectifs, Sessions, IP
+  | 'targets'
+  | 'ip-access'
+  | 'sessions';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
