@@ -774,10 +774,16 @@ export default function ConversationsView({
                                                             );
                                                         }
                                                         if (mediaType === 'video') {
-                                                            return (
+                                                            const videoSrc = resolveMediaUrl(media.url);
+                                                            return videoSrc ? (
+                                                                <a key={idx} href={videoSrc} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors">
+                                                                    <Video className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs truncate underline">{media.file_name ?? 'Vidéo'}</span>
+                                                                </a>
+                                                            ) : (
                                                                 <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
                                                                     <Video className="w-4 h-4 flex-shrink-0" />
-                                                                    <span className="text-xs truncate">{media.file_name ?? 'Video'}</span>
+                                                                    <span className="text-xs truncate">{media.file_name ?? 'Vidéo'}</span>
                                                                 </div>
                                                             );
                                                         }
@@ -805,7 +811,14 @@ export default function ConversationsView({
                                                             );
                                                         }
                                                         if (mediaType === 'document' || mediaType === 'application') {
-                                                            return (
+                                                            const docSrc = resolveMediaUrl(media.url);
+                                                            return docSrc ? (
+                                                                <a key={idx} href={docSrc} target="_blank" rel="noopener noreferrer" download={media.file_name ?? true} className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs truncate underline">{media.file_name ?? 'Document'}</span>
+                                                                    <span className="text-[10px] opacity-60 shrink-0">Télécharger</span>
+                                                                </a>
+                                                            ) : (
                                                                 <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
                                                                     <FileText className="w-4 h-4 flex-shrink-0" />
                                                                     <span className="text-xs truncate">{media.file_name ?? 'Document'}</span>
@@ -824,12 +837,20 @@ export default function ConversationsView({
                                                                 </div>
                                                             );
                                                         }
-                                                        return (
-                                                            <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
-                                                                <Image className="w-4 h-4 flex-shrink-0" />
-                                                                <span className="text-xs truncate">{media.file_name ?? mediaType ?? 'Media'}</span>
-                                                            </div>
-                                                        );
+                                                        {
+                                                            const fallbackSrc = resolveMediaUrl(media.url);
+                                                            return fallbackSrc ? (
+                                                                <a key={idx} href={fallbackSrc} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-black/10 rounded hover:bg-black/20 transition-colors">
+                                                                    <Image className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs truncate underline">{media.file_name ?? mediaType ?? 'Media'}</span>
+                                                                </a>
+                                                            ) : (
+                                                                <div key={idx} className="flex items-center gap-2 p-2 bg-black/10 rounded">
+                                                                    <Image className="w-4 h-4 flex-shrink-0" />
+                                                                    <span className="text-xs truncate">{media.file_name ?? mediaType ?? 'Media'}</span>
+                                                                </div>
+                                                            );
+                                                        }
                                                     })}
                                                 </div>
                                             )}
