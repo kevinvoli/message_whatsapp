@@ -91,8 +91,10 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
     }
   };
 
-  const messageText = msg.text && msg.text.trim().length > 0 ? msg.text : null;
   const hasMedia = Array.isArray(msg.medias) && msg.medias.length > 0;
+  const hasLocationMedia = msg.medias?.some((m) => m.type === 'location' || m.type === 'live_location') ?? false;
+  // Ne pas afficher le texte fallback si le message a un média location (évite "[Localisation]" en doublon)
+  const messageText = msg.text && msg.text.trim().length > 0 && !hasLocationMedia ? msg.text : null;
   const isFromMe = msg.from_me;
   const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : null;
   const messageId = msg.id || `msg-fallback-${index}`;

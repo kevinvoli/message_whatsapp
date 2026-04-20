@@ -468,8 +468,12 @@ export class WhatsappMessageService {
 
     const savedMessage = await this.messageRepository.save(messageEntity);
 
+    const locMediaId = `agent_loc_${Date.now()}`;
     const mediaEntity = this.mediaRepository.create({
-      media_id: `agent_loc_${Date.now()}`,
+      media_id: locMediaId,
+      whapi_media_id: locMediaId,
+      mime_type: '',
+      view_once: '0',
       media_type: 'location' as WhatsappMediaType,
       latitude: data.latitude,
       longitude: data.longitude,
