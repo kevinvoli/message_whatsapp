@@ -57,6 +57,8 @@ import { RbacModule } from './rbac/rbac.module';
 import { SentimentModule } from './sentiment/sentiment.module';
 import { OutboundWebhookModule } from './outbound-webhook/outbound-webhook.module';
 import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
+import { FollowUpModule } from './follow-up/follow_up.module';
+import { ClientDossierModule } from './client-dossier/client-dossier.module';
 
 @Module({
   imports: [
@@ -172,6 +174,9 @@ import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
     SentimentModule,
     OutboundWebhookModule,
     AiAssistantModule,
+    // Phase 7 — Suivi client : dossier, statuts métier, relances, portefeuille
+    FollowUpModule,
+    ClientDossierModule,
   ],
   controllers: [AppController],
   providers: [

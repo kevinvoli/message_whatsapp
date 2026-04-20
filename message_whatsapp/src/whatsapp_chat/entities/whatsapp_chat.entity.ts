@@ -21,6 +21,18 @@ export enum WhatsappChatStatus {
   FERME = 'fermé',
 }
 
+export enum ConversationResult {
+  COMMANDE_CONFIRMEE = 'commande_confirmee',
+  COMMANDE_A_SAISIR = 'commande_a_saisir',
+  A_RELANCER = 'a_relancer',
+  RAPPEL_PROGRAMME = 'rappel_programme',
+  PAS_INTERESSE = 'pas_interesse',
+  SANS_REPONSE = 'sans_reponse',
+  INFOS_INCOMPLETES = 'infos_incompletes',
+  DEJA_CLIENT = 'deja_client',
+  ANNULE = 'annule',
+}
+
 @Entity({ engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
 @Index('IDX_whatsapp_chat_tenant_id', ['tenant_id'])
 @Index('UQ_whatsapp_chat_tenant_chat_id', ['tenant_id', 'chat_id'], {
@@ -199,6 +211,25 @@ export class WhatsappChat {
 
   @Column({ name: 'reopened_at', type: 'timestamp', nullable: true })
   reopened_at: Date | null;
+
+  // ─── P7 — Statut métier de fin de conversation ──────────────────────────────
+  @Column({
+    name: 'conversation_result',
+    type: 'enum',
+    enum: ConversationResult,
+    nullable: true,
+    default: null,
+  })
+  conversation_result: ConversationResult | null;
+
+  @Column({ name: 'conversation_result_at', type: 'timestamp', nullable: true, default: null })
+  conversation_result_at: Date | null;
+
+  @Column({ name: 'conversation_result_by', type: 'char', length: 36, nullable: true, default: null })
+  conversation_result_by: string | null;
+
+  @Column({ name: 'is_locked', type: 'boolean', default: false })
+  is_locked: boolean;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];

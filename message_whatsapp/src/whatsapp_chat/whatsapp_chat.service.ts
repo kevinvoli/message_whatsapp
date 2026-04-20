@@ -3,10 +3,10 @@
  * `ConversationReadQueryService`. Ce service ne conserve que les mutations
  * (create, update, mark-as-read, lock/unlock, etc.).
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WhatsappChat } from './entities/whatsapp_chat.entity';
+import { WhatsappChat, ConversationResult } from './entities/whatsapp_chat.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import {
   ConversationReadQueryService,
@@ -203,5 +203,42 @@ export class WhatsappChatService {
   /** @see ConversationReadQueryService.getStatsByCommercial */
   async getStatsByCommercial(): Promise<CommercialStats[]> {
     return this.readQuery.getStatsByCommercial();
+  }
+
+  // ─── P7 — Statut métier de fin de conversation ──────────────────────────────
+
+  /**
+   * Enregistre le résultat métier d'une conversation.
+   * Utilise l'UUID interne (id) de la conversation, pas le chat_id Whapi.
+   */
+  async setConversationResult(
+    id: string,
+    result: ConversationResult,
+    commercial_id: string,
+  ): Promise<WhatsappChat> {
+    const chat = await this.chatRepository.findOne({ where: { id } });
+    if (!chat) throw new NotFoundException(`Conversation ${id} introuvable`);
+
+    chat.conversation_result = result;
+    chat.conversation_result_at = new Date();
+    chat.conversation_result_by = commercial_id;
+    return this.chatRepository.save(chat);
+  }
+
+  /** Statistiques par résultat métier (admin) */
+  async getOutcomeStats(dateStart?: Date, poste_id?: string): Promise<{ result: string; count: number }[]> {
+    const qb = this.chatRepository
+      .createQueryBuilder('c')
+      .select('c.conversation_result', 'result')
+      .addSelect('COUNT(*)', 'count')
+      .where('c.conversation_result IS NOT NULL')
+      .andWhere('c.deletedAt IS NULL')
+      .groupBy('c.conversation_result');
+
+    if (dateStart) qb.andWhere('c.createdAt >= :dateStart', { dateStart });
+    if (poste_id) qb.andWhere('c.poste_id = :poste_id', { poste_id });
+
+    const rows = await qb.getRawMany<{ result: string; count: string }>();
+    return rows.map((r) => ({ result: r.result, count: Number(r.count) }));
   }
 }

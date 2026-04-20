@@ -86,4 +86,61 @@ export class ContactController {
     await this.gateway.emitContactRemoved(contact);
     return contact;
   }
+
+  // ─── P7 — Portefeuille ─────────────────────────────────────────────────────
+
+  /** Mon portefeuille (commercial connecté) */
+  @Get('portfolio/mine')
+  @UseGuards(AuthGuard('jwt'))
+  getMyPortfolio(
+    @Request() req: { user: { userId: string } },
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.findPortfolioByCommercial(
+      req.user.userId,
+      search,
+      limit ? Math.min(parseInt(limit, 10), 200) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
+
+  /** Assigner un contact à un commercial (admin) */
+  @Patch(':id/portfolio')
+  @UseGuards(AdminGuard)
+  async assignPortfolio(
+    @Param('id') id: string,
+    @Body('commercial_id') commercial_id: string,
+  ) {
+    const contact = await this.service.assignPortfolio(id, commercial_id);
+    await this.gateway.emitContactUpsert(contact);
+    return contact;
+  }
+
+  /** Désattribuer un contact de son commercial (admin) */
+  @Patch(':id/portfolio/unassign')
+  @UseGuards(AdminGuard)
+  async unassignPortfolio(@Param('id') id: string) {
+    const contact = await this.service.unassignPortfolio(id);
+    await this.gateway.emitContactUpsert(contact);
+    return contact;
+  }
+
+  /** Vue admin : portefeuille d'un commercial ou tous les contacts attribués */
+  @Get('portfolio/admin')
+  @UseGuards(AdminGuard)
+  getPortfolioAdmin(
+    @Query('commercial_id') commercial_id?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.findPortfolioAdmin(
+      commercial_id,
+      search,
+      limit ? Math.min(parseInt(limit, 10), 200) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
 }

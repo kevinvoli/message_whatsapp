@@ -6,9 +6,21 @@ import {
   Query,
   Patch,
   Body,
+  Request,
 } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
+import { AuthGuard } from '@nestjs/passport';
+import { IsEnum, IsNotEmpty } from 'class-validator';
+import { ConversationResult } from './entities/whatsapp_chat.entity';
+
+class SetOutcomeDto {
+  @IsEnum(ConversationResult)
+  @IsNotEmpty()
+  result: ConversationResult;
+}
+
+interface JwtUser { userId: string; }
 
 @Controller('chats')
 @UseGuards(AdminGuard)
@@ -68,5 +80,38 @@ export class WhatsappChatController {
   @Patch(':chat_id')
   async update(@Param('chat_id') chat_id: string, @Body() data: any) {
     return this.chatService.update(chat_id, data);
+  }
+
+  // ─── P7 — Statut métier ────────────────────────────────────────────────────
+
+  /** Enregistre le résultat métier d'une conversation (commercial JWT ou admin) */
+  @Patch(':id/outcome')
+  @UseGuards(AuthGuard('jwt'))
+  setOutcome(
+    @Param('id') id: string,
+    @Body() dto: SetOutcomeDto,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.chatService.setConversationResult(id, dto.result, req.user.userId);
+  }
+
+  /** Stats des résultats métier — admin uniquement */
+  @Get('stats/outcomes')
+  async outcomeStats(
+    @Query('periode') periode?: string,
+    @Query('poste_id') poste_id?: string,
+  ) {
+    let dateStart: Date | undefined;
+    if (periode) {
+      const now = new Date();
+      const joursMap: Record<string, number> = { today: 0, week: 7, month: 30, year: 365 };
+      const jours = joursMap[periode];
+      if (jours !== undefined) {
+        dateStart = new Date(now);
+        dateStart.setDate(dateStart.getDate() - (jours || 0));
+        dateStart.setHours(0, 0, 0, 0);
+      }
+    }
+    return this.chatService.getOutcomeStats(dateStart, poste_id);
   }
 }

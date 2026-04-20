@@ -22,6 +22,20 @@ export enum Priority {
   Basse = 'basse',
 }
 
+export enum ClientCategory {
+  JAMAIS_COMMANDE = 'jamais_commande',
+  COMMANDE_SANS_LIVRAISON = 'commande_sans_livraison',
+  COMMANDE_AVEC_LIVRAISON = 'commande_avec_livraison',
+  COMMANDE_ANNULEE = 'commande_annulee',
+}
+
+export enum CertificationStatus {
+  NON_VERIFIE = 'non_verifie',
+  EN_ATTENTE = 'en_attente',
+  CERTIFIE = 'certifie',
+  REJETE = 'rejete',
+}
+
 @Entity()
 // phone : hot path — appelé sur chaque message entrant (findOrCreate)
 @Index('IDX_contact_phone',              ['phone'])
@@ -103,6 +117,24 @@ export class Contact {
 
   @Column({ default: true })
   is_active: boolean;
+
+  // ─── P7 — Portefeuille et enrichissement client ──────────────────────────────
+  @Column({ name: 'portfolio_owner_id', type: 'char', length: 36, nullable: true, default: null })
+  portfolio_owner_id?: string | null;
+
+  @Column({ name: 'order_client_id', type: 'int', nullable: true, default: null,
+    comment: 'ID client dans la plateforme de gestion des commandes' })
+  order_client_id?: number | null;
+
+  @Column({ name: 'client_category', type: 'enum', enum: ClientCategory, nullable: true, default: null })
+  client_category?: ClientCategory | null;
+
+  @Column({ name: 'client_order_summary', type: 'json', nullable: true })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client_order_summary?: any;
+
+  @Column({ name: 'certification_status', type: 'enum', enum: CertificationStatus, nullable: true, default: null })
+  certification_status?: CertificationStatus | null;
 
   @CreateDateColumn({
     name: 'createdAt',

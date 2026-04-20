@@ -160,4 +160,75 @@ export class ContactService {
     const contact = await this.findOne(id);
     return this.repo.remove(contact);
   }
+
+  // ─── P7 — Portefeuille commercial ──────────────────────────────────────────
+
+  /** Assigne un contact à un commercial (portfolio_owner_id) */
+  async assignPortfolio(contactId: string, commercial_id: string): Promise<Contact> {
+    await this.repo.update({ id: contactId }, { portfolio_owner_id: commercial_id });
+    return this.findOne(contactId);
+  }
+
+  /** Retire l'attribution d'un contact */
+  async unassignPortfolio(contactId: string): Promise<Contact> {
+    await this.repo.update({ id: contactId }, { portfolio_owner_id: null });
+    return this.findOne(contactId);
+  }
+
+  /** Liste tous les contacts du portefeuille d'un commercial */
+  async findPortfolioByCommercial(
+    commercial_id: string,
+    search?: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{ data: Contact[]; total: number }> {
+    const qb = this.repo
+      .createQueryBuilder('c')
+      .where('c.portfolio_owner_id = :commercial_id', { commercial_id })
+      .andWhere('c.deletedAt IS NULL');
+
+    if (search?.trim()) {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('(c.name LIKE :term OR c.phone LIKE :term)', { term });
+    }
+
+    const [data, total] = await qb
+      .orderBy('c.createdAt', 'DESC')
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
+
+    return { data, total };
+  }
+
+  /** Vue admin : portefeuille de n'importe quel commercial */
+  async findPortfolioAdmin(
+    commercial_id?: string,
+    search?: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<{ data: Contact[]; total: number }> {
+    const qb = this.repo
+      .createQueryBuilder('c')
+      .where('c.deletedAt IS NULL');
+
+    if (commercial_id) {
+      qb.andWhere('c.portfolio_owner_id = :commercial_id', { commercial_id });
+    } else {
+      qb.andWhere('c.portfolio_owner_id IS NOT NULL');
+    }
+
+    if (search?.trim()) {
+      const term = `%${search.trim()}%`;
+      qb.andWhere('(c.name LIKE :term OR c.phone LIKE :term)', { term });
+    }
+
+    const [data, total] = await qb
+      .orderBy('c.createdAt', 'DESC')
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
+
+    return { data, total };
+  }
 }
