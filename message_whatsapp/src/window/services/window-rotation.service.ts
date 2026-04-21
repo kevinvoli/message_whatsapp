@@ -141,23 +141,22 @@ export class WindowRotationService {
   }
 
   /**
-   * Batch update de slots via transaction.
-   * Réduit les round-trips réseau : N updates dans une seule transaction MySQL.
+   * Batch update de slots — updates en parallèle sans transaction explicite.
+   * Évite les problèmes de manager.transaction dans certaines configurations TypeORM.
    */
   private async batchUpdateSlots(
     assignments: Array<{ id: string; slot: number | null; status: WindowStatus; isLocked: boolean }>,
   ): Promise<void> {
     if (assignments.length === 0) return;
 
-    await this.chatRepo.manager.transaction(async (em) => {
-      for (const a of assignments) {
-        await em.update(
-          WhatsappChat,
+    await Promise.all(
+      assignments.map((a) =>
+        this.chatRepo.update(
           { id: a.id },
           { window_slot: a.slot, window_status: a.status, is_locked: a.isLocked },
-        );
-      }
-    });
+        ),
+      ),
+    );
   }
 
   /**
@@ -165,14 +164,12 @@ export class WindowRotationService {
    */
   private async batchRelease(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
-    await this.chatRepo.manager.transaction(async (em) => {
-      await em
-        .createQueryBuilder()
-        .update(WhatsappChat)
-        .set({ window_slot: null as any, window_status: WindowStatus.RELEASED, is_locked: false })
-        .whereInIds(ids)
-        .execute();
-    });
+    await this.chatRepo
+      .createQueryBuilder()
+      .update()
+      .set({ window_slot: null as any, window_status: WindowStatus.RELEASED, is_locked: false })
+      .whereInIds(ids)
+      .execute();
   }
 
   /**

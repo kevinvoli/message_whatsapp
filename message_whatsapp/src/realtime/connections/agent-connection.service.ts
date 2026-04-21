@@ -103,7 +103,14 @@ export class AgentConnectionService {
     await this.emitQueueUpdate('agent_connected');
 
     // Construit ou répare la fenêtre glissante avant d'envoyer les conversations
-    await this.windowRotation.buildWindowForPoste(posteId);
+    try {
+      await this.windowRotation.buildWindowForPoste(posteId);
+    } catch (err) {
+      this.logger.error(
+        `buildWindowForPoste failed for poste ${posteId} — conversations envoyées sans slots`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
     await this.sendConversationsToClient(client);
     return true;
   }

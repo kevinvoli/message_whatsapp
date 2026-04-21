@@ -41,12 +41,6 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
     getCount: jest.fn().mockResolvedValue(chats.length),
   };
 
-  // EntityManager mock avec transaction qui exécute le callback immédiatement
-  const emMock: any = {
-    update: jest.fn().mockResolvedValue({}),
-    createQueryBuilder: jest.fn().mockReturnValue(qb),
-  };
-
   return {
     find: jest.fn().mockResolvedValue(chats),
     findOne: jest.fn().mockResolvedValue(chats[0] ?? null),
@@ -54,11 +48,7 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
     count: jest.fn().mockResolvedValue(chats.length),
     query: jest.fn().mockResolvedValue({}),
     createQueryBuilder: jest.fn().mockReturnValue(qb),
-    manager: {
-      transaction: jest.fn().mockImplementation((cb: (em: any) => Promise<void>) => cb(emMock)),
-    },
     _qb: qb,
-    _em: emMock,
   } as any;
 }
 

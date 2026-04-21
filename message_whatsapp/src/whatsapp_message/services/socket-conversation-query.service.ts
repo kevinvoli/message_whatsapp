@@ -59,6 +59,21 @@ export class SocketConversationQueryService {
         if (b.window_slot != null) return 1;
         return (b.last_activity_at?.getTime() ?? 0) - (a.last_activity_at?.getTime() ?? 0);
       });
+
+      // Fallback : si buildWindowForPoste n'a pas encore tourné (pas de window_slot),
+      // appliquer le verrouillage par position en mémoire pour l'affichage immédiat.
+      const { quotaActive } = await this.capacityService.getQuotas();
+      const noneSlotted = chats.every((c) => c.window_slot == null);
+      if (noneSlotted && chats.length > 0) {
+        chats = chats.map((chat, idx) => {
+          const isLocked = idx >= quotaActive;
+          return Object.assign(Object.create(Object.getPrototypeOf(chat)), chat, {
+            window_slot: idx + 1,
+            window_status: isLocked ? WindowStatus.LOCKED : WindowStatus.ACTIVE,
+            is_locked: isLocked,
+          });
+        });
+      }
     } else {
       // Mode classique : tri par activité récente
       chats.sort(
@@ -75,7 +90,7 @@ export class SocketConversationQueryService {
 
     const chatIds = chats.map((c) => c.chat_id);
 
-    // Charger les états de validation uniquement en mode glissant
+    // Charger les états de validation uniquement en mode glissant (conversations actives)
     const activeChatIds = modeEnabled
       ? chats
           .filter((c) => c.window_status === WindowStatus.ACTIVE || c.window_status === WindowStatus.VALIDATED)
