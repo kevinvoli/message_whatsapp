@@ -26,4 +26,16 @@ export class ConversationCapacityController {
   forceUnlock(@Param('chatId') chatId: string) {
     return this.service.forceUnlock(chatId);
   }
+
+  @Get('window-mode')
+  async getWindowMode() {
+    const enabled = await this.service.isWindowModeEnabled();
+    return { enabled };
+  }
+
+  @Patch('window-mode')
+  async setWindowMode(@Body() body: { enabled: boolean }) {
+    await this.service.setWindowMode(body.enabled);
+    return { enabled: body.enabled };
+  }
 }

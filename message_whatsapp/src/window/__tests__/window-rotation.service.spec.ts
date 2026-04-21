@@ -62,9 +62,11 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
   } as any;
 }
 
-function makeCapacityService(quotaActive = 10, quotaTotal = 50) {
+function makeCapacityService(quotaActive = 10, quotaTotal = 50, windowModeEnabled = true) {
   return {
     getQuotas: jest.fn().mockResolvedValue({ quotaActive, quotaTotal }),
+    isWindowModeEnabled: jest.fn().mockResolvedValue(windowModeEnabled),
+    onConversationQualifiedLegacy: jest.fn().mockResolvedValue(undefined),
   } as any;
 }
 

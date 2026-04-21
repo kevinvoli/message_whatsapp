@@ -7,6 +7,8 @@ import {
   getCapacitySummary,
   getCapacityConfig,
   setCapacityConfig,
+  getWindowMode,
+  setWindowMode,
 } from '../lib/api/capacity.api';
 import {
   ValidationCriterion,
@@ -41,6 +43,8 @@ export default function CapacityView() {
   const [criteria, setCriteria] = useState<ValidationCriterion[]>([]);
   const [savingCriterion, setSavingCriterion] = useState<string | null>(null);
   const [actionPoste, setActionPoste] = useState<string | null>(null);
+  const [windowModeEnabled, setWindowModeEnabled] = useState(true);
+  const [togglingMode, setTogglingMode] = useState(false);
   const [callEvents, setCallEvents] = useState<CallEventEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,15 +57,28 @@ export default function CapacityView() {
       getCapacityConfig(),
       getValidationCriteria(),
       getCallEvents(20),
+      getWindowMode(),
     ])
-      .then(([s, c, cr, ce]) => {
+      .then(([s, c, cr, ce, wm]) => {
         setSummary(s);
         setConfig(c);
         setCriteria(cr);
         setCallEvents(ce.data);
+        setWindowModeEnabled(wm.enabled);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleToggleWindowMode = async () => {
+    setTogglingMode(true);
+    const next = !windowModeEnabled;
+    try {
+      await setWindowMode(next);
+      setWindowModeEnabled(next);
+    } finally {
+      setTogglingMode(false);
+    }
+  };
 
   const handleForceRotation = async (posteId: string) => {
     setActionPoste(posteId);
@@ -141,6 +158,36 @@ export default function CapacityView() {
       {/* ── Onglet : Quotas ── */}
       {activeTab === 'quotas' && (
         <div className="space-y-5">
+
+          {/* Toggle mode glissant */}
+          <div className={`rounded-xl border p-5 flex items-start justify-between gap-4 ${
+            windowModeEnabled ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+          }`}>
+            <div>
+              <p className="font-medium text-gray-900">Mode fenêtre glissante</p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {windowModeEnabled
+                  ? 'Activé — rotation par bloc de 10, validation métier requise pour progresser.'
+                  : 'Désactivé — déverrouillage unitaire à chaque qualification (comportement classique).'}
+              </p>
+            </div>
+            <button
+              onClick={handleToggleWindowMode}
+              disabled={togglingMode}
+              className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                windowModeEnabled ? 'bg-green-500' : 'bg-gray-300'
+              }`}
+              role="switch"
+              aria-checked={windowModeEnabled}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                  windowModeEnabled ? 'translate-x-7' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
           {/* Config quotas */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
             <h3 className="font-medium text-gray-800">Configuration de la fenêtre</h3>

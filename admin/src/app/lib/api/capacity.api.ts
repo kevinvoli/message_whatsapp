@@ -43,3 +43,18 @@ export async function forceUnlock(chatId: string): Promise<void> {
     credentials: 'include',
   });
 }
+
+export async function getWindowMode(): Promise<{ enabled: boolean }> {
+  return handleResponse<{ enabled: boolean }>(
+    await fetch(`${API_BASE_URL}/capacity/window-mode`, { credentials: 'include' }),
+  );
+}
+
+export async function setWindowMode(enabled: boolean): Promise<void> {
+  await fetch(`${API_BASE_URL}/capacity/window-mode`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+}

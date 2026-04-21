@@ -37,8 +37,14 @@ export class WindowRotationService {
    * Construit ou répare la fenêtre de 50 conversations pour un poste.
    * Appelé à la connexion d'un commercial.
    * Nettoie d'abord les slots des conversations fermées avant d'assigner.
+   * Ignoré si le mode fenêtre glissante est désactivé.
    */
   async buildWindowForPoste(posteId: string): Promise<void> {
+    const modeEnabled = await this.capacityService.isWindowModeEnabled();
+    if (!modeEnabled) {
+      this.logger.debug(`buildWindowForPoste ignoré pour poste ${posteId} (mode glissant désactivé)`);
+      return;
+    }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
     // 1. Libérer les slots des conversations fermées (auto-close cron ou fermeture directe)
@@ -177,14 +183,21 @@ export class WindowRotationService {
   async handleConversationResultSet(payload: { chatId: string; posteId: string | null | undefined }): Promise<void> {
     if (!payload.posteId) return;
 
+    const modeEnabled = await this.capacityService.isWindowModeEnabled();
+
+    if (!modeEnabled) {
+      // Mode classique : déverrouiller la conversation suivante
+      await this.capacityService.onConversationQualifiedLegacy(payload.posteId);
+      return;
+    }
+
+    // Mode glissant : moteur de validation + rotation éventuelle
     const allRequiredMet = await this.validationEngine.onConversationResultSet(payload.chatId);
 
-    // Si tous les critères sont atteints, passer window_status à VALIDATED avant de notifier le front
     if (allRequiredMet) {
       await this.onConversationValidated(payload.chatId, payload.posteId);
     }
 
-    // Notifier le front APRÈS la mise à jour de window_status (UPSERT + progression)
     this.eventEmitter.emit(WINDOW_CRITERION_VALIDATED_EVENT, {
       posteId: payload.posteId,
       chatId: payload.chatId,
@@ -247,7 +260,10 @@ export class WindowRotationService {
    * Si oui, déclenche la rotation.
    */
   async checkAndTriggerRotation(posteId: string): Promise<void> {
-    if (this.rotatingPostes.has(posteId)) return; // rotation déjà en cours
+    if (this.rotatingPostes.has(posteId)) return;
+
+    const modeEnabled = await this.capacityService.isWindowModeEnabled();
+    if (!modeEnabled) return;
 
     const { quotaActive } = await this.capacityService.getQuotas();
 

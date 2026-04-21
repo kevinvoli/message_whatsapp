@@ -10,6 +10,7 @@ import {
   mapConversationWithContact,
 } from 'src/realtime/mappers/socket-conversation.mapper';
 import { ValidationEngineService } from 'src/window/services/validation-engine.service';
+import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 
 export interface ConversationQueryResult {
   conversations: ReturnType<typeof mapConversationWithContact>[];
@@ -27,52 +28,59 @@ export class SocketConversationQueryService {
     private readonly contactService: ContactService,
     private readonly channelService: ChannelService,
     private readonly validationEngine: ValidationEngineService,
+    private readonly capacityService: ConversationCapacityService,
   ) {}
 
   /**
-   * Charge la fenêtre de 50 conversations d'un poste (fenêtre glissante).
-   * La liste est bornée à 50 et triée par window_slot ASC.
-   * Plus de pagination keyset pour la vue commerciale.
+   * Charge la fenêtre de conversations d'un poste.
+   * Mode glissant activé : 50 max, triées par window_slot ASC, avec états de validation.
+   * Mode glissant désactivé : 50 max, triées par last_activity_at DESC, sans validation.
    */
   async loadConversationsForPoste(
     posteId: string,
     tenantIds: string[],
     searchTerm?: string,
-    // cursor conservé pour compatibilité API mais ignoré — fenêtre fixe
     _cursor?: { activityAt: string; chatId: string },
   ): Promise<ConversationQueryResult> {
-    let { chats } = await this.chatService.findByPosteId(
-      posteId,
-      [],
-      50, // fenêtre fixe maximale
-    );
+    const modeEnabled = await this.capacityService.isWindowModeEnabled();
+
+    let { chats } = await this.chatService.findByPosteId(posteId, [], 50);
 
     if (tenantIds.length > 0) {
       const tenantSet = new Set(tenantIds);
       chats = chats.filter((c) => !c.tenant_id || tenantSet.has(c.tenant_id));
     }
 
-    // Trier : conversations avec window_slot en premier (1→50), puis sans slot par activité
-    chats.sort((a, b) => {
-      if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;
-      if (a.window_slot != null) return -1;
-      if (b.window_slot != null) return 1;
-      return (b.last_activity_at?.getTime() ?? 0) - (a.last_activity_at?.getTime() ?? 0);
-    });
+    if (modeEnabled) {
+      // Trier par window_slot ASC (conversations slottées d'abord, puis par activité)
+      chats.sort((a, b) => {
+        if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;
+        if (a.window_slot != null) return -1;
+        if (b.window_slot != null) return 1;
+        return (b.last_activity_at?.getTime() ?? 0) - (a.last_activity_at?.getTime() ?? 0);
+      });
+    } else {
+      // Mode classique : tri par activité récente
+      chats.sort(
+        (a, b) => (b.last_activity_at?.getTime() ?? 0) - (a.last_activity_at?.getTime() ?? 0),
+      );
+    }
 
     if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
+      const lower = searchTerm.toLowerCase();
       chats = chats.filter(
-        (c) =>
-          c.name.toLowerCase().includes(lowerSearch) ||
-          c.chat_id.includes(lowerSearch),
+        (c) => c.name.toLowerCase().includes(lower) || c.chat_id.includes(lower),
       );
     }
 
     const chatIds = chats.map((c) => c.chat_id);
-    const activeChatIds = chats
-      .filter((c) => c.window_status === WindowStatus.ACTIVE || c.window_status === WindowStatus.VALIDATED)
-      .map((c) => c.chat_id);
+
+    // Charger les états de validation uniquement en mode glissant
+    const activeChatIds = modeEnabled
+      ? chats
+          .filter((c) => c.window_status === WindowStatus.ACTIVE || c.window_status === WindowStatus.VALIDATED)
+          .map((c) => c.chat_id)
+      : [];
 
     const [lastMsgMap, unreadMap, contactMap, validationMap] = await Promise.all([
       this.messageService.findLastMessagesBulk(chatIds),

@@ -5,10 +5,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 
-const KEY_QUOTA_ACTIVE = 'CAPACITY_QUOTA_ACTIVE';
-const KEY_QUOTA_TOTAL = 'CAPACITY_QUOTA_TOTAL';
+const KEY_QUOTA_ACTIVE    = 'CAPACITY_QUOTA_ACTIVE';
+const KEY_QUOTA_TOTAL     = 'CAPACITY_QUOTA_TOTAL';
+const KEY_WINDOW_MODE     = 'SLIDING_WINDOW_ENABLED';
 const DEFAULT_QUOTA_ACTIVE = 10;
-const DEFAULT_QUOTA_TOTAL = 50;
+const DEFAULT_QUOTA_TOTAL  = 50;
 
 export interface CapacitySummaryEntry {
   posteId: string;
@@ -52,6 +53,17 @@ export class ConversationCapacityService {
     ]);
   }
 
+  async isWindowModeEnabled(): Promise<boolean> {
+    const val = await this.systemConfig.get(KEY_WINDOW_MODE);
+    // Par défaut activé (true) si la clé n'est pas encore configurée
+    return val === null || val === 'true';
+  }
+
+  async setWindowMode(enabled: boolean): Promise<void> {
+    await this.systemConfig.set(KEY_WINDOW_MODE, enabled ? 'true' : 'false');
+    this.logger.log(`Mode fenêtre glissante ${enabled ? 'activé' : 'désactivé'}`);
+  }
+
   async countForPoste(
     posteId: string,
   ): Promise<{ active: number; locked: number; total: number }> {
@@ -77,14 +89,47 @@ export class ConversationCapacityService {
   }
 
   /**
+   * Déverrouille la plus ancienne conversation verrouillée (mode classique).
+   * Appelé par WindowRotationService quand le mode glissant est désactivé.
+   */
+  async onConversationQualifiedLegacy(posteId: string): Promise<void> {
+    const oldest = await this.chatRepo
+      .createQueryBuilder('c')
+      .where('c.poste_id = :posteId', { posteId })
+      .andWhere('c.is_locked = true')
+      .andWhere('c.status != :ferme', { ferme: 'fermé' })
+      .andWhere('c.deletedAt IS NULL')
+      .orderBy('c.createdAt', 'ASC')
+      .getOne();
+
+    if (!oldest) return;
+    await this.chatRepo.update({ id: oldest.id }, { is_locked: false });
+    this.logger.log(`Conv ${oldest.chat_id} déverrouillée (mode classique, poste ${posteId})`);
+  }
+
+  /**
    * Appelé après qu'une conversation est assignée à un poste.
-   * Assigne le prochain slot de fenêtre et verrouille si le quota actif est dépassé.
-   * Utilise un mutex par poste pour éviter les race conditions.
+   * Si mode glissant activé : assigne un slot de fenêtre.
+   * Si mode glissant désactivé : verrouille si quotaActive dépassé (ancien comportement).
    * Retourne true si la conversation a été verrouillée.
    */
   async onConversationAssigned(chat: WhatsappChat): Promise<boolean> {
     if (!chat.poste_id) return false;
     if (chat.window_slot != null) return chat.is_locked;
+
+    const modeEnabled = await this.isWindowModeEnabled();
+
+    if (!modeEnabled) {
+      // Mode classique : verrouiller si quotaActive dépassé
+      const { quotaActive } = await this.getQuotas();
+      const { active } = await this.countForPoste(chat.poste_id);
+      if (active > quotaActive) {
+        await this.chatRepo.update({ id: chat.id }, { is_locked: true });
+        this.logger.log(`Conv ${chat.chat_id} verrouillée (mode classique, quota actif: ${active}/${quotaActive})`);
+        return true;
+      }
+      return false;
+    }
 
     const posteId = chat.poste_id;
 
