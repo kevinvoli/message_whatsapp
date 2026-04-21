@@ -48,7 +48,7 @@ export class AiExecutionLog {
   error_message: string | null;
 
   /** Tokens consommés si le provider les expose */
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   tokens_used: number | null;
 
   @CreateDateColumn({ name: 'created_at' })
