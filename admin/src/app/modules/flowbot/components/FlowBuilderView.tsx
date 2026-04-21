@@ -12,6 +12,7 @@ import {
 } from '../api/flowbot.api';
 import type { FlowAnalyticsRow } from '@/app/lib/definitions';
 import { NODE_TYPE_LABELS, TRIGGER_LABELS } from './FlowListView';
+import FlowbotAiStatusBanner from './FlowbotAiStatusBanner';
 
 interface FlowBuilderViewProps {
     flowId: string;
@@ -729,18 +730,56 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
                 </div>
 
                 {(node.type === 'MESSAGE' || node.type === 'QUESTION') && (
-                    <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Corps du message
-                            <span className="text-gray-400 font-normal ml-1">— Variables: {'{contact_name}'}, {'{current_time}'}, {'{session.CLE}'}</span>
-                        </label>
-                        <textarea
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                            rows={3}
-                            value={(config as { body?: string }).body ?? ''}
-                            onChange={e => onChange({ ...node, config: { ...config, body: e.target.value } })}
-                            placeholder="Bonjour {contact_name} ! Comment puis-je vous aider ?"
-                        />
+                    <div className="col-span-2 space-y-3">
+                        {/* Toggle IA pour ce nœud */}
+                        <div className={`rounded-lg border p-3 ${(config as { ai_generate?: boolean }).ai_generate ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                            <label className="flex items-center gap-3 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 accent-purple-600"
+                                    checked={(config as { ai_generate?: boolean }).ai_generate ?? false}
+                                    onChange={e => onChange({ ...node, config: { ...config, ai_generate: e.target.checked } })}
+                                />
+                                <span className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                                    ✦ Générer ce message avec l&apos;IA
+                                </span>
+                            </label>
+                            {(config as { ai_generate?: boolean }).ai_generate && (
+                                <div className="mt-3 space-y-3">
+                                    <FlowbotAiStatusBanner variant="inline" />
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">Contexte IA pour ce message <span className="text-gray-400 font-normal">(décrit la situation, l'objectif, le ton attendu)</span></label>
+                                        <textarea
+                                            className="w-full border border-purple-200 rounded-lg px-3 py-2 text-sm resize-none bg-white"
+                                            rows={3}
+                                            value={(config as { ai_context?: string }).ai_context ?? ''}
+                                            onChange={e => onChange({ ...node, config: { ...config, ai_context: e.target.value } })}
+                                            placeholder="Ex: Le client vient d'ouvrir la conversation. Accueille-le chaleureusement, présente le service et demande ce dont il a besoin."
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Corps du message statique (fallback si IA activée, contenu si IA désactivée) */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                {(config as { ai_generate?: boolean }).ai_generate
+                                    ? <>Message de repli <span className="text-gray-400 font-normal">(utilisé si l&apos;IA est indisponible)</span></>
+                                    : <>Corps du message <span className="text-gray-400 font-normal">— Variables: {'{contact_name}'}, {'{current_time}'}, {'{session.CLE}'}</span></>}
+                            </label>
+                            <textarea
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                rows={3}
+                                value={(config as { body?: string }).body ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, body: e.target.value } })}
+                                placeholder={
+                                    (config as { ai_generate?: boolean }).ai_generate
+                                        ? "Message envoyé si l'IA est désactivée ou en erreur…"
+                                        : "Bonjour {contact_name} ! Comment puis-je vous aider ?"
+                                }
+                            />
+                        </div>
                     </div>
                 )}
 
@@ -993,9 +1032,8 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
                 {/* ── P6.4 : AI_REPLY ── */}
                 {node.type === 'AI_REPLY' && (
                     <div className="col-span-2 space-y-4">
-                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-                            Ce nœud génère une réponse contextuelle via le fournisseur IA configuré dans <strong>Gouvernance IA → Modules → Nœud FlowBot</strong>. Le module <strong>Nœud IA dans FlowBot</strong> doit être activé.
-                        </div>
+                        {/* Statut + toggle du module IA FlowBot */}
+                        <FlowbotAiStatusBanner variant="inline" />
 
                         {/* Contexte métier */}
                         <div>

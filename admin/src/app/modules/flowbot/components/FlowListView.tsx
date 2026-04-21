@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import type { FlowBot } from '@/app/lib/definitions';
 import { useFlows } from '../hooks/useFlows';
+import FlowbotAiStatusBanner from './FlowbotAiStatusBanner';
 
 interface FlowListViewProps {
     onOpenBuilder: (flowId: string) => void;
@@ -122,6 +123,9 @@ export default function FlowListView({ onOpenBuilder }: FlowListViewProps) {
                 </div>
             )}
 
+            {/* Statut module IA FlowBot */}
+            <FlowbotAiStatusBanner variant="card" />
+
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
                     {error}
@@ -179,6 +183,7 @@ function FlowCard({ flow, onOpen, onToggle, onDelete }: {
 }) {
     const triggers = flow.triggers ?? [];
     const nodes = flow.nodes ?? [];
+    const hasAiNodes = nodes.some(n => n.type === 'AI_REPLY');
 
     return (
         <div className={`bg-white rounded-xl border shadow-sm transition-all hover:shadow-md ${flow.isActive ? 'border-green-300' : 'border-gray-200'}`}>
@@ -195,6 +200,11 @@ function FlowCard({ flow, onOpen, onToggle, onDelete }: {
                         {flow.priority > 0 && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
                                 Prio {flow.priority}
+                            </span>
+                        )}
+                        {hasAiNodes && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-medium">
+                                ✦ IA
                             </span>
                         )}
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${flow.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>

@@ -339,11 +339,29 @@ export class FlowEngineService {
       body?: string;
       typingDelaySeconds?: number;
       mediaUrl?: string;
+      ai_generate?: boolean;
+      ai_context?: string;
     };
 
-    const resolvedText = config.body
-      ? this.variableService.resolve(config.body, session, execCtx)
-      : '';
+    let resolvedText: string;
+    if (config.ai_generate) {
+      const flowbotEnabled = await this.aiAssistant.isFlowbotEnabled();
+      const fallbackBody = config.body ? this.variableService.resolve(config.body, session, execCtx) : '';
+      if (flowbotEnabled) {
+        try {
+          resolvedText = await this.aiAssistant.generateFlowbotReply(conv.chatRef, {
+            context: config.ai_context,
+            fallbackText: fallbackBody,
+          });
+        } catch {
+          resolvedText = fallbackBody;
+        }
+      } else {
+        resolvedText = fallbackBody;
+      }
+    } else {
+      resolvedText = config.body ? this.variableService.resolve(config.body, session, execCtx) : '';
+    }
 
     const caps = adapter.capabilities();
 
