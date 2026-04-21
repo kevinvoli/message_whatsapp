@@ -63,7 +63,6 @@ import { FlowBotModule } from 'src/flowbot/flowbot.module';
 import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 import { ContextModule } from 'src/context/context.module';
-import { RedisModule } from 'src/redis/redis.module';
 import { QueueModule } from 'src/queue/queue.module';
 import { WebhookWorker } from 'src/queue/workers/webhook.worker';
 import { SecurityEventHandler } from 'src/webhooks/adapters/meta-event-handlers/security.handler';
@@ -97,7 +96,6 @@ import { MetaNonMessageHandler } from 'src/webhooks/adapters/meta-event-handlers
     SystemAlertModule,
     FlowBotModule,
     ContextModule,
-    RedisModule,
     QueueModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
