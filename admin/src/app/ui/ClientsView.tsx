@@ -3,12 +3,36 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Edit, Trash2, UserPlus, RefreshCw, Search, X, Briefcase, UserCheck, UserX } from 'lucide-react';
 import { formatDate, formatDateShort } from '@/app/lib/dateUtils';
-import { Client, ClientSummary, Commercial } from '@/app/lib/definitions';
+import { Client, ClientSummary, Commercial, ClientCategory, CertificationStatus } from '@/app/lib/definitions';
 import { createClient, deleteClient, updateClient, getClients, searchClientsAdmin, assignPortfolio, unassignPortfolio } from '@/app/lib/api/clients.api';
 import { getCommerciaux } from '@/app/lib/api/commerciaux.api';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 import { Pagination } from '@/app/ui/Pagination';
+
+const CATEGORY_LABELS: Record<string, { label: string; cls: string }> = {
+  jamais_commande:         { label: 'Jamais commandé',  cls: 'bg-gray-100 text-gray-600' },
+  commande_sans_livraison: { label: 'Sans livraison',   cls: 'bg-orange-100 text-orange-700' },
+  commande_avec_livraison: { label: 'Livré',            cls: 'bg-green-100 text-green-700' },
+  commande_annulee:        { label: 'Annulé',           cls: 'bg-red-100 text-red-700' },
+};
+const CERTIF_LABELS: Record<string, { label: string; cls: string }> = {
+  non_verifie: { label: 'Non vérifié', cls: 'bg-gray-100 text-gray-500' },
+  en_attente:  { label: 'En attente',  cls: 'bg-orange-100 text-orange-700' },
+  certifie:    { label: '✓ Certifié', cls: 'bg-green-100 text-green-700' },
+  rejete:      { label: 'Rejeté',     cls: 'bg-red-100 text-red-700' },
+};
+
+function CategoryBadge({ category }: { category?: string | null }) {
+  if (!category) return <span className="text-gray-300 text-xs">—</span>;
+  const m = CATEGORY_LABELS[category];
+  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${m?.cls ?? 'bg-gray-100 text-gray-600'}`}>{m?.label ?? category}</span>;
+}
+function CertifBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-gray-300 text-xs">—</span>;
+  const m = CERTIF_LABELS[status];
+  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${m?.cls ?? 'bg-gray-100 text-gray-500'}`}>{m?.label ?? status}</span>;
+}
 
 interface ClientsViewProps {
   onRefresh?: () => void;
@@ -42,6 +66,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [portfolioSearch, setPortfolioSearch] = useState('');
   const [filterCommercialId, setFilterCommercialId] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
   const [assigningClient, setAssigningClient] = useState<ClientSummary | null>(null);
   const [assignTarget, setAssignTarget] = useState('');
@@ -66,6 +91,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
       const result = await searchClientsAdmin({
         search: portfolioSearch || undefined,
         portfolio_owner_id: filterCommercialId || undefined,
+        category: filterCategory || undefined,
         limit: 50,
         offset: portfolioOffset.current,
       });
@@ -222,6 +248,17 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Toutes catégories</option>
+              <option value="jamais_commande">Jamais commandé</option>
+              <option value="commande_sans_livraison">Sans livraison</option>
+              <option value="commande_avec_livraison">Livré</option>
+              <option value="commande_annulee">Annulé</option>
+            </select>
           </div>
 
           {/* Portfolio table */}
@@ -231,6 +268,8 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
                 <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
                   <th className="px-4 py-3">Client</th>
                   <th className="px-4 py-3">Téléphone</th>
+                  <th className="px-4 py-3">Catégorie</th>
+                  <th className="px-4 py-3">Certification</th>
                   <th className="px-4 py-3">Responsable</th>
                   <th className="px-4 py-3">Prochaine relance</th>
                   <th className="px-4 py-3">Actions</th>
@@ -238,13 +277,19 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {portfolioLoading ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Chargement...</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Chargement...</td></tr>
                 ) : portfolio.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Aucun client trouvé</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Aucun client trouvé</td></tr>
                 ) : portfolio.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
                     <td className="px-4 py-3 text-gray-600">{c.phone}</td>
+                    <td className="px-4 py-3">
+                      <CategoryBadge category={(c as ClientSummary & { client_category?: ClientCategory }).client_category} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <CertifBadge status={(c as ClientSummary & { certification_status?: CertificationStatus }).certification_status} />
+                    </td>
                     <td className="px-4 py-3">
                       {c.portfolio_owner_name ? (
                         <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
@@ -359,7 +404,8 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
           columns={[
             { header: 'Nom', render: (c) => <span className="font-medium text-gray-900">{c.name}</span> },
             { header: 'Téléphone', render: (c) => <span className="text-gray-700">{c.phone}</span> },
-            { header: 'Chat ID', render: (c) => <span className="text-gray-700">{c.chat_id || 'N/A'}</span> },
+            { header: 'Catégorie', render: (c) => <CategoryBadge category={c.client_category} /> },
+            { header: 'Certification', render: (c) => <CertifBadge status={c.certification_status} /> },
             {
               header: 'Statut',
               render: (c) => (

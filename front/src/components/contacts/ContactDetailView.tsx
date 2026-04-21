@@ -438,6 +438,38 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
     );
   };
 
+  const certificationBadge = () => {
+    if (!c.certification_status) return null;
+    const colorMap: Record<string, { bg: string; text: string; label: string }> = {
+      non_verifie: { bg: '#f3f4f6', text: '#6b7280', label: 'Non vérifié' },
+      en_attente:  { bg: '#fff7ed', text: '#ea580c', label: 'En attente' },
+      certifie:    { bg: '#ecfdf5', text: '#059669', label: '✓ Certifié' },
+      rejete:      { bg: '#fef2f2', text: '#dc2626', label: 'Rejeté' },
+    };
+    const item = colorMap[c.certification_status] ?? colorMap['non_verifie'];
+    return (
+      <span style={{ background: item.bg, color: item.text, borderRadius: 999, fontSize: 12, fontWeight: 600, padding: '4px 10px', marginLeft: 6 }}>
+        {item.label}
+      </span>
+    );
+  };
+
+  const categoryBadge = () => {
+    if (!c.client_category) return null;
+    const colorMap: Record<string, { bg: string; text: string; label: string }> = {
+      jamais_commande:         { bg: '#f3f4f6', text: '#6b7280',  label: 'Jamais commandé' },
+      commande_sans_livraison: { bg: '#fff7ed', text: '#ea580c',  label: 'Sans livraison' },
+      commande_avec_livraison: { bg: '#ecfdf5', text: '#059669',  label: 'Livré' },
+      commande_annulee:        { bg: '#fef2f2', text: '#dc2626',  label: 'Annulé' },
+    };
+    const item = colorMap[c.client_category] ?? { bg: '#f3f4f6', text: '#6b7280', label: c.client_category };
+    return (
+      <span style={{ background: item.bg, color: item.text, borderRadius: 999, fontSize: 12, fontWeight: 600, padding: '4px 10px', marginLeft: 6 }}>
+        {item.label}
+      </span>
+    );
+  };
+
   return (
     <div style={{ flex: 1, minWidth: 0, background: '#f3f4f6', padding: 28, height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
 
@@ -463,6 +495,8 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {callStatusBadge()}
             {conversionBadge()}
+            {certificationBadge()}
+            {categoryBadge()}
           </div>
         </div>
 
@@ -511,6 +545,30 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
           </div>
         </div>
       </div>
+
+      {/* ── Parrainage & ERP ── */}
+      {(c.referral_code || c.order_client_id) && (
+        <div style={{ background: 'white', borderRadius: 16, padding: 18, border: '1px solid #e5e7eb', marginTop: 16 }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 700, color: '#111827' }}>Intégration ERP</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 14 }}>
+            {c.order_client_id != null && (
+              <InfoRow label="ID client ERP" value={String(c.order_client_id)} mono />
+            )}
+            {c.referral_code && (
+              <InfoRow label="Code parrainage" value={c.referral_code} mono />
+            )}
+            {c.referral_count != null && (
+              <InfoRow label="Filleuls" value={String(c.referral_count)} />
+            )}
+            {c.referral_commission != null && (
+              <InfoRow label="Commission" value={`${c.referral_commission} FCFA`} />
+            )}
+            {c.certified_at && (
+              <InfoRow label="Certifié le" value={formatDateShort(c.certified_at)} />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Champs CRM ── */}
       {crmFields.length > 0 && (

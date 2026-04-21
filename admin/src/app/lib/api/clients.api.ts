@@ -43,6 +43,7 @@ export interface SearchClientsParams {
     search?: string;
     portfolio_owner_id?: string;
     source?: string;
+    category?: string;
     limit?: number;
     offset?: number;
 }
@@ -54,6 +55,7 @@ export async function searchClientsAdmin(
     if (params.search?.trim()) p.set('search', params.search.trim());
     if (params.portfolio_owner_id) p.set('portfolio_owner_id', params.portfolio_owner_id);
     if (params.source) p.set('source', params.source);
+    if (params.category) p.set('category', params.category);
     p.set('limit', String(params.limit ?? 50));
     p.set('offset', String(params.offset ?? 0));
     const response = await fetch(`${API_BASE_URL}/clients?${p.toString()}`, {
