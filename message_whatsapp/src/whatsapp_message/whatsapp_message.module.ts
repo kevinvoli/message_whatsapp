@@ -48,7 +48,6 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WindowModule } from 'src/window/window.module';
 import { WindowPublisher } from 'src/realtime/publishers/window.publisher';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
-import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 
 @Module({
   imports: [
@@ -85,7 +84,6 @@ import { ConversationCapacityService } from 'src/conversation-capacity/conversat
   controllers: [WhatsappMessageController],
   providers: [
     WhatsappChatService,
-    ConversationCapacityService,
     WhatsappMessageGateway,
     WhatsappMessageService,
     WhatsappCommercialService,
