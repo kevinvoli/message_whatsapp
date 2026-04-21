@@ -7,6 +7,7 @@ import { WhatsappMessage } from '../whatsapp_message/entities/whatsapp_message.e
 import { CallLog } from '../call-log/entities/call_log.entity';
 import { FollowUp } from '../follow-up/entities/follow_up.entity';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
+import { SystemConfigService } from '../system-config/system-config.service';
 
 export interface CommercialRankingEntry {
   rank: number;
@@ -41,6 +42,7 @@ export class TargetsService {
     private readonly followUpRepo: Repository<FollowUp>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+    private readonly systemConfig: SystemConfigService,
   ) {}
 
   findAll(commercial_id?: string): Promise<CommercialTarget[]> {
@@ -167,13 +169,20 @@ export class TargetsService {
     const fuMap    = toMap(fuRows);
     const orderMap = toMap(orderRows);
 
+    const weights = await this.getRankingWeights();
+
     const entries: CommercialRankingEntry[] = Array.from(allIds).map((id) => {
       const conversations = convMap.get(id)  ?? 0;
       const messages_sent = msgMap.get(id)   ?? 0;
       const calls         = callMap.get(id)  ?? 0;
       const follow_ups    = fuMap.get(id)    ?? 0;
       const orders        = orderMap.get(id) ?? 0;
-      const score = orders * 5 + conversations * 3 + calls * 2 + follow_ups * 2 + Math.floor(messages_sent * 0.1);
+      const score =
+        orders        * weights.orders        +
+        conversations * weights.conversations  +
+        calls         * weights.calls          +
+        follow_ups    * weights.follow_ups     +
+        Math.floor(messages_sent * weights.messages);
       const comm  = commMap.get(id);
       return {
         rank: 0,
@@ -192,6 +201,29 @@ export class TargetsService {
     entries.sort((a, b) => b.score - a.score);
     entries.forEach((e, i) => { e.rank = i + 1; });
     return entries;
+  }
+
+  async getRankingWeights(): Promise<{
+    orders: number; conversations: number; calls: number; follow_ups: number; messages: number;
+  }> {
+    const parse = (v: string | null, def: number) => {
+      const n = parseFloat(v ?? '');
+      return isNaN(n) ? def : n;
+    };
+    const [o, c, cl, fu, m] = await Promise.all([
+      this.systemConfig.get('RANKING_WEIGHT_ORDERS'),
+      this.systemConfig.get('RANKING_WEIGHT_CONVERSATIONS'),
+      this.systemConfig.get('RANKING_WEIGHT_CALLS'),
+      this.systemConfig.get('RANKING_WEIGHT_FOLLOW_UPS'),
+      this.systemConfig.get('RANKING_WEIGHT_MESSAGES'),
+    ]);
+    return {
+      orders:        parse(o,  5),
+      conversations: parse(c,  3),
+      calls:         parse(cl, 2),
+      follow_ups:    parse(fu, 2),
+      messages:      parse(m,  0.1),
+    };
   }
 
   private rankingPeriodRange(period: 'today' | 'week' | 'month'): { start: Date; end: Date } {

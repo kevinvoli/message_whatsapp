@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Trophy, RefreshCw, Medal, MessageSquare, Phone, Bell, ShoppingCart, Zap } from 'lucide-react';
-import { CommercialRankingEntry, RankingPeriod, getRanking } from '../lib/api/ranking.api';
+import { CommercialRankingEntry, RankingPeriod, RankingWeights, getRanking, getRankingFormula } from '../lib/api/ranking.api';
+import { Settings } from 'lucide-react';
 
 const PERIOD_LABELS: Record<RankingPeriod, string> = {
   today: "Aujourd'hui",
@@ -27,17 +28,22 @@ function StatPill({ icon: Icon, value, color }: { icon: React.ElementType; value
   );
 }
 
+const DEFAULT_WEIGHTS: RankingWeights = { orders: 5, conversations: 3, calls: 2, follow_ups: 2, messages: 0.1 };
+
 export default function RankingView() {
   const [entries, setEntries] = useState<CommercialRankingEntry[]>([]);
   const [period, setPeriod] = useState<RankingPeriod>('month');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [weights, setWeights] = useState<RankingWeights>(DEFAULT_WEIGHTS);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setEntries(await getRanking(period));
+      const [data, formula] = await Promise.all([getRanking(period), getRankingFormula()]);
+      setEntries(data);
+      setWeights(formula);
     } catch {
       setError('Impossible de charger le classement.');
     } finally {
@@ -126,13 +132,19 @@ export default function RankingView() {
       )}
 
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Formule de score</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Formule de score active</h3>
+          <span className="flex items-center gap-1 text-xs text-gray-400">
+            <Settings className="w-3 h-3" />
+            Modifiable dans Paramètres → Classement
+          </span>
+        </div>
         <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-          <span className="flex items-center gap-1"><ShoppingCart className="w-3 h-3 text-purple-500" /> Commandes × 5</span>
-          <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3 text-blue-500" /> Conversations × 3</span>
-          <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-green-500" /> Appels × 2</span>
-          <span className="flex items-center gap-1"><Bell className="w-3 h-3 text-orange-500" /> Relances × 2</span>
-          <span className="text-gray-400">+ Messages envoyés × 0.1</span>
+          <span className="flex items-center gap-1"><ShoppingCart className="w-3 h-3 text-purple-500" /> Commandes × <strong>{weights.orders}</strong></span>
+          <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3 text-blue-500" /> Conversations × <strong>{weights.conversations}</strong></span>
+          <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-green-500" /> Appels × <strong>{weights.calls}</strong></span>
+          <span className="flex items-center gap-1"><Bell className="w-3 h-3 text-orange-500" /> Relances × <strong>{weights.follow_ups}</strong></span>
+          <span className="text-gray-400">+ Messages × <strong>{weights.messages}</strong> (arrondi inférieur)</span>
         </div>
       </div>
     </div>

@@ -49,6 +49,38 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
   { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant)', isSecret: true },
 
+  // ─── Formule de classement des commerciaux ────────────────────────────────────
+  {
+    key: 'RANKING_WEIGHT_ORDERS',
+    label: 'Poids — Commandes',
+    category: 'ranking',
+    description: 'Multiplicateur pour chaque commande (défaut : 5)',
+  },
+  {
+    key: 'RANKING_WEIGHT_CONVERSATIONS',
+    label: 'Poids — Conversations',
+    category: 'ranking',
+    description: 'Multiplicateur pour chaque conversation traitée (défaut : 3)',
+  },
+  {
+    key: 'RANKING_WEIGHT_CALLS',
+    label: 'Poids — Appels',
+    category: 'ranking',
+    description: 'Multiplicateur pour chaque appel effectué (défaut : 2)',
+  },
+  {
+    key: 'RANKING_WEIGHT_FOLLOW_UPS',
+    label: 'Poids — Relances',
+    category: 'ranking',
+    description: 'Multiplicateur pour chaque relance réalisée (défaut : 2)',
+  },
+  {
+    key: 'RANKING_WEIGHT_MESSAGES',
+    label: 'Poids — Messages envoyés',
+    category: 'ranking',
+    description: 'Coefficient par message envoyé (défaut : 0.1 → arrondi à l\'entier inférieur)',
+  },
+
   // ─── Intelligence Artificielle ────────────────────────────────────────────────
   {
     key: 'AI_PROVIDER',

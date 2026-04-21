@@ -37,6 +37,12 @@ export class TargetsController {
     return this.targetsService.getRanking(period ?? 'month');
   }
 
+  @UseGuards(AdminGuard)
+  @Get('ranking/formula')
+  getRankingFormula() {
+    return this.targetsService.getRankingWeights();
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Get('my-progress')
   getMyProgress(@Request() req) {
