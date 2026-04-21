@@ -137,12 +137,18 @@ export function handleChatEvent(
 
     case 'WINDOW_ROTATED': {
       const { releasedChatIds } = data.payload as { releasedChatIds: string[]; promotedChatIds: string[] };
+
+      // Phase 1 : marquer les conversations libérées pour l'animation de sortie
+      chatState.setReleasingChatIds(releasedChatIds);
       chatState.setWindowRotating(true);
-      // Marque les conversations libérées avec une animation puis recharge après 600ms
+
+      // Phase 2 (après animation slide-up) : recharger la fenêtre complète
       setTimeout(() => {
+        chatState.setReleasingChatIds([]);
         chatState.setWindowRotating(false);
         chatState.loadConversations(chatState.currentSearch || undefined);
-      }, 600);
+      }, 500);
+
       logger.debug('WINDOW_ROTATED reçu', { releasedCount: releasedChatIds.length });
       break;
     }

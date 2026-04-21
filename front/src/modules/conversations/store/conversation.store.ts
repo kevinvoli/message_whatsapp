@@ -36,12 +36,14 @@ export interface ConversationSlice {
   currentSearch: string;
   blockProgress: BlockProgress;
   windowRotating: boolean;
+  releasingChatIds: string[];
 
   loadConversations: (search?: string) => void;
-  loadMoreConversations: () => void;
+  loadMoreConversations: () => void;  // conservé pour compat legacy — no-op
   selectConversation: (chat_id: string) => void;
   setBlockProgress: (progress: BlockProgress) => void;
   setWindowRotating: (rotating: boolean) => void;
+  setReleasingChatIds: (ids: string[]) => void;
 
   setConversations: (
     conversations: Conversation[],
@@ -83,6 +85,7 @@ export const createConversationSlice: StateCreator<
   currentSearch: '',
   blockProgress: { validated: 0, total: 10 },
   windowRotating: false,
+  releasingChatIds: [],
 
   // ─── Chargement ─────────────────────────────────────────────────────────────
 
@@ -290,4 +293,6 @@ export const createConversationSlice: StateCreator<
   setBlockProgress: (progress) => set({ blockProgress: progress }),
 
   setWindowRotating: (rotating) => set({ windowRotating: rotating }),
+
+  setReleasingChatIds: (ids) => set({ releasingChatIds: ids }),
 });

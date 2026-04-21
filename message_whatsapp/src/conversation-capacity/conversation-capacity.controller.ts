@@ -29,13 +29,21 @@ export class ConversationCapacityController {
 
   @Get('window-mode')
   async getWindowMode() {
-    const enabled = await this.service.isWindowModeEnabled();
-    return { enabled };
+    const [enabled, threshold] = await Promise.all([
+      this.service.isWindowModeEnabled(),
+      this.service.getValidationThreshold(),
+    ]);
+    return { enabled, threshold };
   }
 
   @Patch('window-mode')
-  async setWindowMode(@Body() body: { enabled: boolean }) {
-    await this.service.setWindowMode(body.enabled);
-    return { enabled: body.enabled };
+  async setWindowMode(@Body() body: { enabled?: boolean; threshold?: number }) {
+    if (body.enabled !== undefined) await this.service.setWindowMode(body.enabled);
+    if (body.threshold !== undefined) await this.service.setValidationThreshold(body.threshold);
+    const [enabled, threshold] = await Promise.all([
+      this.service.isWindowModeEnabled(),
+      this.service.getValidationThreshold(),
+    ]);
+    return { enabled, threshold };
   }
 }

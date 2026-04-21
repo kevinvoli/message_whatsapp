@@ -45,6 +45,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'FF_UNIFIED_WHAPI_PCT', label: 'Pourcentage trafic Whapi unifié', category: 'feature_flags', description: '0–100' },
   { key: 'FF_FLOWBOT_ACTIVE', label: 'FlowBot actif', category: 'feature_flags', description: 'true / false — active le moteur FlowBot' },
   { key: 'SLIDING_WINDOW_ENABLED', label: 'Mode fenêtre glissante', category: 'feature_flags', description: 'true / false — active la rotation par bloc de 10 conversations' },
+  { key: 'WINDOW_VALIDATION_THRESHOLD', label: 'Seuil de validation du bloc', category: 'feature_flags', description: 'Nb min de conversations validées pour rotation (0 = toutes requises)' },
 
   // ─── Intégration ERP ─────────────────────────────────────────────────────────
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },

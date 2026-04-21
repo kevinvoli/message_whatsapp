@@ -44,6 +44,7 @@ export default function CapacityView() {
   const [savingCriterion, setSavingCriterion] = useState<string | null>(null);
   const [actionPoste, setActionPoste] = useState<string | null>(null);
   const [windowModeEnabled, setWindowModeEnabled] = useState(true);
+  const [validationThreshold, setValidationThreshold] = useState(0);
   const [togglingMode, setTogglingMode] = useState(false);
   const [callEvents, setCallEvents] = useState<CallEventEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +66,7 @@ export default function CapacityView() {
         setCriteria(cr);
         setCallEvents(ce.data);
         setWindowModeEnabled(wm.enabled);
+        setValidationThreshold(wm.threshold ?? 0);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -73,8 +75,19 @@ export default function CapacityView() {
     setTogglingMode(true);
     const next = !windowModeEnabled;
     try {
-      await setWindowMode(next);
-      setWindowModeEnabled(next);
+      const result = await setWindowMode({ enabled: next });
+      setWindowModeEnabled(result.enabled);
+      setValidationThreshold(result.threshold);
+    } finally {
+      setTogglingMode(false);
+    }
+  };
+
+  const handleSaveThreshold = async (value: number) => {
+    setTogglingMode(true);
+    try {
+      const result = await setWindowMode({ threshold: value });
+      setValidationThreshold(result.threshold);
     } finally {
       setTogglingMode(false);
     }
@@ -187,6 +200,37 @@ export default function CapacityView() {
               />
             </button>
           </div>
+
+          {/* Seuil de validation */}
+          {windowModeEnabled && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4">
+              <div className="flex-1">
+                <p className="font-medium text-gray-800 text-sm">Seuil de validation du bloc</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Nombre minimum de conversations à valider pour déclencher la rotation.
+                  0 = toutes requises ({config.quotaActive}/{config.quotaActive}).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <input
+                  type="number"
+                  min={0}
+                  max={config.quotaActive}
+                  value={validationThreshold}
+                  onChange={(e) => setValidationThreshold(parseInt(e.target.value) || 0)}
+                  className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-center"
+                />
+                <span className="text-xs text-gray-400">/ {config.quotaActive}</span>
+                <button
+                  onClick={() => handleSaveThreshold(validationThreshold)}
+                  disabled={togglingMode}
+                  className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Config quotas */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">

@@ -43,6 +43,7 @@ const initialState = {
   currentSearch: '',
   blockProgress: { validated: 0, total: 10 },
   windowRotating: false,
+  releasingChatIds: [],
 };
 
 // ─── Store composé ────────────────────────────────────────────────────────────

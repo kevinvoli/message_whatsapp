@@ -5,11 +5,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 
-const KEY_QUOTA_ACTIVE    = 'CAPACITY_QUOTA_ACTIVE';
-const KEY_QUOTA_TOTAL     = 'CAPACITY_QUOTA_TOTAL';
-const KEY_WINDOW_MODE     = 'SLIDING_WINDOW_ENABLED';
-const DEFAULT_QUOTA_ACTIVE = 10;
-const DEFAULT_QUOTA_TOTAL  = 50;
+const KEY_QUOTA_ACTIVE          = 'CAPACITY_QUOTA_ACTIVE';
+const KEY_QUOTA_TOTAL           = 'CAPACITY_QUOTA_TOTAL';
+const KEY_WINDOW_MODE           = 'SLIDING_WINDOW_ENABLED';
+const KEY_VALIDATION_THRESHOLD  = 'WINDOW_VALIDATION_THRESHOLD';
+const DEFAULT_QUOTA_ACTIVE      = 10;
+const DEFAULT_QUOTA_TOTAL       = 50;
 
 export interface CapacitySummaryEntry {
   posteId: string;
@@ -55,13 +56,27 @@ export class ConversationCapacityService {
 
   async isWindowModeEnabled(): Promise<boolean> {
     const val = await this.systemConfig.get(KEY_WINDOW_MODE);
-    // Par défaut activé (true) si la clé n'est pas encore configurée
     return val === null || val === 'true';
   }
 
   async setWindowMode(enabled: boolean): Promise<void> {
     await this.systemConfig.set(KEY_WINDOW_MODE, enabled ? 'true' : 'false');
     this.logger.log(`Mode fenêtre glissante ${enabled ? 'activé' : 'désactivé'}`);
+  }
+
+  /**
+   * Seuil de validation : nombre minimum de conversations validées pour déclencher la rotation.
+   * 0 (défaut) = toutes les conversations actives doivent être validées (100%).
+   * Ex: 8 = 8/10 suffisent.
+   */
+  async getValidationThreshold(): Promise<number> {
+    const val = await this.systemConfig.get(KEY_VALIDATION_THRESHOLD);
+    return val ? parseInt(val, 10) : 0;
+  }
+
+  async setValidationThreshold(threshold: number): Promise<void> {
+    await this.systemConfig.set(KEY_VALIDATION_THRESHOLD, String(threshold));
+    this.logger.log(`Seuil de validation mis à ${threshold}`);
   }
 
   async countForPoste(

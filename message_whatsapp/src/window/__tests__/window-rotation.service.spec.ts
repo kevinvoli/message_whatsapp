@@ -56,6 +56,7 @@ function makeCapacityService(quotaActive = 10, quotaTotal = 50, windowModeEnable
   return {
     getQuotas: jest.fn().mockResolvedValue({ quotaActive, quotaTotal }),
     isWindowModeEnabled: jest.fn().mockResolvedValue(windowModeEnabled),
+    getValidationThreshold: jest.fn().mockResolvedValue(0),
     onConversationQualifiedLegacy: jest.fn().mockResolvedValue(undefined),
   } as any;
 }
@@ -63,6 +64,7 @@ function makeCapacityService(quotaActive = 10, quotaTotal = 50, windowModeEnable
 function makeValidationEngine() {
   return {
     initConversationValidation: jest.fn().mockResolvedValue(undefined),
+    initConversationValidationBulk: jest.fn().mockResolvedValue(undefined),
     onConversationResultSet: jest.fn().mockResolvedValue(true),
     getBlockProgress: jest.fn().mockResolvedValue({ validated: 0, total: 10 }),
   } as any;

@@ -4,6 +4,7 @@ import BlockProgressBar from './BlockProgressBar';
 import { BulkActionBar } from './BulkActionBar';
 import { Conversation } from '@/types/chat';
 import { useChatStore } from '@/store/chatStore';
+import styles from './ConversationList.module.css';
 
 interface ConversationListProps {
     filteredConversations: Conversation[];
@@ -18,8 +19,10 @@ export default function ConversationList({
     selectedConversation,
     onSelectConversation,
 }: ConversationListProps) {
-    const typingStatus   = useChatStore((state) => state.typingStatus);
-    const windowRotating = useChatStore((state) => state.windowRotating);
+    const typingStatus      = useChatStore((state) => state.typingStatus);
+    const windowRotating    = useChatStore((state) => state.windowRotating);
+    const releasingChatIds  = useChatStore((state) => state.releasingChatIds);
+    const releasingSet      = new Set(releasingChatIds);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const toggleCheck = useCallback((chatId: string) => {
@@ -58,18 +61,22 @@ export default function ConversationList({
             )}
 
             <div className="flex-1 overflow-y-auto">
-                {filteredConversations.map((conv) => (
-                    <ConversationItem
-                        key={conv.id}
-                        conversation={conv}
-                        isSelected={selectedConversation?.id === conv.id}
-                        isTyping={!!typingStatus[conv.chat_id]}
-                        onClick={() => onSelectConversation(conv)}
-                        bulkMode={bulkMode}
-                        isChecked={selectedIds.has(conv.chat_id)}
-                        onToggleCheck={toggleCheck}
-                    />
-                ))}
+                {filteredConversations.map((conv) => {
+                    const isReleasing = releasingSet.has(conv.chat_id);
+                    return (
+                        <div key={conv.id} className={isReleasing ? styles.releasing : undefined}>
+                            <ConversationItem
+                                conversation={conv}
+                                isSelected={selectedConversation?.id === conv.id}
+                                isTyping={!!typingStatus[conv.chat_id]}
+                                onClick={() => onSelectConversation(conv)}
+                                bulkMode={bulkMode}
+                                isChecked={selectedIds.has(conv.chat_id)}
+                                onToggleCheck={toggleCheck}
+                            />
+                        </div>
+                    );
+                })}
             </div>
 
             {bulkMode && (

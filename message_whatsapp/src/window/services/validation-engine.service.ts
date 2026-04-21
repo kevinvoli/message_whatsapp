@@ -155,28 +155,44 @@ export class ValidationEngineService {
   }
 
   /**
-   * Initialise les enregistrements de validation pour une conversation.
-   * Appelé quand une conversation entre dans la fenêtre active.
+   * Initialise les enregistrements de validation pour une conversation (bulk).
+   * Vérifie les existants en une requête puis insère les manquants en une requête.
    */
   async initConversationValidation(chatId: string): Promise<void> {
     const criteria = await this.getActiveCriteria();
-    for (const c of criteria) {
-      const exists = await this.validationRepo.findOne({
-        where: { chat_id: chatId, criterion_type: c.criterion_type },
-      });
-      if (!exists) {
-        await this.validationRepo.save(
-          this.validationRepo.create({
-            chat_id: chatId,
-            criterion_type: c.criterion_type,
-            is_validated: false,
-            validated_at: null,
-            external_id: null,
-            external_data: null,
-          }),
-        );
-      }
+    if (criteria.length === 0) return;
+
+    const existing = await this.validationRepo.find({
+      where: { chat_id: chatId },
+      select: ['criterion_type'],
+    });
+    const existingTypes = new Set(existing.map((e) => e.criterion_type));
+
+    const toCreate = criteria
+      .filter((c) => !existingTypes.has(c.criterion_type))
+      .map((c) =>
+        this.validationRepo.create({
+          chat_id: chatId,
+          criterion_type: c.criterion_type,
+          is_validated: false,
+          validated_at: null,
+          external_id: null,
+          external_data: null,
+        }),
+      );
+
+    if (toCreate.length > 0) {
+      await this.validationRepo.save(toCreate);
     }
+  }
+
+  /**
+   * Initialise les validations pour plusieurs conversations en lot.
+   * Réduit les aller-retours DB lors de la construction de la fenêtre.
+   */
+  async initConversationValidationBulk(chatIds: string[]): Promise<void> {
+    if (chatIds.length === 0) return;
+    await Promise.all(chatIds.map((id) => this.initConversationValidation(id)));
   }
 
   /**
