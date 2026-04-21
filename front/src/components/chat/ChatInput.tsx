@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, MapPin, Mic, Paperclip, Send, Smile, Wand2, X } from 'lucide-react';
+import { AlertCircle, MapPin, Mic, Paperclip, Send, Smile, Sparkles, Wand2, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
@@ -110,6 +110,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isRewriting, setIsRewriting] = useState(false);
   const [showRewriteMenu, setShowRewriteMenu] = useState(false);
+  const [suggestions, setSuggestions] = useState<{ text: string; rationale: string }[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const rewriteMenuRef = useRef<HTMLDivElement>(null);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -147,6 +150,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMessage((prev) => prev + emoji.native);
     setShowEmojiPicker(false);
   }, []);
+
+  const handleFetchSuggestions = async () => {
+    if (!chat_id) return;
+    setLoadingSuggestions(true);
+    setShowSuggestions(true);
+    try {
+      const res = await fetch(`${API_URL}/ai/suggestions/${chat_id}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json() as { text: string; rationale: string }[];
+        setSuggestions(data);
+      }
+    } catch { /* silencieux */ } finally {
+      setLoadingSuggestions(false);
+    }
+  };
 
   const handleRewrite = async (mode: 'correct' | 'improve' | 'formal' | 'short') => {
     if (!message.trim()) return;
@@ -412,6 +430,45 @@ const ChatInput: React.FC<ChatInputProps> = ({
     )}
     <div className="bg-white border-t border-gray-200 p-3">
       <div className="max-w-4xl mx-auto">
+        {/* Suggestions IA */}
+        {showSuggestions && (
+          <div className="mb-2 p-2 bg-purple-50 border border-purple-200 rounded-xl">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-purple-700 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                Suggestions IA
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSuggestions(false)}
+                className="text-purple-400 hover:text-purple-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {loadingSuggestions ? (
+              <div className="flex items-center gap-2 py-1">
+                <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-purple-500">Génération en cours…</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { setMessage(s.text); setShowSuggestions(false); }}
+                    title={s.rationale}
+                    className="text-left text-xs px-2.5 py-1.5 bg-white border border-purple-200 rounded-lg hover:bg-purple-100 text-gray-700 truncate"
+                  >
+                    {s.text}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Bannière "En réponse à..." */}
         {replyToMessage && (
           <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-gray-50 border-l-4 border-green-500 rounded-r-lg">
@@ -501,6 +558,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 <Paperclip className="w-5 h-5" />
               )}
             </button>
+            {!message.trim() && (
+              <button
+                type="button"
+                onClick={() => void handleFetchSuggestions()}
+                disabled={disabled || !isConnected || loadingSuggestions}
+                title="Suggestions IA"
+                className="p-3 text-gray-400 hover:text-purple-600 disabled:opacity-50"
+              >
+                {loadingSuggestions ? (
+                  <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Sparkles className="w-5 h-5" />
+                )}
+              </button>
+            )}
             <textarea
               value={message}
               onChange={(e) => {

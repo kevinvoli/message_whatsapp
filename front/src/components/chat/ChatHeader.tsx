@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, Tag, Bell } from 'lucide-react';
+import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X } from 'lucide-react';
 import {
   CallStatus,
   Conversation,
@@ -68,6 +68,22 @@ function SlaCountdown({ deadline }: { deadline: Date }) {
     );
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+interface AiSummaryData {
+  summary: string;
+  sentiment: 'positive' | 'neutral' | 'negative' | 'mixed';
+  keyPoints: string[];
+  suggestedActions: string[];
+}
+
+const SENTIMENT_MAP: Record<string, { label: string; color: string }> = {
+  positive: { label: 'Positif', color: 'text-emerald-700 bg-emerald-50' },
+  neutral:  { label: 'Neutre',  color: 'text-gray-600 bg-gray-100' },
+  negative: { label: 'Négatif', color: 'text-red-700 bg-red-50' },
+  mixed:    { label: 'Mixte',   color: 'text-orange-700 bg-orange-50' },
+};
+
 export default function ChatHeader({ currentConv, totalMessages, onOpenContact }: ChatHeaderProps) {
     const { updateConversation, changeConversationStatus } = useChatStore();
     const { selectContactByChatId } = useContactStore();
@@ -77,6 +93,21 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
     const [localResult, setLocalResult] = useState<ConversationResult | null>(
       currentConv.conversation_result ?? null,
     );
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const [summary, setSummary] = useState<AiSummaryData | null>(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
+
+    const handleFetchSummary = async () => {
+      setShowSummaryModal(true);
+      if (summary) return; // cache — don't refetch unless conversation changes
+      setLoadingSummary(true);
+      try {
+        const res = await fetch(`${API_URL}/ai/summary/${currentConv.chat_id}`, { credentials: 'include' });
+        if (res.ok) setSummary(await res.json() as AiSummaryData);
+      } catch { /* silencieux */ } finally {
+        setLoadingSummary(false);
+      }
+    };
 
     function handleOpenContact() {
         selectContactByChatId(currentConv.chat_id);
@@ -145,6 +176,15 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Bouton résumé IA */}
+                    <button
+                        onClick={() => void handleFetchSummary()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                        title="Résumé IA de la conversation"
+                    >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Résumé IA
+                    </button>
                     {/* Bouton qualifier */}
                     <button
                         onClick={() => setShowOutcomeModal(true)}
@@ -192,6 +232,69 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                 conversationId={currentConv.id}
                 onClose={() => setShowFollowUpModal(false)}
             />
+        )}
+
+        {/* Modal résumé IA */}
+        {showSummaryModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowSummaryModal(false)}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-5" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-600" />
+                            Résumé IA
+                        </h3>
+                        <button onClick={() => setShowSummaryModal(false)} className="text-gray-400 hover:text-gray-600">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    {loadingSummary ? (
+                        <div className="flex flex-col items-center py-6 gap-3">
+                            <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-sm text-gray-500">Analyse de la conversation…</p>
+                        </div>
+                    ) : summary ? (
+                        <div className="flex flex-col gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sentiment</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${SENTIMENT_MAP[summary.sentiment]?.color ?? 'bg-gray-100 text-gray-700'}`}>
+                                        {SENTIMENT_MAP[summary.sentiment]?.label ?? summary.sentiment}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-gray-700 leading-relaxed">{summary.summary}</p>
+                            </div>
+                            {summary.keyPoints.length > 0 && (
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Points clés</p>
+                                    <ul className="flex flex-col gap-1">
+                                        {summary.keyPoints.map((pt, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                                                <span className="text-purple-400 mt-0.5">•</span>
+                                                {pt}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {summary.suggestedActions.length > 0 && (
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Actions suggérées</p>
+                                    <ul className="flex flex-col gap-1">
+                                        {summary.suggestedActions.map((a, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                                                <span className="text-emerald-500 mt-0.5">→</span>
+                                                {a}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-400 text-center py-4">Impossible de générer le résumé.</p>
+                    )}
+                </div>
+            </div>
         )}
         </>
     );
