@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Bell } from 'lucide-react';
+import { X, Bell, Sparkles } from 'lucide-react';
 import { FollowUpType, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
 import { createFollowUp } from '@/lib/followUpApi';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface Props {
   contactId?: string;
   conversationId?: string;
+  contactName?: string;
   onClose: () => void;
   onCreated?: () => void;
 }
@@ -27,12 +30,31 @@ function todayPlusDays(n: number): string {
   return d.toISOString().slice(0, 16);
 }
 
-export default function CreateFollowUpModal({ contactId, conversationId, onClose, onCreated }: Props) {
+export default function CreateFollowUpModal({ contactId, conversationId, contactName, onClose, onCreated }: Props) {
   const [type, setType] = useState<FollowUpType>('rappel');
   const [scheduledAt, setScheduledAt] = useState(todayPlusDays(1));
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiMessage, setAiMessage] = useState('');
+  const [loadingAi, setLoadingAi] = useState(false);
+
+  const handleGenerateAiMessage = async () => {
+    setLoadingAi(true);
+    try {
+      const res = await fetch(`${API_URL}/ai/followup-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ followUpType: type, contactName }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { message: string };
+        if (data.message) setAiMessage(data.message);
+      }
+    } catch { /* silencieux */ }
+    finally { setLoadingAi(false); }
+  };
 
   async function handleSave() {
     setSaving(true);
@@ -89,14 +111,41 @@ export default function CreateFollowUpModal({ contactId, conversationId, onClose
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Notes (optionnel)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-700">Notes / Message (optionnel)</label>
+              <button
+                type="button"
+                onClick={() => void handleGenerateAiMessage()}
+                disabled={loadingAi}
+                className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                title="Générer un message de relance avec l'IA"
+              >
+                {loadingAi
+                  ? <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  : <Sparkles className="w-3 h-3" />}
+                Générer avec IA
+              </button>
+            </div>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={2}
+              rows={3}
               placeholder="Raison de la relance, contexte…"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
             />
+            {aiMessage && (
+              <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                <p className="text-xs text-purple-700 font-medium mb-1 flex items-center gap-1"><Sparkles className="w-3 h-3" /> Suggestion IA</p>
+                <p className="text-xs text-gray-700 mb-2">{aiMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => { setNotes(aiMessage); setAiMessage(''); }}
+                  className="text-xs text-purple-600 hover:underline"
+                >
+                  Utiliser ce message
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

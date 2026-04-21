@@ -63,7 +63,9 @@ export type ViewMode =
   // Phase Intégration ERP
   | 'integration'
   // Ranking (4.7)
-  | 'ranking';
+  | 'ranking'
+  // IA Gouvernance (CDC IA)
+  | 'ia-governance';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 # Cahier des Charges — Évolution de la Plateforme Conversationnelle
 
-**Version** : 1.1  
-**Date** : 20 avril 2026  
+**Version** : 1.2  
+**Date** : 21 avril 2026  
 **Périmètre** : Plateforme conversationnelle (backend `message_whatsapp`, front commercial `front`, panel admin `admin`) + intégration plateforme de gestion des commandes  
 
 > **Note importante** : La plateforme est déjà en production avec des données réelles actives. Toutes les évolutions décrites dans ce document doivent être conçues et déployées sans interruption de service ni perte de données existantes.
@@ -66,7 +66,7 @@ Ce document décrit les évolutions à apporter à la plateforme conversationnel
 | `whatsapp_chat` + `whatsapp_message` | Conversations temps réel, messagerie, transfert, merge, labels |
 | `flowbot` | Bot, automatisations, triggers, sessions, conditions, délais, A/B, HTTP, templates |
 | `analytics` + `sla` + `audit` + `rbac` | KPIs globaux, performance agents, SLA, rôles et permissions, audit |
-| `ai-assistant` + `sentiment` | Suggestions de réponse, résumé conversation, sentiment lexical |
+| `ai-assistant` + `sentiment` | Suggestions de réponse IA (ChatInput), résumé conversation IA (ChatHeader), réécriture/correction de texte, sentiment lexical — fournisseur et modèle configurables depuis le panel admin (Anthropic, OpenAI, compatible OpenAI, Ollama) |
 | `dispatcher` | Dispatch automatique, queue, postes dédiés, conversations orphelines |
 | `broadcast` + `whatsapp-template` | Templates HSM, broadcasts par lots |
 | `outbound-webhook` | Webhooks sortants signés avec retry |
@@ -339,36 +339,45 @@ La catégorie est calculée par la **plateforme de gestion des commandes** et tr
 ### 4.7. Classement des commerciaux
 
 **Priorité** : Haute  
-**Phase de livraison** : Phase 2
+**Phase de livraison** : Phase 2 ✅ Implémenté
 
 #### Description fonctionnelle
 
-Calculer un ranking commercial basé sur des indicateurs mesurables et afficher un classement dans l'admin et un widget personnel pour le commercial.
+Calculer un ranking commercial basé sur des indicateurs mesurables et afficher un classement dans l'admin avec filtres par période (aujourd'hui / 7 derniers jours / mois courant).
 
 #### Indicateurs de ranking
 
-| Indicateur | Source |
-|------------|--------|
-| Conversations traitées | `whatsapp_chat` |
-| Appels réalisés | `call_log` |
-| Relances effectuées | `follow_up` |
-| Commandes initiées (`commande_confirmee` + `commande_a_saisir`) | statuts de conversation |
-| Taux de transformation | commandes / conversations |
-| Temps de première réponse | analytics existant |
-| Respect du traitement (statut qualifié vs non qualifié) | `conversation_result` |
+| Indicateur | Source | Poids par défaut |
+|------------|--------|-----------------|
+| Commandes (`commande_confirmee` + `commande_a_saisir`) | statut de conversation | 5 |
+| Conversations traitées | `whatsapp_message` (DISTINCT chat_id, direction OUT) | 3 |
+| Appels réalisés | `call_log` | 2 |
+| Relances effectuées (`status = 'effectuee'`) | `follow_up` | 2 |
+| Messages envoyés | `whatsapp_message` (direction OUT) | 0.1 (arrondi inférieur) |
 
-#### Travail backend
+**Formule** : `score = commandes × P1 + conversations × P2 + appels × P3 + relances × P4 + ⌊messages × P5⌋`
 
-- Étendre `message_whatsapp/src/analytics` avec un service de calcul de ranking
-- Stocker des snapshots périodiques (quotidien/hebdomadaire/mensuel) pour les classements historiques
+#### Formule paramétrable depuis l'admin ✅
 
-#### Travail admin
+Les 5 poids sont stockés dans la table `system_configs` (clés `RANKING_WEIGHT_ORDERS`, `RANKING_WEIGHT_CONVERSATIONS`, `RANKING_WEIGHT_CALLS`, `RANKING_WEIGHT_FOLLOW_UPS`, `RANKING_WEIGHT_MESSAGES`) et modifiables directement depuis la section **Paramètres → Classement** du panel admin, sans redémarrage.
 
-- Tableau de classement avec filtres par période dans `admin/src/app/ui/PerformanceView.tsx`
+Un endpoint dédié `GET /targets/ranking/formula` (AdminGuard) expose les poids courants au frontend, qui les affiche en bas du tableau de classement.
+
+#### Travail backend ✅
+
+- Module `targets` avec `TargetsService.getRanking(period)` et `getRankingWeights()`
+- Endpoint `GET /targets/ranking?period=today|week|month`
+- Endpoint `GET /targets/ranking/formula`
+- Les poids sont lus depuis `SystemConfigService` à chaque calcul (pas de cache — changement immédiatement effectif)
+
+#### Travail admin ✅
+
+- Vue `admin/src/app/ui/RankingView.tsx` : tableau de classement, médailles or/argent/bronze, badges par indicateur, score affiché, formule active avec poids réels en bas de page
+- Les poids sont modifiables dans `admin/src/app/ui/SettingsView.tsx` → catégorie "Classement — Poids de la formule"
 
 #### Travail front
 
-- Widget "Ma position" dans le dashboard commercial
+- Widget "Ma position" dans le dashboard commercial (à implémenter)
 
 ---
 
@@ -452,16 +461,40 @@ Empêcher les connexions depuis des adresses IP non autorisées (hors locaux de 
 
 ---
 
-### 4.11. IA de correction et amélioration de texte
+### 4.11. IA conversationnelle et correction de texte
 
 **Priorité** : Moyenne  
-**Phase de livraison** : Phase 4
+**Phase de livraison** : Phase 4 ✅ Implémenté
 
 #### Description fonctionnelle
 
-Proposer, avant l'envoi, une correction orthographique et/ou une amélioration de ton des messages rédigés par le commercial.
+Trois fonctionnalités IA au service du commercial, toutes pilotées par un fournisseur IA configurable depuis le panel admin.
 
-#### Modes proposés
+#### 4.11.1 Fournisseur IA configurable ✅
+
+Le fournisseur IA, le modèle, la clé API et l'URL sont **stockés en base de données** dans `system_configs` et modifiables depuis **Paramètres → Intelligence Artificielle** dans le panel admin, sans redémarrage du backend.
+
+| Clé de config | Description | Défaut |
+|---------------|-------------|--------|
+| `AI_PROVIDER` | `anthropic`, `openai`, `ollama`, `custom` | `anthropic` |
+| `AI_MODEL` | Identifiant du modèle | `claude-haiku-4-5-20251001` |
+| `AI_API_KEY` | Clé API (champ secret masqué en admin) | fallback sur `ANTHROPIC_API_KEY` env |
+| `AI_API_URL` | URL de l'API (utile pour Ollama / API custom) | URL Anthropic standard |
+| `AI_FLOWBOT_ENABLED` | Active/désactive le nœud IA dans FlowBot | `false` |
+
+Le service `AiAssistantService.getAiConfig()` lit ces valeurs à chaque appel. Le dispatch vers `callAnthropic()` ou `callOpenAiCompat()` est automatique selon le provider.
+
+#### 4.11.2 Suggestions de réponse dans le chat ✅
+
+Bouton "Sparkles" (⚡) dans `front/src/components/chat/ChatInput.tsx` (visible quand le champ est vide). Déclenche `GET /ai/suggestions/:chat_id` → 3 suggestions cliquables affichées dans un panneau violet au-dessus du champ de saisie.
+
+#### 4.11.3 Résumé IA de la conversation ✅
+
+Bouton "Résumé IA" dans `front/src/components/chat/ChatHeader.tsx`. Déclenche `GET /ai/summary/:chat_id` → modal affichant : sentiment (badge coloré), points clés (puces), actions suggérées (flèches). Le résumé est mis en cache localement (ne recharge pas si déjà chargé).
+
+#### 4.11.4 Correction / amélioration de texte ✅
+
+Endpoint `POST /ai/rewrite` acceptant le texte brut + le mode.
 
 | Mode | Description |
 |------|-------------|
@@ -469,16 +502,11 @@ Proposer, avant l'envoi, une correction orthographique et/ou une amélioration d
 | Ton professionnel | Reformulation plus formelle |
 | Reformulation courte | Version condensée du message |
 
-#### Travail backend
+Prévisualisation de la version corrigée avant envoi dans `ChatInput.tsx`, avec option d'accepter ou ignorer.
 
-- Ajouter un endpoint `POST /ai/rewrite` dans `message_whatsapp/src/ai-assistant`
-- Accepter le texte brut + le mode demandé
-- Retourner la version reformulée
+#### 4.11.5 Nœud FlowBot AI_REPLY ✅
 
-#### Travail front
-
-- Bouton "Corriger" / "Améliorer" dans `front/src/components/chat/ChatInput.tsx`
-- Prévisualisation de la version corrigée avant envoi, avec option d'accepter ou ignorer
+Nouveau type de nœud `AI_REPLY` dans le moteur FlowBot (`FlowNodeType.AI_REPLY`). Quand `AI_FLOWBOT_ENABLED = true` en base, le nœud appelle `suggestReplies()` et envoie automatiquement la première suggestion générée par le LLM configuré. Paramètres du nœud : `fallbackText` (texte de repli si IA désactivée ou en erreur), `variableName` (stocker la réponse dans une variable de session). Configurable depuis le FlowBuilder admin.
 
 ---
 
@@ -1201,7 +1229,10 @@ développement local → staging (avec dump de production anonymisé) → produc
 | `contact` | `portfolio_owner_id`, `client_category`, `certification_status`, `referral_data`, `order_summary` |
 | `whatsapp_chat` | `conversation_result`, `is_locked`, historique des statuts |
 | `analytics` | Calcul de ranking, snapshots, service de progression objectifs |
-| `ai-assistant` | Endpoint de réécriture/correction |
+| `ai-assistant` | ✅ Endpoints suggestions, résumé, réécriture — fournisseur multi-provider configurable via `SystemConfigService` (clés `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_API_URL`, `AI_FLOWBOT_ENABLED`) |
+| `targets` | ✅ `getRanking()` avec formule paramétrable — poids lus depuis `SystemConfigService` (clés `RANKING_WEIGHT_*`) — endpoint `GET /targets/ranking/formula` |
+| `flowbot` | ✅ Nœud `AI_REPLY` — appel `AiAssistantService.suggestReplies()` conditionné par `AI_FLOWBOT_ENABLED` |
+| `system-config` | ✅ Catégories `ranking` et `ai` ajoutées au catalogue — visibles dans Paramètres admin |
 | `auth` | Vérification IP, whitelist, journalisation des refus |
 | `outbound-webhook` | Nouveaux événements métier (follow_up, client, conversation) |
 
@@ -1211,4 +1242,14 @@ développement local → staging (avec dump de production anonymisé) → produc
 
 ---
 
-*Fin du cahier des charges — Version 1.0 — 20 avril 2026*
+---
+
+## Changelog
+
+| Version | Date | Modifications |
+|---------|------|---------------|
+| 1.0 | 20 avril 2026 | Version initiale |
+| 1.1 | 20 avril 2026 | Ajout intégration ERP (catégorie client, certification, parrainage) dans front commercial |
+| 1.2 | 21 avril 2026 | Section 4.7 : formule de classement paramétrable (5 poids configurables via Paramètres admin) ; Section 4.11 : refonte complète IA (fournisseur multi-provider DB-configurable, suggestions chat, résumé IA, nœud FlowBot AI_REPLY) ; Annexe : extensions `ai-assistant`, `targets`, `flowbot`, `system-config` documentées |
+
+*Fin du cahier des charges — Version 1.2 — 21 avril 2026*

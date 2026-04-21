@@ -42,6 +42,7 @@ import CapacityView from '@/app/ui/CapacityView';
 import SystemHealthView from '@/app/ui/SystemHealthView';
 import IntegrationView from '@/app/ui/IntegrationView';
 import RankingView from '@/app/ui/RankingView';
+import AiGovernanceView from '@/app/ui/AiGovernanceView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -204,6 +205,8 @@ export default function AdminDashboard() {
                 return <SessionsView />;
             case 'capacity':
                 return <CapacityView />;
+            case 'ia-governance':
+                return <AiGovernanceView />;
             default:
                 return null;
         }

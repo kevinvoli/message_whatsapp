@@ -57,6 +57,7 @@ import { RbacModule } from './rbac/rbac.module';
 import { SentimentModule } from './sentiment/sentiment.module';
 import { OutboundWebhookModule } from './outbound-webhook/outbound-webhook.module';
 import { AiAssistantModule } from './ai-assistant/ai-assistant.module';
+import { AiGovernanceModule } from './ai-governance/ai-governance.module';
 import { FollowUpModule } from './follow-up/follow_up.module';
 import { ClientDossierModule } from './client-dossier/client-dossier.module';
 import { TargetsModule } from './targets/targets.module';
@@ -181,6 +182,7 @@ import { IntegrationModule } from './integration/integration.module';
     SentimentModule,
     OutboundWebhookModule,
     AiAssistantModule,
+    AiGovernanceModule,
     // Phase 7 — Suivi client : dossier, statuts métier, relances, portefeuille
     FollowUpModule,
     ClientDossierModule,

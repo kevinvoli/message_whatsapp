@@ -13,6 +13,7 @@ import {
   Edit2,
   Check,
   X as XIcon,
+  Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useContactStore } from '@/store/contactStore';
@@ -43,6 +44,15 @@ const FOLLOWUP_STATUS_COLORS: Record<FollowUpStatus, { bg: string; text: string 
 };
 
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID ?? 'default';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+interface DossierSynthesis {
+  summary: string;
+  parcours_description: string;
+  next_action_suggested: string;
+  risk_level: 'faible' | 'moyen' | 'élevé';
+  key_signals: string[];
+}
 
 // ─── Modal modification ───────────────────────────────────────────────────────
 
@@ -201,6 +211,8 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<CrmRawValue>(null);
   const [crmSaving, setCrmSaving] = useState(false);
+  const [dossierSynthesis, setDossierSynthesis] = useState<DossierSynthesis | null>(null);
+  const [loadingDossier, setLoadingDossier] = useState(false);
 
   const loadCrm = useCallback(async (contactId: string) => {
     try {
@@ -224,7 +236,23 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
       setCrmFieldsState([]);
       setContactFollowUps([]);
     }
+    setDossierSynthesis(null);
   }, [selectedContact?.id, loadCrm, loadFollowUps]);
+
+  const handleSynthesizeDossier = useCallback(async () => {
+    if (!selectedContact?.id) return;
+    setLoadingDossier(true);
+    try {
+      const res = await fetch(`${API_URL}/ai/dossier/${selectedContact.id}`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json() as DossierSynthesis;
+        setDossierSynthesis(data);
+      }
+    } catch { /* silently ignore */ }
+    finally { setLoadingDossier(false); }
+  }, [selectedContact?.id]);
 
   function getCrmDisplayValue(entry: CrmFieldEntry): string {
     const v = entry.value;
@@ -522,6 +550,51 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
           >
             Archiver
           </button>
+        </div>
+
+        {/* Synthèse IA dossier */}
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => void handleSynthesizeDossier()}
+            disabled={loadingDossier}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1px solid #e9d5ff', background: '#faf5ff', color: '#7c3aed', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: loadingDossier ? 0.6 : 1, width: '100%', justifyContent: 'center' }}
+          >
+            {loadingDossier
+              ? <div style={{ width: 14, height: 14, border: '2px solid #a855f7', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              : <Sparkles style={{ width: 14, height: 14 }} />}
+            Synthèse IA du dossier client
+          </button>
+
+          {dossierSynthesis && (
+            <div style={{ marginTop: 10, padding: 14, background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Sparkles style={{ width: 12, height: 12 }} /> Synthèse IA
+                </p>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                  background: dossierSynthesis.risk_level === 'élevé' ? '#fee2e2' : dossierSynthesis.risk_level === 'moyen' ? '#fef9c3' : '#dcfce7',
+                  color:      dossierSynthesis.risk_level === 'élevé' ? '#dc2626' : dossierSynthesis.risk_level === 'moyen' ? '#ca8a04' : '#16a34a',
+                }}>
+                  Risque {dossierSynthesis.risk_level}
+                </span>
+              </div>
+              <p style={{ margin: '0 0 6px', fontSize: 13, color: '#374151' }}>{dossierSynthesis.summary}</p>
+              {dossierSynthesis.parcours_description && (
+                <p style={{ margin: '0 0 6px', fontSize: 12, color: '#6b7280' }}>{dossierSynthesis.parcours_description}</p>
+              )}
+              <p style={{ margin: '0 0 6px', fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>
+                Prochaine action : {dossierSynthesis.next_action_suggested}
+              </p>
+              {dossierSynthesis.key_signals.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                  {dossierSynthesis.key_signals.map((s, i) => (
+                    <span key={i} style={{ padding: '2px 8px', background: '#ede9fe', color: '#6d28d9', borderRadius: 20, fontSize: 11 }}>{s}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Infos 2 colonnes */}

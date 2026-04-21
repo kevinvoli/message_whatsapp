@@ -992,10 +992,87 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
 
                 {/* ── P6.4 : AI_REPLY ── */}
                 {node.type === 'AI_REPLY' && (
-                    <div className="col-span-2 space-y-3">
+                    <div className="col-span-2 space-y-4">
                         <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-                            Ce nœud génère une réponse contextuelle via le fournisseur IA configuré dans <strong>Paramètres → Intelligence Artificielle</strong> et l&apos;envoie automatiquement au client. Requiert <code>AI_FLOWBOT_ENABLED = true</code>.
+                            Ce nœud génère une réponse contextuelle via le fournisseur IA configuré dans <strong>Gouvernance IA → Modules → Nœud FlowBot</strong>. Le module <strong>Nœud IA dans FlowBot</strong> doit être activé.
                         </div>
+
+                        {/* Contexte métier */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Contexte métier</label>
+                            <input
+                                type="text"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { context?: string }).context ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, context: e.target.value } })}
+                                placeholder="Ex: vente de produits alimentaires en Côte d'Ivoire"
+                            />
+                        </div>
+
+                        {/* Objectif */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Objectif de la réponse</label>
+                            <input
+                                type="text"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { objective?: string }).objective ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, objective: e.target.value } })}
+                                placeholder="Ex: rassurer le client sur le délai de livraison"
+                            />
+                        </div>
+
+                        {/* Ton + Style */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Ton</label>
+                                <input
+                                    type="text"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    value={(config as { tone?: string }).tone ?? ''}
+                                    onChange={e => onChange({ ...node, config: { ...config, tone: e.target.value } })}
+                                    placeholder="Ex: professionnel et chaleureux"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Style</label>
+                                <input
+                                    type="text"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    value={(config as { style?: string }).style ?? ''}
+                                    onChange={e => onChange({ ...node, config: { ...config, style: e.target.value } })}
+                                    placeholder="Ex: court, max 2 phrases"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Longueur max */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Longueur maximale (caractères)</label>
+                            <input
+                                type="number"
+                                min={50}
+                                max={2000}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { maxLength?: number }).maxLength ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, maxLength: e.target.value ? parseInt(e.target.value) : undefined } })}
+                                placeholder="Ex: 300 (laisser vide = pas de limite)"
+                            />
+                        </div>
+
+                        {/* Sujets interdits */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Sujets interdits (un par ligne)</label>
+                            <textarea
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                                rows={3}
+                                value={((config as { forbiddenTopics?: string[] }).forbiddenTopics ?? []).join('\n')}
+                                onChange={e => onChange({ ...node, config: { ...config, forbiddenTopics: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) } })}
+                                placeholder={'promettre une livraison\ndonner des prix non validés\nparler de la concurrence'}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">L&apos;IA ne mentionnera jamais ces sujets dans sa réponse.</p>
+                        </div>
+
+                        {/* Fallback + Variable */}
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Message de repli (si IA indisponible)</label>
                             <input
@@ -1005,7 +1082,7 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
                                 onChange={e => onChange({ ...node, config: { ...config, fallbackText: e.target.value } })}
                                 placeholder="Ex: Un agent va vous répondre sous peu."
                             />
-                            <p className="text-xs text-gray-400 mt-1">Envoyé si l&apos;IA est désactivée ou si une erreur survient. Laisser vide pour ignorer le nœud en cas d&apos;échec.</p>
+                            <p className="text-xs text-gray-400 mt-1">Envoyé si le module IA est désactivé ou en erreur.</p>
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Variable de stockage (optionnel)</label>
@@ -1016,7 +1093,6 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
                                 onChange={e => onChange({ ...node, config: { ...config, variableName: e.target.value } })}
                                 placeholder="ai_response"
                             />
-                            <p className="text-xs text-gray-400 mt-1">Si renseigné, la réponse générée est aussi stockée dans cette variable de session.</p>
                         </div>
                     </div>
                 )}

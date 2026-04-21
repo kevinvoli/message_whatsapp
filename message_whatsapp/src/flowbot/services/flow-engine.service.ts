@@ -682,9 +682,16 @@ export class FlowEngineService {
 
   /**
    * AI_REPLY — Génère une réponse via le fournisseur IA configuré en BDD et l'envoie.
-   * config: { fallbackText?: string; variableName?: string }
-   * - fallbackText : message envoyé si l'IA est désactivée ou indisponible
-   * - variableName : si défini, stocke la réponse dans une variable de session
+   * config: {
+   *   fallbackText?: string      — message envoyé si l'IA est désactivée ou indisponible
+   *   variableName?: string      — stocke la réponse dans une variable de session
+   *   context?: string           — contexte métier injecté dans le prompt (ex: "vente de produits alimentaires")
+   *   objective?: string         — objectif de la réponse (ex: "rassurer le client sur le délai")
+   *   tone?: string              — ton attendu (ex: "professionnel et chaleureux")
+   *   style?: string             — style attendu (ex: "court, direct, pas plus de 2 phrases")
+   *   maxLength?: number         — longueur max en caractères
+   *   forbiddenTopics?: string[] — sujets interdits à ne jamais aborder
+   * }
    */
   private async executeAiReply(
     session: FlowSession,
@@ -694,7 +701,16 @@ export class FlowEngineService {
     adapter: BotProviderAdapter | null,
     ctx: BotConversationContext,
   ): Promise<void> {
-    const config = (node.config as { fallbackText?: string; variableName?: string } | null) ?? {};
+    const config = (node.config as {
+      fallbackText?: string;
+      variableName?: string;
+      context?: string;
+      objective?: string;
+      tone?: string;
+      style?: string;
+      maxLength?: number;
+      forbiddenTopics?: string[];
+    } | null) ?? {};
     const fallbackText = config.fallbackText ?? '';
 
     const sendText = async (text: string) => {
@@ -713,16 +729,23 @@ export class FlowEngineService {
     if (!enabled) {
       if (fallbackText) {
         await sendText(fallbackText);
-        await this.writeLog(session, node, null, 'ai_reply_fallback', 'AI_FLOWBOT_ENABLED=false');
+        await this.writeLog(session, node, null, 'ai_reply_fallback', 'flowbot module disabled');
       } else {
-        await this.writeLog(session, node, null, 'ai_reply_skipped', 'AI_FLOWBOT_ENABLED=false, no fallback');
+        await this.writeLog(session, node, null, 'ai_reply_skipped', 'flowbot module disabled, no fallback');
       }
       return;
     }
 
     try {
-      const suggestions = await this.aiAssistant.suggestReplies(conv.chatRef, 10);
-      const replyText = suggestions[0]?.text ?? fallbackText;
+      const replyText = await this.aiAssistant.generateFlowbotReply(conv.chatRef, {
+        context:         config.context,
+        objective:       config.objective,
+        tone:            config.tone,
+        style:           config.style,
+        maxLength:       config.maxLength,
+        forbiddenTopics: config.forbiddenTopics,
+        fallbackText,
+      });
 
       if (!replyText) {
         await this.writeLog(session, node, null, 'ai_reply_empty', 'no suggestion and no fallback');

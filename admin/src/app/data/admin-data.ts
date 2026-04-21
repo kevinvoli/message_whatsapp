@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -100,6 +100,13 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'roles', name: 'Rôles & Permissions', icon: ShieldCheck, badge: null },
       { id: 'audit-logs', name: 'Journal d\'audit', icon: ClipboardList, badge: null },
       { id: 'outbound-webhooks', name: 'Webhooks sortants', icon: Webhook, badge: null },
+    ],
+  },
+  {
+    label: 'Intelligence Artificielle',
+    icon: Sparkles,
+    items: [
+      { id: 'ia-governance', name: 'Gouvernance IA', icon: Sparkles, badge: 'NEW' },
     ],
   },
 ];
