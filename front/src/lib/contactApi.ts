@@ -12,6 +12,12 @@ export interface ClientSummary {
   phone: string;
   source?: string | null;
   client_category?: string | null;
+  certification_status?: string | null;
+  certified_at?: string | null;
+  order_client_id?: string | null;
+  referral_code?: string | null;
+  referral_count?: number | null;
+  referral_commission?: number | null;
   portfolio_owner_id?: string | null;
   call_status?: string | null;
   last_call_date?: string | null;

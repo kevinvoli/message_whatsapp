@@ -51,6 +51,44 @@ function ConversionBadge({ status }: { status?: string }) {
   );
 }
 
+function CategoryBadge({ category }: { category?: string | null }) {
+  if (!category) return null;
+  const map: Record<string, string> = {
+    jamais_commande:           'bg-gray-100 text-gray-600 border border-gray-200',
+    commande_sans_livraison:   'bg-orange-50 text-orange-700 border border-orange-200',
+    commande_avec_livraison:   'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    commande_annulee:          'bg-red-50 text-red-700 border border-red-200',
+  };
+  const labels: Record<string, string> = {
+    jamais_commande:           'Jamais commandé',
+    commande_sans_livraison:   'Sans livraison',
+    commande_avec_livraison:   'Livré',
+    commande_annulee:          'Annulé',
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${map[category] ?? 'bg-gray-100 text-gray-700'}`}>
+      {labels[category] ?? category}
+    </span>
+  );
+}
+
+function CertifBadge({ status }: { status?: string | null }) {
+  if (!status || status === 'non_verifie') return null;
+  const map: Record<string, string> = {
+    certifie:    'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    en_attente:  'bg-yellow-50 text-yellow-700 border border-yellow-200',
+    rejete:      'bg-red-50 text-red-700 border border-red-200',
+  };
+  const labels: Record<string, string> = {
+    certifie: '✓ Certifié', en_attente: '⏳ En attente', rejete: '✗ Rejeté',
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] ?? 'bg-gray-100 text-gray-700'}`}>
+      {labels[status] ?? status}
+    </span>
+  );
+}
+
 // ─── Modal modification statut + notes ───────────────────────────────────────
 
 interface EditModalProps {
@@ -169,9 +207,11 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
               <p className="text-sm text-gray-500 mt-0.5">{contact.contact}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <CallStatusBadge status={contact.call_status} />
             <ConversionBadge status={contact.conversion_status} />
+            <CategoryBadge category={contact.client_category} />
+            <CertifBadge status={contact.certification_status} />
           </div>
         </div>
 
@@ -274,6 +314,45 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
           </div>
         </div>
       </div>
+
+      {/* Intégration ERP */}
+      {(contact.order_client_id || contact.referral_code || contact.referral_count || contact.certified_at) && (
+        <div className="bg-white rounded-[18px] p-5 border border-gray-100">
+          <h3 className="text-base font-bold text-gray-900 mb-3">Intégration ERP</h3>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            {contact.order_client_id && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">ID Client ERP</p>
+                <p className="font-mono text-gray-800">{contact.order_client_id}</p>
+              </div>
+            )}
+            {contact.referral_code && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Code parrainage</p>
+                <p className="font-mono text-gray-800">{contact.referral_code}</p>
+              </div>
+            )}
+            {(contact.referral_count ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Filleuls</p>
+                <p className="text-gray-800">{contact.referral_count}</p>
+              </div>
+            )}
+            {contact.referral_commission != null && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Commission parrainage</p>
+                <p className="text-gray-800">{contact.referral_commission} FCFA</p>
+              </div>
+            )}
+            {contact.certified_at && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Certifié le</p>
+                <p className="text-gray-800">{formatDateShort(contact.certified_at)}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Historique */}
       <div className="bg-white rounded-[18px] p-5 border border-gray-100">
