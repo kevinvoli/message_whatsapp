@@ -3,12 +3,13 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from '../whatsapp_message.service';
 import { ContactService } from 'src/contact/contact.service';
 import { ChannelService } from 'src/channel/channel.service';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from '../entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import {
   mapConversationWithContact,
 } from 'src/realtime/mappers/socket-conversation.mapper';
+import { ValidationEngineService } from 'src/window/services/validation-engine.service';
 
 export interface ConversationQueryResult {
   conversations: ReturnType<typeof mapConversationWithContact>[];
@@ -25,32 +26,39 @@ export class SocketConversationQueryService {
     private readonly messageService: WhatsappMessageService,
     private readonly contactService: ContactService,
     private readonly channelService: ChannelService,
+    private readonly validationEngine: ValidationEngineService,
   ) {}
 
   /**
-   * Charge les conversations d'un poste avec les métadonnées associées
-   * (dernier message, unread count, contact).
-   * Appelé par le gateway lors d'une connexion ou d'une requête conversations:get.
+   * Charge la fenêtre de 50 conversations d'un poste (fenêtre glissante).
+   * La liste est bornée à 50 et triée par window_slot ASC.
+   * Plus de pagination keyset pour la vue commerciale.
    */
   async loadConversationsForPoste(
     posteId: string,
     tenantIds: string[],
     searchTerm?: string,
-    cursor?: { activityAt: string; chatId: string },
+    // cursor conservé pour compatibilité API mais ignoré — fenêtre fixe
+    _cursor?: { activityAt: string; chatId: string },
   ): Promise<ConversationQueryResult> {
-    const isFirstPage = !cursor;
-
-    let { chats, hasMore } = await this.chatService.findByPosteId(
+    let { chats } = await this.chatService.findByPosteId(
       posteId,
       [],
-      300,
-      cursor,
+      50, // fenêtre fixe maximale
     );
 
     if (tenantIds.length > 0) {
       const tenantSet = new Set(tenantIds);
       chats = chats.filter((c) => !c.tenant_id || tenantSet.has(c.tenant_id));
     }
+
+    // Trier : conversations avec window_slot en premier (1→50), puis sans slot par activité
+    chats.sort((a, b) => {
+      if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;
+      if (a.window_slot != null) return -1;
+      if (b.window_slot != null) return 1;
+      return (b.last_activity_at?.getTime() ?? 0) - (a.last_activity_at?.getTime() ?? 0);
+    });
 
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
@@ -59,14 +67,18 @@ export class SocketConversationQueryService {
           c.name.toLowerCase().includes(lowerSearch) ||
           c.chat_id.includes(lowerSearch),
       );
-      hasMore = false;
     }
 
     const chatIds = chats.map((c) => c.chat_id);
-    const [lastMsgMap, unreadMap, contactMap] = await Promise.all([
+    const activeChatIds = chats
+      .filter((c) => c.window_status === WindowStatus.ACTIVE || c.window_status === WindowStatus.VALIDATED)
+      .map((c) => c.chat_id);
+
+    const [lastMsgMap, unreadMap, contactMap, validationMap] = await Promise.all([
       this.messageService.findLastMessagesBulk(chatIds),
       this.messageService.countUnreadMessagesBulk(chatIds),
       this.contactService.findByChatIds(chatIds),
+      this.loadValidationStates(activeChatIds),
     ]);
 
     const conversations = chats.map((chat) =>
@@ -75,19 +87,26 @@ export class SocketConversationQueryService {
         lastMsgMap.get(chat.chat_id) ?? null,
         unreadMap.get(chat.chat_id) ?? chat.unread_count ?? 0,
         contactMap.get(chat.chat_id),
+        validationMap.get(chat.chat_id),
       ),
     );
 
-    const last = chats.at(-1);
-    const nextCursor =
-      hasMore && last
-        ? {
-            activityAt: (last.last_activity_at ?? last.createdAt).toISOString(),
-            chatId: last.chat_id,
-          }
-        : null;
+    return { conversations, hasMore: false, nextCursor: null };
+  }
 
-    return { conversations, hasMore, nextCursor };
+  private async loadValidationStates(
+    chatIds: string[],
+  ): Promise<Map<string, import('src/window/services/validation-engine.service').CriterionState[]>> {
+    const map = new Map<string, import('src/window/services/validation-engine.service').CriterionState[]>();
+    if (chatIds.length === 0) return map;
+
+    await Promise.all(
+      chatIds.map(async (chatId) => {
+        const state = await this.validationEngine.getValidationState(chatId);
+        map.set(chatId, state.criteria);
+      }),
+    );
+    return map;
   }
 
   /**

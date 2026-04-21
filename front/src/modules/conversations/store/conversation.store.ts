@@ -20,6 +20,11 @@ export interface ConversationCursor {
 
 let typingTimeout: NodeJS.Timeout;
 
+export interface BlockProgress {
+  validated: number;
+  total: number;
+}
+
 export interface ConversationSlice {
   conversations: Conversation[];
   selectedConversation: Conversation | null;
@@ -29,10 +34,14 @@ export interface ConversationSlice {
   isLoadingMoreConversations: boolean;
   conversationCursor: ConversationCursor | null;
   currentSearch: string;
+  blockProgress: BlockProgress;
+  windowRotating: boolean;
 
   loadConversations: (search?: string) => void;
   loadMoreConversations: () => void;
   selectConversation: (chat_id: string) => void;
+  setBlockProgress: (progress: BlockProgress) => void;
+  setWindowRotating: (rotating: boolean) => void;
 
   setConversations: (
     conversations: Conversation[],
@@ -72,6 +81,8 @@ export const createConversationSlice: StateCreator<
   isLoadingMoreConversations: false,
   conversationCursor: null,
   currentSearch: '',
+  blockProgress: { validated: 0, total: 10 },
+  windowRotating: false,
 
   // ─── Chargement ─────────────────────────────────────────────────────────────
 
@@ -275,4 +286,8 @@ export const createConversationSlice: StateCreator<
   },
 
   setTotalUnread: (count) => set({ totalUnread: count }),
+
+  setBlockProgress: (progress) => set({ blockProgress: progress }),
+
+  setWindowRotating: (rotating) => set({ windowRotating: rotating }),
 });

@@ -10,6 +10,8 @@ import { SocketAuthService } from 'src/whatsapp_message/services/socket-auth.ser
 import { SocketConversationQueryService } from 'src/whatsapp_message/services/socket-conversation-query.service';
 import { QueuePublisher } from 'src/realtime/publishers/queue.publisher';
 import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WindowRotationService } from 'src/window/services/window-rotation.service';
+import { ValidationEngineService } from 'src/window/services/validation-engine.service';
 
 export interface AgentSession {
   commercialId: string;
@@ -47,6 +49,8 @@ export class AgentConnectionService {
     private readonly chatService: WhatsappChatService,
     private readonly conversationQueryService: SocketConversationQueryService,
     private readonly queuePublisher: QueuePublisher,
+    private readonly windowRotation: WindowRotationService,
+    private readonly validationEngine: ValidationEngineService,
   ) {}
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
@@ -97,6 +101,9 @@ export class AgentConnectionService {
 
     await this.jobRunner.startAgentSlaMonitor(posteId);
     await this.emitQueueUpdate('agent_connected');
+
+    // Construit ou répare la fenêtre glissante avant d'envoyer les conversations
+    await this.windowRotation.buildWindowForPoste(posteId);
     await this.sendConversationsToClient(client);
     return true;
   }
@@ -198,9 +205,11 @@ export class AgentConnectionService {
         cursor,
       );
 
+    const blockProgress = await this.validationEngine.getBlockProgress(agent.posteId);
+
     client.emit('chat:event', {
       type: 'CONVERSATION_LIST',
-      payload: { conversations, hasMore, nextCursor },
+      payload: { conversations, hasMore: false, nextCursor: null, blockProgress },
     });
 
     if (isFirstPage) {
@@ -208,6 +217,11 @@ export class AgentConnectionService {
       client.emit('chat:event', {
         type: 'TOTAL_UNREAD_UPDATE',
         payload: { totalUnread },
+      });
+
+      client.emit('chat:event', {
+        type: 'WINDOW_BLOCK_PROGRESS',
+        payload: blockProgress,
       });
     }
   }

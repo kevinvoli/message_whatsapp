@@ -230,9 +230,11 @@ export class WhatsappChatService {
     chat.conversation_result_by = commercial_id;
     const saved = await this.chatRepository.save(chat);
 
-    if (this.capacityService && saved.poste_id) {
-      await this.capacityService.onConversationQualified(saved.poste_id);
-    }
+    this.eventEmitter.emit('conversation.result_set', {
+      chatId: saved.chat_id,
+      posteId: saved.poste_id,
+      result,
+    });
 
     this.eventEmitter.emit('conversation.status_changed', {
       chatId: saved.chat_id,

@@ -64,6 +64,7 @@ import { TargetsModule } from './targets/targets.module';
 import { CommercialSessionModule } from './commercial-session/commercial_session.module';
 import { GeoAccessModule } from './geo-access/geo_access.module';
 import { ConversationCapacityModule } from './conversation-capacity/conversation-capacity.module';
+import { WindowModule } from './window/window.module';
 import { SystemHealthModule } from './system-health/system-health.module';
 import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
 import { IntegrationModule } from './integration/integration.module';
@@ -197,6 +198,8 @@ import { IntegrationModule } from './integration/integration.module';
     // Phase Intégration — webhooks entrants ERP + identity mapping + webhooks sortants
     InboundIntegrationModule,
     IntegrationModule,
+    // Phase 9 — Fenêtre glissante, moteur de validation, webhook appels
+    WindowModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { IsNull, Not, Repository } from 'typeorm';
+import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 
 const KEY_QUOTA_ACTIVE = 'CAPACITY_QUOTA_ACTIVE';
@@ -72,45 +72,57 @@ export class ConversationCapacityService {
 
   /**
    * Appelé après qu'une conversation est assignée à un poste.
-   * Verrouille la conversation si le quota actif est dépassé.
+   * Assigne le prochain slot de fenêtre et verrouille si le quota actif est dépassé.
    * Retourne true si la conversation a été verrouillée.
    */
   async onConversationAssigned(chat: WhatsappChat): Promise<boolean> {
     if (!chat.poste_id) return false;
 
-    const { quotaActive } = await this.getQuotas();
-    const { active } = await this.countForPoste(chat.poste_id);
+    const { quotaActive, quotaTotal } = await this.getQuotas();
 
-    if (active > quotaActive) {
+    // Déjà dans la fenêtre (slot déjà assigné) : rien à faire
+    if (chat.window_slot != null) return chat.is_locked;
+
+    // Compter les slots déjà utilisés (hors released)
+    const slotsUsed = await this.chatRepo.count({
+      where: {
+        poste_id: chat.poste_id,
+        window_slot: Not(IsNull()),
+        window_status: Not(WindowStatus.RELEASED as any),
+      },
+    });
+
+    const nextSlot = slotsUsed + 1;
+
+    if (nextSlot > quotaTotal) {
+      // Hors fenêtre : verrouillée sans slot (sera injectée au prochain cycle)
       await this.chatRepo.update({ id: chat.id }, { is_locked: true });
-      this.logger.log(
-        `Conv ${chat.chat_id} verrouillée (quota actif: ${active}/${quotaActive})`,
-      );
+      this.logger.log(`Conv ${chat.chat_id} hors fenêtre (slot ${nextSlot}/${quotaTotal})`);
       return true;
     }
-    return false;
+
+    const status = nextSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
+    const isLocked = status === WindowStatus.LOCKED;
+
+    await this.chatRepo.update(
+      { id: chat.id },
+      { window_slot: nextSlot, window_status: status, is_locked: isLocked },
+    );
+
+    this.logger.log(
+      `Conv ${chat.chat_id} assignée slot ${nextSlot}/${quotaTotal} → ${status}`,
+    );
+    return isLocked;
   }
 
   /**
-   * Appelé après qu'une conversation est qualifiée (résultat défini).
-   * Déverrouille la plus ancienne conversation verrouillée du même poste.
+   * @deprecated Remplacé par WindowRotationService.onConversationValidated.
+   * Conservé pour compatibilité pendant la transition.
    */
-  async onConversationQualified(posteId: string): Promise<void> {
-    const oldest = await this.chatRepo
-      .createQueryBuilder('c')
-      .where('c.poste_id = :posteId', { posteId })
-      .andWhere('c.is_locked = true')
-      .andWhere('c.status != :ferme', { ferme: 'fermé' })
-      .andWhere('c.deletedAt IS NULL')
-      .orderBy('c.createdAt', 'ASC')
-      .getOne();
-
-    if (!oldest) return;
-
-    await this.chatRepo.update({ id: oldest.id }, { is_locked: false });
-    this.logger.log(
-      `Conv ${oldest.chat_id} déverrouillée (slot libéré pour poste ${posteId})`,
-    );
+  async onConversationQualified(_posteId: string): Promise<void> {
+    // La rotation par bloc est maintenant gérée par WindowRotationService.
+    // Cette méthode est conservée pour éviter les erreurs de compilation des
+    // appelants existants jusqu'à leur migration complète.
   }
 
   /** Force-déverrouille une conversation (admin). */

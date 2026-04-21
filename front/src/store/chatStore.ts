@@ -41,6 +41,8 @@ const initialState = {
   isLoadingMoreConversations: false,
   conversationCursor: null,
   currentSearch: '',
+  blockProgress: { validated: 0, total: 10 },
+  windowRotating: false,
 };
 
 // ─── Store composé ────────────────────────────────────────────────────────────

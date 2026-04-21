@@ -117,12 +117,35 @@ export function handleChatEvent(
       } else {
         chatState.setConversations(convArray, hasMore, nextCursor);
       }
+
+      // Mise à jour de la progression du bloc si incluse dans le payload
+      if (isNewFormat && raw.blockProgress) {
+        chatState.setBlockProgress(raw.blockProgress as { validated: number; total: number });
+      }
       break;
     }
 
     case 'TOTAL_UNREAD_UPDATE':
       chatState.setTotalUnread((data.payload as { totalUnread: number }).totalUnread);
       break;
+
+    case 'WINDOW_BLOCK_PROGRESS': {
+      const progress = data.payload as { validated: number; total: number };
+      chatState.setBlockProgress(progress);
+      break;
+    }
+
+    case 'WINDOW_ROTATED': {
+      const { releasedChatIds } = data.payload as { releasedChatIds: string[]; promotedChatIds: string[] };
+      chatState.setWindowRotating(true);
+      // Marque les conversations libérées avec une animation puis recharge après 600ms
+      setTimeout(() => {
+        chatState.setWindowRotating(false);
+        chatState.loadConversations(chatState.currentSearch || undefined);
+      }, 600);
+      logger.debug('WINDOW_ROTATED reçu', { releasedCount: releasedChatIds.length });
+      break;
+    }
 
     case 'CONVERSATION_READONLY':
       upsertConversationPatch(data.payload.chat_id, { readonly: true });

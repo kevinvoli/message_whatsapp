@@ -45,6 +45,8 @@ import { CallLogModule } from 'src/call-log/call_log.module';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
+import { WindowModule } from 'src/window/window.module';
+import { WindowPublisher } from 'src/realtime/publishers/window.publisher';
 
 @Module({
   imports: [
@@ -75,6 +77,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     JorbsModule,
     NotificationModule,
     SystemAlertModule,
+    WindowModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [
@@ -99,6 +102,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     RealtimeServerService,
     ConversationPublisher,
     QueuePublisher,
+    WindowPublisher,
     AgentConnectionService,
     ChannelProviderRegistry,
     ResolveTenantUseCase,

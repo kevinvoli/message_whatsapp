@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X } from 'lucide-react';
+import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X, CheckCircle, Circle } from 'lucide-react';
 import {
   CallStatus,
   Conversation,
@@ -212,6 +212,33 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                     <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />
                 </div>
             </div>
+
+        {/* Barre de critères de validation (fenêtre glissante) */}
+        {currentConv.validation_state && currentConv.validation_state.length > 0 && (
+          <div className="flex items-center gap-3 pt-2 border-t border-gray-100 mt-2 flex-wrap">
+            <span className="text-xs text-gray-400 font-medium">Validation :</span>
+            {currentConv.validation_state.map((c) => (
+              <span
+                key={c.type}
+                className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                  c.validated
+                    ? 'bg-green-100 text-green-700'
+                    : c.required
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-gray-100 text-gray-500'
+                }`}
+                title={c.validated ? `Validé le ${c.validatedAt ? new Date(c.validatedAt).toLocaleString('fr-FR') : ''}` : 'Non validé'}
+              >
+                {c.validated
+                  ? <CheckCircle className="w-3 h-3" />
+                  : <Circle className="w-3 h-3" />
+                }
+                {c.label}
+                {c.required && !c.validated && <span className="text-red-400 ml-0.5">*</span>}
+              </span>
+            ))}
+          </div>
+        )}
         </div>
 
         {showOutcomeModal && (

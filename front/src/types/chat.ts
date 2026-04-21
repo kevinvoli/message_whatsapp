@@ -408,10 +408,22 @@ export interface Conversation {
   /** 4.15 — Conversation verrouillée (quota actif dépassé) */
   is_locked?: boolean;
 
+  /** Phase 9 — Fenêtre glissante */
+  window_slot?: number | null;
+  window_status?: 'active' | 'locked' | 'validated' | 'released' | null;
+  validation_state?: ValidationCriterionState[] | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
 
+export interface ValidationCriterionState {
+  type: string;
+  label: string;
+  required: boolean;
+  validated: boolean;
+  validatedAt: Date | null;
+}
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "error";
 
@@ -623,6 +635,9 @@ interface RawConversationData {
     is_active?: boolean;
   } | null;
   is_locked?: boolean;
+  window_slot?: number | null;
+  window_status?: string | null;
+  validation_state?: any[] | null;
 }
 
 interface RawCommercialData {
@@ -897,6 +912,18 @@ export const transformToConversation = (
       : null,
 
     is_locked: raw.is_locked === true,
+
+    window_slot: raw.window_slot ?? null,
+    window_status: (raw.window_status ?? null) as Conversation['window_status'],
+    validation_state: Array.isArray(raw.validation_state)
+      ? raw.validation_state.map((c: any) => ({
+          type: c.type,
+          label: c.label,
+          required: c.required,
+          validated: c.validated,
+          validatedAt: c.validatedAt ? new Date(c.validatedAt) : null,
+        }))
+      : null,
 
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),

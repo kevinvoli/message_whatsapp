@@ -21,6 +21,13 @@ export enum WhatsappChatStatus {
   FERME = 'fermé',
 }
 
+export enum WindowStatus {
+  ACTIVE    = 'active',
+  LOCKED    = 'locked',
+  VALIDATED = 'validated',
+  RELEASED  = 'released',
+}
+
 export enum ConversationResult {
   COMMANDE_CONFIRMEE = 'commande_confirmee',
   COMMANDE_A_SAISIR = 'commande_a_saisir',
@@ -230,6 +237,12 @@ export class WhatsappChat {
 
   @Column({ name: 'is_locked', type: 'boolean', default: false })
   is_locked: boolean;
+
+  @Column({ name: 'window_slot', type: 'int', nullable: true, default: null })
+  window_slot: number | null;
+
+  @Column({ name: 'window_status', type: 'enum', enum: WindowStatus, nullable: true, default: null })
+  window_status: WindowStatus | null;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];

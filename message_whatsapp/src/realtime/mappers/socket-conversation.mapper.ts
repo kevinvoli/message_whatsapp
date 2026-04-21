@@ -1,17 +1,22 @@
 import {
   WhatsappChat,
   WhatsappChatStatus,
+  WindowStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { resolveMessageText } from './socket-message.mapper';
+import { CriterionState } from 'src/window/services/validation-engine.service';
 
 export function mapConversation(
   chat: WhatsappChat,
   lastMessage: WhatsappMessage | null,
   unreadCount: number,
+  validationState?: CriterionState[],
 ) {
-  const locked = chat.is_locked === true;
+  // window_status est la source de vérité ; is_locked comme fallback
+  const windowStatus = chat.window_status ?? (chat.is_locked ? WindowStatus.LOCKED : WindowStatus.ACTIVE);
+  const locked = windowStatus === WindowStatus.LOCKED;
 
   return {
     id: chat.id,
@@ -44,8 +49,11 @@ export function mapConversation(
         : null,
     read_only: chat.read_only,
     is_locked: locked,
+    window_slot: chat.window_slot ?? null,
+    window_status: windowStatus,
     contact_client: locked ? null : chat.contact_client,
     first_response_deadline_at: locked ? null : chat.first_response_deadline_at,
+    validation_state: locked ? null : (validationState ?? null),
   };
 }
 
@@ -54,9 +62,10 @@ export function mapConversationWithContact(
   lastMessage: WhatsappMessage | null,
   unreadCount: number,
   contact?: Contact,
+  validationState?: CriterionState[],
 ) {
   return {
-    ...mapConversation(chat, lastMessage, unreadCount),
+    ...mapConversation(chat, lastMessage, unreadCount, validationState),
     contact_summary: contact
       ? {
           id: contact.id,
