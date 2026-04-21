@@ -38,6 +38,8 @@ import FollowUpsView from '@/app/ui/FollowUpsView';
 import TargetsView from '@/app/ui/TargetsView';
 import IpAccessView from '@/app/ui/IpAccessView';
 import SessionsView from '@/app/ui/SessionsView';
+import CapacityView from '@/app/ui/CapacityView';
+import SystemHealthView from '@/app/ui/SystemHealthView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -114,6 +116,8 @@ export default function AdminDashboard() {
                 return <AlertConfigView onStatusRefresh={refreshHealth} />;
             case 'observabilite':
                 return <ObservabiliteView />;
+            case 'system-health':
+                return <SystemHealthView />;
             case 'go_no_go':
                 return <GoNoGoView />;
             case 'canaux':
@@ -192,6 +196,8 @@ export default function AdminDashboard() {
                 return <IpAccessView />;
             case 'sessions':
                 return <SessionsView />;
+            case 'capacity':
+                return <CapacityView />;
             default:
                 return null;
         }

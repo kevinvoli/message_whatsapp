@@ -3,7 +3,7 @@
  * `ConversationReadQueryService`. Ce service ne conserve que les mutations
  * (create, update, mark-as-read, lock/unlock, etc.).
  */
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat, ConversationResult } from './entities/whatsapp_chat.entity';
@@ -14,6 +14,7 @@ import {
   PosteStats,
   CommercialStats,
 } from 'src/conversations/infrastructure/conversation-read-query.service';
+import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 
 // Re-export des interfaces pour les consommateurs existants (rétro-compatibilité)
 export type { PosteStats, CommercialStats };
@@ -27,6 +28,9 @@ export class WhatsappChatService {
     private readonly chatRepository: Repository<WhatsappChat>,
     private readonly posteService: WhatsappPosteService,
     private readonly readQuery: ConversationReadQueryService,
+
+    @Optional()
+    private readonly capacityService: ConversationCapacityService,
   ) {}
 
   // ── Délégation aux lectures : ConversationReadQueryService ──────────────────
@@ -222,7 +226,13 @@ export class WhatsappChatService {
     chat.conversation_result = result;
     chat.conversation_result_at = new Date();
     chat.conversation_result_by = commercial_id;
-    return this.chatRepository.save(chat);
+    const saved = await this.chatRepository.save(chat);
+
+    if (this.capacityService && saved.poste_id) {
+      await this.capacityService.onConversationQualified(saved.poste_id);
+    }
+
+    return saved;
   }
 
   /** Statistiques par résultat métier (admin) */

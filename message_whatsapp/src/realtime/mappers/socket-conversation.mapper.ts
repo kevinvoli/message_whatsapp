@@ -11,36 +11,41 @@ export function mapConversation(
   lastMessage: WhatsappMessage | null,
   unreadCount: number,
 ) {
+  const locked = chat.is_locked === true;
+
   return {
     id: chat.id,
     chat_id: chat.chat_id,
     channel_id: chat.channel_id,
     last_msg_client_channel_id: chat.last_msg_client_channel_id,
-    name: chat.name,
+    name: locked ? 'Contact masqué' : chat.name,
     poste_id: chat.poste_id,
     // Normalise 'en attente' → 'attente' une seule fois à la source
     status:
       chat.status === WhatsappChatStatus.EN_ATTENTE ? 'attente' : chat.status,
-    unreadCount,
+    unreadCount: locked ? 0 : unreadCount,
     createdAt: chat.createdAt,
     last_activity_at: chat.last_activity_at,
-    last_client_message_at: chat.last_client_message_at || null,
-    last_poste_message_at: chat.last_poste_message_at || null,
+    last_client_message_at: locked ? null : (chat.last_client_message_at || null),
+    last_poste_message_at: locked ? null : (chat.last_poste_message_at || null),
     updatedAt: chat.updatedAt,
     poste: chat.poste || null,
-    last_message: lastMessage
-      ? {
-          id: lastMessage.id,
-          text: resolveMessageText(lastMessage) ?? '',
-          timestamp: lastMessage.timestamp ?? lastMessage.createdAt,
-          from_me: lastMessage.from_me,
-          status: lastMessage.status,
-          type: lastMessage.type,
-        }
-      : null,
+    last_message: locked
+      ? null
+      : lastMessage
+        ? {
+            id: lastMessage.id,
+            text: resolveMessageText(lastMessage) ?? '',
+            timestamp: lastMessage.timestamp ?? lastMessage.createdAt,
+            from_me: lastMessage.from_me,
+            status: lastMessage.status,
+            type: lastMessage.type,
+          }
+        : null,
     read_only: chat.read_only,
-    contact_client: chat.contact_client,
-    first_response_deadline_at: chat.first_response_deadline_at,
+    is_locked: locked,
+    contact_client: locked ? null : chat.contact_client,
+    first_response_deadline_at: locked ? null : chat.first_response_deadline_at,
   };
 }
 

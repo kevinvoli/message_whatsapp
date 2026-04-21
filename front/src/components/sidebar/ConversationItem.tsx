@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
@@ -114,8 +114,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const provider = getProviderFromChatId(conversation.chat_id);
   const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
   const slaAlert = hasSlaWarning(conversation);
+  const isLocked = conversation.is_locked === true;
 
   const handleClick = (e: React.MouseEvent) => {
+    if (isLocked) return;
     if (bulkMode && onToggleCheck) {
       e.preventDefault();
       onToggleCheck(conversation.chat_id);
@@ -127,12 +129,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   return (
     <div
       onClick={handleClick}
-      className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
-        isChecked
-          ? 'bg-blue-50 border-l-4 border-l-blue-500'
+      className={`p-4 border-b border-gray-100 transition-colors ${
+        isLocked
+          ? 'opacity-50 cursor-not-allowed bg-gray-50'
+          : isChecked
+          ? 'bg-blue-50 border-l-4 border-l-blue-500 cursor-pointer'
           : isSelected
-          ? 'bg-green-50 border-l-4 border-l-green-600'
-          : 'hover:bg-gray-50'
+          ? 'bg-green-50 border-l-4 border-l-green-600 cursor-pointer'
+          : 'hover:bg-gray-50 cursor-pointer'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -177,7 +181,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(conversation.status)}`}>
               {conversation.status.replace('_', ' ')}
             </span>
-            {slaAlert && (
+            {isLocked && (
+              <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded-full">
+                <Lock className="w-3 h-3" /> En attente
+              </span>
+            )}
+            {slaAlert && !isLocked && (
               <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full" title="Client en attente depuis plus de 30 min">
                 <Clock className="w-3 h-3" /> SLA
               </span>

@@ -62,6 +62,9 @@ import { ClientDossierModule } from './client-dossier/client-dossier.module';
 import { TargetsModule } from './targets/targets.module';
 import { CommercialSessionModule } from './commercial-session/commercial_session.module';
 import { GeoAccessModule } from './geo-access/geo_access.module';
+import { ConversationCapacityModule } from './conversation-capacity/conversation-capacity.module';
+import { SystemHealthModule } from './system-health/system-health.module';
+import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
 
 @Module({
   imports: [
@@ -184,6 +187,12 @@ import { GeoAccessModule } from './geo-access/geo_access.module';
     TargetsModule,
     CommercialSessionModule,
     GeoAccessModule,
+    // Phase 3 (4.15) — Capacité conversationnelle
+    ConversationCapacityModule,
+    // Phase 4 — Dashboard technique
+    SystemHealthModule,
+    // Phase Intégration — webhooks entrants ERP
+    InboundIntegrationModule,
   ],
   controllers: [AppController],
   providers: [

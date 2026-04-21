@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -14,6 +14,7 @@ import { transitionStatus } from 'src/conversations/domain/conversation-state-ma
 import { ContextResolverService } from 'src/context/services/context-resolver.service';
 import { ContextService } from 'src/context/services/context.service';
 import { ChatContext } from 'src/context/entities/chat-context.entity';
+import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 
 export interface AssignConversationResult {
   chat: WhatsappChat;
@@ -43,6 +44,9 @@ export class AssignConversationUseCase {
 
     @Inject(forwardRef(() => WhatsappMessageGateway))
     private readonly messageGateway: WhatsappMessageGateway,
+
+    @Optional()
+    private readonly capacityService: ConversationCapacityService,
   ) {}
 
   async execute(
@@ -188,6 +192,9 @@ export class AssignConversationUseCase {
       conversation.first_response_deadline_at = this.slaPolicy.initialDeadline();
       conversation.last_client_message_at = new Date();
       const saved = await this.queryService.saveChat(conversation);
+      if (this.capacityService) {
+        await this.capacityService.onConversationAssigned(saved);
+      }
       void this.notificationService.create(
         'info',
         `Conversation réassignée — ${saved.name || saved.chat_id}`,
@@ -221,6 +228,9 @@ export class AssignConversationUseCase {
       last_client_message_at: new Date(),
     });
     const saved = await this.queryService.saveChat(newChat);
+    if (this.capacityService) {
+      await this.capacityService.onConversationAssigned(saved);
+    }
     void this.notificationService.create(
       'info',
       `Nouvelle conversation — ${clientName || clientPhone.split('@')[0]}`,

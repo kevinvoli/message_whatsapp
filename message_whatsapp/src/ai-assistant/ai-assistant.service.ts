@@ -18,6 +18,8 @@ export interface ConversationSummary {
   suggestedActions: string[];
 }
 
+export type RewriteMode = 'correct' | 'improve' | 'formal' | 'short';
+
 @Injectable()
 export class AiAssistantService {
   private readonly logger = new Logger(AiAssistantService.name);
@@ -71,6 +73,29 @@ Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, 
     }
 
     return this.fallbackSuggestions(messages);
+  }
+
+  // ─── Réécriture / correction de texte ────────────────────────────────────
+
+  async rewriteText(text: string, mode: RewriteMode): Promise<{ result: string }> {
+    if (!text.trim()) return { result: text };
+
+    const PROMPTS: Record<RewriteMode, string> = {
+      correct: `Corrige uniquement les fautes d'orthographe et de grammaire dans ce texte, sans modifier le sens ou le style :\n\n"${text}"\n\nRéponds UNIQUEMENT avec le texte corrigé, sans guillemets ni explication.`,
+      improve: `Améliore ce texte pour qu'il soit plus clair et professionnel tout en conservant le sens original :\n\n"${text}"\n\nRéponds UNIQUEMENT avec le texte amélioré, sans guillemets ni explication.`,
+      formal:  `Reformule ce texte en un style formel et courtois adapté à un contexte commercial :\n\n"${text}"\n\nRéponds UNIQUEMENT avec le texte reformulé, sans guillemets ni explication.`,
+      short:   `Résume ce texte en une version plus courte en conservant le message essentiel :\n\n"${text}"\n\nRéponds UNIQUEMENT avec le texte résumé, sans guillemets ni explication.`,
+    };
+
+    if (!this.anthropicApiKey) return { result: text };
+
+    try {
+      const result = await this.callClaude(PROMPTS[mode]);
+      return { result: result.trim() || text };
+    } catch (err) {
+      this.logger.warn(`rewriteText error: ${err}`);
+      return { result: text };
+    }
   }
 
   // ─── Résumé de conversation ───────────────────────────────────────────────

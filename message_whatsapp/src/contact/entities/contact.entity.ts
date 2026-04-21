@@ -136,6 +136,19 @@ export class Contact {
   @Column({ name: 'certification_status', type: 'enum', enum: CertificationStatus, nullable: true, default: null })
   certification_status?: CertificationStatus | null;
 
+  @Column({ name: 'certified_at', type: 'timestamp', nullable: true, default: null })
+  certified_at?: Date | null;
+
+  // ─── P8 — Parrainage ─────────────────────────────────────────────────────────
+  @Column({ name: 'referral_code', type: 'varchar', length: 50, nullable: true, default: null })
+  referral_code?: string | null;
+
+  @Column({ name: 'referral_count', type: 'int', nullable: true, default: null })
+  referral_count?: number | null;
+
+  @Column({ name: 'referral_commission', type: 'decimal', precision: 12, scale: 2, nullable: true, default: null })
+  referral_commission?: number | null;
+
   @CreateDateColumn({
     name: 'createdAt',
     type: 'timestamp',

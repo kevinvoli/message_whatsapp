@@ -48,6 +48,7 @@ import { ConversationReadQueryService } from 'src/conversations/infrastructure/c
 import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 import { ContextModule } from 'src/context/context.module';
+import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { ContextModule } from 'src/context/context.module';
     JorbsModule,
     NotificationModule,
     ContextModule,
+    ConversationCapacityModule,
   ],
   controllers: [DispatcherController],
   providers: [

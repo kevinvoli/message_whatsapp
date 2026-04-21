@@ -396,6 +396,9 @@ export interface Conversation {
   /** Données du contact associé, chargées en batch avec les conversations. */
   contact_summary?: ContactSummary | null;
 
+  /** 4.15 — Conversation verrouillée (quota actif dépassé) */
+  is_locked?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -610,6 +613,7 @@ interface RawConversationData {
     last_call_date?: string | Date | null;
     is_active?: boolean;
   } | null;
+  is_locked?: boolean;
 }
 
 interface RawCommercialData {
@@ -882,6 +886,8 @@ export const transformToConversation = (
           is_active: raw.contact_summary.is_active ?? true,
         }
       : null,
+
+    is_locked: raw.is_locked === true,
 
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),

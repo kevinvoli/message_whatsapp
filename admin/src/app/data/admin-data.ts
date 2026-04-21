@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -44,6 +44,7 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'contexts', name: 'Contextes', icon: Layers, badge: 'NEW' },
       { id: 'observabilite', name: 'Observabilite', icon: Activity, badge: 'SLO' },
       { id: 'go_no_go', name: 'GO/NO-GO', icon: ShieldCheck, badge: 'OPS' },
+      { id: 'system-health', name: 'Santé serveur', icon: Server, badge: null },
     ],
   },
   {
@@ -78,6 +79,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'ip-access', name: 'Restriction géo.', icon: Lock, badge: null },
       { id: 'sessions', name: 'Heures travail', icon: Clock, badge: null },
+      { id: 'capacity', name: 'Capacité conv.', icon: Gauge, badge: null },
     ],
   },
   {

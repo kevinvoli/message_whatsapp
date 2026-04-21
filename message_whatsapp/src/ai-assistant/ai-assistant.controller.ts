@@ -1,6 +1,6 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { AiAssistantService } from './ai-assistant.service';
+import { AiAssistantService, RewriteMode } from './ai-assistant.service';
 
 /**
  * P6.4 — Suggestions de réponses et résumé IA
@@ -30,5 +30,15 @@ export class AiAssistantController {
   @Get('summary/:chat_id')
   getSummary(@Param('chat_id') chatId: string) {
     return this.service.summarizeConversation(chatId);
+  }
+
+  /**
+   * POST /ai/rewrite
+   * Corrige / améliore / formate le texte passé en corps.
+   * mode: 'correct' | 'improve' | 'formal' | 'short'
+   */
+  @Post('rewrite')
+  rewrite(@Body() body: { text: string; mode?: RewriteMode }) {
+    return this.service.rewriteText(body.text ?? '', body.mode ?? 'correct');
   }
 }

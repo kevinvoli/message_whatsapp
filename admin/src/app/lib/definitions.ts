@@ -55,7 +55,11 @@ export type ViewMode =
   // Phase 2 — Ranking, Objectifs, Sessions, IP
   | 'targets'
   | 'ip-access'
-  | 'sessions';
+  | 'sessions'
+  // Phase 3 — Capacité conversationnelle
+  | 'capacity'
+  // Phase 4 — Dashboard technique
+  | 'system-health';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, MapPin, Mic, Paperclip, Send, Smile, X } from 'lucide-react';
+import { AlertCircle, MapPin, Mic, Paperclip, Send, Smile, Wand2, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { logger } from '@/lib/logger';
 import { useChatStore } from '@/store/chatStore';
@@ -108,6 +108,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [showRewriteMenu, setShowRewriteMenu] = useState(false);
+  const rewriteMenuRef = useRef<HTMLDivElement>(null);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -144,6 +147,39 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMessage((prev) => prev + emoji.native);
     setShowEmojiPicker(false);
   }, []);
+
+  const handleRewrite = async (mode: 'correct' | 'improve' | 'formal' | 'short') => {
+    if (!message.trim()) return;
+    setShowRewriteMenu(false);
+    setIsRewriting(true);
+    try {
+      const res = await fetch(`${API_URL}/ai/rewrite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text: message, mode }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { result: string };
+        if (data.result) setMessage(data.result);
+      }
+    } catch {
+      // silencieux
+    } finally {
+      setIsRewriting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showRewriteMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (rewriteMenuRef.current && !rewriteMenuRef.current.contains(e.target as Node)) {
+        setShowRewriteMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRewriteMenu]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -478,6 +514,44 @@ const ChatInput: React.FC<ChatInputProps> = ({
               rows={1}
               disabled={disabled || !isConnected || isUploading}
             />
+            {message.trim().length > 0 && (
+              <div className="relative" ref={rewriteMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowRewriteMenu((v) => !v)}
+                  disabled={isRewriting || disabled}
+                  title="Réécrire avec l'IA"
+                  className="p-3 text-gray-400 hover:text-purple-600 disabled:opacity-50"
+                >
+                  {isRewriting ? (
+                    <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Wand2 className="w-5 h-5" />
+                  )}
+                </button>
+                {showRewriteMenu && (
+                  <div className="absolute bottom-14 right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 w-44">
+                    {(
+                      [
+                        { mode: 'correct', label: 'Corriger' },
+                        { mode: 'improve', label: 'Améliorer' },
+                        { mode: 'formal',  label: 'Formaliser' },
+                        { mode: 'short',   label: 'Raccourcir' },
+                      ] as const
+                    ).map(({ mode, label }) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => void handleRewrite(mode)}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="relative" ref={emojiPickerRef}>
               <button
                 type="button"
