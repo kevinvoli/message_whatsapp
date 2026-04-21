@@ -22,6 +22,8 @@ const NODE_TYPE_OPTIONS: FlowNodeType[] = [
     'MESSAGE', 'QUESTION', 'CONDITION', 'ACTION', 'WAIT', 'ESCALATE', 'END', 'AB_TEST',
     // P6.2
     'DELAY', 'HTTP_REQUEST', 'SEND_TEMPLATE', 'ASSIGN_LABEL',
+    // P6.4
+    'AI_REPLY',
 ];
 const TRIGGER_TYPE_OPTIONS: FlowTriggerType[] = [
     'INBOUND_MESSAGE', 'CONVERSATION_OPEN', 'CONVERSATION_REOPEN', 'OUT_OF_HOURS',
@@ -46,6 +48,8 @@ const NODE_COLORS: Record<string, string> = {
     HTTP_REQUEST: 'bg-cyan-50 border-cyan-200 text-cyan-800',
     SEND_TEMPLATE: 'bg-violet-50 border-violet-200 text-violet-800',
     ASSIGN_LABEL: 'bg-lime-50 border-lime-200 text-lime-800',
+    // P6.4
+    AI_REPLY: 'bg-purple-50 border-purple-200 text-purple-800',
 };
 
 const SESSION_STATUS_STYLE: Record<string, string> = {
@@ -983,6 +987,37 @@ function NodeForm({ node, onChange, onSave, onCancel, error, saving }: {
                             placeholder={'uuid-label-1\nuuid-label-2'}
                         />
                         <p className="text-xs text-gray-400 mt-1">UUID des labels à assigner à la conversation</p>
+                    </div>
+                )}
+
+                {/* ── P6.4 : AI_REPLY ── */}
+                {node.type === 'AI_REPLY' && (
+                    <div className="col-span-2 space-y-3">
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
+                            Ce nœud génère une réponse contextuelle via le fournisseur IA configuré dans <strong>Paramètres → Intelligence Artificielle</strong> et l&apos;envoie automatiquement au client. Requiert <code>AI_FLOWBOT_ENABLED = true</code>.
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Message de repli (si IA indisponible)</label>
+                            <input
+                                type="text"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                value={(config as { fallbackText?: string }).fallbackText ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, fallbackText: e.target.value } })}
+                                placeholder="Ex: Un agent va vous répondre sous peu."
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Envoyé si l&apos;IA est désactivée ou si une erreur survient. Laisser vide pour ignorer le nœud en cas d&apos;échec.</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Variable de stockage (optionnel)</label>
+                            <input
+                                type="text"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                                value={(config as { variableName?: string }).variableName ?? ''}
+                                onChange={e => onChange({ ...node, config: { ...config, variableName: e.target.value } })}
+                                placeholder="ai_response"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Si renseigné, la réponse générée est aussi stockée dans cette variable de session.</p>
+                        </div>
                     </div>
                 )}
 

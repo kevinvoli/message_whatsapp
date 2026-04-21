@@ -49,6 +49,39 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
   { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant)', isSecret: true },
 
+  // ─── Intelligence Artificielle ────────────────────────────────────────────────
+  {
+    key: 'AI_PROVIDER',
+    label: 'Fournisseur IA',
+    category: 'ai',
+    description: 'Provider utilisé pour la correction, les suggestions et les résumés : anthropic | openai | ollama | custom',
+  },
+  {
+    key: 'AI_MODEL',
+    label: 'Modèle IA',
+    category: 'ai',
+    description: 'Identifiant du modèle (ex: claude-haiku-4-5-20251001, gpt-4o-mini, llama3, mistral…)',
+  },
+  {
+    key: 'AI_API_KEY',
+    label: 'Clé API IA',
+    category: 'ai',
+    description: 'Clé secrète du fournisseur (x-api-key pour Anthropic, Authorization Bearer pour OpenAI/compatible)',
+    isSecret: true,
+  },
+  {
+    key: 'AI_API_URL',
+    label: 'URL API IA (optionnel)',
+    category: 'ai',
+    description: 'URL de base de l\'API. Requis pour ollama ou fournisseur custom. Laisser vide pour Anthropic/OpenAI officiels.',
+  },
+  {
+    key: 'AI_FLOWBOT_ENABLED',
+    label: 'Activer l\'IA dans le FlowBot',
+    category: 'ai',
+    description: 'true / false — autorise le nœud AI_REPLY dans les FlowBots',
+  },
+
 ];
 
 

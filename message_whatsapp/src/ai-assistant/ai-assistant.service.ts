@@ -1,13 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
 export interface ReplySuggestion {
   text: string;
-  rationale: string; // pourquoi cette suggestion
+  rationale: string;
 }
 
 export interface ConversationSummary {
@@ -20,65 +20,89 @@ export interface ConversationSummary {
 
 export type RewriteMode = 'correct' | 'improve' | 'formal' | 'short';
 
+interface AiConfig {
+  provider: string;   // anthropic | openai | ollama | custom
+  model: string;
+  apiKey: string | null;
+  apiUrl: string | null;
+}
+
 @Injectable()
 export class AiAssistantService {
   private readonly logger = new Logger(AiAssistantService.name);
-  private readonly anthropicApiKey: string | null;
 
   constructor(
     @InjectRepository(WhatsappMessage)
     private readonly messageRepo: Repository<WhatsappMessage>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
-    private readonly config: ConfigService,
-  ) {
-    this.anthropicApiKey = config.get<string>('ANTHROPIC_API_KEY') ?? null;
+    private readonly systemConfig: SystemConfigService,
+  ) {}
+
+  // ─── Config depuis la BDD ──────────────────────────────────────────────────
+
+  private async getAiConfig(): Promise<AiConfig> {
+    const [provider, model, apiKey, apiUrl] = await Promise.all([
+      this.systemConfig.get('AI_PROVIDER'),
+      this.systemConfig.get('AI_MODEL'),
+      this.systemConfig.get('AI_API_KEY'),
+      this.systemConfig.get('AI_API_URL'),
+    ]);
+
+    // Compatibilité ascendante : si AI_PROVIDER n'est pas encore défini, tenter ANTHROPIC_API_KEY
+    const legacyKey = process.env.ANTHROPIC_API_KEY ?? null;
+    const resolvedProvider = provider?.trim() || (legacyKey ? 'anthropic' : '');
+    const resolvedKey = apiKey?.trim() || legacyKey;
+    const resolvedModel = model?.trim() || 'claude-haiku-4-5-20251001';
+
+    return {
+      provider: resolvedProvider,
+      model: resolvedModel,
+      apiKey: resolvedKey ?? null,
+      apiUrl: apiUrl?.trim() || null,
+    };
   }
 
-  // ─── Suggestions de réponses ──────────────────────────────────────────────
+  async isFlowbotEnabled(): Promise<boolean> {
+    const val = await this.systemConfig.get('AI_FLOWBOT_ENABLED');
+    return val?.toLowerCase() === 'true';
+  }
 
-  /**
-   * Génère 3 suggestions de réponses contextuelles pour une conversation.
-   * Si ANTHROPIC_API_KEY n'est pas configuré, retourne des suggestions génériques.
-   */
+  // ─── Suggestions de réponses ───────────────────────────────────────────────
+
   async suggestReplies(chatId: string, contextSize = 10): Promise<ReplySuggestion[]> {
     const messages = await this.getRecentMessages(chatId, contextSize);
-    if (messages.length === 0) {
-      return this.genericSuggestions();
-    }
+    if (messages.length === 0) return this.genericSuggestions();
 
-    const conversationText = this.formatConversation(messages);
+    const config = await this.getAiConfig();
+    if (!config.apiKey) return this.fallbackSuggestions(messages);
 
-    if (!this.anthropicApiKey) {
-      return this.fallbackSuggestions(messages);
-    }
-
-    try {
-      const response = await this.callClaude(
-        `Tu es un assistant pour agent de service client WhatsApp.
+    const prompt = `Tu es un assistant pour agent de service client WhatsApp.
 Voici les derniers échanges de la conversation :
 
-${conversationText}
+${this.formatConversation(messages)}
 
 Génère exactement 3 suggestions de réponses courtes (max 2 phrases chacune) pour l'agent.
-Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, ...]`,
-      );
+Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, ...]`;
 
-      const parsed = JSON.parse(response);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.slice(0, 3);
-      }
+    try {
+      const response = await this.callProvider(config, prompt);
+      const parsed = JSON.parse(response) as ReplySuggestion[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 3);
     } catch (err) {
-      this.logger.warn(`suggestReplies API error: ${err} — fallback`);
+      this.logger.warn(`suggestReplies error: ${err} — fallback`);
     }
 
     return this.fallbackSuggestions(messages);
   }
 
-  // ─── Réécriture / correction de texte ────────────────────────────────────
+  // ─── Réécriture / correction ───────────────────────────────────────────────
 
   async rewriteText(text: string, mode: RewriteMode): Promise<{ result: string }> {
     if (!text.trim()) return { result: text };
+
+    const config = await this.getAiConfig();
+    if (!config.apiKey) return { result: text };
 
     const PROMPTS: Record<RewriteMode, string> = {
       correct: `Corrige uniquement les fautes d'orthographe et de grammaire dans ce texte, sans modifier le sens ou le style :\n\n"${text}"\n\nRéponds UNIQUEMENT avec le texte corrigé, sans guillemets ni explication.`,
@@ -87,10 +111,8 @@ Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, 
       short:   `Résume ce texte en une version plus courte en conservant le message essentiel :\n\n"${text}"\n\nRéponds UNIQUEMENT avec le texte résumé, sans guillemets ni explication.`,
     };
 
-    if (!this.anthropicApiKey) return { result: text };
-
     try {
-      const result = await this.callClaude(PROMPTS[mode]);
+      const result = await this.callProvider(config, PROMPTS[mode]);
       return { result: result.trim() || text };
     } catch (err) {
       this.logger.warn(`rewriteText error: ${err}`);
@@ -98,24 +120,20 @@ Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, 
     }
   }
 
-  // ─── Résumé de conversation ───────────────────────────────────────────────
+  // ─── Résumé de conversation ────────────────────────────────────────────────
 
   async summarizeConversation(chatId: string): Promise<ConversationSummary> {
     const chat = await this.chatRepo.findOne({ where: { id: chatId } });
     if (!chat) throw new NotFoundException(`Conversation ${chatId} introuvable`);
 
     const messages = await this.getRecentMessages(chatId, 50);
-    const conversationText = this.formatConversation(messages);
+    const config = await this.getAiConfig();
 
-    if (!this.anthropicApiKey || messages.length === 0) {
-      return this.fallbackSummary(chatId, messages);
-    }
+    if (!config.apiKey || messages.length === 0) return this.fallbackSummary(chatId, messages);
 
-    try {
-      const response = await this.callClaude(
-        `Résume la conversation de support client suivante en JSON :
+    const prompt = `Résume la conversation de support client suivante en JSON :
 
-${conversationText}
+${this.formatConversation(messages)}
 
 Réponds UNIQUEMENT avec un JSON valide :
 {
@@ -123,10 +141,11 @@ Réponds UNIQUEMENT avec un JSON valide :
   "sentiment": "positive|neutral|negative|mixed",
   "keyPoints": ["point 1", "point 2"],
   "suggestedActions": ["action 1", "action 2"]
-}`,
-      );
+}`;
 
-      const parsed = JSON.parse(response);
+    try {
+      const response = await this.callProvider(config, prompt);
+      const parsed = JSON.parse(response) as Partial<ConversationSummary>;
       return {
         chatId,
         summary:          parsed.summary          ?? 'Résumé non disponible',
@@ -135,52 +154,86 @@ Réponds UNIQUEMENT avec un JSON valide :
         suggestedActions: parsed.suggestedActions  ?? [],
       };
     } catch (err) {
-      this.logger.warn(`summarizeConversation API error: ${err} — fallback`);
+      this.logger.warn(`summarizeConversation error: ${err} — fallback`);
       return this.fallbackSummary(chatId, messages);
     }
   }
 
-  // ─── Helpers privés ───────────────────────────────────────────────────────
+  // ─── Appel générique au provider configuré ────────────────────────────────
+
+  private async callProvider(config: AiConfig, prompt: string): Promise<string> {
+    switch (config.provider) {
+      case 'anthropic':
+        return this.callAnthropic(config, prompt);
+      case 'openai':
+      case 'ollama':
+      case 'custom':
+        return this.callOpenAiCompat(config, prompt);
+      default:
+        // Tentative OpenAI-compat par défaut si une URL est fournie
+        if (config.apiUrl) return this.callOpenAiCompat(config, prompt);
+        return this.callAnthropic(config, prompt);
+    }
+  }
+
+  private async callAnthropic(config: AiConfig, prompt: string): Promise<string> {
+    const url = config.apiUrl || 'https://api.anthropic.com/v1/messages';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey!,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
+
+    const data = await res.json() as { content: Array<{ type: string; text: string }> };
+    return data.content.find((c) => c.type === 'text')?.text ?? '';
+  }
+
+  private async callOpenAiCompat(config: AiConfig, prompt: string): Promise<string> {
+    const baseUrl = config.apiUrl || 'https://api.openai.com';
+    const url = `${baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`OpenAI-compat API ${res.status}: ${await res.text()}`);
+
+    const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+    return data.choices[0]?.message?.content ?? '';
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async getRecentMessages(chatId: string, limit: number): Promise<WhatsappMessage[]> {
     return this.messageRepo.find({
       where: { chat_id: chatId },
       order: { createdAt: 'DESC' },
       take: limit,
-    }).then((msgs) => msgs.reverse()); // chronologique
+    }).then((msgs) => msgs.reverse());
   }
 
   private formatConversation(messages: WhatsappMessage[]): string {
     return messages
-      .map((m) => {
-        const role = m.direction === 'IN' ? 'Client' : 'Agent';
-        const text = m.text ?? '[média]';
-        return `${role}: ${text}`;
-      })
+      .map((m) => `${m.direction === 'IN' ? 'Client' : 'Agent'}: ${m.text ?? '[média]'}`)
       .join('\n');
-  }
-
-  private async callClaude(prompt: string): Promise<string> {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.anthropicApiKey!,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Claude API error ${res.status}: ${await res.text()}`);
-    }
-
-    const data = await res.json() as { content: Array<{ type: string; text: string }> };
-    return data.content.find((c) => c.type === 'text')?.text ?? '';
   }
 
   private genericSuggestions(): ReplySuggestion[] {

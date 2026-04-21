@@ -21,6 +21,7 @@ import {
   BotConversationContext,
   BotProviderAdapter,
 } from '../interfaces/provider-adapter.interface';
+import { AiAssistantService } from 'src/ai-assistant/ai-assistant.service';
 
 const MAX_STEPS = 50;
 const MAX_LOOP_DETECTION = 3;
@@ -38,6 +39,7 @@ export class FlowEngineService {
     private readonly analyticsService: FlowAnalyticsService,
     private readonly variableService: FlowVariableService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly aiAssistant: AiAssistantService,
     @InjectRepository(FlowNode)
     private readonly nodeRepo: Repository<FlowNode>,
     @InjectRepository(FlowEdge)
@@ -278,6 +280,10 @@ export class FlowEngineService {
 
         case FlowNodeType.ASSIGN_LABEL:
           await this.executeAssignLabel(session, node, conv);
+          break;
+
+        case FlowNodeType.AI_REPLY:
+          await this.executeAiReply(session, node, conv, execCtx, adapter, ctx);
           break;
 
         default:
@@ -672,6 +678,70 @@ export class FlowEngineService {
     });
 
     await this.writeLog(session, node, null, 'assign_label_queued', labelIds.join(','));
+  }
+
+  /**
+   * AI_REPLY — Génère une réponse via le fournisseur IA configuré en BDD et l'envoie.
+   * config: { fallbackText?: string; variableName?: string }
+   * - fallbackText : message envoyé si l'IA est désactivée ou indisponible
+   * - variableName : si défini, stocke la réponse dans une variable de session
+   */
+  private async executeAiReply(
+    session: FlowSession,
+    node: FlowNode,
+    conv: BotConversation,
+    execCtx: BotExecutionContext,
+    adapter: BotProviderAdapter | null,
+    ctx: BotConversationContext,
+  ): Promise<void> {
+    const config = (node.config as { fallbackText?: string; variableName?: string } | null) ?? {};
+    const fallbackText = config.fallbackText ?? '';
+
+    const sendText = async (text: string) => {
+      if (!adapter || !text) return;
+      const result = await adapter.sendMessage({ context: ctx, text });
+      const evt = new FlowbotOutboundSentEvent();
+      evt.chatRef = execCtx.externalRef;
+      evt.text = text;
+      evt.providerMessageId = result.externalMessageRef ?? `bot_${Date.now()}`;
+      evt.provider = execCtx.provider;
+      evt.sentAt = result.sentAt ?? new Date();
+      this.eventEmitter.emit(FLOWBOT_OUTBOUND_SENT, evt);
+    };
+
+    const enabled = await this.aiAssistant.isFlowbotEnabled();
+    if (!enabled) {
+      if (fallbackText) {
+        await sendText(fallbackText);
+        await this.writeLog(session, node, null, 'ai_reply_fallback', 'AI_FLOWBOT_ENABLED=false');
+      } else {
+        await this.writeLog(session, node, null, 'ai_reply_skipped', 'AI_FLOWBOT_ENABLED=false, no fallback');
+      }
+      return;
+    }
+
+    try {
+      const suggestions = await this.aiAssistant.suggestReplies(conv.chatRef, 10);
+      const replyText = suggestions[0]?.text ?? fallbackText;
+
+      if (!replyText) {
+        await this.writeLog(session, node, null, 'ai_reply_empty', 'no suggestion and no fallback');
+        return;
+      }
+
+      if (config.variableName) {
+        session.variables = { ...session.variables, [config.variableName]: replyText };
+      }
+
+      await sendText(replyText);
+      await this.writeLog(session, node, null, 'ai_reply_sent', replyText.slice(0, 100));
+    } catch (err) {
+      this.logger.warn(`executeAiReply error: ${err}`);
+      if (fallbackText) {
+        await sendText(fallbackText);
+        await this.writeLog(session, node, null, 'ai_reply_fallback', String(err));
+      }
+    }
   }
 
   private async executeAbTest(

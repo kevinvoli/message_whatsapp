@@ -113,7 +113,9 @@ export interface ChatContextsPage {
 export type FlowNodeType =
   | 'MESSAGE' | 'QUESTION' | 'CONDITION' | 'ACTION' | 'WAIT' | 'ESCALATE' | 'END' | 'AB_TEST'
   // P6.2
-  | 'DELAY' | 'HTTP_REQUEST' | 'SEND_TEMPLATE' | 'ASSIGN_LABEL';
+  | 'DELAY' | 'HTTP_REQUEST' | 'SEND_TEMPLATE' | 'ASSIGN_LABEL'
+  // P6.4
+  | 'AI_REPLY';
 export type FlowTriggerType =
   | 'INBOUND_MESSAGE' | 'CONVERSATION_OPEN' | 'CONVERSATION_REOPEN'
   | 'OUT_OF_HOURS' | 'ON_ASSIGN' | 'QUEUE_WAIT' | 'NO_RESPONSE'

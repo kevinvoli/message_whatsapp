@@ -23,6 +23,8 @@ export enum FlowNodeType {
   HTTP_REQUEST = 'HTTP_REQUEST',
   SEND_TEMPLATE = 'SEND_TEMPLATE',
   ASSIGN_LABEL = 'ASSIGN_LABEL',
+  // P6.4 — Réponse IA (utilise la config AI_PROVIDER / AI_MODEL en BDD)
+  AI_REPLY = 'AI_REPLY',
 }
 
 @Entity('flow_node')

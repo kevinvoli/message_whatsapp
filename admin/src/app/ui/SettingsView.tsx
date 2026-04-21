@@ -25,9 +25,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   whapi: 'WhatsApp / Whapi',
   meta: 'Meta (API)',
   feature_flags: 'Feature Flags',
+  ai: 'Intelligence Artificielle',
+  integration: 'Intégration ERP',
 };
 
-const CATEGORY_ORDER = ['general', 'whapi', 'meta', 'feature_flags', 'cron'];
+const CATEGORY_ORDER = ['general', 'whapi', 'meta', 'feature_flags', 'ai', 'integration', 'cron'];
 
 function groupByCategory(entries: SystemConfigEntry[]): Record<string, SystemConfigEntry[]> {
   const groups: Record<string, SystemConfigEntry[]> = {};
