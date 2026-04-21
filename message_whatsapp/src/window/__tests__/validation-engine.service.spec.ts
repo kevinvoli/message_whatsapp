@@ -81,6 +81,11 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
 describe('ValidationEngineService', () => {
   let service: ValidationEngineService;
 
+  const mockSystemConfig = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue({}),
+  } as any;
+
   function build(
     criteria: ValidationCriterionConfig[] = [makeCriterion()],
     validations: ConversationValidation[] = [],
@@ -90,6 +95,7 @@ describe('ValidationEngineService', () => {
       makeValidationRepo(validations),
       makeCriterionRepo(criteria),
       makeChatRepo(chats),
+      mockSystemConfig,
     );
   }
 
@@ -130,7 +136,7 @@ describe('ValidationEngineService', () => {
   describe('markCriterionMet', () => {
     it('crée un nouveau record si inexistant', async () => {
       const repo = makeValidationRepo([]);
-      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo());
+      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo(), mockSystemConfig);
       const isNew = await service.markCriterionMet('chat-123', 'result_set');
       expect(isNew).toBe(true);
       expect(repo.save).toHaveBeenCalled();
@@ -139,7 +145,7 @@ describe('ValidationEngineService', () => {
     it('est idempotent : retourne false si déjà validé', async () => {
       const alreadyValidated = makeValidation({ is_validated: true });
       const repo = makeValidationRepo([alreadyValidated]);
-      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo());
+      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo(), mockSystemConfig);
       const isNew = await service.markCriterionMet('chat-123', 'result_set');
       expect(isNew).toBe(false);
       expect(repo.update).not.toHaveBeenCalled();
@@ -148,7 +154,7 @@ describe('ValidationEngineService', () => {
     it('met à jour le record existant non validé', async () => {
       const existing = makeValidation({ is_validated: false });
       const repo = makeValidationRepo([existing]);
-      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo());
+      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo(), mockSystemConfig);
       const isNew = await service.markCriterionMet('chat-123', 'result_set', 'ext-id-1');
       expect(isNew).toBe(true);
       expect(repo.update).toHaveBeenCalledWith(
@@ -169,7 +175,7 @@ describe('ValidationEngineService', () => {
       const val1 = makeValidation({ chat_id: 'chat-1', is_validated: true, validated_at: new Date() });
       const val2 = makeValidation({ chat_id: 'chat-2', criterion_type: 'result_set', is_validated: false });
       const repo = makeValidationRepo([val1, val2]);
-      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo());
+      service = new ValidationEngineService(repo, makeCriterionRepo(), makeChatRepo(), mockSystemConfig);
 
       const map = await service.getValidationStatesBulk(['chat-1', 'chat-2']);
       expect(map.size).toBe(2);
@@ -196,7 +202,7 @@ describe('ValidationEngineService', () => {
       chatRepo.find
         .mockResolvedValueOnce([active])       // ACTIVE only
         .mockResolvedValueOnce([active, validated]); // ACTIVE + VALIDATED
-      service = new ValidationEngineService(makeValidationRepo(), makeCriterionRepo(), chatRepo);
+      service = new ValidationEngineService(makeValidationRepo(), makeCriterionRepo(), chatRepo, mockSystemConfig);
       const progress = await service.getBlockProgress('poste-abc');
       expect(progress.validated).toBeGreaterThanOrEqual(0);
       expect(progress.total).toBeGreaterThanOrEqual(0);
@@ -209,7 +215,7 @@ describe('ValidationEngineService', () => {
       const criterionRepo = makeCriterionRepo([makeCriterion({ criterion_type: 'result_set', is_required: true })]);
       // Après markCriterionMet, getValidationState doit retourner validé
       repo.find.mockResolvedValue([makeValidation({ is_validated: true, validated_at: new Date() })]);
-      service = new ValidationEngineService(repo, criterionRepo, makeChatRepo());
+      service = new ValidationEngineService(repo, criterionRepo, makeChatRepo(), mockSystemConfig);
       const result = await service.onConversationResultSet('chat-123');
       expect(typeof result).toBe('boolean');
     });

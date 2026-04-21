@@ -4,6 +4,7 @@ import { IsNull, Not, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 
 const KEY_QUOTA_ACTIVE          = 'CAPACITY_QUOTA_ACTIVE';
 const KEY_QUOTA_TOTAL           = 'CAPACITY_QUOTA_TOTAL';
@@ -26,14 +27,13 @@ export interface CapacitySummaryEntry {
 @Injectable()
 export class ConversationCapacityService {
   private readonly logger = new Logger(ConversationCapacityService.name);
-  /** Mutex par poste pour éviter les race conditions sur l'assignation de slots. */
-  private readonly assigningPostes = new Map<string, Promise<boolean>>();
 
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly systemConfig: SystemConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly lockService: DistributedLockService,
   ) {}
 
   async getQuotas(): Promise<{ quotaActive: number; quotaTotal: number }> {
@@ -77,6 +77,15 @@ export class ConversationCapacityService {
   async setValidationThreshold(threshold: number): Promise<void> {
     await this.systemConfig.set(KEY_VALIDATION_THRESHOLD, String(threshold));
     this.logger.log(`Seuil de validation mis à ${threshold}`);
+  }
+
+  async getExternalTimeoutHours(): Promise<number> {
+    const val = await this.systemConfig.get('WINDOW_EXTERNAL_TIMEOUT_HOURS');
+    return val ? parseInt(val, 10) : 0;
+  }
+
+  async setExternalTimeoutHours(hours: number): Promise<void> {
+    await this.systemConfig.set('WINDOW_EXTERNAL_TIMEOUT_HOURS', String(hours));
   }
 
   async countForPoste(
@@ -135,7 +144,6 @@ export class ConversationCapacityService {
     const modeEnabled = await this.isWindowModeEnabled();
 
     if (!modeEnabled) {
-      // Mode classique : verrouiller si quotaActive dépassé
       const { quotaActive } = await this.getQuotas();
       const { active } = await this.countForPoste(chat.poste_id);
       if (active > quotaActive) {
@@ -146,20 +154,12 @@ export class ConversationCapacityService {
       return false;
     }
 
-    const posteId = chat.poste_id;
-
-    // Sérialiser les assignations par poste (évite les doublons de slot)
-    const pending = this.assigningPostes.get(posteId) ?? Promise.resolve(false);
-    const next = pending.then(() => this.doAssignSlot(chat));
-    this.assigningPostes.set(posteId, next.catch(() => false));
-    try {
-      const result = await next;
-      return result;
-    } finally {
-      if (this.assigningPostes.get(posteId) === next) {
-        this.assigningPostes.delete(posteId);
-      }
-    }
+    // Mutex distribué (Redis → fallback in-process) pour éviter les doublons de slot
+    return this.lockService.withLock(
+      `window:slot:${chat.poste_id}`,
+      10_000,
+      () => this.doAssignSlot(chat),
+    );
   }
 
   private async doAssignSlot(chat: WhatsappChat): Promise<boolean> {

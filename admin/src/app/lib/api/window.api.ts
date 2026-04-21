@@ -71,6 +71,17 @@ export async function rebuildWindow(posteId: string): Promise<{ ok: boolean; blo
   );
 }
 
+export async function forceValidateConversation(chatId: string, posteId?: string): Promise<{ ok: boolean; allRequiredMet: boolean }> {
+  return handleResponse(
+    await fetch(`${API_BASE_URL}/window/force-validate/${encodeURIComponent(chatId)}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ posteId }),
+    }),
+  );
+}
+
 export async function updateValidationCriterion(
   id: string,
   updates: { is_required?: boolean; is_active?: boolean; label?: string; sort_order?: number },

@@ -143,4 +143,27 @@ export class WindowController {
   getProgress(@Param('posteId') posteId: string) {
     return this.validationEngine.getBlockProgress(posteId);
   }
+
+  /**
+   * Force la validation complète d'une conversation active — admin.
+   * Utile quand une conversation est bloquée (critère externe jamais reçu).
+   * POST /window/force-validate/:chatId
+   * Body optionnel : { posteId: string }
+   */
+  @Post('force-validate/:chatId')
+  @UseGuards(AdminGuard)
+  async forceValidateConversation(
+    @Param('chatId') chatId: string,
+    @Body() body?: { posteId?: string },
+  ) {
+    const criteria = await this.validationEngine.getActiveCriteria();
+    for (const c of criteria) {
+      await this.validationEngine.markCriterionMet(chatId, c.criterion_type, 'admin_force');
+    }
+    const state = await this.validationEngine.getValidationState(chatId);
+    if (state.allRequiredMet && body?.posteId) {
+      await this.windowRotation.onConversationValidated(chatId, body.posteId);
+    }
+    return { ok: true, allRequiredMet: state.allRequiredMet, criteria: state.criteria };
+  }
 }

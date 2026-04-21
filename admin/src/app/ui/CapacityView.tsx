@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   CapacitySummaryEntry,
   CapacityConfig,
+  WindowModeConfig,
   getCapacitySummary,
   getCapacityConfig,
   setCapacityConfig,
@@ -18,6 +19,7 @@ import {
   updateValidationCriterion,
   forceWindowRotation,
   rebuildWindow,
+  forceValidateConversation,
 } from '../lib/api/window.api';
 
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -45,8 +47,12 @@ export default function CapacityView() {
   const [actionPoste, setActionPoste] = useState<string | null>(null);
   const [windowModeEnabled, setWindowModeEnabled] = useState(true);
   const [validationThreshold, setValidationThreshold] = useState(0);
+  const [externalTimeout, setExternalTimeout] = useState(0);
   const [togglingMode, setTogglingMode] = useState(false);
   const [callEvents, setCallEvents] = useState<CallEventEntry[]>([]);
+  const [forceValidateChatId, setForceValidateChatId] = useState('');
+  const [forcingValidation, setForcingValidation] = useState(false);
+  const [forceValidateResult, setForceValidateResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -67,6 +73,7 @@ export default function CapacityView() {
         setCallEvents(ce.data);
         setWindowModeEnabled(wm.enabled);
         setValidationThreshold(wm.threshold ?? 0);
+        setExternalTimeout(wm.externalTimeoutHours ?? 0);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -78,16 +85,18 @@ export default function CapacityView() {
       const result = await setWindowMode({ enabled: next });
       setWindowModeEnabled(result.enabled);
       setValidationThreshold(result.threshold);
+      setExternalTimeout(result.externalTimeoutHours);
     } finally {
       setTogglingMode(false);
     }
   };
 
-  const handleSaveThreshold = async (value: number) => {
+  const handleSaveWindowConfig = async (patch: Partial<WindowModeConfig>) => {
     setTogglingMode(true);
     try {
-      const result = await setWindowMode({ threshold: value });
+      const result = await setWindowMode(patch);
       setValidationThreshold(result.threshold);
+      setExternalTimeout(result.externalTimeoutHours);
     } finally {
       setTogglingMode(false);
     }
@@ -113,6 +122,24 @@ export default function CapacityView() {
       setSummary(s);
     } finally {
       setActionPoste(null);
+    }
+  };
+
+  const handleForceValidate = async () => {
+    const chatId = forceValidateChatId.trim();
+    if (!chatId) return;
+    setForcingValidation(true);
+    setForceValidateResult(null);
+    try {
+      const r = await forceValidateConversation(chatId);
+      setForceValidateResult(r.allRequiredMet ? 'Conversation validée — rotation déclenchée si applicable.' : 'Critères marqués mais validation incomplète.');
+      setForceValidateChatId('');
+      const s = await getCapacitySummary();
+      setSummary(s);
+    } catch {
+      setForceValidateResult('Erreur : conversation introuvable ou déjà fermée.');
+    } finally {
+      setForcingValidation(false);
     }
   };
 
@@ -222,7 +249,38 @@ export default function CapacityView() {
                 />
                 <span className="text-xs text-gray-400">/ {config.quotaActive}</span>
                 <button
-                  onClick={() => handleSaveThreshold(validationThreshold)}
+                  onClick={() => handleSaveWindowConfig({ threshold: validationThreshold })}
+                  disabled={togglingMode}
+                  className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Timeout webhook absent */}
+          {windowModeEnabled && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4">
+              <div className="flex-1">
+                <p className="font-medium text-gray-800 text-sm">Timeout sans réponse externe</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Si le webhook d&apos;appel n&apos;arrive pas dans ce délai, le critère est validé automatiquement.
+                  0 = désactivé (attente infinie).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <input
+                  type="number"
+                  min={0}
+                  max={168}
+                  value={externalTimeout}
+                  onChange={(e) => setExternalTimeout(parseInt(e.target.value) || 0)}
+                  className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-center"
+                />
+                <span className="text-xs text-gray-400">heures</span>
+                <button
+                  onClick={() => handleSaveWindowConfig({ externalTimeoutHours: externalTimeout })}
                   disabled={togglingMode}
                   className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
@@ -370,6 +428,42 @@ export default function CapacityView() {
               </table>
             </div>
           )}
+
+          {/* Force-valider une conversation */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+            <div>
+              <p className="font-medium text-gray-800 text-sm">Force-valider une conversation</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Marque tous les critères comme remplis pour une conversation bloquée (usage admin uniquement).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Chat ID (ex: 33612345678@s.whatsapp.net)"
+                value={forceValidateChatId}
+                onChange={(e) => { setForceValidateChatId(e.target.value); setForceValidateResult(null); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleForceValidate()}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+              />
+              <button
+                onClick={handleForceValidate}
+                disabled={forcingValidation || !forceValidateChatId.trim()}
+                className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {forcingValidation ? '…' : 'Force-valider'}
+              </button>
+            </div>
+            {forceValidateResult && (
+              <p className={`text-xs px-3 py-2 rounded-lg ${
+                forceValidateResult.startsWith('Erreur')
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-green-50 text-green-700'
+              }`}>
+                {forceValidateResult}
+              </p>
+            )}
+          </div>
         </div>
       )}
 

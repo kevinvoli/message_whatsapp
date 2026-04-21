@@ -9,6 +9,7 @@ import { CallEventService } from './services/call-event.service';
 import { WindowController } from './controllers/call-event.controller';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
+import { SystemConfigModule } from 'src/system-config/system-config.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
       WhatsappChat,
     ]),
     ConversationCapacityModule,
+    SystemConfigModule,
   ],
   controllers: [WindowController],
   providers: [ValidationEngineService, WindowRotationService, CallEventService],

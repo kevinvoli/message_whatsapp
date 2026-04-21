@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -38,8 +39,8 @@ export class ConversationMergeService {
     private readonly mediaRepo: Repository<WhatsappMedia>,
 
     private readonly conversationPublisher: ConversationPublisher,
-
     private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async merge(
@@ -102,6 +103,13 @@ export class ConversationMergeService {
         this.conversationPublisher.emitConversationRemoved(sourceChatId, source.poste_id);
       }
       await this.conversationPublisher.emitConversationUpsertByChatId(targetChatId);
+
+      // 6. Libérer le slot fenêtre de la source (handled by WindowRotationService listener)
+      this.eventEmitter.emit('conversation.status_changed', {
+        chatId: sourceChatId,
+        newStatus: WhatsappChatStatus.FERME,
+        oldStatus: source.status,
+      });
 
       const [updatedSource, updatedTarget] = await Promise.all([
         this.chatRepo.findOne({ where: { chat_id: sourceChatId } }),

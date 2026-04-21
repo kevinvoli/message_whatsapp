@@ -44,14 +44,20 @@ export async function forceUnlock(chatId: string): Promise<void> {
   });
 }
 
-export async function getWindowMode(): Promise<{ enabled: boolean; threshold: number }> {
-  return handleResponse<{ enabled: boolean; threshold: number }>(
+export interface WindowModeConfig {
+  enabled: boolean;
+  threshold: number;
+  externalTimeoutHours: number;
+}
+
+export async function getWindowMode(): Promise<WindowModeConfig> {
+  return handleResponse<WindowModeConfig>(
     await fetch(`${API_BASE_URL}/capacity/window-mode`, { credentials: 'include' }),
   );
 }
 
-export async function setWindowMode(patch: { enabled?: boolean; threshold?: number }): Promise<{ enabled: boolean; threshold: number }> {
-  return handleResponse<{ enabled: boolean; threshold: number }>(
+export async function setWindowMode(patch: Partial<WindowModeConfig>): Promise<WindowModeConfig> {
+  return handleResponse<WindowModeConfig>(
     await fetch(`${API_BASE_URL}/capacity/window-mode`, {
       method: 'PATCH',
       credentials: 'include',

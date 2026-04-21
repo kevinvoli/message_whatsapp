@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConversationValidation } from '../entities/conversation-validation.entity';
 import { ValidationCriterionConfig } from '../entities/validation-criterion-config.entity';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
 export interface CriterionState {
   type: string;
@@ -34,6 +36,7 @@ export class ValidationEngineService {
     private readonly criterionRepo: Repository<ValidationCriterionConfig>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
+    private readonly systemConfig: SystemConfigService,
   ) {}
 
   async getActiveCriteria(): Promise<ValidationCriterionConfig[]> {
@@ -235,5 +238,57 @@ export class ValidationEngineService {
     const total = allActive.length;
     const validated = allActive.filter((c) => c.window_status === WindowStatus.VALIDATED).length;
     return { validated, total };
+  }
+
+  /**
+   * Cron toutes les heures : auto-valide le critère 'call_confirmed' pour les conversations
+   * actives dont le délai sans réponse externe est dépassé.
+   * Configurable via WINDOW_EXTERNAL_TIMEOUT_HOURS (0 = désactivé).
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleExternalCriterionTimeout(): Promise<void> {
+    const raw = await this.systemConfig.get('WINDOW_EXTERNAL_TIMEOUT_HOURS');
+    const hours = raw ? parseInt(raw, 10) : 0;
+    if (hours <= 0) return;
+
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+    // Trouver les conversations actives dont call_confirmed n'est pas encore validé
+    // et dont l'enregistrement est plus vieux que le délai configuré
+    const pending = await this.validationRepo.find({
+      where: {
+        criterion_type: 'call_confirmed',
+        is_validated: false,
+        created_at: LessThan(cutoff),
+      },
+    });
+
+    if (pending.length === 0) return;
+
+    let autoValidated = 0;
+    for (const v of pending) {
+      const chat = await this.chatRepo.findOne({
+        where: { chat_id: v.chat_id, window_status: WindowStatus.ACTIVE },
+        select: ['id', 'chat_id'],
+      });
+      if (!chat) continue;
+
+      await this.validationRepo.update(
+        { id: v.id },
+        {
+          is_validated: true,
+          validated_at: new Date(),
+          external_id: 'auto_timeout',
+          external_data: { reason: 'timeout', hours } as any,
+        },
+      );
+      autoValidated++;
+    }
+
+    if (autoValidated > 0) {
+      this.logger.log(
+        `Auto-validation call_confirmed pour ${autoValidated} conversation(s) (timeout ${hours}h)`,
+      );
+    }
   }
 }

@@ -29,21 +29,24 @@ export class ConversationCapacityController {
 
   @Get('window-mode')
   async getWindowMode() {
-    const [enabled, threshold] = await Promise.all([
+    const [enabled, threshold, externalTimeoutHours] = await Promise.all([
       this.service.isWindowModeEnabled(),
       this.service.getValidationThreshold(),
+      this.service.getExternalTimeoutHours(),
     ]);
-    return { enabled, threshold };
+    return { enabled, threshold, externalTimeoutHours };
   }
 
   @Patch('window-mode')
-  async setWindowMode(@Body() body: { enabled?: boolean; threshold?: number }) {
+  async setWindowMode(@Body() body: { enabled?: boolean; threshold?: number; externalTimeoutHours?: number }) {
     if (body.enabled !== undefined) await this.service.setWindowMode(body.enabled);
     if (body.threshold !== undefined) await this.service.setValidationThreshold(body.threshold);
-    const [enabled, threshold] = await Promise.all([
+    if (body.externalTimeoutHours !== undefined) await this.service.setExternalTimeoutHours(body.externalTimeoutHours);
+    const [enabled, threshold, externalTimeoutHours] = await Promise.all([
       this.service.isWindowModeEnabled(),
       this.service.getValidationThreshold(),
+      this.service.getExternalTimeoutHours(),
     ]);
-    return { enabled, threshold };
+    return { enabled, threshold, externalTimeoutHours };
   }
 }
