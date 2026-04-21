@@ -8,6 +8,7 @@ import {
   WINDOW_CRITERION_VALIDATED_EVENT,
 } from 'src/window/services/window-rotation.service';
 import { ValidationEngineService } from 'src/window/services/validation-engine.service';
+import { ConversationPublisher } from './conversation.publisher';
 
 @Injectable()
 export class WindowPublisher {
@@ -16,6 +17,7 @@ export class WindowPublisher {
   constructor(
     private readonly realtimeServer: RealtimeServerService,
     private readonly validationEngine: ValidationEngineService,
+    private readonly conversationPublisher: ConversationPublisher,
   ) {}
 
   /**
@@ -47,12 +49,16 @@ export class WindowPublisher {
   }
 
   /**
-   * Écoute la validation d'un critère et pousse immédiatement la progression au poste.
-   * Permet au commercial de voir la barre avancer sans attendre la rotation.
+   * Écoute la validation d'un critère.
+   * 1. Pousse WINDOW_BLOCK_PROGRESS pour la barre de progression.
+   * 2. Pousse CONVERSATION_UPSERT pour que le badge "Validée" apparaisse dans la liste.
    */
   @OnEvent(WINDOW_CRITERION_VALIDATED_EVENT, { async: true })
-  async handleCriterionValidated(payload: WindowCriterionValidatedPayload): Promise<void> {
+  async handleCriterionValidated(payload: WindowCriterionValidatedPayload & { chatId?: string }): Promise<void> {
     await this.emitBlockProgress(payload.posteId);
+    if (payload.chatId) {
+      await this.conversationPublisher.emitConversationUpsertByChatId(payload.chatId);
+    }
   }
 
   /**

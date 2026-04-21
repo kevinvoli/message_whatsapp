@@ -17,6 +17,7 @@ export interface WindowRotatedPayload {
 
 export interface WindowCriterionValidatedPayload {
   posteId: string;
+  chatId?: string;
 }
 
 @Injectable()
@@ -35,71 +36,137 @@ export class WindowRotationService {
   /**
    * Construit ou répare la fenêtre de 50 conversations pour un poste.
    * Appelé à la connexion d'un commercial.
+   * Nettoie d'abord les slots des conversations fermées avant d'assigner.
    */
   async buildWindowForPoste(posteId: string): Promise<void> {
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-    const alreadySlotted = await this.chatRepo.count({
-      where: {
-        poste_id: posteId,
-        window_slot: Not(IsNull()),
-        window_status: Not(WindowStatus.RELEASED as any),
-      },
-    });
+    // 1. Libérer les slots des conversations fermées (auto-close cron ou fermeture directe)
+    await this.releaseSlotsOfClosedConversations(posteId);
 
-    if (alreadySlotted >= quotaTotal) {
-      this.logger.log(`Fenêtre déjà complète pour poste ${posteId} (${alreadySlotted} slots)`);
+    // 2. Lire les conversations slottées restantes (non fermées, non released)
+    const slottedChats = await this.chatRepo
+      .createQueryBuilder('c')
+      .where('c.poste_id = :posteId', { posteId })
+      .andWhere('c.window_slot IS NOT NULL')
+      .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
+      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .andWhere('c.deletedAt IS NULL')
+      .orderBy('c.window_slot', 'ASC')
+      .getMany();
+
+    const needed = quotaTotal - slottedChats.length;
+    if (needed <= 0) {
+      this.logger.log(`Fenêtre complète pour poste ${posteId} (${slottedChats.length} slots actifs)`);
       return;
     }
 
-    // Conversations actives déjà assignées (triées par slot)
-    const slottedChats = await this.chatRepo.find({
-      where: {
-        poste_id: posteId,
-        window_slot: Not(IsNull()),
-        window_status: Not(WindowStatus.RELEASED as any),
-      },
-      order: { window_slot: 'ASC' },
-    });
-
-    const needed = quotaTotal - slottedChats.length;
-    if (needed <= 0) return;
-
     const slottedIds = new Set(slottedChats.map((c) => c.id));
 
-    // Conversations non encore slottées (prioriser actif/en attente, triées par activité)
-    const unslotted = await this.chatRepo.find({
-      where: {
-        poste_id: posteId,
-        deletedAt: IsNull(),
-        status: Not(In([WhatsappChatStatus.FERME])),
-      },
-      order: { last_activity_at: 'DESC' },
-      take: needed + slottedChats.length,
-    });
+    // 3. Candidats non encore slottés
+    const unslotted = await this.chatRepo
+      .createQueryBuilder('c')
+      .where('c.poste_id = :posteId', { posteId })
+      .andWhere('c.deletedAt IS NULL')
+      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .orderBy('c.last_activity_at', 'DESC')
+      .take(needed + slottedChats.length + 5)
+      .getMany();
 
     const candidates = unslotted.filter((c) => !slottedIds.has(c.id)).slice(0, needed);
 
-    if (candidates.length === 0) return;
-
-    const nextSlot = slottedChats.length + 1;
-    for (let i = 0; i < candidates.length; i++) {
-      const chat = candidates[i];
-      const slot = nextSlot + i;
-      const status = slot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-      const isLocked = status === WindowStatus.LOCKED;
-
-      await this.chatRepo.update(
-        { id: chat.id },
-        { window_slot: slot, window_status: status, is_locked: isLocked },
-      );
-
-      if (status === WindowStatus.ACTIVE) {
-        await this.validationEngine.initConversationValidation(chat.chat_id);
-      }
+    if (candidates.length === 0 && slottedChats.length > 0) {
+      this.logger.log(`Fenêtre stable pour poste ${posteId} (${slottedChats.length} slots, aucun nouveau candidat)`);
+      return;
     }
 
-    this.logger.log(`Fenêtre construite pour poste ${posteId} : ${candidates.length} nouvelles conversations assignées`);
+    // 4. Réassigner les slots 1…N pour tous (existants + nouveaux), en batch
+    const all = [...slottedChats, ...candidates];
+    const toInit: string[] = [];
+
+    // Calculer les valeurs cibles pour chaque conversation
+    const assignments = all.map((chat, i) => {
+      const slot = i + 1;
+      const status = slot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
+      const isLocked = status === WindowStatus.LOCKED;
+      const wasActive = chat.window_status === WindowStatus.ACTIVE;
+      if (status === WindowStatus.ACTIVE && !wasActive) toInit.push(chat.chat_id);
+      return { id: chat.id, slot, status, isLocked };
+    });
+
+    // Un seul UPDATE par groupe de statut (évite N aller-retours DB)
+    await this.batchUpdateSlots(assignments);
+
+    // Initialiser les validations pour les nouvelles conversations actives
+    for (const chatId of toInit) {
+      await this.validationEngine.initConversationValidation(chatId);
+    }
+
+    this.logger.log(
+      `Fenêtre construite pour poste ${posteId} : ${slottedChats.length} existantes + ${candidates.length} nouvelles (total ${all.length})`,
+    );
+  }
+
+  /**
+   * Libère les slots des conversations fermées (status=fermé) qui ont encore un slot assigné.
+   * Gère le cas de l'auto-fermeture par cron sans événement.
+   */
+  private async releaseSlotsOfClosedConversations(posteId: string): Promise<void> {
+    const closedWithSlot = await this.chatRepo
+      .createQueryBuilder('c')
+      .select('c.id')
+      .where('c.poste_id = :posteId', { posteId })
+      .andWhere('c.window_slot IS NOT NULL')
+      .andWhere('c.status = :ferme', { ferme: WhatsappChatStatus.FERME })
+      .getMany();
+
+    if (closedWithSlot.length === 0) return;
+
+    // Un seul UPDATE pour tous les slots à libérer
+    const ids = closedWithSlot.map((c) => c.id);
+    await this.chatRepo
+      .createQueryBuilder()
+      .update()
+      .set({ window_slot: null as any, window_status: WindowStatus.RELEASED, is_locked: false })
+      .whereInIds(ids)
+      .execute();
+
+    this.logger.log(`${ids.length} slot(s) libéré(s) (conversations fermées) pour poste ${posteId}`);
+  }
+
+  /**
+   * Batch update de slots via transaction.
+   * Réduit les round-trips réseau : N updates dans une seule transaction MySQL.
+   */
+  private async batchUpdateSlots(
+    assignments: Array<{ id: string; slot: number | null; status: WindowStatus; isLocked: boolean }>,
+  ): Promise<void> {
+    if (assignments.length === 0) return;
+
+    await this.chatRepo.manager.transaction(async (em) => {
+      for (const a of assignments) {
+        await em.update(
+          WhatsappChat,
+          { id: a.id },
+          { window_slot: a.slot, window_status: a.status, is_locked: a.isLocked },
+        );
+      }
+    });
+  }
+
+  /**
+   * Libère les slots de plusieurs conversations en un seul UPDATE.
+   */
+  private async batchRelease(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.chatRepo.manager.transaction(async (em) => {
+      await em
+        .createQueryBuilder()
+        .update(WhatsappChat)
+        .set({ window_slot: null as any, window_status: WindowStatus.RELEASED, is_locked: false })
+        .whereInIds(ids)
+        .execute();
+    });
   }
 
   /**
@@ -112,14 +179,25 @@ export class WindowRotationService {
 
     const allRequiredMet = await this.validationEngine.onConversationResultSet(payload.chatId);
 
-    // Push progression au poste dès que le critère est validé
-    this.eventEmitter.emit(WINDOW_CRITERION_VALIDATED_EVENT, {
-      posteId: payload.posteId,
-    } satisfies WindowCriterionValidatedPayload);
-
+    // Si tous les critères sont atteints, passer window_status à VALIDATED avant de notifier le front
     if (allRequiredMet) {
       await this.onConversationValidated(payload.chatId, payload.posteId);
     }
+
+    // Notifier le front APRÈS la mise à jour de window_status (UPSERT + progression)
+    this.eventEmitter.emit(WINDOW_CRITERION_VALIDATED_EVENT, {
+      posteId: payload.posteId,
+      chatId: payload.chatId,
+    } satisfies WindowCriterionValidatedPayload);
+  }
+
+  /**
+   * Écoute la demande de compactage après réassignation de conversation.
+   */
+  @OnEvent('window.compact_requested', { async: true })
+  async handleCompactRequested(payload: { posteId: string }): Promise<void> {
+    await this.compactSlots(payload.posteId);
+    this.logger.log(`Compactage effectué pour poste ${payload.posteId} (réassignation)`);
   }
 
   /**
@@ -211,16 +289,11 @@ export class WindowRotationService {
         order: { window_slot: 'ASC' },
       });
 
-      const releasedChatIds: string[] = [];
-      for (const chat of validated) {
-        await this.chatRepo.update(
-          { id: chat.id },
-          { window_status: WindowStatus.RELEASED, window_slot: null, is_locked: false },
-        );
-        releasedChatIds.push(chat.chat_id);
-      }
+      // 1. Libérer les conversations validées en un seul UPDATE
+      const releasedChatIds = validated.map((c) => c.chat_id);
+      await this.batchRelease(validated.map((c) => c.id));
 
-      // 2. Conversations verrouillées restantes — réassigner les slots
+      // 2. Conversations verrouillées/actives restantes — réassigner les slots
       const remaining = await this.chatRepo.find({
         where: {
           poste_id: posteId,
@@ -231,22 +304,19 @@ export class WindowRotationService {
       });
 
       const promotedChatIds: string[] = [];
-      for (let i = 0; i < remaining.length; i++) {
-        const chat = remaining[i];
+      const remainingAssignments = remaining.map((chat, i) => {
         const newSlot = i + 1;
         const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-        const wasLocked = chat.window_status === WindowStatus.LOCKED;
-        const promoted = wasLocked && newStatus === WindowStatus.ACTIVE;
-
-        await this.chatRepo.update(
-          { id: chat.id },
-          { window_slot: newSlot, window_status: newStatus, is_locked: newStatus === WindowStatus.LOCKED },
-        );
-
-        if (promoted) {
+        if (chat.window_status === WindowStatus.LOCKED && newStatus === WindowStatus.ACTIVE) {
           promotedChatIds.push(chat.chat_id);
-          await this.validationEngine.initConversationValidation(chat.chat_id);
         }
+        return { id: chat.id, slot: newSlot, status: newStatus, isLocked: newStatus === WindowStatus.LOCKED };
+      });
+      await this.batchUpdateSlots(remainingAssignments);
+
+      // Initialiser les validations pour les conversations promues (hors transaction)
+      for (const chatId of promotedChatIds) {
+        await this.validationEngine.initConversationValidation(chatId);
       }
 
       // 3. Injecter de nouvelles conversations (non encore dans la fenêtre)
@@ -254,11 +324,10 @@ export class WindowRotationService {
       const slotsAvailable = quotaTotal - slotsUsed;
 
       if (slotsAvailable > 0) {
-        const existingIds = new Set(remaining.map((c) => c.id));
-        releasedChatIds.forEach((_, idx) => {
-          const rel = validated[idx];
-          if (rel) existingIds.add(rel.id);
-        });
+        const excludedIds = new Set([
+          ...remaining.map((c) => c.id),
+          ...validated.map((c) => c.id),
+        ]);
 
         const newCandidates = await this.chatRepo.find({
           where: {
@@ -270,18 +339,18 @@ export class WindowRotationService {
           take: slotsAvailable + validated.length,
         });
 
-        const toInject = newCandidates.filter((c) => !existingIds.has(c.id)).slice(0, slotsAvailable);
-        for (let i = 0; i < toInject.length; i++) {
-          const chat = toInject[i];
+        const toInject = newCandidates.filter((c) => !excludedIds.has(c.id)).slice(0, slotsAvailable);
+        const injectAssignments = toInject.map((chat, i) => {
           const newSlot = slotsUsed + i + 1;
           const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-          await this.chatRepo.update(
-            { id: chat.id },
-            { window_slot: newSlot, window_status: newStatus, is_locked: newStatus === WindowStatus.LOCKED },
-          );
-          if (newStatus === WindowStatus.ACTIVE) {
-            await this.validationEngine.initConversationValidation(chat.chat_id);
-          }
+          return { id: chat.id, slot: newSlot, status: newStatus, isLocked: newStatus === WindowStatus.LOCKED };
+        });
+        await this.batchUpdateSlots(injectAssignments);
+
+        // Initialiser les validations pour les nouvelles actives
+        for (const a of injectAssignments.filter((a) => a.status === WindowStatus.ACTIVE)) {
+          const chat = toInject.find((c) => c.id === a.id);
+          if (chat) await this.validationEngine.initConversationValidation(chat.chat_id);
         }
 
         this.logger.log(`${toInject.length} nouvelles conversations injectées pour poste ${posteId}`);
@@ -310,31 +379,32 @@ export class WindowRotationService {
   private async compactSlots(posteId: string): Promise<void> {
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-    const current = await this.chatRepo.find({
-      where: {
-        poste_id: posteId,
-        window_slot: Not(IsNull()),
-        window_status: Not(WindowStatus.RELEASED as any),
-      },
-      order: { window_slot: 'ASC' },
-    });
+    // Libérer d'abord les fermées
+    await this.releaseSlotsOfClosedConversations(posteId);
 
-    // Réassigner slots 1…N
-    for (let i = 0; i < current.length; i++) {
-      const chat = current[i];
+    const current = await this.chatRepo
+      .createQueryBuilder('c')
+      .where('c.poste_id = :posteId', { posteId })
+      .andWhere('c.window_slot IS NOT NULL')
+      .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
+      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .andWhere('c.deletedAt IS NULL')
+      .orderBy('c.window_slot', 'ASC')
+      .getMany();
+
+    // Réassigner slots 1…N en batch
+    const toInit: string[] = [];
+    const compactAssignments = current.map((chat, i) => {
       const newSlot = i + 1;
       const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-      const wasLocked = chat.window_status === WindowStatus.LOCKED;
-      const nowActive = newStatus === WindowStatus.ACTIVE;
-
-      await this.chatRepo.update(
-        { id: chat.id },
-        { window_slot: newSlot, window_status: newStatus, is_locked: !nowActive },
-      );
-
-      if (wasLocked && nowActive) {
-        await this.validationEngine.initConversationValidation(chat.chat_id);
+      if (chat.window_status === WindowStatus.LOCKED && newStatus === WindowStatus.ACTIVE) {
+        toInit.push(chat.chat_id);
       }
+      return { id: chat.id, slot: newSlot, status: newStatus, isLocked: newStatus === WindowStatus.LOCKED };
+    });
+    await this.batchUpdateSlots(compactAssignments);
+    for (const chatId of toInit) {
+      await this.validationEngine.initConversationValidation(chatId);
     }
 
     // Injecter une nouvelle conversation si de la place est disponible
@@ -352,17 +422,15 @@ export class WindowRotationService {
       });
 
       const toInject = candidates.filter((c) => !existingIds.has(c.id)).slice(0, quotaTotal - slotsUsed);
-      for (let i = 0; i < toInject.length; i++) {
-        const chat = toInject[i];
+      const injectAssignments = toInject.map((chat, i) => {
         const newSlot = slotsUsed + i + 1;
         const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-        await this.chatRepo.update(
-          { id: chat.id },
-          { window_slot: newSlot, window_status: newStatus, is_locked: newStatus === WindowStatus.LOCKED },
-        );
-        if (newStatus === WindowStatus.ACTIVE) {
-          await this.validationEngine.initConversationValidation(chat.chat_id);
-        }
+        return { id: chat.id, slot: newSlot, status: newStatus, isLocked: newStatus === WindowStatus.LOCKED };
+      });
+      await this.batchUpdateSlots(injectAssignments);
+      for (const a of injectAssignments.filter((a) => a.status === WindowStatus.ACTIVE)) {
+        const c = toInject.find((x) => x.id === a.id);
+        if (c) await this.validationEngine.initConversationValidation(c.chat_id);
       }
 
       if (toInject.length > 0) {

@@ -17,13 +17,16 @@ import { Repository } from 'typeorm';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { CallEventService, CreateCallEventDto } from '../services/call-event.service';
 import { ValidationEngineService } from '../services/validation-engine.service';
+import { WindowRotationService } from '../services/window-rotation.service';
 import { ValidationCriterionConfig } from '../entities/validation-criterion-config.entity';
+import { CallEventApiKeyGuard } from '../guards/call-event-api-key.guard';
 
 @Controller('window')
 export class WindowController {
   constructor(
     private readonly callEventService: CallEventService,
     private readonly validationEngine: ValidationEngineService,
+    private readonly windowRotation: WindowRotationService,
     @InjectRepository(ValidationCriterionConfig)
     private readonly criterionRepo: Repository<ValidationCriterionConfig>,
   ) {}
@@ -31,8 +34,10 @@ export class WindowController {
   /**
    * Webhook entrant — plateforme externe de gestion des commandes.
    * POST /window/call-event
+   * Requiert le header x-api-key (CALL_EVENT_API_KEY en env).
    */
   @Post('call-event')
+  @UseGuards(CallEventApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   async receiveCallEvent(@Body() dto: CreateCallEventDto) {
     try {
@@ -104,5 +109,38 @@ export class WindowController {
 
     await this.criterionRepo.update({ id }, updates);
     return this.criterionRepo.findOne({ where: { id } });
+  }
+
+  /**
+   * Force la rotation du bloc pour un poste — admin.
+   * POST /window/rotate/:posteId
+   */
+  @Post('rotate/:posteId')
+  @UseGuards(AdminGuard)
+  async forceRotation(@Param('posteId') posteId: string) {
+    const result = await this.windowRotation.performRotation(posteId);
+    return { ok: true, ...result };
+  }
+
+  /**
+   * Reconstruit la fenêtre d'un poste depuis zéro — admin.
+   * POST /window/rebuild/:posteId
+   */
+  @Post('rebuild/:posteId')
+  @UseGuards(AdminGuard)
+  async rebuildWindow(@Param('posteId') posteId: string) {
+    await this.windowRotation.buildWindowForPoste(posteId);
+    const progress = await this.validationEngine.getBlockProgress(posteId);
+    return { ok: true, blockProgress: progress };
+  }
+
+  /**
+   * Progression du bloc pour un poste — admin.
+   * GET /window/progress/:posteId
+   */
+  @Get('progress/:posteId')
+  @UseGuards(AdminGuard)
+  getProgress(@Param('posteId') posteId: string) {
+    return this.validationEngine.getBlockProgress(posteId);
   }
 }

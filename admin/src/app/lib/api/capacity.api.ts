@@ -4,6 +4,7 @@ export interface CapacitySummaryEntry {
   posteId: string;
   posteName: string;
   activeCount: number;
+  validatedCount: number;
   lockedCount: number;
   totalCount: number;
   quotaActive: number;

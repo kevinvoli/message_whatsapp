@@ -97,16 +97,7 @@ export class SocketConversationQueryService {
   private async loadValidationStates(
     chatIds: string[],
   ): Promise<Map<string, import('src/window/services/validation-engine.service').CriterionState[]>> {
-    const map = new Map<string, import('src/window/services/validation-engine.service').CriterionState[]>();
-    if (chatIds.length === 0) return map;
-
-    await Promise.all(
-      chatIds.map(async (chatId) => {
-        const state = await this.validationEngine.getValidationState(chatId);
-        map.set(chatId, state.criteria);
-      }),
-    );
-    return map;
+    return this.validationEngine.getValidationStatesBulk(chatIds);
   }
 
   /**

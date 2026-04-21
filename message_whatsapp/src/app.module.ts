@@ -113,6 +113,7 @@ import { IntegrationModule } from './integration/integration.module';
         WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().allow('').optional(),
         WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().allow('').optional(),
         WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
+        CALL_EVENT_API_KEY: Joi.string().allow('').optional(),
         FF_UNIFIED_WEBHOOK_ROUTER: Joi.string().optional(),
         FF_SHADOW_UNIFIED: Joi.string().optional(),
         REDIS_HOST: Joi.string().optional(),

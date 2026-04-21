@@ -1,15 +1,30 @@
 import React from 'react';
-import { CheckCircle, Lock } from 'lucide-react';
+import { CheckCircle, Lock, RotateCw } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 
 export default function BlockProgressBar() {
-  const blockProgress = useChatStore((state) => state.blockProgress);
+  const blockProgress   = useChatStore((state) => state.blockProgress);
+  const windowRotating  = useChatStore((state) => state.windowRotating);
 
   if (!blockProgress || blockProgress.total === 0) return null;
 
   const { validated, total } = blockProgress;
   const pct = Math.round((validated / total) * 100);
   const allDone = validated >= total;
+
+  if (windowRotating) {
+    return (
+      <div className="px-3 py-2 border-b border-blue-100 bg-blue-50 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <RotateCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+          <span className="text-xs font-medium text-blue-700">Rotation du bloc en cours…</span>
+        </div>
+        <div className="w-full bg-blue-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-blue-400 animate-pulse w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-3 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0">
@@ -35,8 +50,8 @@ export default function BlockProgressBar() {
         />
       </div>
       {allDone && (
-        <p className="text-xs text-green-600 mt-1 font-medium">
-          ✓ Toutes les conversations validées — rotation en cours…
+        <p className="text-xs text-green-600 mt-1 font-medium animate-pulse">
+          ✓ Toutes validées — rotation imminente
         </p>
       )}
     </div>

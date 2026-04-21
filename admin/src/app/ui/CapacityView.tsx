@@ -14,6 +14,8 @@ import {
   getValidationCriteria,
   getCallEvents,
   updateValidationCriterion,
+  forceWindowRotation,
+  rebuildWindow,
 } from '../lib/api/window.api';
 
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -38,6 +40,7 @@ export default function CapacityView() {
   const [config, setConfig] = useState<CapacityConfig>({ quotaActive: 10, quotaTotal: 50 });
   const [criteria, setCriteria] = useState<ValidationCriterion[]>([]);
   const [savingCriterion, setSavingCriterion] = useState<string | null>(null);
+  const [actionPoste, setActionPoste] = useState<string | null>(null);
   const [callEvents, setCallEvents] = useState<CallEventEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,6 +62,29 @@ export default function CapacityView() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleForceRotation = async (posteId: string) => {
+    setActionPoste(posteId);
+    try {
+      const r = await forceWindowRotation(posteId);
+      alert(`Rotation effectuée : ${r.releasedChatIds.length} libérées, ${r.promotedChatIds.length} promues`);
+      const [s] = await Promise.all([getCapacitySummary()]);
+      setSummary(s);
+    } finally {
+      setActionPoste(null);
+    }
+  };
+
+  const handleRebuildWindow = async (posteId: string) => {
+    setActionPoste(posteId);
+    try {
+      await rebuildWindow(posteId);
+      const [s] = await Promise.all([getCapacitySummary()]);
+      setSummary(s);
+    } finally {
+      setActionPoste(null);
+    }
+  };
 
   const handleToggleCriterion = async (id: string, field: 'is_required' | 'is_active', value: boolean) => {
     setSavingCriterion(id);
@@ -186,39 +212,69 @@ export default function CapacityView() {
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Poste</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Actives</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600">Validées</th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600">Verrouillées</th>
                     <th className="px-4 py-3 text-right font-medium text-gray-600">Total</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {summary.map((entry) => (
-                    <tr key={entry.posteId} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{entry.posteName}</td>
-                      <td className="px-4 py-3 w-48">
-                        <ProgressBar
-                          value={entry.activeCount}
-                          max={entry.quotaActive}
-                          color={
-                            entry.activeCount >= entry.quotaActive
-                              ? 'bg-red-500'
-                              : entry.activeCount >= entry.quotaActive * 0.8
-                                ? 'bg-orange-400'
-                                : 'bg-green-500'
-                          }
-                        />
-                      </td>
-                      <td className="px-4 py-3 w-48">
-                        <ProgressBar
-                          value={entry.lockedCount}
-                          max={Math.max(entry.quotaTotal - entry.quotaActive, 1)}
-                          color="bg-gray-400"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-700 font-medium">
-                        {entry.totalCount}/{entry.quotaTotal}
-                      </td>
-                    </tr>
-                  ))}
+                  {summary.map((entry) => {
+                    const blockTotal = entry.activeCount + entry.validatedCount;
+                    const allValidated = blockTotal > 0 && entry.activeCount === 0 && entry.validatedCount >= blockTotal;
+                    const isActing = actionPoste === entry.posteId;
+                    return (
+                      <tr key={entry.posteId} className={`hover:bg-gray-50 ${isActing ? 'opacity-50' : ''}`}>
+                        <td className="px-4 py-3 font-medium text-gray-900">{entry.posteName}</td>
+                        <td className="px-4 py-3 w-40">
+                          <ProgressBar
+                            value={entry.activeCount}
+                            max={entry.quotaActive}
+                            color={entry.activeCount >= entry.quotaActive ? 'bg-orange-400' : 'bg-blue-500'}
+                          />
+                        </td>
+                        <td className="px-4 py-3 w-32">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            allValidated ? 'bg-green-100 text-green-700' :
+                            entry.validatedCount > 0 ? 'bg-green-50 text-green-600' :
+                            'bg-gray-100 text-gray-400'
+                          }`}>
+                            {entry.validatedCount} / {entry.quotaActive}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 w-40">
+                          <ProgressBar
+                            value={entry.lockedCount}
+                            max={Math.max(entry.quotaTotal - entry.quotaActive, 1)}
+                            color="bg-gray-400"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-700 font-medium">
+                          {entry.totalCount}/{entry.quotaTotal}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleForceRotation(entry.posteId)}
+                              disabled={isActing}
+                              title="Forcer la rotation du bloc"
+                              className="text-xs px-2 py-1 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-md transition-colors disabled:opacity-50"
+                            >
+                              ↻ Rotation
+                            </button>
+                            <button
+                              onClick={() => handleRebuildWindow(entry.posteId)}
+                              disabled={isActing}
+                              title="Reconstruire la fenêtre"
+                              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors disabled:opacity-50"
+                            >
+                              ⟳ Rebuild
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -53,6 +53,24 @@ export async function getConversationValidationState(chatId: string): Promise<Co
   );
 }
 
+export async function forceWindowRotation(posteId: string): Promise<{ ok: boolean; releasedChatIds: string[]; promotedChatIds: string[] }> {
+  return handleResponse(
+    await fetch(`${API_BASE_URL}/window/rotate/${encodeURIComponent(posteId)}`, {
+      method: 'POST',
+      credentials: 'include',
+    }),
+  );
+}
+
+export async function rebuildWindow(posteId: string): Promise<{ ok: boolean; blockProgress: { validated: number; total: number } }> {
+  return handleResponse(
+    await fetch(`${API_BASE_URL}/window/rebuild/${encodeURIComponent(posteId)}`, {
+      method: 'POST',
+      credentials: 'include',
+    }),
+  );
+}
+
 export async function updateValidationCriterion(
   id: string,
   updates: { is_required?: boolean; is_active?: boolean; label?: string; sort_order?: number },

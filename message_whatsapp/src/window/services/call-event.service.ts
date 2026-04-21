@@ -87,27 +87,66 @@ export class CallEventService {
   }
 
   /**
-   * Corrèle un appel à la conversation active en cherchant le client par numéro
-   * et le commercial par son canal associé.
+   * Corrèle un appel à la conversation active :
+   * - Exact match sur plusieurs variantes de numéro (local, international)
+   * - Fallback LIKE sur les 8 derniers chiffres
+   * - Priorise les conversations dans la fenêtre active (window_status active/validated)
+   * - Restriction par commercial_phone si poste identifiable
    */
   private async correlateToChat(
     clientPhone: string,
-    _commercialPhone: string,
+    commercialPhone: string,
   ): Promise<WhatsappChat | null> {
-    const normalized = clientPhone.replace(/\D/g, '');
+    const clientNorm = clientPhone.replace(/\D/g, '');
+    const { exact, suffix } = this.buildPhoneVariants(clientNorm);
 
-    const chat = await this.chatRepo
-      .createQueryBuilder('c')
-      .where(
-        "(c.contact_client LIKE :phone OR c.contact_client LIKE :intl)",
-        { phone: `%${normalized}`, intl: `%${normalized.replace(/^0/, '225')}` },
-      )
-      .andWhere('c.deletedAt IS NULL')
-      .andWhere("c.status != 'fermé'")
-      .orderBy('c.last_activity_at', 'DESC')
-      .getOne();
+    // Construire les clauses OR paramétrées (exact + LIKE séparés)
+    const conditions: string[] = exact.map((_, i) => `c.contact_client = :e${i}`);
+    const params: Record<string, string> = {};
+    exact.forEach((v, i) => { params[`e${i}`] = v; });
+    if (suffix) {
+      conditions.push('c.contact_client LIKE :suffix');
+      params['suffix'] = `%${suffix}`;
+    }
 
-    return chat ?? null;
+    if (conditions.length === 0) return null;
+
+    const buildBase = () =>
+      this.chatRepo
+        .createQueryBuilder('c')
+        .where(`(${conditions.join(' OR ')})`, params)
+        .andWhere('c.deletedAt IS NULL')
+        .andWhere("c.status != 'fermé'")
+        .orderBy(`CASE WHEN c.window_status IN ('active','validated') THEN 0 ELSE 1 END`, 'ASC')
+        .addOrderBy('c.last_activity_at', 'DESC');
+
+    // Essai restreint au poste du commercial
+    if (commercialPhone) {
+      const commNorm = commercialPhone.replace(/\D/g, '');
+      if (commNorm.length >= 8) {
+        const withPoste = await buildBase()
+          .innerJoin('c.poste', 'p')
+          .andWhere('p.phone LIKE :commPhone', { commPhone: `%${commNorm.slice(-8)}` })
+          .getOne();
+        if (withPoste) return withPoste;
+      }
+    }
+
+    return buildBase().getOne() ?? null;
+  }
+
+  private buildPhoneVariants(normalized: string): { exact: string[]; suffix: string | null } {
+    const exact = new Set<string>([normalized]);
+    // 0XXXXXXXX → 225XXXXXXXX (Côte d'Ivoire)
+    if (normalized.startsWith('0') && normalized.length >= 9) {
+      exact.add('225' + normalized.slice(1));
+    }
+    // 225XXXXXXXX → 0XXXXXXXX
+    if (normalized.startsWith('225') && normalized.length >= 11) {
+      exact.add('0' + normalized.slice(3));
+    }
+    const suffix = normalized.length >= 8 ? normalized.slice(-8) : null;
+    return { exact: [...exact], suffix };
   }
 
   /** Historique des appels (admin). */

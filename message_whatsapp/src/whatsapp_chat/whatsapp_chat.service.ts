@@ -186,6 +186,14 @@ export class WhatsappChatService {
 
   async update(chat_id: string, data: Partial<WhatsappChat>): Promise<void> {
     await this.chatRepository.update({ chat_id }, data);
+    // Émettre l'événement de changement de statut si applicable
+    if (data.status !== undefined) {
+      this.eventEmitter.emit('conversation.status_changed', {
+        chatId: chat_id,
+        newStatus: data.status,
+        oldStatus: null,
+      });
+    }
   }
 
   /** Marque une conversation comme réouverte (utilisé par FlowBot isReopened). */

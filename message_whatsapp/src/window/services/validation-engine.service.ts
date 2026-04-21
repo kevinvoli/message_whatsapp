@@ -49,6 +49,48 @@ export class ValidationEngineService {
       this.validationRepo.find({ where: { chat_id: chatId } }),
     ]);
 
+    return this.buildStateFromCriteriaAndValidations(criteria, validations);
+  }
+
+  /**
+   * Charge les états de validation pour plusieurs conversations en 2 requêtes (bulk).
+   * Remplace N appels à getValidationState().
+   */
+  async getValidationStatesBulk(
+    chatIds: string[],
+  ): Promise<Map<string, CriterionState[]>> {
+    const result = new Map<string, CriterionState[]>();
+    if (chatIds.length === 0) return result;
+
+    const [criteria, allValidations] = await Promise.all([
+      this.getActiveCriteria(),
+      this.validationRepo
+        .createQueryBuilder('v')
+        .where('v.chat_id IN (:...chatIds)', { chatIds })
+        .getMany(),
+    ]);
+
+    // Grouper les validations par chat_id
+    const byChat = new Map<string, typeof allValidations>();
+    for (const v of allValidations) {
+      const list = byChat.get(v.chat_id) ?? [];
+      list.push(v);
+      byChat.set(v.chat_id, list);
+    }
+
+    for (const chatId of chatIds) {
+      const validations = byChat.get(chatId) ?? [];
+      const { criteria: states } = this.buildStateFromCriteriaAndValidations(criteria, validations);
+      result.set(chatId, states);
+    }
+
+    return result;
+  }
+
+  private buildStateFromCriteriaAndValidations(
+    criteria: ValidationCriterionConfig[],
+    validations: ConversationValidation[],
+  ): ConversationValidationState {
     const validationMap = new Map(validations.map((v) => [v.criterion_type, v]));
 
     const criteriaStates: CriterionState[] = criteria.map((c) => {

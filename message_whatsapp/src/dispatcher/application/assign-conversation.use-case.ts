@@ -181,7 +181,11 @@ export class AssignConversationUseCase {
       const targetStatus = nextAgent.is_active
         ? WhatsappChatStatus.ACTIF
         : WhatsappChatStatus.EN_ATTENTE;
+      const oldPosteId = conversation.poste_id ?? null;
       transitionStatus(conversation.chat_id, conversation.status, targetStatus, 'AssignConversation/reassign');
+      // Vider le slot fenêtre avant de changer de poste
+      conversation.window_slot = null;
+      conversation.window_status = null;
       conversation.poste = nextAgent;
       conversation.poste_id = nextAgent.id;
       conversation.status = targetStatus;
@@ -193,6 +197,10 @@ export class AssignConversationUseCase {
       conversation.last_client_message_at = new Date();
       const saved = await this.queryService.saveChat(conversation);
       if (this.capacityService) {
+        // Si c'est un changement de poste, compacter l'ancien poste en arrière-plan
+        if (oldPosteId && oldPosteId !== nextAgent.id) {
+          this.capacityService.scheduleCompact(oldPosteId);
+        }
         await this.capacityService.onConversationAssigned(saved);
       }
       void this.notificationService.create(
