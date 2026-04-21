@@ -1,4 +1,4 @@
-import { Module, Logger } from '@nestjs/common';
+import { Global, Module, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { DistributedLockService } from './distributed-lock.service';
@@ -15,6 +15,7 @@ import { DistributedLockService } from './distributed-lock.service';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
+@Global()
 @Module({
   providers: [
     {
