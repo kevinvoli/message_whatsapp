@@ -65,6 +65,7 @@ import { GeoAccessModule } from './geo-access/geo_access.module';
 import { ConversationCapacityModule } from './conversation-capacity/conversation-capacity.module';
 import { SystemHealthModule } from './system-health/system-health.module';
 import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
+import { IntegrationModule } from './integration/integration.module';
 
 @Module({
   imports: [
@@ -191,8 +192,9 @@ import { InboundIntegrationModule } from './inbound-integration/inbound-integrat
     ConversationCapacityModule,
     // Phase 4 — Dashboard technique
     SystemHealthModule,
-    // Phase Intégration — webhooks entrants ERP
+    // Phase Intégration — webhooks entrants ERP + identity mapping + webhooks sortants
     InboundIntegrationModule,
+    IntegrationModule,
   ],
   controllers: [AppController],
   providers: [

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact, CertificationStatus, ClientCategory } from 'src/contact/entities/contact.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // ── Payloads entrants depuis l'ERP ─────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export class InboundIntegrationService {
   constructor(
     @InjectRepository(Contact)
     private readonly contactRepo: Repository<Contact>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async handleErpEvent(payload: InboundErpPayload): Promise<{ processed: boolean; event: string }> {
@@ -176,6 +178,11 @@ export class InboundIntegrationService {
 
     await this.contactRepo.save(contact);
     this.logger.log(`Contact ${contact.id} certification → ${contact.certification_status}`);
+    this.eventEmitter.emit('contact.updated', {
+      contactId: contact.id,
+      phone: contact.phone,
+      changes: { certification_status: contact.certification_status, certified_at: contact.certified_at },
+    });
   }
 
   private async handleReferral(payload: ReferralUpdatedPayload): Promise<void> {
@@ -191,5 +198,10 @@ export class InboundIntegrationService {
 
     await this.contactRepo.save(contact);
     this.logger.log(`Contact ${contact.id} parrainage → code=${contact.referral_code} count=${contact.referral_count}`);
+    this.eventEmitter.emit('contact.updated', {
+      contactId: contact.id,
+      phone: contact.phone,
+      changes: { referral_code: contact.referral_code, referral_count: contact.referral_count, referral_commission: contact.referral_commission },
+    });
   }
 }

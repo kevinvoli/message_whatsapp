@@ -45,6 +45,10 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'FF_UNIFIED_WHAPI_PCT', label: 'Pourcentage trafic Whapi unifié', category: 'feature_flags', description: '0–100' },
   { key: 'FF_FLOWBOT_ACTIVE', label: 'FlowBot actif', category: 'feature_flags', description: 'true / false — active le moteur FlowBot' },
 
+  // ─── Intégration ERP ─────────────────────────────────────────────────────────
+  { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
+  { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant)', isSecret: true },
+
 ];
 
 

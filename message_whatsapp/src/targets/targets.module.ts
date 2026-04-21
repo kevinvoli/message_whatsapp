@@ -6,9 +6,10 @@ import { TargetsController } from './targets.controller';
 import { WhatsappMessage } from '../whatsapp_message/entities/whatsapp_message.entity';
 import { CallLog } from '../call-log/entities/call_log.entity';
 import { FollowUp } from '../follow-up/entities/follow_up.entity';
+import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CommercialTarget, WhatsappMessage, CallLog, FollowUp])],
+  imports: [TypeOrmModule.forFeature([CommercialTarget, WhatsappMessage, CallLog, FollowUp, WhatsappCommercial])],
   providers: [TargetsService],
   controllers: [TargetsController],
   exports: [TargetsService],

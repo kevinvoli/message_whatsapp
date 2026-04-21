@@ -5,6 +5,7 @@ import { LessThan, Repository } from 'typeorm';
 import { FollowUp, FollowUpStatus } from './entities/follow_up.entity';
 import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { CompleteFollowUpDto } from './dto/complete-follow-up.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class FollowUpService {
@@ -13,6 +14,7 @@ export class FollowUpService {
   constructor(
     @InjectRepository(FollowUp)
     private readonly repo: Repository<FollowUp>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateFollowUpDto, commercial_id: string, commercial_name: string): Promise<FollowUp> {
@@ -23,7 +25,15 @@ export class FollowUpService {
       commercial_name,
       status: FollowUpStatus.PLANIFIEE,
     });
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+    this.eventEmitter.emit('follow_up.created', {
+      followUpId: saved.id,
+      contactId: saved.contact_id,
+      commercialId: saved.commercial_id,
+      scheduledAt: saved.scheduled_at,
+      notes: saved.notes ?? undefined,
+    });
+    return saved;
   }
 
   async findByContact(contact_id: string): Promise<FollowUp[]> {
@@ -79,7 +89,15 @@ export class FollowUpService {
     entity.completed_at = new Date();
     entity.result = dto.result ?? null;
     if (dto.notes) entity.notes = dto.notes;
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+    this.eventEmitter.emit('follow_up.completed', {
+      followUpId: saved.id,
+      contactId: saved.contact_id,
+      commercialId: saved.commercial_id,
+      outcome: saved.result ?? undefined,
+      completedAt: saved.completed_at!,
+    });
+    return saved;
   }
 
   async cancel(id: string, commercial_id: string): Promise<FollowUp> {

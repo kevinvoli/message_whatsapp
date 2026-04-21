@@ -40,6 +40,8 @@ import IpAccessView from '@/app/ui/IpAccessView';
 import SessionsView from '@/app/ui/SessionsView';
 import CapacityView from '@/app/ui/CapacityView';
 import SystemHealthView from '@/app/ui/SystemHealthView';
+import IntegrationView from '@/app/ui/IntegrationView';
+import RankingView from '@/app/ui/RankingView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -118,6 +120,10 @@ export default function AdminDashboard() {
                 return <ObservabiliteView />;
             case 'system-health':
                 return <SystemHealthView />;
+            case 'integration':
+                return <IntegrationView />;
+            case 'ranking':
+                return <RankingView />;
             case 'go_no_go':
                 return <GoNoGoView />;
             case 'canaux':

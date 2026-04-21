@@ -31,6 +31,12 @@ export class TargetsController {
     return this.targetsService.getProgressAll();
   }
 
+  @UseGuards(AdminGuard)
+  @Get('ranking')
+  getRanking(@Query('period') period?: 'today' | 'week' | 'month') {
+    return this.targetsService.getRanking(period ?? 'month');
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Get('my-progress')
   getMyProgress(@Request() req) {

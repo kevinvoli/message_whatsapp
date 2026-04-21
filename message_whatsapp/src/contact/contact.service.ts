@@ -9,6 +9,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ContactService {
@@ -18,6 +19,7 @@ export class ContactService {
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
     private readonly callLogService: CallLogService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
   
 
@@ -39,7 +41,14 @@ export class ContactService {
         name: name ?? phone,
         chat_id: chat_id ?? undefined,
       });
-      return this.repo.save(contact);
+      const saved = await this.repo.save(contact);
+      this.eventEmitter.emit('contact.created', {
+        contactId: saved.id,
+        phone: saved.phone,
+        name: saved.name,
+        source: saved.source ?? undefined,
+      });
+      return saved;
     }
 
     // Keep chat link and display name fresh when webhook provides new values.

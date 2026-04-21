@@ -59,7 +59,11 @@ export type ViewMode =
   // Phase 3 — Capacité conversationnelle
   | 'capacity'
   // Phase 4 — Dashboard technique
-  | 'system-health';
+  | 'system-health'
+  // Phase Intégration ERP
+  | 'integration'
+  // Ranking (4.7)
+  | 'ranking';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

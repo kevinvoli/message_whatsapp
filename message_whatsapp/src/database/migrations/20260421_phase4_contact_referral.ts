@@ -1,25 +1,37 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
 export class Phase4ContactReferral1745200000010 implements MigrationInterface {
   name = 'Phase4ContactReferral1745200000010';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE \`contact\`
-        ADD COLUMN IF NOT EXISTS \`certified_at\`        TIMESTAMP     NULL DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS \`referral_code\`       VARCHAR(50)   NULL DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS \`referral_count\`      INT           NULL DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS \`referral_commission\` DECIMAL(12,2) NULL DEFAULT NULL
-    `);
+    if (!(await queryRunner.hasColumn('contact', 'certified_at'))) {
+      await queryRunner.addColumn('contact', new TableColumn({
+        name: 'certified_at', type: 'timestamp', isNullable: true, default: null,
+      }));
+    }
+    if (!(await queryRunner.hasColumn('contact', 'referral_code'))) {
+      await queryRunner.addColumn('contact', new TableColumn({
+        name: 'referral_code', type: 'varchar', length: '50', isNullable: true, default: null,
+      }));
+    }
+    if (!(await queryRunner.hasColumn('contact', 'referral_count'))) {
+      await queryRunner.addColumn('contact', new TableColumn({
+        name: 'referral_count', type: 'int', isNullable: true, default: null,
+      }));
+    }
+    if (!(await queryRunner.hasColumn('contact', 'referral_commission'))) {
+      await queryRunner.addColumn('contact', new TableColumn({
+        name: 'referral_commission', type: 'decimal', precision: 12, scale: 2,
+        isNullable: true, default: null,
+      }));
+    }
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE \`contact\`
-        DROP COLUMN IF EXISTS \`certified_at\`,
-        DROP COLUMN IF EXISTS \`referral_code\`,
-        DROP COLUMN IF EXISTS \`referral_count\`,
-        DROP COLUMN IF EXISTS \`referral_commission\`
-    `);
+    for (const col of ['certified_at', 'referral_code', 'referral_count', 'referral_commission']) {
+      if (await queryRunner.hasColumn('contact', col)) {
+        await queryRunner.dropColumn('contact', col);
+      }
+    }
   }
 }

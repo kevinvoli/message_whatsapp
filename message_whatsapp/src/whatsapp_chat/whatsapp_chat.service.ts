@@ -15,6 +15,7 @@ import {
   CommercialStats,
 } from 'src/conversations/infrastructure/conversation-read-query.service';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Re-export des interfaces pour les consommateurs existants (rétro-compatibilité)
 export type { PosteStats, CommercialStats };
@@ -31,6 +32,7 @@ export class WhatsappChatService {
 
     @Optional()
     private readonly capacityService: ConversationCapacityService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ── Délégation aux lectures : ConversationReadQueryService ──────────────────
@@ -231,6 +233,13 @@ export class WhatsappChatService {
     if (this.capacityService && saved.poste_id) {
       await this.capacityService.onConversationQualified(saved.poste_id);
     }
+
+    this.eventEmitter.emit('conversation.status_changed', {
+      chatId: saved.chat_id,
+      oldStatus: saved.status,
+      newStatus: saved.status,
+      result: result,
+    });
 
     return saved;
   }
