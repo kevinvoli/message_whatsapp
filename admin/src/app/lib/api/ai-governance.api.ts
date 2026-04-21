@@ -11,6 +11,7 @@ export interface AiModuleConfig {
   allowed_roles: string[] | null;
   allowed_channels: string[] | null;
   security_rules: Record<string, unknown> | null;
+  provider_id: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +22,7 @@ export interface UpdateModuleConfigDto {
   requires_human_validation?: boolean;
   schedule_start?: string | null;
   schedule_end?: string | null;
+  provider_id?: string | null;
 }
 
 export interface AiExecutionLog {
@@ -88,6 +90,52 @@ export async function getAiDashboard(since?: string): Promise<AiDashboard> {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) throw new Error('Erreur chargement dashboard IA');
   return res.json() as Promise<AiDashboard>;
+}
+
+export interface AiProvider {
+  id: string;
+  name: string;
+  provider_type: 'anthropic' | 'openai' | 'ollama' | 'custom';
+  model: string;
+  api_key: string | null;
+  api_url: string | null;
+  timeout_ms: number;
+  is_active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getAiProviders(): Promise<AiProvider[]> {
+  const res = await fetch(`${BASE}/providers`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Erreur chargement moteurs IA');
+  return res.json() as Promise<AiProvider[]>;
+}
+
+export async function createAiProvider(dto: Omit<AiProvider, 'id' | 'createdAt' | 'updatedAt' | 'is_active'>): Promise<AiProvider> {
+  const res = await fetch(`${BASE}/providers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) throw new Error('Erreur création moteur IA');
+  return res.json() as Promise<AiProvider>;
+}
+
+export async function updateAiProvider(id: string, dto: Partial<Omit<AiProvider, 'id' | 'createdAt' | 'updatedAt'>>): Promise<AiProvider> {
+  const res = await fetch(`${BASE}/providers/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) throw new Error('Erreur mise à jour moteur IA');
+  return res.json() as Promise<AiProvider>;
+}
+
+export async function deleteAiProvider(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/providers/${id}`, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) throw new Error('Erreur suppression moteur IA');
 }
 
 export interface QualityAnalysis {

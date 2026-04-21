@@ -52,6 +52,10 @@ export class AiModuleConfig {
   @Column({ type: 'json', nullable: true })
   security_rules: Record<string, unknown> | null;
 
+  /** ID du moteur IA dédié à ce module (null = utiliser le provider global system_config) */
+  @Column({ type: 'char', length: 36, nullable: true })
+  provider_id: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

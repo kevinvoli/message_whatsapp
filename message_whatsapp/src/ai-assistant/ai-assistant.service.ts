@@ -86,7 +86,25 @@ export class AiAssistantService {
 
   // ─── Config depuis la BDD ──────────────────────────────────────────────────
 
-  private async getAiConfig(): Promise<AiConfig> {
+  /**
+   * Résout la config IA à utiliser pour un module donné.
+   * Priorité : provider dédié au module → provider global system_config → var d'env legacy.
+   */
+  private async getAiConfig(moduleName?: string): Promise<AiConfig> {
+    // 1. Provider dédié au module
+    if (moduleName) {
+      const dedicated = await this.governance.getProviderForModule(moduleName);
+      if (dedicated) {
+        return {
+          provider: dedicated.provider_type,
+          model: dedicated.model,
+          apiKey: dedicated.api_key,
+          apiUrl: dedicated.api_url,
+        };
+      }
+    }
+
+    // 2. Provider global depuis system_config
     const [provider, model, apiKey, apiUrl] = await Promise.all([
       this.systemConfig.get('AI_PROVIDER'),
       this.systemConfig.get('AI_MODEL'),
@@ -126,7 +144,7 @@ export class AiAssistantService {
 
     if (messages.length === 0) return this.genericSuggestions();
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('suggestions');
     if (!config.apiKey) {
       await this.governance.log({ module_name: 'suggestions', scenario: 'suggestReplies', triggered_by: triggeredBy, chat_id: chatId, success: true, latency_ms: 0, fallback_used: true });
       return this.fallbackSuggestions(messages);
@@ -166,7 +184,7 @@ Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, 
       return { result: text };
     }
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('rewrite');
     if (!config.apiKey) {
       await this.governance.log({ module_name: 'rewrite', scenario: `rewrite:${mode}`, triggered_by: triggeredBy, success: true, latency_ms: 0, fallback_used: true });
       return { result: text };
@@ -205,7 +223,7 @@ Réponds UNIQUEMENT avec un JSON valide : [{"text": "...", "rationale": "..."}, 
       return this.fallbackSummary(chatId, messages);
     }
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('summary');
     if (!config.apiKey || messages.length === 0) {
       await this.governance.log({ module_name: 'summary', scenario: 'summarizeConversation', triggered_by: triggeredBy, chat_id: chatId, success: true, latency_ms: 0, fallback_used: true });
       return this.fallbackSummary(chatId, messages);
@@ -262,7 +280,7 @@ Réponds UNIQUEMENT avec un JSON valide :
       return fallback;
     }
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('qualification');
     if (!config.apiKey || messages.length === 0) {
       await this.governance.log({ module_name: 'qualification', scenario: 'qualifyConversation', triggered_by: triggeredBy, chat_id: chatId, success: true, latency_ms: 0, fallback_used: true });
       return fallback;
@@ -318,7 +336,7 @@ Réponds UNIQUEMENT avec un JSON valide :
       return { message: '' };
     }
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('followup');
     if (!config.apiKey) {
       await this.governance.log({ module_name: 'followup', scenario: 'generateFollowUpMessage', triggered_by: triggeredBy, success: true, latency_ms: 0, fallback_used: true });
       return { message: '' };
@@ -361,7 +379,7 @@ Réponds UNIQUEMENT avec le texte du message, sans guillemets ni explication.`;
 
   async generateFlowbotReply(chatId: string, opts: FlowbotReplyOptions): Promise<string> {
     const messages = await this.getRecentMessages(chatId, 10);
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('flowbot');
     const t0 = Date.now();
 
     if (!config.apiKey) {
@@ -425,7 +443,7 @@ Réponds UNIQUEMENT avec le texte du message, sans guillemets ni explication.`;
       return fallback;
     }
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('dossier');
     if (!config.apiKey) {
       await this.governance.log({ module_name: 'dossier', scenario: 'synthesizeDossier', triggered_by: triggeredBy, success: true, latency_ms: 0, fallback_used: true });
       return fallback;
@@ -506,7 +524,7 @@ Réponds UNIQUEMENT avec un JSON valide :
       return fallback;
     }
 
-    const config = await this.getAiConfig();
+    const config = await this.getAiConfig('quality');
     if (!config.apiKey || messages.length === 0) {
       await this.governance.log({ module_name: 'quality', scenario: 'analyzeQuality', triggered_by: triggeredBy, chat_id: chatId, success: true, latency_ms: 0, fallback_used: true });
       return fallback;

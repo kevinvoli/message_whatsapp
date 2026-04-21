@@ -6,11 +6,12 @@ import {
   XCircle, AlertTriangle, BarChart3, List, Settings2, Zap, Activity,
 } from 'lucide-react';
 import {
-  AiDashboard, AiExecutionLog, AiModuleConfig, QualityAnalysis,
+  AiDashboard, AiExecutionLog, AiModuleConfig, AiProvider, QualityAnalysis,
   getAiDashboard, getAiLogs, getAiModules, updateAiModule, analyzeConversationQuality,
+  getAiProviders, createAiProvider, updateAiProvider, deleteAiProvider,
 } from '../lib/api/ai-governance.api';
 
-type Tab = 'dashboard' | 'modules' | 'logs' | 'coaching';
+type Tab = 'dashboard' | 'modules' | 'logs' | 'coaching' | 'providers';
 
 const MODULE_ICONS: Record<string, React.ElementType> = {
   suggestions: Sparkles,
@@ -106,8 +107,9 @@ function ModuleRow({ mod, onToggle, onEdit }: {
   );
 }
 
-function EditModal({ mod, onClose, onSave }: {
+function EditModal({ mod, providers, onClose, onSave }: {
   mod: AiModuleConfig;
+  providers: AiProvider[];
   onClose: () => void;
   onSave: (name: string, dto: Partial<AiModuleConfig>) => Promise<void>;
 }) {
@@ -115,6 +117,7 @@ function EditModal({ mod, onClose, onSave }: {
   const [scheduleStart, setScheduleStart] = useState(mod.schedule_start ?? '');
   const [scheduleEnd, setScheduleEnd] = useState(mod.schedule_end ?? '');
   const [validation, setValidation] = useState(mod.requires_human_validation);
+  const [providerId, setProviderId] = useState<string>(mod.provider_id ?? '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -124,16 +127,44 @@ function EditModal({ mod, onClose, onSave }: {
       schedule_start: scheduleStart || null,
       schedule_end: scheduleEnd || null,
       requires_human_validation: validation,
+      provider_id: providerId || null,
     });
     setSaving(false);
     onClose();
   };
+
+  const activeProviders = providers.filter(p => p.is_active);
+  const selectedProvider = activeProviders.find(p => p.id === providerId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
         <h3 className="text-base font-bold text-gray-900 mb-4">Configurer — {mod.label}</h3>
         <div className="space-y-4">
+          {/* Moteur IA dédié */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Moteur IA pour ce module</label>
+            <select
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              value={providerId}
+              onChange={e => setProviderId(e.target.value)}
+            >
+              <option value="">— Provider global (system_config) —</option>
+              {activeProviders.map(p => (
+                <option key={p.id} value={p.id}>{p.name} — {p.model}</option>
+              ))}
+            </select>
+            {selectedProvider && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                {PROVIDER_TYPE_LABELS[selectedProvider.provider_type]} · {selectedProvider.model}
+                {selectedProvider.api_url ? ` · ${selectedProvider.api_url}` : ''}
+              </p>
+            )}
+            {activeProviders.length === 0 && (
+              <p className="text-xs text-amber-600 mt-0.5">Aucun moteur actif — allez dans l&apos;onglet &quot;Moteurs IA&quot; pour en ajouter.</p>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Texte de fallback</label>
             <textarea
@@ -235,6 +266,181 @@ function LogsTable({ logs, total, page, onPage, filterModule, onFilterModule, mo
           <button onClick={() => onPage(page - 1)} disabled={page <= 1} className="px-3 py-1 text-xs border border-gray-200 rounded disabled:opacity-40">Précédent</button>
           <span className="text-xs text-gray-500">{page} / {totalPages}</span>
           <button onClick={() => onPage(page + 1)} disabled={page >= totalPages} className="px-3 py-1 text-xs border border-gray-200 rounded disabled:opacity-40">Suivant</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PROVIDER_TYPE_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic (Claude)',
+  openai: 'OpenAI / Compatible',
+  ollama: 'Ollama (local)',
+  custom: 'Personnalisé',
+};
+const PROVIDER_TYPE_COLORS: Record<string, string> = {
+  anthropic: 'bg-violet-100 text-violet-700',
+  openai:    'bg-green-100 text-green-700',
+  ollama:    'bg-orange-100 text-orange-700',
+  custom:    'bg-gray-100 text-gray-700',
+};
+
+function ProviderFormModal({ initial, onClose, onSave }: {
+  initial?: AiProvider | null;
+  onClose: () => void;
+  onSave: (dto: Partial<AiProvider>) => Promise<void>;
+}) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [type, setType] = useState<AiProvider['provider_type']>(initial?.provider_type ?? 'anthropic');
+  const [model, setModel] = useState(initial?.model ?? '');
+  const [apiKey, setApiKey] = useState(initial?.api_key ?? '');
+  const [apiUrl, setApiUrl] = useState(initial?.api_url ?? '');
+  const [timeout, setTimeout] = useState(String(initial?.timeout_ms ?? 30000));
+  const [saving, setSaving] = useState(false);
+
+  const DEFAULT_MODELS: Record<string, string> = {
+    anthropic: 'claude-haiku-4-5-20251001',
+    openai: 'gpt-4o-mini',
+    ollama: 'llama3',
+    custom: '',
+  };
+
+  const handleSave = async () => {
+    if (!name.trim() || !model.trim()) return;
+    setSaving(true);
+    await onSave({ name, provider_type: type, model, api_key: apiKey || null, api_url: apiUrl || null, timeout_ms: parseInt(timeout) || 30000 });
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-gray-900">{initial ? 'Modifier le moteur' : 'Ajouter un moteur IA'}</h3>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Nom du moteur *</label>
+          <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Claude Haiku — FlowBot" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Type de provider *</label>
+            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={type} onChange={e => { setType(e.target.value as AiProvider['provider_type']); if (!model) setModel(DEFAULT_MODELS[e.target.value] ?? ''); }}>
+              {Object.entries(PROVIDER_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Modèle *</label>
+            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono" value={model} onChange={e => setModel(e.target.value)} placeholder={DEFAULT_MODELS[type]} />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Clé API</label>
+          <input type="password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-… ou vide si non requis (Ollama local)" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">URL API personnalisée</label>
+            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono" value={apiUrl} onChange={e => setApiUrl(e.target.value)} placeholder="http://localhost:11434" />
+            <p className="text-xs text-gray-400 mt-0.5">Vide = URL par défaut du provider</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Timeout (ms)</label>
+            <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={timeout} onChange={e => setTimeout(e.target.value)} min={1000} />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Annuler</button>
+          <button onClick={() => void handleSave()} disabled={saving || !name.trim() || !model.trim()} className="px-4 py-2 text-sm font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50">
+            {saving ? 'Enregistrement…' : initial ? 'Enregistrer' : 'Ajouter'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProvidersPanel({ providers, onRefresh }: { providers: AiProvider[]; onRefresh: () => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<AiProvider | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const handleSave = async (dto: Partial<AiProvider>) => {
+    if (editing) await updateAiProvider(editing.id, dto);
+    else await createAiProvider(dto as Omit<AiProvider, 'id' | 'createdAt' | 'updatedAt' | 'is_active'>);
+    onRefresh();
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteAiProvider(id);
+    setConfirmDelete(null);
+    onRefresh();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">Configurez vos moteurs IA. Chaque module peut utiliser un moteur différent — si aucun moteur n&apos;est assigné à un module, le provider global (system_config) est utilisé.</p>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+          + Ajouter un moteur
+        </button>
+      </div>
+
+      {providers.length === 0 && (
+        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl text-gray-400">
+          Aucun moteur IA configuré — ajoutez-en un pour l&apos;assigner à des modules.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {providers.map(p => (
+          <div key={p.id} className={`flex items-center gap-4 p-4 rounded-xl border ${p.is_active ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-semibold text-gray-900 text-sm">{p.name}</p>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PROVIDER_TYPE_COLORS[p.provider_type] ?? 'bg-gray-100 text-gray-600'}`}>{PROVIDER_TYPE_LABELS[p.provider_type] ?? p.provider_type}</span>
+                {!p.is_active && <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-600">Inactif</span>}
+              </div>
+              <div className="flex items-center gap-4 text-xs text-gray-400">
+                <span className="font-mono">{p.model}</span>
+                {p.api_url && <span>URL : {p.api_url}</span>}
+                <span>Timeout : {p.timeout_ms} ms</span>
+                {p.api_key && <span className="text-green-600">● Clé API définie</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { setEditing(p); setShowForm(true); }} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">Modifier</button>
+              <button onClick={() => void updateAiProvider(p.id, { is_active: !p.is_active }).then(onRefresh)} className={`px-3 py-1.5 text-xs border rounded-lg ${p.is_active ? 'border-orange-200 text-orange-600 hover:bg-orange-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
+                {p.is_active ? 'Désactiver' : 'Activer'}
+              </button>
+              <button onClick={() => setConfirmDelete(p.id)} className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50">Supprimer</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {(showForm) && (
+        <ProviderFormModal
+          initial={editing}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          onSave={handleSave}
+        />
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl p-6 shadow-xl max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-gray-900 mb-2">Supprimer ce moteur ?</h3>
+            <p className="text-sm text-gray-500 mb-4">Les modules qui l&apos;utilisent reviendront au provider global.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg">Annuler</button>
+              <button onClick={() => void handleDelete(confirmDelete)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Supprimer</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -347,6 +553,7 @@ function CoachingPanel() {
 export default function AiGovernanceView() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [modules, setModules] = useState<AiModuleConfig[]>([]);
+  const [providers, setProviders] = useState<AiProvider[]>([]);
   const [dashboard, setDashboard] = useState<AiDashboard | null>(null);
   const [logs, setLogs] = useState<AiExecutionLog[]>([]);
   const [logsTotal, setLogsTotal] = useState(0);
@@ -360,9 +567,10 @@ export default function AiGovernanceView() {
     setLoading(true);
     setError(null);
     try {
-      const [mods, dash] = await Promise.all([getAiModules(), getAiDashboard()]);
+      const [mods, dash, provs] = await Promise.all([getAiModules(), getAiDashboard(), getAiProviders()]);
       setModules(mods);
       setDashboard(dash);
+      setProviders(provs);
     } catch { setError('Impossible de charger les données IA.'); }
     finally { setLoading(false); }
   }, []);
@@ -414,7 +622,7 @@ export default function AiGovernanceView() {
 
       {/* Tabs */}
       <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit">
-        {([['dashboard', 'Dashboard', BarChart3], ['modules', 'Modules', Settings2], ['logs', 'Journaux', List], ['coaching', 'Coaching', Activity]] as [Tab, string, React.ElementType][]).map(([id, label, Icon]) => (
+        {([['dashboard', 'Dashboard', BarChart3], ['providers', 'Moteurs IA', Zap], ['modules', 'Modules', Settings2], ['logs', 'Journaux', List], ['coaching', 'Coaching', Activity]] as [Tab, string, React.ElementType][]).map(([id, label, Icon]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -497,6 +705,14 @@ export default function AiGovernanceView() {
         />
       )}
 
+      {/* Moteurs IA */}
+      {tab === 'providers' && (
+        <ProvidersPanel
+          providers={providers}
+          onRefresh={() => void loadModules()}
+        />
+      )}
+
       {/* Coaching */}
       {tab === 'coaching' && <CoachingPanel />}
 
@@ -504,6 +720,7 @@ export default function AiGovernanceView() {
       {editingModule && (
         <EditModal
           mod={editingModule}
+          providers={providers}
           onClose={() => setEditingModule(null)}
           onSave={handleSaveEdit}
         />

@@ -7,4 +7,5 @@ export class UpdateModuleConfigDto {
   allowed_roles?: string[] | null;
   allowed_channels?: string[] | null;
   security_rules?: Record<string, unknown> | null;
+  provider_id?: string | null;
 }

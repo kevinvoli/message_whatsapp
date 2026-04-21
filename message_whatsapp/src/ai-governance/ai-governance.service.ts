@@ -1,8 +1,9 @@
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository } from 'typeorm';
 import { AiModuleConfig, AiModuleName } from './entities/ai-module-config.entity';
 import { AiExecutionLog } from './entities/ai-execution-log.entity';
+import { AiProvider } from './entities/ai-provider.entity';
 import { UpdateModuleConfigDto } from './dto/update-module-config.dto';
 
 export interface LogAiExecutionDto {
@@ -59,6 +60,8 @@ export class AiGovernanceService implements OnApplicationBootstrap {
     private readonly configRepo: Repository<AiModuleConfig>,
     @InjectRepository(AiExecutionLog)
     private readonly logRepo: Repository<AiExecutionLog>,
+    @InjectRepository(AiProvider)
+    private readonly providerRepo: Repository<AiProvider>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -147,6 +150,69 @@ export class AiGovernanceService implements OnApplicationBootstrap {
       take: limit,
     });
     return { items, total };
+  }
+
+  // ── Moteurs IA (providers) ────────────────────────────────────────────────
+
+  async getProviders(): Promise<AiProvider[]> {
+    return this.providerRepo.find({ order: { createdAt: 'ASC' } });
+  }
+
+  async getProvider(id: string): Promise<AiProvider | null> {
+    return this.providerRepo.findOne({ where: { id } });
+  }
+
+  /** Résout le provider configuré pour un module (ou null si global). */
+  async getProviderForModule(moduleName: string): Promise<AiProvider | null> {
+    const cfg = await this.getModuleConfig(moduleName);
+    if (!cfg?.provider_id) return null;
+    return this.providerRepo.findOne({ where: { id: cfg.provider_id, is_active: true } });
+  }
+
+  async createProvider(dto: {
+    name: string;
+    provider_type: string;
+    model: string;
+    api_key?: string | null;
+    api_url?: string | null;
+    timeout_ms?: number;
+  }): Promise<AiProvider> {
+    const entity = this.providerRepo.create({
+      name: dto.name,
+      provider_type: dto.provider_type as AiProvider['provider_type'],
+      model: dto.model,
+      api_key: dto.api_key ?? null,
+      api_url: dto.api_url ?? null,
+      timeout_ms: dto.timeout_ms ?? 30000,
+      is_active: true,
+    });
+    return this.providerRepo.save(entity);
+  }
+
+  async updateProvider(id: string, dto: Partial<{
+    name: string;
+    provider_type: string;
+    model: string;
+    api_key: string | null;
+    api_url: string | null;
+    timeout_ms: number;
+    is_active: boolean;
+  }>): Promise<AiProvider> {
+    const entity = await this.providerRepo.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException(`Provider ${id} introuvable`);
+    Object.assign(entity, dto);
+    return this.providerRepo.save(entity);
+  }
+
+  async deleteProvider(id: string): Promise<void> {
+    await this.providerRepo.delete(id);
+    // Désassocier les modules qui utilisaient ce provider
+    await this.configRepo
+      .createQueryBuilder()
+      .update()
+      .set({ provider_id: null })
+      .where('provider_id = :id', { id })
+      .execute();
   }
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
