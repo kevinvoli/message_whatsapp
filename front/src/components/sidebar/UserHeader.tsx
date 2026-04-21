@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target } from 'lucide-react';
+import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
 
 interface UserHeaderProps {
@@ -124,6 +124,17 @@ export default function UserHeader({
                     >
                         <Target className="w-4 h-4" />
                         <span className="text-xs">Objectifs</span>
+                    </button>
+                    <button
+                        onClick={() => handleViewChange('ranking')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
+                            viewMode === 'ranking'
+                                ? 'bg-white text-green-700 shadow-md font-medium'
+                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                        }`}
+                    >
+                        <Trophy className="w-4 h-4" />
+                        <span className="text-xs">Rang</span>
                     </button>
                 </div>
             )}

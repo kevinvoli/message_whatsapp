@@ -20,3 +20,21 @@ export async function getMyProgress(): Promise<TargetProgress[]> {
   const r = await axios.get(`${base}/targets/my-progress`, cfg);
   return r.data;
 }
+
+export interface CommercialRankingEntry {
+  rank: number;
+  commercial_id: string;
+  commercial_name: string;
+  commercial_email: string;
+  conversations: number;
+  messages_sent: number;
+  calls: number;
+  follow_ups: number;
+  orders: number;
+  score: number;
+}
+
+export async function getRanking(period: 'today' | 'week' | 'month' = 'month'): Promise<CommercialRankingEntry[]> {
+  const r = await axios.get(`${base}/targets/ranking?period=${period}`, cfg);
+  return r.data;
+}

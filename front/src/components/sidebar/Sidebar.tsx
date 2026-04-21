@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger';
 import { ContactSidebarPanel } from '@/components/contacts/ContactSidebarPanel';
 import FollowUpPanel from '@/components/chat/FollowUpPanel';
 import ObjectifsPanel from '@/components/chat/ObjectifsPanel';
+import RankingPositionWidget from '@/components/chat/RankingPositionWidget';
 import { OutboundModal } from '@/components/conversation/OutboundModal';
 
 interface SidebarProps {
@@ -108,6 +109,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         <ContactSidebarPanel searchQuery={searchQuery ?? ''} />
       ) : viewMode === 'objectifs' ? (
         <ObjectifsPanel />
+      ) : viewMode === 'ranking' ? (
+        <RankingPositionWidget />
       ) : (
         <FollowUpPanel />
       )}
