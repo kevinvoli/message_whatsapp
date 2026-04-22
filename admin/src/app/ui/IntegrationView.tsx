@@ -90,7 +90,16 @@ export default function IntegrationView() {
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-1">
         <p className="font-medium">Fonctionnement</p>
         <ul className="list-disc list-inside space-y-0.5 text-blue-700">
-          <li>Webhook entrant ERP : <code className="bg-blue-100 px-1 rounded">POST /integration/erp</code> (header <code className="bg-blue-100 px-1 rounded">x-integration-secret</code>)</li>
+          <li>
+            Webhook entrant unifié GICOP :
+            <code className="bg-blue-100 px-1 rounded mx-1">POST /webhooks/gicop</code>
+            (header <code className="bg-blue-100 px-1 rounded">x-integration-secret</code>)
+            — commandes ERP <strong>et</strong> notifications d&apos;appels
+          </li>
+          <li>
+            Vérification du webhook :
+            <code className="bg-blue-100 px-1 rounded mx-1">GET /webhooks/gicop?hub.mode=subscribe&amp;hub.verify_token=...&amp;hub.challenge=...</code>
+          </li>
           <li>Webhook sortant vers ERP : variable d&apos;environnement <code className="bg-blue-100 px-1 rounded">INTEGRATION_ERP_URL</code></li>
           <li>Les mappings permettent de convertir UUID ↔ ID entier dans les payloads envoyés à l&apos;ERP.</li>
         </ul>

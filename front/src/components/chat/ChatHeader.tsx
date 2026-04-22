@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers } from 'lucide-react';
 import {
-  CallStatus,
   Conversation,
   ConversationStatus,
   ConversationResult,
@@ -15,7 +14,6 @@ const CreateFollowUpModal = dynamic(() => import('./CreateFollowUpModal'), { ssr
 const GicopReportPanel = dynamic(() => import('./GicopReportPanel'), { ssr: false });
 const CatalogModal = dynamic(() => import('./CatalogModal'), { ssr: false });
 import { getStatusBadge } from '@/lib/utils';
-import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
@@ -121,19 +119,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
     }
     const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
-    const handleCallStatusChange = (
-      _conversationId: string,
-      callStatus: CallStatus,
-      notes?: string,
-    ) => {
-      updateConversation({
-        ...currentConv,
-        call_status: callStatus,
-        last_call_notes: notes,
-        last_call_date: new Date(),
-      });
-    };
-
     const handleConversationStatusChange = (
       _conversationId: string,
       newStatus: ConversationStatus,
@@ -235,8 +220,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                         <MessageCircle className="w-4 h-4" />
                         <span className="font-medium">{totalMessages} messages</span>
                     </div>
-                    <CallButton conversation={currentConv}
-                    onCallStatusChange={handleCallStatusChange} />
                     <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />
                 </div>
             </div>

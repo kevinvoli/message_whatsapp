@@ -1,10 +1,7 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
-  HttpCode,
-  HttpStatus,
   NotFoundException,
   Param,
   Patch,
@@ -15,11 +12,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AdminGuard } from 'src/auth/admin.guard';
-import { CallEventService, CreateCallEventDto } from '../services/call-event.service';
+import { CallEventService } from '../services/call-event.service';
 import { ValidationEngineService } from '../services/validation-engine.service';
 import { WindowRotationService } from '../services/window-rotation.service';
 import { ValidationCriterionConfig } from '../entities/validation-criterion-config.entity';
-import { CallEventApiKeyGuard } from '../guards/call-event-api-key.guard';
 
 @Controller('window')
 export class WindowController {
@@ -30,26 +26,6 @@ export class WindowController {
     @InjectRepository(ValidationCriterionConfig)
     private readonly criterionRepo: Repository<ValidationCriterionConfig>,
   ) {}
-
-  /**
-   * Webhook entrant — plateforme externe de gestion des commandes.
-   * POST /window/call-event
-   * Requiert le header x-api-key (CALL_EVENT_API_KEY en env).
-   */
-  @Post('call-event')
-  @UseGuards(CallEventApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  async receiveCallEvent(@Body() dto: CreateCallEventDto) {
-    try {
-      const event = await this.callEventService.receiveCallEvent(dto);
-      return { ok: true, id: event.id };
-    } catch (err) {
-      if (err instanceof ConflictException) {
-        return { ok: true, duplicate: true };
-      }
-      throw err;
-    }
-  }
 
   /**
    * Historique des appels — admin seulement.
@@ -146,9 +122,7 @@ export class WindowController {
 
   /**
    * Force la validation complète d'une conversation active — admin.
-   * Utile quand une conversation est bloquée (critère externe jamais reçu).
    * POST /window/force-validate/:chatId
-   * Body optionnel : { posteId: string }
    */
   @Post('force-validate/:chatId')
   @UseGuards(AdminGuard)

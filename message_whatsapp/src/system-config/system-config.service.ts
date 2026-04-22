@@ -52,7 +52,8 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
 
   // ─── Intégration ERP ─────────────────────────────────────────────────────────
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
-  { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant)', isSecret: true },
+  { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP / GICOP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant) + POST /webhooks/gicop', isSecret: true },
+  { key: 'GICOP_WEBHOOK_VERIFY_TOKEN', label: 'Token vérification webhook GICOP', category: 'integration', description: 'Token pour le GET /webhooks/gicop?hub.verify_token=... (si vide, utilise INTEGRATION_SECRET)', isSecret: true },
 
   // ─── Formule de classement des commerciaux ────────────────────────────────────
   {

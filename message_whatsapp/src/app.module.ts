@@ -70,6 +70,7 @@ import { InboundIntegrationModule } from './inbound-integration/inbound-integrat
 import { IntegrationModule } from './integration/integration.module';
 import { ConversationReportModule } from './gicop-report/conversation-report.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { GicopWebhookModule } from './gicop-webhook/gicop-webhook.module';
 
 @Module({
   imports: [
@@ -115,7 +116,6 @@ import { CatalogModule } from './catalog/catalog.module';
         WHAPI_WEBHOOK_SECRET_HEADER: Joi.string().allow('').optional(),
         WHAPI_WEBHOOK_SECRET_VALUE: Joi.string().allow('').optional(),
         WHAPI_WEBHOOK_SECRET_VALUE_PREVIOUS: Joi.string().allow('').optional(),
-        CALL_EVENT_API_KEY: Joi.string().allow('').optional(),
         SLIDING_WINDOW_ENABLED: Joi.string().allow('').optional(),
         WINDOW_VALIDATION_THRESHOLD: Joi.number().optional(),
         WINDOW_EXTERNAL_TIMEOUT_HOURS: Joi.number().optional(),
@@ -210,6 +210,8 @@ import { CatalogModule } from './catalog/catalog.module';
     ConversationReportModule,
     // GICOP Sprint 8 — Catalogue multimédia
     CatalogModule,
+    // GICOP Webhook unifié — commandes ERP + appels
+    GicopWebhookModule,
   ],
   controllers: [AppController],
   providers: [
