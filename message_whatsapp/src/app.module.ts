@@ -71,6 +71,7 @@ import { IntegrationModule } from './integration/integration.module';
 import { ConversationReportModule } from './gicop-report/conversation-report.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { GicopWebhookModule } from './gicop-webhook/gicop-webhook.module';
+import { CallObligationModule } from './call-obligations/call-obligation.module';
 
 @Module({
   imports: [
@@ -212,6 +213,8 @@ import { GicopWebhookModule } from './gicop-webhook/gicop-webhook.module';
     CatalogModule,
     // GICOP Webhook unifié — commandes ERP + appels
     GicopWebhookModule,
+    // Sprint 6 — Obligations d'appels GICOP
+    CallObligationModule,
   ],
   controllers: [AppController],
   providers: [

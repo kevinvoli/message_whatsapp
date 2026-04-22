@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { WhatsappChat, WindowStatus, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { ValidationEngineService } from './validation-engine.service';
+import { CallObligationService } from 'src/call-obligations/call-obligation.service';
 
 export const WINDOW_ROTATED_EVENT         = 'window.rotated';
 export const WINDOW_CRITERION_VALIDATED_EVENT = 'window.criterion_validated';
@@ -31,6 +32,9 @@ export class WindowRotationService {
     private readonly capacityService: ConversationCapacityService,
     private readonly validationEngine: ValidationEngineService,
     private readonly eventEmitter: EventEmitter2,
+
+    @Optional()
+    private readonly obligationService: CallObligationService,
   ) {}
 
   /**
@@ -44,6 +48,11 @@ export class WindowRotationService {
     if (!modeEnabled) {
       this.logger.debug(`buildWindowForPoste ignoré pour poste ${posteId} (mode glissant désactivé)`);
       return;
+    }
+
+    // S'assurer qu'un batch d'obligations est actif pour ce poste
+    if (this.obligationService) {
+      await this.obligationService.getOrCreateActiveBatch(posteId);
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
@@ -287,6 +296,34 @@ export class WindowRotationService {
     // Tolérance minimum si le poste a peu de conversations
     if (activeGroup.length < quotaActive && activeGroup.length < 3) return;
 
+    // ── Contrôle qualité messages (S6-004) ────────────────────────────────
+    // Le commercial doit avoir le dernier message sur toutes les conversations actives
+    if (this.obligationService) {
+      const qualityPassed = await this.obligationService.checkAndRecordQuality(posteId, activeGroup);
+      if (!qualityPassed) {
+        this.logger.warn(
+          `Rotation BLOQUÉE poste ${posteId} — contrôle qualité non passé (commercial doit avoir le dernier message)`,
+        );
+        return;
+      }
+    }
+
+    // ── Obligations d'appels (S6-001/S6-002/S6-003) ───────────────────────
+    // 5 appels annulés + 5 livrés + 5 sans commande ≥ 90s chacun
+    if (this.obligationService) {
+      const ready = await this.obligationService.isPosteReadyForRotation(posteId);
+      if (!ready) {
+        const status = await this.obligationService.getStatus(posteId);
+        this.logger.warn(
+          `Rotation BLOQUÉE poste ${posteId} — obligations appels incomplètes: ` +
+          `annulés=${status?.annulee.done}/${status?.annulee.required} ` +
+          `livrés=${status?.livree.done}/${status?.livree.required} ` +
+          `sans-cmd=${status?.sansCommande.done}/${status?.sansCommande.required}`,
+        );
+        return;
+      }
+    }
+
     this.logger.log(
       `Rotation déclenchée pour poste ${posteId} (${validatedCount}/${activeGroup.length} validées, seuil: ${requiredCount})`,
     );
@@ -380,6 +417,11 @@ export class WindowRotationService {
       this.logger.log(
         `Rotation complète poste ${posteId} — libérées: ${releasedChatIds.length}, promues: ${promotedChatIds.length}`,
       );
+
+      // Créer le prochain batch d'obligations pour ce poste
+      if (this.obligationService) {
+        await this.obligationService.getOrCreateActiveBatch(posteId);
+      }
 
       this.eventEmitter.emit(WINDOW_ROTATED_EVENT, {
         posteId,

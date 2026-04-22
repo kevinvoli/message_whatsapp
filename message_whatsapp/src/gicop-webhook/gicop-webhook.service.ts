@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InboundIntegrationService } from 'src/inbound-integration/inbound-integration.service';
 import { CallEventService } from 'src/window/services/call-event.service';
+import { CallObligationService } from 'src/call-obligations/call-obligation.service';
 import { GicopMessage } from './dto/gicop-webhook.dto';
 
 export interface GicopProcessResult {
@@ -17,6 +18,9 @@ export class GicopWebhookService {
   constructor(
     private readonly erpService: InboundIntegrationService,
     private readonly callEventService: CallEventService,
+
+    @Optional()
+    private readonly obligationService: CallObligationService,
   ) {}
 
   async processMessages(messages: GicopMessage[]): Promise<GicopProcessResult[]> {
@@ -51,17 +55,36 @@ export class GicopWebhookService {
         // ── Notification d'appel téléphonique ──────────────────────────────
         case 'call_event': {
           const d = msg.data as Record<string, unknown>;
-          await this.callEventService.receiveCallEvent({
+          const clientPhone  = String(d.client_phone  ?? msg.from ?? '');
+          const commercialPhone = String(d.commercial_phone ?? d.from ?? '');
+          const durationSeconds = d.duration_seconds != null ? Number(d.duration_seconds) : null;
+
+          const callEvent = await this.callEventService.receiveCallEvent({
             external_id: msg.id,
             event_at: new Date((msg.timestamp ?? Date.now() / 1000) * 1000).toISOString(),
-            commercial_phone: String(d.commercial_phone ?? d.from ?? ''),
-            client_phone: String(d.client_phone ?? msg.from ?? ''),
+            commercial_phone: commercialPhone,
+            client_phone: clientPhone,
             call_status: String(d.call_status ?? 'unknown'),
-            duration_seconds: d.duration_seconds != null ? Number(d.duration_seconds) : null,
+            duration_seconds: durationSeconds,
             recording_url: d.recording_url != null ? String(d.recording_url) : null,
             order_id: d.order_id != null ? String(d.order_id) : null,
           });
-          this.logger.log(`GICOP call_event id=${msg.id}`);
+
+          // Tentative de correspondance avec une tâche d'obligation GICOP
+          // Le poste est résolu automatiquement via commercial_phone → WhatsappCommercial
+          if (this.obligationService) {
+            const match = await this.obligationService.tryMatchCallToTask({
+              clientPhone,
+              commercialPhone,
+              callEventId: callEvent.id,
+              durationSeconds,
+              posteId: null, // résolu en interne via commercialPhone
+            });
+            this.logger.log(
+              `GICOP call_event id=${msg.id} — obligation: ${match.matched ? `OUI (tâche ${match.taskId})` : `NON (${match.reason})`}`,
+            );
+          }
+
           return { id: msg.id, type: msg.type, processed: true };
         }
 
