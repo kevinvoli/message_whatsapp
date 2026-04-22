@@ -249,7 +249,7 @@ export class WhatsappMessageService {
 
   async createAgentMediaMessage(data: {
     chat_id: string;
-    poste_id: string;
+    poste_id?: string | null;
     timestamp: Date;
     commercial_id?: string | null;
     channel_id: string;
@@ -342,6 +342,9 @@ export class WhatsappMessageService {
       const channelQuery = `?channelId=${encodeURIComponent(channel.channel_id)}`;
       if (sendResponse.provider === 'meta' && sendResponse.providerMediaId) {
         resolvedMediaUrl = `/messages/media/meta/${sendResponse.providerMediaId}${channelQuery}`;
+      } else if (sendResponse.provider === 'messenger' && sendResponse.providerMessageId) {
+        // Messenger : proxy via GET /{messageId}?fields=attachments (Graph API)
+        resolvedMediaUrl = `/messages/media/messenger/${sendResponse.providerMessageId}${channelQuery}`;
       } else if (sendResponse.provider === 'whapi') {
         // Proxy interne : évite la dépendance à l'Auto-Download Whapi et les
         // race conditions (CDN pas encore disponible au moment de l'envoi).
@@ -351,7 +354,11 @@ export class WhatsappMessageService {
       // 4. Create media entity
       const mediaEntity = this.mediaRepository.create({
         media_id: `agent_media_${Date.now()}`,
-        provider_media_id: sendResponse.providerMediaId ?? null,
+        // Messenger : stocker le messageId (pas l'attachmentId) pour que le proxy
+        // puisse le retrouver par provider_media_id = messageId.
+        provider_media_id: sendResponse.provider === 'messenger'
+          ? (sendResponse.providerMessageId ?? null)
+          : (sendResponse.providerMediaId ?? null),
         whapi_media_id: sendResponse.providerMediaId ?? sendResponse.providerMessageId ?? `agent_${Date.now()}`,
         media_type: data.mediaType as WhatsappMediaType,
         mime_type: data.mimeType,
