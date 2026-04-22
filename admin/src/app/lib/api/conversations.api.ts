@@ -97,6 +97,23 @@ export async function sendMessage(chat_id: string, text: string, poste_id: strin
     return handleResponse<WhatsappMessage>(response);
 }
 
+export async function sendAdminMedia(
+    chat_id: string,
+    file: File,
+    caption?: string,
+): Promise<{ success: boolean; message_id: string }> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('chat_id', chat_id);
+    if (caption) form.append('caption', caption);
+    const response = await fetch(`${API_BASE_URL}/messages/media/admin`, {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+    });
+    return handleResponse<{ success: boolean; message_id: string }>(response);
+}
+
 export async function patchChat(chatId: string, data: Partial<{ read_only: boolean; is_archived: boolean }>): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatId)}`, {
         method: 'PATCH',

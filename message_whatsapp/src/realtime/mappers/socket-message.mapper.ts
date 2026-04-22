@@ -51,6 +51,12 @@ export function resolveMediaUrl(
     return `/messages/media/meta/${providerMediaId}${channelQuery}`;
   }
 
+  if (message.provider === 'messenger') {
+    const providerMediaId = media.provider_media_id ?? media.media_id;
+    if (!providerMediaId) return directUrl ?? null;
+    return `/messages/media/messenger/${providerMediaId}${channelQuery}`;
+  }
+
   if (directUrl) {
     if (directUrl.startsWith('/')) return directUrl;
     try {
