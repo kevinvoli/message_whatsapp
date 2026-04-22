@@ -95,4 +95,38 @@ export class AssignmentAffinityService {
     await this.repo.save(existing);
     this.logger.log(`AFFINITY_RELEASED chat_id=${chatId} reason=${reason}`);
   }
+
+  /** Retourne les chat_ids ayant une affinité active vers un poste donné. */
+  async getActiveChatIdsForPoste(posteId: string): Promise<string[]> {
+    const rows = await this.repo.find({
+      where: { posteId, isActive: true },
+      select: ['chatId'],
+    });
+    return rows.map((r) => r.chatId);
+  }
+
+  /** Vue agrégée pour l'admin : toutes les affinités actives avec compteurs. */
+  async getAffinityStats(): Promise<
+    { posteId: string; posteIdAlias: string; count: number; topChatIds: string[] }[]
+  > {
+    const actives = await this.repo.find({
+      where: { isActive: true },
+      order: { lastAssignedAt: 'DESC' },
+    });
+
+    const grouped = new Map<string, { count: number; chatIds: string[] }>();
+    for (const a of actives) {
+      const entry = grouped.get(a.posteId) ?? { count: 0, chatIds: [] };
+      entry.count += 1;
+      if (entry.chatIds.length < 5) entry.chatIds.push(a.chatId);
+      grouped.set(a.posteId, entry);
+    }
+
+    return Array.from(grouped.entries()).map(([posteId, data]) => ({
+      posteId,
+      posteIdAlias: posteId,
+      count: data.count,
+      topChatIds: data.chatIds,
+    }));
+  }
 }

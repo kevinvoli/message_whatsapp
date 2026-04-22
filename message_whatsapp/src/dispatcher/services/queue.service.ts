@@ -492,6 +492,29 @@ export class QueueService implements OnModuleInit {
     });
   }
 
+  /**
+   * S2-004/S2-005 — Vérifie qu'un poste précis est éligible pour recevoir une conversation.
+   * Conditions : poste présent dans la queue (online) ET sous quota actif.
+   * Utilisé par le sticky assignment lors des réinjections SLA et offline.
+   */
+  async canAssignToPoste(posteId: string): Promise<boolean> {
+    const inQueue = await this.queueRepository.findOne({ where: { poste_id: posteId } });
+    if (!inQueue) return false;
+
+    const quotaRaw = this.systemConfig
+      ? await this.systemConfig.get('CAPACITY_QUOTA_ACTIVE')
+      : null;
+    const quotaActive = quotaRaw ? parseInt(quotaRaw, 10) : DEFAULT_QUOTA_ACTIVE;
+
+    const count = await this.chatRepository.count({
+      where: {
+        poste_id: posteId,
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
+      },
+    });
+    return count < quotaActive;
+  }
+
   async blockPoste(posteId: string): Promise<void> {
     await this.queueLock.runExclusive(async () => {
       await this.posteRepository.update(posteId, { is_queue_enabled: false });

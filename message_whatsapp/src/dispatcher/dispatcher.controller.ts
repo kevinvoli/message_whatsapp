@@ -2,6 +2,7 @@
   Body,
   Controller,
   Get,
+  Optional,
   Param,
   Post,
   Query,
@@ -18,6 +19,7 @@ import { DispatchSettings } from './entities/dispatch-settings.entity';
 import { UpdateDispatchSettingsDto } from './dto/update-dispatch-settings.dto';
 import { RedispatchWaitingUseCase } from './application/redispatch-waiting.use-case';
 import { ResetStuckActiveUseCase } from './application/reset-stuck-active.use-case';
+import { AssignmentAffinityService } from './domain/assignment-affinity.service';
 
 @ApiTags('Queue')
 @Controller('queue')
@@ -30,6 +32,9 @@ export class DispatcherController {
     private readonly dispatchSettingsService: DispatchSettingsService,
     private readonly redispatchWaitingUseCase: RedispatchWaitingUseCase,
     private readonly resetStuckActiveUseCase: ResetStuckActiveUseCase,
+
+    @Optional()
+    private readonly affinityService: AssignmentAffinityService,
   ) {}
 
   @Get()
@@ -140,6 +145,25 @@ export class DispatcherController {
       from,
       to,
     );
+  }
+
+  // ─── S2-006 — Surcharge capacité + affinités ────────────────────────────────
+
+  @Get('affinity/:posteId')
+  @ApiOperation({ summary: 'chat_ids avec affinité active vers ce poste' })
+  async getAffinityChatsForPoste(
+    @Param('posteId') posteId: string,
+  ): Promise<{ chatIds: string[] }> {
+    const chatIds = this.affinityService
+      ? await this.affinityService.getActiveChatIdsForPoste(posteId)
+      : [];
+    return { chatIds };
+  }
+
+  @Get('affinity-stats')
+  @ApiOperation({ summary: 'Vue admin : affinités actives par poste' })
+  async getAffinityStats(): Promise<unknown[]> {
+    return this.affinityService ? this.affinityService.getAffinityStats() : [];
   }
 
   @Get('dispatch/settings/audit/page')

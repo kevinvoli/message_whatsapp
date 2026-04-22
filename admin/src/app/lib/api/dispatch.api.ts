@@ -106,3 +106,35 @@ export async function unblockPosteFromQueue(posteId: string): Promise<{ success:
     });
     return handleResponse<{ success: boolean }>(response);
 }
+
+// S2-006 — Capacité + affinités
+export interface CapacitySummaryEntry {
+    posteId: string;
+    posteName: string;
+    activeCount: number;
+    validatedCount: number;
+    lockedCount: number;
+    totalCount: number;
+    quotaActive: number;
+    quotaTotal: number;
+}
+
+export interface AffinityStatEntry {
+    posteId: string;
+    count: number;
+    topChatIds: string[];
+}
+
+export async function getCapacitySummary(): Promise<CapacitySummaryEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/capacity/summary`, {
+        credentials: 'include',
+    });
+    return handleResponse<CapacitySummaryEntry[]>(response);
+}
+
+export async function getAffinityStats(): Promise<AffinityStatEntry[]> {
+    const response = await fetch(`${API_BASE_URL}/queue/affinity-stats`, {
+        credentials: 'include',
+    });
+    return handleResponse<AffinityStatEntry[]>(response);
+}

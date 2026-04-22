@@ -44,6 +44,7 @@ const initialState = {
   blockProgress: { validated: 0, total: 10 },
   windowRotating: false,
   releasingChatIds: [],
+  affinityChats: null,
 };
 
 // ─── Store composé ────────────────────────────────────────────────────────────

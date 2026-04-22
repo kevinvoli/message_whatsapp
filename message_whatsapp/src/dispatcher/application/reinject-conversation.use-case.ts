@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -10,6 +10,8 @@ import { DispatchPolicyService } from '../domain/dispatch-policy.service';
 import { DispatchQueryService } from '../infrastructure/dispatch-query.service';
 import { SlaPolicyService } from '../domain/sla-policy.service';
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
+import { AssignmentAffinityService } from '../domain/assignment-affinity.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 /**
  * TICKET-03-C — Cas d'usage : réinjecter une conversation SLA-expirée.
@@ -28,6 +30,9 @@ export class ReinjectConversationUseCase {
     private readonly conversationPublisher: ConversationPublisher,
     private readonly notificationService: NotificationService,
     private readonly slaPolicy: SlaPolicyService,
+
+    @Optional()
+    private readonly affinityService: AssignmentAffinityService,
   ) {}
 
   /**
@@ -54,7 +59,11 @@ export class ReinjectConversationUseCase {
     }
 
     const oldPosteId = chat.poste_id ?? null;
-    const nextPoste = await this.queueService.getNextInQueue();
+
+    // S2-004/S2-005 — Sticky assignment : vérifier l'affinité avant la queue
+    const nextPoste =
+      (await this.resolveAffinityPosteForReinject(chat)) ??
+      (await this.queueService.getNextInQueue());
 
     if (!nextPoste) {
       this.logger.warn(
@@ -80,6 +89,8 @@ export class ReinjectConversationUseCase {
       first_response_deadline_at: this.slaPolicy.reinjectDeadline(),
     });
 
+    await this.affinityService?.upsertAffinity(chat.chat_id, nextPoste.id);
+
     void this.notificationService.create(
       'alert',
       `SLA dépassé — ${chat.name || chat.chat_id}`,
@@ -96,5 +107,23 @@ export class ReinjectConversationUseCase {
       nextPoste.id,
     );
     return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
+  }
+
+  // ─── Affinity resolution ─────────────────────────────────────────────────
+
+  private async resolveAffinityPosteForReinject(chat: WhatsappChat): Promise<WhatsappPoste | null> {
+    if (!this.affinityService) return null;
+    const candidate = await this.affinityService.getAffinityPoste(chat.chat_id);
+    if (!candidate) return null;
+    // Ne pas réinjecter vers le même poste (déjà là, mais n'a pas répondu)
+    if (candidate.id === chat.poste_id) return null;
+
+    const eligible = await this.queueService.canAssignToPoste(candidate.id);
+    if (eligible) {
+      this.logger.log(`AFFINITY_HIT(reinject) chat_id=${chat.chat_id} poste=${candidate.name}`);
+      return candidate;
+    }
+    this.logger.log(`AFFINITY_FALLBACK(reinject) chat_id=${chat.chat_id} poste=${candidate.name} not_eligible`);
+    return null;
   }
 }

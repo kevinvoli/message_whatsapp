@@ -37,6 +37,8 @@ export interface ConversationSlice {
   blockProgress: BlockProgress;
   windowRotating: boolean;
   releasingChatIds: string[];
+  /** S1-006 — chat_ids pour lesquels ce poste est le poste d'affinité actif */
+  affinityChats: Set<string> | null;
 
   loadConversations: (search?: string) => void;
   loadMoreConversations: () => void;  // conservé pour compat legacy — no-op
@@ -67,6 +69,7 @@ export interface ConversationSlice {
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
   changeConversationStatus: (chat_id: string, status: ConversationStatus) => void;
+  loadAffinityChats: (posteId: string) => Promise<void>;
 }
 
 export const createConversationSlice: StateCreator<
@@ -86,6 +89,7 @@ export const createConversationSlice: StateCreator<
   blockProgress: { validated: 0, total: 10 },
   windowRotating: false,
   releasingChatIds: [],
+  affinityChats: null,
 
   // ─── Chargement ─────────────────────────────────────────────────────────────
 
@@ -295,4 +299,17 @@ export const createConversationSlice: StateCreator<
   setWindowRotating: (rotating) => set({ windowRotating: rotating }),
 
   setReleasingChatIds: (ids) => set({ releasingChatIds: ids }),
+
+  // S1-006 — Charge les chat_ids avec affinité vers le poste courant
+  loadAffinityChats: async (posteId: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+      const res = await fetch(`${API_URL}/queue/affinity/${posteId}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json() as { chatIds: string[] };
+      set({ affinityChats: new Set(data.chatIds) });
+    } catch {
+      // silencieux — le badge est juste absent si l'appel échoue
+    }
+  },
 });

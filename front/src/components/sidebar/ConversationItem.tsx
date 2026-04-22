@@ -1,10 +1,11 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, CheckCircle } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, CheckCircle, Star } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
 import { getStatusBadge } from '@/lib/utils';
 import { formatConversationTime } from '@/lib/dateUtils';
+import { useChatStore } from '@/store/chatStore';
 
 type PlaceholderMeta = {
   label: string;
@@ -118,6 +119,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const isLocked = windowStatus === 'locked' || (windowStatus == null && conversation.is_locked === true);
   const isValidated = windowStatus === 'validated';
 
+  // S1-006 — badge affinité (contact propriétaire)
+  const affinityChats = useChatStore((s) => s.affinityChats);
+  const isAffinity = affinityChats?.has(conversation.chat_id) ?? false;
+
   const handleClick = (e: React.MouseEvent) => {
     if (isLocked) return;
     if (bulkMode && onToggleCheck) {
@@ -193,6 +198,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             {isValidated && (
               <span className="flex items-center gap-1 text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
                 <CheckCircle className="w-3 h-3" /> Validée
+              </span>
+            )}
+            {/* S2-003 — numéro de slot x/10 */}
+            {conversation.window_slot != null && !isLocked && (
+              <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full font-medium">
+                #{conversation.window_slot}
+              </span>
+            )}
+            {/* S1-006 — badge propriétaire (affinité active) */}
+            {isAffinity && !isLocked && (
+              <span
+                className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium"
+                title="Contact fidèle — réaffecté à votre poste"
+              >
+                <Star className="w-3 h-3" /> Fidèle
               </span>
             )}
             {slaAlert && !isLocked && (
