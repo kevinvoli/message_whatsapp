@@ -87,14 +87,19 @@ export class AuthController {
     if (!body?.username) {
       throw new BadRequestException('username requis');
     }
-
+      console.log("le connection auto :",  body.username);
+     
     const user = await this.authService.autoLogin(body.username.trim());
 
     if (!user) {
+      console.log("log aucun user trouver", user);
+      
       throw new UnauthorizedException('Commercial introuvable');
     }
 
     const { accessToken, refreshToken } = this.authService.login(user);
+    console.log("user connecte :", accessToken);
+    
 
     res.cookie('Authentication', accessToken, {
       httpOnly: true,
