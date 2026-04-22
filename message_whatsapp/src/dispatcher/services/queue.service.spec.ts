@@ -60,6 +60,7 @@ describe('QueueService', () => {
       {} as any, // chatRepository
       { createQueryBuilder: () => ({ select: () => ({ where: () => ({ getRawMany: () => Promise.resolve([]) }) }) }) } as any, // channelRepository
       dataSource as any,
+      null as any, // systemConfig (optional)
     );
   });
 

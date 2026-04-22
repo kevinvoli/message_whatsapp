@@ -49,6 +49,9 @@ import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.reg
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 import { ContextModule } from 'src/context/context.module';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
+import { SystemConfigModule } from 'src/system-config/system-config.module';
+import { ContactAssignmentAffinity } from './entities/contact-assignment-affinity.entity';
+import { AssignmentAffinityService } from './domain/assignment-affinity.service';
 
 @Module({
   imports: [
@@ -65,6 +68,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
       Contact,
       WhatsappPoste,
       WhatsappMedia,
+      ContactAssignmentAffinity,
     ]),
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
@@ -73,6 +77,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
     NotificationModule,
     ContextModule,
     ConversationCapacityModule,
+    SystemConfigModule,
   ],
   controllers: [DispatcherController],
   providers: [
@@ -105,6 +110,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
     ConversationReadQueryService,
     ChannelProviderRegistry,
     ResolveTenantUseCase,
+    AssignmentAffinityService,
   ],
   exports: [
     DispatcherService,
@@ -115,6 +121,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
     SlaPolicyService,
     AssignConversationUseCase,
     ReinjectConversationUseCase,
+    AssignmentAffinityService,
   ],
 })
 export class DispatcherModule {}

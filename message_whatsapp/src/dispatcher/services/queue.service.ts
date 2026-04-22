@@ -3,6 +3,7 @@
   Logger,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Not, Repository } from 'typeorm';
@@ -15,6 +16,9 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { SystemConfigService } from 'src/system-config/system-config.service';
+
+const DEFAULT_QUOTA_ACTIVE = 10;
 
 @Injectable()
 export class QueueService implements OnModuleInit {
@@ -38,6 +42,9 @@ export class QueueService implements OnModuleInit {
     private readonly channelRepository: Repository<WhapiChannel>,
 
     private readonly dataSource: DataSource,
+
+    @Optional()
+    private readonly systemConfig: SystemConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -199,6 +206,11 @@ export class QueueService implements OnModuleInit {
 
       // ─── ÉTAPE 1 : stratégie normale via queue_positions ─────────────────────
       if (candidates.length > 0) {
+        const quotaRaw = this.systemConfig
+          ? await this.systemConfig.get('CAPACITY_QUOTA_ACTIVE')
+          : null;
+        const quotaActive = quotaRaw ? parseInt(quotaRaw, 10) : DEFAULT_QUOTA_ACTIVE;
+
         const posteIds = candidates.map((qp) => qp.poste_id);
         const chatCounts = await this.chatRepository
           .createQueryBuilder('chat')
@@ -216,19 +228,31 @@ export class QueueService implements OnModuleInit {
           countMap.set(row.poste_id, parseInt(row.count, 10));
         }
 
-        let best = candidates[0];
+        // S2-002 — exclure les postes ayant atteint ou dépassé le quota actif
+        const belowQuota = candidates.filter(
+          (qp) => (countMap.get(qp.poste_id) ?? 0) < quotaActive,
+        );
+
+        if (belowQuota.length === 0) {
+          this.logger.warn(
+            `CAPACITY_ALL_FULL quota=${quotaActive} — tous les postes ont atteint leur quota, conversation en attente`,
+          );
+          return null;
+        }
+
+        let best = belowQuota[0];
         let bestCount = countMap.get(best.poste_id) ?? 0;
 
-        for (let i = 1; i < candidates.length; i++) {
-          const count = countMap.get(candidates[i].poste_id) ?? 0;
+        for (let i = 1; i < belowQuota.length; i++) {
+          const count = countMap.get(belowQuota[i].poste_id) ?? 0;
           if (count < bestCount) {
-            best = candidates[i];
+            best = belowQuota[i];
             bestCount = count;
           }
         }
 
         this.logger.debug(
-          `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs`,
+          `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs (quota=${quotaActive})`,
         );
         await this.moveToEndInternal(best.poste_id);
         return best.poste;

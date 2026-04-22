@@ -112,6 +112,16 @@ export class ConversationCapacityService {
   }
 
   /**
+   * Vérifie si un poste peut recevoir une nouvelle conversation (quota actif non atteint).
+   * Utilisé par le sticky assignment avant de confirmer le hit d'affinité.
+   */
+  async hasCapacityForNewConversation(posteId: string): Promise<boolean> {
+    const { quotaActive } = await this.getQuotas();
+    const { active } = await this.countForPoste(posteId);
+    return active < quotaActive;
+  }
+
+  /**
    * Déverrouille la plus ancienne conversation verrouillée (mode classique).
    * Appelé par WindowRotationService quand le mode glissant est désactivé.
    */

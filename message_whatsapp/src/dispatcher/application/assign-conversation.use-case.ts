@@ -15,6 +15,8 @@ import { ContextResolverService } from 'src/context/services/context-resolver.se
 import { ContextService } from 'src/context/services/context.service';
 import { ChatContext } from 'src/context/entities/chat-context.entity';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
+import { AssignmentAffinityService } from '../domain/assignment-affinity.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 export interface AssignConversationResult {
   chat: WhatsappChat;
@@ -47,6 +49,9 @@ export class AssignConversationUseCase {
 
     @Optional()
     private readonly capacityService: ConversationCapacityService,
+
+    @Optional()
+    private readonly affinityService: AssignmentAffinityService,
   ) {}
 
   async execute(
@@ -111,12 +116,31 @@ export class AssignConversationUseCase {
         `📩 Conversation (${conversation.chat_id}) assignée à ${conversation?.poste?.name ?? 'NON ASSIGNE'}`,
       );
       const saved = await this.queryService.saveChat(conversation);
+      if (saved.poste_id) {
+        await this.affinityService?.upsertAffinity(saved.chat_id, saved.poste_id);
+      }
       await this.conversationPublisher.emitConversationUpsertByChatId(saved.chat_id);
       return this.buildResult(saved, channelId);
     }
 
+    // ── Sticky assignment : tentative d'affinité (pool uniquement) ───────────
+    const affinityPoste = (!eligibleForReuse && !dedicatedPosteId)
+      ? await this.resolveAffinityPoste(clientPhone, traceId)
+      : null;
+
+    if (dedicatedPosteId && this.affinityService) {
+      const affinity = await this.affinityService.getActiveAffinity(clientPhone);
+      if (affinity && affinity.posteId !== dedicatedPosteId) {
+        this.logger.log(
+          `AFFINITY_OVERRIDDEN trace=${traceId ?? '-'} chat_id=${clientPhone} affinity_poste=${affinity.posteId} dedicated_poste=${dedicatedPosteId}`,
+        );
+      }
+    }
+
     // ── Résolution du prochain poste ─────────────────────────────────────────
-    const { poste: nextAgent } = await this.dispatchPolicy.resolvePosteForChannel(channelId);
+    const { poste: nextAgent } = affinityPoste
+      ? { poste: affinityPoste }
+      : await this.dispatchPolicy.resolvePosteForChannel(channelId);
 
     // ── Cas 2 : aucun agent disponible ───────────────────────────────────────
     if (!nextAgent) {
@@ -203,6 +227,7 @@ export class AssignConversationUseCase {
         }
         await this.capacityService.onConversationAssigned(saved);
       }
+      await this.affinityService?.upsertAffinity(saved.chat_id, nextAgent.id);
       void this.notificationService.create(
         'info',
         `Conversation réassignée — ${saved.name || saved.chat_id}`,
@@ -239,6 +264,7 @@ export class AssignConversationUseCase {
     if (this.capacityService) {
       await this.capacityService.onConversationAssigned(saved);
     }
+    await this.affinityService?.upsertAffinity(saved.chat_id, nextAgent.id);
     void this.notificationService.create(
       'info',
       `Nouvelle conversation — ${clientName || clientPhone.split('@')[0]}`,
@@ -246,6 +272,29 @@ export class AssignConversationUseCase {
     );
     await this.conversationPublisher.emitConversationAssigned(saved.chat_id);
     return this.buildResult(saved, channelId);
+  }
+
+  // ─── Affinity resolution ─────────────────────────────────────────────────
+
+  private async resolveAffinityPoste(chatId: string, traceId?: string): Promise<WhatsappPoste | null> {
+    if (!this.affinityService) return null;
+    const candidate = await this.affinityService.getAffinityPoste(chatId);
+    if (!candidate) return null;
+
+    const isOnline = this.messageGateway.isAgentConnected(candidate.id);
+    const hasCapacity = this.capacityService
+      ? await this.capacityService.hasCapacityForNewConversation(candidate.id)
+      : true;
+
+    if (isOnline && hasCapacity) {
+      this.logger.log(`AFFINITY_HIT trace=${traceId ?? '-'} chat_id=${chatId} poste=${candidate.name}`);
+      return candidate;
+    }
+
+    this.logger.log(
+      `AFFINITY_${!isOnline ? 'WAITING' : 'FALLBACK'} trace=${traceId ?? '-'} chat_id=${chatId} poste=${candidate.name} online=${isOnline} capacity=${hasCapacity}`,
+    );
+    return null;
   }
 
   // ─── Context helper ───────────────────────────────────────────────────────
