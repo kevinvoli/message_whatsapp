@@ -425,6 +425,10 @@ export type QueuePosition = {
 export type DispatchSnapshot = {
   queue_size: number;
   waiting_count: number;
+  /** Conversations sans poste_id — ont besoin d'être dispatché */
+  orphan_count: number;
+  /** Conversations avec poste_id en attente de reconnexion de l'agent */
+  waiting_on_poste_count: number;
   stuck_active_count: number;
   waiting_items: Array<{
     id: string;

@@ -65,8 +65,12 @@ function PreviewModal({
       const d = data as ReinjectionPreview;
       return (
         <div>
-          <p className="text-sm text-gray-700 mb-3">
-            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront réinjectées dans le système.
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <strong>Cron désactivé — règle poste permanent.</strong> Les conversations restent sur leur poste même hors-ligne.
+            Ce cron ne déplace plus aucune conversation. Les {d.total} ci-dessous resteront en EN_ATTENTE sur leur poste jusqu'à reconnexion de l'agent.
+          </div>
+          <p className="text-sm text-gray-500 mb-3 italic">
+            Aperçu informatif : <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} sur poste hors-ligne (aucune action).
           </p>
           {d.total === 0 ? (
             <p className="text-xs text-gray-400 italic">Aucune conversation à réinjecter.</p>

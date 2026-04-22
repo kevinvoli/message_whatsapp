@@ -13,8 +13,9 @@ export default function ConversationFilters({ conversations, totalUnread, filter
     const [showPosteLoad, setShowPosteLoad] = useState(false);
 
     const counts = useMemo(() => ({
-        all:     conversations.length,
-        nouveau: conversations.filter((c) => !c.last_poste_message_at).length,
+        all:       conversations.length,
+        nouveau:   conversations.filter((c) => !c.last_poste_message_at).length,
+        attente:   conversations.filter((c) => c.status === 'attente').length,
     }), [conversations]);
 
     // Charge par poste : grouper les conversations actives par poste
@@ -47,9 +48,10 @@ export default function ConversationFilters({ conversations, totalUnread, filter
     return (
         <div className="border-b border-gray-200 bg-gray-50">
             <div className="px-3 pt-2 pb-1 flex items-center gap-2 overflow-x-auto">
-                {btn('all',     'Tous',     counts.all)}
-                {btn('unread',  'Non lus',  totalUnread)}
-                {btn('nouveau', 'Nouveaux', counts.nouveau)}
+                {btn('all',     'Tous',        counts.all)}
+                {btn('unread',  'Non lus',     totalUnread)}
+                {btn('nouveau', 'Nouveaux',    counts.nouveau)}
+                {counts.attente > 0 && btn('attente', `En attente (${counts.attente})`, undefined)}
             </div>
 
             {multiPoste && (

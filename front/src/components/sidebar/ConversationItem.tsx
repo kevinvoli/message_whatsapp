@@ -123,6 +123,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const affinityChats = useChatStore((s) => s.affinityChats);
   const isAffinity = affinityChats?.has(conversation.chat_id) ?? false;
 
+  // Poste permanent hors-ligne : conversation en attente de reconnexion de l'agent
+  const isWaitingOnAgent = conversation.status === 'attente' && !isLocked;
+
   const handleClick = (e: React.MouseEvent) => {
     if (isLocked) return;
     if (bulkMode && onToggleCheck) {
@@ -192,7 +195,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             </span>
             {isLocked && (
               <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded-full">
-                <Lock className="w-3 h-3" /> En attente
+                <Lock className="w-3 h-3" /> Verrouillée
+              </span>
+            )}
+            {isWaitingOnAgent && (
+              <span className="flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full" title="Agent hors-ligne — message reçu dès la reconnexion">
+                <Clock className="w-3 h-3" /> Agent hors-ligne
               </span>
             )}
             {isValidated && (

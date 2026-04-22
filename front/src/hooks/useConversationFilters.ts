@@ -14,6 +14,8 @@ export function useConversationFilters(conversations: Conversation[]) {
         case 'unread':  return conv.unreadCount > 0;
         // "Nouveaux" = le commercial n'a jamais répondu (last_poste_message_at null).
         case 'nouveau': return !conv.last_poste_message_at;
+        // "En attente" = agent hors-ligne, conversation attend la reconnexion
+        case 'attente': return conv.status === 'attente';
         default:        return true;
       }
     });

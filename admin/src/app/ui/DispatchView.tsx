@@ -95,11 +95,11 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       setRedispatching(true);
       const result = await redispatchAllWaiting();
       if (result.dispatched === 0) {
-        addToast({ type: 'info', message: 'Aucune conversation à redispatcher.' });
+        addToast({ type: 'info', message: 'Aucun orphelin à dispatcher (conversations sans poste).' });
       } else {
         addToast({
           type: 'success',
-          message: `${result.dispatched} conversation(s) assignée(s).${result.still_waiting > 0 ? ` ${result.still_waiting} toujours en attente (aucun agent disponible).` : ''}`,
+          message: `${result.dispatched} orphelin(s) assigné(s).${result.still_waiting > 0 ? ` ${result.still_waiting} sans agent disponible.` : ''}`,
         });
       }
       await refresh();
@@ -124,7 +124,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       } else {
         addToast({
           type: 'success',
-          message: `${result.reset} conversation(s) remises en attente. Les agents les récupèreront en se connectant.`,
+          message: `${result.reset} conversation(s) remises en EN_ATTENTE sur leur poste d'origine. Elles se réactiveront à la reconnexion de l'agent.`,
         });
       }
       await refresh();
@@ -163,8 +163,18 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         </button>
       </div>
 
+      {/* Bannière règle poste permanent */}
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-start gap-2">
+        <ListChecks className="h-4 w-4 mt-0.5 flex-shrink-0" />
+        <span>
+          <strong>Règle poste permanent active</strong> — une conversation reste sur son poste pour toujours.
+          Les EN_ATTENTE &quot;sur poste&quot; sont normaux (agent hors-ligne) et se réactivent à la reconnexion.
+          Seuls les <strong>orphelins</strong> (sans poste) nécessitent une action.
+        </span>
+      </div>
+
       {/* Compteurs */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
@@ -173,17 +183,31 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Queue</p>
               <p className="text-2xl font-semibold text-gray-900">{snapshot?.queue_size ?? 0}</p>
+              <p className="text-[10px] text-gray-400">agents connectés</p>
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-xl border p-4 shadow-sm ${(snapshot?.orphan_count ?? 0) > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${(snapshot?.orphan_count ?? 0) > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Orphelins</p>
+              <p className={`text-2xl font-semibold ${(snapshot?.orphan_count ?? 0) > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{snapshot?.orphan_count ?? 0}</p>
+              <p className="text-[10px] text-gray-400">sans poste — à dispatcher</p>
             </div>
           </div>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">En attente</p>
-              <p className="text-2xl font-semibold text-gray-900">{snapshot?.waiting_count ?? 0}</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Att. agent</p>
+              <p className="text-2xl font-semibold text-gray-700">{snapshot?.waiting_on_poste_count ?? 0}</p>
+              <p className="text-[10px] text-gray-400">agent hors-ligne (normal)</p>
             </div>
           </div>
         </div>
@@ -195,7 +219,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Actifs bloqués</p>
               <p className={`text-2xl font-semibold ${(snapshot?.stuck_active_count ?? 0) > 0 ? 'text-red-700' : 'text-gray-900'}`}>{snapshot?.stuck_active_count ?? 0}</p>
-              <p className="text-[10px] text-gray-400">agent hors ligne</p>
+              <p className="text-[10px] text-gray-400">ACTIF sans agent connecté</p>
             </div>
           </div>
         </div>
@@ -231,29 +255,34 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         {activeTab === 'queue' && (
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-              <p className="text-xs text-gray-500">
-                {snapshot?.waiting_count
-                  ? `${snapshot.waiting_count} conversation(s) en attente d'un agent.`
-                  : 'Aucune conversation en attente.'}
-                {(snapshot?.stuck_active_count ?? 0) > 0 && (
-                  <span className="ml-2 font-semibold text-red-600">{snapshot!.stuck_active_count} actives bloquées (agent offline).</span>
+              <div className="text-xs text-gray-500 space-y-0.5">
+                {(snapshot?.orphan_count ?? 0) > 0
+                  ? <p className="text-amber-700 font-medium">{snapshot!.orphan_count} orphelin(s) sans poste — action requise.</p>
+                  : <p>Aucun orphelin à dispatcher.</p>
+                }
+                {(snapshot?.waiting_on_poste_count ?? 0) > 0 && (
+                  <p className="text-gray-400">{snapshot!.waiting_on_poste_count} conversation(s) en attente de reconnexion de leur agent (normal).</p>
                 )}
-              </p>
+                {(snapshot?.stuck_active_count ?? 0) > 0 && (
+                  <p className="font-semibold text-red-600">{snapshot!.stuck_active_count} actives bloquées — agent offline sans mise à jour.</p>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => { void handleRedispatchAll(); }}
-                  disabled={redispatching || resettingStuck || !snapshot?.waiting_count}
+                  disabled={redispatching || resettingStuck || (snapshot?.orphan_count ?? 0) === 0}
+                  title="Assigne uniquement les conversations sans poste (orphelins)"
                   className="flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-200"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${redispatching ? 'animate-spin' : ''}`} />
-                  {redispatching ? 'Redispatch...' : 'Redispatcher en attente'}
+                  {redispatching ? 'Dispatch...' : `Assigner orphelins${(snapshot?.orphan_count ?? 0) > 0 ? ` (${snapshot!.orphan_count})` : ''}`}
                 </button>
                 <button
                   type="button"
                   onClick={() => { void handleResetStuck(); }}
                   disabled={resettingStuck || redispatching || (snapshot?.stuck_active_count ?? 0) === 0}
-                  title="Remet en EN_ATTENTE toutes les conversations ACTIF dont l'agent est hors ligne"
+                  title="Remet en EN_ATTENTE sur le même poste (le poste est conservé)"
                   className="flex items-center gap-1.5 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-200"
                 >
                   <AlertTriangle className={`h-3.5 w-3.5 ${resettingStuck ? 'animate-pulse' : ''}`} />

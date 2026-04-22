@@ -171,7 +171,12 @@ export class DispatcherService {
 
   async getDispatchSnapshot(): Promise<{
     queue_size: number;
+    /** Total EN_ATTENTE (toutes catégories) */
     waiting_count: number;
+    /** EN_ATTENTE sans poste_id — ont besoin d'être dispatché (orphelins) */
+    orphan_count: number;
+    /** EN_ATTENTE avec poste_id — en attente de reconnexion de leur agent (normal) */
+    waiting_on_poste_count: number;
     stuck_active_count: number;
     waiting_items: WhatsappChat[];
   }> {
@@ -180,7 +185,9 @@ export class DispatcherService {
     const activeChats = await this.queryService.findActiveChatsWithPoste();
     const stuckActiveCount = activeChats.filter((c) => !c.poste || !c.poste.is_active).length;
 
-    // Limiter la liste des waiting à 50, triée par date de mise à jour
+    const orphans = waitingChats.filter((c) => !c.poste_id);
+    const waitingOnPoste = waitingChats.filter((c) => !!c.poste_id);
+
     const waitingItems = waitingChats
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 50);
@@ -188,6 +195,8 @@ export class DispatcherService {
     return {
       queue_size: queue.length,
       waiting_count: waitingChats.length,
+      orphan_count: orphans.length,
+      waiting_on_poste_count: waitingOnPoste.length,
       stuck_active_count: stuckActiveCount,
       waiting_items: waitingItems,
     };
