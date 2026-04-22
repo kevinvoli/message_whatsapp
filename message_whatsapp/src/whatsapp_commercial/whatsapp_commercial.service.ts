@@ -81,7 +81,7 @@ export class WhatsappCommercialService {
 
     const hmac = (value: string) =>
       crypto
-        .createHmac('sha256', process.env.AUTO_LOGIN_SECRET ?? 'gicop')
+        .createHmac('sha256','gicop')
         .update(value)
         .digest('hex');
 
