@@ -69,6 +69,17 @@ export class WhatsappCommercialService {
     return this.whatsappCommercialRepository.findOne({ where: { email } });
   }
 
+  async findOneByEmailOrPhone(
+    username: string,
+  ): Promise<WhatsappCommercial | null> {
+    return this.whatsappCommercialRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.poste', 'poste')
+      .where('user.email = :username OR user.phone = :username', { username })
+      .andWhere('user.deletedAt IS NULL')
+      .getOne();
+  }
+
   async setConnectionStatus(userId: string, isConnected: boolean) {
     return this.whatsappCommercialRepository.update(userId, {
       isConnected,

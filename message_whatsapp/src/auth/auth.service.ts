@@ -34,6 +34,12 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
     };
   }
 
+  async autoLogin(username: string): Promise<AuthUser | null> {
+    const user = await this.usersService.findOneByEmailOrPhone(username);
+    if (!user) return null;
+    return this.toAuthUser(user);
+  }
+
   async getProfile(userId: string): Promise<AuthUser | null> {
     const user = await this.usersService.findOneById(userId);
     if (!user) return null;

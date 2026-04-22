@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
@@ -72,6 +73,43 @@ export class AuthController {
     });
 
     // 4.9 — Logger la session de travail
+    void this.sessionService.openSession(user.id, user.name).catch(() => {});
+
+    return { user, accessToken };
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 20 } })
+  @Post('auto-login')
+  async autoLogin(
+    @Body() body: { username: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!body?.username) {
+      throw new BadRequestException('username requis');
+    }
+
+    const user = await this.authService.autoLogin(body.username.trim());
+
+    if (!user) {
+      throw new UnauthorizedException('Commercial introuvable');
+    }
+
+    const { accessToken, refreshToken } = this.authService.login(user);
+
+    res.cookie('Authentication', accessToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    res.cookie('Refresh', refreshToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
     void this.sessionService.openSession(user.id, user.name).catch(() => {});
 
     return { user, accessToken };

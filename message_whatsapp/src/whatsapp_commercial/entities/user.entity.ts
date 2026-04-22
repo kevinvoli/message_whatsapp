@@ -32,6 +32,10 @@ export class WhatsappCommercial {
   @Column({ type: 'varchar', name: 'email', unique: true, nullable: true })
   email: string;
 
+  @Index('IDX_commercial_phone', { unique: true })
+  @Column({ type: 'varchar', length: 50, nullable: true, default: null })
+  phone?: string | null;
+
   @Column({ type: 'varchar', nullable: false })
   name: string;
 
