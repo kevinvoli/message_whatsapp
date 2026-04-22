@@ -16,11 +16,12 @@ function AutoConnexionHandler() {
     attempted.current = true;
 
     const username = searchParams.get('username');
+    console.log('le username crypte est ici', username);
 
-    if (!username || !apiBaseUrl) {
-      router.replace('/login');
-      return;
-    }
+    // if (!username || !apiBaseUrl) {
+    //   router.replace('/login');
+    //   return;
+    // }
     console.log('le username crypte est ici', username);
     
     axios
