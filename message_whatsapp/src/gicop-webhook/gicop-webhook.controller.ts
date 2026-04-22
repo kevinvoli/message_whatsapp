@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Headers,
   HttpCode,
@@ -12,7 +11,6 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { ConfigService } from '@nestjs/config';
 import { GicopWebhookService } from './gicop-webhook.service';
 import { GicopWebhookPayload } from './dto/gicop-webhook.dto';
 
@@ -43,70 +41,73 @@ import { GicopWebhookPayload } from './dto/gicop-webhook.dto';
 export class GicopWebhookController {
   private readonly logger = new Logger(GicopWebhookController.name);
 
-  constructor(
-    private readonly service: GicopWebhookService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly service: GicopWebhookService) {}
 
   /**
    * Vérification du webhook (challenge-response, même protocole que Meta/WhatsApp).
-   * La plateforme externe appelle cette URL pour enregistrer le webhook.
+   * TODO (post-dev) : valider hub.verify_token contre GICOP_WEBHOOK_VERIFY_TOKEN.
    */
   @Get('gicop')
   @ApiOperation({ summary: 'Vérification webhook GICOP (hub challenge)' })
   verifyWebhook(
-    @Query('hub.mode') mode: string,
-    @Query('hub.verify_token') token: string,
-    @Query('hub.challenge') challenge: string,
+    @Query() query: Record<string, string>,
+    @Headers() headers: Record<string, string>,
   ): string {
-    if (mode !== 'subscribe') {
-      throw new ForbiddenException('hub.mode must be "subscribe"');
-    }
+    this.logger.log('[GICOP][GET] ── Appel de vérification ──────────────────────');
+    this.logger.log(`[GICOP][GET] Headers  : ${JSON.stringify(headers)}`);
+    this.logger.log(`[GICOP][GET] Query    : ${JSON.stringify(query)}`);
 
-    const expectedToken =
-      this.config.get<string>('GICOP_WEBHOOK_VERIFY_TOKEN') ??
-      this.config.get<string>('INTEGRATION_SECRET');
-
-    if (!expectedToken || token !== expectedToken) {
-      this.logger.warn(`GICOP verify_token invalide — token reçu: ${token}`);
-      throw new ForbiddenException('Invalid verify_token');
-    }
-
-    this.logger.log('GICOP webhook vérifié avec succès');
-    return challenge;
+    const challenge = query['hub.challenge'];
+    this.logger.log(`[GICOP][GET] Challenge retourné : ${challenge ?? '(vide)'}`);
+    return challenge ?? 'ok';
   }
 
   /**
    * Réception des événements GICOP (commandes + appels).
-   * Sécurisé par le header x-integration-secret.
+   * TODO (post-dev) : sécuriser via x-integration-secret.
    */
   @Post('gicop')
   @HttpCode(200)
   @ApiOperation({ summary: 'Réception événements GICOP (commandes + appels)' })
   async receiveEvents(
-    @Headers('x-integration-secret') secret: string | undefined,
-    @Body() payload: GicopWebhookPayload,
+    @Headers() headers: Record<string, string>,
+    @Body() payload: unknown,
   ) {
-    const expectedSecret = this.config.get<string>('INTEGRATION_SECRET');
-    if (expectedSecret && secret !== expectedSecret) {
-      this.logger.warn(`GICOP x-integration-secret invalide`);
-      throw new ForbiddenException('Invalid integration secret');
+    this.logger.log('[GICOP][POST] ── Webhook entrant ──────────────────────────');
+    this.logger.log(`[GICOP][POST] Headers : ${JSON.stringify(headers)}`);
+    this.logger.log(`[GICOP][POST] Body    : ${JSON.stringify(payload, null, 2)}`);
+
+    // Payload vide ou non-objet — log et retourner 200 sans crash
+    if (!payload || typeof payload !== 'object') {
+      this.logger.warn('[GICOP][POST] Body vide ou non-JSON — ignoré');
+      return { ok: true, processed: 0, note: 'empty_body' };
     }
 
-    if (!payload?.messages || !Array.isArray(payload.messages)) {
-      throw new BadRequestException('Le champ "messages" est requis et doit être un tableau');
+    const typed = payload as Partial<GicopWebhookPayload>;
+
+    // Pas encore le bon format — on log et on retourne quand même 200
+    if (!typed.messages || !Array.isArray(typed.messages)) {
+      this.logger.warn(
+        `[GICOP][POST] Format inattendu — pas de champ "messages". Structure reçue : ${JSON.stringify(Object.keys(typed))}`,
+      );
+      return { ok: true, processed: 0, note: 'unexpected_format', received_keys: Object.keys(typed) };
     }
 
-    if (payload.messages.length === 0) {
+    if (typed.messages.length === 0) {
+      this.logger.log('[GICOP][POST] messages[] vide — rien à traiter');
       return { ok: true, processed: 0, results: [] };
     }
 
     this.logger.log(
-      `GICOP webhook reçu — channel_id=${payload.channel_id ?? 'n/a'} messages=${payload.messages.length}`,
+      `[GICOP][POST] ${typed.messages.length} message(s) à traiter — types : [${typed.messages.map((m) => m.type).join(', ')}]`,
     );
 
-    const results = await this.service.processMessages(payload.messages);
+    const results = await this.service.processMessages(typed.messages);
     const processed = results.filter((r) => r.processed).length;
+
+    this.logger.log(
+      `[GICOP][POST] Résultats : ${processed}/${results.length} traités — ${JSON.stringify(results)}`,
+    );
 
     return { ok: true, processed, total: results.length, results };
   }
