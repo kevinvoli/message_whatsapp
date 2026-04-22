@@ -9,6 +9,7 @@ import { ContextResolverService } from './services/context-resolver.service';
 import { ContextService } from './services/context.service';
 
 import { ContextController } from './context.controller';
+import { RedisModule } from 'src/redis/redis.module';
 
 /**
  * CTX-A4 — ContextModule
@@ -20,7 +21,7 @@ import { ContextController } from './context.controller';
  *   - FlowBotModule (CTX-D1)
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Context, ContextBinding, ChatContext])],
+  imports: [TypeOrmModule.forFeature([Context, ContextBinding, ChatContext]), RedisModule],
   providers: [ContextResolverService, ContextService],
   controllers: [ContextController],
   exports: [ContextResolverService, ContextService],

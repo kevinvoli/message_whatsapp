@@ -4,7 +4,6 @@ import { IsNull, Not, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
-import { DistributedLockService } from 'src/redis/distributed-lock.service';
 
 const KEY_QUOTA_ACTIVE          = 'CAPACITY_QUOTA_ACTIVE';
 const KEY_QUOTA_TOTAL           = 'CAPACITY_QUOTA_TOTAL';
@@ -27,13 +26,13 @@ export interface CapacitySummaryEntry {
 @Injectable()
 export class ConversationCapacityService {
   private readonly logger = new Logger(ConversationCapacityService.name);
+  private readonly slotLocks = new Map<string, Promise<boolean>>();
 
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly systemConfig: SystemConfigService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly lockService: DistributedLockService,
   ) {}
 
   async getQuotas(): Promise<{ quotaActive: number; quotaTotal: number }> {
@@ -154,12 +153,14 @@ export class ConversationCapacityService {
       return false;
     }
 
-    // Mutex distribué (Redis → fallback in-process) pour éviter les doublons de slot
-    return this.lockService.withLock(
-      `window:slot:${chat.poste_id}`,
-      10_000,
-      () => this.doAssignSlot(chat),
-    );
+    // Mutex in-process pour sérialiser les assignations de slot par poste
+    const key = chat.poste_id;
+    const prev = this.slotLocks.get(key) ?? Promise.resolve(false);
+    const next = prev.then(() => this.doAssignSlot(chat)).finally(() => {
+      if (this.slotLocks.get(key) === next) this.slotLocks.delete(key);
+    });
+    this.slotLocks.set(key, next);
+    return next;
   }
 
   private async doAssignSlot(chat: WhatsappChat): Promise<boolean> {
