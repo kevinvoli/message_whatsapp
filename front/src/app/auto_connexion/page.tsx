@@ -21,7 +21,8 @@ function AutoConnexionHandler() {
       router.replace('/login');
       return;
     }
-
+    console.log('le username crypte est ici', username);
+    
     axios
       .post(
         `${apiBaseUrl}/auth/auto-login`,
