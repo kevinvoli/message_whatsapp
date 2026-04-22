@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-export default function AutoConnexionPage() {
+function AutoConnexionHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const attempted = useRef(false);
@@ -40,5 +40,19 @@ export default function AutoConnexionPage() {
     <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600" />
     </div>
+  );
+}
+
+export default function AutoConnexionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600" />
+        </div>
+      }
+    >
+      <AutoConnexionHandler />
+    </Suspense>
   );
 }

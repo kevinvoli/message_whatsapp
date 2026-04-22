@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -69,15 +70,38 @@ export class WhatsappCommercialService {
     return this.whatsappCommercialRepository.findOne({ where: { email } });
   }
 
-  async findOneByEmailOrPhone(
-    username: string,
+  async findOneByAutoLoginToken(
+    token: string,
   ): Promise<WhatsappCommercial | null> {
-    return this.whatsappCommercialRepository
+    const commercials = await this.whatsappCommercialRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.poste', 'poste')
-      .where('user.email = :username OR user.phone = :username', { username })
-      .andWhere('user.deletedAt IS NULL')
-      .getOne();
+      .where('user.deletedAt IS NULL')
+      .getMany();
+
+    const hmac = (value: string) =>
+      crypto
+        .createHmac('sha256', process.env.AUTO_LOGIN_SECRET ?? 'gicop')
+        .update(value)
+        .digest('hex');
+
+    const safeEqual = (a: string, b: string) => {
+      const ba = Buffer.from(a, 'hex');
+      const bb = Buffer.from(b, 'hex');
+      if (ba.length !== bb.length) return false;
+      return crypto.timingSafeEqual(ba, bb);
+    };
+
+    for (const commercial of commercials) {
+      if (commercial.email && safeEqual(hmac(commercial.email), token)) {
+        return commercial;
+      }
+      if (commercial.phone && safeEqual(hmac(commercial.phone), token)) {
+        return commercial;
+      }
+    }
+
+    return null;
   }
 
   async setConnectionStatus(userId: string, isConnected: boolean) {
