@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Check, X, MoreVertical, Tag, AlertCircle, ArrowRight, Merge } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, X, MoreVertical, Tag, AlertCircle, ArrowRight, Merge, ClipboardList } from 'lucide-react';
 import { Conversation, ConversationStatus } from '@/types/chat';
 import { TransferModal } from './TransferModal';
 import { LabelMenu } from './LabelMenu';
@@ -21,6 +21,19 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   const [showTransfer, setShowTransfer] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
+  const [closeBlocked, setCloseBlocked] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ chatId?: string }>).detail;
+      if (!detail?.chatId || detail.chatId === conversation.chat_id) {
+        setCloseBlocked(true);
+        setTimeout(() => setCloseBlocked(false), 5000);
+      }
+    };
+    window.addEventListener('gicop:close-blocked', handler);
+    return () => window.removeEventListener('gicop:close-blocked', handler);
+  }, [conversation.chat_id]);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
     if (newStatus === 'fermé' || newStatus === 'converti') {
@@ -36,6 +49,7 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
       onStatusChange(conversation.id, showConfirmation);
       setShowConfirmation(null);
       setIsOpen(false);
+      setCloseBlocked(false);
       onClose?.();
     }
   };
@@ -134,6 +148,16 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
                 )}
               </button>
             ))}
+
+            {/* S4-004 — Bannière rapport GICOP requis */}
+            {closeBlocked && (
+              <div className="mx-2 mb-1 mt-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
+                <ClipboardList className="w-3.5 h-3.5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-orange-700 leading-tight">
+                  Rapport GICOP incomplet — remplissez le rapport avant de clôturer.
+                </p>
+              </div>
+            )}
 
             {/* Actions supplémentaires */}
             <div className="px-3 py-2 border-t border-gray-100 mt-1">

@@ -68,6 +68,8 @@ import { WindowModule } from './window/window.module';
 import { SystemHealthModule } from './system-health/system-health.module';
 import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
 import { IntegrationModule } from './integration/integration.module';
+import { ConversationReportModule } from './gicop-report/conversation-report.module';
+import { CatalogModule } from './catalog/catalog.module';
 
 @Module({
   imports: [
@@ -204,6 +206,10 @@ import { IntegrationModule } from './integration/integration.module';
     IntegrationModule,
     // Phase 9 — Fenêtre glissante, moteur de validation, webhook appels
     WindowModule,
+    // GICOP Sprint 4 — Rapport commercial obligatoire
+    ConversationReportModule,
+    // GICOP Sprint 8 — Catalogue multimédia
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   WhatsappChat,
@@ -9,6 +9,8 @@ import { LessThan, Not, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
 import { ChannelService } from 'src/channel/channel.service';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
 export interface ReadOnlyEnforcementPreview {
   total: number;
@@ -29,6 +31,12 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     private readonly conversationPublisher: ConversationPublisher,
     private readonly cronConfigService: CronConfigService,
     private readonly channelService: ChannelService,
+
+    @Optional()
+    private readonly reportService: ConversationReportService,
+
+    @Optional()
+    private readonly systemConfig: SystemConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -92,6 +100,10 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     const limit = new Date(Date.now() - thresholdMs);
     const chats = await this.findEligible(limit);
 
+    const gicoRequired = this.systemConfig
+      ? (await this.systemConfig.get('FF_GICOP_REPORT_REQUIRED')) === 'true'
+      : false;
+
     let closed = 0;
     let skipped = 0;
     for (const chat of chats) {
@@ -101,6 +113,14 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
         skipped++;
         continue;
       }
+      // S4-005 — Ne pas fermer auto si rapport GICOP requis et incomplet
+      if (gicoRequired && this.reportService) {
+        const complete = await this.reportService.isReportComplete(chat.chat_id);
+        if (!complete) {
+          skipped++;
+          continue;
+        }
+      }
       transitionStatus(chat.chat_id, chat.status, WhatsappChatStatus.FERME, 'ReadOnlyEnforcementJob');
       chat.status = WhatsappChatStatus.FERME;
       chat.read_only = false;
@@ -108,6 +128,6 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
       await this.conversationPublisher.emitConversationClosed(chat);
       closed++;
     }
-    return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} canal(aux) dédié(s) ignoré(s))` : ''}`;
+    return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} ignorée(s))` : ''}`;
   }
 }

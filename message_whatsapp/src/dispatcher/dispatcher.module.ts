@@ -52,6 +52,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ContactAssignmentAffinity } from './entities/contact-assignment-affinity.entity';
 import { AssignmentAffinityService } from './domain/assignment-affinity.service';
+import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { AssignmentAffinityService } from './domain/assignment-affinity.service'
     ContextModule,
     ConversationCapacityModule,
     SystemConfigModule,
+    ConversationReportModule,
   ],
   controllers: [DispatcherController],
   providers: [

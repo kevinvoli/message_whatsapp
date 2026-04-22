@@ -51,6 +51,8 @@ import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { AgentConnectionService } from 'src/realtime/connections/agent-connection.service';
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -93,6 +95,12 @@ export class WhatsappMessageGateway
     private readonly agentConnectionService: AgentConnectionService,
     @Optional() @Inject(REDIS_CLIENT)
     private readonly redis: Redis | null,
+
+    @Optional()
+    private readonly reportService: ConversationReportService,
+
+    @Optional()
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   afterInit(server: Server): void {
@@ -318,6 +326,22 @@ export class WhatsappMessageGateway
             `CONVERSATION_STATUS_CHANGE blocked: chat=${chatId} — no_close activé sur le canal`,
           );
           return;
+        }
+      }
+
+      // S4-004 — Rapport GICOP obligatoire à la clôture
+      if (newStatus === WhatsappChatStatus.FERME && this.reportService && this.systemConfigService) {
+        const gicoRequired = (await this.systemConfigService.get('FF_GICOP_REPORT_REQUIRED')) === 'true';
+        if (gicoRequired) {
+          const complete = await this.reportService.isReportComplete(chatId);
+          if (!complete) {
+            this.logger.warn(`CLOSE_BLOCKED chat=${chatId} — rapport GICOP incomplet`);
+            client.emit('chat:event', {
+              type: 'CONVERSATION_CLOSE_BLOCKED',
+              payload: { chat_id: chatId, reason: 'GICOP_REPORT_INCOMPLETE' },
+            });
+            return;
+          }
         }
       }
 

@@ -204,6 +204,21 @@ export function handleChatEvent(
       break;
     }
 
+    // S4-004 — Clôture bloquée par rapport GICOP incomplet
+    case 'CONVERSATION_CLOSE_BLOCKED': {
+      const blockedPayload = data.payload as { chat_id?: string; reason?: string };
+      if (blockedPayload.reason === 'GICOP_REPORT_INCOMPLETE') {
+        // Émettre un événement DOM custom pour que le composant affiche le message
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('gicop:close-blocked', { detail: { chatId: blockedPayload.chat_id } }),
+          );
+        }
+      }
+      logger.warn('Conversation close blocked', blockedPayload);
+      break;
+    }
+
     default:
       logger.warn('Unhandled chat event type', { type: data.type });
   }

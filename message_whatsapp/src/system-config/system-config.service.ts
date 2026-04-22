@@ -48,6 +48,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'WINDOW_VALIDATION_THRESHOLD', label: 'Seuil de validation du bloc', category: 'feature_flags', description: 'Nb min de conversations validées pour rotation (0 = toutes requises)' },
   { key: 'WINDOW_EXTERNAL_TIMEOUT_HOURS', label: 'Timeout critère externe (h)', category: 'feature_flags', description: 'Heures avant auto-validation du critère call_confirmed si absent (0 = désactivé)' },
   { key: 'FF_STICKY_ASSIGNMENT', label: 'Sticky assignment (affinité client→poste)', category: 'feature_flags', description: 'true / false — réaffecte un contact à son dernier poste si celui-ci est disponible' },
+  { key: 'FF_GICOP_REPORT_REQUIRED', label: 'Rapport GICOP obligatoire à la clôture', category: 'feature_flags', description: 'true / false — bloque la clôture si le rapport GICOP est incomplet' },
 
   // ─── Intégration ERP ─────────────────────────────────────────────────────────
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },

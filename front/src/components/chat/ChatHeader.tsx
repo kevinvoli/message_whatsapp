@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X, CheckCircle, Circle } from 'lucide-react';
+import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers } from 'lucide-react';
 import {
   CallStatus,
   Conversation,
@@ -12,6 +12,8 @@ import dynamic from 'next/dynamic';
 
 const ConversationOutcomeModal = dynamic(() => import('./ConversationOutcomeModal'), { ssr: false });
 const CreateFollowUpModal = dynamic(() => import('./CreateFollowUpModal'), { ssr: false });
+const GicopReportPanel = dynamic(() => import('./GicopReportPanel'), { ssr: false });
+const CatalogModal = dynamic(() => import('./CatalogModal'), { ssr: false });
 import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
@@ -30,6 +32,9 @@ interface ChatHeaderProps {
     currentConv: Conversation;
     totalMessages: number;
     onOpenContact?: () => void;
+    onCatalogSend?: (mediaUrl: string, text: string) => void;
+    showReportPanel?: boolean;
+    onToggleReport?: () => void;
 }
 
 function SlaCountdown({ deadline }: { deadline: Date }) {
@@ -84,7 +89,7 @@ const SENTIMENT_MAP: Record<string, { label: string; color: string }> = {
   mixed:    { label: 'Mixte',   color: 'text-orange-700 bg-orange-50' },
 };
 
-export default function ChatHeader({ currentConv, totalMessages, onOpenContact }: ChatHeaderProps) {
+export default function ChatHeader({ currentConv, totalMessages, onOpenContact, onCatalogSend, showReportPanel, onToggleReport }: ChatHeaderProps) {
     const { updateConversation, changeConversationStatus } = useChatStore();
     const { selectContactByChatId } = useContactStore();
     const provider = getProviderFromChatId(currentConv.chat_id);
@@ -96,6 +101,7 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [summary, setSummary] = useState<AiSummaryData | null>(null);
     const [loadingSummary, setLoadingSummary] = useState(false);
+    const [showCatalog, setShowCatalog] = useState(false);
 
     const handleFetchSummary = async () => {
       setShowSummaryModal(true);
@@ -176,6 +182,28 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* S4-003 — Bouton rapport GICOP */}
+                    <button
+                        onClick={() => onToggleReport?.()}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                            showReportPanel
+                                ? 'bg-blue-600 text-white'
+                                : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                        }`}
+                        title="Rapport GICOP"
+                    >
+                        <ClipboardList className="w-3.5 h-3.5" />
+                        Rapport
+                    </button>
+                    {/* S8-003 — Bouton catalogue multimédia */}
+                    <button
+                        onClick={() => setShowCatalog(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
+                        title="Catalogue multimédia"
+                    >
+                        <Layers className="w-3.5 h-3.5" />
+                        Catalogue
+                    </button>
                     {/* Bouton résumé IA */}
                     <button
                         onClick={() => void handleFetchSummary()}
@@ -258,6 +286,15 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact }
                 contactId={currentConv.contact_summary?.id}
                 conversationId={currentConv.id}
                 onClose={() => setShowFollowUpModal(false)}
+            />
+        )}
+
+        {/* S8-003 — Modal catalogue multimédia */}
+        {showCatalog && (
+            <CatalogModal
+                chatId={currentConv.chat_id}
+                onSend={(mediaUrl, text) => onCatalogSend?.(mediaUrl, text)}
+                onClose={() => setShowCatalog(false)}
             />
         )}
 

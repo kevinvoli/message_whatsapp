@@ -48,6 +48,8 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WindowModule } from 'src/window/window.module';
 import { WindowPublisher } from 'src/realtime/publishers/window.publisher';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
+import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
+import { SystemConfigModule } from 'src/system-config/system-config.module';
 
 @Module({
   imports: [
@@ -80,6 +82,8 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
     SystemAlertModule,
     WindowModule,
     ConversationCapacityModule,
+    ConversationReportModule,
+    SystemConfigModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [
