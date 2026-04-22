@@ -16,21 +16,23 @@ function AutoConnexionHandler() {
     attempted.current = true;
 
     const username = searchParams.get('username');
-    console.log('le username crypte est ici', username);
 
-    // if (!username || !apiBaseUrl) {
-    //   router.replace('/login');
-    //   return;
-    // }
-    console.log('le username crypte est ici', username);
-    
+    if (!username || !apiBaseUrl) {
+      router.replace('/login');
+      return;
+    }
+
     axios
       .post(
         `${apiBaseUrl}/auth/auto-login`,
         { username },
         { withCredentials: true },
       )
-      .then(() => {
+      .then((res) => {
+        const token = res.data?.accessToken;
+        if (token) {
+          sessionStorage.setItem('auth_token', token);
+        }
         window.location.replace('/whatsapp');
       })
       .catch(() => {

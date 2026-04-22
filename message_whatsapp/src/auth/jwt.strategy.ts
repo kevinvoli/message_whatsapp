@@ -8,11 +8,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private configService: ConfigService) {
     super({
       jwtFromRequest: (req) => {
-        let token = null;
-        if (req && req.cookies) {
-          token = req.cookies['Authentication'];
+        if (req?.cookies?.['Authentication']) {
+          return req.cookies['Authentication'];
         }
-        return token;
+        const authHeader = req?.headers?.['authorization'];
+        if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+          return authHeader.slice(7);
+        }
+        return null;
       },
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'),
