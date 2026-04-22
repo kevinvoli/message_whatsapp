@@ -79,11 +79,10 @@ export class WhatsappCommercialService {
       .where('user.deletedAt IS NULL')
       .getMany();
 
+    const secret = process.env.AUTO_LOGIN_SECRET ?? 'gicop';
+
     const hmac = (value: string) =>
-      crypto
-        .createHmac('sha256','gicop')
-        .update(value)
-        .digest('hex');
+      crypto.createHmac('sha256', secret).update(value).digest('hex');
 
     const safeEqual = (a: string, b: string) => {
       const ba = Buffer.from(a, 'hex');
@@ -92,12 +91,17 @@ export class WhatsappCommercialService {
       return crypto.timingSafeEqual(ba, bb);
     };
 
+    this.logger.debug(
+      `[AUTO-LOGIN] token recu: ${token} | commerciaux charges: ${commercials.length} | secret: "${secret}"`,
+    );
+
     for (const commercial of commercials) {
-      if (commercial.email && safeEqual(hmac(commercial.email), token)) {
-        return commercial;
-      }
-      if (commercial.phone && safeEqual(hmac(commercial.phone), token)) {
-        return commercial;
+      if (commercial.email) {
+        const computed = hmac(commercial.email);
+        this.logger.debug(
+          `[AUTO-LOGIN] email="${commercial.email}" -> hmac=${computed}`,
+        );
+        if (safeEqual(computed, token)) return commercial;
       }
     }
 
