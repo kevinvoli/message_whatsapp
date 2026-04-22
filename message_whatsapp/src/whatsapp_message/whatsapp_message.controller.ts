@@ -120,6 +120,55 @@ export class WhatsappMessageController {
     }
   }
 
+  @Post('media/admin')
+  @UseGuards(AdminGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAdminMedia(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { chat_id: string; caption?: string; channel_id?: string },
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+    if (!body.chat_id) throw new BadRequestException('chat_id is required');
+
+    const chat = await this.chatService.findBychat_id(body.chat_id);
+    if (!chat) throw new BadRequestException(`Chat ${body.chat_id} not found`);
+
+    const resolvedChannelId =
+      body.channel_id ??
+      chat.last_msg_client_channel_id ??
+      chat.channel_id ??
+      (await this.messageService.findLastMessageBychat_id(chat.chat_id))?.channel_id ??
+      null;
+
+    if (!resolvedChannelId) throw new BadRequestException('Cannot resolve channel for this chat');
+
+    const mediaType = detectMediaType(file.mimetype);
+    let message;
+    try {
+      message = await this.messageService.createAgentMediaMessage({
+        chat_id: body.chat_id,
+        poste_id: null,
+        timestamp: new Date(),
+        commercial_id: null,
+        channel_id: resolvedChannelId,
+        mediaBuffer: file.buffer,
+        mimeType: file.mimetype,
+        fileName: file.originalname,
+        mediaType,
+        caption: body.caption,
+      });
+    } catch (error) {
+      if (error instanceof WhapiOutboundError) {
+        if (error.statusCode === 415) throw new UnprocessableEntityException(error.message);
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+
+    await this.gateway.notifyNewMessage(message, chat);
+    return { success: true, message_id: message.id };
+  }
+
   @Post('media')
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(FileInterceptor('file'))

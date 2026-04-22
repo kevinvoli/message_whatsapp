@@ -1408,8 +1408,13 @@ export class WhatsappMessageGateway
     if (message.provider === 'meta') {
       const providerMediaId = media.provider_media_id ?? media.media_id;
       if (!providerMediaId) return null;
-      // Chemin relatif : le frontend préfixe avec NEXT_PUBLIC_API_URL
       return `/messages/media/meta/${providerMediaId}${channelQuery}`;
+    }
+
+    if (message.provider === 'messenger') {
+      const providerMediaId = media.provider_media_id ?? media.media_id;
+      if (!providerMediaId) return directUrl ?? null;
+      return `/messages/media/messenger/${providerMediaId}${channelQuery}`;
     }
 
     if (directUrl) {

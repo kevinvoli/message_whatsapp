@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, getChats, getPostes, getChatStatsByCommercial, patchChat } from '@/app/lib/api';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip } from 'lucide-react';
+import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getPostes, getChatStatsByCommercial, patchChat } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
@@ -58,6 +58,7 @@ export default function ConversationsView({
     const [selectedCommercialId, setSelectedCommercialId] = useState<string>(initialCommercialId ?? '');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const mediaInputRef = useRef<HTMLInputElement>(null);
 
     // Chargement initial des postes et commerciaux (une seule fois)
     useEffect(() => {
@@ -321,6 +322,22 @@ export default function ConversationsView({
             });
             // Revert optimistic update on error
             setMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
+        }
+    };
+
+    const handleSendMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !selectedChat) return;
+        if (mediaInputRef.current) mediaInputRef.current.value = '';
+        try {
+            await sendAdminMedia(selectedChat.chat_id, file);
+            void loadChats(limit, offset);
+            scrollToBottom();
+        } catch (err) {
+            addToast({
+                type: 'error',
+                message: err instanceof Error ? err.message : "Échec envoi du média.",
+            });
         }
     };
 
@@ -901,6 +918,23 @@ export default function ConversationsView({
                         )}
 
                         <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-200 bg-white flex items-center gap-2 sticky bottom-0">
+                            <input
+                                ref={mediaInputRef}
+                                type="file"
+                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+                                className="hidden"
+                                onChange={handleSendMedia}
+                                disabled={loadingMessages || activeTab !== 'conversation'}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => mediaInputRef.current?.click()}
+                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                disabled={loadingMessages || activeTab !== 'conversation'}
+                                title="Envoyer un média"
+                            >
+                                <Paperclip className="w-5 h-5" />
+                            </button>
                             <input
                                 type="text"
                                 value={messageInput}
