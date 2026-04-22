@@ -91,17 +91,12 @@ export class WhatsappCommercialService {
       return crypto.timingSafeEqual(ba, bb);
     };
 
-    console.log(
-      `[AUTO-LOGIN] token recu: ${token} | commerciaux charges: ${commercials.length} | secret: "${secret}"`,
-    );
-
     for (const commercial of commercials) {
-      if (commercial.email) {
-        const computed = hmac(commercial.email);
-        console.log(
-          `[AUTO-LOGIN] email="${commercial.email}" -> hmac=${computed} | match=${computed === token}`,
-        );
-        if (safeEqual(computed, token)) return commercial;
+      if (commercial.email && safeEqual(hmac(commercial.email), token)) {
+        return commercial;
+      }
+      if (commercial.phone && safeEqual(hmac(commercial.phone), token)) {
+        return commercial;
       }
     }
 
