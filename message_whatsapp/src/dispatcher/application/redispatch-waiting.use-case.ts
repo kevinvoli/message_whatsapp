@@ -39,11 +39,8 @@ export class RedispatchWaitingUseCase {
     for (const chat of waitingChats) {
       if (chat.read_only) { stillWaiting++; continue; }
 
-      // Canaux dédiés : ne pas quitter leur poste
-      const dedicatedPosteId = chat.channel_id
-        ? await this.channelService.getDedicatedPosteId(chat.channel_id)
-        : null;
-      if (dedicatedPosteId) { stillWaiting++; continue; }
+      // RÈGLE PERMANENTE — conserver le poste d'origine, jamais redispatché
+      if (chat.poste_id) { stillWaiting++; continue; }
 
       const lock = this.getOrCreateLock(chat.chat_id);
       const assigned = await lock.runExclusive(async () => {

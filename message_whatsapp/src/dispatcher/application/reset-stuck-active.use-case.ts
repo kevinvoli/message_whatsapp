@@ -28,20 +28,16 @@ export class ResetStuckActiveUseCase {
 
     for (const chat of stuck) {
       transitionStatus(chat.chat_id, chat.status, WhatsappChatStatus.EN_ATTENTE, 'ResetStuckActive');
+      // RÈGLE PERMANENTE — on garde le poste_id : la conversation reste attachée à ce poste
+      // même quand l'agent est hors-ligne. Elle repassera ACTIF dès sa reconnexion.
       await this.queryService.updateChat(chat.id, {
-        poste: null,
-        poste_id: null,
         status: WhatsappChatStatus.EN_ATTENTE,
-        assigned_at: null,
-        assigned_mode: null,
         first_response_deadline_at: null,
       });
-      if (chat.poste_id) {
-        await this.conversationPublisher.emitConversationRemoved(chat.chat_id, chat.poste_id);
-      }
+      await this.conversationPublisher.emitConversationUpsertByChatId(chat.chat_id);
     }
 
-    this.logger.log(`resetStuckActiveToWaiting: ${stuck.length} conversation(s) remise(s) en EN_ATTENTE`);
+    this.logger.log(`resetStuckActive: ${stuck.length} conversation(s) remise(s) en EN_ATTENTE (poste conservé)`);
     return { reset: stuck.length };
   }
 }

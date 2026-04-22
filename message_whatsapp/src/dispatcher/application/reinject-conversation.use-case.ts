@@ -58,16 +58,24 @@ export class ReinjectConversationUseCase {
       return null;
     }
 
-    const oldPosteId = chat.poste_id ?? null;
+    // RÈGLE PERMANENTE — toute conversation avec un poste garde son poste.
+    // Le SLA checker ne réassigne plus : il étend uniquement la deadline.
+    if (chat.poste_id) {
+      this.logger.log(
+        `REINJECT_SKIPPED chat=${chat.chat_id} — poste permanent ${chat.poste_id} — deadline étendue`,
+      );
+      await this.queryService.updateChat(chat.id, {
+        first_response_deadline_at: this.slaPolicy.reinjectDeadline(),
+      });
+      return null;
+    }
 
-    // S2-004/S2-005 — Sticky assignment : vérifier l'affinité avant la queue
-    const nextPoste =
-      (await this.resolveAffinityPosteForReinject(chat)) ??
-      (await this.queueService.getNextInQueue());
+    // Orphelin (poste_id IS NULL) : chercher un poste via la queue
+    const nextPoste = await this.queueService.getNextInQueue();
 
     if (!nextPoste) {
       this.logger.warn(
-        `Réinjection impossible (${chat.chat_id}): aucun poste alternatif — deadline étendue +30 min`,
+        `Réinjection impossible (${chat.chat_id}): aucun agent disponible — deadline étendue`,
       );
       await this.queryService.updateChat(chat.id, {
         first_response_deadline_at: this.slaPolicy.reinjectDeadline(),
@@ -78,7 +86,7 @@ export class ReinjectConversationUseCase {
     const targetStatus = nextPoste.is_active
       ? WhatsappChatStatus.ACTIF
       : WhatsappChatStatus.EN_ATTENTE;
-    transitionStatus(chat.chat_id, chat.status, targetStatus, 'ReinjectConversation');
+    transitionStatus(chat.chat_id, chat.status, targetStatus, 'ReinjectConversation/orphan');
 
     await this.queryService.updateChat(chat.id, {
       poste: nextPoste,
@@ -92,38 +100,20 @@ export class ReinjectConversationUseCase {
     await this.affinityService?.upsertAffinity(chat.chat_id, nextPoste.id);
 
     void this.notificationService.create(
-      'alert',
-      `SLA dépassé — ${chat.name || chat.chat_id}`,
-      `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} a été réassignée au poste ${nextPoste.name}.`,
+      'info',
+      `Conversation orpheline assignée — ${chat.name || chat.chat_id}`,
+      `La conversation de ${chat.name || chat.contact_client || chat.chat_id.split('@')[0]} a été assignée au poste ${nextPoste.name}.`,
     );
 
     if (skipEmit) {
-      return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
+      return { oldPosteId: '', newPosteId: nextPoste.id };
     }
 
     await this.conversationPublisher.emitConversationReassigned(
       { ...chat, poste_id: nextPoste.id, poste: nextPoste } as WhatsappChat,
-      oldPosteId ?? '',
+      '',
       nextPoste.id,
     );
-    return { oldPosteId: oldPosteId ?? '', newPosteId: nextPoste.id };
-  }
-
-  // ─── Affinity resolution ─────────────────────────────────────────────────
-
-  private async resolveAffinityPosteForReinject(chat: WhatsappChat): Promise<WhatsappPoste | null> {
-    if (!this.affinityService) return null;
-    const candidate = await this.affinityService.getAffinityPoste(chat.chat_id);
-    if (!candidate) return null;
-    // Ne pas réinjecter vers le même poste (déjà là, mais n'a pas répondu)
-    if (candidate.id === chat.poste_id) return null;
-
-    const eligible = await this.queueService.canAssignToPoste(candidate.id);
-    if (eligible) {
-      this.logger.log(`AFFINITY_HIT(reinject) chat_id=${chat.chat_id} poste=${candidate.name}`);
-      return candidate;
-    }
-    this.logger.log(`AFFINITY_FALLBACK(reinject) chat_id=${chat.chat_id} poste=${candidate.name} not_eligible`);
-    return null;
+    return { oldPosteId: '', newPosteId: nextPoste.id };
   }
 }

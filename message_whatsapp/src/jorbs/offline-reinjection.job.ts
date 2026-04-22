@@ -55,29 +55,10 @@ export class OfflineReinjectionJob implements OnModuleInit {
   }
 
   async offlineReinject(): Promise<string> {
-    this.logger.debug('Offline reinjection cron started');
-
-    // Phase 1 uniquement — Conversations actives sur un poste hors-ligne.
-    // AM#4 — Phase 2 supprimée : les orphelins (poste_id IS NULL) sont gérés exclusivement
-    // par orphan-checker (toutes les 15 min) pour éviter la double-assignation (AM#3).
-    const actives = await this.chatRepo.find({
-      where: {
-        status: WhatsappChatStatus.ACTIF,
-        last_poste_message_at: IsNull(),
-      },
-      relations: ['poste'],
-      take: 50,
-    });
-
-    let reinjectedOffline = 0;
-    for (const chat of actives) {
-      const poste = chat.poste;
-      if (!poste) continue;
-      if (poste.is_active) continue;
-      await this.reinjectUseCase.execute(chat);
-      reinjectedOffline++;
-    }
-
-    return `${reinjectedOffline} réinjectée(s) hors-ligne`;
+    // RÈGLE PERMANENTE — Une conversation appartient définitivement à son poste.
+    // Elle reste en EN_ATTENTE sur ce poste jusqu'à ce que l'agent se reconnecte.
+    // La réinjection offline est désactivée.
+    this.logger.debug('Offline reinjection ignorée — règle poste permanent active');
+    return 'Ignoré — règle poste permanent (les conversations restent sur leur poste même hors-ligne)';
   }
 }
