@@ -12,8 +12,9 @@ import {
   CallTaskStatus,
 } from './entities/call-task.entity';
 import { Contact, ClientCategory } from 'src/contact/entities/contact.entity';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 const REQUIRED_PER_CATEGORY = 5;
 const MIN_CALL_DURATION_SECONDS = 90;
@@ -57,6 +58,9 @@ export class CallObligationService {
 
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
+
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepo: Repository<WhatsappPoste>,
   ) {}
 
   // ── Gestion du batch actif ──────────────────────────────────────────────
@@ -230,6 +234,32 @@ export class CallObligationService {
     };
   }
 
+  // ── Initialisation batch pour tous les postes ────────────────────────────
+
+  async initAllBatches(): Promise<{ created: number; alreadyActive: number }> {
+    const postes = await this.posteRepo.find({ select: ['id'] });
+    let created = 0;
+    let alreadyActive = 0;
+    for (const poste of postes) {
+      const active = await this.getActiveBatch(poste.id);
+      if (active) { alreadyActive++; continue; }
+      await this.getOrCreateActiveBatch(poste.id);
+      created++;
+    }
+    this.logger.log(`initAllBatches — créés: ${created}, déjà actifs: ${alreadyActive}`);
+    return { created, alreadyActive };
+  }
+
+  // ── Contrôle qualité à la demande ────────────────────────────────────────
+
+  async runQualityCheck(posteId: string): Promise<boolean> {
+    const activeConvs = await this.chatRepo.find({
+      where: { poste_id: posteId, status: WhatsappChatStatus.ACTIF },
+      select: ['id', 'last_client_message_at', 'last_poste_message_at'],
+    });
+    return this.checkAndRecordQuality(posteId, activeConvs);
+  }
+
   isReadyForRotation(batch: CommercialObligationBatch): boolean {
     return this.isBatchReady(batch);
   }
@@ -275,8 +305,8 @@ export class CallObligationService {
     const normalized = phone.replace(/\D/g, '');
     const commercial = await this.commercialRepo.findOne({
       where: { phone: normalized },
-      select: ['poste_id'],
+      relations: { poste: true },
     });
-    return commercial?.poste_id ?? null;
+    return commercial?.poste?.id ?? null;
   }
 }

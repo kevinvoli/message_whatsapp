@@ -1,24 +1,27 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, ListChecks, RefreshCw, History } from 'lucide-react';
-import { DispatchSettingsAudit, DispatchSnapshot } from '@/app/lib/definitions';
+import { AlertTriangle, Clock, ListChecks, RefreshCw, History, Phone } from 'lucide-react';
+import { DispatchSettingsAudit, DispatchSnapshot, Poste } from '@/app/lib/definitions';
 import {
   getDispatchSettingsAudit,
   getDispatchSnapshot,
   redispatchAllWaiting,
   resetStuckConversations,
 } from '@/app/lib/api/dispatch.api';
+import { getPostes } from '@/app/lib/api/postes.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate } from '@/app/lib/dateUtils';
+import CallObligationsView from '@/app/modules/dispatch/components/CallObligationsView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'queue' | 'historique';
+type Tab = 'queue' | 'historique' | 'obligations';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'queue',      label: 'File d\'attente', icon: ListChecks },
-  { id: 'historique', label: 'Historique',      icon: History    },
+  { id: 'queue',       label: 'File d\'attente',    icon: ListChecks },
+  { id: 'historique',  label: 'Historique',         icon: History    },
+  { id: 'obligations', label: 'Obligations appels', icon: Phone      },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,6 +32,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) {
   const [activeTab, setActiveTab] = useState<Tab>('queue');
 
+  const [postes, setPostes] = useState<Poste[]>([]);
   const [snapshot, setSnapshot] = useState<DispatchSnapshot | null>(null);
   const [audit, setAudit] = useState<DispatchSettingsAudit[]>([]);
   const [auditOffset, setAuditOffset] = useState(0);
@@ -66,13 +70,15 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const refresh = async () => {
     try {
       setLoading(true);
-      const [snapshotData, auditData] = await Promise.all([
+      const [snapshotData, auditData, postesData] = await Promise.all([
         getDispatchSnapshot(),
         loadAudit({ offset: 0 }),
+        getPostes(),
       ]);
       setSnapshot(snapshotData);
       setAudit(auditData);
       setAuditOffset(0);
+      setPostes(postesData);
     } catch (error) {
       addToast({
         type: 'error',
@@ -320,6 +326,15 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
               </p>
             )}
           </div>
+          </div>
+        )}
+
+        {/* ── Onglet : Obligations d'appels ── */}
+        {activeTab === 'obligations' && (
+          <div className="p-4">
+            <CallObligationsView
+              postes={postes.map((p) => ({ id: p.id, name: p.name }))}
+            />
           </div>
         )}
 

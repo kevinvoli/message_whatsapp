@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reset = useChatStore((s) => s.reset);
+  const loadAffinityChats = useChatStore((s) => s.loadAffinityChats);
 
   useEffect(() => {
     const bootstrapSession = async () => {
@@ -63,7 +64,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
           withCredentials: true,
         });
-        setUser(normalizeUser(response.data));
+        const userData = normalizeUser(response.data);
+        setUser(userData);
+        if (userData.poste_id) void loadAffinityChats(userData.poste_id);
       } catch {
         setUser(null);
         if (storedToken) {
@@ -113,8 +116,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { withCredentials: true },
       );
 
-      setUser(normalizeUser(response.data.user));
+      const userData = normalizeUser(response.data.user);
+      setUser(userData);
       setToken(response.data.accessToken ?? null);
+      if (userData.poste_id) void loadAffinityChats(userData.poste_id);
     } catch (err) {
       let errorMessage = 'Connexion échouée';
       if (axios.isAxiosError(err)) {

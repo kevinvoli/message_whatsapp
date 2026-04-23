@@ -95,6 +95,9 @@ export class ReinjectConversationUseCase {
       status: targetStatus,
       assigned_at: new Date(),
       first_response_deadline_at: this.slaPolicy.reinjectDeadline(),
+      // Vider le slot fenêtre : la conversation change de poste
+      window_slot: null,
+      window_status: null,
     });
 
     await this.affinityService?.upsertAffinity(chat.chat_id, nextPoste.id);

@@ -5,6 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationPublisher } from 'src/realtime/publishers/conversation.publisher';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LessThan, Not, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
@@ -31,6 +32,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     private readonly conversationPublisher: ConversationPublisher,
     private readonly cronConfigService: CronConfigService,
     private readonly channelService: ChannelService,
+    private readonly eventEmitter: EventEmitter2,
 
     @Optional()
     private readonly reportService: ConversationReportService,
@@ -126,6 +128,11 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
       chat.read_only = false;
       await this.chatRepo.save(chat);
       await this.conversationPublisher.emitConversationClosed(chat);
+      // Déclencher le compactage de la fenêtre glissante
+      this.eventEmitter.emit('conversation.status_changed', {
+        chatId: chat.chat_id,
+        newStatus: WhatsappChatStatus.FERME,
+      });
       closed++;
     }
     return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} ignorée(s))` : ''}`;

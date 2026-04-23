@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import ConversationItem from './ConversationItem';
 import BlockProgressBar from './BlockProgressBar';
+import ObligationProgressBar from './ObligationProgressBar';
 import { BulkActionBar } from './BulkActionBar';
 import { Conversation } from '@/types/chat';
 import { useChatStore } from '@/store/chatStore';
@@ -40,6 +41,8 @@ export default function ConversationList({
         <div className="flex-1 overflow-y-auto relative flex flex-col">
             {/* Barre de progression du bloc actif */}
             <BlockProgressBar />
+            {/* Obligations d'appels GICOP */}
+            <ObligationProgressBar />
 
             {/* Animation de rotation (flash discret) */}
             {windowRotating && (
