@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, CheckCircle, Star, Phone, AlertCircle } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
@@ -120,12 +120,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const isValidated = windowStatus === 'validated';
 
   // S1-006 — badge affinité (contact propriétaire)
-  const affinityChats     = useChatStore((s) => s.affinityChats);
-  const obligationStatus  = useChatStore((s) => s.obligationStatus);
-  const blockProgress     = useChatStore((s) => s.blockProgress);
+  const affinityChats    = useChatStore((s) => s.affinityChats);
+  const obligationStatus = useChatStore((s) => s.obligationStatus);
+  const blockProgress    = useChatStore((s) => s.blockProgress);
   const isAffinity = affinityChats?.has(conversation.chat_id) ?? false;
-
-  const [showTooltip, setShowTooltip] = useState(false);
 
   // Poste permanent hors-ligne : conversation en attente de reconnexion de l'agent
   const isWaitingOnAgent = conversation.status === 'attente' && !isLocked;
@@ -140,22 +138,19 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  // ── Infos tooltip pour conversation verrouillée ──────────────────────────
-  const remainingCalls = obligationStatus && !obligationStatus.readyForRotation
-    ? (['annulee', 'livree', 'sansCommande'] as const).reduce(
-        (sum, k) => sum + Math.max(0, obligationStatus[k].required - obligationStatus[k].done), 0
-      )
+  // ── Calculs pour l'info-bulle des conversations verrouillées ────────────
+  const remainingCalls = isLocked && obligationStatus && !obligationStatus.readyForRotation
+    ? (['annulee', 'livree', 'sansCommande'] as const)
+        .reduce((sum, k) => sum + Math.max(0, obligationStatus[k].required - obligationStatus[k].done), 0)
     : 0;
-  const remainingConvs = blockProgress
+  const remainingConvs = isLocked
     ? Math.max(0, blockProgress.total - blockProgress.validated)
     : 0;
 
   return (
     <div
       onClick={handleClick}
-      onMouseEnter={() => isLocked && setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-      className={`relative p-4 border-b border-gray-100 transition-colors ${
+      className={`group/item relative p-4 border-b border-gray-100 transition-colors ${
         isLocked
           ? 'opacity-50 cursor-not-allowed bg-gray-50'
           : isValidated
@@ -260,9 +255,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         )}
       </div>
 
-      {/* Tooltip info-bulle — conversation verrouillée */}
-      {isLocked && showTooltip && (remainingCalls > 0 || remainingConvs > 0) && (
-        <div className="absolute left-2 right-2 bottom-full mb-1 z-50 pointer-events-none">
+      {/* Info-bulle CSS pur — visible uniquement au survol d'une conversation verrouillée */}
+      {isLocked && (remainingCalls > 0 || remainingConvs > 0) && (
+        <div className="absolute left-2 right-2 bottom-full mb-1 z-50 pointer-events-none
+                        opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
           <div className="bg-gray-900 text-white text-xs rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
             <p className="font-semibold text-gray-200 flex items-center gap-1.5 mb-1">
               <Lock className="w-3 h-3 text-gray-400" />
@@ -274,13 +270,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 <Phone className="w-3 h-3 text-orange-400 flex-shrink-0 mt-0.5" />
                 <span>
                   <span className="font-bold text-orange-300">{remainingCalls}</span>
-                  {' '}appel{remainingCalls > 1 ? 's' : ''} restant{remainingCalls > 1 ? 's' : ''} à effectuer
+                  {' '}appel{remainingCalls > 1 ? 's' : ''} à effectuer
                   {obligationStatus && (
                     <span className="text-gray-400 ml-1">
                       ({[
-                        obligationStatus.annulee.required - obligationStatus.annulee.done > 0 && `${obligationStatus.annulee.required - obligationStatus.annulee.done} annulées`,
-                        obligationStatus.livree.required - obligationStatus.livree.done > 0 && `${obligationStatus.livree.required - obligationStatus.livree.done} livrées`,
-                        obligationStatus.sansCommande.required - obligationStatus.sansCommande.done > 0 && `${obligationStatus.sansCommande.required - obligationStatus.sansCommande.done} sans cmd`,
+                        obligationStatus.annulee.required - obligationStatus.annulee.done > 0
+                          && `${obligationStatus.annulee.required - obligationStatus.annulee.done} annulées`,
+                        obligationStatus.livree.required - obligationStatus.livree.done > 0
+                          && `${obligationStatus.livree.required - obligationStatus.livree.done} livrées`,
+                        obligationStatus.sansCommande.required - obligationStatus.sansCommande.done > 0
+                          && `${obligationStatus.sansCommande.required - obligationStatus.sansCommande.done} sans cmd`,
                       ].filter(Boolean).join(', ')})
                     </span>
                   )}
@@ -293,21 +292,21 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 <AlertCircle className="w-3 h-3 text-blue-400 flex-shrink-0" />
                 <span>
                   <span className="font-bold text-blue-300">{remainingConvs}</span>
-                  {' '}conversation{remainingConvs > 1 ? 's' : ''} à finaliser (
-                  {blockProgress.validated}/{blockProgress.total} validées)
+                  {' '}conversation{remainingConvs > 1 ? 's' : ''} à finaliser
+                  {' '}({blockProgress.validated}/{blockProgress.total} validées)
                 </span>
               </div>
             )}
 
-            {!obligationStatus?.qualityCheckPassed && obligationStatus && (
+            {obligationStatus && !obligationStatus.qualityCheckPassed && (
               <div className="flex items-center gap-1.5 text-yellow-300">
                 <AlertCircle className="w-3 h-3 flex-shrink-0" />
                 <span>Répondre au dernier message de chaque conversation</span>
               </div>
             )}
 
-            {/* Flèche bas */}
-            <div className="absolute left-4 bottom-0 translate-y-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-900" />
+            <div className="absolute left-4 bottom-0 translate-y-full w-0 h-0
+                            border-x-4 border-x-transparent border-t-4 border-t-gray-900" />
           </div>
         </div>
       )}
