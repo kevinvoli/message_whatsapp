@@ -599,7 +599,8 @@ interface RawConversationData {
 
   status?: ConversationStatus | string;
   channel_id?: string;
-  
+  channel?: { poste_id?: string | null } | null;
+
   // 🆕 Champs d'appel
   call_status?: CallStatus;
   last_call_date?: string | number | Date | null;
@@ -883,7 +884,7 @@ export const transformToConversation = (
     tags: raw.tags || [],
 
     readonly: raw.read_only ?? undefined,
-    channel_dedicated: raw.channel_dedicated ?? false,
+    channel_dedicated: raw.channel_dedicated ?? !!(raw.channel?.poste_id),
 
     first_response_deadline_at: raw.first_response_deadline_at
       ? new Date(raw.first_response_deadline_at)

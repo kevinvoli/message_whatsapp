@@ -83,9 +83,16 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     const limit = new Date(Date.now() - thresholdMs);
     const chats = await this.findEligible(limit);
 
+    const eligible: typeof chats = [];
+    for (const c of chats) {
+      const channelId = c.channel_id ?? c.last_msg_client_channel_id ?? null;
+      if (channelId && await this.channelService.shouldSkipAutoClose(channelId)) continue;
+      eligible.push(c);
+    }
+
     return {
-      total: chats.length,
-      conversations: chats.map((c) => ({
+      total: eligible.length,
+      conversations: eligible.map((c) => ({
         chat_id: c.chat_id,
         name: c.name,
         status: c.status,
@@ -109,9 +116,9 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     let closed = 0;
     let skipped = 0;
     for (const chat of chats) {
-      // Ne jamais fermer une conversation si no_close est activé sur le canal
-      const channelId = chat.last_msg_client_channel_id ?? null;
-      if (channelId && await this.channelService.isCloseBlocked(channelId)) {
+      // Priorité : canal permanent de la conversation, puis canal du dernier message client
+      const channelId = chat.channel_id ?? chat.last_msg_client_channel_id ?? null;
+      if (channelId && await this.channelService.shouldSkipAutoClose(channelId)) {
         skipped++;
         continue;
       }
@@ -135,6 +142,6 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
       });
       closed++;
     }
-    return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} ignorée(s))` : ''}`;
+    return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} ignorée(s) — canal dédié ou no_close)` : ''}`;
   }
 }

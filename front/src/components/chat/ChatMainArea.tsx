@@ -23,10 +23,12 @@ export default function ChatMainArea({ onOpenContact }: { onOpenContact?: () => 
 
   // Fenêtre de messagerie 23h : si le client n'a pas écrit depuis plus de 23h,
   // l'envoi de messages ordinaires est interdit côté WhatsApp.
+  // Exception : les canaux dédiés à un poste ne sont pas soumis à cette restriction.
   const WINDOW_MS = 23 * 60 * 60 * 1000;
   const lastClientAt = selectedConversation?.last_client_message_at;
   const windowExpired =
     selectedConversation != null &&
+    !selectedConversation.channel_dedicated &&
     (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS);
 
   return (
