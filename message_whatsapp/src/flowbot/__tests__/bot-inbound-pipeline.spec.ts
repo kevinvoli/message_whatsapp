@@ -45,6 +45,7 @@ import { FlowTrigger, FlowTriggerType } from '../entities/flow-trigger.entity';
 import { BotConversation, BotConversationStatus } from '../entities/bot-conversation.entity';
 import { BotInboundMessageEvent, BOT_INBOUND_EVENT } from '../events/bot-inbound-message.event';
 import { BOT_ESCALATE_EVENT } from '../events/bot-outbound.events';
+import { AiAssistantService } from 'src/ai-assistant/ai-assistant.service';
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -233,6 +234,7 @@ describe('BotInbound Pipeline (intégration)', () => {
         { provide: BotMessageService, useValue: botMsgServiceMock },
         { provide: FlowSessionService, useValue: sessionServiceMock },
         { provide: FlowAnalyticsService, useValue: analyticsServiceMock },
+        { provide: AiAssistantService, useValue: { generateReply: jest.fn() } },
         // TypeORM repos
         { provide: getRepositoryToken(FlowNode), useValue: nodeRepoMock },
         { provide: getRepositoryToken(FlowEdge), useValue: edgeRepoMock },

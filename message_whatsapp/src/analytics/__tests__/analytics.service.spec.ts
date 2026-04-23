@@ -5,6 +5,8 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { CallLog } from 'src/call-log/entities/call_log.entity';
+import { FollowUp } from 'src/follow-up/entities/follow_up.entity';
 
 const qbMock = () => ({
   select: jest.fn().mockReturnThis(),
@@ -48,6 +50,8 @@ describe('AnalyticsService', () => {
     channelRepo.createQueryBuilder.mockReturnValue(channelQb);
     agentRepo.createQueryBuilder.mockReturnValue(agentQb);
 
+    const callLogRepo = repoMock();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnalyticsService,
@@ -55,6 +59,8 @@ describe('AnalyticsService', () => {
         { provide: getRepositoryToken(WhatsappMessage), useValue: msgRepo },
         { provide: getRepositoryToken(WhapiChannel), useValue: channelRepo },
         { provide: getRepositoryToken(WhatsappCommercial), useValue: agentRepo },
+        { provide: getRepositoryToken(CallLog), useValue: callLogRepo },
+        { provide: getRepositoryToken(FollowUp), useValue: repoMock() },
       ],
     }).compile();
 

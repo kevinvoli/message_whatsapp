@@ -1,13 +1,14 @@
 import {
-  BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   HttpCode,
   Logger,
   Post,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -45,7 +46,7 @@ export class GicopWebhookController {
 
   /**
    * Vérification du webhook (challenge-response, même protocole que Meta/WhatsApp).
-   * TODO (post-dev) : valider hub.verify_token contre GICOP_WEBHOOK_VERIFY_TOKEN.
+   * Si GICOP_WEBHOOK_VERIFY_TOKEN est configuré, le hub.verify_token est validé.
    */
   @Get('gicop')
   @ApiOperation({ summary: 'Vérification webhook GICOP (hub challenge)' })
@@ -57,6 +58,14 @@ export class GicopWebhookController {
     this.logger.log(`[GICOP][GET] Headers  : ${JSON.stringify(headers)}`);
     this.logger.log(`[GICOP][GET] Query    : ${JSON.stringify(query)}`);
 
+    const verifyToken = process.env.GICOP_WEBHOOK_VERIFY_TOKEN || process.env.INTEGRATION_SECRET;
+    if (verifyToken && query['hub.mode'] === 'subscribe') {
+      if (query['hub.verify_token'] !== verifyToken) {
+        this.logger.warn('[GICOP][GET] hub.verify_token invalide — accès refusé');
+        throw new ForbiddenException('hub.verify_token invalide');
+      }
+    }
+
     const challenge = query['hub.challenge'];
     this.logger.log(`[GICOP][GET] Challenge retourné : ${challenge ?? '(vide)'}`);
     return challenge ?? 'ok';
@@ -64,7 +73,7 @@ export class GicopWebhookController {
 
   /**
    * Réception des événements GICOP (commandes + appels).
-   * TODO (post-dev) : sécuriser via x-integration-secret.
+   * Si INTEGRATION_SECRET est configuré, le header x-integration-secret est validé.
    */
   @Post('gicop')
   @HttpCode(200)
@@ -74,6 +83,16 @@ export class GicopWebhookController {
     @Body() payload: unknown,
   ) {
     this.logger.log('[GICOP][POST] ── Webhook entrant ──────────────────────────');
+
+    const secret = process.env.INTEGRATION_SECRET;
+    if (secret) {
+      const provided = headers['x-integration-secret'];
+      if (provided !== secret) {
+        this.logger.warn('[GICOP][POST] x-integration-secret invalide — accès refusé');
+        throw new UnauthorizedException('x-integration-secret invalide');
+      }
+    }
+
     this.logger.log(`[GICOP][POST] Headers : ${JSON.stringify(headers)}`);
     this.logger.log(`[GICOP][POST] Body    : ${JSON.stringify(payload, null, 2)}`);
 

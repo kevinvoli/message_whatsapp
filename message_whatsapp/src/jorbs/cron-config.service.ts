@@ -83,6 +83,19 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: null,
     maxSteps: null,
   },
+  'obligation-quality-check': {
+    label: 'Contrôle qualité messages GICOP',
+    description:
+      'Vérifie toutes les 30 min que chaque commercial a répondu au dernier message de ses conversations actives. Résultat persisté dans le batch GICOP courant.',
+    enabled: true,
+    scheduleType: 'interval',
+    intervalMinutes: 30,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

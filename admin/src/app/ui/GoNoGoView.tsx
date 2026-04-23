@@ -12,11 +12,12 @@ import { goNoGoChecklist } from '@/app/data/admin-data';
 // ─── Recommandations GICOP ────────────────────────────────────────────────────
 
 const GICOP_CRON_RULES: { key: string; recetteEnabled: boolean; label: string; reason: string }[] = [
-  { key: 'read-only-enforcement', recetteEnabled: false, label: 'Fermeture automatique',   reason: 'S0-006 — suspendu en recette : évite la fermeture auto qui bypass le rapport GICOP' },
-  { key: 'sla-checker',           recetteEnabled: true,  label: 'Vérificateur SLA',        reason: 'Actif — réinjection SLA nécessaire' },
-  { key: 'offline-reinject',      recetteEnabled: true,  label: 'Réinjection agents',      reason: 'Actif — réinjection agents hors-ligne' },
-  { key: 'orphan-checker',        recetteEnabled: true,  label: 'Rattrapage orphelins',    reason: 'Actif — filet de sécurité conversations sans poste' },
-  { key: 'webhook-purge',         recetteEnabled: true,  label: 'Purge webhook',           reason: 'Actif — maintenance courante' },
+  { key: 'read-only-enforcement',     recetteEnabled: false, label: 'Fermeture automatique',   reason: 'S0-006 — suspendu en recette : évite la fermeture auto qui bypass le rapport GICOP' },
+  { key: 'sla-checker',              recetteEnabled: true,  label: 'Vérificateur SLA',        reason: 'Actif — réinjection SLA nécessaire' },
+  { key: 'offline-reinject',         recetteEnabled: true,  label: 'Réinjection agents',      reason: 'Actif — réinjection agents hors-ligne' },
+  { key: 'orphan-checker',           recetteEnabled: true,  label: 'Rattrapage orphelins',    reason: 'Actif — filet de sécurité conversations sans poste' },
+  { key: 'webhook-purge',            recetteEnabled: true,  label: 'Purge webhook',           reason: 'Actif — maintenance courante' },
+  { key: 'obligation-quality-check', recetteEnabled: true,  label: 'Qualité messages GICOP', reason: 'Actif — contrôle qualité périodique des messages commerciaux' },
 ];
 
 const GICOP_FLAG_RULES: { key: string; expectedValue: string; label: string; reason: string }[] = [
@@ -156,6 +157,37 @@ const buildSloGates = (metrics: WebhookMetricsSnapshot | null): GoNoGoGate[] => 
   ];
 };
 
+const buildGicopGates = (crons: CronConfig[], configs: SystemConfigEntry[]): GoNoGoGate[] => {
+  const gates: GoNoGoGate[] = [];
+  if (crons.length === 0 && configs.length === 0) return gates; // pas encore chargé
+
+  for (const rule of GICOP_CRON_RULES) {
+    const cron = crons.find((c) => c.key === rule.key);
+    if (!cron) continue;
+    const ok = cron.enabled === rule.recetteEnabled;
+    gates.push({
+      id: `gicop-cron-${rule.key}`,
+      title: `[GICOP] Cron ${rule.label}`,
+      status: ok ? 'pass' : 'fail',
+      detail: `Requis: ${rule.recetteEnabled ? 'ON' : 'OFF'} — Actuel: ${cron.enabled ? 'ON' : 'OFF'}`,
+    });
+  }
+
+  for (const rule of GICOP_FLAG_RULES) {
+    const entry = configs.find((c) => c.configKey === rule.key);
+    if (!entry) continue;
+    const ok = entry.configValue === rule.expectedValue;
+    gates.push({
+      id: `gicop-flag-${rule.key}`,
+      title: `[GICOP] Flag ${rule.label}`,
+      status: ok ? 'pass' : 'fail',
+      detail: `Requis: ${rule.expectedValue} — Actuel: ${entry.configValue ?? 'non défini'}`,
+    });
+  }
+
+  return gates;
+};
+
 const overallStatus = (gates: GoNoGoGate[], checklist: GoNoGoChecklistItem[]): GoNoGoGateStatus => {
   const allStatuses = [...gates.map((g) => g.status), ...checklist.map((c) => c.status)];
   if (allStatuses.some((s) => s === 'fail')) return 'fail';
@@ -193,7 +225,8 @@ export default function GoNoGoView({ onRefresh }: Props) {
   }, [fetchData, fetchGicop]);
 
   const gates = buildSloGates(metrics);
-  const global = overallStatus(gates, checklist);
+  const gicoGates = buildGicopGates(crons, configs);
+  const global = overallStatus([...gates, ...gicoGates], checklist);
   const globalConfig = statusConfig[global];
   const GlobalIcon = globalConfig.icon;
 

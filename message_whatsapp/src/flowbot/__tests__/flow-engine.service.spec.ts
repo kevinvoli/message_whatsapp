@@ -35,6 +35,7 @@ import { BotConversation, BotConversationStatus } from '../entities/bot-conversa
 import { BotInboundMessageEvent } from '../events/bot-inbound-message.event';
 import { FlowTriggerType } from '../entities/flow-trigger.entity';
 import { BOT_ESCALATE_EVENT } from '../events/bot-outbound.events';
+import { AiAssistantService } from 'src/ai-assistant/ai-assistant.service';
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -201,6 +202,7 @@ describe('FlowEngineService', () => {
         { provide: FlowAnalyticsService, useValue: analyticsServiceMock },
         { provide: FlowVariableService, useValue: variableServiceMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
+        { provide: AiAssistantService, useValue: { generateReply: jest.fn() } },
         { provide: getRepositoryToken(FlowNode), useValue: nodeRepoMock },
         { provide: getRepositoryToken(FlowEdge), useValue: edgeRepoMock },
         { provide: getRepositoryToken(FlowSession), useValue: sessionRepoMock },

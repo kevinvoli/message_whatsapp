@@ -234,6 +234,16 @@ export class CallObligationService {
     };
   }
 
+  // ── Postes avec batch actif ──────────────────────────────────────────────
+
+  async getActivePosteIds(): Promise<string[]> {
+    const batches = await this.batchRepo.find({
+      where: { status: BatchStatus.PENDING },
+      select: ['posteId'],
+    });
+    return [...new Set(batches.map((b) => b.posteId))];
+  }
+
   // ── Initialisation batch pour tous les postes ────────────────────────────
 
   async initAllBatches(): Promise<{ created: number; alreadyActive: number }> {

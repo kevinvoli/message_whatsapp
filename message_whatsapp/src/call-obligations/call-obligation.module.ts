@@ -4,10 +4,12 @@ import { CommercialObligationBatch } from './entities/commercial-obligation-batc
 import { CallTask } from './entities/call-task.entity';
 import { CallObligationService } from './call-obligation.service';
 import { CallObligationController } from './call-obligation.controller';
+import { ObligationQualityCheckJob } from './obligation-quality-check.job';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
 
 @Module({
   imports: [
@@ -19,9 +21,10 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
       WhatsappChat,
       WhatsappPoste,
     ]),
+    JorbsModule,
   ],
   controllers: [CallObligationController],
-  providers: [CallObligationService],
+  providers: [CallObligationService, ObligationQualityCheckJob],
   exports: [CallObligationService],
 })
 export class CallObligationModule {}
