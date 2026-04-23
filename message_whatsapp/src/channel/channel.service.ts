@@ -519,6 +519,22 @@ export class ChannelService implements OnModuleInit {
     return !!ch?.no_close;
   }
 
+  /**
+   * Retourne true si la fermeture automatique doit être ignorée pour ce canal.
+   * Deux conditions protègent un canal :
+   *   1. flag no_close activé par l'admin
+   *   2. canal dédié à un poste (poste_id IS NOT NULL) — le commercial dédié
+   *      doit pouvoir répondre sans limite de 24h
+   */
+  async shouldSkipAutoClose(channelId: string): Promise<boolean> {
+    if (!channelId) return false;
+    const ch = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      select: ['channel_id', 'no_close', 'poste_id'],
+    });
+    return !!ch?.no_close || !!ch?.poste_id;
+  }
+
   async findAll() {
     return await this.channelRepository.find({ relations: ['poste'] });
   }

@@ -66,6 +66,7 @@ describe('AutoMessageMasterJob', () => {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where:             jest.fn().mockReturnThis(),
         andWhere:          jest.fn().mockReturnThis(),
+        limit:             jest.fn().mockReturnThis(),
         getMany:           jest.fn().mockResolvedValue([]),
       }),
       find: jest.fn().mockResolvedValue([]),

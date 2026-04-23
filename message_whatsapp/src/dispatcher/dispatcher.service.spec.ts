@@ -213,6 +213,7 @@ describe('DispatcherService', () => {
         status: WhatsappChatStatus.ACTIF,
       };
       chatRepository.findOne.mockResolvedValue(existingChat);
+      channelService.getDedicatedPosteId.mockResolvedValue(null); // canal non dédié
       gateway.isAgentConnected.mockReturnValue(true); // agent connecté
       chatRepository.save.mockImplementation(async (c) => c);
       gateway.emitConversationUpsertByChatId.mockResolvedValue(undefined);
@@ -227,8 +228,6 @@ describe('DispatcherService', () => {
 
       // Queue non touchée — agent actif sur ce poste
       expect(queueService.getNextInQueue).not.toHaveBeenCalled();
-      // ChannelService non consulté — court-circuit avant resolvePosteForChannel
-      expect(channelService.getDedicatedPosteId).not.toHaveBeenCalled();
     });
   });
 });
