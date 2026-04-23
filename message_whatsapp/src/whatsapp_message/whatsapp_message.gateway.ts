@@ -366,6 +366,11 @@ export class WhatsappMessageGateway
       await this.chatService.update(chatId, { status: newStatus });
       this.logger.log(`Conversation status changed: ${chatId} → ${newStatus}`);
 
+      // Alimentation du portefeuille client à la clôture
+      if (newStatus === WhatsappChatStatus.FERME && this.dossierService && agent.commercialId) {
+        void this.dossierService.assignToPortfolio(chatId, agent.commercialId);
+      }
+
       const updatedChat = await this.chatService.findBychat_id(chatId);
       if (!updatedChat?.poste_id) return;
 

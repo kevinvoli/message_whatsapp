@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -20,6 +20,8 @@ export interface TimelineEvent {
 
 @Injectable()
 export class ClientDossierService {
+  private readonly logger = new Logger(ClientDossierService.name);
+
   constructor(
     @InjectRepository(Contact)
     private readonly contactRepo: Repository<Contact>,
@@ -100,6 +102,20 @@ export class ClientDossierService {
     if (dto.notes !== undefined) dossier.notes = dto.notes ?? null;
 
     return this.dossierRepo.save(dossier);
+  }
+
+  /**
+   * Assigne le contact lié à cette conversation au portefeuille du commercial.
+   * N'écrase pas un propriétaire déjà attribué (premier commercial qui finalise = propriétaire).
+   */
+  async assignToPortfolio(chatId: string, commercialId: string): Promise<void> {
+    const contact = await this.contactRepo.findOne({
+      where: { chat_id: chatId },
+      select: ['id', 'portfolio_owner_id'],
+    });
+    if (!contact || contact.portfolio_owner_id) return; // déjà dans un portefeuille
+    await this.contactRepo.update(contact.id, { portfolio_owner_id: commercialId });
+    this.logger.log(`Portfolio: contact ${contact.id} assigné au commercial ${commercialId}`);
   }
 
   /** Retourne true si le dossier lié à cette conversation est complet (nom + besoin + score) */
