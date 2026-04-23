@@ -9,10 +9,12 @@ import { ClientDossier } from './entities/client-dossier.entity';
 import { ContactPhone } from './entities/contact-phone.entity';
 import { ClientDossierService } from './client-dossier.service';
 import { ClientDossierController } from './client-dossier.controller';
+import { GicopPlatformModule } from 'src/gicop-platform/gicop-platform.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ClientDossier, ContactPhone, Contact, CallLog, FollowUp, WhatsappChat, WhatsappMessage]),
+    GicopPlatformModule,
   ],
   controllers: [ClientDossierController],
   providers: [ClientDossierService],

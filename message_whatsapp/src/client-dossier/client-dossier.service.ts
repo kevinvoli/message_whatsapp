@@ -9,6 +9,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { ClientDossier } from './entities/client-dossier.entity';
 import { ContactPhone } from './entities/contact-phone.entity';
 import { UpsertDossierDto } from './dto/upsert-dossier.dto';
+import { GicopPlatformService } from 'src/gicop-platform/gicop-platform.service';
 
 export interface TimelineEvent {
   type: 'message' | 'call' | 'follow_up' | 'conversation_opened' | 'conversation_closed';
@@ -37,6 +38,7 @@ export class ClientDossierService {
     private readonly dossierRepo: Repository<ClientDossier>,
     @InjectRepository(ContactPhone)
     private readonly phoneRepo: Repository<ContactPhone>,
+    private readonly gicopPlatform: GicopPlatformService,
   ) {}
 
   // ── Méthodes dossier structuré ────────────────────────────────────────────
@@ -105,17 +107,36 @@ export class ClientDossierService {
   }
 
   /**
-   * Assigne le contact lié à cette conversation au portefeuille du commercial.
+   * Assigne le contact lié à cette conversation au portefeuille du commercial,
+   * puis envoie les données à la plateforme GICOP (gicop.ci).
    * N'écrase pas un propriétaire déjà attribué (premier commercial qui finalise = propriétaire).
    */
-  async assignToPortfolio(chatId: string, commercialId: string): Promise<void> {
+  async assignToPortfolio(chatId: string, commercialId: string, posteId: string): Promise<void> {
     const contact = await this.contactRepo.findOne({
       where: { chat_id: chatId },
-      select: ['id', 'portfolio_owner_id'],
+      select: ['id', 'phone', 'portfolio_owner_id'],
     });
-    if (!contact || contact.portfolio_owner_id) return; // déjà dans un portefeuille
-    await this.contactRepo.update(contact.id, { portfolio_owner_id: commercialId });
-    this.logger.log(`Portfolio: contact ${contact.id} assigné au commercial ${commercialId}`);
+    if (!contact) return;
+
+    // Assigner le portefeuille si pas encore fait
+    if (!contact.portfolio_owner_id) {
+      await this.contactRepo.update(contact.id, { portfolio_owner_id: commercialId });
+      this.logger.log(`Portfolio: contact ${contact.id} assigné au commercial ${commercialId}`);
+    }
+
+    // Récupérer le type depuis le dossier (nextAction du commercial)
+    const dossier = await this.dossierRepo.findOne({
+      where: { contactId: contact.id },
+      select: ['nextAction'],
+    });
+    const type = dossier?.nextAction ?? 'relancer';
+
+    // Envoyer à la plateforme gicop.ci
+    void this.gicopPlatform.sendNumberToCall({
+      number:   contact.phone,
+      poste_id: posteId,
+      type,
+    });
   }
 
   /** Retourne true si le dossier lié à cette conversation est complet (nom + besoin + score) */
