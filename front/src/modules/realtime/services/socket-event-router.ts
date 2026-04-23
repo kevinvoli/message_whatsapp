@@ -204,14 +204,17 @@ export function handleChatEvent(
       break;
     }
 
-    // S4-004 — Clôture bloquée par rapport GICOP incomplet
+    // Clôture bloquée (rapport GICOP incomplet ou dossier client incomplet)
     case 'CONVERSATION_CLOSE_BLOCKED': {
       const blockedPayload = data.payload as { chat_id?: string; reason?: string };
-      if (blockedPayload.reason === 'GICOP_REPORT_INCOMPLETE') {
-        // Émettre un événement DOM custom pour que le composant affiche le message
-        if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
+        if (blockedPayload.reason === 'GICOP_REPORT_INCOMPLETE') {
           window.dispatchEvent(
             new CustomEvent('gicop:close-blocked', { detail: { chatId: blockedPayload.chat_id } }),
+          );
+        } else if (blockedPayload.reason === 'DOSSIER_INCOMPLET') {
+          window.dispatchEvent(
+            new CustomEvent('dossier:close-blocked', { detail: { chatId: blockedPayload.chat_id } }),
           );
         }
       }

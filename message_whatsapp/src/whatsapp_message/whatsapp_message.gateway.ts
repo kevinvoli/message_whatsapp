@@ -53,6 +53,7 @@ import { AgentConnectionService } from 'src/realtime/connections/agent-connectio
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
 import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 import { SystemConfigService } from 'src/system-config/system-config.service';
+import { ClientDossierService } from 'src/client-dossier/client-dossier.service';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -101,6 +102,9 @@ export class WhatsappMessageGateway
 
     @Optional()
     private readonly systemConfigService: SystemConfigService,
+
+    @Optional()
+    private readonly dossierService: ClientDossierService,
   ) {}
 
   afterInit(server: Server): void {
@@ -342,6 +346,19 @@ export class WhatsappMessageGateway
             });
             return;
           }
+        }
+      }
+
+      // Dossier client obligatoire à la clôture
+      if (newStatus === WhatsappChatStatus.FERME && this.dossierService) {
+        const dossierComplete = await this.dossierService.isDossierComplete(chatId);
+        if (!dossierComplete) {
+          this.logger.warn(`CLOSE_BLOCKED chat=${chatId} — dossier client incomplet`);
+          client.emit('chat:event', {
+            type: 'CONVERSATION_CLOSE_BLOCKED',
+            payload: { chat_id: chatId, reason: 'DOSSIER_INCOMPLET' },
+          });
+          return;
         }
       }
 

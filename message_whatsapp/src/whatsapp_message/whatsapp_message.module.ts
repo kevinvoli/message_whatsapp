@@ -50,6 +50,7 @@ import { WindowPublisher } from 'src/realtime/publishers/window.publisher';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
+import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
     ConversationCapacityModule,
     ConversationReportModule,
     SystemConfigModule,
+    ClientDossierModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

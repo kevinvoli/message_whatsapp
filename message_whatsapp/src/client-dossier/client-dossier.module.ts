@@ -16,6 +16,6 @@ import { ClientDossierController } from './client-dossier.controller';
   ],
   controllers: [ClientDossierController],
   providers: [ClientDossierService],
-  exports: [ClientDossierService],
+  exports: [ClientDossierService, TypeOrmModule],
 })
 export class ClientDossierModule {}

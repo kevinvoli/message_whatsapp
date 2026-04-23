@@ -21,18 +21,30 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   const [showTransfer, setShowTransfer] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
-  const [closeBlocked, setCloseBlocked] = useState(false);
+  const [closeBlocked, setCloseBlocked]         = useState(false);
+  const [dossierBlocked, setDossierBlocked]     = useState(false);
 
   useEffect(() => {
-    const handler = (e: Event) => {
+    const gicoHandler = (e: Event) => {
       const detail = (e as CustomEvent<{ chatId?: string }>).detail;
       if (!detail?.chatId || detail.chatId === conversation.chat_id) {
         setCloseBlocked(true);
         setTimeout(() => setCloseBlocked(false), 5000);
       }
     };
-    window.addEventListener('gicop:close-blocked', handler);
-    return () => window.removeEventListener('gicop:close-blocked', handler);
+    const dossierHandler = (e: Event) => {
+      const detail = (e as CustomEvent<{ chatId?: string }>).detail;
+      if (!detail?.chatId || detail.chatId === conversation.chat_id) {
+        setDossierBlocked(true);
+        setTimeout(() => setDossierBlocked(false), 6000);
+      }
+    };
+    window.addEventListener('gicop:close-blocked', gicoHandler);
+    window.addEventListener('dossier:close-blocked', dossierHandler);
+    return () => {
+      window.removeEventListener('gicop:close-blocked', gicoHandler);
+      window.removeEventListener('dossier:close-blocked', dossierHandler);
+    };
   }, [conversation.chat_id]);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
@@ -149,12 +161,22 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
               </button>
             ))}
 
-            {/* S4-004 — Bannière rapport GICOP requis */}
+            {/* Bannière rapport GICOP requis */}
             {closeBlocked && (
               <div className="mx-2 mb-1 mt-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
                 <ClipboardList className="w-3.5 h-3.5 text-orange-600 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-orange-700 leading-tight">
                   Rapport GICOP incomplet — remplissez le rapport avant de clôturer.
+                </p>
+              </div>
+            )}
+
+            {/* Bannière dossier client requis */}
+            {dossierBlocked && (
+              <div className="mx-2 mb-1 mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700 leading-tight">
+                  Dossier client incomplet — renseignez le nom, le besoin et le score d&apos;intérêt avant de clôturer.
                 </p>
               </div>
             )}

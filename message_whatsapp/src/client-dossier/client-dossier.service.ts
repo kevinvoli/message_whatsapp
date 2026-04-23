@@ -102,6 +102,18 @@ export class ClientDossierService {
     return this.dossierRepo.save(dossier);
   }
 
+  /** Retourne true si le dossier lié à cette conversation est complet (nom + besoin + score) */
+  async isDossierComplete(chatId: string): Promise<boolean> {
+    const contact = await this.contactRepo.findOne({ where: { chat_id: chatId }, select: ['id'] });
+    if (!contact) return false;
+    const dossier = await this.dossierRepo.findOne({
+      where: { contactId: contact.id },
+      select: ['fullName', 'clientNeed', 'interestScore'],
+    });
+    if (!dossier) return false;
+    return !!(dossier.fullName?.trim() && dossier.clientNeed?.trim() && dossier.interestScore !== null);
+  }
+
   // ── Gestion des numéros de téléphone ────────────────────────────────────
 
   async listPhones(contactId: string): Promise<ContactPhone[]> {
