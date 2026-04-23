@@ -14,11 +14,25 @@ import { createSocketSessionSlice, SocketSessionSlice } from '@/modules/realtime
 import { createMessageSlice, MessageSlice } from '@/modules/chat/store/message.store';
 import { createConversationSlice, ConversationSlice } from '@/modules/conversations/store/conversation.store';
 
+// ─── Type obligation status ───────────────────────────────────────────────────
+
+export type CategoryProgress = { done: number; required: number };
+export type ObligationStatus = {
+  batchNumber:        number;
+  annulee:            CategoryProgress;
+  livree:             CategoryProgress;
+  sansCommande:       CategoryProgress;
+  qualityCheckPassed: boolean;
+  readyForRotation:   boolean;
+};
+
 // ─── Type unifié ─────────────────────────────────────────────────────────────
 
 export type ChatState = SocketSessionSlice &
   MessageSlice &
   ConversationSlice & {
+    obligationStatus: ObligationStatus | null;
+    setObligationStatus: (s: ObligationStatus | null) => void;
     reset: () => void;
   };
 
@@ -45,6 +59,7 @@ const initialState = {
   windowRotating: false,
   releasingChatIds: [],
   affinityChats: null,
+  obligationStatus: null,
 };
 
 // ─── Store composé ────────────────────────────────────────────────────────────
@@ -53,6 +68,13 @@ export const useChatStore = create<ChatState>()((...a) => ({
   ...createSocketSessionSlice(...a),
   ...createMessageSlice(...a),
   ...createConversationSlice(...a),
+
+  obligationStatus: null,
+
+  setObligationStatus: (s) => {
+    const [set] = a;
+    set({ obligationStatus: s });
+  },
 
   reset: () => {
     const [set] = a;

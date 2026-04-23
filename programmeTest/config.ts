@@ -27,7 +27,7 @@ for (const envFile of envFiles) {
 
 const env = process.env;
 
-export type TestMode = 'messages' | 'status' | 'mix';
+export type TestMode = 'messages' | 'status' | 'mix' | 'call' | 'obligations' | 'window' | 'ping';
 export type ProviderConfig = 'whapi' | 'meta' | 'messenger' | 'instagram' | 'telegram' | 'mix';
 
 export const config = {
@@ -91,6 +91,15 @@ export const config = {
   dbUser:     env.MYSQL_USER     ?? 'root',
   dbPassword: env.MYSQL_PASSWORD ?? '',
   dbName:     env.MYSQL_DATABASE ?? 'whatsappflow',
+
+  // ── GICOP — Webhook appels ──────────────────────────────────────────────────
+  gicopWebhookUrl:    env.GICOP_WEBHOOK_URL    ?? 'http://148.230.112.175:3002/webhooks/gicop',
+  integrationSecret:  env.INTEGRATION_SECRET   ?? '',
+  commercialPhone:    env.COMMERCIAL_PHONE      ?? '',
+  posteId:            env.POSTE_ID              ?? '',
+  clientPhones:       (env.CLIENT_PHONES ?? '').split(',').map(p => p.trim()).filter(Boolean),
+  callDurationSeconds: Number(env.CALL_DURATION_SECONDS ?? 120),
+  windowSize:         Number(env.WINDOW_SIZE    ?? 10),
 
   // ── Backward compat ─────────────────────────────────────────────────────
   /** @deprecated Utiliser mixProviders à la place */

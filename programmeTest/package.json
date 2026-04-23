@@ -22,7 +22,13 @@
     "rich": "cross-env MODE=mix node --loader ts-node/esm index.ts",
     "rich:whapi": "cross-env MODE=mix PROVIDER=whapi node --loader ts-node/esm index.ts",
     "rich:telegram": "cross-env MODE=mix PROVIDER=telegram node --loader ts-node/esm index.ts",
-    "rich:all": "cross-env MODE=mix PROVIDER=mix MIXED_PROVIDERS=whapi,meta,messenger,instagram,telegram node --loader ts-node/esm index.ts"
+    "rich:all": "cross-env MODE=mix PROVIDER=mix MIXED_PROVIDERS=whapi,meta,messenger,instagram,telegram node --loader ts-node/esm index.ts",
+
+    "gicop:ping":        "cross-env MODE=ping node --loader ts-node/esm index.ts",
+    "gicop:call":        "cross-env MODE=call node --loader ts-node/esm index.ts",
+    "gicop:short":       "cross-env MODE=short node --loader ts-node/esm index.ts",
+    "gicop:obligations": "cross-env MODE=obligations node --loader ts-node/esm index.ts",
+    "gicop:window":      "cross-env MODE=window node --loader ts-node/esm index.ts"
   },
   "author": "",
   "license": "ISC",

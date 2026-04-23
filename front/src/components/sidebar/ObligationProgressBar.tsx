@@ -2,19 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { Phone, CheckCircle, AlertCircle } from 'lucide-react';
+import { useChatStore, type ObligationStatus } from '@/store/chatStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-
-interface CategoryProgress { done: number; required: number; }
-
-interface ObligationStatus {
-  batchNumber: number;
-  annulee:      CategoryProgress;
-  livree:       CategoryProgress;
-  sansCommande: CategoryProgress;
-  qualityCheckPassed: boolean;
-  readyForRotation: boolean;
-}
 
 const LABELS: Record<keyof Pick<ObligationStatus, 'annulee' | 'livree' | 'sansCommande'>, string> = {
   annulee:      'Annulées',
@@ -25,18 +15,23 @@ const LABELS: Record<keyof Pick<ObligationStatus, 'annulee' | 'livree' | 'sansCo
 export default function ObligationProgressBar() {
   const [status, setStatus] = useState<ObligationStatus | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const setObligationStatus = useChatStore((s) => s.setObligationStatus);
 
   useEffect(() => {
     const load = async () => {
       try {
         const res = await fetch(`${API_URL}/call-obligations/mine`, { credentials: 'include' });
-        if (res.ok) setStatus(await res.json() as ObligationStatus);
+        if (res.ok) {
+          const data = await res.json() as ObligationStatus;
+          setStatus(data);
+          setObligationStatus(data); // partage avec le store
+        }
       } catch { /* silencieux */ }
     };
     void load();
     const id = setInterval(() => void load(), 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [setObligationStatus]);
 
   if (!status) return null;
 

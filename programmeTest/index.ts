@@ -399,4 +399,34 @@ export async function runStressTest() {
   }
 }
 
-runStressTest();
+// ── Routage MODE GICOP ────────────────────────────────────────────────────────
+
+async function runGicop() {
+  const {
+    scenarioSingleCall,
+    scenarioObligations,
+    scenarioShortCall,
+    scenarioWindow,
+    scenarioPing,
+  } = await import('./window-scenario.ts');
+
+  const mode = config.mode as string;
+  switch (mode) {
+    case 'call':        return scenarioSingleCall();
+    case 'obligations': return scenarioObligations();
+    case 'window':      return scenarioWindow();
+    case 'ping':        return scenarioPing();
+    case 'short':       return scenarioShortCall();
+    default:
+      console.error(`Mode GICOP inconnu : "${mode}". Valeurs : call | obligations | window | ping | short`);
+      process.exit(1);
+  }
+}
+
+const GICOP_MODES = new Set(['call', 'obligations', 'window', 'ping', 'short']);
+
+if (GICOP_MODES.has(config.mode as string)) {
+  runGicop();
+} else {
+  runStressTest();
+}
