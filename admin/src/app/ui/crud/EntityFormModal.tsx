@@ -27,12 +27,19 @@ export function EntityFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-gray-600 bg-opacity-50">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">{title}</h3>
-        <form onSubmit={onSubmit}>
-          {children}
-          <div className="mt-6 flex justify-end gap-2">
+    <div className="fixed inset-0 z-50 flex h-full w-full items-center justify-center bg-gray-600 bg-opacity-50 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white shadow-xl flex flex-col max-h-[90vh]">
+        {/* En-tête fixe */}
+        <div className="px-8 pt-8 pb-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        </div>
+        {/* Corps scrollable */}
+        <form onSubmit={onSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="overflow-y-auto flex-1 px-8 py-4">
+            {children}
+          </div>
+          {/* Pied fixe */}
+          <div className="px-8 py-4 border-t border-gray-100 flex justify-end gap-2 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
