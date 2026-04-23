@@ -83,6 +83,7 @@ function buildService(chatRepo: any, opts: { quotaActive?: number; quotaTotal?: 
     makeCapacityService(opts.quotaActive ?? 10, opts.quotaTotal ?? 50),
     makeValidationEngine(),
     emitter,
+    undefined as any, // obligationService (@Optional)
   );
   return { service, emitter };
 }

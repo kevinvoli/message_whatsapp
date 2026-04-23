@@ -1,11 +1,29 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
-import { GoNoGoChecklistItem, GoNoGoGate, GoNoGoGateStatus, WebhookMetricsSnapshot } from '@/app/lib/definitions';
+import { AlertCircle, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from 'lucide-react';
+import { CronConfig, GoNoGoChecklistItem, GoNoGoGate, GoNoGoGateStatus, SystemConfigEntry, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { formatDate } from '@/app/lib/dateUtils';
 import { getWebhookMetrics } from '@/app/lib/api/metrics.api';
+import { getCronConfigs } from '@/app/lib/api/crons.api';
+import { getSystemConfigs } from '@/app/lib/api/system-config.api';
 import { goNoGoChecklist } from '@/app/data/admin-data';
+
+// ─── Recommandations GICOP ────────────────────────────────────────────────────
+
+const GICOP_CRON_RULES: { key: string; recetteEnabled: boolean; label: string; reason: string }[] = [
+  { key: 'read-only-enforcement', recetteEnabled: false, label: 'Fermeture automatique',   reason: 'S0-006 — suspendu en recette : évite la fermeture auto qui bypass le rapport GICOP' },
+  { key: 'sla-checker',           recetteEnabled: true,  label: 'Vérificateur SLA',        reason: 'Actif — réinjection SLA nécessaire' },
+  { key: 'offline-reinject',      recetteEnabled: true,  label: 'Réinjection agents',      reason: 'Actif — réinjection agents hors-ligne' },
+  { key: 'orphan-checker',        recetteEnabled: true,  label: 'Rattrapage orphelins',    reason: 'Actif — filet de sécurité conversations sans poste' },
+  { key: 'webhook-purge',         recetteEnabled: true,  label: 'Purge webhook',           reason: 'Actif — maintenance courante' },
+];
+
+const GICOP_FLAG_RULES: { key: string; expectedValue: string; label: string; reason: string }[] = [
+  { key: 'FF_STICKY_ASSIGNMENT',     expectedValue: 'true', label: 'Sticky assignment',        reason: 'Réaffectation client fidèle — obligatoire GICOP' },
+  { key: 'FF_GICOP_REPORT_REQUIRED', expectedValue: 'true', label: 'Rapport GICOP obligatoire', reason: 'Bloque la clôture si le rapport GICOP est incomplet' },
+  { key: 'SLIDING_WINDOW_ENABLED',   expectedValue: 'true', label: 'Fenêtre glissante',         reason: 'Mode bloc de 10 conversations — obligatoire GICOP' },
+];
 
 type Props = {
   onRefresh?: () => void;
@@ -148,6 +166,9 @@ const overallStatus = (gates: GoNoGoGate[], checklist: GoNoGoChecklistItem[]): G
 
 export default function GoNoGoView({ onRefresh }: Props) {
   const [metrics, setMetrics] = useState<WebhookMetricsSnapshot | null>(null);
+  const [crons, setCrons]     = useState<CronConfig[]>([]);
+  const [configs, setConfigs] = useState<SystemConfigEntry[]>([]);
+  const [loadingGicop, setLoadingGicop] = useState(false);
   const checklist = goNoGoChecklist;
 
   const fetchData = useCallback(async () => {
@@ -155,9 +176,21 @@ export default function GoNoGoView({ onRefresh }: Props) {
     setMetrics(data);
   }, []);
 
+  const fetchGicop = useCallback(async () => {
+    setLoadingGicop(true);
+    try {
+      const [cronData, configData] = await Promise.all([getCronConfigs(), getSystemConfigs()]);
+      setCrons(cronData);
+      setConfigs(configData);
+    } finally {
+      setLoadingGicop(false);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchData();
-  }, [fetchData]);
+    void fetchGicop();
+  }, [fetchData, fetchGicop]);
 
   const gates = buildSloGates(metrics);
   const global = overallStatus(gates, checklist);
@@ -206,6 +239,115 @@ export default function GoNoGoView({ onRefresh }: Props) {
             );
           })}
         </div>
+      </div>
+
+      {/* ── Section GICOP Readiness ── */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">GICOP — Matrice crons (recette)</h3>
+          <button onClick={() => void fetchGicop()} disabled={loadingGicop}
+            className="p-1 rounded hover:bg-gray-100 text-gray-500">
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingGicop ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="text-xs text-gray-400 uppercase text-left border-b">
+            <tr>
+              <th className="py-2">Cron</th>
+              <th className="py-2 text-center">Requis (recette)</th>
+              <th className="py-2 text-center">Actuel</th>
+              <th className="py-2 text-center">Statut</th>
+              <th className="py-2">Raison</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {GICOP_CRON_RULES.map((rule) => {
+              const cron = crons.find((c) => c.key === rule.key);
+              const currentEnabled = cron?.enabled ?? null;
+              const ok = currentEnabled === rule.recetteEnabled;
+              const unknown = currentEnabled === null;
+              return (
+                <tr key={rule.key} className={ok ? 'bg-green-50/40' : unknown ? '' : 'bg-red-50/40'}>
+                  <td className="py-2 pr-2 font-mono text-xs text-gray-800">{rule.key}</td>
+                  <td className="py-2 text-center">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${rule.recetteEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {rule.recetteEnabled ? 'ON' : 'OFF'}
+                    </span>
+                  </td>
+                  <td className="py-2 text-center">
+                    {unknown
+                      ? <span className="text-xs text-gray-400">—</span>
+                      : <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${currentEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {currentEnabled ? 'ON' : 'OFF'}
+                        </span>
+                    }
+                  </td>
+                  <td className="py-2 text-center">
+                    {unknown
+                      ? <Clock3 className="w-4 h-4 text-gray-400 mx-auto" />
+                      : ok
+                      ? <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto" />
+                      : <ShieldAlert className="w-4 h-4 text-red-500 mx-auto" />
+                    }
+                  </td>
+                  <td className="py-2 text-xs text-gray-500">{rule.reason}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="mt-3 text-[11px] text-gray-400">
+          Crons internes non contrôlables ici (à vérifier manuellement) :
+          <code className="ml-1 bg-gray-100 px-1 rounded">ValidationEngineService.handleExternalCriterionTimeout</code>
+          {' · '}
+          <code className="bg-gray-100 px-1 rounded">FlowPollingJob.pollQueueWait/pollInactivity</code>
+        </p>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">GICOP — Feature flags requis</h3>
+        <table className="w-full text-sm">
+          <thead className="text-xs text-gray-400 uppercase text-left border-b">
+            <tr>
+              <th className="py-2">Flag</th>
+              <th className="py-2 text-center">Valeur requise</th>
+              <th className="py-2 text-center">Valeur actuelle</th>
+              <th className="py-2 text-center">Statut</th>
+              <th className="py-2">Raison</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {GICOP_FLAG_RULES.map((rule) => {
+              const entry = configs.find((c) => c.configKey === rule.key);
+              const current = entry?.configValue ?? null;
+              const ok = current === rule.expectedValue;
+              const unknown = current === null;
+              return (
+                <tr key={rule.key} className={ok ? 'bg-green-50/40' : unknown ? '' : 'bg-red-50/40'}>
+                  <td className="py-2 pr-2 font-mono text-xs text-gray-800">{rule.key}</td>
+                  <td className="py-2 text-center">
+                    <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{rule.expectedValue}</code>
+                  </td>
+                  <td className="py-2 text-center">
+                    {unknown
+                      ? <span className="text-xs text-gray-400">non défini</span>
+                      : <code className={`text-xs px-1.5 py-0.5 rounded ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{current}</code>
+                    }
+                  </td>
+                  <td className="py-2 text-center">
+                    {unknown
+                      ? <Clock3 className="w-4 h-4 text-gray-400 mx-auto" />
+                      : ok
+                      ? <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto" />
+                      : <ShieldAlert className="w-4 h-4 text-red-500 mx-auto" />
+                    }
+                  </td>
+                  <td className="py-2 text-xs text-gray-500">{rule.reason}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
