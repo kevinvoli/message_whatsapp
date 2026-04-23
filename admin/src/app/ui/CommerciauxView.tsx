@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api/commerciaux.api';
 import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
@@ -31,8 +31,8 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     remove,
   } = useCrudResource<
     PerformanceCommercial,
-    { name: string; email: string; password: string; poste_id?: string | null },
-    { name?: string; email?: string; password?: string; poste_id?: string | null; is_active?: boolean }
+    { name: string; email: string; password: string; poste_id?: string | null; phone?: string | null },
+    { name?: string; email?: string; password?: string; poste_id?: string | null; phone?: string | null; is_active?: boolean }
   >({
     initialItems: [],
     onRefresh: () => refreshRef.current(),
@@ -75,6 +75,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   const [formPosteId, setFormPosteId] = useState<string | null>(null);
   const [formPassword, setFormPassword] = useState<string>('');
   const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
@@ -122,6 +123,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
         email: formEmail,
         password: formPassword,
         poste_id: formPosteId,
+        phone: formPhone.trim() || null,
       },
       'Commercial ajouté.',
     );
@@ -143,10 +145,11 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
       addToast({ type: 'error', message: "L'ID du commercial est manquant." });
       return;
     }
-    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null } = {
+    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null; phone?: string | null } = {
       name: formName,
       email: formEmail,
       poste_id: formPosteId,
+      phone: formPhone.trim() || null,
     };
     if (formPassword) {
       payload.password = formPassword;
@@ -166,6 +169,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     setFormEmail('');
     setFormPassword('');
     setFormPosteId(null);
+    setFormPhone('');
     setFormIsActive(true);
     clearStatus();
     setShowAddModal(true);
@@ -182,6 +186,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     setFormEmail(commercial.email);
     setFormPassword('');
     setFormPosteId(commercial?.poste_id || null);
+    setFormPhone(commercial.phone ?? '');
     setFormIsActive(true);
     setShowEditModal(true);
     clearStatus();
@@ -194,11 +199,15 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   };
 
   // Filtrer les commerciaux par recherche
-  const commerciauxFiltres = commerciaux.filter(commercial =>
-    commercial.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    commercial.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    commercial.poste_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const commerciauxFiltres = commerciaux.filter(commercial => {
+    const term = searchTerm.toLowerCase();
+    return (
+      commercial.name.toLowerCase().includes(term) ||
+      commercial.email.toLowerCase().includes(term) ||
+      commercial.poste_name.toLowerCase().includes(term) ||
+      (commercial.phone ?? '').toLowerCase().includes(term)
+    );
+  });
 
   // Statistiques globales
   const statsGlobales = {
@@ -304,6 +313,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commercial</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Téléphone</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chats actifs</th>
@@ -319,7 +329,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
             <tbody className="divide-y divide-gray-200">
               {dataLoading ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center">
+                  <td colSpan={12} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                       <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -331,7 +341,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </tr>
               ) : commerciauxFiltres.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
                   </td>
                 </tr>
@@ -352,6 +362,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                           <p className="text-xs text-gray-500">{commercial.email}</p>
                         </div>
                       </div>
+                    </td>
+
+                    {/* Téléphone */}
+                    <td className="px-6 py-4">
+                      {commercial.phone
+                        ? <span className="flex items-center gap-1.5 text-sm text-gray-700 font-mono"><Phone className="w-3.5 h-3.5 text-gray-400" />{commercial.phone}</span>
+                        : <span className="text-xs text-gray-400 italic">—</span>
+                      }
                     </td>
 
                     {/* Statut */}
@@ -518,8 +536,11 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{selectedDetail.name}</h3>
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {selectedDetail.email}</span>
+                    {selectedDetail.phone && (
+                      <span className="flex items-center gap-1 font-mono"><Phone className="w-3 h-3" /> {selectedDetail.phone}</span>
+                    )}
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedDetail.poste_name || 'Non assigne'}</span>
                   </div>
                 </div>
@@ -590,6 +611,10 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                   <span className="font-semibold text-gray-900">{formatDate(selectedDetail.lastConnectionAt)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Téléphone</span>
+                  <span className="font-mono text-sm text-gray-900">{selectedDetail.phone || '-'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">Poste</span>
                   <span className="font-semibold text-gray-900">{selectedDetail.poste_name || '-'}</span>
                 </div>
@@ -637,6 +662,19 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
             value={formEmail}
             onChange={(e) => setFormEmail(e.target.value)}
             required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="phone" className="mb-2 block text-sm font-bold text-gray-700">
+            Téléphone <span className="font-normal text-gray-400">(optionnel)</span>
+          </label>
+          <input
+            type="tel"
+            id="phone"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formPhone}
+            onChange={(e) => setFormPhone(e.target.value)}
+            placeholder="+225 07 00 00 00 00"
           />
         </div>
         <div className="mb-4">
@@ -705,6 +743,19 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
             value={formEmail}
             onChange={(e) => setFormEmail(e.target.value)}
             required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-phone" className="mb-2 block text-sm font-bold text-gray-700">
+            Téléphone <span className="font-normal text-gray-400">(optionnel)</span>
+          </label>
+          <input
+            type="tel"
+            id="edit-phone"
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formPhone}
+            onChange={(e) => setFormPhone(e.target.value)}
+            placeholder="+225 07 00 00 00 00"
           />
         </div>
         <div className="mb-4">

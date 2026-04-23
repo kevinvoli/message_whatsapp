@@ -168,6 +168,11 @@ export class PerformanceCommercialDto {
   @IsString()
   email: string;
 
+  @ApiProperty({ description: 'Téléphone du commercial', required: false })
+  @IsOptional()
+  @IsString()
+  phone?: string | null;
+
   @ApiProperty({ description: 'Statut de connexion' })
   @IsBoolean()
   isConnected: boolean;

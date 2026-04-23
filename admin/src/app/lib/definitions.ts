@@ -556,6 +556,7 @@ export type PerformanceCommercial = {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
   isConnected: boolean;
   poste_name: string;
   poste_id: string | null;

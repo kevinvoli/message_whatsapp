@@ -27,4 +27,8 @@ export class UpdateWhatsappCommercialDto {
   @IsOptional()
   @IsBoolean()
   isConnected?: boolean;
+
+  @IsOptional()
+  @IsString()
+  phone?: string | null;
 }

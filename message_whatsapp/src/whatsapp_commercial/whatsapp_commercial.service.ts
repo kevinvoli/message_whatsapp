@@ -120,7 +120,7 @@ export class WhatsappCommercialService {
   async create(
     createWhatsappCommercialDto: CreateWhatsappCommercialDto,
   ): Promise<SafeWhatsappCommercial> {
-    const { email, name, password, poste_id } = createWhatsappCommercialDto;
+    const { email, name, password, poste_id, phone } = createWhatsappCommercialDto;
 
     const existingUser = await this.whatsappCommercialRepository.findOne({
       where: { name },
@@ -142,6 +142,7 @@ export class WhatsappCommercialService {
       name,
       password: password,
       poste: poste,
+      phone: phone ?? null,
     });
 
     this.logger.debug(
@@ -386,6 +387,10 @@ export class WhatsappCommercialService {
         updateWhatsappCommercialDto.password,
         user.salt,
       );
+    }
+
+    if (updateWhatsappCommercialDto.phone !== undefined) {
+      user.phone = updateWhatsappCommercialDto.phone ?? null;
     }
 
     if (updateWhatsappCommercialDto.poste_id !== undefined) {
