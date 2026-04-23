@@ -6,6 +6,8 @@ import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { FollowUp, FollowUpStatus } from 'src/follow-up/entities/follow_up.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { ClientDossier } from './entities/client-dossier.entity';
+import { UpsertDossierDto } from './dto/upsert-dossier.dto';
 
 export interface TimelineEvent {
   type: 'message' | 'call' | 'follow_up' | 'conversation_opened' | 'conversation_closed';
@@ -28,7 +30,72 @@ export class ClientDossierService {
     private readonly chatRepo: Repository<WhatsappChat>,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepo: Repository<WhatsappMessage>,
+    @InjectRepository(ClientDossier)
+    private readonly dossierRepo: Repository<ClientDossier>,
   ) {}
+
+  // ── Méthodes dossier structuré ────────────────────────────────────────────
+
+  /** Récupère le dossier structuré par contact UUID */
+  findByContactId(contactId: string): Promise<ClientDossier | null> {
+    return this.dossierRepo.findOne({ where: { contactId } });
+  }
+
+  /** Récupère dossier + contact + 20 derniers appels par chatId */
+  async findByChatId(chatId: string): Promise<{
+    dossier: ClientDossier | null;
+    contact: Contact | null;
+    callLogs: CallLog[];
+  }> {
+    const contact = await this.contactRepo.findOne({ where: { chat_id: chatId } });
+
+    if (!contact) {
+      return { dossier: null, contact: null, callLogs: [] };
+    }
+
+    const [dossier, callLogs] = await Promise.all([
+      this.dossierRepo.findOne({ where: { contactId: contact.id } }),
+      this.callLogRepo.find({
+        where: { contact_id: contact.id },
+        order: { called_at: 'DESC' },
+        take: 20,
+      }),
+    ]);
+
+    return { dossier, contact, callLogs };
+  }
+
+  /** Upsert du dossier structuré par chatId */
+  async upsertByChatId(chatId: string, dto: UpsertDossierDto): Promise<ClientDossier> {
+    const contact = await this.contactRepo.findOne({ where: { chat_id: chatId } });
+
+    if (!contact) {
+      throw new NotFoundException(`Contact introuvable pour chatId ${chatId}`);
+    }
+
+    let dossier = await this.dossierRepo.findOne({ where: { contactId: contact.id } });
+
+    if (!dossier) {
+      dossier = this.dossierRepo.create({ contactId: contact.id });
+    }
+
+    if (dto.fullName !== undefined) dossier.fullName = dto.fullName ?? null;
+    if (dto.ville !== undefined) dossier.ville = dto.ville ?? null;
+    if (dto.commune !== undefined) dossier.commune = dto.commune ?? null;
+    if (dto.quartier !== undefined) dossier.quartier = dto.quartier ?? null;
+    if (dto.otherPhones !== undefined) dossier.otherPhones = dto.otherPhones ?? null;
+    if (dto.productCategory !== undefined) dossier.productCategory = dto.productCategory ?? null;
+    if (dto.clientNeed !== undefined) dossier.clientNeed = dto.clientNeed ?? null;
+    if (dto.interestScore !== undefined) dossier.interestScore = dto.interestScore ?? null;
+    if (dto.isMaleNotInterested !== undefined) dossier.isMaleNotInterested = dto.isMaleNotInterested ?? false;
+    if (dto.followUpAt !== undefined) {
+      dossier.followUpAt = dto.followUpAt ? new Date(dto.followUpAt) : null;
+    }
+    if (dto.nextAction !== undefined) dossier.nextAction = dto.nextAction ?? null;
+    if (dto.notes !== undefined) dossier.notes = dto.notes ?? null;
+
+    return this.dossierRepo.save(dossier);
+  }
 
   /** Dossier complet d'un client par son UUID de contact */
   async getDossier(contactId: string) {

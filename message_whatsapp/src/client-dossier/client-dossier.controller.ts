@@ -1,7 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Put,
   Query,
   Request,
   UseGuards,
@@ -9,6 +11,7 @@ import {
 import { ClientDossierService } from './client-dossier.service';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { UpsertDossierDto } from './dto/upsert-dossier.dto';
 
 interface JwtUser { userId: string; }
 
@@ -52,6 +55,25 @@ export class ClientDossierController {
     @Query('limit') limit?: string,
   ) {
     return this.service.getTimeline(id, limit ? Math.min(parseInt(limit, 10), 200) : 50);
+  }
+
+  // ── Routes dossier structuré par chatId ──────────────────────────────────
+
+  /** Dossier structuré + contact + appels par chatId */
+  @Get('by-chat/:chatId')
+  @UseGuards(AuthGuard('jwt'))
+  findByChatId(@Param('chatId') chatId: string) {
+    return this.service.findByChatId(chatId);
+  }
+
+  /** Upsert dossier structuré par chatId */
+  @Put('by-chat/:chatId')
+  @UseGuards(AuthGuard('jwt'))
+  upsertByChatId(
+    @Param('chatId') chatId: string,
+    @Body() dto: UpsertDossierDto,
+  ) {
+    return this.service.upsertByChatId(chatId, dto);
   }
 
   // ── Admin ─────────────────────────────────────────────────────────────────

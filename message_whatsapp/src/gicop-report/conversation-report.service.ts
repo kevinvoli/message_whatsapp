@@ -1,17 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConversationReport } from './entities/conversation-report.entity';
+import { ConversationReport, NextAction } from './entities/conversation-report.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface UpsertReportDto {
-  clientInterest?: ConversationReport['clientInterest'];
+  // Nouvelles informations client
+  clientName?: string | null;
+  ville?: string | null;
+  commune?: string | null;
+  quartier?: string | null;
+  productCategory?: string | null;
+  otherPhones?: string | null;
+  clientNeed?: string | null;
+  interestScore?: number | null;
+  isMaleNotInterested?: boolean;
+  followUpAt?: string | null;
+  nextAction?: NextAction | null;
+  notes?: string | null;
+  // Legacy
+  clientInterest?: string | null;
   hasOrder?: boolean | null;
-  nextAction?: ConversationReport['nextAction'];
   orderAmount?: number | null;
   nextActionAt?: string | null;
   objections?: string | null;
-  notes?: string | null;
   commercialId?: string;
   posteId?: string;
 }
@@ -29,22 +41,30 @@ export class ConversationReportService {
 
   async upsert(chatId: string, dto: UpsertReportDto): Promise<ConversationReport> {
     let report = await this.repo.findOne({ where: { chatId } });
-
     if (!report) {
       report = this.repo.create({ id: uuidv4(), chatId });
     }
 
-    if (dto.clientInterest !== undefined) report.clientInterest = dto.clientInterest ?? null;
-    if (dto.hasOrder !== undefined) report.hasOrder = dto.hasOrder ?? null;
-    if (dto.nextAction !== undefined) report.nextAction = dto.nextAction ?? null;
-    if (dto.orderAmount !== undefined) report.orderAmount = dto.orderAmount ?? null;
-    if (dto.nextActionAt !== undefined) {
-      report.nextActionAt = dto.nextActionAt ? new Date(dto.nextActionAt) : null;
-    }
-    if (dto.objections !== undefined) report.objections = dto.objections ?? null;
-    if (dto.notes !== undefined) report.notes = dto.notes ?? null;
+    if (dto.clientName      !== undefined) report.clientName      = dto.clientName ?? null;
+    if (dto.ville           !== undefined) report.ville           = dto.ville ?? null;
+    if (dto.commune         !== undefined) report.commune         = dto.commune ?? null;
+    if (dto.quartier        !== undefined) report.quartier        = dto.quartier ?? null;
+    if (dto.productCategory !== undefined) report.productCategory = dto.productCategory ?? null;
+    if (dto.otherPhones     !== undefined) report.otherPhones     = dto.otherPhones ?? null;
+    if (dto.clientNeed      !== undefined) report.clientNeed      = dto.clientNeed ?? null;
+    if (dto.interestScore   !== undefined) report.interestScore   = dto.interestScore ?? null;
+    if (dto.isMaleNotInterested !== undefined) report.isMaleNotInterested = dto.isMaleNotInterested ?? false;
+    if (dto.followUpAt      !== undefined) report.followUpAt      = dto.followUpAt ? new Date(dto.followUpAt) : null;
+    if (dto.nextAction      !== undefined) report.nextAction      = dto.nextAction ?? null;
+    if (dto.notes           !== undefined) report.notes           = dto.notes ?? null;
+    // Legacy
+    if (dto.clientInterest  !== undefined) report.clientInterest  = dto.clientInterest ?? null;
+    if (dto.hasOrder        !== undefined) report.hasOrder        = dto.hasOrder ?? null;
+    if (dto.orderAmount     !== undefined) report.orderAmount     = dto.orderAmount ?? null;
+    if (dto.nextActionAt    !== undefined) report.nextActionAt    = dto.nextActionAt ? new Date(dto.nextActionAt) : null;
+    if (dto.objections      !== undefined) report.objections      = dto.objections ?? null;
     if (dto.commercialId) report.commercialId = dto.commercialId;
-    if (dto.posteId) report.posteId = dto.posteId;
+    if (dto.posteId)       report.posteId     = dto.posteId;
 
     report.isComplete = this.computeComplete(report);
 
@@ -68,10 +88,10 @@ export class ConversationReportService {
   }
 
   private computeComplete(report: ConversationReport): boolean {
-    return (
-      report.clientInterest !== null &&
-      report.hasOrder !== null &&
-      report.nextAction !== null
+    return !!(
+      report.clientName?.trim() &&
+      report.clientNeed?.trim() &&
+      report.interestScore !== null
     );
   }
 }
