@@ -1,9 +1,11 @@
 import {
   IsBoolean,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Length,
+  Min,
 } from 'class-validator';
 
 export class CreateWhatsappPosteDto {
@@ -30,4 +32,10 @@ export class CreateWhatsappPosteDto {
   @IsOptional()
   @IsBoolean()
   is_queue_enabled?: boolean;
+
+  /** Identifiant numérique sur la plateforme GICOP — nullable */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  numero_poste?: number | null;
 }

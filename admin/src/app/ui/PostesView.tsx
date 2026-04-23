@@ -29,7 +29,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     remove,
   } = useCrudResource<
     Poste,
-    { name: string; code: string; is_active: boolean },
+    { name: string; code: string; is_active: boolean; numero_poste?: number | null },
     Partial<Poste>
   >({
     initialItems: [],
@@ -57,6 +57,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
   const [formName, setFormName] = useState('');
   const [formCode, setFormCode] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formNumeroPoste, setFormNumeroPoste] = useState<string>('');
   const [queueActionLoadingId, setQueueActionLoadingId] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'blocked' | 'allowed'>('all');
   const { addToast } = useToast();
@@ -65,6 +66,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     setFormName('');
     setFormCode('');
     setFormIsActive(true);
+    setFormNumeroPoste('');
     clearStatus();
     setShowAddModal(true);
   };
@@ -74,6 +76,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     setFormName(poste.name);
     setFormCode(poste.code);
     setFormIsActive(poste.is_queue_enabled === false ? false : poste.is_active);
+    setFormNumeroPoste(poste.numero_poste != null ? String(poste.numero_poste) : '');
     clearStatus();
     setShowEditModal(true);
   };
@@ -96,6 +99,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
         name: formName,
         code: formCode,
         is_active: formIsActive,
+        numero_poste: formNumeroPoste !== '' ? Number(formNumeroPoste) : null,
       },
       'Poste ajoute.',
     );
@@ -116,7 +120,12 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     }
     const result = await update(
       currentPoste.id,
-      { name: formName, code: formCode, is_active: formIsActive },
+      {
+        name: formName,
+        code: formCode,
+        is_active: formIsActive,
+        numero_poste: formNumeroPoste !== '' ? Number(formNumeroPoste) : null,
+      },
       'Poste mis a jour.',
     );
     if (!result.ok && result.error?.toLowerCase().includes('bloque')) {
@@ -278,6 +287,14 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
               render: (poste) => <span className="text-gray-700">{poste.code}</span>,
             },
             {
+              header: 'N° GICOP',
+              render: (poste) => (
+                poste.numero_poste != null
+                  ? <span className="font-mono text-sm text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">{poste.numero_poste}</span>
+                  : <span className="text-xs text-gray-400 italic">Non configuré</span>
+              ),
+            },
+            {
               header: 'Statut',
               render: (poste) => (
                 <span
@@ -423,6 +440,21 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
             required
           />
         </div>
+        <div className="mb-4">
+          <label htmlFor="numero_poste" className="mb-2 block text-sm font-bold text-gray-700">
+            Numéro GICOP <span className="font-normal text-gray-400">(optionnel)</span>
+          </label>
+          <input
+            type="number"
+            id="numero_poste"
+            min={1}
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formNumeroPoste}
+            onChange={(e) => setFormNumeroPoste(e.target.value)}
+            placeholder="Ex: 12"
+          />
+          <p className="mt-1 text-xs text-gray-400">Identifiant numérique du poste sur la plateforme gicop.ci</p>
+        </div>
         <div className="mb-4 flex items-center">
           <input
             type="checkbox"
@@ -471,6 +503,21 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
             onChange={(e) => setFormCode(e.target.value)}
             required
           />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="edit-numero_poste" className="mb-2 block text-sm font-bold text-gray-700">
+            Numéro GICOP <span className="font-normal text-gray-400">(optionnel)</span>
+          </label>
+          <input
+            type="number"
+            id="edit-numero_poste"
+            min={1}
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+            value={formNumeroPoste}
+            onChange={(e) => setFormNumeroPoste(e.target.value)}
+            placeholder="Ex: 12"
+          />
+          <p className="mt-1 text-xs text-gray-400">Identifiant numérique du poste sur la plateforme gicop.ci</p>
         </div>
         <div className="mb-4 flex items-center">
           <input

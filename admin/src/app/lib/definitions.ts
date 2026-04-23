@@ -265,6 +265,8 @@ export type Poste = {
   code: string;
   is_active: boolean;
   is_queue_enabled?: boolean;
+  /** Identifiant numérique sur la plateforme GICOP (nullable) */
+  numero_poste?: number | null;
   createdAt?: string;
   updatedAt?: string;
   chats?: WhatsappChat[] | null;

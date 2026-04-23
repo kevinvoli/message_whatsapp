@@ -10,6 +10,7 @@ import { ClientDossier } from './entities/client-dossier.entity';
 import { ContactPhone } from './entities/contact-phone.entity';
 import { UpsertDossierDto } from './dto/upsert-dossier.dto';
 import { GicopPlatformService } from 'src/gicop-platform/gicop-platform.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 export interface TimelineEvent {
   type: 'message' | 'call' | 'follow_up' | 'conversation_opened' | 'conversation_closed';
@@ -38,6 +39,8 @@ export class ClientDossierService {
     private readonly dossierRepo: Repository<ClientDossier>,
     @InjectRepository(ContactPhone)
     private readonly phoneRepo: Repository<ContactPhone>,
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepo: Repository<WhatsappPoste>,
     private readonly gicopPlatform: GicopPlatformService,
   ) {}
 
@@ -131,10 +134,20 @@ export class ClientDossierService {
     });
     const type = dossier?.nextAction ?? 'relancer';
 
+    // Résoudre le numero_poste (identifiant numérique GICOP) depuis l'UUID
+    const poste = posteId
+      ? await this.posteRepo.findOne({ where: { id: posteId }, select: ['id', 'numero_poste'] })
+      : null;
+
+    if (!poste?.numero_poste) {
+      this.logger.warn(`GICOP_PLATFORM skipped: poste ${posteId} n'a pas de numero_poste configuré`);
+      return;
+    }
+
     // Envoyer à la plateforme gicop.ci
     void this.gicopPlatform.sendNumberToCall({
       number:   contact.phone,
-      poste_id: posteId,
+      poste_id: poste.numero_poste,
       type,
     });
   }

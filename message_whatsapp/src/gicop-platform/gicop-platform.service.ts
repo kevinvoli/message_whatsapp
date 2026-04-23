@@ -3,7 +3,7 @@ import axios, { AxiosError } from 'axios';
 
 export interface GicopCallPayload {
   number:   string;
-  poste_id: string;
+  poste_id: number;
   type:     string;
 }
 
