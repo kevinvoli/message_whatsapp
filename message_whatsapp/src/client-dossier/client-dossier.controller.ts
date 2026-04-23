@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Post,
   Put,
   Query,
   Request,
@@ -74,6 +76,25 @@ export class ClientDossierController {
     @Body() dto: UpsertDossierDto,
   ) {
     return this.service.upsertByChatId(chatId, dto);
+  }
+
+  // ── Gestion des numéros de téléphone ────────────────────────────────────
+
+  /** Ajoute un numéro au client lié à cette conversation */
+  @Post('by-chat/:chatId/phones')
+  @UseGuards(AuthGuard('jwt'))
+  addPhone(
+    @Param('chatId') chatId: string,
+    @Body() body: { phone: string; label?: string | null },
+  ) {
+    return this.service.addPhone(chatId, body.phone, body.label ?? null);
+  }
+
+  /** Supprime un numéro par son id */
+  @Delete('phones/:phoneId')
+  @UseGuards(AuthGuard('jwt'))
+  removePhone(@Param('phoneId') phoneId: string) {
+    return this.service.removePhone(phoneId);
   }
 
   // ── Admin ─────────────────────────────────────────────────────────────────

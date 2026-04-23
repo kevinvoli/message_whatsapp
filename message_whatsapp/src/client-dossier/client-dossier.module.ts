@@ -6,12 +6,13 @@ import { FollowUp } from 'src/follow-up/entities/follow_up.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { ClientDossier } from './entities/client-dossier.entity';
+import { ContactPhone } from './entities/contact-phone.entity';
 import { ClientDossierService } from './client-dossier.service';
 import { ClientDossierController } from './client-dossier.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ClientDossier, Contact, CallLog, FollowUp, WhatsappChat, WhatsappMessage]),
+    TypeOrmModule.forFeature([ClientDossier, ContactPhone, Contact, CallLog, FollowUp, WhatsappChat, WhatsappMessage]),
   ],
   controllers: [ClientDossierController],
   providers: [ClientDossierService],

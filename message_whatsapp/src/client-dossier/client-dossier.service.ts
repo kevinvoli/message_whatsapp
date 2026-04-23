@@ -7,6 +7,7 @@ import { FollowUp, FollowUpStatus } from 'src/follow-up/entities/follow_up.entit
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { ClientDossier } from './entities/client-dossier.entity';
+import { ContactPhone } from './entities/contact-phone.entity';
 import { UpsertDossierDto } from './dto/upsert-dossier.dto';
 
 export interface TimelineEvent {
@@ -32,6 +33,8 @@ export class ClientDossierService {
     private readonly messageRepo: Repository<WhatsappMessage>,
     @InjectRepository(ClientDossier)
     private readonly dossierRepo: Repository<ClientDossier>,
+    @InjectRepository(ContactPhone)
+    private readonly phoneRepo: Repository<ContactPhone>,
   ) {}
 
   // ── Méthodes dossier structuré ────────────────────────────────────────────
@@ -41,20 +44,22 @@ export class ClientDossierService {
     return this.dossierRepo.findOne({ where: { contactId } });
   }
 
-  /** Récupère dossier + contact + 20 derniers appels par chatId */
+  /** Récupère dossier + contact + téléphones + 20 derniers appels par chatId */
   async findByChatId(chatId: string): Promise<{
     dossier: ClientDossier | null;
     contact: Contact | null;
+    phones: ContactPhone[];
     callLogs: CallLog[];
   }> {
     const contact = await this.contactRepo.findOne({ where: { chat_id: chatId } });
 
     if (!contact) {
-      return { dossier: null, contact: null, callLogs: [] };
+      return { dossier: null, contact: null, phones: [], callLogs: [] };
     }
 
-    const [dossier, callLogs] = await Promise.all([
+    const [dossier, phones, callLogs] = await Promise.all([
       this.dossierRepo.findOne({ where: { contactId: contact.id } }),
+      this.listPhones(contact.id),
       this.callLogRepo.find({
         where: { contact_id: contact.id },
         order: { called_at: 'DESC' },
@@ -62,7 +67,7 @@ export class ClientDossierService {
       }),
     ]);
 
-    return { dossier, contact, callLogs };
+    return { dossier, contact, phones, callLogs };
   }
 
   /** Upsert du dossier structuré par chatId */
@@ -96,6 +101,31 @@ export class ClientDossierService {
 
     return this.dossierRepo.save(dossier);
   }
+
+  // ── Gestion des numéros de téléphone ────────────────────────────────────
+
+  async listPhones(contactId: string): Promise<ContactPhone[]> {
+    return this.phoneRepo.find({ where: { contactId }, order: { isPrimary: 'DESC', createdAt: 'ASC' } });
+  }
+
+  async addPhone(chatId: string, phone: string, label: string | null): Promise<ContactPhone> {
+    const contact = await this.contactRepo.findOne({ where: { chat_id: chatId } });
+    if (!contact) throw new NotFoundException(`Contact introuvable pour chatId ${chatId}`);
+    const entry = this.phoneRepo.create({ contactId: contact.id, phone: phone.replace(/\s/g, ''), label: label ?? null });
+    return this.phoneRepo.save(entry);
+  }
+
+  async removePhone(phoneId: string): Promise<void> {
+    await this.phoneRepo.delete(phoneId);
+  }
+
+  async listPhonesByChatId(chatId: string): Promise<ContactPhone[]> {
+    const contact = await this.contactRepo.findOne({ where: { chat_id: chatId } });
+    if (!contact) return [];
+    return this.listPhones(contact.id);
+  }
+
+  // ── Dossier complet ───────────────────────────────────────────────────────
 
   /** Dossier complet d'un client par son UUID de contact */
   async getDossier(contactId: string) {
