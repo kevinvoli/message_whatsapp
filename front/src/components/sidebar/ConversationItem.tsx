@@ -259,9 +259,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       {isLocked && (remainingCalls > 0 || remainingConvs > 0) && (
         <div className="absolute left-2 right-2 bottom-full mb-1 z-50 pointer-events-none
                         opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
-          <div className="bg-gray-900 text-white text-xs rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
-            <p className="font-semibold text-gray-200 flex items-center gap-1.5 mb-1">
-              <Lock className="w-3 h-3 text-gray-400" />
+          <div className="bg-green-700 text-white text-xs rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
+            <p className="font-semibold text-green-200 flex items-center gap-1.5 mb-1">
+              <Lock className="w-3 h-3 text-green-400" />
               Conversation verrouillée
             </p>
 
@@ -272,7 +272,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                   <span className="font-bold text-orange-300">{remainingCalls}</span>
                   {' '}appel{remainingCalls > 1 ? 's' : ''} à effectuer
                   {obligationStatus && (
-                    <span className="text-gray-400 ml-1">
+                    <span className="text-blue-400 ml-1">
                       ({[
                         obligationStatus.annulee.required - obligationStatus.annulee.done > 0
                           && `${obligationStatus.annulee.required - obligationStatus.annulee.done} annulées`,
