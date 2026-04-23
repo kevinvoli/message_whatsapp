@@ -35,8 +35,8 @@ export class WhatsappPoste {
   @Column({ default: true })
   is_active: boolean;
 
-  /** Identifiant numérique du poste sur la plateforme GICOP (nullable) */
-  @Column({ name: 'numero_poste', type: 'int', nullable: true, default: null })
+  /** Identifiant numérique du poste sur la plateforme GICOP (nullable, unique) */
+  @Column({ name: 'numero_poste', type: 'int', nullable: true, default: null, unique: true })
   numero_poste: number | null;
 
   @Column({ default: true })

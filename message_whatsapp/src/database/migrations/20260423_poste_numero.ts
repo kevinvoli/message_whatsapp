@@ -11,7 +11,8 @@ export class PosteNumero1745856000004 implements MigrationInterface {
         type:       'int',
         isNullable: true,
         default:    null,
-        comment:    'Identifiant numérique du poste sur la plateforme GICOP',
+        isUnique:   true,
+        comment:    'Identifiant numérique du poste sur la plateforme GICOP (unique)',
       }),
     );
   }
