@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Put,
   Request,
   UseGuards,
@@ -11,6 +12,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConversationReportService, UpsertReportDto } from './conversation-report.service';
+import { ReportSubmissionService } from './report-submission.service';
 
 interface JwtUser { userId: string; posteId?: string; }
 
@@ -18,7 +20,10 @@ interface JwtUser { userId: string; posteId?: string; }
 @Controller('gicop-report')
 @UseGuards(AuthGuard('jwt'))
 export class ConversationReportController {
-  constructor(private readonly service: ConversationReportService) {}
+  constructor(
+    private readonly service: ConversationReportService,
+    private readonly submissionService: ReportSubmissionService,
+  ) {}
 
   @Get(':chatId')
   @ApiOperation({ summary: 'Récupère le rapport GICOP d\'une conversation' })
@@ -46,5 +51,20 @@ export class ConversationReportController {
     @Request() req: { user: JwtUser },
   ) {
     return this.service.validate(chatId, req.user.userId);
+  }
+
+  @Post(':chatId/submit')
+  @ApiOperation({ summary: 'Soumet le rapport vers la plateforme de gestion des commandes' })
+  submit(
+    @Param('chatId') chatId: string,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.submissionService.submitReport(chatId, req.user.userId);
+  }
+
+  @Get(':chatId/submission-status')
+  @ApiOperation({ summary: 'Statut de soumission du rapport' })
+  submissionStatus(@Param('chatId') chatId: string) {
+    return this.submissionService.getSubmissionStatus(chatId);
   }
 }

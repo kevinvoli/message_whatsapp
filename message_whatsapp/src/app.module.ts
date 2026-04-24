@@ -73,6 +73,7 @@ import { ConversationReportModule } from './gicop-report/conversation-report.mod
 import { CatalogModule } from './catalog/catalog.module';
 import { GicopWebhookModule } from './gicop-webhook/gicop-webhook.module';
 import { CallObligationModule } from './call-obligations/call-obligation.module';
+import { ConversationClosureModule } from './conversation-closure/conversation-closure.module';
 
 @Module({
   imports: [
@@ -217,6 +218,8 @@ import { CallObligationModule } from './call-obligations/call-obligation.module'
     GicopWebhookModule,
     // Sprint 6 — Obligations d'appels GICOP
     CallObligationModule,
+    // Sprint 1 Backlog prioritaire — Fermeture conversationnelle guidée
+    ConversationClosureModule,
   ],
   controllers: [AppController],
   providers: [

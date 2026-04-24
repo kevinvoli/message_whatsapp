@@ -1,8 +1,22 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { InboundIntegrationService } from 'src/inbound-integration/inbound-integration.service';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { GicopMessage } from './dto/gicop-webhook.dto';
+
+export interface DirectCallEventDto {
+  external_id: string;
+  event_at: string;
+  client_phone: string;
+  commercial_phone: string;
+  commercial_email?: string | null;
+  call_status: string;
+  duration_seconds?: number | null;
+  recording_url?: string | null;
+}
 
 export interface GicopProcessResult {
   id: string;
@@ -18,6 +32,9 @@ export class GicopWebhookService {
   constructor(
     private readonly erpService: InboundIntegrationService,
     private readonly callEventService: CallEventService,
+
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
 
     @Optional()
     private readonly obligationService: CallObligationService,
@@ -107,6 +124,67 @@ export class GicopWebhookService {
       }
       this.logger.error(`GICOP erreur type=${msg.type} id=${msg.id} — ${message}`);
       return { id: msg.id, type: msg.type, processed: false, reason: message };
+    }
+  }
+
+  /**
+   * Point d'entrée direct pour les appels — format simplifié sans enveloppe Whapi.
+   * Résout le commercial par phone en priorité, puis par email en fallback.
+   */
+  async receiveDirectCallEvent(dto: DirectCallEventDto): Promise<{ processed: boolean; reason?: string }> {
+    try {
+      // Résolution commercial_id
+      let commercial: WhatsappCommercial | null = null;
+      if (dto.commercial_phone) {
+        const norm = dto.commercial_phone.replace(/\D/g, '');
+        commercial = await this.commercialRepo
+          .createQueryBuilder('c')
+          .where('c.phone LIKE :phone', { phone: `%${norm.slice(-8)}` })
+          .andWhere('c.deletedAt IS NULL')
+          .getOne();
+      }
+      if (!commercial && dto.commercial_email) {
+        commercial = await this.commercialRepo.findOne({
+          where: { email: dto.commercial_email },
+        });
+      }
+
+      const callEvent = await this.callEventService.receiveCallEvent({
+        external_id:      dto.external_id,
+        event_at:         dto.event_at,
+        commercial_phone: dto.commercial_phone,
+        commercial_email: dto.commercial_email ?? null,
+        client_phone:     dto.client_phone,
+        call_status:      dto.call_status,
+        duration_seconds: dto.duration_seconds ?? null,
+        recording_url:    dto.recording_url ?? null,
+        commercial_id:    commercial?.id ?? null,
+      });
+
+      if (this.obligationService && commercial) {
+        const poste = await this.commercialRepo
+          .createQueryBuilder('c')
+          .leftJoinAndSelect('c.poste', 'p')
+          .where('c.id = :id', { id: commercial.id })
+          .getOne();
+
+        await this.obligationService.tryMatchCallToTask({
+          clientPhone: dto.client_phone,
+          commercialPhone: dto.commercial_phone,
+          callEventId: callEvent.id,
+          durationSeconds: dto.duration_seconds ?? null,
+          posteId: poste?.poste?.id ?? null,
+        });
+      }
+
+      return { processed: true };
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg?.includes('déjà traité') || msg?.includes('Conflict')) {
+        return { processed: true, reason: 'duplicate' };
+      }
+      this.logger.error(`DirectCallEvent error id=${dto.external_id} — ${msg}`);
+      return { processed: false, reason: msg };
     }
   }
 

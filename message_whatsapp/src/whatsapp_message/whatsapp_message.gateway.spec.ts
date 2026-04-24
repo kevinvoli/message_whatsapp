@@ -41,6 +41,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       null as any, // reportService (optionnel)
       null as any, // systemConfigService (optionnel)
       null as any, // dossierService (optionnel)
+      null as any, // closureService (optionnel)
     );
   };
 

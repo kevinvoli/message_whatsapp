@@ -54,6 +54,7 @@ import { transitionStatus } from 'src/conversations/domain/conversation-state-ma
 import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import { ClientDossierService } from 'src/client-dossier/client-dossier.service';
+import { ConversationClosureService } from 'src/conversation-closure/conversation-closure.service';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -105,6 +106,9 @@ export class WhatsappMessageGateway
 
     @Optional()
     private readonly dossierService: ClientDossierService,
+
+    @Optional()
+    private readonly closureService: ConversationClosureService,
   ) {}
 
   afterInit(server: Server): void {
@@ -333,32 +337,42 @@ export class WhatsappMessageGateway
         }
       }
 
-      // S4-004 — Rapport GICOP obligatoire à la clôture
-      if (newStatus === WhatsappChatStatus.FERME && this.reportService && this.systemConfigService) {
-        const gicoRequired = (await this.systemConfigService.get('FF_GICOP_REPORT_REQUIRED')) === 'true';
-        if (gicoRequired) {
-          const complete = await this.reportService.isReportComplete(chatId);
-          if (!complete) {
-            this.logger.warn(`CLOSE_BLOCKED chat=${chatId} — rapport GICOP incomplet`);
+      // Centralisation des règles de clôture via ConversationClosureService
+      if (newStatus === WhatsappChatStatus.FERME && this.closureService) {
+        const readiness = await this.closureService.validateClosure(chatId, agent.commercialId);
+        if (!readiness.ok) {
+          const firstBlocker = readiness.blockers[0];
+          this.logger.warn(`CLOSE_BLOCKED chat=${chatId} — ${firstBlocker?.code}`);
+          client.emit('chat:event', {
+            type: 'CONVERSATION_CLOSE_BLOCKED',
+            payload: { chat_id: chatId, reason: firstBlocker?.code, blockers: readiness.blockers },
+          });
+          return;
+        }
+      } else if (newStatus === WhatsappChatStatus.FERME) {
+        // Fallback si le service n'est pas disponible — vérifications legacy
+        if (this.reportService && this.systemConfigService) {
+          const gicoRequired = (await this.systemConfigService.get('FF_GICOP_REPORT_REQUIRED')) === 'true';
+          if (gicoRequired) {
+            const complete = await this.reportService.isReportComplete(chatId);
+            if (!complete) {
+              client.emit('chat:event', {
+                type: 'CONVERSATION_CLOSE_BLOCKED',
+                payload: { chat_id: chatId, reason: 'GICOP_REPORT_INCOMPLETE' },
+              });
+              return;
+            }
+          }
+        }
+        if (this.dossierService) {
+          const dossierComplete = await this.dossierService.isDossierComplete(chatId);
+          if (!dossierComplete) {
             client.emit('chat:event', {
               type: 'CONVERSATION_CLOSE_BLOCKED',
-              payload: { chat_id: chatId, reason: 'GICOP_REPORT_INCOMPLETE' },
+              payload: { chat_id: chatId, reason: 'DOSSIER_INCOMPLET' },
             });
             return;
           }
-        }
-      }
-
-      // Dossier client obligatoire à la clôture
-      if (newStatus === WhatsappChatStatus.FERME && this.dossierService) {
-        const dossierComplete = await this.dossierService.isDossierComplete(chatId);
-        if (!dossierComplete) {
-          this.logger.warn(`CLOSE_BLOCKED chat=${chatId} — dossier client incomplet`);
-          client.emit('chat:event', {
-            type: 'CONVERSATION_CLOSE_BLOCKED',
-            payload: { chat_id: chatId, reason: 'DOSSIER_INCOMPLET' },
-          });
-          return;
         }
       }
 

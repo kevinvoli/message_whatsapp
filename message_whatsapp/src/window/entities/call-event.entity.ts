@@ -21,6 +21,9 @@ export class CallEvent {
   @Column({ name: 'commercial_phone', type: 'varchar', length: 50 })
   commercial_phone: string;
 
+  @Column({ name: 'commercial_email', type: 'varchar', length: 200, nullable: true })
+  commercial_email: string | null;
+
   @Column({ name: 'client_phone', type: 'varchar', length: 50 })
   client_phone: string;
 

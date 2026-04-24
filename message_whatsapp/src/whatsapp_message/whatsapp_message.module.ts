@@ -51,6 +51,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
+import { ConversationClosureModule } from 'src/conversation-closure/conversation-closure.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
     ConversationReportModule,
     SystemConfigModule,
     ClientDossierModule,
+    ConversationClosureModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

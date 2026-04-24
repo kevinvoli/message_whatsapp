@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { CheckCircle, ChevronDown, ChevronUp, ClipboardList, Phone, Plus, Save, Star, Trash2, X } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { CheckCircle, ChevronDown, ChevronUp, ClipboardList, Loader2, Phone, Plus, Save, Send, Star, Trash2, X } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
+
+type SubmissionStatus = 'pending' | 'sent' | 'failed' | null;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -86,9 +88,26 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
   const [customCategory, setCustomCategory] = useState('');
   const [newPhone, setNewPhone]       = useState('');
   const [newPhoneLabel, setNewPhoneLabel] = useState('');
-  const [addingPhone, setAddingPhone] = useState(false);
+  const [addingPhone, setAddingPhone]           = useState(false);
+  const [submitting, setSubmitting]             = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>(null);
+  const [submissionError, setSubmissionError]   = useState<string | null>(null);
+
+  // Charger le statut de soumission
+  const loadSubmissionStatus = useCallback(() => {
+    fetch(`${API_URL}/gicop-report/${chatId}/submission-status`, { credentials: 'include' })
+      .then((r) => r.ok ? r.json() as Promise<{ status: SubmissionStatus; error: string | null }> : null)
+      .then((data) => {
+        if (data) {
+          setSubmissionStatus(data.status);
+          setSubmissionError(data.error);
+        }
+      })
+      .catch(() => {});
+  }, [chatId]);
 
   useEffect(() => {
+    loadSubmissionStatus();
     setSaved(false);
     setDirty(false);
     fetch(`${API_URL}/clients/by-chat/${chatId}`, { credentials: 'include' })
@@ -104,7 +123,27 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         }
       })
       .catch(() => {});
-  }, [chatId]);
+  }, [chatId, loadSubmissionStatus]);
+
+  // ── Soumission rapport vers la plateforme commandes ──────────────────────
+
+  const handleSubmitReport = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/gicop-report/${chatId}/submit`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json() as { status: SubmissionStatus; error: string | null };
+      setSubmissionStatus(data.status);
+      setSubmissionError(data.error ?? null);
+    } catch {
+      setSubmissionStatus('failed');
+      setSubmissionError('Erreur réseau');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // ── Sauvegarde explicite ─────────────────────────────────────────────────
 
@@ -179,6 +218,34 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
           }
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+      </div>
+
+      {/* Soumission rapport */}
+      <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {submissionStatus === 'sent' && (
+            <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+              <CheckCircle className="w-3 h-3" /> Soumis
+            </span>
+          )}
+          {submissionStatus === 'failed' && (
+            <span className="text-xs text-red-600 truncate" title={submissionError ?? ''}>
+              Échec soumission
+            </span>
+          )}
+          {submissionStatus === 'pending' && (
+            <span className="text-xs text-orange-600">En cours…</span>
+          )}
+        </div>
+        <button
+          onClick={handleSubmitReport}
+          disabled={!isComplete || submitting || submissionStatus === 'sent'}
+          title={!isComplete ? 'Complétez le dossier avant de soumettre' : submissionStatus === 'sent' ? 'Déjà soumis' : 'Soumettre le rapport vers la plateforme commandes'}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+        >
+          {submitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          {submissionStatus === 'sent' ? 'Soumis' : 'Soumettre'}
+        </button>
       </div>
 
       {/* Résumé contact */}

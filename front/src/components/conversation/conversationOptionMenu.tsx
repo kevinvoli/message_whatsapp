@@ -4,6 +4,9 @@ import { Conversation, ConversationStatus } from '@/types/chat';
 import { TransferModal } from './TransferModal';
 import { LabelMenu } from './LabelMenu';
 import { MergeModal } from './MergeModal';
+import dynamic from 'next/dynamic';
+
+const ConversationClosureModal = dynamic(() => import('../chat/ConversationClosureModal'), { ssr: false });
 
 interface ConversationOptionsMenuProps {
   conversation: Conversation;
@@ -23,6 +26,7 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   const [showMerge, setShowMerge] = useState(false);
   const [closeBlocked, setCloseBlocked]         = useState(false);
   const [dossierBlocked, setDossierBlocked]     = useState(false);
+  const [showClosureModal, setShowClosureModal] = useState(false);
 
   useEffect(() => {
     const gicoHandler = (e: Event) => {
@@ -48,7 +52,10 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   }, [conversation.chat_id]);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
-    if (newStatus === 'fermé' || newStatus === 'converti') {
+    if (newStatus === 'fermé') {
+      setIsOpen(false);
+      setShowClosureModal(true);
+    } else if (newStatus === 'converti') {
       setShowConfirmation(newStatus);
     } else {
       onStatusChange(conversation.id, newStatus);
@@ -224,6 +231,19 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
             </div>
           </div>
         </>
+      )}
+
+      {/* Modal de fermeture guidée */}
+      {showClosureModal && (
+        <ConversationClosureModal
+          chatId={conversation.chat_id}
+          onConfirm={() => {
+            setShowClosureModal(false);
+            onStatusChange(conversation.id, 'fermé');
+            onClose?.();
+          }}
+          onCancel={() => setShowClosureModal(false)}
+        />
       )}
 
       {/* Modal de confirmation */}

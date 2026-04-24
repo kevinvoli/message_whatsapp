@@ -1,0 +1,22 @@
+import { Controller, Get, Param, Request, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ConversationClosureService } from './conversation-closure.service';
+
+interface JwtUser { userId: string; }
+
+@ApiTags('Conversation Closure')
+@Controller('conversations')
+@UseGuards(AuthGuard('jwt'))
+export class ConversationClosureController {
+  constructor(private readonly closureService: ConversationClosureService) {}
+
+  @Get(':chatId/closure-readiness')
+  @ApiOperation({ summary: 'Vérifie si la conversation peut être fermée et retourne les blocages' })
+  async checkReadiness(
+    @Param('chatId') chatId: string,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.closureService.validateClosure(chatId, req.user.userId);
+  }
+}

@@ -101,6 +101,22 @@ export class ConversationReport {
   @Column({ name: 'validated_by_id', type: 'char', length: 36, nullable: true, default: null })
   validatedById: string | null;
 
+  // ─── Soumission vers la plateforme de gestion des commandes ───────────────
+  @Column({
+    name: 'submission_status',
+    type: 'enum',
+    enum: ['pending', 'sent', 'failed'],
+    nullable: true,
+    default: null,
+  })
+  submissionStatus: 'pending' | 'sent' | 'failed' | null;
+
+  @Column({ name: 'submitted_at', type: 'timestamp', nullable: true, default: null })
+  submittedAt: Date | null;
+
+  @Column({ name: 'submission_error', type: 'text', nullable: true })
+  submissionError: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

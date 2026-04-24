@@ -15,6 +15,8 @@ export interface CreateCallEventDto {
   duration_seconds?: number | null;
   recording_url?: string | null;
   order_id?: string | null;
+  commercial_email?: string | null;
+  commercial_id?: string | null;
 }
 
 @Injectable()
@@ -48,6 +50,7 @@ export class CallEventService {
       this.callEventRepo.create({
         external_id: dto.external_id,
         commercial_phone: dto.commercial_phone,
+        commercial_email: dto.commercial_email ?? null,
         client_phone: dto.client_phone,
         call_status: dto.call_status,
         duration_seconds: dto.duration_seconds ?? null,
@@ -55,7 +58,7 @@ export class CallEventService {
         order_id: dto.order_id ?? null,
         event_at: new Date(dto.event_at),
         chat_id: chat?.chat_id ?? null,
-        commercial_id: null,
+        commercial_id: dto.commercial_id ?? null,
       }),
     );
 

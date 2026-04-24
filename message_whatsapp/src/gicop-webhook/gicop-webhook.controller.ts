@@ -12,8 +12,35 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { GicopWebhookService } from './gicop-webhook.service';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { GicopWebhookService, DirectCallEventDto } from './gicop-webhook.service';
 import { GicopWebhookPayload } from './dto/gicop-webhook.dto';
+
+class DirectCallEventBody implements DirectCallEventDto {
+  @IsString() @IsNotEmpty()
+  external_id: string;
+
+  @IsString() @IsNotEmpty()
+  event_at: string;
+
+  @IsString() @IsNotEmpty()
+  client_phone: string;
+
+  @IsString() @IsNotEmpty()
+  commercial_phone: string;
+
+  @IsOptional() @IsString()
+  commercial_email?: string | null;
+
+  @IsString() @IsNotEmpty()
+  call_status: string;
+
+  @IsOptional() @IsNumber() @Min(0)
+  duration_seconds?: number | null;
+
+  @IsOptional() @IsString()
+  recording_url?: string | null;
+}
 
 /**
  * Webhook unifié GICOP — commandes ERP + notifications d'appels.
@@ -129,5 +156,28 @@ export class GicopWebhookController {
     );
 
     return { ok: true, processed, total: results.length, results };
+  }
+
+  /**
+   * Endpoint dédié pour les notifications d'appel en format direct.
+   * POST /webhooks/gicop/call-events
+   */
+  @Post('gicop/call-events')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Réception directe d\'un événement d\'appel (format simplifié)' })
+  async receiveCallEvent(
+    @Headers() headers: Record<string, string>,
+    @Body() body: DirectCallEventBody,
+  ) {
+    const secret = process.env.INTEGRATION_SECRET;
+    if (secret) {
+      const provided = headers['x-integration-secret'];
+      if (provided !== secret) {
+        throw new UnauthorizedException('x-integration-secret invalide');
+      }
+    }
+    this.logger.log(`[GICOP/CALL] ${body.external_id} — ${body.call_status} — ${body.client_phone}`);
+    const result = await this.service.receiveDirectCallEvent(body);
+    return { ok: result.processed, ...result };
   }
 }
