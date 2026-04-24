@@ -158,24 +158,24 @@ export default function UserHeader({
             {/* Stats rapides */}
 
             {
-               viewMode === 'conversations' ? (
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
-                    <p className="text-xs text-green-100">Actives</p>
-                    <p className="text-lg font-bold">
-                        {conversation?.filter((con) => con.status === 'actif').length}
-                    </p>
-                </div>
-                <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
-                    <p className="text-xs text-green-100">Non lus</p>
-                    <p className="text-lg font-bold">{totalUnread}</p>
-                </div>
-                <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
-                    <p className="text-xs text-green-100">Conv.</p>
-                    <p className="text-lg font-bold">{conversation?.length}</p>
-                </div>
-            </div>
-               ) : <div></div>
+            //    viewMode === 'conversations' ? (
+            //       <div className="grid grid-cols-3 gap-2 mb-3">
+            //     <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
+            //         <p className="text-xs text-green-100">Actives</p>
+            //         <p className="text-lg font-bold">
+            //             {conversation?.filter((con) => con.status === 'actif').length}
+            //         </p>
+            //     </div>
+            //     <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
+            //         <p className="text-xs text-green-100">Non lus</p>
+            //         <p className="text-lg font-bold">{totalUnread}</p>
+            //     </div>
+            //     <div className="bg-green-700 bg-opacity-50 rounded p-2 text-center">
+            //         <p className="text-xs text-green-100">Conv.</p>
+            //         <p className="text-lg font-bold">{conversation?.length}</p>
+            //     </div>
+            // </div>
+            //    ) : <div></div>
             }
 
           
