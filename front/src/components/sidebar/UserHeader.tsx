@@ -87,82 +87,94 @@ export default function UserHeader({
                 </button>
             </div>
 
-            {/* 🆕 Switch entre Conversations et Contacts */}
+            {/* Navigation vues — 2 lignes de 3 pour tenir dans la sidebar */}
             {onViewModeChange && (
-                <div className="mb-3 bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
-                    <button
-                        onClick={() => handleViewChange('conversations')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
-                            viewMode === 'conversations'
-                                ? 'bg-white text-green-700 shadow-md font-medium'
-                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                        }`}
-                    >
-                        <MessageSquare className="w-4 h-4" />
-                        <span className="text-xs">Conv.</span>
-                    </button>
-                    <button
-                        onClick={() => handleViewChange('contacts')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
-                            viewMode === 'contacts'
-                                ? 'bg-white text-green-700 shadow-md font-medium'
-                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                        }`}
-                    >
-                        <Users className="w-4 h-4" />
-                        <span className="text-xs">Contacts</span>
-                    </button>
-                    <button
-                        onClick={() => handleViewChange('relances')}
-                        className={`flex-1 relative flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
-                            viewMode === 'relances'
-                                ? 'bg-white text-green-700 shadow-md font-medium'
-                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                        }`}
-                    >
-                        <div className="relative">
-                            <Bell className="w-4 h-4" />
-                            {reminderCount > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                                    {reminderCount > 9 ? '9+' : reminderCount}
-                                </span>
-                            )}
-                        </div>
-                        <span className="text-xs">Relances</span>
-                    </button>
-                    <button
-                        onClick={() => handleViewChange('objectifs')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
-                            viewMode === 'objectifs'
-                                ? 'bg-white text-green-700 shadow-md font-medium'
-                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                        }`}
-                    >
-                        <Target className="w-4 h-4" />
-                        <span className="text-xs">Objectifs</span>
-                    </button>
-                    <button
-                        onClick={() => handleViewChange('ranking')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
-                            viewMode === 'ranking'
-                                ? 'bg-white text-green-700 shadow-md font-medium'
-                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                        }`}
-                    >
-                        <Trophy className="w-4 h-4" />
-                        <span className="text-xs">Rang</span>
-                    </button>
-                    <button
-                        onClick={() => handleViewChange('menus-metier')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
-                            viewMode === 'menus-metier'
-                                ? 'bg-white text-green-700 shadow-md font-medium'
-                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                        }`}
-                    >
-                        <Briefcase className="w-4 h-4" />
-                        <span className="text-xs">Métier</span>
-                    </button>
+                <div className="mb-3 space-y-1">
+                    {/* Ligne 1 : Conv · Contacts · Relances */}
+                    <div className="bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
+                        <button
+                            onClick={() => handleViewChange('conversations')}
+                            title="Conversations"
+                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'conversations'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Conv.</span>
+                        </button>
+                        <button
+                            onClick={() => handleViewChange('contacts')}
+                            title="Contacts"
+                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'contacts'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <Users className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Contacts</span>
+                        </button>
+                        <button
+                            onClick={() => handleViewChange('relances')}
+                            title="Relances"
+                            className={`flex-1 relative flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'relances'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <div className="relative">
+                                <Bell className="w-4 h-4" />
+                                {reminderCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                                        {reminderCount > 9 ? '9+' : reminderCount}
+                                    </span>
+                                )}
+                            </div>
+                            <span className="text-[10px] mt-0.5 leading-none">Relances</span>
+                        </button>
+                    </div>
+                    {/* Ligne 2 : Objectifs · Rang · Métier */}
+                    <div className="bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
+                        <button
+                            onClick={() => handleViewChange('objectifs')}
+                            title="Objectifs"
+                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'objectifs'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <Target className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Objectifs</span>
+                        </button>
+                        <button
+                            onClick={() => handleViewChange('ranking')}
+                            title="Classement"
+                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'ranking'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <Trophy className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Rang</span>
+                        </button>
+                        <button
+                            onClick={() => handleViewChange('menus-metier')}
+                            title="Menus métier"
+                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'menus-metier'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <Briefcase className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Métier</span>
+                        </button>
+                    </div>
                 </div>
             )}
 
