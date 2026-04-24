@@ -186,9 +186,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-semibold text-gray-800 truncate">{
-            isLocked ? "" :  conversation.clientName }</h3>
+            conversation.clientName }</h3>
             <span className="text-xs text-gray-500">
-              {conversation.lastMessage ? formatConversationTime(conversation.lastMessage.timestamp) : "NA"}
+              {isLocked? "": conversation.lastMessage ? formatConversationTime(conversation.lastMessage.timestamp) : "NA"}
             </span>
           </div>
           <p className="text-sm text-gray-600 truncate">{
