@@ -54,6 +54,9 @@ export class CallLog {
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes?: string | null;
 
+  @Column({ name: 'treated', type: 'tinyint', width: 1, default: 0 })
+  treated: boolean;
+
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 

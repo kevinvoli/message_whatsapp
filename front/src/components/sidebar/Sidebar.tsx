@@ -13,6 +13,8 @@ import FollowUpPanel from '@/components/chat/FollowUpPanel';
 import ObjectifsPanel from '@/components/chat/ObjectifsPanel';
 import RankingPositionWidget from '@/components/chat/RankingPositionWidget';
 import { OutboundModal } from '@/components/conversation/OutboundModal';
+import BusinessMenusPanel from './BusinessMenusPanel';
+import PrioritePostePanel from './PrioritePostePanel';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -80,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {viewMode === 'conversations' ? (
         <>
+          <PrioritePostePanel />
           <div className="flex items-center border-b border-gray-100">
             <div className="flex-1">
               <ConversationFilters
@@ -111,6 +114,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         <ObjectifsPanel />
       ) : viewMode === 'ranking' ? (
         <RankingPositionWidget />
+      ) : viewMode === 'menus-metier' ? (
+        <BusinessMenusPanel />
       ) : (
         <FollowUpPanel />
       )}

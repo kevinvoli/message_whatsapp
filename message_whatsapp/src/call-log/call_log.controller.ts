@@ -3,14 +3,18 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CallLogService } from './call_log.service';
 import { CreateCallLogDto } from './dto/create-call-log.dto';
 import { AdminGuard } from 'src/auth/admin.guard';
+
+interface JwtUser { userId: string; }
 
 @Controller()
 export class CallLogController {
@@ -42,5 +46,20 @@ export class CallLogController {
   @UseGuards(AdminGuard)
   remove(@Param('id') id: string) {
     return this.callLogService.remove(id);
+  }
+
+  /** GET /call-logs/mine/missed — appels en absence non traités du commercial connecté */
+  @Get('call-logs/mine/missed')
+  @UseGuards(AuthGuard('jwt'))
+  missedMine(@Request() req: { user: JwtUser }) {
+    return this.callLogService.findMissedByCommercial(req.user.userId);
+  }
+
+  /** PATCH /call-logs/:id/treat — marque un appel en absence comme traité */
+  @Patch('call-logs/:id/treat')
+  @HttpCode(200)
+  @UseGuards(AuthGuard('jwt'))
+  treat(@Param('id') id: string, @Request() req: { user: JwtUser }) {
+    return this.callLogService.markTreated(id, req.user.userId);
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CallLog } from './entities/call_log.entity';
+import { CallLog, CallOutcome } from './entities/call_log.entity';
 import { CreateCallLogDto } from './dto/create-call-log.dto';
 
 @Injectable()
@@ -44,5 +44,20 @@ export class CallLogService {
     const log = await this.repo.findOne({ where: { id } });
     if (!log) throw new NotFoundException('CallLog introuvable');
     await this.repo.remove(log);
+  }
+
+  findMissedByCommercial(commercial_id: string, limit = 30): Promise<CallLog[]> {
+    return this.repo.find({
+      where: { commercial_id, outcome: CallOutcome.PasDeRéponse, treated: false },
+      order: { called_at: 'DESC' },
+      take: limit,
+    });
+  }
+
+  async markTreated(id: string, commercial_id: string): Promise<{ ok: boolean }> {
+    const log = await this.repo.findOne({ where: { id, commercial_id } });
+    if (!log) throw new NotFoundException('CallLog introuvable');
+    await this.repo.update(id, { treated: true });
+    return { ok: true };
   }
 }

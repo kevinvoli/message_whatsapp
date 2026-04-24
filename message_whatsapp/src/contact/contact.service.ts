@@ -210,6 +210,40 @@ export class ContactService {
     return { data, total };
   }
 
+  async findByCategory(
+    commercial_id: string,
+    categories: string[],
+    limit = 50,
+  ): Promise<Contact[]> {
+    return this.repo
+      .createQueryBuilder('c')
+      .where('c.portfolio_owner_id = :commercial_id', { commercial_id })
+      .andWhere('c.client_category IN (:...categories)', { categories })
+      .andWhere('c.deletedAt IS NULL')
+      .orderBy('c.last_message_date', 'DESC')
+      .addOrderBy('c.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+  }
+
+  async findInactive(
+    commercial_id: string,
+    days = 60,
+    limit = 50,
+  ): Promise<Contact[]> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return this.repo
+      .createQueryBuilder('c')
+      .where('c.portfolio_owner_id = :commercial_id', { commercial_id })
+      .andWhere('c.deletedAt IS NULL')
+      .andWhere('c.last_message_date IS NOT NULL')
+      .andWhere('c.last_message_date <= :cutoff', { cutoff })
+      .orderBy('c.last_message_date', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
   /** Vue admin : portefeuille de n'importe quel commercial */
   async findPortfolioAdmin(
     commercial_id?: string,

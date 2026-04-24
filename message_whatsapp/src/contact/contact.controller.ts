@@ -143,4 +143,49 @@ export class ContactController {
       offset ? parseInt(offset, 10) : 0,
     );
   }
+
+  // ─── Menus métier ─────────────────────────────────────────────────────────────
+
+  /** Prospects à relancer : jamais_commande + commande_sans_livraison */
+  @Get('business/prospects')
+  @UseGuards(AuthGuard('jwt'))
+  getProspects(
+    @Request() req: { user: { userId: string } },
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findByCategory(
+      req.user.userId,
+      ['jamais_commande', 'commande_sans_livraison'],
+      limit ? Math.min(parseInt(limit, 10), 100) : 50,
+    );
+  }
+
+  /** Commandes annulées */
+  @Get('business/annulee')
+  @UseGuards(AuthGuard('jwt'))
+  getAnnulee(
+    @Request() req: { user: { userId: string } },
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findByCategory(
+      req.user.userId,
+      ['commande_annulee'],
+      limit ? Math.min(parseInt(limit, 10), 100) : 50,
+    );
+  }
+
+  /** Anciennes clientes : inactives depuis X jours (défaut 60) */
+  @Get('business/anciennes')
+  @UseGuards(AuthGuard('jwt'))
+  getAnciennes(
+    @Request() req: { user: { userId: string } },
+    @Query('days') days?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.findInactive(
+      req.user.userId,
+      days ? parseInt(days, 10) : 60,
+      limit ? Math.min(parseInt(limit, 10), 100) : 50,
+    );
+  }
 }

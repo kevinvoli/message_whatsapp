@@ -62,6 +62,14 @@ export class WhatsappChatController {
   }
 
   // ⚠️ Doit être AVANT @Get(':chat_id') pour éviter le conflit de route
+
+  /** Messages non répondus du poste du commercial connecté */
+  @Get('mine/unanswered')
+  @UseGuards(AuthGuard('jwt'))
+  unanswered(@Request() req: { user: JwtUser }) {
+    return this.chatService.findUnansweredByCommercial(req.user.userId);
+  }
+
   @Get('stats/by-poste')
   async statsByPoste() {
     return this.chatService.getStatsByPoste();

@@ -5,8 +5,9 @@
  */
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { WhatsappChat, ConversationResult } from './entities/whatsapp_chat.entity';
+import { MoreThan, Repository } from 'typeorm';
+import { WhatsappChat, WhatsappChatStatus, ConversationResult } from './entities/whatsapp_chat.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import {
   ConversationReadQueryService,
@@ -27,6 +28,8 @@ export class WhatsappChatService {
   constructor(
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
     private readonly posteService: WhatsappPosteService,
     private readonly readQuery: ConversationReadQueryService,
 
@@ -269,5 +272,34 @@ export class WhatsappChatService {
 
     const rows = await qb.getRawMany<{ result: string; count: string }>();
     return rows.map((r) => ({ result: r.result, count: Number(r.count) }));
+  }
+
+  async findUnansweredByCommercial(
+    userId: string,
+    limit = 20,
+  ): Promise<Array<{ chat_id: string; contact_client: string; unread_count: number; last_activity_at: Date }>> {
+    const commercial = await this.commercialRepo.findOne({
+      where: { id: userId },
+      relations: ['poste'],
+    });
+    if (!commercial?.poste?.id) return [];
+
+    const chats = await this.chatRepository.find({
+      where: {
+        poste_id:    commercial.poste.id,
+        status:      WhatsappChatStatus.ACTIF,
+        unread_count: MoreThan(0),
+      },
+      order: { unread_count: 'DESC', last_activity_at: 'DESC' },
+      take: limit,
+      select: ['chat_id', 'contact_client', 'unread_count', 'last_activity_at'],
+    });
+
+    return chats.map((c) => ({
+      chat_id:        c.chat_id,
+      contact_client: c.contact_client,
+      unread_count:   c.unread_count,
+      last_activity_at: c.last_activity_at,
+    }));
   }
 }

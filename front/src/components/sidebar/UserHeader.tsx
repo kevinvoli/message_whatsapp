@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy } from 'lucide-react';
+import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy, Briefcase } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
 
 interface UserHeaderProps {
@@ -151,6 +151,17 @@ export default function UserHeader({
                     >
                         <Trophy className="w-4 h-4" />
                         <span className="text-xs">Rang</span>
+                    </button>
+                    <button
+                        onClick={() => handleViewChange('menus-metier')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
+                            viewMode === 'menus-metier'
+                                ? 'bg-white text-green-700 shadow-md font-medium'
+                                : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                        }`}
+                    >
+                        <Briefcase className="w-4 h-4" />
+                        <span className="text-xs">Métier</span>
                     </button>
                 </div>
             )}
