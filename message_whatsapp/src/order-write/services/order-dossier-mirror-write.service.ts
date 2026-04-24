@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
@@ -30,38 +30,42 @@ export interface DossierMirrorPayload {
   closedAt?:          Date | null;
 }
 
-const CREATE_TABLE_SQL = `
-CREATE TABLE IF NOT EXISTS messaging_client_dossier_mirror (
-  messaging_chat_id  VARCHAR(100) NOT NULL,
-  id_client          INT          DEFAULT NULL,
-  id_commercial      INT          DEFAULT NULL,
-  client_name        VARCHAR(200) DEFAULT NULL,
-  commercial_name    VARCHAR(200) DEFAULT NULL,
-  commercial_phone   VARCHAR(30)  DEFAULT NULL,
-  commercial_email   VARCHAR(200) DEFAULT NULL,
-  ville              VARCHAR(100) DEFAULT NULL,
-  commune            VARCHAR(100) DEFAULT NULL,
-  quartier           VARCHAR(100) DEFAULT NULL,
-  product_category   VARCHAR(200) DEFAULT NULL,
-  client_need        TEXT         DEFAULT NULL,
-  interest_score     TINYINT      DEFAULT NULL,
-  next_action        VARCHAR(50)  DEFAULT NULL,
-  follow_up_at       DATETIME     DEFAULT NULL,
-  notes              TEXT         DEFAULT NULL,
-  conversation_result VARCHAR(50) DEFAULT NULL,
-  closed_at          DATETIME     DEFAULT NULL,
-  sync_status        ENUM('pending','synced','error') DEFAULT 'pending',
-  sync_error         TEXT         DEFAULT NULL,
-  submitted_at       DATETIME     DEFAULT NULL,
-  updated_at         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (messaging_chat_id),
-  KEY IDX_mirror_id_client     (id_client),
-  KEY IDX_mirror_id_commercial (id_commercial)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-`;
+/**
+ * SCHÉMA À FOURNIR À L'ÉQUIPE DB2 pour création manuelle :
+ *
+ * CREATE TABLE messaging_client_dossier_mirror (
+ *   messaging_chat_id  VARCHAR(100) NOT NULL,
+ *   id_client          INT          DEFAULT NULL,
+ *   id_commercial      INT          DEFAULT NULL,
+ *   client_name        VARCHAR(200) DEFAULT NULL,
+ *   commercial_name    VARCHAR(200) DEFAULT NULL,
+ *   commercial_phone   VARCHAR(30)  DEFAULT NULL,
+ *   commercial_email   VARCHAR(200) DEFAULT NULL,
+ *   ville              VARCHAR(100) DEFAULT NULL,
+ *   commune            VARCHAR(100) DEFAULT NULL,
+ *   quartier           VARCHAR(100) DEFAULT NULL,
+ *   product_category   VARCHAR(200) DEFAULT NULL,
+ *   client_need        TEXT         DEFAULT NULL,
+ *   interest_score     TINYINT      DEFAULT NULL,
+ *   next_action        VARCHAR(50)  DEFAULT NULL,
+ *   follow_up_at       DATETIME     DEFAULT NULL,
+ *   notes              TEXT         DEFAULT NULL,
+ *   conversation_result VARCHAR(50) DEFAULT NULL,
+ *   closed_at          DATETIME     DEFAULT NULL,
+ *   sync_status        ENUM('pending','synced','error') DEFAULT 'pending',
+ *   sync_error         TEXT         DEFAULT NULL,
+ *   submitted_at       DATETIME     DEFAULT NULL,
+ *   updated_at         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ *   PRIMARY KEY (messaging_chat_id),
+ *   KEY IDX_mirror_id_client     (id_client),
+ *   KEY IDX_mirror_id_commercial (id_commercial)
+ * ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ *
+ * NE PAS exécuter ce SQL depuis le code — la table est créée par l'équipe DB2.
+ */
 
 @Injectable()
-export class OrderDossierMirrorWriteService implements OnModuleInit {
+export class OrderDossierMirrorWriteService {
   private readonly logger = new Logger(OrderDossierMirrorWriteService.name);
 
   constructor(
@@ -79,17 +83,6 @@ export class OrderDossierMirrorWriteService implements OnModuleInit {
     @InjectRepository(ClientIdentityMapping)
     private readonly clientMappingRepo: Repository<ClientIdentityMapping>,
   ) {}
-
-  /** Crée la table miroir dans DB2 au démarrage si elle n'existe pas. */
-  async onModuleInit(): Promise<void> {
-    if (!this.orderDb) return;
-    try {
-      await this.orderDb.query(CREATE_TABLE_SQL);
-      this.logger.log('Table messaging_client_dossier_mirror vérifiée/créée dans DB2');
-    } catch (err) {
-      this.logger.error(`Impossible de créer la table miroir DB2: ${(err as Error).message}`);
-    }
-  }
 
   /**
    * Upsert du dossier client dans la table miroir DB2.

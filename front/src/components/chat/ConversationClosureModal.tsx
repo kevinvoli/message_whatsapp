@@ -31,10 +31,22 @@ const CODE_ACTIONS: Record<string, string> = {
 };
 
 export default function ConversationClosureModal({ chatId, onConfirm, onCancel }: Props) {
-  const [readiness, setReadiness]   = useState<ClosureReadiness | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [confirming, setConfirming] = useState(false);
-  const [closeError, setCloseError] = useState<string | null>(null);
+  const [readiness, setReadiness]         = useState<ClosureReadiness | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [confirming, setConfirming]       = useState(false);
+  const [closeError, setCloseError]       = useState<string | null>(null);
+  const [priorityCount, setPriorityCount] = useState(0);
+  const [priorityCritical, setPriorityCritical] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ total: number; isCritical: boolean }>).detail;
+      setPriorityCount(detail.total);
+      setPriorityCritical(detail.isCritical);
+    };
+    window.addEventListener('poste:priority-update', handler);
+    return () => window.removeEventListener('poste:priority-update', handler);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +137,21 @@ export default function ConversationClosureModal({ chatId, onConfirm, onCancel }
             </div>
           )}
         </div>
+
+        {/* Avertissement priorités critiques */}
+        {priorityCritical && readiness?.ok && (
+          <div className="mx-5 mb-1 px-3 py-2.5 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-orange-800">
+                {priorityCount} priorité{priorityCount > 1 ? 's' : ''} poste non traitée{priorityCount > 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-orange-600 mt-0.5">
+                Appels en absence ou messages sans réponse détectés. Traiter les priorités avant de clôturer est recommandé.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-100 space-y-2">

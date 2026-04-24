@@ -2,6 +2,11 @@ import { Global, Logger, Module, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from './order-db.constants';
+// Entités DB2 — déclarées explicitement pour que getRepository() fonctionne
+// sans ambiguïté. synchronize: false → aucune migration générée.
+import { OrderCommand } from 'src/order-read/entities/order-command.entity';
+import { OrderCallLog } from 'src/order-read/entities/order-call-log.entity';
+import { MessagingClientDossierMirror } from 'src/order-write/entities/messaging-client-dossier-mirror.entity';
 
 const logger = new Logger('OrderDbModule');
 
@@ -31,7 +36,10 @@ const orderDbProvider: Provider = {
       username: config.get<string>('ORDER_DB_USER') ?? '',
       password: config.get<string>('ORDER_DB_PASSWORD') ?? '',
       database: config.get<string>('ORDER_DB_NAME') ?? '',
-      synchronize:       false,
+      // Entités DB2 connues — synchronize: false garantit aucune DDL
+      entities:          [OrderCommand, OrderCallLog, MessagingClientDossierMirror],
+      synchronize:       false,   // JAMAIS de migration sur DB2
+      migrationsRun:     false,   // JAMAIS de migration sur DB2
       logging:           false,
       connectTimeout:    10_000,
       extra: {

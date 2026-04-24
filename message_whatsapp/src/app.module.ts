@@ -67,11 +67,9 @@ import { GeoAccessModule } from './geo-access/geo_access.module';
 import { ConversationCapacityModule } from './conversation-capacity/conversation-capacity.module';
 import { WindowModule } from './window/window.module';
 import { SystemHealthModule } from './system-health/system-health.module';
-import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
 import { IntegrationModule } from './integration/integration.module';
 import { ConversationReportModule } from './gicop-report/conversation-report.module';
 import { CatalogModule } from './catalog/catalog.module';
-import { GicopWebhookModule } from './gicop-webhook/gicop-webhook.module';
 import { CallObligationModule } from './call-obligations/call-obligation.module';
 import { ConversationClosureModule } from './conversation-closure/conversation-closure.module';
 import { OrderDbModule } from './order-db/order-db.module';
@@ -79,6 +77,7 @@ import { IntegrationSyncModule } from './integration-sync/integration-sync.modul
 import { OrderCallSyncModule } from './order-call-sync/order-call-sync.module';
 import { OrderWriteModule } from './order-write/order-write.module';
 import { OrderReadModule } from './order-read/order-read.module';
+import { BusinessMetricsModule } from './business-metrics/business-metrics.module';
 
 @Module({
   imports: [
@@ -216,8 +215,7 @@ import { OrderReadModule } from './order-read/order-read.module';
     ConversationCapacityModule,
     // Phase 4 — Dashboard technique
     SystemHealthModule,
-    // Phase Intégration — webhooks entrants ERP + identity mapping + webhooks sortants
-    InboundIntegrationModule,
+    // Intégration — identity mapping uniquement (InboundIntegrationModule supprimé — lecture DB2 directe)
     IntegrationModule,
     // Phase 9 — Fenêtre glissante, moteur de validation, webhook appels
     WindowModule,
@@ -225,8 +223,7 @@ import { OrderReadModule } from './order-read/order-read.module';
     ConversationReportModule,
     // GICOP Sprint 8 — Catalogue multimédia
     CatalogModule,
-    // GICOP Webhook unifié — commandes ERP + appels
-    GicopWebhookModule,
+    // GicopWebhookModule supprimé — remplacé par lecture directe DB2 (OrderCallSyncModule)
     // Sprint 6 — Obligations d'appels GICOP
     CallObligationModule,
     // Sprint 1 Backlog prioritaire — Fermeture conversationnelle guidée
@@ -238,6 +235,10 @@ import { OrderReadModule } from './order-read/order-read.module';
     OrderCallSyncModule,
     // Epic C — Écriture table miroir DB2 (messaging_client_dossier_mirror)
     OrderWriteModule,
+    // Epic B — Lecture segmentation DB2 (commandes)
+    OrderReadModule,
+    // Epic 7 — Métriques flux métier (supervision admin)
+    BusinessMetricsModule,
   ],
   controllers: [AppController],
   providers: [

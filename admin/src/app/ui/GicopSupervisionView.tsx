@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardList, Loader2, RefreshCw, RotateCcw, Send, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ClipboardList, Database, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -17,6 +17,21 @@ interface ClosureStats {
     blockers: Array<{ code: string; label: string; severity: string }> | null;
     createdAt: string;
   }>;
+}
+
+interface BusinessMetrics {
+  period:               string;
+  closuresBlocked24h:   number;
+  reportsSubmitted24h:  number;
+  reportsFailed:        number;
+  remindersExecuted24h: number;
+  syncLog:              Record<string, number>;
+  db2Available:         boolean;
+}
+
+interface SyncStatus {
+  db2: { dbAvailable: boolean; lastSyncAt: string | null; processedCount: number };
+  syncLog: Record<string, number>;
 }
 
 interface FailedReport {
@@ -49,19 +64,25 @@ async function fetchJson<T>(url: string): Promise<T> {
 export default function GicopSupervisionView() {
   const [closureStats, setClosureStats] = useState<ClosureStats | null>(null);
   const [failedReports, setFailedReports] = useState<FailedReport[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [retrying, setRetrying] = useState<Record<string, boolean>>({});
-  const [retryResults, setRetryResults] = useState<Record<string, 'ok' | 'error'>>({});
+  const [syncStatus, setSyncStatus]       = useState<SyncStatus | null>(null);
+  const [metrics, setMetrics]             = useState<BusinessMetrics | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [retrying, setRetrying]           = useState<Record<string, boolean>>({});
+  const [retryResults, setRetryResults]   = useState<Record<string, 'ok' | 'error'>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [stats, failed] = await Promise.all([
+      const [stats, failed, sync, biz] = await Promise.all([
         fetchJson<ClosureStats>(`${API_URL}/conversations/admin/closure-stats`),
         fetchJson<FailedReport[]>(`${API_URL}/gicop-report/admin/failed-submissions`),
+        fetchJson<SyncStatus>(`${API_URL}/admin/order-sync/status`).catch(() => null),
+        fetchJson<BusinessMetrics>(`${API_URL}/admin/business-metrics`).catch(() => null),
       ]);
       setClosureStats(stats);
       setFailedReports(failed);
+      if (sync) setSyncStatus(sync);
+      if (biz)  setMetrics(biz);
     } catch { /* silencieux */ }
     finally { setLoading(false); }
   }, []);
@@ -255,17 +276,78 @@ export default function GicopSupervisionView() {
         </div>
       </div>
 
-      {/* Section info Epic 2 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <Send className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div>
-          <p className="text-sm font-medium text-blue-900">Réception des appels</p>
-          <p className="text-xs text-blue-700 mt-0.5">
-            Les appels de la plateforme de commande arrivent via{' '}
-            <span className="font-mono bg-blue-100 px-1 rounded">POST /webhooks/gicop/call-events</span>.
-            La déduplication par <span className="font-mono bg-blue-100 px-1 rounded">external_id</span> est active.
-            Le matching commercial se fait par téléphone puis email en fallback.
-          </p>
+      {/* Section 3 — Métriques flux métier */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+          <ClipboardList className="w-4 h-4 text-blue-500" />
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Flux métier — dernières 24h</h2>
+            <p className="text-xs text-gray-400">Fermetures · Rapports · Relances · Sync</p>
+          </div>
+        </div>
+        <div className="p-6">
+          {!metrics && (
+            <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+          )}
+          {metrics && (
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Fermetures bloquées (24h)',  value: metrics.closuresBlocked24h,   color: metrics.closuresBlocked24h  > 0 ? 'text-red-600'    : 'text-green-600' },
+                { label: 'Rapports soumis (24h)',      value: metrics.reportsSubmitted24h,   color: 'text-blue-600' },
+                { label: 'Rapports en échec',          value: metrics.reportsFailed,          color: metrics.reportsFailed       > 0 ? 'text-red-600'    : 'text-green-600' },
+                { label: 'Rappels relances (24h)',     value: metrics.remindersExecuted24h,  color: 'text-purple-600' },
+                { label: 'Sync DB2 — succès',          value: metrics.syncLog['success'] ?? 0, color: 'text-green-600' },
+                { label: 'Sync DB2 — échecs',          value: metrics.syncLog['failed']  ?? 0, color: (metrics.syncLog['failed'] ?? 0) > 0 ? 'text-red-600' : 'text-green-600' },
+              ].map((item) => (
+                <div key={item.label} className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">{item.label}</p>
+                  <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Section 4 — Synchronisation DB2 */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+          <Database className="w-4 h-4 text-indigo-500" />
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Synchronisation DB2 (base commandes)</h2>
+            <p className="text-xs text-gray-400">Lecture call_logs + écriture table miroir</p>
+          </div>
+        </div>
+        <div className="p-6">
+          {!syncStatus && (
+            <p className="text-sm text-gray-400 text-center py-4">Statut non disponible</p>
+          )}
+          {syncStatus && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-sm text-gray-700">Connexion DB2</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${syncStatus.db2.dbAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {syncStatus.db2.dbAvailable ? 'Connectée' : 'Non disponible'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-sm text-gray-700">Appels traités</span>
+                <span className="text-sm font-semibold text-gray-900">{syncStatus.db2.processedCount.toLocaleString('fr-FR')}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-sm text-gray-700">Dernière sync appels</span>
+                <span className="text-sm text-gray-500">{syncStatus.db2.lastSyncAt ? formatDate(syncStatus.db2.lastSyncAt) : '—'}</span>
+              </div>
+              {Object.entries(syncStatus.syncLog).map(([status, count]) => (
+                <div key={status} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <span className="text-sm text-gray-700">Journal sync — {status}</span>
+                  <span className={`text-sm font-semibold ${status === 'failed' ? 'text-red-600' : status === 'pending' ? 'text-orange-600' : 'text-green-600'}`}>
+                    {count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

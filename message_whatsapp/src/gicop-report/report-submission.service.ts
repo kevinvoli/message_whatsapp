@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConversationReport } from './entities/conversation-report.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
 import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
 
 export interface SubmissionResult {
@@ -22,6 +23,8 @@ export class ReportSubmissionService {
     private readonly reportRepo: Repository<ConversationReport>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+    @InjectRepository(Contact)
+    private readonly contactRepo: Repository<Contact>,
     private readonly mirrorService: OrderDossierMirrorWriteService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -38,10 +41,16 @@ export class ReportSubmissionService {
     report.submissionStatus = 'pending';
     await this.reportRepo.save(report);
 
-    const commercial = await this.commercialRepo.findOne({
-      where: { id: commercialId },
-      select: ['name', 'phone', 'email'],
-    });
+    const [commercial, contact] = await Promise.all([
+      this.commercialRepo.findOne({
+        where:  { id: commercialId },
+        select: ['name', 'phone', 'email'],
+      }),
+      this.contactRepo.findOne({
+        where:  { chat_id: chatId },
+        select: ['id'],
+      }),
+    ]);
 
     const now = new Date();
 
@@ -49,7 +58,7 @@ export class ReportSubmissionService {
       await this.mirrorService.upsertDossier({
         messagingChatId:  chatId,
         commercialIdDb1:  commercialId,
-        contactIdDb1:     report.chatId, // résolution par chatId si nécessaire
+        contactIdDb1:     contact?.id ?? null,   // Contact.id (UUID DB1) → ClientIdentityMapping → id_client DB2
         clientName:       report.clientName,
         commercialName:   commercial?.name ?? null,
         commercialPhone:  commercial?.phone ?? null,

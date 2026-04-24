@@ -7,6 +7,9 @@ import { useChatStore } from '@/store/chatStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
+/** Seuil à partir duquel les priorités sont considérées critiques. */
+const PRIORITY_CRITICAL_THRESHOLD = 3;
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface MissedCall {
@@ -43,8 +46,20 @@ export default function PrioritePostePanel() {
       fetch(`${API_URL}/call-logs/mine/missed`, { credentials: 'include' }).then((r) => r.ok ? r.json() as Promise<MissedCall[]> : []),
       fetch(`${API_URL}/chats/mine/unanswered`, { credentials: 'include' }).then((r) => r.ok ? r.json() as Promise<UnansweredChat[]> : []),
     ]);
-    if (missed.status === 'fulfilled') setMissedCalls(missed.value);
-    if (unans.status  === 'fulfilled') setUnanswered(unans.value);
+
+    const missedList = missed.status === 'fulfilled' ? missed.value : [];
+    const unansList  = unans.status  === 'fulfilled' ? unans.value  : [];
+
+    setMissedCalls(missedList);
+    setUnanswered(unansList);
+
+    // Notifier les autres composants du niveau de criticité
+    const total = missedList.length + unansList.length;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('poste:priority-update', {
+        detail: { total, isCritical: total >= PRIORITY_CRITICAL_THRESHOLD },
+      }));
+    }
   }, []);
 
   useEffect(() => {
