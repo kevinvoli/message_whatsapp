@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConversationClosureService } from './conversation-closure.service';
@@ -18,5 +18,21 @@ export class ConversationClosureController {
     @Request() req: { user: JwtUser },
   ) {
     return this.closureService.validateClosure(chatId, req.user.userId);
+  }
+
+  @Post(':chatId/close')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Ferme définitivement la conversation après validation des conditions métier' })
+  async closeConversation(
+    @Param('chatId') chatId: string,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.closureService.closeConversation(chatId, req.user.userId);
+  }
+
+  @Get('admin/closure-stats')
+  @ApiOperation({ summary: 'Statistiques des tentatives de fermeture bloquées (admin)' })
+  async closureStats() {
+    return this.closureService.getClosureStats();
   }
 }

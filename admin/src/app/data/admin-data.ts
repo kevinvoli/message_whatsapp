@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -107,6 +107,13 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Sparkles,
     items: [
       { id: 'ia-governance', name: 'Gouvernance IA', icon: Sparkles, badge: 'NEW' },
+    ],
+  },
+  {
+    label: 'GICOP',
+    icon: Stethoscope,
+    items: [
+      { id: 'gicop-supervision', name: 'Supervision GICOP', icon: Stethoscope, badge: 'P0' },
     ],
   },
 ];

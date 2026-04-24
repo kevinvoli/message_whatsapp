@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
 
@@ -30,15 +30,24 @@ export default function UserHeader({
 }: UserHeaderProps) {
     
     const searchRef = useRef<HTMLInputElement>(null);
+    const [reminderCount, setReminderCount] = useState(0);
 
     const handleViewChange = (mode: ViewMode) => {
+        if (mode === 'relances') setReminderCount(0);
         onViewModeChange?.(mode);
     };
 
     useEffect(() => {
         const handler = () => searchRef.current?.focus();
         document.addEventListener('app:focus-search', handler);
-        return () => document.removeEventListener('app:focus-search', handler);
+
+        const reminderHandler = () => setReminderCount((n) => n + 1);
+        window.addEventListener('followup:reminder', reminderHandler);
+
+        return () => {
+            document.removeEventListener('app:focus-search', handler);
+            window.removeEventListener('followup:reminder', reminderHandler);
+        };
     }, []);
 
     return (
@@ -105,13 +114,20 @@ export default function UserHeader({
                     </button>
                     <button
                         onClick={() => handleViewChange('relances')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
+                        className={`flex-1 relative flex items-center justify-center gap-2 py-2 px-2 rounded-md transition-all ${
                             viewMode === 'relances'
                                 ? 'bg-white text-green-700 shadow-md font-medium'
                                 : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
                         }`}
                     >
-                        <Bell className="w-4 h-4" />
+                        <div className="relative">
+                            <Bell className="w-4 h-4" />
+                            {reminderCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                                    {reminderCount > 9 ? '9+' : reminderCount}
+                                </span>
+                            )}
+                        </div>
                         <span className="text-xs">Relances</span>
                     </button>
                     <button

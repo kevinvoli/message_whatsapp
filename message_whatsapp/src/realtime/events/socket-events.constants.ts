@@ -52,6 +52,8 @@ export const CHAT_EVENT_TYPES = {
   RATE_LIMITED:               'RATE_LIMITED',
   TYPING_START:               'TYPING_START',
   TYPING_STOP:                'TYPING_STOP',
+  // Relances
+  FOLLOW_UP_REMINDER:         'FOLLOW_UP_REMINDER',
 } as const;
 
 export type ChatEventType = typeof CHAT_EVENT_TYPES[keyof typeof CHAT_EVENT_TYPES];

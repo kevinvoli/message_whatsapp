@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhatsappChat, WhatsappChatStatus, ConversationResult } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationReport } from 'src/gicop-report/entities/conversation-report.entity';
 import { FollowUp, FollowUpStatus } from 'src/follow-up/entities/follow_up.entity';
@@ -39,9 +40,10 @@ export class ConversationClosureService {
     private readonly followUpRepo: Repository<FollowUp>,
     @InjectRepository(ClosureAttemptLog)
     private readonly logRepo: Repository<ClosureAttemptLog>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async validateClosure(chatId: string, commercialId?: string): Promise<ClosureReadiness> {
+  async validateClosure(chatId: string, commercialId?: string, logAttempt = true): Promise<ClosureReadiness> {
     const blockers: ClosureBlocker[] = [];
 
     const [chat, report] = await Promise.all([
@@ -95,9 +97,61 @@ export class ConversationClosureService {
 
     const ok = blockers.length === 0;
 
-    void this.logAttempt(chatId, commercialId ?? null, blockers, !ok);
+    if (logAttempt) {
+      void this.logAttempt(chatId, commercialId ?? null, blockers, !ok);
+    }
 
     return { ok, blockers };
+  }
+
+  async closeConversation(chatId: string, commercialId: string): Promise<{ ok: boolean }> {
+    const readiness = await this.validateClosure(chatId, commercialId, false);
+    if (!readiness.ok) {
+      throw new BadRequestException({ message: 'Fermeture bloquée', blockers: readiness.blockers });
+    }
+
+    await this.chatRepo.update({ chat_id: chatId }, { status: WhatsappChatStatus.FERME });
+    void this.logAttempt(chatId, commercialId, [], false);
+    this.eventEmitter.emit('conversation.closed', { chatId, commercialId });
+
+    this.logger.log(`Conversation fermée: chat=${chatId} commercial=${commercialId}`);
+    return { ok: true };
+  }
+
+  async getClosureStats(limit = 100): Promise<{
+    blockedCount: number;
+    blockerSummary: Record<string, number>;
+    recentAttempts: Array<{
+      chatId: string;
+      commercialId: string | null;
+      blockers: object | null;
+      createdAt: Date;
+    }>;
+  }> {
+    const attempts = await this.logRepo.find({
+      where: { wasBlocked: 1 },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+
+    const blockerSummary: Record<string, number> = {};
+    for (const attempt of attempts) {
+      const list = (attempt.blockers as Array<{ code: string }>) ?? [];
+      for (const b of list) {
+        blockerSummary[b.code] = (blockerSummary[b.code] ?? 0) + 1;
+      }
+    }
+
+    return {
+      blockedCount: attempts.length,
+      blockerSummary,
+      recentAttempts: attempts.map((a) => ({
+        chatId: a.chatId,
+        commercialId: a.commercialId,
+        blockers: a.blockers,
+        createdAt: a.createdAt,
+      })),
+    };
   }
 
   private async logAttempt(

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -66,5 +67,18 @@ export class ConversationReportController {
   @ApiOperation({ summary: 'Statut de soumission du rapport' })
   submissionStatus(@Param('chatId') chatId: string) {
     return this.submissionService.getSubmissionStatus(chatId);
+  }
+
+  @Get('admin/failed-submissions')
+  @ApiOperation({ summary: 'Liste des rapports en échec de soumission (admin)' })
+  failedSubmissions() {
+    return this.submissionService.getFailedReports();
+  }
+
+  @Post('admin/:chatId/retry')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Relance la soumission d\'un rapport en échec (admin)' })
+  retrySubmission(@Param('chatId') chatId: string) {
+    return this.submissionService.retryReport(chatId);
   }
 }

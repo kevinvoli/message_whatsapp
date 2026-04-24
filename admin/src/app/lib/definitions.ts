@@ -65,7 +65,9 @@ export type ViewMode =
   // Ranking (4.7)
   | 'ranking'
   // IA Gouvernance (CDC IA)
-  | 'ia-governance';
+  | 'ia-governance'
+  // GICOP — Supervision fermetures + rapports
+  | 'gicop-supervision';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

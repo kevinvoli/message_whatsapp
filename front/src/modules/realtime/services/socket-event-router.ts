@@ -204,6 +204,32 @@ export function handleChatEvent(
       break;
     }
 
+    // Rappel relance à échéance
+    case 'FOLLOW_UP_REMINDER': {
+      const reminder = data.payload as {
+        commercial_id: string;
+        follow_up_id: string;
+        scheduled_at: string;
+        type: string;
+      };
+      if (reminder.commercial_id !== userId) break;
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('followup:reminder', { detail: reminder }));
+        if (document.hidden && Notification.permission === 'granted') {
+          const notif = new Notification('Relance à échéance', {
+            body: `Une relance (${reminder.type}) est arrivée à échéance`,
+            icon: '/favicon.ico',
+            tag: `followup-${reminder.follow_up_id}`,
+          });
+          notif.onclick = () => { window.focus(); notif.close(); };
+        } else if (document.hidden && Notification.permission === 'default') {
+          void Notification.requestPermission();
+        }
+      }
+      break;
+    }
+
     // Clôture bloquée (rapport GICOP incomplet ou dossier client incomplet)
     case 'CONVERSATION_CLOSE_BLOCKED': {
       const blockedPayload = data.payload as { chat_id?: string; reason?: string };

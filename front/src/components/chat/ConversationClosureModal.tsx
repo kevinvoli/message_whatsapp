@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle, Loader2, X, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, X, XCircle, AlertTriangle } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -31,9 +31,10 @@ const CODE_ACTIONS: Record<string, string> = {
 };
 
 export default function ConversationClosureModal({ chatId, onConfirm, onCancel }: Props) {
-  const [readiness, setReadiness] = useState<ClosureReadiness | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [readiness, setReadiness]   = useState<ClosureReadiness | null>(null);
+  const [loading, setLoading]       = useState(true);
   const [confirming, setConfirming] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,8 +50,20 @@ export default function ConversationClosureModal({ chatId, onConfirm, onCancel }
   const handleConfirm = async () => {
     if (!readiness?.ok) return;
     setConfirming(true);
+    setCloseError(null);
     try {
+      const res = await fetch(`${API_URL}/conversations/${chatId}/close`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string };
+        setCloseError(body.message ?? 'Erreur lors de la fermeture');
+        return;
+      }
       onConfirm();
+    } catch {
+      setCloseError('Erreur réseau — réessayez');
     } finally {
       setConfirming(false);
     }
@@ -114,21 +127,29 @@ export default function ConversationClosureModal({ chatId, onConfirm, onCancel }
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={loading || !readiness?.ok || confirming}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {confirming && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Fermer la conversation
-          </button>
+        <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+          {closeError && (
+            <div className="flex items-center gap-2 p-2.5 bg-red-50 border border-red-100 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-xs text-red-700">{closeError}</p>
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => void handleConfirm()}
+              disabled={loading || !readiness?.ok || confirming}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {confirming && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Fermer la conversation
+            </button>
+          </div>
         </div>
       </div>
     </div>

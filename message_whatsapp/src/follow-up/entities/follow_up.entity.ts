@@ -57,6 +57,9 @@ export class FollowUp {
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completed_at?: Date | null;
 
+  @Column({ name: 'reminded_at', type: 'timestamp', nullable: true, default: null })
+  reminded_at?: Date | null;
+
   @Column({ name: 'result', type: 'varchar', length: 255, nullable: true })
   result?: string | null;
 

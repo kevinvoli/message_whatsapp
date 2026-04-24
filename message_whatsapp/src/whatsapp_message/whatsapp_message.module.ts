@@ -47,6 +47,7 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WindowModule } from 'src/window/window.module';
 import { WindowPublisher } from 'src/realtime/publishers/window.publisher';
+import { FollowUpPublisher } from 'src/realtime/publishers/follow-up.publisher';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
@@ -113,6 +114,7 @@ import { ConversationClosureModule } from 'src/conversation-closure/conversation
     ConversationPublisher,
     QueuePublisher,
     WindowPublisher,
+    FollowUpPublisher,
     AgentConnectionService,
     ChannelProviderRegistry,
     ResolveTenantUseCase,

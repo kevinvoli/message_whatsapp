@@ -43,6 +43,7 @@ import SystemHealthView from '@/app/ui/SystemHealthView';
 import IntegrationView from '@/app/ui/IntegrationView';
 import RankingView from '@/app/ui/RankingView';
 import AiGovernanceView from '@/app/ui/AiGovernanceView';
+import GicopSupervisionView from '@/app/ui/GicopSupervisionView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -207,6 +208,8 @@ export default function AdminDashboard() {
                 return <CapacityView />;
             case 'ia-governance':
                 return <AiGovernanceView />;
+            case 'gicop-supervision':
+                return <GicopSupervisionView />;
             default:
                 return null;
         }
