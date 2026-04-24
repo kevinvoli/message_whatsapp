@@ -2,5 +2,52 @@
   "github.copilot.enable": {
     "typescript": true,
     "*": false
-  }
+  },
+  "sqltools.connections": [
+    {
+      "mysqlOptions": {
+        "authProtocol": "default",
+        "enableSsl": "Disabled"
+      },
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 3306,
+      "driver": "MySQL",
+      "name": "wha^pi",
+      "database": "whatsappflow",
+      "username": "root",
+      "password": ""
+    },
+    {
+      "mysqlOptions": {
+        "authProtocol": "default",
+        "enableSsl": "Disabled"
+      },
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "148.230.112.175",
+      "port": 3306,
+      "driver": "MySQL",
+      "name": "production",
+      "database": "whatsappflow",
+      "username": "root",
+      "password": "kevinVoli"
+    },
+    {
+      "mysqlOptions": {
+        "authProtocol": "default",
+        "enableSsl": "Disabled"
+      },
+      "ssh": "Disabled",
+      "previewLimit": 500,
+      "server": "23.88.69.107",
+      "port": 3306,
+      "driver": "MySQL",
+      "name": "gicops",
+      "database": "gicopnet_gicop_optimise",
+      "username": "gicopnet_didier",
+      "password": "Jojose1988"
+    }
+  ]
 }

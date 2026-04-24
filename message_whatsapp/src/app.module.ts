@@ -74,6 +74,11 @@ import { CatalogModule } from './catalog/catalog.module';
 import { GicopWebhookModule } from './gicop-webhook/gicop-webhook.module';
 import { CallObligationModule } from './call-obligations/call-obligation.module';
 import { ConversationClosureModule } from './conversation-closure/conversation-closure.module';
+import { OrderDbModule } from './order-db/order-db.module';
+import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
+import { OrderCallSyncModule } from './order-call-sync/order-call-sync.module';
+import { OrderWriteModule } from './order-write/order-write.module';
+import { OrderReadModule } from './order-read/order-read.module';
 
 @Module({
   imports: [
@@ -131,6 +136,12 @@ import { ConversationClosureModule } from './conversation-closure/conversation-c
           .min(1)
           .max(240)
           .default(24),
+        // ── Base de données commandes (DB2) — optionnelle ─────────────────────
+        ORDER_DB_HOST:     Joi.string().optional(),
+        ORDER_DB_PORT:     Joi.number().default(3306).optional(),
+        ORDER_DB_USER:     Joi.string().optional(),
+        ORDER_DB_PASSWORD: Joi.string().allow('').optional(),
+        ORDER_DB_NAME:     Joi.string().optional(),
         ADMIN_NAME: Joi.string().optional(),
         ADMIN_EMAIL: Joi.when('NODE_ENV', {
           is: 'production',
@@ -220,6 +231,13 @@ import { ConversationClosureModule } from './conversation-closure/conversation-c
     CallObligationModule,
     // Sprint 1 Backlog prioritaire — Fermeture conversationnelle guidée
     ConversationClosureModule,
+    // Double DB — Connexion base commandes (DB2) + journal de synchronisation
+    OrderDbModule,
+    IntegrationSyncModule,
+    // Epic G — Lecture incrémentale call_logs DB2 → obligations d'appels
+    OrderCallSyncModule,
+    // Epic C — Écriture table miroir DB2 (messaging_client_dossier_mirror)
+    OrderWriteModule,
   ],
   controllers: [AppController],
   providers: [

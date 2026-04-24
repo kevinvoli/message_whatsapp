@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConversationReport } from './entities/conversation-report.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { OrderPlatformSyncService } from './order-platform-sync.service';
+import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
 
 export interface SubmissionResult {
   status: 'sent' | 'failed';
@@ -22,7 +22,7 @@ export class ReportSubmissionService {
     private readonly reportRepo: Repository<ConversationReport>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
-    private readonly syncService: OrderPlatformSyncService,
+    private readonly mirrorService: OrderDossierMirrorWriteService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -44,41 +44,45 @@ export class ReportSubmissionService {
     });
 
     const now = new Date();
-    const result = await this.syncService.send({
-      chat_id:          chatId,
-      commercial_name:  commercial?.name ?? 'Inconnu',
-      commercial_phone: commercial?.phone ?? null,
-      commercial_email: commercial?.email ?? null,
-      client_name:      report.clientName,
-      ville:            report.ville,
-      commune:          report.commune,
-      quartier:         report.quartier,
-      product_category: report.productCategory,
-      client_need:      report.clientNeed,
-      interest_score:   report.interestScore,
-      next_action:      report.nextAction,
-      follow_up_at:     report.followUpAt?.toISOString() ?? null,
-      notes:            report.notes,
-      submitted_at:     now.toISOString(),
-    });
 
-    report.submissionStatus = result.ok ? 'sent' : 'failed';
-    report.submittedAt      = result.ok ? now : null;
-    report.submissionError  = result.error ?? null;
-    await this.reportRepo.save(report);
+    try {
+      await this.mirrorService.upsertDossier({
+        messagingChatId:  chatId,
+        commercialIdDb1:  commercialId,
+        contactIdDb1:     report.chatId, // résolution par chatId si nécessaire
+        clientName:       report.clientName,
+        commercialName:   commercial?.name ?? null,
+        commercialPhone:  commercial?.phone ?? null,
+        commercialEmail:  commercial?.email ?? null,
+        ville:            report.ville,
+        commune:          report.commune,
+        quartier:         report.quartier,
+        productCategory:  report.productCategory,
+        clientNeed:       report.clientNeed,
+        interestScore:    report.interestScore,
+        nextAction:       report.nextAction ?? null,
+        followUpAt:       report.followUpAt,
+        notes:            report.notes,
+      });
 
-    if (result.ok) {
+      report.submissionStatus = 'sent';
+      report.submittedAt      = now;
+      report.submissionError  = null;
       this.eventEmitter.emit('conversation.report.submitted', { chatId, commercialId });
+      this.logger.log(`Rapport soumis en DB2 mirror: chat=${chatId}`);
+    } catch (err) {
+      report.submissionStatus = 'failed';
+      report.submittedAt      = null;
+      report.submissionError  = (err as Error).message;
+      this.logger.error(`Soumission DB2 échouée chat=${chatId}: ${(err as Error).message}`);
     }
 
-    this.logger.log(
-      `Soumission rapport chat=${chatId} commercial=${commercialId} → ${result.ok ? 'OK' : 'ÉCHEC: ' + result.error}`,
-    );
+    await this.reportRepo.save(report);
 
     return {
-      status: report.submissionStatus,
+      status:     report.submissionStatus,
       submittedAt: report.submittedAt,
-      error: report.submissionError,
+      error:      report.submissionError,
     };
   }
 
