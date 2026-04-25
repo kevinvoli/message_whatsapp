@@ -207,6 +207,9 @@ export class WindowRotationService {
     if (!hasWindow) {
       this.logger.log(`Fenêtre non initialisée pour poste ${payload.posteId} — auto-build au dépôt du rapport`);
       await this.buildWindowForPoste(payload.posteId);
+      // Conversations déjà soumises avant le déploiement : leur result_set est déjà
+      // validé en base → les marquer directement VALIDATED sans attendre re-soumission.
+      await this.syncValidatedStatusAfterBuild(payload.posteId);
     }
 
     // Mode glissant : moteur de validation + rotation éventuelle
@@ -451,6 +454,42 @@ export class WindowRotationService {
     } finally {
       this.rotatingPostes.delete(posteId);
     }
+  }
+
+  /**
+   * Après un auto-build, marque immédiatement VALIDATED les conversations dont
+   * tous les critères requis sont déjà satisfaits (soumises avant le déploiement
+   * du mode fenêtre glissante). Permet à la rotation de partir dès la 1ère re-soumission
+   * quand le commercial avait déjà rempli ses 10 rapports.
+   */
+  private async syncValidatedStatusAfterBuild(posteId: string): Promise<void> {
+    const activeChats = await this.chatRepo.find({
+      where: { poste_id: posteId, window_status: WindowStatus.ACTIVE },
+      select: ['id', 'chat_id'],
+    });
+    if (activeChats.length === 0) return;
+
+    const statesMap = await this.validationEngine.getValidationStatesBulk(
+      activeChats.map((c) => c.chat_id),
+    );
+
+    const toValidate = activeChats.filter((c) => {
+      const states = statesMap.get(c.chat_id) ?? [];
+      const required = states.filter((s) => s.required);
+      return required.length > 0 && required.every((s) => s.validated);
+    });
+
+    if (toValidate.length === 0) return;
+
+    await Promise.all(
+      toValidate.map((c) =>
+        this.chatRepo.update({ id: c.id }, { window_status: WindowStatus.VALIDATED }),
+      ),
+    );
+
+    this.logger.log(
+      `syncValidatedStatusAfterBuild: ${toValidate.length}/${activeChats.length} conv(s) déjà soumises → VALIDATED pour poste ${posteId}`,
+    );
   }
 
   /**
