@@ -63,6 +63,12 @@ export class CallObligationService {
     private readonly posteRepo: Repository<WhatsappPoste>,
   ) {}
 
+  // ── Feature flag ─────────────────────────────────────────────────────────
+
+  isEnabled(): boolean {
+    return process.env['FF_CALL_OBLIGATIONS_ENABLED'] === 'true';
+  }
+
   // ── Gestion du batch actif ──────────────────────────────────────────────
 
   async getOrCreateActiveBatch(posteId: string): Promise<CommercialObligationBatch> {
@@ -131,6 +137,10 @@ export class CallObligationService {
     durationSeconds: number | null;
     posteId?: string | null;
   }): Promise<{ matched: boolean; taskId?: string; reason?: string }> {
+
+    if (!this.isEnabled()) {
+      return { matched: false, reason: 'feature_disabled' };
+    }
 
     // 1. Vérifier la durée minimale
     if (!params.durationSeconds || params.durationSeconds < MIN_CALL_DURATION_SECONDS) {
@@ -237,6 +247,7 @@ export class CallObligationService {
   // ── Postes avec batch actif ──────────────────────────────────────────────
 
   async getActivePosteIds(): Promise<string[]> {
+    if (!this.isEnabled()) return [];
     const batches = await this.batchRepo.find({
       where: { status: BatchStatus.PENDING },
       select: ['posteId'],

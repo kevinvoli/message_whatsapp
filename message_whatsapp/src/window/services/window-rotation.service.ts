@@ -51,7 +51,7 @@ export class WindowRotationService {
     }
 
     // S'assurer qu'un batch d'obligations est actif pour ce poste
-    if (this.obligationService) {
+    if (this.obligationService?.isEnabled()) {
       await this.obligationService.getOrCreateActiveBatch(posteId);
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
@@ -298,7 +298,7 @@ export class WindowRotationService {
 
     // ── Contrôle qualité messages (S6-004) ────────────────────────────────
     // Le commercial doit avoir le dernier message sur toutes les conversations actives
-    if (this.obligationService) {
+    if (this.obligationService?.isEnabled()) {
       const qualityPassed = await this.obligationService.checkAndRecordQuality(posteId, activeGroup);
       if (!qualityPassed) {
         this.logger.warn(
@@ -310,7 +310,7 @@ export class WindowRotationService {
 
     // ── Obligations d'appels (S6-001/S6-002/S6-003) ───────────────────────
     // 5 appels annulés + 5 livrés + 5 sans commande ≥ 90s chacun
-    if (this.obligationService) {
+    if (this.obligationService?.isEnabled()) {
       const ready = await this.obligationService.isPosteReadyForRotation(posteId);
       if (!ready) {
         const status = await this.obligationService.getStatus(posteId);
@@ -419,7 +419,7 @@ export class WindowRotationService {
       );
 
       // Créer le prochain batch d'obligations pour ce poste
-      if (this.obligationService) {
+      if (this.obligationService?.isEnabled()) {
         await this.obligationService.getOrCreateActiveBatch(posteId);
       }
 

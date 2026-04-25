@@ -230,19 +230,13 @@ export function handleChatEvent(
       break;
     }
 
-    // Clôture bloquée (rapport GICOP incomplet ou dossier client incomplet)
+    // Clôture bloquée (rapport de conversation incomplet)
     case 'CONVERSATION_CLOSE_BLOCKED': {
       const blockedPayload = data.payload as { chat_id?: string; reason?: string };
       if (typeof window !== 'undefined') {
-        if (blockedPayload.reason === 'GICOP_REPORT_INCOMPLETE') {
-          window.dispatchEvent(
-            new CustomEvent('gicop:close-blocked', { detail: { chatId: blockedPayload.chat_id } }),
-          );
-        } else if (blockedPayload.reason === 'DOSSIER_INCOMPLET') {
-          window.dispatchEvent(
-            new CustomEvent('dossier:close-blocked', { detail: { chatId: blockedPayload.chat_id } }),
-          );
-        }
+        window.dispatchEvent(
+          new CustomEvent('gicop:close-blocked', { detail: { chatId: blockedPayload.chat_id } }),
+        );
       }
       logger.warn('Conversation close blocked', blockedPayload);
       break;

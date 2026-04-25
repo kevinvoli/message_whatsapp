@@ -12,6 +12,7 @@ export interface ConfigEntry {
   description?: string;
   isSecret?: boolean;
   isReadonly?: boolean;
+  defaultValue?: string;
 }
 
 export interface WebhookEntry {
@@ -49,6 +50,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'WINDOW_EXTERNAL_TIMEOUT_HOURS', label: 'Timeout critère externe (h)', category: 'feature_flags', description: 'Heures avant auto-validation du critère call_confirmed si absent (0 = désactivé)' },
   { key: 'FF_STICKY_ASSIGNMENT', label: 'Sticky assignment (affinité client→poste)', category: 'feature_flags', description: 'true / false — réaffecte un contact à son dernier poste si celui-ci est disponible' },
   { key: 'FF_GICOP_REPORT_REQUIRED', label: 'Rapport GICOP obligatoire à la clôture', category: 'feature_flags', description: 'true / false — bloque la clôture si le rapport GICOP est incomplet' },
+  { key: 'FF_CALL_OBLIGATIONS_ENABLED', label: 'Obligations d\'appels GICOP', category: 'feature_flags', description: 'true / false — active les obligations d\'appels quotidiens (5 annulés + 5 livrés + 5 sans commande ≥ 90s) et bloque la rotation si incomplètes', defaultValue: 'false' },
 
   // ─── Intégration ERP ─────────────────────────────────────────────────────────
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
@@ -153,7 +155,7 @@ export class SystemConfigService implements OnApplicationBootstrap {
       const existing = await this.repo.findOne({ where: { configKey: entry.key } });
       if (existing) continue;
 
-      const envValue = process.env[entry.key] ?? null;
+      const envValue = process.env[entry.key] ?? entry.defaultValue ?? null;
       await this.repo.save(
         this.repo.create({
           configKey: entry.key,

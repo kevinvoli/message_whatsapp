@@ -350,26 +350,13 @@ export class WhatsappMessageGateway
           return;
         }
       } else if (newStatus === WhatsappChatStatus.FERME) {
-        // Fallback si le service n'est pas disponible — vérifications legacy
-        if (this.reportService && this.systemConfigService) {
-          const gicoRequired = (await this.systemConfigService.get('FF_GICOP_REPORT_REQUIRED')) === 'true';
-          if (gicoRequired) {
-            const complete = await this.reportService.isReportComplete(chatId);
-            if (!complete) {
-              client.emit('chat:event', {
-                type: 'CONVERSATION_CLOSE_BLOCKED',
-                payload: { chat_id: chatId, reason: 'GICOP_REPORT_INCOMPLETE' },
-              });
-              return;
-            }
-          }
-        }
-        if (this.dossierService) {
-          const dossierComplete = await this.dossierService.isDossierComplete(chatId);
-          if (!dossierComplete) {
+        // Fallback si le service n'est pas disponible — vérification legacy rapport
+        if (this.reportService) {
+          const complete = await this.reportService.isReportComplete(chatId);
+          if (!complete) {
             client.emit('chat:event', {
               type: 'CONVERSATION_CLOSE_BLOCKED',
-              payload: { chat_id: chatId, reason: 'DOSSIER_INCOMPLET' },
+              payload: { chat_id: chatId, reason: 'RAPPORT_INCOMPLET' },
             });
             return;
           }

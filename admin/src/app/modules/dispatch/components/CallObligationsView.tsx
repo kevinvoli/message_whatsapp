@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Phone, CheckCircle, AlertTriangle, RefreshCw, XCircle } from 'lucide-react';
+import { Phone, CheckCircle, AlertTriangle, RefreshCw, XCircle, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
+import { getSystemConfigs, updateSystemConfig } from '@/app/lib/api/system-config.api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+const FLAG_KEY = 'FF_CALL_OBLIGATIONS_ENABLED';
 
 interface CategoryProgress { done: number; required: number; }
 
@@ -35,6 +38,16 @@ async function fetchObligation(posteId: string): Promise<ObligationStatus | null
 export default function CallObligationsView({ postes }: { postes: { id: string; name: string }[] }) {
   const [rows, setRows] = useState<PosteRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [toggling, setToggling] = useState(false);
+
+  const loadFlag = useCallback(async () => {
+    try {
+      const configs = await getSystemConfigs();
+      const entry = configs.find((c) => c.configKey === FLAG_KEY);
+      setEnabled(entry?.configValue === 'true');
+    } catch { /* silencieux */ }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +62,22 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
     setLoading(false);
   }, [postes]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void loadFlag();
+    void load();
+  }, [load, loadFlag]);
+
+  const handleToggle = async () => {
+    if (toggling || enabled === null) return;
+    setToggling(true);
+    try {
+      const newValue = !enabled;
+      await updateSystemConfig(FLAG_KEY, String(newValue));
+      setEnabled(newValue);
+    } catch { /* silencieux */ } finally {
+      setToggling(false);
+    }
+  };
 
   const statusIcon = (done: number, req: number) =>
     done >= req
@@ -63,11 +91,39 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
           <Phone className="w-5 h-5 text-orange-600" />
           <h3 className="text-base font-bold text-gray-900">Obligations d'appels GICOP</h3>
         </div>
-        <button onClick={() => void load()} disabled={loading}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Toggle ON/OFF */}
+          <button
+            onClick={() => void handleToggle()}
+            disabled={toggling || enabled === null}
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+              enabled
+                ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100'
+                : 'bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100'
+            } disabled:opacity-50`}
+          >
+            {toggling
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : enabled
+              ? <ToggleRight className="w-4 h-4" />
+              : <ToggleLeft className="w-4 h-4" />
+            }
+            {enabled ? 'Activé' : 'Désactivé'}
+          </button>
+
+          <button onClick={() => void load()} disabled={loading}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
+
+      {!enabled && enabled !== null && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          Les obligations d'appels sont désactivées — la rotation n'est pas bloquée.
+        </div>
+      )}
 
       <p className="text-xs text-gray-500">
         Chaque commercial doit effectuer 15 appels (5 commandes annulées + 5 livrées + 5 sans commande) ≥ 1min30 avant la prochaine rotation.
@@ -93,7 +149,9 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
                 return (
                   <tr key={row.posteId} className="bg-white">
                     <td className="px-4 py-3 font-medium text-gray-700">{row.posteName}</td>
-                    <td colSpan={6} className="px-4 py-3 text-center text-gray-400 text-xs">Aucun batch actif</td>
+                    <td colSpan={6} className="px-4 py-3 text-center text-gray-400 text-xs">
+                      {enabled ? 'Aucun batch actif' : 'Désactivé'}
+                    </td>
                   </tr>
                 );
               }

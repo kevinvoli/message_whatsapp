@@ -22,8 +22,9 @@ const GICOP_CRON_RULES: { key: string; recetteEnabled: boolean; label: string; r
 
 const GICOP_FLAG_RULES: { key: string; expectedValue: string; label: string; reason: string }[] = [
   { key: 'FF_STICKY_ASSIGNMENT',     expectedValue: 'true', label: 'Sticky assignment',        reason: 'Réaffectation client fidèle — obligatoire GICOP' },
-  { key: 'FF_GICOP_REPORT_REQUIRED', expectedValue: 'true', label: 'Rapport GICOP obligatoire', reason: 'Bloque la clôture si le rapport GICOP est incomplet' },
-  { key: 'SLIDING_WINDOW_ENABLED',   expectedValue: 'true', label: 'Fenêtre glissante',         reason: 'Mode bloc de 10 conversations — obligatoire GICOP' },
+  { key: 'FF_GICOP_REPORT_REQUIRED',      expectedValue: 'true', label: 'Rapport GICOP obligatoire', reason: 'Bloque la clôture si le rapport GICOP est incomplet' },
+  { key: 'SLIDING_WINDOW_ENABLED',        expectedValue: 'true', label: 'Fenêtre glissante',          reason: 'Mode bloc de 10 conversations — obligatoire GICOP' },
+  { key: 'FF_CALL_OBLIGATIONS_ENABLED',   expectedValue: 'true', label: 'Obligations d\'appels',      reason: 'Bloque la rotation si les 15 appels GICOP sont incomplets (5 annulés + 5 livrés + 5 sans commande ≥ 90s)' },
 ];
 
 type Props = {

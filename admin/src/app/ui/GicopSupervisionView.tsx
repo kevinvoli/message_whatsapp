@@ -44,11 +44,7 @@ interface FailedReport {
 // ─── Labels ────────────────────────────────────────────────────────────────────
 
 const BLOCKER_LABELS: Record<string, string> = {
-  RAPPORT_INCOMPLET:            'Rapport GICOP incomplet',
-  RESULTAT_MANQUANT:            'Résultat de conversation manquant',
-  PROCHAINE_ACTION_MANQUANTE:   'Prochaine action manquante',
-  RELANCE_REQUISE:              'Relance non planifiée',
-  DOSSIER_INCOMPLET:            'Dossier client incomplet',
+  RAPPORT_INCOMPLET: 'Rapport de conversation incomplet',
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

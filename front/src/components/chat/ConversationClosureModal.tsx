@@ -23,11 +23,7 @@ interface Props {
 }
 
 const CODE_ACTIONS: Record<string, string> = {
-  RAPPORT_INCOMPLET:          'Compléter le rapport GICOP (onglet dossier)',
-  RESULTAT_MANQUANT:          'Renseigner le résultat de la conversation',
-  PROCHAINE_ACTION_MANQUANTE: 'Indiquer la prochaine action dans le rapport',
-  RELANCE_REQUISE:            'Planifier une relance via le panneau relances',
-  DOSSIER_INCOMPLET:          'Compléter le dossier client',
+  RAPPORT_INCOMPLET: 'Compléter le rapport de la conversation (onglet dossier)',
 };
 
 export default function ConversationClosureModal({ chatId, onConfirm, onCancel }: Props) {
