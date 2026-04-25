@@ -91,6 +91,22 @@ const toDossier = (raw: any): Dossier => ({
   notes:               raw?.notes               ?? null,
 });
 
+// Mappe les champs Dossier (ClientDossier) vers ConversationReport.
+// fullName → clientName est la seule différence de nom.
+const toReportDto = (d: Dossier) => ({
+  clientName:          d.fullName,
+  ville:               d.ville,
+  commune:             d.commune,
+  quartier:            d.quartier,
+  productCategory:     d.productCategory,
+  clientNeed:          d.clientNeed,
+  interestScore:       d.interestScore,
+  isMaleNotInterested: d.isMaleNotInterested,
+  followUpAt:          d.followUpAt,
+  nextAction:          d.nextAction,
+  notes:               d.notes,
+});
+
 interface Props { chatId: string; onClose: () => void; }
 
 export default function GicopReportPanel({ chatId, onClose }: Props) {
@@ -151,6 +167,12 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         method: 'POST',
         credentials: 'include',
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { message?: string };
+        setSubmissionStatus('failed');
+        setSubmissionError(err.message ?? `Erreur HTTP ${res.status}`);
+        return;
+      }
       const data = await res.json() as { status: SubmissionStatus; error: string | null };
       setSubmissionStatus(data.status);
       setSubmissionError(data.error ?? null);
@@ -168,12 +190,22 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
     setSaving(true);
     setSaved(false);
     try {
-      const res = await fetch(`${API_URL}/clients/by-chat/${chatId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(toDossier(dossier)),
-      });
+      const [res] = await Promise.all([
+        fetch(`${API_URL}/clients/by-chat/${chatId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(toDossier(dossier)),
+        }),
+        // Alimente aussi ConversationReport pour que submitReport() trouve les données complètes.
+        // fullName (ClientDossier) est envoyé en tant que clientName (ConversationReport).
+        fetch(`${API_URL}/gicop-report/${chatId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(toReportDto(dossier)),
+        }),
+      ]);
       if (res.ok) {
         const updated = await res.json() as { dossier: unknown };
         if (updated.dossier) setDossier(toDossier(updated.dossier));

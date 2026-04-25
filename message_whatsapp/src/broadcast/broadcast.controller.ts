@@ -23,6 +23,7 @@ import { AdminGuard } from 'src/auth/admin.guard';
 export class BroadcastController {
   constructor(private readonly service: BroadcastService) {}
 
+  
   @Post()
   create(@Body() dto: CreateBroadcastDto) {
     return this.service.create(dto);
