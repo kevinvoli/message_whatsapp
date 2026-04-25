@@ -99,6 +99,18 @@ export class WindowController {
   }
 
   /**
+   * Déclenche la vérification de rotation (soft) pour un poste bloqué — admin.
+   * Ne force pas la rotation : exécute la même logique que la soumission de rapport.
+   * POST /window/rotate-check/:posteId
+   */
+  @Post('rotate-check/:posteId')
+  @UseGuards(AdminGuard)
+  async triggerRotationCheck(@Param('posteId') posteId: string) {
+    await this.windowRotation.checkAndTriggerRotation(posteId);
+    return { ok: true };
+  }
+
+  /**
    * Reconstruit la fenêtre d'un poste depuis zéro — admin.
    * POST /window/rebuild/:posteId
    */

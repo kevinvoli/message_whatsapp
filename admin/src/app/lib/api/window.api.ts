@@ -53,6 +53,15 @@ export async function getConversationValidationState(chatId: string): Promise<Co
   );
 }
 
+export async function triggerRotationCheck(posteId: string): Promise<{ ok: boolean }> {
+  return handleResponse(
+    await fetch(`${API_BASE_URL}/window/rotate-check/${encodeURIComponent(posteId)}`, {
+      method: 'POST',
+      credentials: 'include',
+    }),
+  );
+}
+
 export async function forceWindowRotation(posteId: string): Promise<{ ok: boolean; releasedChatIds: string[]; promotedChatIds: string[] }> {
   return handleResponse(
     await fetch(`${API_BASE_URL}/window/rotate/${encodeURIComponent(posteId)}`, {

@@ -18,6 +18,7 @@ import {
   getCallEvents,
   updateValidationCriterion,
   forceWindowRotation,
+  triggerRotationCheck,
   rebuildWindow,
   forceValidateConversation,
 } from '../lib/api/window.api';
@@ -99,6 +100,17 @@ export default function CapacityView() {
       setExternalTimeout(result.externalTimeoutHours);
     } finally {
       setTogglingMode(false);
+    }
+  };
+
+  const handleRotationCheck = async (posteId: string) => {
+    setActionPoste(posteId);
+    try {
+      await triggerRotationCheck(posteId);
+      const s = await getCapacitySummary();
+      setSummary(s);
+    } finally {
+      setActionPoste(null);
     }
   };
 
@@ -403,6 +415,14 @@ export default function CapacityView() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleRotationCheck(entry.posteId)}
+                              disabled={isActing}
+                              title="Vérifier les conditions et déclencher la rotation si elles sont remplies"
+                              className="text-xs px-2 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-md transition-colors disabled:opacity-50"
+                            >
+                              ✓ Vérifier
+                            </button>
                             <button
                               onClick={() => handleForceRotation(entry.posteId)}
                               disabled={isActing}

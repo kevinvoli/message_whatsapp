@@ -297,10 +297,7 @@ export class WindowRotationService {
     const modeEnabled = await this.capacityService.isWindowModeEnabled();
     if (!modeEnabled) return;
 
-    const [{ quotaActive }, rawThreshold] = await Promise.all([
-      this.capacityService.getQuotas(),
-      this.capacityService.getValidationThreshold(),
-    ]);
+    const { quotaActive } = await this.capacityService.getQuotas();
 
     const activeGroup = await this.chatRepo.find({
       where: {
@@ -314,54 +311,11 @@ export class WindowRotationService {
 
     const validatedCount = activeGroup.filter((c) => c.window_status === WindowStatus.VALIDATED).length;
 
-    // Seuil de déclenchement : 0 = toutes requises, sinon valeur absolue configurée
-    const requiredCount = rawThreshold > 0
-      ? Math.min(rawThreshold, activeGroup.length)
-      : activeGroup.length;
+    // Seuil = quotaActive (10 par défaut), ou moins si le poste a peu de conversations.
+    // La rotation se déclenche quand tous les slots actifs ont un rapport soumis.
+    const requiredCount = Math.min(quotaActive, activeGroup.length);
 
     if (validatedCount < requiredCount) return;
-
-    // Tolérance minimum si le poste a peu de conversations
-    if (activeGroup.length < quotaActive && activeGroup.length < 3) return;
-
-    // ── Contrôle qualité messages (S6-004) ────────────────────────────────
-    // Le commercial doit avoir le dernier message sur toutes les conversations actives
-    if (this.obligationService?.isEnabled()) {
-      const qualityPassed = await this.obligationService.checkAndRecordQuality(posteId, activeGroup);
-      if (!qualityPassed) {
-        this.logger.warn(
-          `Rotation BLOQUÉE poste ${posteId} — contrôle qualité non passé (commercial doit avoir le dernier message)`,
-        );
-        this.eventEmitter.emit(WINDOW_ROTATION_BLOCKED_EVENT, {
-          posteId,
-          reason: 'quality_check_failed',
-          progress: { validated: validatedCount, total: activeGroup.length },
-        } satisfies WindowRotationBlockedPayload);
-        return;
-      }
-    }
-
-    // ── Obligations d'appels (S6-001/S6-002/S6-003) ───────────────────────
-    // 5 appels annulés + 5 livrés + 5 sans commande ≥ 90s chacun
-    if (this.obligationService?.isEnabled()) {
-      const ready = await this.obligationService.isPosteReadyForRotation(posteId);
-      if (!ready) {
-        const status = await this.obligationService.getStatus(posteId);
-        this.logger.warn(
-          `Rotation BLOQUÉE poste ${posteId} — obligations appels incomplètes: ` +
-          `annulés=${status?.annulee.done}/${status?.annulee.required} ` +
-          `livrés=${status?.livree.done}/${status?.livree.required} ` +
-          `sans-cmd=${status?.sansCommande.done}/${status?.sansCommande.required}`,
-        );
-        this.eventEmitter.emit(WINDOW_ROTATION_BLOCKED_EVENT, {
-          posteId,
-          reason: 'call_obligations_incomplete',
-          progress: { validated: validatedCount, total: activeGroup.length },
-          obligations: status ?? null,
-        } satisfies WindowRotationBlockedPayload);
-        return;
-      }
-    }
 
     this.logger.log(
       `Rotation déclenchée pour poste ${posteId} (${validatedCount}/${activeGroup.length} validées, seuil: ${requiredCount})`,
