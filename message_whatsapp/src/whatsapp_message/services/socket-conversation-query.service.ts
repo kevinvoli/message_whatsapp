@@ -54,6 +54,10 @@ export class SocketConversationQueryService {
     }
 
     if (modeEnabled) {
+      // Exclure les conversations libérées (rotation passée) — elles ont window_slot=null
+      // et window_status=RELEASED, elles ne doivent plus apparaître dans la fenêtre active.
+      chats = chats.filter((c) => c.window_status !== WindowStatus.RELEASED);
+
       // Trier par window_slot ASC (conversations slottées d'abord, puis par activité)
       chats.sort((a, b) => {
         if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;
