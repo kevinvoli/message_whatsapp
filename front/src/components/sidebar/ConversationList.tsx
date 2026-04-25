@@ -64,7 +64,7 @@ export default function ConversationList({
                 {filteredConversations.map((conv) => {
                     const isReleasing = releasingSet.has(conv.chat_id);
                     return (
-                        <div key={conv.id} className={isReleasing ? styles.releasing : undefined}>
+                        <div key={conv.chat_id} className={isReleasing ? styles.releasing : undefined}>
                             <ConversationItem
                                 conversation={conv}
                                 isSelected={selectedConversation?.id === conv.id}

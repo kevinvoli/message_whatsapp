@@ -212,16 +212,15 @@ export class WindowRotationService {
       await this.syncValidatedStatusAfterBuild(payload.posteId);
     }
 
-    // Mode glissant : moteur de validation + rotation éventuelle
-    const allRequiredMet = await this.validationEngine.onConversationResultSet(payload.chatId);
+    // Mode glissant : marquer le critère result_set, puis toujours valider + vérifier la rotation.
+    // La validation n'est pas conditionnée par allRequiredMet : la soumission du rapport suffit
+    // pour marquer la conversation prête à la rotation, quel que soit l'état des autres critères.
+    await this.validationEngine.onConversationResultSet(payload.chatId);
 
-    if (allRequiredMet) {
-      await this.onConversationValidated(payload.chatId, payload.posteId);
-      // Vérification directe de la rotation : couvre les cas où onConversationValidated
-      // est retourné tôt (conversation déjà VALIDATED ou window_status non ACTIVE —
-      // ex: re-soumission). Le guard rotatingPostes empêche tout double-déclenchement.
-      await this.checkAndTriggerRotation(payload.posteId);
-    }
+    await this.onConversationValidated(payload.chatId, payload.posteId);
+    // Vérification directe : couvre la re-soumission (conversation déjà VALIDATED, onConversationValidated
+    // retourné tôt). Le guard rotatingPostes empêche tout double-déclenchement.
+    await this.checkAndTriggerRotation(payload.posteId);
 
     this.eventEmitter.emit(WINDOW_CRITERION_VALIDATED_EVENT, {
       posteId: payload.posteId,

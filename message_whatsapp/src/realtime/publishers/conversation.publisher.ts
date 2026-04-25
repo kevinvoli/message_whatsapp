@@ -161,13 +161,12 @@ export class ConversationPublisher {
     posteId: string | null;
   }): Promise<void> {
     if (!payload.posteId) return;
-    // Retirer immédiatement la conversation du bandeau (avant rotation)
-    this.emitConversationRemoved(payload.chatId, payload.posteId);
+    // Mise à jour du badge uniquement — WINDOW_ROTATED gère le retrait visuel lors de la rotation.
     this.realtimeServer.getServer().to(`poste:${payload.posteId}`).emit('chat:event', {
       type: 'REPORT_SUBMITTED',
       payload: { chat_id: payload.chatId, report_submission_status: 'sent' },
     });
-    this.logger.log(`REPORT_SUBMITTED + CONVERSATION_REMOVED émis pour chat=${payload.chatId} → poste:${payload.posteId}`);
+    this.logger.log(`REPORT_SUBMITTED émis pour chat=${payload.chatId} → poste:${payload.posteId}`);
   }
 
   isAgentConnected(posteId: string, connectedPosteIds: string[]): boolean {
