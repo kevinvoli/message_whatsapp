@@ -76,6 +76,7 @@ export class ConversationReadQueryService {
     limit = 300,
     cursor?: { activityAt: string; chatId: string },
     excludeWindowStatus?: string,
+    prioritizeSlotted = false,
   ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
     const qb = this.chatRepository
       .createQueryBuilder('chat')
@@ -83,9 +84,19 @@ export class ConversationReadQueryService {
       .leftJoinAndSelect('chat.channel', 'channel')
       .where('chat.poste_id = :poste_id', { poste_id })
       .andWhere('chat.deletedAt IS NULL')
-      .orderBy('chat.last_activity_at', 'DESC')
-      .addOrderBy('chat.chat_id', 'DESC')
       .limit(limit + 1); // +1 pour détecter hasMore
+
+    if (prioritizeSlotted) {
+      // En mode fenêtre : les conversations slottées (ACTIVE+LOCKED) passent en tête,
+      // garantissant qu'elles occupent les 50 premiers slots même avec 1000+ conversations.
+      qb.orderBy('CASE WHEN chat.window_slot IS NULL THEN 1 ELSE 0 END', 'ASC')
+        .addOrderBy('chat.window_slot', 'ASC')
+        .addOrderBy('chat.last_activity_at', 'DESC')
+        .addOrderBy('chat.chat_id', 'DESC');
+    } else {
+      qb.orderBy('chat.last_activity_at', 'DESC')
+        .addOrderBy('chat.chat_id', 'DESC');
+    }
 
     if (excludeStatuses.length > 0) {
       qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });

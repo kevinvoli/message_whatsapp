@@ -50,10 +50,11 @@ export class SocketConversationQueryService {
     // les laisser occuper des slots dans le top-50 et évincer les LOCKED (grises).
     let { chats } = await this.chatService.findByPosteId(
       posteId,
-      [],
+      ['fermé', 'converti'],
       50,
       undefined,
       modeEnabled ? WindowStatus.RELEASED : undefined,
+      modeEnabled,
     );
 
     if (tenantIds.length > 0) {

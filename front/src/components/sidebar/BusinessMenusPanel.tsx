@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Briefcase, ChevronDown, Loader2, Phone, RefreshCw } from 'lucide-react';
+import { AlertCircle, Briefcase, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
 
@@ -57,15 +57,6 @@ function ContactCard({ contact, onOpenConversation }: ContactCardProps) {
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {contact.phone && (
-            <a
-              href={`tel:${contact.phone}`}
-              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-              title="Appeler"
-            >
-              <Phone className="w-3.5 h-3.5" />
-            </a>
-          )}
           {contact.chat_id && (
             <button
               onClick={() => onOpenConversation(contact.chat_id!)}

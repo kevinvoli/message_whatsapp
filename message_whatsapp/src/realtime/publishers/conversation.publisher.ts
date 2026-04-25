@@ -152,6 +152,16 @@ export class ConversationPublisher {
   }
 
   /**
+   * Émet CONVERSATION_REMOVED dès qu'une conversation est fermée (manuellement ou auto).
+   * Le frontend retire la conversation du bandeau sans rechargement.
+   */
+  @OnEvent('conversation.closed', { async: true })
+  handleConversationClosed(payload: { chatId: string; posteId: string | null }): void {
+    if (!payload.posteId) return;
+    this.emitConversationRemoved(payload.chatId, payload.posteId);
+  }
+
+  /**
    * Pousse un event REPORT_SUBMITTED au front dès que le rapport est soumis.
    * Le frontend met à jour le badge "rapport envoyé" sans rechargement.
    */

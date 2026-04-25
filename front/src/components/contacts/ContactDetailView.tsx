@@ -534,14 +534,8 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
           <button
-            onClick={() => setShowEditModal(true)}
-            style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontWeight: 600, cursor: 'pointer', background: '#2563eb', color: 'white', fontSize: 14 }}
-          >
-            Appeler le contact
-          </button>
-          <button
             onClick={handleViewConversation}
-            style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontWeight: 600, cursor: 'pointer', background: '#f3f4f6', color: '#111827', fontSize: 14 }}
+            style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontWeight: 600, cursor: 'pointer', background: '#2563eb', color: 'white', fontSize: 14 }}
           >
             Voir la conversation
           </button>

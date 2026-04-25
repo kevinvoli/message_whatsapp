@@ -221,15 +221,8 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
         {/* Actions */}
         <div className="flex gap-3 mt-5">
           <button
-            onClick={onEditClick}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-          >
-            <Phone className="w-4 h-4" />
-            Appeler le contact
-          </button>
-          <button
             onClick={onViewConversation}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-800 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
           >
             <MessageSquare className="w-4 h-4" />
             Voir la conversation
