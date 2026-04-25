@@ -64,10 +64,10 @@ export class ConversationClosureService {
       throw new BadRequestException({ message: 'Fermeture bloquée', blockers: readiness.blockers });
     }
 
-    // Charger le résultat de conversation avant la fermeture (pour le payload d'événement)
+    // Charger le résultat et le poste avant la fermeture (pour le payload d'événement)
     const chat = await this.chatRepo.findOne({
       where:  { chat_id: chatId },
-      select: ['conversation_result'],
+      select: ['conversation_result', 'poste_id'],
     });
 
     await this.chatRepo.update({ chat_id: chatId }, { status: WhatsappChatStatus.FERME });
@@ -77,6 +77,7 @@ export class ConversationClosureService {
     this.eventEmitter.emit('conversation.closed', {
       chatId,
       commercialId,
+      posteId:            chat?.poste_id ?? null,
       conversationResult: chat?.conversation_result ?? null,
       closedAt,
     });

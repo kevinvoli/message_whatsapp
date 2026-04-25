@@ -51,6 +51,7 @@ import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { AgentConnectionService } from 'src/realtime/connections/agent-connection.service';
 import { transitionStatus } from 'src/conversations/domain/conversation-state-machine';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import { ClientDossierService } from 'src/client-dossier/client-dossier.service';
@@ -109,6 +110,8 @@ export class WhatsappMessageGateway
 
     @Optional()
     private readonly closureService: ConversationClosureService,
+
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   afterInit(server: Server): void {
@@ -367,9 +370,15 @@ export class WhatsappMessageGateway
       await this.chatService.update(chatId, { status: newStatus });
       this.logger.log(`Conversation status changed: ${chatId} → ${newStatus}`);
 
-      // Alimentation du portefeuille client + envoi plateforme GICOP à la clôture
-      if (newStatus === WhatsappChatStatus.FERME && this.dossierService && agent.commercialId) {
-        void this.dossierService.assignToPortfolio(chatId, agent.commercialId, agent.posteId ?? '');
+      // Émettre conversation.closed pour déclencher DB2 mirror + portfolio (via listeners)
+      if (newStatus === WhatsappChatStatus.FERME) {
+        this.eventEmitter.emit('conversation.closed', {
+          chatId,
+          commercialId: agent.commercialId ?? null,
+          posteId:      agent.posteId ?? null,
+          conversationResult: chat.conversation_result ?? null,
+          closedAt: new Date(),
+        });
       }
 
       const updatedChat = await this.chatService.findBychat_id(chatId);

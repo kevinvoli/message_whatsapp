@@ -11,6 +11,7 @@ import { ContactPhone } from './entities/contact-phone.entity';
 import { ClientDossierService } from './client-dossier.service';
 import { ClientDossierController } from './client-dossier.controller';
 import { GicopPlatformModule } from 'src/gicop-platform/gicop-platform.module';
+import { ClosurePortfolioListener } from './listeners/closure-portfolio.listener';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { GicopPlatformModule } from 'src/gicop-platform/gicop-platform.module';
     GicopPlatformModule,
   ],
   controllers: [ClientDossierController],
-  providers: [ClientDossierService],
+  providers: [ClientDossierService, ClosurePortfolioListener],
   exports: [ClientDossierService, TypeOrmModule],
 })
 export class ClientDossierModule {}
