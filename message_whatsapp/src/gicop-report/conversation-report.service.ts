@@ -88,9 +88,14 @@ export class ConversationReportService {
     if (chatIds.length === 0) return new Map();
     const reports = await this.repo.find({
       where:  { chatId: In(chatIds) },
-      select: ['chatId', 'submissionStatus'],
+      select: ['chatId', 'isSubmitted', 'submissionStatus'],
     });
-    return new Map(reports.map((r) => [r.chatId, r.submissionStatus]));
+    // Si le commercial a soumis (isSubmitted=true), on retourne 'sent' quel que soit
+    // l'état de la sync DB2 — la sync se fait en arrière-plan.
+    return new Map(reports.map((r) => [
+      r.chatId,
+      r.isSubmitted ? 'sent' : r.submissionStatus,
+    ]));
   }
 
   async isReportComplete(chatId: string): Promise<boolean> {

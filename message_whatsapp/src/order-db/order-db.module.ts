@@ -31,11 +31,11 @@ const orderDbProvider: Provider = {
 
     const dataSource = new DataSource({
       type: 'mysql',
-      host,
-      port:     config.get<number>('ORDER_DB_PORT') ?? 3306,
-      username: config.get<string>('ORDER_DB_USER') ?? '',
-      password: config.get<string>('ORDER_DB_PASSWORD') ?? '',
-      database: config.get<string>('ORDER_DB_NAME') ?? '',
+      host:config.get<string>('ORDER_DB_HOST'),
+      port:     config.get<number>('ORDER_DB_PORT'),
+      username: config.get<string>('ORDER_DB_USER') ,
+      password: config.get<string>('ORDER_DB_PASSWORD') ,
+      database: config.get<string>('ORDER_DB_NAME') ,
       // Entités DB2 connues — synchronize: false garantit aucune DDL
       entities:          [OrderCommand, OrderCallLog, MessagingClientDossierMirror],
       synchronize:       false,   // JAMAIS de migration sur DB2

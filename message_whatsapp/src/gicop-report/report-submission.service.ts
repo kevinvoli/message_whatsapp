@@ -43,10 +43,17 @@ export class ReportSubmissionService {
       throw new BadRequestException('Rapport incomplet — renseignez le nom client, le besoin et le score d\'intérêt');
     }
 
-    // Marquer pending
+    const isFirstSubmission = !report.isSubmitted;
+
+    // ── Marquer soumis côté commercial (indépendant du DB2) ──────────────────
+    if (isFirstSubmission) {
+      report.isSubmitted     = true;
+      report.submittedAt     = new Date();
+    }
     report.submissionStatus = 'pending';
     await this.reportRepo.save(report);
 
+    // ── Charger les données associées ────────────────────────────────────────
     const [commercial, contact, chat] = await Promise.all([
       this.commercialRepo.findOne({
         where:  { id: commercialId },
@@ -62,6 +69,21 @@ export class ReportSubmissionService {
       }),
     ]);
 
+    // ── Émettre les événements dès la première soumission (sans attendre DB2) ─
+    // La validation de fenêtre et le badge UI ne dépendent pas de la sync DB2.
+    if (isFirstSubmission) {
+      this.eventEmitter.emit('conversation.report.submitted', {
+        chatId,
+        commercialId,
+        posteId: chat?.poste_id ?? null,
+      });
+      this.eventEmitter.emit('conversation.result_set', {
+        chatId,
+        posteId: chat?.poste_id ?? null,
+      });
+    }
+
+    // ── Tentative de sync DB2 (non-bloquante pour le commercial) ─────────────
     const extraPhones = contact
       ? await this.phoneRepo.find({ where: { contactId: contact.id } })
       : [];
@@ -70,8 +92,6 @@ export class ReportSubmissionService {
       ...extraPhones.map((p) => ({ phone: p.phone, label: p.label, isPrimary: p.isPrimary })),
     ];
     const clientPhonesJson = allPhones.length > 0 ? JSON.stringify(allPhones) : null;
-
-    const now = new Date();
 
     try {
       await this.mirrorService.upsertDossier({
@@ -94,55 +114,45 @@ export class ReportSubmissionService {
         followUpAt:       report.followUpAt,
         notes:            report.notes,
       });
-
       report.submissionStatus = 'sent';
-      report.submittedAt      = now;
       report.submissionError  = null;
-      // Notifie le système de validation fenêtre + UI temps réel
-      this.eventEmitter.emit('conversation.report.submitted', {
-        chatId,
-        commercialId,
-        posteId: chat?.poste_id ?? null,
-      });
-      // Marque le critère result_set pour que la conversation soit comptabilisée
-      // dans le bloc objectifs (X/Y validées dans la fenêtre glissante)
-      this.eventEmitter.emit('conversation.result_set', {
-        chatId,
-        posteId: chat?.poste_id ?? null,
-      });
-      this.logger.log(`Rapport soumis en DB2 mirror: chat=${chatId}`);
+      this.logger.log(`Dossier miroir DB2 sync OK: chat=${chatId}`);
     } catch (err) {
+      // DB2 indisponible : on met en file d'attente pour le retry automatique (cron horaire).
+      // Le rapport reste "soumis" du point de vue du commercial.
       report.submissionStatus = 'failed';
-      report.submittedAt      = null;
       report.submissionError  = (err as Error).message;
-      this.logger.error(`Soumission DB2 échouée chat=${chatId}: ${(err as Error).message}`);
+      this.logger.warn(`DB2 indisponible — rapport en file d'attente (retry auto): chat=${chatId}: ${(err as Error).message}`);
     }
 
     await this.reportRepo.save(report);
 
+    // Retourne toujours 'sent' si le commercial a soumis — la sync DB2 est en arrière-plan.
     return {
-      status:     report.submissionStatus,
+      status:      'sent',
       submittedAt: report.submittedAt,
-      error:      report.submissionError,
+      error:       report.submissionStatus === 'failed' ? report.submissionError : null,
     };
   }
 
   async getSubmissionStatus(chatId: string): Promise<{ status: string | null; submittedAt: Date | null; error: string | null }> {
     const report = await this.reportRepo.findOne({
       where: { chatId },
-      select: ['submissionStatus', 'submittedAt', 'submissionError'],
+      select: ['isSubmitted', 'submissionStatus', 'submittedAt', 'submissionError'],
     });
+    // Si le commercial a soumis, on retourne 'sent' même si la sync DB2 est en attente/échec.
+    // La sync DB2 se fait en arrière-plan via le retry automatique.
     return {
-      status: report?.submissionStatus ?? null,
+      status:      report?.isSubmitted ? 'sent' : (report?.submissionStatus ?? null),
       submittedAt: report?.submittedAt ?? null,
-      error: report?.submissionError ?? null,
+      error:       report?.submissionStatus === 'failed' ? (report?.submissionError ?? null) : null,
     };
   }
 
   async retryReport(chatId: string): Promise<SubmissionResult> {
     const report = await this.reportRepo.findOne({
       where: { chatId },
-      select: ['chatId', 'commercialId', 'isComplete', 'submissionStatus'],
+      select: ['chatId', 'commercialId', 'isComplete', 'isSubmitted', 'submissionStatus'],
     });
     if (!report) throw new NotFoundException(`Rapport introuvable pour la conversation ${chatId}`);
     if (!report.commercialId) throw new BadRequestException('Aucun commercial associé au rapport — relance impossible');

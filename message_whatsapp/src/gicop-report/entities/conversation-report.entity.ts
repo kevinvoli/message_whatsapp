@@ -92,6 +92,10 @@ export class ConversationReport {
   @Column({ name: 'is_complete', type: 'boolean', default: false })
   isComplete: boolean;
 
+  /** true dès que le commercial a cliqué "Soumettre" — indépendant de la sync DB2. */
+  @Column({ name: 'is_submitted', type: 'boolean', default: false })
+  isSubmitted: boolean;
+
   @Column({ name: 'is_validated', type: 'boolean', default: false })
   isValidated: boolean;
 
