@@ -74,6 +74,23 @@ const EMPTY_DOSSIER: Dossier = {
   followUpAt: null, nextAction: null, notes: null,
 };
 
+// Extrait uniquement les champs du DTO pour éviter que des champs internes
+// (id, contactId, createdAt…) soient renvoyés au backend et rejetés par la ValidationPipe.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toDossier = (raw: any): Dossier => ({
+  fullName:            raw?.fullName            ?? null,
+  ville:               raw?.ville               ?? null,
+  commune:             raw?.commune             ?? null,
+  quartier:            raw?.quartier            ?? null,
+  productCategory:     raw?.productCategory     ?? null,
+  clientNeed:          raw?.clientNeed          ?? null,
+  interestScore:       raw?.interestScore       ?? null,
+  isMaleNotInterested: raw?.isMaleNotInterested ?? false,
+  followUpAt:          raw?.followUpAt          ?? null,
+  nextAction:          raw?.nextAction          ?? null,
+  notes:               raw?.notes               ?? null,
+});
+
 interface Props { chatId: string; onClose: () => void; }
 
 export default function GicopReportPanel({ chatId, onClose }: Props) {
@@ -114,7 +131,7 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { dossier: Dossier | null; contact: ContactInfo | null; phones: PhoneEntry[]; callLogs: CallLogEntry[] } | null) => {
         if (!data) return;
-        setDossier(data.dossier ?? EMPTY_DOSSIER);
+        setDossier(data.dossier ? toDossier(data.dossier) : EMPTY_DOSSIER);
         setContact(data.contact ?? null);
         setPhones(data.phones ?? []);
         setCallLogs(data.callLogs ?? []);
@@ -155,11 +172,11 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(dossier),
+        body: JSON.stringify(toDossier(dossier)),
       });
       if (res.ok) {
-        const updated = await res.json() as { dossier: Dossier };
-        if (updated.dossier) setDossier(updated.dossier);
+        const updated = await res.json() as { dossier: unknown };
+        if (updated.dossier) setDossier(toDossier(updated.dossier));
         setSaved(true);
         setDirty(false);
       }
