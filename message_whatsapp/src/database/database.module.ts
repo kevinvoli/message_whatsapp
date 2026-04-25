@@ -10,7 +10,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       useFactory: (configService: ConfigService) => {
         const isDev = configService.get('NODE_ENV') !== 'production';
         const forceSync = configService.get('TYPEORM_SYNCHRONIZE') === 'true';
-
         
         return {
           type: 'mysql' as const,
