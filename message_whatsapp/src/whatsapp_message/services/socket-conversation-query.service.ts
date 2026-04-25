@@ -46,16 +46,46 @@ export class SocketConversationQueryService {
   ): Promise<ConversationQueryResult> {
     const modeEnabled = await this.capacityService.isWindowModeEnabled();
 
-    // En mode fenêtre glissante, exclure les RELEASED dès la requête DB pour ne pas
-    // les laisser occuper des slots dans le top-50 et évincer les LOCKED (grises).
-    let { chats } = await this.chatService.findByPosteId(
-      posteId,
-      ['fermé', 'converti'],
-      50,
-      undefined,
-      modeEnabled ? WindowStatus.RELEASED : undefined,
-      modeEnabled,
-    );
+    let chats: WhatsappChat[];
+
+    if (modeEnabled) {
+      // Mode fenêtre glissante — deux requêtes pour garantir que toutes les conversations
+      // slottées (ACTIVE+LOCKED, y compris celles avec une activité ancienne) apparaissent.
+
+      // 1. Toutes les conversations avec un slot assigné (max quotaTotal ≈ 50)
+      const { chats: slotted } = await this.chatService.findByPosteId(
+        posteId,
+        ['fermé', 'converti'],
+        100,
+        undefined,
+        WindowStatus.RELEASED,
+        true,  // onlySlotted
+      );
+
+      // 2. Compléter jusqu'à 50 avec des conversations non-slottées (les plus récentes)
+      const slottedIds = new Set(slotted.map((c) => c.chat_id));
+      const needed = Math.max(0, 50 - slotted.length);
+      let nonSlotted: WhatsappChat[] = [];
+      if (needed > 0) {
+        const { chats: ns } = await this.chatService.findByPosteId(
+          posteId,
+          ['fermé', 'converti'],
+          needed + 5,
+          undefined,
+          WindowStatus.RELEASED,
+        );
+        nonSlotted = ns.filter((c) => !slottedIds.has(c.chat_id)).slice(0, needed);
+      }
+
+      chats = [...slotted, ...nonSlotted];
+    } else {
+      const result = await this.chatService.findByPosteId(
+        posteId,
+        ['fermé', 'converti'],
+        50,
+      );
+      chats = result.chats;
+    }
 
     if (tenantIds.length > 0) {
       const tenantSet = new Set(tenantIds);
