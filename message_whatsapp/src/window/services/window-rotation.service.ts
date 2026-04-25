@@ -7,8 +7,9 @@ import { ConversationCapacityService } from 'src/conversation-capacity/conversat
 import { ValidationEngineService } from './validation-engine.service';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
 
-export const WINDOW_ROTATED_EVENT         = 'window.rotated';
+export const WINDOW_ROTATED_EVENT             = 'window.rotated';
 export const WINDOW_CRITERION_VALIDATED_EVENT = 'window.criterion_validated';
+export const WINDOW_ROTATION_BLOCKED_EVENT    = 'window.rotation_blocked';
 
 export interface WindowRotatedPayload {
   posteId: string;
@@ -19,6 +20,13 @@ export interface WindowRotatedPayload {
 export interface WindowCriterionValidatedPayload {
   posteId: string;
   chatId?: string;
+}
+
+export interface WindowRotationBlockedPayload {
+  posteId: string;
+  reason: 'quality_check_failed' | 'call_obligations_incomplete';
+  progress: { validated: number; total: number };
+  obligations?: object | null;
 }
 
 @Injectable()
@@ -324,6 +332,11 @@ export class WindowRotationService {
         this.logger.warn(
           `Rotation BLOQUÉE poste ${posteId} — contrôle qualité non passé (commercial doit avoir le dernier message)`,
         );
+        this.eventEmitter.emit(WINDOW_ROTATION_BLOCKED_EVENT, {
+          posteId,
+          reason: 'quality_check_failed',
+          progress: { validated: validatedCount, total: activeGroup.length },
+        } satisfies WindowRotationBlockedPayload);
         return;
       }
     }
@@ -340,6 +353,12 @@ export class WindowRotationService {
           `livrés=${status?.livree.done}/${status?.livree.required} ` +
           `sans-cmd=${status?.sansCommande.done}/${status?.sansCommande.required}`,
         );
+        this.eventEmitter.emit(WINDOW_ROTATION_BLOCKED_EVENT, {
+          posteId,
+          reason: 'call_obligations_incomplete',
+          progress: { validated: validatedCount, total: activeGroup.length },
+          obligations: status ?? null,
+        } satisfies WindowRotationBlockedPayload);
         return;
       }
     }

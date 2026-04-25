@@ -30,7 +30,15 @@ export default function ObligationProgressBar() {
     };
     void load();
     const id = setInterval(() => void load(), 60_000);
-    return () => clearInterval(id);
+
+    // Rechargement immédiat sur événements socket pertinents
+    const handleReload = () => void load();
+    window.addEventListener('obligations:reload', handleReload);
+
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('obligations:reload', handleReload);
+    };
   }, [setObligationStatus]);
 
   if (!status) return null;

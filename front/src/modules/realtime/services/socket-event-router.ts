@@ -138,6 +138,9 @@ export function handleChatEvent(
     case 'WINDOW_ROTATED': {
       const { releasedChatIds } = data.payload as { releasedChatIds: string[]; promotedChatIds: string[] };
 
+      // Rotation réussie : effacer le blocage éventuel
+      chatState.setRotationBlocked(null);
+
       // Phase 1 : marquer les conversations libérées pour l'animation de sortie
       chatState.setReleasingChatIds(releasedChatIds);
       chatState.setWindowRotating(true);
@@ -150,6 +153,25 @@ export function handleChatEvent(
       }, 500);
 
       logger.debug('WINDOW_ROTATED reçu', { releasedCount: releasedChatIds.length });
+      break;
+    }
+
+    case 'WINDOW_ROTATION_BLOCKED': {
+      const { reason, progress, obligations } = data.payload as {
+        reason: 'quality_check_failed' | 'call_obligations_incomplete';
+        progress: { validated: number; total: number };
+        obligations?: import('@/store/chatStore').ObligationStatus | null;
+      };
+      chatState.setBlockProgress(progress);
+      chatState.setRotationBlocked({ reason });
+      if (obligations) {
+        chatState.setObligationStatus(obligations);
+      }
+      // Rechargement immédiat de la barre d'obligations
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('obligations:reload'));
+      }
+      logger.warn('WINDOW_ROTATION_BLOCKED reçu', { reason, progress });
       break;
     }
 
@@ -237,6 +259,10 @@ export function handleChatEvent(
         report_submission_status: 'sent' | 'failed' | 'pending';
       };
       chatState.patchConversation(chat_id, { report_submission_status });
+      // Rechargement immédiat de la barre d'obligations après soumission
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('obligations:reload'));
+      }
       break;
     }
 

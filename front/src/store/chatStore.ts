@@ -58,6 +58,7 @@ const initialState = {
   blockProgress: { validated: 0, total: 10 },
   windowRotating: false,
   releasingChatIds: [],
+  rotationBlocked: null,
   affinityChats: null,
   obligationStatus: null,
 };

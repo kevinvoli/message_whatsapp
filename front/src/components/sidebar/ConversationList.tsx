@@ -2,9 +2,15 @@ import React, { useState, useCallback } from 'react';
 import ConversationItem from './ConversationItem';
 import ObligationProgressBar from './ObligationProgressBar';
 import { BulkActionBar } from './BulkActionBar';
+import { AlertTriangle } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { useChatStore } from '@/store/chatStore';
 import styles from './ConversationList.module.css';
+
+const ROTATION_BLOCKED_LABELS: Record<string, string> = {
+  quality_check_failed:        'Répondez au dernier message de chaque conversation avant la rotation.',
+  call_obligations_incomplete: 'Complétez vos obligations d\'appels pour débloquer la rotation.',
+};
 
 interface ConversationListProps {
     filteredConversations: Conversation[];
@@ -22,6 +28,8 @@ export default function ConversationList({
     const typingStatus      = useChatStore((state) => state.typingStatus);
     const windowRotating    = useChatStore((state) => state.windowRotating);
     const releasingChatIds  = useChatStore((state) => state.releasingChatIds);
+    const rotationBlocked   = useChatStore((state) => state.rotationBlocked);
+    const blockProgress     = useChatStore((state) => state.blockProgress);
     const releasingSet      = new Set(releasingChatIds);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -40,6 +48,19 @@ export default function ConversationList({
         <div className="flex-1 overflow-y-auto relative flex flex-col">
             {/* Obligations d'appels GICOP */}
             <ObligationProgressBar />
+
+            {/* Bannière blocage de rotation */}
+            {rotationBlocked && (
+              <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-red-500" />
+                <span>
+                  <span className="font-semibold">
+                    {blockProgress.validated}/{blockProgress.total} rapports validés — rotation bloquée.
+                  </span>{' '}
+                  {ROTATION_BLOCKED_LABELS[rotationBlocked.reason] ?? 'Vérifiez les conditions de rotation.'}
+                </span>
+              </div>
+            )}
 
             {/* Animation de rotation (flash discret) */}
             {windowRotating && (

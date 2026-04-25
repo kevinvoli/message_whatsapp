@@ -37,6 +37,8 @@ export interface ConversationSlice {
   blockProgress: BlockProgress;
   windowRotating: boolean;
   releasingChatIds: string[];
+  /** Raison du blocage de rotation, null si pas bloqué */
+  rotationBlocked: { reason: 'quality_check_failed' | 'call_obligations_incomplete' } | null;
   /** S1-006 — chat_ids pour lesquels ce poste est le poste d'affinité actif */
   affinityChats: Set<string> | null;
 
@@ -46,6 +48,7 @@ export interface ConversationSlice {
   setBlockProgress: (progress: BlockProgress) => void;
   setWindowRotating: (rotating: boolean) => void;
   setReleasingChatIds: (ids: string[]) => void;
+  setRotationBlocked: (blocked: { reason: 'quality_check_failed' | 'call_obligations_incomplete' } | null) => void;
 
   setConversations: (
     conversations: Conversation[],
@@ -90,6 +93,7 @@ export const createConversationSlice: StateCreator<
   blockProgress: { validated: 0, total: 10 },
   windowRotating: false,
   releasingChatIds: [],
+  rotationBlocked: null,
   affinityChats: null,
 
   // ─── Chargement ─────────────────────────────────────────────────────────────
@@ -312,6 +316,8 @@ export const createConversationSlice: StateCreator<
   setWindowRotating: (rotating) => set({ windowRotating: rotating }),
 
   setReleasingChatIds: (ids) => set({ releasingChatIds: ids }),
+
+  setRotationBlocked: (blocked) => set({ rotationBlocked: blocked }),
 
   // S1-006 — Charge les chat_ids avec affinité vers le poste courant
   loadAffinityChats: async (posteId: string) => {

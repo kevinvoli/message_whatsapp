@@ -6,6 +6,8 @@ import {
   WINDOW_ROTATED_EVENT,
   WindowCriterionValidatedPayload,
   WINDOW_CRITERION_VALIDATED_EVENT,
+  WindowRotationBlockedPayload,
+  WINDOW_ROTATION_BLOCKED_EVENT,
 } from 'src/window/services/window-rotation.service';
 import { ValidationEngineService } from 'src/window/services/validation-engine.service';
 import { ConversationPublisher } from './conversation.publisher';
@@ -59,6 +61,24 @@ export class WindowPublisher {
     if (payload.chatId) {
       await this.conversationPublisher.emitConversationUpsertByChatId(payload.chatId);
     }
+  }
+
+  /**
+   * Écoute le blocage de rotation et pousse WINDOW_ROTATION_BLOCKED au commercial concerné.
+   */
+  @OnEvent(WINDOW_ROTATION_BLOCKED_EVENT, { async: true })
+  async handleRotationBlocked(payload: WindowRotationBlockedPayload): Promise<void> {
+    this.realtimeServer.getServer().to(`poste:${payload.posteId}`).emit('chat:event', {
+      type: 'WINDOW_ROTATION_BLOCKED',
+      payload: {
+        reason:      payload.reason,
+        progress:    payload.progress,
+        obligations: payload.obligations ?? null,
+      },
+    });
+    this.logger.log(
+      `WINDOW_ROTATION_BLOCKED → poste:${payload.posteId} (raison: ${payload.reason})`,
+    );
   }
 
   /**
