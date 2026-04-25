@@ -303,8 +303,6 @@ export class WindowRotationService {
       order: { window_slot: 'ASC' },
     });
 
-    if (activeGroup.length === 0) return;
-
     if (activeGroup.length < quotaActive) {
       await this.compactSlots(posteId);
       activeGroup = await this.chatRepo.find({
