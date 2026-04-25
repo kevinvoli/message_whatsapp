@@ -288,12 +288,12 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         </div>
         <button
           onClick={handleSubmitReport}
-          disabled={!isComplete || submitting || submissionStatus === 'sent'}
-          title={!isComplete ? 'Complétez le dossier avant de soumettre' : submissionStatus === 'sent' ? 'Déjà soumis' : 'Soumettre le rapport vers la plateforme commandes'}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          disabled={!isComplete || submitting}
+          title={!isComplete ? 'Complétez le dossier avant de soumettre' : submissionStatus === 'sent' ? 'Re-soumettre le rapport (données mises à jour)' : 'Soumettre le rapport vers la plateforme commandes'}
+          className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg text-white transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${submissionStatus === 'sent' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
         >
           {submitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-          {submissionStatus === 'sent' ? 'Soumis' : 'Soumettre'}
+          {submissionStatus === 'sent' ? 'Re-soumettre' : 'Soumettre'}
         </button>
       </div>
 
