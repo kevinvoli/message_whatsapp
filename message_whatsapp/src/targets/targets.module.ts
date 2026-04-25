@@ -8,10 +8,11 @@ import { CallLog } from '../call-log/entities/call_log.entity';
 import { FollowUp } from '../follow-up/entities/follow_up.entity';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { SystemConfigModule } from '../system-config/system-config.module';
+import { ConversationReport } from '../gicop-report/entities/conversation-report.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CommercialTarget, WhatsappMessage, CallLog, FollowUp, WhatsappCommercial]),
+    TypeOrmModule.forFeature([CommercialTarget, WhatsappMessage, CallLog, FollowUp, WhatsappCommercial, ConversationReport]),
     SystemConfigModule,
   ],
   providers: [TargetsService],

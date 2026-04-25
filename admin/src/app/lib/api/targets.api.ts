@@ -6,7 +6,7 @@ export interface CommercialTarget {
   commercial_name?: string | null;
   period_type: 'day' | 'week' | 'month' | 'quarter';
   period_start: string;
-  metric: 'conversations' | 'calls' | 'follow_ups' | 'orders' | 'relances';
+  metric: 'conversations' | 'calls' | 'follow_ups' | 'orders' | 'relances' | 'reports_submitted';
   target_value: number;
   created_by?: string | null;
   createdAt: string;

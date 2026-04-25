@@ -20,6 +20,7 @@ const METRIC_LABELS: Record<CommercialTarget['metric'], string> = {
   follow_ups: 'Relances effectuées',
   orders: 'Commandes',
   relances: 'Relances (alt)',
+  reports_submitted: 'Rapports soumis (GICOP)',
 };
 
 const PERIOD_LABELS: Record<CommercialTarget['period_type'], string> = {

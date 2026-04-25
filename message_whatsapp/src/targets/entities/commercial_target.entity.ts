@@ -21,6 +21,7 @@ export enum TargetMetric {
   FollowUps = 'follow_ups',
   Orders = 'orders',
   Relances = 'relances',
+  ReportsSubmitted = 'reports_submitted',
 }
 
 @Entity({ name: 'commercial_target' })

@@ -242,8 +242,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               </span>
             )}
             {conversation.report_submission_status === 'sent' && !isLocked && (
-              <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full" title="Rapport soumis à la plateforme GICOP">
-                <Send className="w-3 h-3" /> Rapport
+              <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full" title="Rapport soumis et synchronisé sur la plateforme GICOP">
+                <Send className="w-3 h-3" /> Rapport GICOP
+              </span>
+            )}
+            {conversation.report_submission_status === 'pending' && !isLocked && (
+              <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full" title="Rapport soumis — synchronisation en cours">
+                <Send className="w-3 h-3" /> Rapport soumis
               </span>
             )}
             {conversation.report_submission_status === 'failed' && !isLocked && (

@@ -1,9 +1,11 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone } from 'lucide-react';
-import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone, Users } from 'lucide-react';
+import { PerformanceCommercial, Poste, ClientSummary } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api/commerciaux.api';
 import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
 import { getPostes } from '@/app/lib/api/postes.api';
+import { searchClientsAdmin } from '@/app/lib/api/clients.api';
+import { formatDateShort } from '@/app/lib/dateUtils';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
@@ -79,6 +81,24 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
+  const [detailTab, setDetailTab] = useState<'performance' | 'portfolio'>('performance');
+  const [portfolioClients, setPortfolioClients] = useState<ClientSummary[]>([]);
+  const [portfolioTotal, setPortfolioTotal] = useState(0);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+
+  const loadPortfolioForCommercial = useCallback(async (commercialId: string) => {
+    setPortfolioLoading(true);
+    try {
+      const result = await searchClientsAdmin({ portfolio_owner_id: commercialId, limit: 50 });
+      setPortfolioClients(result.data);
+      setPortfolioTotal(result.total);
+    } catch {
+      setPortfolioClients([]);
+    } finally {
+      setPortfolioLoading(false);
+    }
+  }, []);
+
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
 
   // Fonction pour obtenir la couleur du statut
@@ -475,7 +495,11 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setSelectedDetail(commercial)}
+                          onClick={() => {
+                            setSelectedDetail(commercial);
+                            setDetailTab('performance');
+                            setPortfolioClients([]);
+                          }}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           title="Voir les details"
                         >
@@ -552,6 +576,39 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
             </span>
           </div>
 
+          {/* Tabs Performance / Portefeuille */}
+          <div className="flex gap-1 px-6 border-b border-gray-100">
+            {(['performance', 'portfolio'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  setDetailTab(t);
+                  if (t === 'portfolio' && portfolioClients.length === 0) {
+                    void loadPortfolioForCommercial(selectedDetail.id);
+                  }
+                }}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === t
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t === 'performance' ? 'Performance' : (
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4" />
+                    Portefeuille
+                    {selectedDetail.portfolio_count != null && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                        {selectedDetail.portfolio_count}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {detailTab === 'performance' && (<>
           <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="flex items-center gap-2 mb-1">
@@ -625,6 +682,64 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
               </div>
             </div>
           </div>
+          </>)}
+
+          {detailTab === 'portfolio' && (
+            <div className="p-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">
+                  {portfolioLoading ? 'Chargement…' : `${portfolioTotal} client${portfolioTotal !== 1 ? 's' : ''} dans le portefeuille`}
+                </p>
+                <button
+                  onClick={() => void loadPortfolioForCommercial(selectedDetail.id)}
+                  className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Actualiser
+                </button>
+              </div>
+              {portfolioLoading ? (
+                <div className="py-8 text-center text-gray-400 text-sm">Chargement du portefeuille…</div>
+              ) : portfolioClients.length === 0 ? (
+                <div className="py-8 text-center text-gray-400 text-sm">Aucun client dans le portefeuille</div>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      <tr>
+                        <th className="px-4 py-2">Client</th>
+                        <th className="px-4 py-2">Téléphone</th>
+                        <th className="px-4 py-2">Catégorie</th>
+                        <th className="px-4 py-2">Prochaine relance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {portfolioClients.map((c) => (
+                        <tr key={c.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 font-medium text-gray-900">{c.name}</td>
+                          <td className="px-4 py-2 text-gray-600 font-mono text-xs">{c.phone}</td>
+                          <td className="px-4 py-2">
+                            {(c as ClientSummary & { client_category?: string }).client_category ? (
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">
+                                {(c as ClientSummary & { client_category?: string }).client_category}
+                              </span>
+                            ) : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-2 text-gray-500 text-xs">
+                            {c.next_follow_up ? formatDateShort(c.next_follow_up) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {portfolioTotal > 50 && (
+                    <p className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
+                      Affichage des 50 premiers sur {portfolioTotal}. Voir l&apos;onglet Portefeuille pour la liste complète.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

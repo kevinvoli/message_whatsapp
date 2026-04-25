@@ -8,6 +8,7 @@ import { CallLog } from '../call-log/entities/call_log.entity';
 import { FollowUp } from '../follow-up/entities/follow_up.entity';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { SystemConfigService } from '../system-config/system-config.service';
+import { ConversationReport } from '../gicop-report/entities/conversation-report.entity';
 
 export interface CommercialRankingEntry {
   rank: number;
@@ -42,6 +43,8 @@ export class TargetsService {
     private readonly followUpRepo: Repository<FollowUp>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+    @InjectRepository(ConversationReport)
+    private readonly reportRepo: Repository<ConversationReport>,
     private readonly systemConfig: SystemConfigService,
   ) {}
 
@@ -304,6 +307,15 @@ export class TargetsService {
           .select('COUNT(DISTINCT m.chat_id)', 'cnt')
           .getRawOne()
           .then((r) => parseInt(r?.cnt ?? '0') || 0);
+
+      case TargetMetric.ReportsSubmitted:
+        return this.reportRepo
+          .createQueryBuilder('r')
+          .where('r.commercialId = :id', { id: target.commercial_id })
+          .andWhere('r.isSubmitted = true')
+          .andWhere('r.submittedAt >= :start', { start })
+          .andWhere('r.submittedAt < :end', { end })
+          .getCount();
 
       default:
         return 0;
