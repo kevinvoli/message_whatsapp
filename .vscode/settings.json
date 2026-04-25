@@ -48,6 +48,21 @@
       "database": "gicopnet_gicop_optimise",
       "username": "gicopnet_didier",
       "password": "Jojose1988"
+    },
+    {
+      "mysqlOptions": {
+        "authProtocol": "default",
+        "enableSsl": "Disabled"
+      },
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "148.230.112.175",
+      "port": 3306,
+      "driver": "MySQL",
+      "name": "gicop_test",
+      "database": "gicop_db",
+      "username": "kevin",
+      "password": "kavinvoli"
     }
   ]
 }
