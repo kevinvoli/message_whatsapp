@@ -11,6 +11,7 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { CallObligationModule } from 'src/call-obligations/call-obligation.module';
+import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CallObligationModule } from 'src/call-obligations/call-obligation.modul
     ConversationCapacityModule,
     SystemConfigModule,
     CallObligationModule,
+    ConversationReportModule,
   ],
   controllers: [WindowController],
   providers: [ValidationEngineService, WindowRotationService, CallEventService],

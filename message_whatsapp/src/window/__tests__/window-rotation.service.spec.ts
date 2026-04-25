@@ -70,22 +70,42 @@ function makeValidationEngine() {
   } as any;
 }
 
+function makeReportService(submittedChatIds: string[] = []) {
+  const submitted = new Set(submittedChatIds);
+  return {
+    getSubmittedMapBulk: jest.fn().mockImplementation((chatIds: string[]) =>
+      Promise.resolve(new Map(chatIds.map((chatId) => [chatId, submitted.has(chatId)]))),
+    ),
+  } as any;
+}
+
 function makeEventEmitter() {
   return {
     emit: jest.fn(),
   } as unknown as EventEmitter2;
 }
 
-function buildService(chatRepo: any, opts: { quotaActive?: number; quotaTotal?: number } = {}) {
+function buildService(
+  chatRepo: any,
+  opts: {
+    quotaActive?: number;
+    quotaTotal?: number;
+    obligationService?: any;
+    submittedChatIds?: string[];
+    reportService?: any;
+  } = {},
+) {
   const emitter = makeEventEmitter();
+  const reportService = opts.reportService ?? makeReportService(opts.submittedChatIds ?? []);
   const service = new WindowRotationService(
     chatRepo,
     makeCapacityService(opts.quotaActive ?? 10, opts.quotaTotal ?? 50),
     makeValidationEngine(),
     emitter,
-    undefined as any, // obligationService (@Optional)
+    reportService,
+    opts.obligationService as any, // obligationService (@Optional)
   );
-  return { service, emitter };
+  return { service, emitter, reportService };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -110,12 +130,78 @@ describe('WindowRotationService', () => {
         makeChat({ window_status: WindowStatus.VALIDATED }),
       ];
       const repo = makeChatRepo(chats);
-      const { service } = buildService(repo, { quotaActive: 10 });
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
       // 2 validées < 3 seuil → pas de rotation
       await service.checkAndTriggerRotation('poste-abc');
       const updateCalls = (repo.update as jest.Mock).mock.calls;
       const releaseCalls = updateCalls.filter((c) => c[1]?.window_status === WindowStatus.RELEASED);
       expect(releaseCalls).toHaveLength(0);
+    });
+    it('declenche la rotation quand les 10 conversations actives ont un rapport soumis', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
+      );
+      const repo = makeChatRepo(chats);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(performRotation).toHaveBeenCalledWith('poste-abc');
+    });
+
+    it('ne declenche pas la rotation avec 10 conversations VALIDATED sans rapport soumis', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.VALIDATED }),
+      );
+      const repo = makeChatRepo(chats);
+      const { service, reportService } = buildService(repo, {
+        quotaActive: 10,
+        submittedChatIds: [],
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(reportService.getSubmittedMapBulk).toHaveBeenCalledWith(chats.map((c) => c.chat_id));
+      expect(performRotation).not.toHaveBeenCalled();
+    });
+
+    it('ignore les obligations d appel pour decider la rotation', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
+      );
+      const repo = makeChatRepo(chats);
+      const obligationService = {
+        isEnabled: jest.fn().mockReturnValue(true),
+        checkAndRecordQuality: jest.fn(),
+        isPosteReadyForRotation: jest.fn(),
+      };
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        obligationService,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(performRotation).toHaveBeenCalledWith('poste-abc');
+      expect(obligationService.isEnabled).not.toHaveBeenCalled();
+      expect(obligationService.checkAndRecordQuality).not.toHaveBeenCalled();
+      expect(obligationService.isPosteReadyForRotation).not.toHaveBeenCalled();
     });
   });
 

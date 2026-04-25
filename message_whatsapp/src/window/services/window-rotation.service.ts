@@ -6,6 +6,7 @@ import { WhatsappChat, WindowStatus, WhatsappChatStatus } from 'src/whatsapp_cha
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { ValidationEngineService } from './validation-engine.service';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 
 export const WINDOW_ROTATED_EVENT             = 'window.rotated';
 export const WINDOW_CRITERION_VALIDATED_EVENT = 'window.criterion_validated';
@@ -40,6 +41,7 @@ export class WindowRotationService {
     private readonly capacityService: ConversationCapacityService,
     private readonly validationEngine: ValidationEngineService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly reportService: ConversationReportService,
 
     @Optional()
     private readonly obligationService: CallObligationService,
@@ -81,6 +83,7 @@ export class WindowRotationService {
     const needed = quotaTotal - slottedChats.length;
     if (needed <= 0) {
       this.logger.log(`Fenêtre complète pour poste ${posteId} (${slottedChats.length} slots actifs)`);
+      await this.checkAndTriggerRotation(posteId);
       return;
     }
 
@@ -100,6 +103,7 @@ export class WindowRotationService {
 
     if (candidates.length === 0 && slottedChats.length > 0) {
       this.logger.log(`Fenêtre stable pour poste ${posteId} (${slottedChats.length} slots, aucun nouveau candidat)`);
+      await this.checkAndTriggerRotation(posteId);
       return;
     }
 
@@ -107,14 +111,22 @@ export class WindowRotationService {
     const all = [...slottedChats, ...candidates];
     const toInit: string[] = [];
 
-    // Calculer les valeurs cibles pour chaque conversation
+    // Calculer les valeurs cibles pour chaque conversation.
+    // IMPORTANT : préserver le statut VALIDATED pour éviter de réinitialiser les conversations
+    // dont le rapport a déjà été soumis (ex : reconnexion du commercial).
     const assignments = all.map((chat, i) => {
       const slot = i + 1;
-      const status = slot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-      const isLocked = status === WindowStatus.LOCKED;
-      const wasActive = chat.window_status === WindowStatus.ACTIVE;
-      if (status === WindowStatus.ACTIVE && !wasActive) toInit.push(chat.chat_id);
-      return { id: chat.id, slot, status, isLocked };
+      const targetStatus = slot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
+      const finalStatus =
+        chat.window_status === WindowStatus.VALIDATED && targetStatus === WindowStatus.ACTIVE
+          ? WindowStatus.VALIDATED
+          : targetStatus;
+      const isLocked = finalStatus === WindowStatus.LOCKED;
+      // N'initialiser la validation que pour les conversations nouvellement promues LOCKED→ACTIVE
+      if (chat.window_status === WindowStatus.LOCKED && targetStatus === WindowStatus.ACTIVE) {
+        toInit.push(chat.chat_id);
+      }
+      return { id: chat.id, slot, status: finalStatus, isLocked };
     });
 
     // Un seul UPDATE par groupe de statut (évite N aller-retours DB)
@@ -126,6 +138,10 @@ export class WindowRotationService {
     this.logger.log(
       `Fenêtre construite pour poste ${posteId} : ${slottedChats.length} existantes + ${candidates.length} nouvelles (total ${all.length})`,
     );
+
+    // Déclencher la rotation si toutes les conversations actives sont déjà validées
+    // (cas : commercial reconnecté avec rapports déjà soumis)
+    await this.checkAndTriggerRotation(posteId);
   }
 
   /**
@@ -225,10 +241,17 @@ export class WindowRotationService {
     // pour marquer la conversation prête à la rotation, quel que soit l'état des autres critères.
     await this.validationEngine.onConversationResultSet(payload.chatId);
 
-    await this.onConversationValidated(payload.chatId, payload.posteId);
-    // Vérification directe : couvre la re-soumission (conversation déjà VALIDATED, onConversationValidated
-    // retourné tôt). Le guard rotatingPostes empêche tout double-déclenchement.
-    await this.checkAndTriggerRotation(payload.posteId);
+    try {
+      await this.onConversationValidated(payload.chatId, payload.posteId);
+      // Vérification directe : couvre la re-soumission (conversation déjà VALIDATED, onConversationValidated
+      // retourné tôt). Le guard rotatingPostes empêche tout double-déclenchement.
+      await this.checkAndTriggerRotation(payload.posteId);
+    } catch (err) {
+      this.logger.error(
+        `Erreur lors de la rotation pour poste ${payload.posteId} / chat ${payload.chatId}`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
 
     this.eventEmitter.emit(WINDOW_CRITERION_VALIDATED_EVENT, {
       posteId: payload.posteId,
@@ -309,16 +332,22 @@ export class WindowRotationService {
 
     if (activeGroup.length === 0) return;
 
-    const validatedCount = activeGroup.filter((c) => c.window_status === WindowStatus.VALIDATED).length;
+    if (activeGroup.length < quotaActive) return;
 
-    // Seuil = quotaActive (10 par défaut), ou moins si le poste a peu de conversations.
-    // La rotation se déclenche quand tous les slots actifs ont un rapport soumis.
-    const requiredCount = Math.min(quotaActive, activeGroup.length);
+    const activeSlots = activeGroup.slice(0, quotaActive);
+    const submittedMap = await this.reportService.getSubmittedMapBulk(
+      activeSlots.map((c) => c.chat_id),
+    );
+    const submittedCount = activeSlots.filter((c) => submittedMap.get(c.chat_id) === true).length;
 
-    if (validatedCount < requiredCount) return;
+    // Seuil = quotaActive (10 par defaut). La rotation se declenche quand
+    // les 10 slots actifs ont un rapport soumis, sans dependance a window_status.
+    const requiredCount = quotaActive;
+
+    if (submittedCount < requiredCount) return;
 
     this.logger.log(
-      `Rotation déclenchée pour poste ${posteId} (${validatedCount}/${activeGroup.length} validées, seuil: ${requiredCount})`,
+      `Rotation déclenchée pour poste ${posteId} (${submittedCount}/${activeSlots.length} rapports soumis, seuil: ${requiredCount})`,
     );
     await this.performRotation(posteId);
   }
@@ -335,21 +364,29 @@ export class WindowRotationService {
     try {
       const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-      // 1. Conversations validées à libérer
-      const validated = await this.chatRepo.find({
-        where: { poste_id: posteId, window_status: WindowStatus.VALIDATED },
+      // 1. Conversations actives dont le rapport est soumis a liberer
+      const activeGroup = await this.chatRepo.find({
+        where: {
+          poste_id: posteId,
+          window_status: In([WindowStatus.ACTIVE, WindowStatus.VALIDATED]),
+        },
         order: { window_slot: 'ASC' },
       });
+      const activeSlots = activeGroup.slice(0, quotaActive);
+      const submittedMap = await this.reportService.getSubmittedMapBulk(
+        activeSlots.map((c) => c.chat_id),
+      );
+      const submitted = activeSlots.filter((c) => submittedMap.get(c.chat_id) === true);
 
-      // 1. Libérer les conversations validées en un seul UPDATE
-      const releasedChatIds = validated.map((c) => c.chat_id);
-      await this.batchRelease(validated.map((c) => c.id));
+      // 1. Liberer les conversations soumises en un seul UPDATE
+      const releasedChatIds = submitted.map((c) => c.chat_id);
+      await this.batchRelease(submitted.map((c) => c.id));
 
       // 2. Conversations verrouillées/actives restantes — réassigner les slots
       const remaining = await this.chatRepo.find({
         where: {
           poste_id: posteId,
-          window_status: In([WindowStatus.LOCKED, WindowStatus.ACTIVE]),
+          window_status: In([WindowStatus.LOCKED, WindowStatus.ACTIVE, WindowStatus.VALIDATED]),
           window_slot: Not(IsNull()),
         },
         order: { window_slot: 'ASC' },
@@ -376,7 +413,7 @@ export class WindowRotationService {
       if (slotsAvailable > 0) {
         const excludedIds = new Set([
           ...remaining.map((c) => c.id),
-          ...validated.map((c) => c.id),
+          ...submitted.map((c) => c.id),
         ]);
 
         const newCandidates = await this.chatRepo.find({
@@ -386,7 +423,7 @@ export class WindowRotationService {
             status: Not(In([WhatsappChatStatus.FERME])),
           },
           order: { last_activity_at: 'DESC' },
-          take: slotsAvailable + validated.length,
+          take: slotsAvailable + submitted.length,
         });
 
         const toInject = newCandidates.filter((c) => !excludedIds.has(c.id)).slice(0, slotsAvailable);
@@ -411,9 +448,11 @@ export class WindowRotationService {
         `Rotation complète poste ${posteId} — libérées: ${releasedChatIds.length}, promues: ${promotedChatIds.length}`,
       );
 
-      // Créer le prochain batch d'obligations pour ce poste
+      // Créer le prochain batch d'obligations pour ce poste (non-bloquant)
       if (this.obligationService?.isEnabled()) {
-        await this.obligationService.getOrCreateActiveBatch(posteId);
+        this.obligationService.getOrCreateActiveBatch(posteId).catch((err) =>
+          this.logger.warn(`Impossible de créer le batch d'obligations pour poste ${posteId}`, err),
+        );
       }
 
       this.eventEmitter.emit(WINDOW_ROTATED_EVENT, {
@@ -484,15 +523,21 @@ export class WindowRotationService {
       .orderBy('c.window_slot', 'ASC')
       .getMany();
 
-    // Réassigner slots 1…N en batch
+    // Réassigner slots 1…N en batch.
+    // Préserver le statut VALIDATED pour ne pas annuler les rapports déjà soumis.
     const toInit: string[] = [];
     const compactAssignments = current.map((chat, i) => {
       const newSlot = i + 1;
-      const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
-      if (chat.window_status === WindowStatus.LOCKED && newStatus === WindowStatus.ACTIVE) {
+      const targetStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
+      const finalStatus =
+        chat.window_status === WindowStatus.VALIDATED && targetStatus === WindowStatus.ACTIVE
+          ? WindowStatus.VALIDATED
+          : targetStatus;
+      const isLocked = finalStatus === WindowStatus.LOCKED;
+      if (chat.window_status === WindowStatus.LOCKED && targetStatus === WindowStatus.ACTIVE) {
         toInit.push(chat.chat_id);
       }
-      return { id: chat.id, slot: newSlot, status: newStatus, isLocked: newStatus === WindowStatus.LOCKED };
+      return { id: chat.id, slot: newSlot, status: finalStatus, isLocked };
     });
     await this.batchUpdateSlots(compactAssignments);
     await this.validationEngine.initConversationValidationBulk(toInit);

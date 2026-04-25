@@ -106,17 +106,7 @@ export class SocketConversationQueryService {
       // Fallback : si buildWindowForPoste n'a pas encore tourné (pas de window_slot),
       // appliquer le verrouillage par position en mémoire pour l'affichage immédiat.
       const { quotaActive } = await this.capacityService.getQuotas();
-      const noneSlotted = chats.every((c) => c.window_slot == null);
-      if (noneSlotted && chats.length > 0) {
-        chats = chats.map((chat, idx) => {
-          const isLocked = idx >= quotaActive;
-          return Object.assign(Object.create(Object.getPrototypeOf(chat)), chat, {
-            window_slot: idx + 1,
-            window_status: isLocked ? WindowStatus.LOCKED : WindowStatus.ACTIVE,
-            is_locked: isLocked,
-          });
-        });
-      }
+      chats = chats.map((chat, idx) => this.withWindowPresentation(chat, idx, quotaActive));
     } else {
       // Mode classique : tri par activité récente
       chats.sort(
@@ -166,6 +156,30 @@ export class SocketConversationQueryService {
     chatIds: string[],
   ): Promise<Map<string, import('src/window/services/validation-engine.service').CriterionState[]>> {
     return this.validationEngine.getValidationStatesBulk(chatIds);
+  }
+
+  private withWindowPresentation(
+    chat: WhatsappChat,
+    index: number,
+    quotaActive: number,
+  ): WhatsappChat {
+    const slot = chat.window_slot ?? index + 1;
+    const status = chat.window_status ?? (slot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED);
+    const isLocked = status === WindowStatus.LOCKED;
+
+    if (
+      chat.window_slot === slot &&
+      chat.window_status === status &&
+      chat.is_locked === isLocked
+    ) {
+      return chat;
+    }
+
+    return Object.assign(Object.create(Object.getPrototypeOf(chat)), chat, {
+      window_slot: slot,
+      window_status: status,
+      is_locked: isLocked,
+    });
   }
 
   /**

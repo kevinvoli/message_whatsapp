@@ -96,6 +96,18 @@ export class ConversationReportService {
     ]));
   }
 
+  async getSubmittedMapBulk(chatIds: string[]): Promise<Map<string, boolean>> {
+    if (chatIds.length === 0) return new Map();
+    const reports = await this.repo.find({
+      where: { chatId: In(chatIds) },
+      select: ['chatId', 'isSubmitted', 'submittedAt', 'submissionStatus'],
+    });
+    return new Map(reports.map((r) => [
+      r.chatId,
+      r.isSubmitted === true || r.submittedAt != null || r.submissionStatus != null,
+    ]));
+  }
+
   async isReportComplete(chatId: string): Promise<boolean> {
     const report = await this.repo.findOne({ where: { chatId }, select: ['isComplete'] });
     return report?.isComplete ?? false;
