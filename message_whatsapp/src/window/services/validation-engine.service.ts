@@ -6,6 +6,7 @@ import { ConversationValidation } from '../entities/conversation-validation.enti
 import { ValidationCriterionConfig } from '../entities/validation-criterion-config.entity';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 
 export interface CriterionState {
   type: string;
@@ -37,6 +38,7 @@ export class ValidationEngineService {
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly systemConfig: SystemConfigService,
+    private readonly reportService: ConversationReportService,
   ) {}
 
   async getActiveCriteria(): Promise<ValidationCriterionConfig[]> {
@@ -210,7 +212,7 @@ export class ValidationEngineService {
   }
 
   /**
-   * Nombre de conversations actives validées pour un poste.
+   * Nombre de rapports soumis dans le bloc actif du poste.
    * "Bloc en cours : X / 10"
    */
   async getBlockProgress(posteId: string): Promise<BlockProgress> {
@@ -219,25 +221,13 @@ export class ValidationEngineService {
       select: ['chat_id'],
     });
 
-    if (activeChats.length === 0) {
-      const validatedChats = await this.chatRepo.find({
-        where: { poste_id: posteId, window_status: WindowStatus.VALIDATED },
-        select: ['chat_id'],
-      });
-      return { validated: validatedChats.length, total: validatedChats.length };
-    }
+    if (activeChats.length === 0) return { validated: 0, total: 0 };
 
-    const allActive = await this.chatRepo.find({
-      where: [
-        { poste_id: posteId, window_status: WindowStatus.ACTIVE },
-        { poste_id: posteId, window_status: WindowStatus.VALIDATED },
-      ],
-      select: ['chat_id', 'window_status'],
-    });
-
-    const total = allActive.length;
-    const validated = allActive.filter((c) => c.window_status === WindowStatus.VALIDATED).length;
-    return { validated, total };
+    const submittedMap = await this.reportService.getSubmittedMapBulk(
+      activeChats.map((c) => c.chat_id),
+    );
+    const submitted = activeChats.filter((c) => submittedMap.get(c.chat_id) === true).length;
+    return { validated: submitted, total: activeChats.length };
   }
 
   /**

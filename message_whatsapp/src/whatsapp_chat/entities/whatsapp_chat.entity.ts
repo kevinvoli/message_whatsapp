@@ -24,7 +24,6 @@ export enum WhatsappChatStatus {
 export enum WindowStatus {
   ACTIVE    = 'active',
   LOCKED    = 'locked',
-  VALIDATED = 'validated',
   RELEASED  = 'released',
 }
 

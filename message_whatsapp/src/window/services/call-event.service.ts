@@ -79,10 +79,7 @@ export class CallEventService {
       );
 
       if (isNew && chat.poste_id) {
-        const state = await this.validationEngine.getValidationState(chat.chat_id);
-        if (state.allRequiredMet) {
-          await this.windowRotation.onConversationValidated(chat.chat_id, chat.poste_id);
-        }
+        await this.windowRotation.checkAndTriggerRotation(chat.poste_id);
       }
     }
 
@@ -93,7 +90,7 @@ export class CallEventService {
    * Corrèle un appel à la conversation active :
    * - Exact match sur plusieurs variantes de numéro (local, international)
    * - Fallback LIKE sur les 8 derniers chiffres
-   * - Priorise les conversations dans la fenêtre active (window_status active/validated)
+   * - Priorise les conversations dans la fenêtre active (window_status active)
    * - Restriction par commercial_phone si poste identifiable
    */
   private async correlateToChat(
@@ -120,7 +117,7 @@ export class CallEventService {
         .where(`(${conditions.join(' OR ')})`, params)
         .andWhere('c.deletedAt IS NULL')
         .andWhere("c.status != 'fermé'")
-        .orderBy(`CASE WHEN c.window_status IN ('active','validated') THEN 0 ELSE 1 END`, 'ASC')
+        .orderBy(`CASE WHEN c.window_status = 'active' THEN 0 ELSE 1 END`, 'ASC')
         .addOrderBy('c.last_activity_at', 'DESC');
 
     // Essai restreint au poste du commercial

@@ -4,8 +4,8 @@ import { RealtimeServerService } from '../realtime-server.service';
 import {
   WindowRotatedPayload,
   WINDOW_ROTATED_EVENT,
-  WindowCriterionValidatedPayload,
-  WINDOW_CRITERION_VALIDATED_EVENT,
+  WindowReportSubmittedPayload,
+  WINDOW_REPORT_SUBMITTED_EVENT,
   WindowRotationBlockedPayload,
   WINDOW_ROTATION_BLOCKED_EVENT,
 } from 'src/window/services/window-rotation.service';
@@ -55,8 +55,8 @@ export class WindowPublisher {
    * 1. Pousse WINDOW_BLOCK_PROGRESS pour la barre de progression.
    * 2. Pousse CONVERSATION_UPSERT pour que le badge "Validée" apparaisse dans la liste.
    */
-  @OnEvent(WINDOW_CRITERION_VALIDATED_EVENT, { async: true })
-  async handleCriterionValidated(payload: WindowCriterionValidatedPayload & { chatId?: string }): Promise<void> {
+  @OnEvent(WINDOW_REPORT_SUBMITTED_EVENT, { async: true })
+  async handleReportSubmitted(payload: WindowReportSubmittedPayload & { chatId?: string }): Promise<void> {
     await this.emitBlockProgress(payload.posteId);
     if (payload.chatId) {
       await this.conversationPublisher.emitConversationUpsertByChatId(payload.chatId);

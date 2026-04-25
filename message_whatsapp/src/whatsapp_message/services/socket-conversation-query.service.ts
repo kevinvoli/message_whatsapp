@@ -126,7 +126,7 @@ export class SocketConversationQueryService {
     // Charger les états de validation uniquement en mode glissant (conversations actives)
     const activeChatIds = modeEnabled
       ? chats
-          .filter((c) => c.window_status === WindowStatus.ACTIVE || c.window_status === WindowStatus.VALIDATED)
+          .filter((c) => c.window_status === WindowStatus.ACTIVE)
           .map((c) => c.chat_id)
       : [];
 

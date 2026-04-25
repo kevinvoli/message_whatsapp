@@ -410,7 +410,7 @@ export interface Conversation {
 
   /** Phase 9 — Fenêtre glissante */
   window_slot?: number | null;
-  window_status?: 'active' | 'locked' | 'validated' | 'released' | null;
+  window_status?: 'active' | 'locked' | 'released' | null;
   validation_state?: ValidationCriterionState[] | null;
 
   /** Statut de soumission du rapport GICOP */

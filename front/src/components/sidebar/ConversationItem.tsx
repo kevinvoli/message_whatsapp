@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, CheckCircle, Star, Phone, AlertCircle, Send } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, Star, Phone, AlertCircle, Send } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
@@ -117,7 +117,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const slaAlert = hasSlaWarning(conversation);
   const windowStatus = conversation.window_status;
   const isLocked = windowStatus === 'locked' || (windowStatus == null && conversation.is_locked === true);
-  const isValidated = windowStatus === 'validated';
 
   // S1-006 — badge affinité (contact propriétaire)
   const affinityChats    = useChatStore((s) => s.affinityChats);
@@ -153,8 +152,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       className={`group/item relative p-4 border-b border-gray-100 transition-colors ${
         isLocked
           ? 'opacity-50 cursor-not-allowed bg-gray-50'
-          : isValidated
-          ? 'bg-green-50/60 border-l-4 border-l-green-400 cursor-pointer'
           : isChecked
           ? 'bg-blue-50 border-l-4 border-l-blue-500 cursor-pointer'
           : isSelected
@@ -214,11 +211,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             {isWaitingOnAgent && (
               <span className="flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full" title="Agent hors-ligne — message reçu dès la reconnexion">
                 <Clock className="w-3 h-3" /> Agent hors-ligne
-              </span>
-            )}
-            {isValidated && (
-              <span className="flex items-center gap-1 text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
-                <CheckCircle className="w-3 h-3" /> Validée
               </span>
             )}
             {/* S2-003 — numéro de slot x/10 */}
@@ -309,8 +301,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 <AlertCircle className="w-3 h-3 text-blue-400 flex-shrink-0" />
                 <span>
                   <span className="font-bold text-blue-300">{remainingConvs}</span>
-                  {' '}conversation{remainingConvs > 1 ? 's' : ''} à finaliser
-                  {' '}({blockProgress.validated}/{blockProgress.total} validées)
+                  {' '}conversation{remainingConvs > 1 ? 's' : ''} a finaliser
+                  {' '}({blockProgress.validated}/{blockProgress.total} rapports soumis)
                 </span>
               </div>
             )}

@@ -106,7 +106,7 @@ export class ConversationCapacityService {
     for (const row of rows) {
       const count = Number(row.cnt);
       if (row.window_status === WindowStatus.LOCKED) locked += count;
-      else if (row.window_status === WindowStatus.ACTIVE || row.window_status === WindowStatus.VALIDATED) active += count;
+      else if (row.window_status === WindowStatus.ACTIVE) active += count;
     }
     return { active, locked, total: active + locked };
   }
@@ -206,8 +206,8 @@ export class ConversationCapacityService {
   }
 
   /**
-   * @deprecated Remplacé par WindowRotationService.onConversationValidated.
-   * Conservé pour compatibilité pendant la transition.
+   * @deprecated La rotation est maintenant geree par WindowRotationService
+   * depuis la soumission du rapport.
    */
   async onConversationQualified(_posteId: string): Promise<void> {
     // La rotation par bloc est maintenant gérée par WindowRotationService.
@@ -241,7 +241,7 @@ export class ConversationCapacityService {
       .select('c.poste_id', 'posteId')
       .addSelect('p.name', 'posteName')
       .addSelect("SUM(CASE WHEN c.window_status = 'active'    THEN 1 ELSE 0 END)", 'active')
-      .addSelect("SUM(CASE WHEN c.window_status = 'validated' THEN 1 ELSE 0 END)", 'validated')
+      .addSelect('0', 'validated')
       .addSelect("SUM(CASE WHEN c.window_status = 'locked'    THEN 1 ELSE 0 END)", 'locked')
       .addSelect('COUNT(*)', 'total')
       .where('c.status != :ferme', { ferme: 'fermé' })

@@ -147,8 +147,8 @@ export class WindowController {
       await this.validationEngine.markCriterionMet(chatId, c.criterion_type, 'admin_force');
     }
     const state = await this.validationEngine.getValidationState(chatId);
-    if (state.allRequiredMet && body?.posteId) {
-      await this.windowRotation.onConversationValidated(chatId, body.posteId);
+    if (body?.posteId) {
+      await this.windowRotation.checkAndTriggerRotation(body.posteId);
     }
     return { ok: true, allRequiredMet: state.allRequiredMet, criteria: state.criteria };
   }
