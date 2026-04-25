@@ -23,6 +23,23 @@ export class MessagingClientDossierMirror {
   @Column({ name: 'id_commercial', type: 'int', nullable: true })
   idCommercial: number | null;
 
+  // ─── Identifiant messaging du client ─────────────────────────────────────
+
+  /**
+   * Contact de la messagerie : numéro WhatsApp, nom Messenger, handle Telegram ou Instagram.
+   * Source : WhatsappChat.contact_client
+   */
+  @Column({ name: 'client_messaging_contact', type: 'varchar', length: 200, nullable: true })
+  clientMessagingContact: string | null;
+
+  /**
+   * Tous les numéros de téléphone associés au client, sérialisés en JSON.
+   * Format : [{"phone":"...", "label":"...", "isPrimary":true}, ...]
+   * Source : Contact.phone (principal) + ContactPhone[]
+   */
+  @Column({ name: 'client_phones', type: 'text', nullable: true })
+  clientPhones: string | null;
+
   // ─── Données du rapport conversationnel ──────────────────────────────────
 
   @Column({ name: 'client_name', type: 'varchar', length: 200, nullable: true })

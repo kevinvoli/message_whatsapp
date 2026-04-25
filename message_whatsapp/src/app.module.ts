@@ -215,15 +215,14 @@ import { BusinessMetricsModule } from './business-metrics/business-metrics.modul
     ConversationCapacityModule,
     // Phase 4 — Dashboard technique
     SystemHealthModule,
-    // Intégration — identity mapping uniquement (InboundIntegrationModule supprimé — lecture DB2 directe)
+    // Intégration — identity mapping (lecture DB2 directe)
     IntegrationModule,
-    // Phase 9 — Fenêtre glissante, moteur de validation, webhook appels
+    // Phase 9 — Fenêtre glissante, moteur de validation
     WindowModule,
     // GICOP Sprint 4 — Rapport commercial obligatoire
     ConversationReportModule,
     // GICOP Sprint 8 — Catalogue multimédia
     CatalogModule,
-    // GicopWebhookModule supprimé — remplacé par lecture directe DB2 (OrderCallSyncModule)
     // Sprint 6 — Obligations d'appels GICOP
     CallObligationModule,
     // Sprint 1 Backlog prioritaire — Fermeture conversationnelle guidée

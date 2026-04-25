@@ -6,6 +6,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConversationReport } from './entities/conversation-report.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
+import { ContactPhone } from 'src/client-dossier/entities/contact-phone.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
 
 export interface SubmissionResult {
@@ -25,6 +27,10 @@ export class ReportSubmissionService {
     private readonly commercialRepo: Repository<WhatsappCommercial>,
     @InjectRepository(Contact)
     private readonly contactRepo: Repository<Contact>,
+    @InjectRepository(ContactPhone)
+    private readonly phoneRepo: Repository<ContactPhone>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepo: Repository<WhatsappChat>,
     private readonly mirrorService: OrderDossierMirrorWriteService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -41,24 +47,39 @@ export class ReportSubmissionService {
     report.submissionStatus = 'pending';
     await this.reportRepo.save(report);
 
-    const [commercial, contact] = await Promise.all([
+    const [commercial, contact, chat] = await Promise.all([
       this.commercialRepo.findOne({
         where:  { id: commercialId },
         select: ['name', 'phone', 'email'],
       }),
       this.contactRepo.findOne({
         where:  { chat_id: chatId },
-        select: ['id'],
+        select: ['id', 'phone'],
+      }),
+      this.chatRepo.findOne({
+        where:  { chat_id: chatId },
+        select: ['contact_client'],
       }),
     ]);
+
+    const extraPhones = contact
+      ? await this.phoneRepo.find({ where: { contactId: contact.id } })
+      : [];
+    const allPhones = [
+      ...(contact?.phone ? [{ phone: contact.phone, label: 'Principal', isPrimary: true }] : []),
+      ...extraPhones.map((p) => ({ phone: p.phone, label: p.label, isPrimary: p.isPrimary })),
+    ];
+    const clientPhonesJson = allPhones.length > 0 ? JSON.stringify(allPhones) : null;
 
     const now = new Date();
 
     try {
       await this.mirrorService.upsertDossier({
-        messagingChatId:  chatId,
-        commercialIdDb1:  commercialId,
-        contactIdDb1:     contact?.id ?? null,   // Contact.id (UUID DB1) → ClientIdentityMapping → id_client DB2
+        messagingChatId:        chatId,
+        commercialIdDb1:        commercialId,
+        contactIdDb1:           contact?.id ?? null,
+        clientMessagingContact: chat?.contact_client ?? null,
+        clientPhones:           clientPhonesJson,
         clientName:       report.clientName,
         commercialName:   commercial?.name ?? null,
         commercialPhone:  commercial?.phone ?? null,

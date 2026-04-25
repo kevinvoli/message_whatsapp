@@ -81,27 +81,19 @@ export default function IntegrationView() {
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Intégration ERP</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Mappings DB</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Correspondance entre les identifiants internes (UUID) et les identifiants externes (entiers) de votre ERP.
+          Correspondance entre les identifiants internes (UUID) et les identifiants ERP (entiers) utilisés lors des écritures dans la base commandes.
         </p>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-1">
-        <p className="font-medium">Fonctionnement</p>
-        <ul className="list-disc list-inside space-y-0.5 text-blue-700">
-          <li>
-            Webhook entrant unifié GICOP :
-            <code className="bg-blue-100 px-1 rounded mx-1">POST /webhooks/gicop</code>
-            (header <code className="bg-blue-100 px-1 rounded">x-integration-secret</code>)
-            — commandes ERP <strong>et</strong> notifications d&apos;appels
-          </li>
-          <li>
-            Vérification du webhook :
-            <code className="bg-blue-100 px-1 rounded mx-1">GET /webhooks/gicop?hub.mode=subscribe&amp;hub.verify_token=...&amp;hub.challenge=...</code>
-          </li>
-          <li>Webhook sortant vers ERP : variable d&apos;environnement <code className="bg-blue-100 px-1 rounded">INTEGRATION_ERP_URL</code></li>
-          <li>Les mappings permettent de convertir UUID ↔ ID entier dans les payloads envoyés à l&apos;ERP.</li>
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 space-y-1">
+        <p className="font-medium">Architecture DB-to-DB</p>
+        <ul className="list-disc list-inside space-y-0.5 text-emerald-700">
+          <li>La messagerie lit les données commandes directement depuis la base ERP (lecture seule).</li>
+          <li>Les rapports et fermetures sont écrits dans la table miroir <code className="bg-emerald-100 px-1 rounded">messaging_client_dossier_mirror</code> côté ERP.</li>
+          <li>Les appels téléphoniques sont lus depuis <code className="bg-emerald-100 px-1 rounded">call_logs</code> via un job incrémental — sans webhook.</li>
+          <li>Ces mappings sont requis pour convertir les UUID internes en ID entiers lors des écritures miroir.</li>
         </ul>
       </div>
 

@@ -13,6 +13,10 @@ export interface DossierMirrorPayload {
   commercialIdDb1?:   string | null;
   /** UUID DB1 du contact — résolu en int DB2 via mapping. */
   contactIdDb1?:      string | null;
+  /** Identifiant messaging : numéro WA, nom Messenger, handle Telegram/Instagram. */
+  clientMessagingContact?: string | null;
+  /** JSON des téléphones associés : [{"phone":"...","label":"...","isPrimary":true}] */
+  clientPhones?:      string | null;
   clientName?:        string | null;
   commercialName?:    string | null;
   commercialPhone?:   string | null;
@@ -34,10 +38,12 @@ export interface DossierMirrorPayload {
  * SCHÉMA À FOURNIR À L'ÉQUIPE DB2 pour création manuelle :
  *
  * CREATE TABLE messaging_client_dossier_mirror (
- *   messaging_chat_id  VARCHAR(100) NOT NULL,
- *   id_client          INT          DEFAULT NULL,
- *   id_commercial      INT          DEFAULT NULL,
- *   client_name        VARCHAR(200) DEFAULT NULL,
+ *   messaging_chat_id       VARCHAR(100) NOT NULL,
+ *   id_client               INT          DEFAULT NULL,
+ *   id_commercial           INT          DEFAULT NULL,
+ *   client_messaging_contact VARCHAR(200) DEFAULT NULL,
+ *   client_phones           TEXT         DEFAULT NULL,
+ *   client_name             VARCHAR(200) DEFAULT NULL,
  *   commercial_name    VARCHAR(200) DEFAULT NULL,
  *   commercial_phone   VARCHAR(30)  DEFAULT NULL,
  *   commercial_email   VARCHAR(200) DEFAULT NULL,
@@ -111,10 +117,12 @@ export class OrderDossierMirrorWriteService {
       ]);
 
       const row: Partial<MessagingClientDossierMirror> = {
-        messagingChatId:    payload.messagingChatId,
-        idClient:           idClient ?? null,
-        idCommercial:       idCommercial ?? null,
-        clientName:         payload.clientName ?? null,
+        messagingChatId:        payload.messagingChatId,
+        idClient:               idClient ?? null,
+        idCommercial:           idCommercial ?? null,
+        clientMessagingContact: payload.clientMessagingContact ?? null,
+        clientPhones:           payload.clientPhones ?? null,
+        clientName:             payload.clientName ?? null,
         commercialName:     payload.commercialName ?? null,
         commercialPhone:    payload.commercialPhone ?? null,
         commercialEmail:    payload.commercialEmail ?? null,
