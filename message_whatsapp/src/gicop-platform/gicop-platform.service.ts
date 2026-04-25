@@ -29,5 +29,6 @@ export class GicopPlatformService {
       // On ne propage pas l'erreur : l'échec de la plateforme externe ne doit pas
       // bloquer la clôture locale de la conversation.
     }
+    
   }
 }
