@@ -106,6 +106,38 @@ export default function GicopSupervisionView() {
 
   return (
     <div className="space-y-6">
+
+      {/* ── Bandeau DB2 — affiché en permanence, rouge si non connectée ── */}
+      {syncStatus !== null && (
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium
+          ${syncStatus.db2.dbAvailable
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50  border-red-300  text-red-800'
+          }`}>
+          <Database className={`w-4 h-4 flex-shrink-0 ${syncStatus.db2.dbAvailable ? 'text-green-600' : 'text-red-600'}`} />
+          <span>
+            DB2 (base commandes) :&nbsp;
+            <strong>{syncStatus.db2.dbAvailable ? 'Connectée' : 'Non disponible'}</strong>
+          </span>
+          {syncStatus.db2.dbAvailable && syncStatus.db2.lastSyncAt && (
+            <span className="ml-auto text-xs text-green-600">
+              Dernière sync : {formatDate(syncStatus.db2.lastSyncAt)}
+            </span>
+          )}
+          {!syncStatus.db2.dbAvailable && (
+            <span className="ml-auto text-xs text-red-600">
+              Les rapports ne peuvent pas être copiés. Vérifier ORDER_DB_HOST / ORDER_DB_USER / ORDER_DB_PASSWORD dans .env
+            </span>
+          )}
+        </div>
+      )}
+      {syncStatus === null && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-orange-50 border-orange-200 text-orange-800 text-sm font-medium">
+          <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
+          <span>Statut DB2 non disponible — impossible de joindre le backend</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

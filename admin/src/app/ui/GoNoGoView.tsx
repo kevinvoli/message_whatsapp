@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, Database, RefreshCw, ShieldAlert } from 'lucide-react';
 import { CronConfig, GoNoGoChecklistItem, GoNoGoGate, GoNoGoGateStatus, SystemConfigEntry, WebhookMetricsSnapshot } from '@/app/lib/definitions';
 import { formatDate } from '@/app/lib/dateUtils';
-import { getWebhookMetrics } from '@/app/lib/api/metrics.api';
+import { getWebhookMetrics, getOrderSyncStatus, OrderSyncStatus } from '@/app/lib/api/metrics.api';
 import { getCronConfigs } from '@/app/lib/api/crons.api';
 import { getSystemConfigs } from '@/app/lib/api/system-config.api';
 import { goNoGoChecklist } from '@/app/data/admin-data';
@@ -189,6 +189,36 @@ const buildGicopGates = (crons: CronConfig[], configs: SystemConfigEntry[]): GoN
   return gates;
 };
 
+const buildInfraGates = (syncStatus: OrderSyncStatus | null | 'loading'): GoNoGoGate[] => {
+  if (syncStatus === 'loading' || syncStatus === null) {
+    return [{
+      id:     'infra-db2',
+      title:  '[INFRA] DB2 — Base commandes',
+      status: syncStatus === 'loading' ? 'pending' : 'pending',
+      detail: syncStatus === null ? 'Impossible de joindre le backend' : 'Chargement…',
+    }];
+  }
+
+  const { dbAvailable, lastSyncAt, processedCount } = syncStatus.db2;
+  const syncFailed  = syncStatus.syncLog['failed']  ?? 0;
+  const syncPending = syncStatus.syncLog['pending']  ?? 0;
+
+  const db2Status: GoNoGoGateStatus = dbAvailable
+    ? syncFailed > 0 ? 'warn' : 'pass'
+    : 'fail';
+
+  const detail = dbAvailable
+    ? `Connectée · ${processedCount.toLocaleString('fr-FR')} appels traités · dernière sync : ${lastSyncAt ? new Date(lastSyncAt).toLocaleString('fr-FR') : '—'}${syncFailed > 0 ? ` · ⚠ ${syncFailed} sync en échec` : ''}${syncPending > 0 ? ` · ${syncPending} en attente` : ''}`
+    : 'Non disponible — vérifier ORDER_DB_HOST / ORDER_DB_USER / ORDER_DB_PASSWORD / ORDER_DB_NAME dans .env';
+
+  return [{
+    id:     'infra-db2',
+    title:  '[INFRA] DB2 — Base commandes',
+    status: db2Status,
+    detail,
+  }];
+};
+
 const overallStatus = (gates: GoNoGoGate[], checklist: GoNoGoChecklistItem[]): GoNoGoGateStatus => {
   const allStatuses = [...gates.map((g) => g.status), ...checklist.map((c) => c.status)];
   if (allStatuses.some((s) => s === 'fail')) return 'fail';
@@ -198,9 +228,10 @@ const overallStatus = (gates: GoNoGoGate[], checklist: GoNoGoChecklistItem[]): G
 };
 
 export default function GoNoGoView({ onRefresh }: Props) {
-  const [metrics, setMetrics] = useState<WebhookMetricsSnapshot | null>(null);
-  const [crons, setCrons]     = useState<CronConfig[]>([]);
-  const [configs, setConfigs] = useState<SystemConfigEntry[]>([]);
+  const [metrics, setMetrics]         = useState<WebhookMetricsSnapshot | null>(null);
+  const [crons, setCrons]             = useState<CronConfig[]>([]);
+  const [configs, setConfigs]         = useState<SystemConfigEntry[]>([]);
+  const [syncStatus, setSyncStatus]   = useState<OrderSyncStatus | null | 'loading'>('loading');
   const [loadingGicop, setLoadingGicop] = useState(false);
   const checklist = goNoGoChecklist;
 
@@ -212,9 +243,14 @@ export default function GoNoGoView({ onRefresh }: Props) {
   const fetchGicop = useCallback(async () => {
     setLoadingGicop(true);
     try {
-      const [cronData, configData] = await Promise.all([getCronConfigs(), getSystemConfigs()]);
+      const [cronData, configData, syncData] = await Promise.all([
+        getCronConfigs(),
+        getSystemConfigs(),
+        getOrderSyncStatus().catch(() => null),
+      ]);
       setCrons(cronData);
       setConfigs(configData);
+      setSyncStatus(syncData);
     } finally {
       setLoadingGicop(false);
     }
@@ -225,9 +261,10 @@ export default function GoNoGoView({ onRefresh }: Props) {
     void fetchGicop();
   }, [fetchData, fetchGicop]);
 
-  const gates = buildSloGates(metrics);
-  const gicoGates = buildGicopGates(crons, configs);
-  const global = overallStatus([...gates, ...gicoGates], checklist);
+  const gates      = buildSloGates(metrics);
+  const gicoGates  = buildGicopGates(crons, configs);
+  const infraGates = buildInfraGates(syncStatus);
+  const global = overallStatus([...gates, ...gicoGates, ...infraGates], checklist);
   const globalConfig = statusConfig[global];
   const GlobalIcon = globalConfig.icon;
 
@@ -269,6 +306,38 @@ export default function GoNoGoView({ onRefresh }: Props) {
                   <span className="ml-auto text-xs font-semibold">{cfg.label}</span>
                 </div>
                 {gate.detail && <p className="text-xs mt-1">{gate.detail}</p>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Section Infrastructure ── */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-semibold text-gray-900">Infrastructure</h3>
+          </div>
+          <button onClick={() => void fetchGicop()} disabled={loadingGicop}
+            className="p-1 rounded hover:bg-gray-100 text-gray-500">
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingGicop ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          {infraGates.map((gate) => {
+            const cfg = statusConfig[gate.status];
+            const Icon = cfg.icon;
+            return (
+              <div key={gate.id} className={`p-3 rounded-lg border ${cfg.className}`}>
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm font-semibold">{gate.title}</span>
+                  <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full border border-current">
+                    {cfg.label}
+                  </span>
+                </div>
+                {gate.detail && <p className="text-xs mt-1.5 font-mono">{gate.detail}</p>}
               </div>
             );
           })}

@@ -102,3 +102,20 @@ export async function getWebhookMetrics(): Promise<WebhookMetricsSnapshot> {
     });
     return handleResponse<WebhookMetricsSnapshot>(response);
 }
+
+export interface OrderSyncStatus {
+    db2: {
+        dbAvailable: boolean;
+        lastSyncAt:   string | null;
+        processedCount: number;
+    };
+    syncLog: Record<string, number>;
+}
+
+export async function getOrderSyncStatus(): Promise<OrderSyncStatus> {
+    const response = await fetch(`${API_BASE_URL}/admin/order-sync/status`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<OrderSyncStatus>(response);
+}
