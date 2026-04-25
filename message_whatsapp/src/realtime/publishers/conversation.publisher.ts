@@ -152,16 +152,6 @@ export class ConversationPublisher {
   }
 
   /**
-   * Émet CONVERSATION_REMOVED dès qu'une conversation est fermée (manuellement ou auto).
-   * Le frontend retire la conversation du bandeau sans rechargement.
-   */
-  @OnEvent('conversation.closed', { async: true })
-  handleConversationClosed(payload: { chatId: string; posteId: string | null }): void {
-    if (!payload.posteId) return;
-    this.emitConversationRemoved(payload.chatId, payload.posteId);
-  }
-
-  /**
    * Pousse un event REPORT_SUBMITTED au front dès que le rapport est soumis.
    * Le frontend met à jour le badge "rapport envoyé" sans rechargement.
    */
@@ -171,11 +161,13 @@ export class ConversationPublisher {
     posteId: string | null;
   }): Promise<void> {
     if (!payload.posteId) return;
+    // Retirer immédiatement la conversation du bandeau (avant rotation)
+    this.emitConversationRemoved(payload.chatId, payload.posteId);
     this.realtimeServer.getServer().to(`poste:${payload.posteId}`).emit('chat:event', {
       type: 'REPORT_SUBMITTED',
       payload: { chat_id: payload.chatId, report_submission_status: 'sent' },
     });
-    this.logger.log(`REPORT_SUBMITTED émis pour chat=${payload.chatId} → poste:${payload.posteId}`);
+    this.logger.log(`REPORT_SUBMITTED + CONVERSATION_REMOVED émis pour chat=${payload.chatId} → poste:${payload.posteId}`);
   }
 
   isAgentConnected(posteId: string, connectedPosteIds: string[]): boolean {

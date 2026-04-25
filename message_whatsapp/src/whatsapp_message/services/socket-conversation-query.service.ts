@@ -53,9 +53,11 @@ export class SocketConversationQueryService {
       // slottées (ACTIVE+LOCKED, y compris celles avec une activité ancienne) apparaissent.
 
       // 1. Toutes les conversations avec un slot assigné (max quotaTotal ≈ 50)
+      //    excludeStatuses=[] : en mode fenêtre, le statut métier ne contrôle pas
+      //    la visibilité — seul window_status=RELEASED exclut une conversation.
       const { chats: slotted } = await this.chatService.findByPosteId(
         posteId,
-        ['fermé', 'converti'],
+        [],
         100,
         undefined,
         WindowStatus.RELEASED,
@@ -69,7 +71,7 @@ export class SocketConversationQueryService {
       if (needed > 0) {
         const { chats: ns } = await this.chatService.findByPosteId(
           posteId,
-          ['fermé', 'converti'],
+          [],
           needed + 5,
           undefined,
           WindowStatus.RELEASED,

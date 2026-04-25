@@ -8,7 +8,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactPhone } from 'src/client-dossier/entities/contact-phone.entity';
 import { ClientDossier } from 'src/client-dossier/entities/client-dossier.entity';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
 
 export interface SubmissionResult {
@@ -99,22 +99,9 @@ export class ReportSubmissionService {
       }),
       this.chatRepo.findOne({
         where:  { chat_id: chatId },
-        select: ['contact_client', 'poste_id', 'status'],
+        select: ['contact_client', 'poste_id'],
       }),
     ]);
-
-    // ── Auto-fermeture à la première soumission ──────────────────────────────
-    // La conversation disparaît du bandeau commercial sans action manuelle.
-    if (isFirstSubmission && chat?.poste_id && chat.status !== WhatsappChatStatus.FERME) {
-      await this.chatRepo.update({ chat_id: chatId }, { status: WhatsappChatStatus.FERME });
-      this.eventEmitter.emit('conversation.closed', {
-        chatId,
-        commercialId,
-        posteId: chat.poste_id,
-        conversationResult: null,
-        closedAt: new Date(),
-      });
-    }
 
     // ── Émettre les événements (sans attendre DB2) ──────────────────────────
     // conversation.report.submitted : une seule fois (portefeuille, publisher).
