@@ -46,7 +46,15 @@ export class SocketConversationQueryService {
   ): Promise<ConversationQueryResult> {
     const modeEnabled = await this.capacityService.isWindowModeEnabled();
 
-    let { chats } = await this.chatService.findByPosteId(posteId, [], 50);
+    // En mode fenêtre glissante, exclure les RELEASED dès la requête DB pour ne pas
+    // les laisser occuper des slots dans le top-50 et évincer les LOCKED (grises).
+    let { chats } = await this.chatService.findByPosteId(
+      posteId,
+      [],
+      50,
+      undefined,
+      modeEnabled ? WindowStatus.RELEASED : undefined,
+    );
 
     if (tenantIds.length > 0) {
       const tenantSet = new Set(tenantIds);
@@ -54,10 +62,6 @@ export class SocketConversationQueryService {
     }
 
     if (modeEnabled) {
-      // Exclure les conversations libérées (rotation passée) — elles ont window_slot=null
-      // et window_status=RELEASED, elles ne doivent plus apparaître dans la fenêtre active.
-      chats = chats.filter((c) => c.window_status !== WindowStatus.RELEASED);
-
       // Trier par window_slot ASC (conversations slottées d'abord, puis par activité)
       chats.sort((a, b) => {
         if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;

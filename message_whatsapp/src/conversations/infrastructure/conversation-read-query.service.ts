@@ -75,6 +75,7 @@ export class ConversationReadQueryService {
     excludeStatuses: string[] = ['fermé', 'converti'],
     limit = 300,
     cursor?: { activityAt: string; chatId: string },
+    excludeWindowStatus?: string,
   ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
     const qb = this.chatRepository
       .createQueryBuilder('chat')
@@ -88,6 +89,13 @@ export class ConversationReadQueryService {
 
     if (excludeStatuses.length > 0) {
       qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });
+    }
+
+    if (excludeWindowStatus) {
+      qb.andWhere(
+        '(chat.window_status IS NULL OR chat.window_status != :excludeWindowStatus)',
+        { excludeWindowStatus },
+      );
     }
 
     if (cursor) {

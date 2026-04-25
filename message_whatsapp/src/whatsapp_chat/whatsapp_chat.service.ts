@@ -46,8 +46,9 @@ export class WhatsappChatService {
     excludeStatuses: string[] = ['fermé', 'converti'],
     limit = 300,
     cursor?: { activityAt: string; chatId: string },
+    excludeWindowStatus?: string,
   ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
-    return this.readQuery.findByPosteId(poste_id, excludeStatuses, limit, cursor);
+    return this.readQuery.findByPosteId(poste_id, excludeStatuses, limit, cursor, excludeWindowStatus);
   }
 
   /** @see ConversationReadQueryService.getTotalUnreadForPoste */
