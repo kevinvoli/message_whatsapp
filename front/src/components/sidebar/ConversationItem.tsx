@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, CheckCircle, Star, Phone, AlertCircle } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, CheckCircle, Star, Phone, AlertCircle, Send } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
@@ -239,6 +239,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             {slaAlert && !isLocked && (
               <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full" title="Client en attente depuis plus de 30 min">
                 <Clock className="w-3 h-3" /> SLA
+              </span>
+            )}
+            {conversation.report_submission_status === 'sent' && !isLocked && (
+              <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full" title="Rapport soumis à la plateforme GICOP">
+                <Send className="w-3 h-3" /> Rapport
+              </span>
+            )}
+            {conversation.report_submission_status === 'failed' && !isLocked && (
+              <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full" title="Échec de soumission du rapport — relancer depuis l'onglet Dossier">
+                <AlertCircle className="w-3 h-3" /> Rapport KO
               </span>
             )}
             <ProviderBadge chatId={conversation.chat_id} showLabel={true} />

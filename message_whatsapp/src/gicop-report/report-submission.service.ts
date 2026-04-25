@@ -58,7 +58,7 @@ export class ReportSubmissionService {
       }),
       this.chatRepo.findOne({
         where:  { chat_id: chatId },
-        select: ['contact_client'],
+        select: ['contact_client', 'poste_id'],
       }),
     ]);
 
@@ -98,7 +98,18 @@ export class ReportSubmissionService {
       report.submissionStatus = 'sent';
       report.submittedAt      = now;
       report.submissionError  = null;
-      this.eventEmitter.emit('conversation.report.submitted', { chatId, commercialId });
+      // Notifie le système de validation fenêtre + UI temps réel
+      this.eventEmitter.emit('conversation.report.submitted', {
+        chatId,
+        commercialId,
+        posteId: chat?.poste_id ?? null,
+      });
+      // Marque le critère result_set pour que la conversation soit comptabilisée
+      // dans le bloc objectifs (X/Y validées dans la fenêtre glissante)
+      this.eventEmitter.emit('conversation.result_set', {
+        chatId,
+        posteId: chat?.poste_id ?? null,
+      });
       this.logger.log(`Rapport soumis en DB2 mirror: chat=${chatId}`);
     } catch (err) {
       report.submissionStatus = 'failed';

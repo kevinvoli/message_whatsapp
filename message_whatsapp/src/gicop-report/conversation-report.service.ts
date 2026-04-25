@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ConversationReport, NextAction } from './entities/conversation-report.entity';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -80,6 +80,17 @@ export class ConversationReportService {
     report.validatedAt = new Date();
     report.validatedById = validatedById;
     return this.repo.save(report);
+  }
+
+  async getSubmissionStatusBulk(
+    chatIds: string[],
+  ): Promise<Map<string, 'pending' | 'sent' | 'failed' | null>> {
+    if (chatIds.length === 0) return new Map();
+    const reports = await this.repo.find({
+      where:  { chatId: In(chatIds) },
+      select: ['chatId', 'submissionStatus'],
+    });
+    return new Map(reports.map((r) => [r.chatId, r.submissionStatus]));
   }
 
   async isReportComplete(chatId: string): Promise<boolean> {

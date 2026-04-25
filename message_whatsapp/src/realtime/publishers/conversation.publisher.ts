@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -148,6 +149,23 @@ export class ConversationPublisher {
       type: 'CONVERSATION_UPSERT',
       payload: mapConversation(chat, lastMessage, chat.unread_count ?? 0),
     });
+  }
+
+  /**
+   * Pousse un event REPORT_SUBMITTED au front dès que le rapport est soumis.
+   * Le frontend met à jour le badge "rapport envoyé" sans rechargement.
+   */
+  @OnEvent('conversation.report.submitted', { async: true })
+  async handleReportSubmitted(payload: {
+    chatId: string;
+    posteId: string | null;
+  }): Promise<void> {
+    if (!payload.posteId) return;
+    this.realtimeServer.getServer().to(`poste:${payload.posteId}`).emit('chat:event', {
+      type: 'REPORT_SUBMITTED',
+      payload: { chat_id: payload.chatId, report_submission_status: 'sent' },
+    });
+    this.logger.log(`REPORT_SUBMITTED émis pour chat=${payload.chatId} → poste:${payload.posteId}`);
   }
 
   isAgentConnected(posteId: string, connectedPosteIds: string[]): boolean {

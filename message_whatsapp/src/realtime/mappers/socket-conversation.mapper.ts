@@ -63,9 +63,11 @@ export function mapConversationWithContact(
   unreadCount: number,
   contact?: Contact,
   validationState?: CriterionState[],
+  reportSubmissionStatus?: 'pending' | 'sent' | 'failed' | null,
 ) {
   return {
     ...mapConversation(chat, lastMessage, unreadCount, validationState),
+    report_submission_status: reportSubmissionStatus ?? null,
     contact_summary: contact
       ? {
           id: contact.id,

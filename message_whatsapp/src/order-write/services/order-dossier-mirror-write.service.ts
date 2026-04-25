@@ -96,8 +96,7 @@ export class OrderDossierMirrorWriteService {
    */
   async upsertDossier(payload: DossierMirrorPayload): Promise<void> {
     if (!this.orderDb) {
-      this.logger.warn(`DB2 non disponible — dossier ${payload.messagingChatId} non synchronisé`);
-      return;
+      throw new Error('DB2 non disponible — ORDER_DB_HOST non configuré ou connexion échouée');
     }
 
     const logEntry = await this.syncLog.createPending(

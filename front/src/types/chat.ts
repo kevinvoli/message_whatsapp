@@ -413,6 +413,9 @@ export interface Conversation {
   window_status?: 'active' | 'locked' | 'validated' | 'released' | null;
   validation_state?: ValidationCriterionState[] | null;
 
+  /** Statut de soumission du rapport GICOP */
+  report_submission_status?: 'pending' | 'sent' | 'failed' | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -639,6 +642,7 @@ interface RawConversationData {
   window_slot?: number | null;
   window_status?: string | null;
   validation_state?: any[] | null;
+  report_submission_status?: string | null;
 }
 
 interface RawCommercialData {
@@ -916,6 +920,7 @@ export const transformToConversation = (
 
     window_slot: raw.window_slot ?? null,
     window_status: (raw.window_status ?? null) as Conversation['window_status'],
+    report_submission_status: (raw.report_submission_status ?? null) as Conversation['report_submission_status'],
     validation_state: Array.isArray(raw.validation_state)
       ? raw.validation_state.map((c: any) => ({
           type: c.type,

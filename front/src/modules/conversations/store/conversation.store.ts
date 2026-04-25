@@ -58,6 +58,7 @@ export interface ConversationSlice {
     cursor: ConversationCursor | null,
   ) => void;
   updateConversation: (conversation: Conversation) => void;
+  patchConversation: (chatId: string, patch: Partial<Conversation>) => void;
   addConversation: (conversation: Conversation) => void;
   removeConversationBychat_id: (conversationId: string) => void;
 
@@ -227,6 +228,18 @@ export const createConversationSlice: StateCreator<
         newConversation,
         ...state.conversations.filter((c) => c.chat_id !== newConversation.chat_id),
       ],
+    }));
+  },
+
+  patchConversation: (chatId, patch) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.chat_id === chatId ? { ...c, ...patch } : c,
+      ),
+      selectedConversation:
+        state.selectedConversation?.chat_id === chatId
+          ? { ...state.selectedConversation, ...patch }
+          : state.selectedConversation,
     }));
   },
 

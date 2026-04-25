@@ -230,6 +230,16 @@ export function handleChatEvent(
       break;
     }
 
+    // Rapport GICOP soumis — mise à jour du badge en temps réel
+    case 'REPORT_SUBMITTED': {
+      const { chat_id, report_submission_status } = data.payload as {
+        chat_id: string;
+        report_submission_status: 'sent' | 'failed' | 'pending';
+      };
+      chatState.patchConversation(chat_id, { report_submission_status });
+      break;
+    }
+
     // Clôture bloquée (rapport de conversation incomplet)
     case 'CONVERSATION_CLOSE_BLOCKED': {
       const blockedPayload = data.payload as { chat_id?: string; reason?: string };

@@ -11,6 +11,7 @@ import {
 } from 'src/realtime/mappers/socket-conversation.mapper';
 import { ValidationEngineService } from 'src/window/services/validation-engine.service';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 
 export interface ConversationQueryResult {
   conversations: ReturnType<typeof mapConversationWithContact>[];
@@ -29,6 +30,7 @@ export class SocketConversationQueryService {
     private readonly channelService: ChannelService,
     private readonly validationEngine: ValidationEngineService,
     private readonly capacityService: ConversationCapacityService,
+    private readonly reportService: ConversationReportService,
   ) {}
 
   /**
@@ -97,11 +99,12 @@ export class SocketConversationQueryService {
           .map((c) => c.chat_id)
       : [];
 
-    const [lastMsgMap, unreadMap, contactMap, validationMap] = await Promise.all([
+    const [lastMsgMap, unreadMap, contactMap, validationMap, reportStatusMap] = await Promise.all([
       this.messageService.findLastMessagesBulk(chatIds),
       this.messageService.countUnreadMessagesBulk(chatIds),
       this.contactService.findByChatIds(chatIds),
       this.loadValidationStates(activeChatIds),
+      this.reportService.getSubmissionStatusBulk(chatIds),
     ]);
 
     const conversations = chats.map((chat) =>
@@ -111,6 +114,7 @@ export class SocketConversationQueryService {
         unreadMap.get(chat.chat_id) ?? chat.unread_count ?? 0,
         contactMap.get(chat.chat_id),
         validationMap.get(chat.chat_id),
+        reportStatusMap.get(chat.chat_id) ?? null,
       ),
     );
 
