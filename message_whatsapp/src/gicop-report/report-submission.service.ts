@@ -161,9 +161,8 @@ export class ReportSubmissionService {
 
     await this.reportRepo.save(report);
 
-    // Retourne toujours 'sent' si le commercial a soumis — la sync DB2 est en arrière-plan.
     return {
-      status:      'sent',
+      status:      report.submissionStatus ?? 'failed',
       submittedAt: report.submittedAt,
       error:       report.submissionStatus === 'failed' ? report.submissionError : null,
     };
@@ -174,10 +173,8 @@ export class ReportSubmissionService {
       where: { chatId },
       select: ['isSubmitted', 'submissionStatus', 'submittedAt', 'submissionError'],
     });
-    // Si le commercial a soumis, on retourne 'sent' même si la sync DB2 est en attente/échec.
-    // La sync DB2 se fait en arrière-plan via le retry automatique.
     return {
-      status:      report?.isSubmitted ? 'sent' : (report?.submissionStatus ?? null),
+      status:      report?.submissionStatus ?? null,
       submittedAt: report?.submittedAt ?? null,
       error:       report?.submissionStatus === 'failed' ? (report?.submissionError ?? null) : null,
     };

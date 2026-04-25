@@ -93,8 +93,12 @@ export default function GicopSupervisionView() {
         method: 'POST',
         credentials: 'include',
       });
-      setRetryResults((prev) => ({ ...prev, [chatId]: res.ok ? 'ok' : 'error' }));
-      if (res.ok) {
+      const data = res.ok
+        ? await res.json().catch(() => null) as { status?: string } | null
+        : null;
+      const ok = res.ok && data?.status === 'sent';
+      setRetryResults((prev) => ({ ...prev, [chatId]: ok ? 'ok' : 'error' }));
+      if (ok) {
         setFailedReports((prev) => prev.filter((r) => r.chatId !== chatId));
       }
     } catch {

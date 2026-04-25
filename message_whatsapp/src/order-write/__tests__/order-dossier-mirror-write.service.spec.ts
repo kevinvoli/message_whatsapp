@@ -78,10 +78,10 @@ describe('OrderDossierMirrorWriteService', () => {
 
   describe('upsertDossier', () => {
 
-    it('ne fait rien si DB2 non disponible (orderDb=null)', async () => {
+    it('lève une erreur si DB2 non disponible (orderDb=null)', async () => {
       const syncLog = makeSyncLog();
       const svc = buildService(null, false, syncLog);
-      await svc.upsertDossier(makePayload());
+      await expect(svc.upsertDossier(makePayload())).rejects.toThrow('DB2 non disponible');
       expect(syncLog.createPending).not.toHaveBeenCalled();
     });
 
