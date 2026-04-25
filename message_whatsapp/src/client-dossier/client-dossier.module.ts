@@ -12,6 +12,7 @@ import { ClientDossierService } from './client-dossier.service';
 import { ClientDossierController } from './client-dossier.controller';
 import { GicopPlatformModule } from 'src/gicop-platform/gicop-platform.module';
 import { ClosurePortfolioListener } from './listeners/closure-portfolio.listener';
+import { ReportPortfolioListener } from './listeners/report-portfolio.listener';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { ClosurePortfolioListener } from './listeners/closure-portfolio.listener
     GicopPlatformModule,
   ],
   controllers: [ClientDossierController],
-  providers: [ClientDossierService, ClosurePortfolioListener],
+  providers: [ClientDossierService, ClosurePortfolioListener, ReportPortfolioListener],
   exports: [ClientDossierService, TypeOrmModule],
 })
 export class ClientDossierModule {}

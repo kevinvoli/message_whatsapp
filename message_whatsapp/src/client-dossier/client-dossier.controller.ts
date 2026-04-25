@@ -74,8 +74,9 @@ export class ClientDossierController {
   upsertByChatId(
     @Param('chatId') chatId: string,
     @Body() dto: UpsertDossierDto,
+    @Request() req: { user: JwtUser },
   ) {
-    return this.service.upsertByChatId(chatId, dto);
+    return this.service.upsertByChatId(chatId, dto, req.user.userId);
   }
 
   // ── Gestion des numéros de téléphone ────────────────────────────────────

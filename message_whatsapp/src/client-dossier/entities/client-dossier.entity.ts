@@ -16,6 +16,10 @@ export class ClientDossier {
   @Column({ name: 'contact_id', type: 'char', length: 36 })
   contactId: string;
 
+  /** Commercial qui a créé ou mis à jour ce dossier en dernier. */
+  @Column({ name: 'commercial_id', type: 'char', length: 36, nullable: true, default: null })
+  commercialId: string | null;
+
   // ── Identification ────────────────────────────────────────────────────────
   @Column({ name: 'full_name', type: 'varchar', length: 200, nullable: true, default: null })
   fullName: string | null;

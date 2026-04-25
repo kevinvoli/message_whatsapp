@@ -78,7 +78,7 @@ export class ClientDossierService {
   }
 
   /** Upsert du dossier structuré par chatId */
-  async upsertByChatId(chatId: string, dto: UpsertDossierDto): Promise<ClientDossier> {
+  async upsertByChatId(chatId: string, dto: UpsertDossierDto, commercialId?: string): Promise<ClientDossier> {
     const contact = await this.contactRepo.findOne({ where: { chat_id: chatId } });
 
     if (!contact) {
@@ -90,6 +90,8 @@ export class ClientDossierService {
     if (!dossier) {
       dossier = this.dossierRepo.create({ contactId: contact.id });
     }
+
+    if (commercialId) dossier.commercialId = commercialId;
 
     if (dto.fullName !== undefined) dossier.fullName = dto.fullName ?? null;
     if (dto.ville !== undefined) dossier.ville = dto.ville ?? null;

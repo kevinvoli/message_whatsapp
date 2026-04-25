@@ -1,12 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConversationReport } from './entities/conversation-report.entity';
+import { ConversationReport, NextAction } from './entities/conversation-report.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactPhone } from 'src/client-dossier/entities/contact-phone.entity';
+import { ClientDossier } from 'src/client-dossier/entities/client-dossier.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
 
@@ -29,6 +30,8 @@ export class ReportSubmissionService {
     private readonly contactRepo: Repository<Contact>,
     @InjectRepository(ContactPhone)
     private readonly phoneRepo: Repository<ContactPhone>,
+    @InjectRepository(ClientDossier)
+    private readonly dossierRepo: Repository<ClientDossier>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly mirrorService: OrderDossierMirrorWriteService,
@@ -36,8 +39,39 @@ export class ReportSubmissionService {
   ) {}
 
   async submitReport(chatId: string, commercialId: string): Promise<SubmissionResult> {
-    const report = await this.reportRepo.findOne({ where: { chatId } });
-    if (!report) throw new NotFoundException(`Rapport introuvable pour la conversation ${chatId}`);
+    let report = await this.reportRepo.findOne({ where: { chatId } });
+
+    // ── Fallback : créer ConversationReport depuis ClientDossier si absent ────
+    // Cela arrive quand le commercial a sauvegardé avant le déploiement du fix
+    // qui synchronise les deux tables lors de la sauvegarde.
+    if (!report) {
+      const contact = await this.contactRepo.findOne({ where: { chat_id: chatId }, select: ['id'] });
+      const dossier = contact
+        ? await this.dossierRepo.findOne({ where: { contactId: contact.id } })
+        : null;
+
+      if (!dossier || !(dossier.fullName?.trim() && dossier.clientNeed?.trim() && dossier.interestScore !== null)) {
+        throw new BadRequestException('Rapport incomplet — renseignez le nom client, le besoin et le score d\'intérêt');
+      }
+
+      report = this.reportRepo.create({
+        chatId,
+        commercialId,
+        clientName:          dossier.fullName,
+        ville:               dossier.ville,
+        commune:             dossier.commune,
+        quartier:            dossier.quartier,
+        productCategory:     dossier.productCategory,
+        clientNeed:          dossier.clientNeed,
+        interestScore:       dossier.interestScore,
+        isMaleNotInterested: dossier.isMaleNotInterested,
+        followUpAt:          dossier.followUpAt,
+        nextAction:          (dossier.nextAction as NextAction | null) ?? null,
+        notes:               dossier.notes,
+        isComplete:          true,
+      });
+      await this.reportRepo.save(report);
+    }
 
     if (!report.isComplete) {
       throw new BadRequestException('Rapport incomplet — renseignez le nom client, le besoin et le score d\'intérêt');
