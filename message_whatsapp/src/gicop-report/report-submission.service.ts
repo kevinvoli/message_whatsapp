@@ -103,17 +103,22 @@ export class ReportSubmissionService {
       }),
     ]);
 
-    // ── Émettre les événements dès la première soumission (sans attendre DB2) ─
-    // La validation de fenêtre et le badge UI ne dépendent pas de la sync DB2.
+    // ── Émettre les événements (sans attendre DB2) ──────────────────────────
+    // conversation.report.submitted : une seule fois (portefeuille, publisher).
+    // conversation.result_set       : à chaque soumission — idempotent côté
+    //   validation, mais permet de relancer le checkAndTriggerRotation même
+    //   en cas de re-soumission ou si la rotation a échoué silencieusement.
     if (isFirstSubmission) {
       this.eventEmitter.emit('conversation.report.submitted', {
         chatId,
         commercialId,
         posteId: chat?.poste_id ?? null,
       });
+    }
+    if (chat?.poste_id) {
       this.eventEmitter.emit('conversation.result_set', {
         chatId,
-        posteId: chat?.poste_id ?? null,
+        posteId: chat.poste_id,
       });
     }
 
