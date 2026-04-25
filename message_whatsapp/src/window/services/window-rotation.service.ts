@@ -207,6 +207,9 @@ export class WindowRotationService {
     if (!hasWindow) {
       this.logger.log(`Fenêtre non initialisée pour poste ${payload.posteId} — auto-build au dépôt du rapport`);
       await this.buildWindowForPoste(payload.posteId);
+      // Synchronise window_status=VALIDATED pour les conversations actives dont
+      // result_set est déjà validé (soumises avant le déploiement du mode fenêtre).
+      await this.syncValidatedStatusAfterBuild(payload.posteId);
     }
 
     // Mode glissant : moteur de validation + rotation éventuelle
@@ -451,6 +454,41 @@ export class WindowRotationService {
     } finally {
       this.rotatingPostes.delete(posteId);
     }
+  }
+
+  /**
+   * Après un auto-build, certaines conversations sont ACTIVE mais ont déjà leurs critères
+   * validés (soumises avant le déploiement du mode fenêtre glissante).
+   * Cette méthode les marque VALIDATED pour que checkAndTriggerRotation() fonctionne.
+   */
+  private async syncValidatedStatusAfterBuild(posteId: string): Promise<void> {
+    const activeChats = await this.chatRepo.find({
+      where: { poste_id: posteId, window_status: WindowStatus.ACTIVE },
+      select: ['id', 'chat_id'],
+    });
+    if (activeChats.length === 0) return;
+
+    const statesMap = await this.validationEngine.getValidationStatesBulk(
+      activeChats.map((c) => c.chat_id),
+    );
+
+    const toValidate = activeChats.filter((c) => {
+      const states = statesMap.get(c.chat_id) ?? [];
+      const required = states.filter((s) => s.required);
+      return required.length > 0 && required.every((s) => s.validated);
+    });
+
+    if (toValidate.length === 0) return;
+
+    await Promise.all(
+      toValidate.map((c) =>
+        this.chatRepo.update({ id: c.id }, { window_status: WindowStatus.VALIDATED }),
+      ),
+    );
+
+    this.logger.log(
+      `syncValidatedStatusAfterBuild: ${toValidate.length}/${activeChats.length} conv(s) synced VALIDATED pour poste ${posteId}`,
+    );
   }
 
   /**

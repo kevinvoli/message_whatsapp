@@ -9,6 +9,7 @@ const METRIC_LABELS: Record<string, string> = {
   follow_ups: 'Relances',
   orders: 'Commandes',
   relances: 'Relances (alt)',
+  reports_submitted: 'Rapports soumis (GICOP)',
 };
 
 function colorForPct(pct: number) {
