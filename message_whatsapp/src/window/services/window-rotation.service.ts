@@ -320,6 +320,9 @@ export class WindowRotationService {
       order: { window_slot: 'ASC' },
     });
 
+    // Si moins de quotaActive conversations actives, compacter pour promouvoir les LOCKED.
+    // On ne quitte PAS si après compactage il en reste encore moins : on calcule
+    // le seuil sur le nombre réel (cas d'un poste avec peu de conversations au total).
     if (activeGroup.length < quotaActive) {
       await this.compactSlots(posteId);
       activeGroup = await this.chatRepo.find({
@@ -330,8 +333,9 @@ export class WindowRotationService {
         },
         order: { window_slot: 'ASC' },
       });
-      if (activeGroup.length < quotaActive) return;
     }
+
+    if (activeGroup.length === 0) return;
 
     const activeSlots = activeGroup.slice(0, quotaActive);
     const submittedMap = await this.reportService.getSubmittedMapBulk(
@@ -339,9 +343,13 @@ export class WindowRotationService {
     );
     const submittedCount = activeSlots.filter((c) => submittedMap.get(c.chat_id) === true).length;
 
-    // Seuil = quotaActive (10 par defaut). La rotation se declenche quand
-    // les 10 slots actifs ont un rapport soumis, sans dependance a window_status.
-    const requiredCount = quotaActive;
+    // Seuil = nombre réel de slots actifs (plafonné à quotaActive).
+    // Ceci couvre le cas où le poste a moins de quotaActive conversations au total.
+    const requiredCount = Math.min(quotaActive, activeSlots.length);
+
+    this.logger.log(
+      `checkAndTriggerRotation poste=${posteId} : ${submittedCount}/${activeSlots.length} soumis, seuil=${requiredCount}`,
+    );
 
     if (submittedCount < requiredCount) return;
 
