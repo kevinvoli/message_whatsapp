@@ -33,6 +33,7 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
       Promise.resolve(chats.filter((c) => c.status === WhatsappChatStatus.FERME && c.window_slot != null)),
     ),
     getCount: jest.fn().mockResolvedValue(chats.length),
+    getRawMany: jest.fn().mockResolvedValue([{ posteId: 'poste-abc' }]),
   };
 
   return {
@@ -286,6 +287,18 @@ describe('WindowRotationService', () => {
       const { service, emitter } = buildService(repo);
       await service.handleConversationResultSet({ chatId: 'chat-1', posteId: null });
       expect(emitter.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('autoCheckRotations', () => {
+    it('lance automatiquement le check des postes avec une fenetre ouverte', async () => {
+      const repo = makeChatRepo([]);
+      const { service } = buildService(repo);
+      const check = jest.spyOn(service, 'checkAndTriggerRotation').mockResolvedValue(undefined);
+
+      await service.autoCheckRotations();
+
+      expect(check).toHaveBeenCalledWith('poste-abc');
     });
   });
 });

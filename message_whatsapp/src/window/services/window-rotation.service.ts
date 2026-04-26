@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { WhatsappChat, WindowStatus, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { ValidationEngineService } from './validation-engine.service';
@@ -348,6 +349,37 @@ export class WindowRotationService {
       `Rotation déclenchée pour poste ${posteId} (${submittedCount}/${activeSlots.length} rapports soumis, seuil: ${requiredCount})`,
     );
     await this.performRotation(posteId);
+  }
+
+  /**
+   * Rattrapage automatique : couvre les postes déjà bloqués sans nouvel événement
+   * socket/soumission après un déploiement.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async autoCheckRotations(): Promise<void> {
+    const modeEnabled = await this.capacityService.isWindowModeEnabled();
+    if (!modeEnabled) return;
+
+    const rows = await this.chatRepo
+      .createQueryBuilder('c')
+      .select('DISTINCT c.poste_id', 'posteId')
+      .where('c.poste_id IS NOT NULL')
+      .andWhere('c.window_slot IS NOT NULL')
+      .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
+      .andWhere('c.deletedAt IS NULL')
+      .getRawMany<{ posteId: string }>();
+
+    for (const row of rows) {
+      if (!row.posteId) continue;
+      try {
+        await this.checkAndTriggerRotation(row.posteId);
+      } catch (err) {
+        this.logger.warn(
+          `autoCheckRotations: rotation check échoué pour poste ${row.posteId}`,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
+    }
   }
 
   /**
