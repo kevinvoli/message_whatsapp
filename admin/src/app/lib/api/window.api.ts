@@ -53,6 +53,35 @@ export async function getConversationValidationState(chatId: string): Promise<Co
   );
 }
 
+export interface WindowDebugConv {
+  chat_id: string;
+  window_slot: number | null;
+  window_status: string;
+  chat_status: string;
+  is_locked: boolean;
+  submitted: boolean;
+}
+
+export interface WindowDebugState {
+  posteId: string;
+  modeEnabled: boolean;
+  quotaActive: number;
+  quotaTotal: number;
+  rotationLocked: boolean;
+  rotationWouldTrigger: boolean;
+  submittedCount: number;
+  requiredCount: number;
+  activeCount: number;
+  lockedCount: number;
+  conversations: WindowDebugConv[];
+}
+
+export async function getWindowDebugState(posteId: string): Promise<WindowDebugState> {
+  return handleResponse<WindowDebugState>(
+    await fetch(`${API_BASE_URL}/window/debug/${encodeURIComponent(posteId)}`, { credentials: 'include' }),
+  );
+}
+
 export async function triggerRotationCheck(posteId: string): Promise<{ ok: boolean }> {
   return handleResponse(
     await fetch(`${API_BASE_URL}/window/rotate-check/${encodeURIComponent(posteId)}`, {

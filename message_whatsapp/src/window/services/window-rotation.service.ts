@@ -391,6 +391,55 @@ export class WindowRotationService {
   }
 
   /**
+   * Retourne l'état détaillé de la fenêtre pour un poste — lecture seule, sans modifier.
+   * Utilisé par l'endpoint admin GET /window/debug/:posteId.
+   */
+  async getDebugState(posteId: string): Promise<object> {
+    const modeEnabled = await this.capacityService.isWindowModeEnabled();
+    const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
+    const rotationLocked = this.rotatingPostes.has(posteId);
+
+    const allSlotted = await this.chatRepo.find({
+      where: { poste_id: posteId },
+      order: { window_slot: 'ASC' },
+    });
+
+    const withSlot = allSlotted.filter((c) => c.window_slot != null);
+    const chatIds = withSlot.map((c) => c.chat_id);
+    const submittedMap = chatIds.length > 0
+      ? await this.reportService.getSubmittedMapBulk(chatIds)
+      : new Map<string, boolean>();
+
+    const activeConvs = withSlot.filter((c) => c.window_status === WindowStatus.ACTIVE);
+    const lockedConvs = withSlot.filter((c) => c.window_status === WindowStatus.LOCKED);
+
+    const activeSlots = activeConvs.slice(0, quotaActive);
+    const submittedCount = activeSlots.filter((c) => submittedMap.get(c.chat_id) === true).length;
+    const requiredCount = Math.min(quotaActive, activeSlots.length);
+
+    return {
+      posteId,
+      modeEnabled,
+      quotaActive,
+      quotaTotal,
+      rotationLocked,
+      rotationWouldTrigger: submittedCount >= requiredCount && activeSlots.length > 0,
+      submittedCount,
+      requiredCount,
+      activeCount: activeConvs.length,
+      lockedCount: lockedConvs.length,
+      conversations: withSlot.map((c) => ({
+        chat_id:      c.chat_id,
+        window_slot:  c.window_slot,
+        window_status: c.window_status,
+        chat_status:  c.status,
+        is_locked:    c.is_locked,
+        submitted:    submittedMap.get(c.chat_id) ?? false,
+      })),
+    };
+  }
+
+  /**
    * Effectue la rotation complète du bloc :
    * 1. Retire les conversations validées (released)
    * 2. Promeut les 10 premières verrouillées en actives

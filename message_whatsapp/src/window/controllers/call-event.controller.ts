@@ -111,6 +111,17 @@ export class WindowController {
   }
 
   /**
+   * Diagnostic en lecture seule : état exact de la fenêtre d'un poste — admin.
+   * Permet de voir pourquoi la rotation ne se déclenche pas.
+   * GET /window/debug/:posteId
+   */
+  @Get('debug/:posteId')
+  @UseGuards(AdminGuard)
+  getDebugState(@Param('posteId') posteId: string) {
+    return this.windowRotation.getDebugState(posteId);
+  }
+
+  /**
    * Reconstruit la fenêtre d'un poste depuis zéro — admin.
    * POST /window/rebuild/:posteId
    */

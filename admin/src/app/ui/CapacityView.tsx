@@ -14,6 +14,7 @@ import {
 import {
   ValidationCriterion,
   CallEventEntry,
+  WindowDebugState,
   getValidationCriteria,
   getCallEvents,
   updateValidationCriterion,
@@ -21,6 +22,7 @@ import {
   triggerRotationCheck,
   rebuildWindow,
   forceValidateConversation,
+  getWindowDebugState,
 } from '../lib/api/window.api';
 
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -58,6 +60,8 @@ export default function CapacityView() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'quotas' | 'criteria' | 'calls'>('quotas');
+  const [debugState, setDebugState] = useState<WindowDebugState | null>(null);
+  const [debugPoste, setDebugPoste] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -100,6 +104,17 @@ export default function CapacityView() {
       setExternalTimeout(result.externalTimeoutHours);
     } finally {
       setTogglingMode(false);
+    }
+  };
+
+  const handleDebug = async (posteId: string) => {
+    setActionPoste(posteId);
+    try {
+      const state = await getWindowDebugState(posteId);
+      setDebugState(state);
+      setDebugPoste(posteId);
+    } finally {
+      setActionPoste(null);
     }
   };
 
@@ -186,6 +201,7 @@ export default function CapacityView() {
     }`;
 
   return (
+    <>
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Fenêtre glissante de conversations</h2>
@@ -416,6 +432,14 @@ export default function CapacityView() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
+                              onClick={() => handleDebug(entry.posteId)}
+                              disabled={isActing}
+                              title="Diagnostic : voir l'état exact de la fenêtre"
+                              className="text-xs px-2 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
+                            >
+                              ⚙ Debug
+                            </button>
+                            <button
                               onClick={() => handleRotationCheck(entry.posteId)}
                               disabled={isActing}
                               title="Vérifier les conditions et déclencher la rotation si elles sont remplies"
@@ -616,5 +640,103 @@ export default function CapacityView() {
         </div>
       )}
     </div>
+
+      {/* ── Modale diagnostic fenêtre ── */}
+      {debugState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <p className="font-semibold text-gray-800">Diagnostic fenêtre — poste {debugPoste}</p>
+                <p className={`text-xs mt-0.5 font-medium ${debugState.rotationWouldTrigger ? 'text-green-600' : 'text-red-600'}`}>
+                  {debugState.rotationWouldTrigger
+                    ? '✓ La rotation devrait se déclencher'
+                    : `✗ Rotation bloquée — ${debugState.submittedCount}/${debugState.requiredCount} soumis (seuil requis)`}
+                </p>
+              </div>
+              <button onClick={() => setDebugState(null)} className="text-gray-400 hover:text-gray-700 text-xl font-bold">×</button>
+            </div>
+
+            <div className="px-6 py-4 border-b grid grid-cols-3 gap-3 text-xs">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-gray-500">Mode fenêtre</p>
+                <p className={`font-bold mt-1 ${debugState.modeEnabled ? 'text-green-600' : 'text-red-600'}`}>
+                  {debugState.modeEnabled ? 'Activé' : 'DÉSACTIVÉ'}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-gray-500">Quota actif / total</p>
+                <p className="font-bold mt-1 text-gray-800">{debugState.quotaActive} / {debugState.quotaTotal}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-gray-500">ACTIVE / LOCKED</p>
+                <p className="font-bold mt-1 text-gray-800">{debugState.activeCount} / {debugState.lockedCount}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-gray-500">Rapports soumis</p>
+                <p className={`font-bold mt-1 ${debugState.submittedCount >= debugState.requiredCount ? 'text-green-600' : 'text-orange-600'}`}>
+                  {debugState.submittedCount} / {debugState.requiredCount}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-gray-500">Verrou rotation</p>
+                <p className={`font-bold mt-1 ${debugState.rotationLocked ? 'text-red-600' : 'text-green-600'}`}>
+                  {debugState.rotationLocked ? 'VERROUILLÉ' : 'Libre'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <p className="text-xs font-medium text-gray-500 mb-2">Conversations dans la fenêtre ({debugState.conversations.length})</p>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-500 border-b">
+                    <th className="text-left py-1 pr-2">Slot</th>
+                    <th className="text-left py-1 pr-2">Win. status</th>
+                    <th className="text-left py-1 pr-2">Chat status</th>
+                    <th className="text-left py-1 pr-2">Rapport</th>
+                    <th className="text-left py-1 font-mono">Chat ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {debugState.conversations.map((c) => (
+                    <tr key={c.chat_id} className={`border-b ${c.submitted ? 'bg-green-50' : ''}`}>
+                      <td className="py-1 pr-2 font-bold">{c.window_slot}</td>
+                      <td className={`py-1 pr-2 font-medium ${
+                        c.window_status === 'ACTIVE' ? 'text-blue-600'
+                        : c.window_status === 'LOCKED' ? 'text-orange-600'
+                        : 'text-gray-400'
+                      }`}>{c.window_status}</td>
+                      <td className={`py-1 pr-2 ${c.chat_status === 'fermé' ? 'text-gray-400' : 'text-gray-700'}`}>{c.chat_status}</td>
+                      <td className={`py-1 pr-2 font-semibold ${c.submitted ? 'text-green-600' : 'text-red-500'}`}>
+                        {c.submitted ? '✓' : '✗'}
+                      </td>
+                      <td className="py-1 font-mono text-gray-500 truncate max-w-[180px]">{c.chat_id}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-6 py-3 border-t flex justify-end gap-2">
+              {!debugState.modeEnabled && (
+                <span className="text-xs text-red-600 self-center mr-auto">Mode fenêtre désactivé — activez-le dans l&apos;onglet Quotas.</span>
+              )}
+              <button onClick={() => setDebugState(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                Fermer
+              </button>
+              {debugState.rotationWouldTrigger && (
+                <button
+                  onClick={async () => { if (debugPoste) await handleRotationCheck(debugPoste); setDebugState(null); }}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Déclencher maintenant
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
