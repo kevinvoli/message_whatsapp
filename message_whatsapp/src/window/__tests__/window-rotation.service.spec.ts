@@ -24,11 +24,14 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
     orderBy: jest.fn().mockReturnThis(),
     addOrderBy: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
     whereInIds: jest.fn().mockReturnThis(),
     execute: jest.fn().mockResolvedValue({}),
-    getMany: jest.fn().mockResolvedValue(chats),
+    getMany: jest.fn().mockImplementation(() =>
+      Promise.resolve(chats.filter((c) => c.status === WhatsappChatStatus.FERME && c.window_slot != null)),
+    ),
     getCount: jest.fn().mockResolvedValue(chats.length),
   };
 
@@ -149,6 +152,28 @@ describe('WindowRotationService', () => {
       expect(performRotation).toHaveBeenCalledWith('poste-abc');
     });
 
+    it('declenche la rotation quand les 10 rapports sont soumis meme avec des conversations fermees', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({
+          window_slot: idx + 1,
+          window_status: WindowStatus.ACTIVE,
+          status: idx % 2 === 0 ? WhatsappChatStatus.FERME : WhatsappChatStatus.ACTIF,
+        }),
+      );
+      const repo = makeChatRepo(chats);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(performRotation).toHaveBeenCalledWith('poste-abc');
+    });
+
     it('ne declenche pas avec 10 conversations actives sans rapport soumis', async () => {
       const chats = Array.from({ length: 10 }, (_, idx) =>
         makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
@@ -214,6 +239,23 @@ describe('WindowRotationService', () => {
         { id: chat.id },
         { window_slot: null, window_status: WindowStatus.RELEASED, is_locked: false },
       );
+    });
+
+    it('ne libere pas immediatement une conversation fermee dont le rapport est soumis', async () => {
+      const chat = makeChat({
+        window_slot: 3,
+        window_status: WindowStatus.ACTIVE,
+        status: WhatsappChatStatus.FERME,
+      });
+      const repo = makeChatRepo([chat]);
+      repo.findOne.mockResolvedValue(chat);
+      const { service } = buildService(repo, { submittedChatIds: [chat.chat_id] });
+      const check = jest.spyOn(service, 'checkAndTriggerRotation').mockResolvedValue(undefined);
+
+      await service.handleConversationStatusChanged({ chatId: chat.chat_id, newStatus: 'fermé' });
+
+      expect(repo.update).not.toHaveBeenCalled();
+      expect(check).toHaveBeenCalledWith('poste-abc');
     });
 
     it('ignore si la conversation n a pas de slot', async () => {

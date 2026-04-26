@@ -66,7 +66,8 @@ export class WindowRotationService {
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-    // 1. Libérer les slots des conversations fermées (auto-close cron ou fermeture directe)
+    // 1. Libérer seulement les conversations fermées sans rapport soumis.
+    // Une conversation fermée mais déjà soumise doit encore compter dans le bloc de 10.
     await this.releaseSlotsOfClosedConversations(posteId);
 
     // 2. Lire les conversations slottées restantes (non fermées, non released)
@@ -75,7 +76,6 @@ export class WindowRotationService {
       .where('c.poste_id = :posteId', { posteId })
       .andWhere('c.window_slot IS NOT NULL')
       .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
-      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
       .andWhere('c.deletedAt IS NULL')
       .orderBy('c.window_slot', 'ASC')
       .getMany();
@@ -147,6 +147,7 @@ export class WindowRotationService {
     const closedWithSlot = await this.chatRepo
       .createQueryBuilder('c')
       .select('c.id')
+      .addSelect('c.chat_id')
       .where('c.poste_id = :posteId', { posteId })
       .andWhere('c.window_slot IS NOT NULL')
       .andWhere('c.status = :ferme', { ferme: WhatsappChatStatus.FERME })
@@ -154,8 +155,15 @@ export class WindowRotationService {
 
     if (closedWithSlot.length === 0) return;
 
-    // Un seul UPDATE pour tous les slots à libérer
-    const ids = closedWithSlot.map((c) => c.id);
+    const submittedMap = await this.reportService.getSubmittedMapBulk(
+      closedWithSlot.map((c) => c.chat_id),
+    );
+    const ids = closedWithSlot
+      .filter((c) => submittedMap.get(c.chat_id) !== true)
+      .map((c) => c.id);
+    if (ids.length === 0) return;
+
+    // Un seul UPDATE pour les conversations fermees sans rapport soumis.
     await this.chatRepo
       .createQueryBuilder()
       .update()
@@ -163,7 +171,7 @@ export class WindowRotationService {
       .whereInIds(ids)
       .execute();
 
-    this.logger.log(`${ids.length} slot(s) libéré(s) (conversations fermées) pour poste ${posteId}`);
+    this.logger.log(`${ids.length} slot(s) libéré(s) (conversations fermées sans rapport soumis) pour poste ${posteId}`);
   }
 
   /**
@@ -272,6 +280,12 @@ export class WindowRotationService {
     const posteId = chat.poste_id;
     const releasedSlot = chat.window_slot;
 
+    const submittedMap = await this.reportService.getSubmittedMapBulk([chat.chat_id]);
+    if (submittedMap.get(chat.chat_id) === true) {
+      await this.checkAndTriggerRotation(posteId);
+      return;
+    }
+
     // Libère le slot
     await this.chatRepo.update(
       { id: chat.id },
@@ -294,11 +308,13 @@ export class WindowRotationService {
     if (!modeEnabled) return;
 
     const { quotaActive } = await this.capacityService.getQuotas();
+    await this.releaseSlotsOfClosedConversations(posteId);
 
     let activeGroup = await this.chatRepo.find({
       where: {
         poste_id: posteId,
         window_status: WindowStatus.ACTIVE,
+        window_slot: Not(IsNull()),
       },
       order: { window_slot: 'ASC' },
     });
@@ -309,6 +325,7 @@ export class WindowRotationService {
         where: {
           poste_id: posteId,
           window_status: WindowStatus.ACTIVE,
+          window_slot: Not(IsNull()),
         },
         order: { window_slot: 'ASC' },
       });
@@ -345,11 +362,13 @@ export class WindowRotationService {
     try {
       const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-      // 1. Conversations actives dont le rapport est soumis a liberer
+      // 1. Conversations du bloc actif dont le rapport est soumis a liberer.
+      // Le statut metier (actif/ferme) ne bloque pas la rotation.
       const activeGroup = await this.chatRepo.find({
         where: {
           poste_id: posteId,
           window_status: WindowStatus.ACTIVE,
+          window_slot: Not(IsNull()),
         },
         order: { window_slot: 'ASC' },
       });
@@ -463,7 +482,6 @@ export class WindowRotationService {
       .where('c.poste_id = :posteId', { posteId })
       .andWhere('c.window_slot IS NOT NULL')
       .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
-      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
       .andWhere('c.deletedAt IS NULL')
       .orderBy('c.window_slot', 'ASC')
       .getMany();
