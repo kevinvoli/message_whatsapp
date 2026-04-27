@@ -14,7 +14,7 @@ export function useConversationFilters(conversations: Conversation[]) {
       // toujours visibles quel que soit le filtre — sauf si le rapport a déjà été
       // soumis ou si la conversation est fermée (elle passe alors en priorité).
       if (conv.window_slot != null && conv.is_locked !== true) {
-        if (conv.report_submission_status != null || conv.status === 'fermé') return false;
+        if (conv.report_submission_status != null) return false;
         return true;
       }
 
