@@ -95,6 +95,7 @@ export class WindowRotationService {
       .where('c.poste_id = :posteId', { posteId })
       .andWhere('c.deletedAt IS NULL')
       .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .andWhere('c.is_priority = 0')
       .orderBy('c.last_activity_at', 'DESC')
       .take(needed + slottedChats.length + 5)
       .getMany();
@@ -111,6 +112,7 @@ export class WindowRotationService {
         .where('c.poste_id = :posteId', { posteId })
         .andWhere('c.status = :ferme', { ferme: WhatsappChatStatus.FERME })
         .andWhere('c.deletedAt IS NULL')
+        .andWhere('c.is_priority = 0')
         .orderBy('c.last_activity_at', 'DESC')
         .take((needed - candidates.length) * 2)
         .getMany();
@@ -556,6 +558,7 @@ export class WindowRotationService {
           .createQueryBuilder('c')
           .where('c.poste_id = :posteId', { posteId })
           .andWhere('c.deletedAt IS NULL')
+          .andWhere('c.is_priority = 0')
           .andWhere('(c.window_status IS NULL OR c.window_status != :released OR c.status = :ferme)', {
             released: WindowStatus.RELEASED,
             ferme: WhatsappChatStatus.FERME,
@@ -663,6 +666,7 @@ export class WindowRotationService {
         .createQueryBuilder('c')
         .where('c.poste_id = :posteId', { posteId })
         .andWhere('c.deletedAt IS NULL')
+        .andWhere('c.is_priority = 0')
         .andWhere('(c.window_status IS NULL OR c.window_status != :released OR c.status = :ferme)', {
           released: WindowStatus.RELEASED,
           ferme: WhatsappChatStatus.FERME,
