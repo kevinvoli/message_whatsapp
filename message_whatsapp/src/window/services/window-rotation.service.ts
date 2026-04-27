@@ -104,12 +104,17 @@ export class WindowRotationService {
 
     // Cas : toutes les conversations du poste sont FERMÉ (ex : cron 24h).
     // On slot quand même les FERMÉ qui ont un rapport soumis — la rotation les libèrera aussitôt.
+    // On exclut les RELEASED pour ne pas re-sloter des conversations déjà traitées par une rotation précédente.
     if (candidates.length < needed) {
-      const fermeChats = await this.chatRepo.find({
-        where: { poste_id: posteId, status: WhatsappChatStatus.FERME, deletedAt: IsNull() },
-        order: { last_activity_at: 'DESC' },
-        take: (needed - candidates.length) * 2,
-      });
+      const fermeChats = await this.chatRepo
+        .createQueryBuilder('c')
+        .where('c.poste_id = :posteId', { posteId })
+        .andWhere('c.status = :ferme', { ferme: WhatsappChatStatus.FERME })
+        .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
+        .andWhere('c.deletedAt IS NULL')
+        .orderBy('c.last_activity_at', 'DESC')
+        .take((needed - candidates.length) * 2)
+        .getMany();
       const fermeCandidates = fermeChats.filter((c) => !slottedIds.has(c.id));
       if (fermeCandidates.length > 0) {
         const submittedMap = await this.reportService.getSubmittedMapBulk(
@@ -420,11 +425,13 @@ export class WindowRotationService {
     // ── 2. Postes sans window_slot → construire la fenêtre (rattrapage) ────────
     // Pas de filtre sur status : si toutes les convs sont FERMÉ (cron 24h),
     // buildWindowForPoste les slotte quand même pour permettre la rotation.
+    // On exclut les RELEASED (window_slot=null après rotation) pour éviter la boucle infinie.
     const uninitRows = await this.chatRepo
       .createQueryBuilder('c')
       .select('DISTINCT c.poste_id', 'posteId')
       .where('c.poste_id IS NOT NULL')
       .andWhere('c.window_slot IS NULL')
+      .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
       .andWhere('c.deletedAt IS NULL')
       .getRawMany<{ posteId: string }>();
 
