@@ -43,6 +43,11 @@ export function mergeConversationInList(
       };
     })
     .sort((a, b) => {
+      // Mode fenêtre glissante : préserver l'ordre par window_slot
+      if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;
+      if (a.window_slot != null) return -1;
+      if (b.window_slot != null) return 1;
+      // Mode classique : tri par activité récente
       const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
       const bTime = b.last_activity_at?.getTime() ?? b.updatedAt.getTime();
       return bTime - aTime;
