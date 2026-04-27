@@ -113,6 +113,15 @@ export class ConversationReportService {
    * dans un nouveau bloc de fenêtre glissante, pour éviter qu'un rapport
    * soumis dans un bloc précédent ne déclenche la rotation prématurément.
    */
+  async hasSubmittedReport(chatId: string): Promise<boolean> {
+    const report = await this.repo.findOne({
+      where: { chatId },
+      select: ['isSubmitted', 'submittedAt', 'submissionStatus'],
+    });
+    if (!report) return false;
+    return report.isSubmitted === true || report.submittedAt != null || report.submissionStatus != null;
+  }
+
   async resetSubmissionBulk(chatIds: string[]): Promise<void> {
     if (chatIds.length === 0) return;
     await this.repo.update(

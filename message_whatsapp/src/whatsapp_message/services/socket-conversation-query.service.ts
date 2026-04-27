@@ -97,6 +97,9 @@ export class SocketConversationQueryService {
     if (modeEnabled) {
       // Trier par window_slot ASC (conversations slottées d'abord, puis par activité)
       chats.sort((a, b) => {
+        // Prioritaires toujours en tête
+        if (a.is_priority && !b.is_priority) return -1;
+        if (!a.is_priority && b.is_priority) return 1;
         if (a.window_slot != null && b.window_slot != null) return a.window_slot - b.window_slot;
         if (a.window_slot != null) return -1;
         if (b.window_slot != null) return 1;

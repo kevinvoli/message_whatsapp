@@ -247,8 +247,12 @@ export class AssignConversationUseCase {
       conversation.read_only = false;
       conversation.assigned_at = new Date();
       conversation.assigned_mode = isAgentOnline ? 'ONLINE' : 'OFFLINE';
-      // Réinitialise le rapport soumis — la conv redevient active et doit être retraitée
-      await this.reportService?.resetSubmissionBulk([conversation.chat_id]);
+      // Marque comme prioritaire si un rapport avait déjà été soumis
+      const hadSubmittedReport = await this.reportService?.hasSubmittedReport(conversation.chat_id) ?? false;
+      if (hadSubmittedReport) {
+        conversation.is_priority = true;
+        await this.reportService?.resetSubmissionBulk([conversation.chat_id]);
+      }
       // Efface le marqueur RELEASED pour que la conv redevienne visible dans la fenêtre
       if (conversation.window_status === WindowStatus.RELEASED) {
         conversation.window_status = null;

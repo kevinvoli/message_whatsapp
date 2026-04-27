@@ -214,6 +214,8 @@ export class WhatsappMessageService {
           // Le commercial vient de répondre → lecture seule jusqu'à la prochaine réponse client
           // Exception : canal dédié → jamais en lecture seule
           ...(data.poste_id && !channel.poste_id ? { read_only: true } : {}),
+          // Le commercial a pris en charge la conv prioritaire → retirer le flag
+          ...(data.poste_id ? { is_priority: false } : {}),
           last_activity_at: new Date(),
         },
       );

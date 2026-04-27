@@ -49,6 +49,7 @@ export function mapConversation(
         : null,
     read_only: chat.read_only,
     is_locked: locked,
+    is_priority: chat.is_priority ?? false,
     window_slot: chat.window_slot ?? null,
     window_status: windowStatus,
     contact_client: locked ? null : chat.contact_client,

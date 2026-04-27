@@ -237,6 +237,10 @@ export class WhatsappChat {
   @Column({ name: 'is_locked', type: 'boolean', default: false })
   is_locked: boolean;
 
+  /** Conv rouverte par le client après soumission de rapport — traitement urgent. */
+  @Column({ name: 'is_priority', type: 'boolean', default: false })
+  is_priority: boolean;
+
   @Column({ name: 'window_slot', type: 'int', nullable: true, default: null })
   window_slot: number | null;
 
