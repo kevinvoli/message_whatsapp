@@ -5,7 +5,7 @@
  */
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThan, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus, ConversationResult } from './entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
@@ -286,21 +286,37 @@ export class WhatsappChatService {
     });
     if (!commercial?.poste?.id) return [];
 
-    const chats = await this.chatRepository.find({
-      where: {
-        poste_id:    commercial.poste.id,
-        status:      In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.FERME]),
-        unread_count: MoreThan(0),
-      },
-      order: { unread_count: 'DESC', last_activity_at: 'DESC' },
-      take: limit,
-      select: ['chat_id', 'contact_client', 'unread_count', 'last_activity_at'],
-    });
+    // Priorité = conversations dont le rapport a été soumis aujourd'hui
+    // ET où le client a réécrit après (unread_count > 0).
+    // On joint conversation_report pour filtrer sur submitted_at >= début du jour.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const chats = await this.chatRepository
+      .createQueryBuilder('chat')
+      .innerJoin(
+        'conversation_report',
+        'report',
+        'report.chat_id = chat.chat_id AND report.is_submitted = 1 AND report.submitted_at >= :today',
+        { today },
+      )
+      .where('chat.poste_id = :posteId', { posteId: commercial.poste.id })
+      .andWhere('chat.unread_count > :zero', { zero: 0 })
+      .orderBy('chat.unread_count', 'DESC')
+      .addOrderBy('chat.last_activity_at', 'DESC')
+      .take(limit)
+      .select([
+        'chat.chat_id',
+        'chat.contact_client',
+        'chat.unread_count',
+        'chat.last_activity_at',
+      ])
+      .getMany();
 
     return chats.map((c) => ({
-      chat_id:        c.chat_id,
-      contact_client: c.contact_client,
-      unread_count:   c.unread_count,
+      chat_id:          c.chat_id,
+      contact_client:   c.contact_client,
+      unread_count:     c.unread_count,
       last_activity_at: c.last_activity_at,
     }));
   }
