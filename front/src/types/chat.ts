@@ -642,6 +642,7 @@ interface RawConversationData {
     is_active?: boolean;
   } | null;
   is_locked?: boolean;
+  is_priority?: boolean;
   window_slot?: number | null;
   window_status?: string | null;
   validation_state?: any[] | null;
