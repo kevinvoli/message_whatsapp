@@ -67,7 +67,11 @@ export class WindowRotationService {
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-    // 1. Lire les conversations slottées restantes (non released)
+    // 1. Libérer seulement les conversations fermées sans rapport soumis.
+    // Une conversation fermée mais déjà soumise doit encore compter dans le bloc de 10.
+    await this.releaseSlotsOfClosedConversations(posteId);
+
+    // 2. Lire les conversations slottées restantes (non fermées, non released)
     const slottedChats = await this.chatRepo
       .createQueryBuilder('c')
       .where('c.poste_id = :posteId', { posteId })
@@ -171,10 +175,10 @@ export class WindowRotationService {
   }
 
   /**
-   * @deprecated — Ne plus utiliser. Le statut ne contrôle pas la gestion des slots.
-   * Conservé temporairement pour référence. Sera supprimé au prochain nettoyage.
+   * Libère les slots des conversations fermées (status=fermé) qui ont encore un slot assigné.
+   * Gère le cas de l'auto-fermeture par cron sans événement.
    */
-  private async _releaseSlotsOfClosedConversations_DEPRECATED(posteId: string): Promise<void> {
+  private async releaseSlotsOfClosedConversations(posteId: string): Promise<void> {
     const closedWithSlot = await this.chatRepo
       .createQueryBuilder('c')
       .select('c.id')
@@ -296,9 +300,7 @@ export class WindowRotationService {
 
   /**
    * Écoute la fermeture d'une conversation.
-   * Ne libère JAMAIS le slot sur la base du statut (le cron et d'autres processus
-   * ferment des conversations indépendamment du rapport).
-   * Seule performRotation libère les slots — quand les 10 rapports sont soumis.
+   * Libère son slot et réinjecte une conversation en fin de fenêtre.
    */
   @OnEvent('conversation.status_changed', { async: true })
   async handleConversationStatusChanged(payload: {
@@ -307,13 +309,27 @@ export class WindowRotationService {
   }): Promise<void> {
     if (payload.newStatus !== 'fermé') return;
 
-    const chat = await this.chatRepo.findOne({
-      where:  { chat_id: payload.chatId },
-      select: ['poste_id', 'window_slot'],
-    });
+    const chat = await this.chatRepo.findOne({ where: { chat_id: payload.chatId } });
     if (!chat?.poste_id || chat.window_slot == null) return;
 
-    await this.checkAndTriggerRotation(chat.poste_id);
+    const posteId = chat.poste_id;
+    const releasedSlot = chat.window_slot;
+
+    const submittedMap = await this.reportService.getSubmittedMapBulk([chat.chat_id]);
+    if (submittedMap.get(chat.chat_id) === true) {
+      await this.checkAndTriggerRotation(posteId);
+      return;
+    }
+
+    // Libère le slot
+    await this.chatRepo.update(
+      { id: chat.id },
+      { window_slot: null, window_status: WindowStatus.RELEASED, is_locked: false },
+    );
+    this.logger.log(`Slot ${releasedSlot} libéré (conv ${payload.chatId} fermée) pour poste ${posteId}`);
+
+    // Réassigne les slots pour compresser le vide
+    await this.compactSlots(posteId);
   }
 
   /**
@@ -327,6 +343,7 @@ export class WindowRotationService {
     if (!modeEnabled) return;
 
     const { quotaActive } = await this.capacityService.getQuotas();
+    await this.releaseSlotsOfClosedConversations(posteId);
 
     let activeGroup = await this.chatRepo.find({
       where: {
@@ -616,6 +633,9 @@ export class WindowRotationService {
    */
   private async compactSlots(posteId: string): Promise<void> {
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
+
+    // Libérer d'abord les fermées
+    await this.releaseSlotsOfClosedConversations(posteId);
 
     const current = await this.chatRepo
       .createQueryBuilder('c')
