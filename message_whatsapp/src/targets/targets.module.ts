@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommercialTarget } from './entities/commercial_target.entity';
+import { CommercialDailyPerformance } from './entities/commercial-daily-performance.entity';
 import { TargetsService } from './targets.service';
+import { CommercialDailySnapshotService } from './commercial-daily-snapshot.service';
 import { TargetsController } from './targets.controller';
 import { WhatsappMessage } from '../whatsapp_message/entities/whatsapp_message.entity';
 import { CallLog } from '../call-log/entities/call_log.entity';
@@ -12,11 +14,11 @@ import { ConversationReport } from '../gicop-report/entities/conversation-report
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CommercialTarget, WhatsappMessage, CallLog, FollowUp, WhatsappCommercial, ConversationReport]),
+    TypeOrmModule.forFeature([CommercialTarget, CommercialDailyPerformance, WhatsappMessage, CallLog, FollowUp, WhatsappCommercial, ConversationReport]),
     SystemConfigModule,
   ],
-  providers: [TargetsService],
+  providers: [TargetsService, CommercialDailySnapshotService],
   controllers: [TargetsController],
-  exports: [TargetsService],
+  exports: [TargetsService, CommercialDailySnapshotService],
 })
 export class TargetsModule {}

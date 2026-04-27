@@ -15,6 +15,7 @@ import RankingPositionWidget from '@/components/chat/RankingPositionWidget';
 import { OutboundModal } from '@/components/conversation/OutboundModal';
 import BusinessMenusPanel from './BusinessMenusPanel';
 import PrioritePostePanel from './PrioritePostePanel';
+import ActionGateBanner from './ActionGateBanner';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -66,6 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="w-100 bg-white border-r border-gray-200 flex flex-col">
+      <ActionGateBanner />
       <UserHeader
         conversation={allConversations ?? conversations}
         totalUnread={totalUnread}

@@ -11,14 +11,20 @@ import { ClientDossier } from 'src/client-dossier/entities/client-dossier.entity
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { OrderWriteModule } from 'src/order-write/order-write.module';
 import { ReportClosureMirrorListener } from './listeners/report-closure-mirror.listener';
+import { IntegrationOutboxModule } from 'src/integration-outbox/integration-outbox.module';
+import { NotificationModule } from 'src/notification/notification.module';
+import { OutboxProcessorService } from './outbox-processor.service';
+import { OutboxAlertService } from './outbox-alert.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ConversationReport, WhatsappCommercial, Contact, ContactPhone, ClientDossier, WhatsappChat]),
     OrderWriteModule,
+    IntegrationOutboxModule,
+    NotificationModule,
   ],
   controllers: [ConversationReportController],
-  providers: [ConversationReportService, ReportSubmissionService, ReportClosureMirrorListener],
+  providers: [ConversationReportService, ReportSubmissionService, ReportClosureMirrorListener, OutboxProcessorService, OutboxAlertService],
   exports: [ConversationReportService, ReportSubmissionService],
 })
 export class ConversationReportModule {}

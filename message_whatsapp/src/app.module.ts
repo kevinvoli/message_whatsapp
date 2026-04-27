@@ -78,6 +78,8 @@ import { OrderCallSyncModule } from './order-call-sync/order-call-sync.module';
 import { OrderWriteModule } from './order-write/order-write.module';
 import { OrderReadModule } from './order-read/order-read.module';
 import { BusinessMetricsModule } from './business-metrics/business-metrics.module';
+import { CommercialActionGateModule } from './commercial-action-gate/commercial-action-gate.module';
+import { IntegrationOutboxModule } from './integration-outbox/integration-outbox.module';
 
 @Module({
   imports: [
@@ -238,6 +240,10 @@ import { BusinessMetricsModule } from './business-metrics/business-metrics.modul
     OrderReadModule,
     // Epic 7 — Métriques flux métier (supervision admin)
     BusinessMetricsModule,
+    // E02 — File d'attente outbox (admin dashboard)
+    IntegrationOutboxModule,
+    // E04 — Gate de priorité commerciale
+    CommercialActionGateModule,
   ],
   controllers: [AppController],
   providers: [

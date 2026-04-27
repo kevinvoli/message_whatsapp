@@ -44,6 +44,7 @@ import IntegrationView from '@/app/ui/IntegrationView';
 import RankingView from '@/app/ui/RankingView';
 import AiGovernanceView from '@/app/ui/AiGovernanceView';
 import GicopSupervisionView from '@/app/ui/GicopSupervisionView';
+import OutboxSyncView from '@/app/ui/OutboxSyncView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -210,6 +211,8 @@ export default function AdminDashboard() {
                 return <AiGovernanceView />;
             case 'gicop-supervision':
                 return <GicopSupervisionView />;
+            case 'outbox-sync':
+                return <OutboxSyncView />;
             default:
                 return null;
         }

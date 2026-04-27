@@ -114,6 +114,7 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Stethoscope,
     items: [
       { id: 'gicop-supervision', name: 'Supervision GICOP', icon: Stethoscope, badge: 'P0' },
+      { id: 'outbox-sync', name: 'Sync DB2 (Outbox)', icon: Database, badge: null },
     ],
   },
 ];

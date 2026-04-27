@@ -8,6 +8,7 @@ import { ConversationCapacityService } from 'src/conversation-capacity/conversat
 import { ValidationEngineService } from './validation-engine.service';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
 import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 
 export const WINDOW_ROTATED_EVENT             = 'window.rotated';
 export const WINDOW_REPORT_SUBMITTED_EVENT    = 'window.report_submitted';
@@ -43,6 +44,7 @@ export class WindowRotationService {
     private readonly validationEngine: ValidationEngineService,
     private readonly eventEmitter: EventEmitter2,
     private readonly reportService: ConversationReportService,
+    private readonly lockService: DistributedLockService,
 
     @Optional()
     private readonly obligationService: CallObligationService,
@@ -487,14 +489,41 @@ export class WindowRotationService {
   }
 
   /**
-   * Effectue la rotation complète du bloc :
-   * 1. Retire les conversations validées (released)
-   * 2. Promeut les 10 premières verrouillées en actives
-   * 3. Injecte de nouvelles conversations en fin de fenêtre
-   * 4. Émet l'événement de rotation
+   * E01-T01 — Effectue la rotation sous verrou distribué (Redlock + fallback in-process).
+   * Garantit qu'une seule instance exécute la rotation pour un poste donné à la fois.
+   * Logs : LOCK_ACQUIRED / LOCK_SKIPPED / LOCK_RELEASED.
    */
   async performRotation(posteId: string): Promise<{ releasedChatIds: string[]; promotedChatIds: string[] }> {
-    this.rotatingPostes.add(posteId);
+    // Guard in-process (même instance) — fast path
+    if (this.rotatingPostes.has(posteId)) {
+      this.logger.log(`LOCK_SKIPPED poste=${posteId} (rotation en cours sur cette instance)`);
+      return { releasedChatIds: [], promotedChatIds: [] };
+    }
+
+    const { acquired, result } = await this.lockService.tryWithLock(
+      `window:rotation:${posteId}`,
+      120_000,
+      async () => {
+        this.rotatingPostes.add(posteId);
+        this.logger.log(`LOCK_ACQUIRED poste=${posteId}`);
+        try {
+          return await this._executeRotation(posteId);
+        } finally {
+          this.rotatingPostes.delete(posteId);
+          this.logger.log(`LOCK_RELEASED poste=${posteId}`);
+        }
+      },
+    );
+
+    if (!acquired) {
+      this.logger.log(`LOCK_SKIPPED poste=${posteId} (rotation en cours sur autre instance)`);
+      return { releasedChatIds: [], promotedChatIds: [] };
+    }
+
+    return result ?? { releasedChatIds: [], promotedChatIds: [] };
+  }
+
+  private async _executeRotation(posteId: string): Promise<{ releasedChatIds: string[]; promotedChatIds: string[] }> {
     try {
       const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
@@ -620,8 +649,8 @@ export class WindowRotationService {
       } satisfies WindowRotatedPayload);
 
       return { releasedChatIds, promotedChatIds };
-    } finally {
-      this.rotatingPostes.delete(posteId);
+    } catch (err) {
+      throw err;
     }
   }
 

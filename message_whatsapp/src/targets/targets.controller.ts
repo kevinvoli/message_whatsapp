@@ -13,11 +13,15 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { AdminGuard } from '../auth/admin.guard';
 import { TargetsService } from './targets.service';
+import { CommercialDailySnapshotService } from './commercial-daily-snapshot.service';
 import { CreateTargetDto } from './dto/create-target.dto';
 
 @Controller('targets')
 export class TargetsController {
-  constructor(private readonly targetsService: TargetsService) {}
+  constructor(
+    private readonly targetsService: TargetsService,
+    private readonly snapshotService: CommercialDailySnapshotService,
+  ) {}
 
   @UseGuards(AdminGuard)
   @Get()
@@ -47,6 +51,22 @@ export class TargetsController {
   @Get('my-progress')
   getMyProgress(@Request() req) {
     return this.targetsService.getProgress(req.user.userId);
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('snapshot/history')
+  getSnapshotHistory(
+    @Query('commercial_id') commercialId: string,
+    @Query('days') days = 30,
+  ) {
+    return this.snapshotService.getHistory(commercialId, Number(days));
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('snapshot/compute')
+  computeSnapshot(@Body('date') date?: string) {
+    const target = date ?? new Date().toISOString().slice(0, 10);
+    return this.snapshotService.computeForDate(target).then(() => ({ computed: true, date: target }));
   }
 
   @UseGuards(AdminGuard)

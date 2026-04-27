@@ -67,7 +67,9 @@ export type ViewMode =
   // IA Gouvernance (CDC IA)
   | 'ia-governance'
   // GICOP — Supervision fermetures + rapports
-  | 'gicop-supervision';
+  | 'gicop-supervision'
+  // E02 — Synchronisation DB2 outbox
+  | 'outbox-sync';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

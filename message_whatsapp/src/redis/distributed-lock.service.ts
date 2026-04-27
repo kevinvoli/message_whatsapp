@@ -96,6 +96,49 @@ export class DistributedLockService {
     }
   }
 
+  /**
+   * Tente d'exécuter fn sous lock — fail fast si déjà tenu.
+   * Ne retente PAS (retryCount=0). Retourne { acquired: false } si lock pris.
+   * Pas de fallback bloquant en in-process : si déjà tenu, on skip.
+   * Logs : LOCK_ACQUIRED / LOCK_SKIPPED / LOCK_RELEASED.
+   */
+  async tryWithLock<T>(
+    resource: string,
+    ttl: number,
+    fn: () => Promise<T>,
+  ): Promise<{ acquired: boolean; result?: T }> {
+    if (this.redlock) {
+      let lock: import('redlock').Lock;
+      try {
+        lock = await this.redlock.acquire([`lock:${resource}`], ttl, {
+          retryCount: 0,
+        } as any);
+      } catch {
+        return { acquired: false };
+      }
+      try {
+        const result = await fn();
+        return { acquired: true, result };
+      } finally {
+        try { await lock.release(); } catch { /* expiré */ }
+      }
+    }
+
+    // Fallback in-process : fail fast si déjà tenu (pas d'attente)
+    if (this.inProcessLocks.has(resource)) {
+      return { acquired: false };
+    }
+    this.inProcessLocks.add(resource);
+    const timer = setTimeout(() => this.inProcessLocks.delete(resource), ttl);
+    try {
+      const result = await fn();
+      return { acquired: true, result };
+    } finally {
+      clearTimeout(timer);
+      this.inProcessLocks.delete(resource);
+    }
+  }
+
   // ─── Fallback in-process (mono-instance) ────────────────────────────────────
 
   private async acquireInProcess(

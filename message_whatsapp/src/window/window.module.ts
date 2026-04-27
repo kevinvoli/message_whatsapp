@@ -12,6 +12,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { CallObligationModule } from 'src/call-obligations/call-obligation.module';
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ConversationReportModule } from 'src/gicop-report/conversation-report.m
     SystemConfigModule,
     CallObligationModule,
     ConversationReportModule,
+    RedisModule,
   ],
   controllers: [WindowController],
   providers: [ValidationEngineService, WindowRotationService, CallEventService],

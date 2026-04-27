@@ -9,10 +9,10 @@ import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactPhone } from 'src/client-dossier/entities/contact-phone.entity';
 import { ClientDossier } from 'src/client-dossier/entities/client-dossier.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
+import { IntegrationOutboxService } from 'src/integration-outbox/integration-outbox.service';
 
 export interface SubmissionResult {
-  status: 'sent' | 'failed';
+  status: 'sent' | 'pending' | 'failed';
   submittedAt: Date | null;
   error: string | null;
 }
@@ -34,7 +34,7 @@ export class ReportSubmissionService {
     private readonly dossierRepo: Repository<ClientDossier>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
-    private readonly mirrorService: OrderDossierMirrorWriteService,
+    private readonly outboxService: IntegrationOutboxService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -42,8 +42,6 @@ export class ReportSubmissionService {
     let report = await this.reportRepo.findOne({ where: { chatId } });
 
     // ── Fallback : créer ConversationReport depuis ClientDossier si absent ────
-    // Cela arrive quand le commercial a sauvegardé avant le déploiement du fix
-    // qui synchronise les deux tables lors de la sauvegarde.
     if (!report) {
       const contact = await this.contactRepo.findOne({ where: { chat_id: chatId }, select: ['id'] });
       const dossier = contact
@@ -79,50 +77,13 @@ export class ReportSubmissionService {
 
     const isFirstSubmission = !report.isSubmitted;
 
-    // ── Marquer soumis côté commercial (indépendant du DB2) ──────────────────
-    if (isFirstSubmission) {
-      report.isSubmitted     = true;
-      report.submittedAt     = new Date();
-    }
-    report.submissionStatus = 'pending';
-    await this.reportRepo.save(report);
-
-    // ── Charger les données associées ────────────────────────────────────────
+    // ── Charger les données associées pour le payload outbox ─────────────────
     const [commercial, contact, chat] = await Promise.all([
-      this.commercialRepo.findOne({
-        where:  { id: commercialId },
-        select: ['name', 'phone', 'email'],
-      }),
-      this.contactRepo.findOne({
-        where:  { chat_id: chatId },
-        select: ['id', 'phone'],
-      }),
-      this.chatRepo.findOne({
-        where:  { chat_id: chatId },
-        select: ['contact_client', 'poste_id'],
-      }),
+      this.commercialRepo.findOne({ where: { id: commercialId }, select: ['name', 'phone', 'email'] }),
+      this.contactRepo.findOne({ where: { chat_id: chatId }, select: ['id', 'phone'] }),
+      this.chatRepo.findOne({ where: { chat_id: chatId }, select: ['contact_client', 'poste_id'] }),
     ]);
 
-    // ── Émettre les événements (sans attendre DB2) ──────────────────────────
-    // conversation.report.submitted : une seule fois (portefeuille, publisher).
-    // conversation.result_set       : à chaque soumission — idempotent côté
-    //   validation, mais permet de relancer le checkAndTriggerRotation même
-    //   en cas de re-soumission ou si la rotation a échoué silencieusement.
-    if (isFirstSubmission) {
-      this.eventEmitter.emit('conversation.report.submitted', {
-        chatId,
-        commercialId,
-        posteId: chat?.poste_id ?? null,
-      });
-    }
-    if (chat?.poste_id) {
-      this.eventEmitter.emit('conversation.result_set', {
-        chatId,
-        posteId: chat.poste_id,
-      });
-    }
-
-    // ── Tentative de sync DB2 (non-bloquante pour le commercial) ─────────────
     const extraPhones = contact
       ? await this.phoneRepo.find({ where: { contactId: contact.id } })
       : [];
@@ -132,44 +93,59 @@ export class ReportSubmissionService {
     ];
     const clientPhonesJson = allPhones.length > 0 ? JSON.stringify(allPhones) : null;
 
-    try {
-      await this.mirrorService.upsertDossier({
-        messagingChatId:        chatId,
-        commercialIdDb1:        commercialId,
-        contactIdDb1:           contact?.id ?? null,
-        clientMessagingContact: chat?.contact_client ?? null,
-        clientPhones:           clientPhonesJson,
-        clientName:       report.clientName,
-        commercialName:   commercial?.name ?? null,
-        commercialPhone:  commercial?.phone ?? null,
-        commercialEmail:  commercial?.email ?? null,
-        ville:            report.ville,
-        commune:          report.commune,
-        quartier:         report.quartier,
-        productCategory:  report.productCategory,
-        clientNeed:       report.clientNeed,
-        interestScore:    report.interestScore,
-        nextAction:       report.nextAction ?? null,
-        followUpAt:       report.followUpAt,
-        notes:            report.notes,
+    // Payload complet pour le worker outbox (capturé au moment de la soumission)
+    const outboxPayload = {
+      messagingChatId:        chatId,
+      commercialIdDb1:        commercialId,
+      contactIdDb1:           contact?.id ?? null,
+      clientMessagingContact: chat?.contact_client ?? null,
+      clientPhones:           clientPhonesJson,
+      clientName:             report.clientName,
+      commercialName:         commercial?.name ?? null,
+      commercialPhone:        commercial?.phone ?? null,
+      commercialEmail:        commercial?.email ?? null,
+      ville:                  report.ville,
+      commune:                report.commune,
+      quartier:               report.quartier,
+      productCategory:        report.productCategory,
+      clientNeed:             report.clientNeed,
+      interestScore:          report.interestScore,
+      nextAction:             report.nextAction ?? null,
+      followUpAt:             report.followUpAt ?? null,
+      notes:                  report.notes ?? null,
+    };
+
+    // ── E02-T02 : persistance atomique rapport + outbox ───────────────────────
+    // Les deux writes se font dans la même transaction DB1 :
+    // si l'une échoue, aucune n'est persistée.
+    await this.reportRepo.manager.transaction(async (manager) => {
+      if (isFirstSubmission) {
+        report!.isSubmitted  = true;
+        report!.submittedAt  = new Date();
+      }
+      report!.submissionStatus = 'pending';
+      await manager.save(ConversationReport, report!);
+      await this.outboxService.enqueue('REPORT_SUBMITTED', chatId, outboxPayload, manager);
+    });
+
+    // ── Émettre les événements métier (hors transaction) ─────────────────────
+    if (isFirstSubmission) {
+      this.eventEmitter.emit('conversation.report.submitted', {
+        chatId,
+        commercialId,
+        posteId: chat?.poste_id ?? null,
       });
-      report.submissionStatus = 'sent';
-      report.submissionError  = null;
-      this.logger.log(`Dossier miroir DB2 sync OK: chat=${chatId}`);
-    } catch (err) {
-      // DB2 indisponible : on met en file d'attente pour le retry automatique (cron horaire).
-      // Le rapport reste "soumis" du point de vue du commercial.
-      report.submissionStatus = 'failed';
-      report.submissionError  = (err as Error).message;
-      this.logger.warn(`DB2 indisponible — rapport en file d'attente (retry auto): chat=${chatId}: ${(err as Error).message}`);
+    }
+    if (chat?.poste_id) {
+      this.eventEmitter.emit('conversation.result_set', { chatId, posteId: chat.poste_id });
     }
 
-    await this.reportRepo.save(report);
+    this.logger.log(`REPORT_SUBMITTED chat=${chatId} → outbox enqueued (worker prendra en charge DB2 sync)`);
 
     return {
-      status:      report.submissionStatus ?? 'failed',
-      submittedAt: report.submittedAt,
-      error:       report.submissionStatus === 'failed' ? report.submissionError : null,
+      status:      'pending',
+      submittedAt: report.submittedAt ?? null,
+      error:       null,
     };
   }
 
@@ -195,16 +171,17 @@ export class ReportSubmissionService {
     return this.submitReport(chatId, report.commercialId);
   }
 
+  /** Fallback legacy : retry des rapports en échec avant l'introduction de l'outbox. */
   @Cron('0 * * * *')
   async autoRetryFailedReports(): Promise<void> {
     const failed = await this.getFailedReports(20);
     if (failed.length === 0) return;
-    this.logger.log(`Auto-retry: ${failed.length} rapport(s) en échec à relancer`);
+    this.logger.log(`Legacy auto-retry: ${failed.length} rapport(s) en échec`);
     for (const r of failed) {
       try {
         await this.retryReport(r.chatId);
       } catch (err) {
-        this.logger.warn(`Auto-retry échoué chat=${r.chatId}: ${(err as Error).message}`);
+        this.logger.warn(`Legacy auto-retry échoué chat=${r.chatId}: ${(err as Error).message}`);
       }
     }
   }
@@ -222,10 +199,10 @@ export class ReportSubmissionService {
       select: ['chatId', 'clientName', 'submissionError', 'updatedAt'],
     });
     return reports.map((r) => ({
-      chatId: r.chatId,
-      clientName: r.clientName,
+      chatId:          r.chatId,
+      clientName:      r.clientName,
       submissionError: r.submissionError,
-      updatedAt: r.updatedAt,
+      updatedAt:       r.updatedAt,
     }));
   }
 }

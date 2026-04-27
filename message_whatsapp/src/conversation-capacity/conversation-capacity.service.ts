@@ -16,7 +16,7 @@ export interface CapacitySummaryEntry {
   posteId: string;
   posteName: string;
   activeCount: number;
-  validatedCount: number;
+  submittedCount: number;
   lockedCount: number;
   totalCount: number;
   quotaActive: number;
@@ -235,14 +235,16 @@ export class ConversationCapacityService {
   async getCapacitySummary(): Promise<CapacitySummaryEntry[]> {
     const { quotaActive, quotaTotal } = await this.getQuotas();
 
+    // E01-T04 : submittedCount = nombre de convs ACTIVE dont le rapport est soumis
     const rows = await this.chatRepo
       .createQueryBuilder('c')
       .innerJoin('c.poste', 'p')
+      .leftJoin('conversation_report', 'r', 'r.chat_id = c.chat_id')
       .select('c.poste_id', 'posteId')
       .addSelect('p.name', 'posteName')
-      .addSelect("SUM(CASE WHEN c.window_status = 'active'    THEN 1 ELSE 0 END)", 'active')
-      .addSelect('0', 'validated')
-      .addSelect("SUM(CASE WHEN c.window_status = 'locked'    THEN 1 ELSE 0 END)", 'locked')
+      .addSelect("SUM(CASE WHEN c.window_status = 'active' THEN 1 ELSE 0 END)", 'active')
+      .addSelect("SUM(CASE WHEN c.window_status = 'active' AND r.is_submitted = 1 THEN 1 ELSE 0 END)", 'submitted')
+      .addSelect("SUM(CASE WHEN c.window_status = 'locked' THEN 1 ELSE 0 END)", 'locked')
       .addSelect('COUNT(*)', 'total')
       .where('c.status != :ferme', { ferme: 'fermé' })
       .andWhere('c.deletedAt IS NULL')
@@ -254,7 +256,7 @@ export class ConversationCapacityService {
         posteId: string;
         posteName: string;
         active: string;
-        validated: string;
+        submitted: string;
         locked: string;
         total: string;
       }>();
@@ -262,10 +264,10 @@ export class ConversationCapacityService {
     return rows.map((r) => ({
       posteId: r.posteId,
       posteName: r.posteName,
-      activeCount: Number(r.active),
-      validatedCount: Number(r.validated),
-      lockedCount: Number(r.locked),
-      totalCount: Number(r.total),
+      activeCount:    Number(r.active),
+      submittedCount: Number(r.submitted),
+      lockedCount:    Number(r.locked),
+      totalCount:     Number(r.total),
       quotaActive,
       quotaTotal,
     }));
