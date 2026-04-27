@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddIsPriorityToChat20260427 implements MigrationInterface {
+export class AddIsPriorityToChat1745769600000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE whatsapp_chat
