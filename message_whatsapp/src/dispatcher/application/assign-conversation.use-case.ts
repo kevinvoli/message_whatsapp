@@ -2,6 +2,7 @@ import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common
 import {
   WhatsappChat,
   WhatsappChatStatus,
+  WindowStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { NotificationService } from 'src/notification/notification.service';
@@ -248,6 +249,11 @@ export class AssignConversationUseCase {
       conversation.assigned_mode = isAgentOnline ? 'ONLINE' : 'OFFLINE';
       // Réinitialise le rapport soumis — la conv redevient active et doit être retraitée
       await this.reportService?.resetSubmissionBulk([conversation.chat_id]);
+      // Efface le marqueur RELEASED pour que la conv redevienne visible dans la fenêtre
+      if (conversation.window_status === WindowStatus.RELEASED) {
+        conversation.window_status = null;
+        conversation.window_slot = null;
+      }
     } else if (conversation.status === WhatsappChatStatus.EN_ATTENTE && isAgentOnline) {
       // Agent maintenant en ligne → activer la conversation
       transitionStatus(conversation.chat_id, conversation.status, WhatsappChatStatus.ACTIF, 'AssignConversation/permanent-activate');
