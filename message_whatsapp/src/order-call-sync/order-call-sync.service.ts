@@ -106,14 +106,15 @@ export class OrderCallSyncService {
   }
 
   /**
-   * Éligible obligation : sortant ('outgoing') + durée >= 90s + numéro local présent.
+   * Éligible obligation : sortant ('outgoing') + durée >= 90s.
    * Un appel manqué ('missed') ne compte jamais dans les obligations.
+   * id_commercial est préféré mais on accepte aussi le fallback par localNumber.
    */
   private isEligibleForObligation(call: OrderCallLog): boolean {
     return (
       call.callType === ORDER_CALL_TYPE_OUTGOING &&
       call.duration >= ORDER_CALL_MIN_DURATION_SEC &&
-      Boolean(call.localNumber)
+      (call.idCommercial != null || Boolean(call.localNumber))
     );
   }
 
@@ -124,11 +125,13 @@ export class OrderCallSyncService {
     if (!this.obligationService) return null;
 
     return this.obligationService.tryMatchCallToTask({
-      clientPhone:      call.remoteNumber,
-      commercialPhone:  call.localNumber ?? '',
-      callEventId:      call.id,
-      durationSeconds:  call.duration,
-      posteId:          null, // résolu en interne via commercialPhone
+      callEventId:       call.id,
+      durationSeconds:   call.duration,
+      idCommercialDb2:   call.idCommercial,
+      idClientDb2:       call.idClient,
+      commercialPhone:   call.localNumber ?? undefined,
+      clientPhone:       call.remoteNumber,
+      posteId:           null,
     });
   }
 

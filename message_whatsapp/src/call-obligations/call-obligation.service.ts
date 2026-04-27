@@ -16,6 +16,8 @@ import { Contact, ClientCategory } from 'src/contact/entities/contact.entity';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
+import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
 
 const REQUIRED_PER_CATEGORY = 5;
 const MIN_CALL_DURATION_SECONDS = 90;
@@ -62,6 +64,12 @@ export class CallObligationService {
 
     @InjectRepository(WhatsappPoste)
     private readonly posteRepo: Repository<WhatsappPoste>,
+
+    @InjectRepository(ClientIdentityMapping)
+    private readonly clientMappingRepo: Repository<ClientIdentityMapping>,
+
+    @InjectRepository(CommercialIdentityMapping)
+    private readonly commercialMappingRepo: Repository<CommercialIdentityMapping>,
 
     private readonly systemConfig: SystemConfigService,
   ) {}
@@ -135,10 +143,14 @@ export class CallObligationService {
    *   - il reste une tâche PENDING de cette catégorie dans le batch actif
    */
   async tryMatchCallToTask(params: {
-    clientPhone: string;
-    commercialPhone: string;
     callEventId: string;
     durationSeconds: number | null;
+    /** Résolution directe via DB2 (prioritaire). */
+    idCommercialDb2?: number | null;
+    idClientDb2?: number | null;
+    /** Fallback par téléphone quand les IDs DB2 ne sont pas disponibles. */
+    clientPhone?: string;
+    commercialPhone?: string;
     posteId?: string | null;
   }): Promise<{ matched: boolean; taskId?: string; reason?: string }> {
 
@@ -151,14 +163,26 @@ export class CallObligationService {
       return { matched: false, reason: `durée_insuffisante (${params.durationSeconds ?? 0}s < ${MIN_CALL_DURATION_SECONDS}s)` };
     }
 
-    // 2. Résoudre le poste
-    const posteId = params.posteId ?? await this.resolvePosteByCommercialPhone(params.commercialPhone);
+    // 2. Résoudre le poste — ID DB2 en priorité, téléphone en fallback
+    let posteId = params.posteId ?? null;
+    if (!posteId) {
+      if (params.idCommercialDb2 != null) {
+        posteId = await this.resolvePosteByCommercialId(params.idCommercialDb2);
+      } else if (params.commercialPhone) {
+        posteId = await this.resolvePosteByCommercialPhone(params.commercialPhone);
+      }
+    }
     if (!posteId) {
       return { matched: false, reason: 'poste_introuvable' };
     }
 
-    // 3. Trouver la catégorie du contact
-    const taskCategory = await this.resolveContactCategory(params.clientPhone);
+    // 3. Trouver la catégorie du contact — ID DB2 en priorité, téléphone en fallback
+    let taskCategory: CallTaskCategory | null = null;
+    if (params.idClientDb2 != null) {
+      taskCategory = await this.resolveContactCategoryById(params.idClientDb2);
+    } else if (params.clientPhone) {
+      taskCategory = await this.resolveContactCategory(params.clientPhone);
+    }
     if (!taskCategory) {
       return { matched: false, reason: 'categorie_contact_inconnue' };
     }
@@ -179,7 +203,7 @@ export class CallObligationService {
 
     // 6. Valider la tâche
     task.status = CallTaskStatus.DONE;
-    task.clientPhone = params.clientPhone;
+    task.clientPhone = params.clientPhone ?? null;
     task.callEventId = params.callEventId;
     task.durationSeconds = params.durationSeconds;
     task.completedAt = new Date();
@@ -333,5 +357,32 @@ export class CallObligationService {
       relations: { poste: true },
     });
     return commercial?.poste?.id ?? null;
+  }
+
+  private async resolvePosteByCommercialId(idCommercialDb2: number): Promise<string | null> {
+    const mapping = await this.commercialMappingRepo.findOne({
+      where: { external_id: idCommercialDb2 },
+      select: ['commercial_id'],
+    });
+    if (!mapping) return null;
+    const commercial = await this.commercialRepo.findOne({
+      where: { id: mapping.commercial_id },
+      relations: { poste: true },
+    });
+    return commercial?.poste?.id ?? null;
+  }
+
+  private async resolveContactCategoryById(idClientDb2: number): Promise<CallTaskCategory | null> {
+    const mapping = await this.clientMappingRepo.findOne({
+      where: { external_id: idClientDb2 },
+      select: ['contact_id'],
+    });
+    if (!mapping) return null;
+    const contact = await this.contactRepo.findOne({
+      where: { id: mapping.contact_id },
+      select: ['client_category'],
+    });
+    if (!contact?.client_category) return null;
+    return CATEGORY_MAP[contact.client_category] ?? null;
   }
 }

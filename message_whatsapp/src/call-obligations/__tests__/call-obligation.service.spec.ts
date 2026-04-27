@@ -102,6 +102,18 @@ function makePosteRepo(posteIds: string[] = ['poste-1']) {
   } as any;
 }
 
+function makeClientMappingRepo(contactId: string | null = 'contact-1') {
+  return {
+    findOne: jest.fn().mockResolvedValue(contactId ? { contact_id: contactId } : null),
+  } as any;
+}
+
+function makeCommercialMappingRepo(commercialId: string | null = 'commercial-1') {
+  return {
+    findOne: jest.fn().mockResolvedValue(commercialId ? { commercial_id: commercialId } : null),
+  } as any;
+}
+
 function buildService(
   batchRepo = makeBatchRepo(),
   taskRepo = makeTaskRepo(),
@@ -110,6 +122,8 @@ function buildService(
   chatRepo = makeChatRepo(),
   posteRepo = makePosteRepo(),
   systemConfig = { get: jest.fn().mockResolvedValue('true') } as any,
+  clientMappingRepo = makeClientMappingRepo(),
+  commercialMappingRepo = makeCommercialMappingRepo(),
 ): CallObligationService {
   return new CallObligationService(
     batchRepo,
@@ -118,6 +132,8 @@ function buildService(
     commercialRepo,
     chatRepo,
     posteRepo,
+    clientMappingRepo,
+    commercialMappingRepo,
     systemConfig,
   );
 }

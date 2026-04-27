@@ -11,6 +11,8 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
+import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
+import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
       WhatsappCommercial,
       WhatsappChat,
       WhatsappPoste,
+      ClientIdentityMapping,
+      CommercialIdentityMapping,
     ]),
     JorbsModule,
     SystemConfigModule,
