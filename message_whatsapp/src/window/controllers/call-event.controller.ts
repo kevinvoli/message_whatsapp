@@ -122,6 +122,19 @@ export class WindowController {
   }
 
   /**
+   * Déclenche le rattrapage immédiat : initialise les fenêtres manquantes
+   * et vérifie la rotation pour tous les postes actifs.
+   * Équivalent à forcer le cron autoCheckRotations maintenant.
+   * POST /window/auto-check-all
+   */
+  @Post('auto-check-all')
+  @UseGuards(AdminGuard)
+  async autoCheckAll() {
+    await this.windowRotation.autoCheckRotations();
+    return { ok: true };
+  }
+
+  /**
    * Reconstruit la fenêtre d'un poste depuis zéro — admin.
    * POST /window/rebuild/:posteId
    */

@@ -76,6 +76,15 @@ export interface WindowDebugState {
   conversations: WindowDebugConv[];
 }
 
+export async function autoCheckAll(): Promise<{ ok: boolean }> {
+  return handleResponse(
+    await fetch(`${API_BASE_URL}/window/auto-check-all`, {
+      method: 'POST',
+      credentials: 'include',
+    }),
+  );
+}
+
 export async function getWindowDebugState(posteId: string): Promise<WindowDebugState> {
   return handleResponse<WindowDebugState>(
     await fetch(`${API_BASE_URL}/window/debug/${encodeURIComponent(posteId)}`, { credentials: 'include' }),

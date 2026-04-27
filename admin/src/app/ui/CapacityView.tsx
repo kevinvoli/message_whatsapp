@@ -23,6 +23,7 @@ import {
   rebuildWindow,
   forceValidateConversation,
   getWindowDebugState,
+  autoCheckAll,
 } from '../lib/api/window.api';
 
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -62,6 +63,7 @@ export default function CapacityView() {
   const [activeTab, setActiveTab] = useState<'quotas' | 'criteria' | 'calls'>('quotas');
   const [debugState, setDebugState] = useState<WindowDebugState | null>(null);
   const [debugPoste, setDebugPoste] = useState<string | null>(null);
+  const [autoChecking, setAutoChecking] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -104,6 +106,17 @@ export default function CapacityView() {
       setExternalTimeout(result.externalTimeoutHours);
     } finally {
       setTogglingMode(false);
+    }
+  };
+
+  const handleAutoCheckAll = async () => {
+    setAutoChecking(true);
+    try {
+      await autoCheckAll();
+      const s = await getCapacitySummary();
+      setSummary(s);
+    } finally {
+      setAutoChecking(false);
     }
   };
 
@@ -379,8 +392,20 @@ export default function CapacityView() {
 
           {/* Résumé par poste */}
           {summary.length === 0 ? (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-700">
-              Aucune conversation active pour le moment.
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm text-yellow-800 font-medium">Aucune fenêtre glissante initialisée.</p>
+              <p className="text-xs text-yellow-700">
+                Cela arrive si le mode fenêtre était désactivé lors de la connexion des commerciaux,
+                ou si <code>buildWindowForPoste</code> n&apos;a pas tourné. Cliquez ci-dessous pour
+                initialiser toutes les fenêtres manquantes et relancer les rotations bloquées.
+              </p>
+              <button
+                onClick={handleAutoCheckAll}
+                disabled={autoChecking}
+                className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
+              >
+                {autoChecking ? 'Initialisation…' : '⚡ Initialiser toutes les fenêtres'}
+              </button>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-200">

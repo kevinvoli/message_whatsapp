@@ -360,15 +360,18 @@ export class WindowRotationService {
   }
 
   /**
-   * Rattrapage automatique : couvre les postes déjà bloqués sans nouvel événement
-   * socket/soumission après un déploiement.
+   * Rattrapage automatique toutes les minutes :
+   * 1. Vérifie la rotation pour les postes dont la fenêtre est déjà construite.
+   * 2. Initialise la fenêtre des postes qui ont des conversations sans window_slot
+   *    (cas : mode activé après connexion du commercial, ou buildWindowForPoste raté).
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async autoCheckRotations(): Promise<void> {
     const modeEnabled = await this.capacityService.isWindowModeEnabled();
     if (!modeEnabled) return;
 
-    const rows = await this.chatRepo
+    // ── 1. Postes avec fenêtre déjà construite → vérifier la rotation ──────────
+    const slottedRows = await this.chatRepo
       .createQueryBuilder('c')
       .select('DISTINCT c.poste_id', 'posteId')
       .where('c.poste_id IS NOT NULL')
@@ -377,13 +380,38 @@ export class WindowRotationService {
       .andWhere('c.deletedAt IS NULL')
       .getRawMany<{ posteId: string }>();
 
-    for (const row of rows) {
+    const slottedPosteIds = new Set(slottedRows.map((r) => r.posteId));
+
+    for (const row of slottedRows) {
       if (!row.posteId) continue;
       try {
         await this.checkAndTriggerRotation(row.posteId);
       } catch (err) {
         this.logger.warn(
           `autoCheckRotations: rotation check échoué pour poste ${row.posteId}`,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
+    }
+
+    // ── 2. Postes sans window_slot → construire la fenêtre (rattrapage) ────────
+    const uninitRows = await this.chatRepo
+      .createQueryBuilder('c')
+      .select('DISTINCT c.poste_id', 'posteId')
+      .where('c.poste_id IS NOT NULL')
+      .andWhere('c.window_slot IS NULL')
+      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .andWhere('c.deletedAt IS NULL')
+      .getRawMany<{ posteId: string }>();
+
+    for (const row of uninitRows) {
+      if (!row.posteId || slottedPosteIds.has(row.posteId)) continue;
+      this.logger.log(`autoCheckRotations: fenêtre non initialisée pour poste ${row.posteId} — build automatique`);
+      try {
+        await this.buildWindowForPoste(row.posteId);
+      } catch (err) {
+        this.logger.warn(
+          `autoCheckRotations: buildWindowForPoste échoué pour poste ${row.posteId}`,
           err instanceof Error ? err.stack : String(err),
         );
       }
