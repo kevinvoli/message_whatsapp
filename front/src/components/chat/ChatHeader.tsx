@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, Tag, Bell, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers, FlaskConical } from 'lucide-react';
+import { MessageCircle, User, Clock, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers } from 'lucide-react';
 import {
   Conversation,
   ConversationStatus,
-  ConversationResult,
-  CONVERSATION_RESULT_LABELS,
-  CONVERSATION_RESULT_COLORS,
 } from '@/types/chat';
 import dynamic from 'next/dynamic';
 
-const ConversationOutcomeModal = dynamic(() => import('./ConversationOutcomeModal'), { ssr: false });
-const CreateFollowUpModal = dynamic(() => import('./CreateFollowUpModal'), { ssr: false });
 const GicopReportPanel = dynamic(() => import('./GicopReportPanel'), { ssr: false });
 const CatalogModal = dynamic(() => import('./CatalogModal'), { ssr: false });
 import { getStatusBadge } from '@/lib/utils';
@@ -91,60 +86,14 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
     const { updateConversation, changeConversationStatus } = useChatStore();
     const { selectContactByChatId } = useContactStore();
     const provider = getProviderFromChatId(currentConv.chat_id);
-    const [showOutcomeModal, setShowOutcomeModal] = useState(false);
-    const [showFollowUpModal, setShowFollowUpModal] = useState(false);
-    const [localResult, setLocalResult] = useState<ConversationResult | null>(
-      currentConv.conversation_result ?? null,
-    );
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [summary, setSummary] = useState<AiSummaryData | null>(null);
     const [loadingSummary, setLoadingSummary] = useState(false);
     const [showCatalog, setShowCatalog] = useState(false);
 
-    // ── Test GICOP ──────────────────────────────────────────────────────────
-    const [showGicopTest, setShowGicopTest] = useState(false);
-    const [gicopNumber, setGicopNumber]     = useState('');
-    const [gicopPosteId, setGicopPosteId]   = useState('');
-    const [gicopType, setGicopType]         = useState('relancer');
-    const [gicopSending, setGicopSending]   = useState(false);
-    const [gicopResult, setGicopResult]     = useState<{ ok: boolean; message: string } | null>(null);
-
-    const handleOpenGicopTest = () => {
-      setGicopNumber(currentConv.clientPhone ?? '');
-      setGicopPosteId('');
-      setGicopType('relancer');
-      setGicopResult(null);
-      setShowGicopTest(true);
-    };
-
-    const handleSendGicop = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setGicopSending(true);
-      setGicopResult(null);
-      try {
-        const res = await fetch(`${API_URL}/gicop-platform/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            number:   gicopNumber,
-            poste_id: Number(gicopPosteId),
-            type:     gicopType,
-          }),
-        });
-        const data = await res.json() as { ok: boolean; message: string };
-        setGicopResult({ ok: res.ok, message: data.message ?? (res.ok ? 'Envoyé' : 'Erreur') });
-      } catch (err) {
-        setGicopResult({ ok: false, message: err instanceof Error ? err.message : 'Erreur réseau' });
-      } finally {
-        setGicopSending(false);
-      }
-    };
-    // ────────────────────────────────────────────────────────────────────────
-
     const handleFetchSummary = async () => {
       setShowSummaryModal(true);
-      if (summary) return; // cache — don't refetch unless conversation changes
+      if (summary) return;
       setLoadingSummary(true);
       try {
         const res = await fetch(`${API_URL}/ai/summary/${currentConv.chat_id}`, { credentials: 'include' });
@@ -191,11 +140,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                             <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(currentConv?.status || 'nouveau')}`}>
                                 {currentConv?.status.replace('_', ' ')}
                             </span>
-                            {localResult && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONVERSATION_RESULT_COLORS[localResult]}`}>
-                                    {CONVERSATION_RESULT_LABELS[localResult]}
-                                </span>
-                            )}
                             {currentConv?.readonly && (
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
                                     Lecture seule
@@ -239,33 +183,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                         <Sparkles className="w-3.5 h-3.5" />
                         Résumé IA
                     </button>
-                    {/* Bouton test GICOP */}
-                    <button
-                        onClick={handleOpenGicopTest}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200"
-                        title="Test envoi GICOP"
-                    >
-                        <FlaskConical className="w-3.5 h-3.5" />
-                        Test GICOP
-                    </button>
-                    {/* Bouton qualifier */}
-                    <button
-                        onClick={() => setShowOutcomeModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                        title="Qualifier la conversation"
-                    >
-                        <Tag className="w-3.5 h-3.5" />
-                        Qualifier
-                    </button>
-                    {/* Bouton relance */}
-                    <button
-                        onClick={() => setShowFollowUpModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                        title="Planifier une relance"
-                    >
-                        <Bell className="w-3.5 h-3.5" />
-                        Relance
-                    </button>
                     <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">
                         <MessageCircle className="w-4 h-4" />
                         <span className="font-medium">{totalMessages} messages</span>
@@ -301,26 +218,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
           </div>
         )}
         </div>
-
-        {showOutcomeModal && (
-            <ConversationOutcomeModal
-                conversationId={currentConv.id}
-                currentResult={localResult}
-                onClose={() => setShowOutcomeModal(false)}
-                onSaved={(result) => {
-                    setLocalResult(result);
-                    updateConversation({ ...currentConv, conversation_result: result });
-                }}
-            />
-        )}
-
-        {showFollowUpModal && (
-            <CreateFollowUpModal
-                contactId={currentConv.contact_summary?.id}
-                conversationId={currentConv.id}
-                onClose={() => setShowFollowUpModal(false)}
-            />
-        )}
 
         {/* S8-003 — Modal catalogue multimédia */}
         {showCatalog && (
@@ -390,76 +287,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                     ) : (
                         <p className="text-sm text-gray-400 text-center py-4">Impossible de générer le résumé.</p>
                     )}
-                </div>
-            </div>
-        )}
-        {/* Modal test GICOP */}
-        {showGicopTest && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowGicopTest(false)}>
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                            <FlaskConical className="w-4 h-4 text-amber-600" />
-                            Test envoi GICOP
-                        </h3>
-                        <button onClick={() => setShowGicopTest(false)} className="text-gray-400 hover:text-gray-600">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <form onSubmit={(e) => void handleSendGicop(e)} className="space-y-3">
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">Numéro (number)</label>
-                            <input
-                                type="tel"
-                                value={gicopNumber}
-                                onChange={(e) => setGicopNumber(e.target.value)}
-                                placeholder="+225 07 00 00 00 00"
-                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">N° poste GICOP (poste_id)</label>
-                            <input
-                                type="number"
-                                value={gicopPosteId}
-                                onChange={(e) => setGicopPosteId(e.target.value)}
-                                placeholder="Ex : 12"
-                                min={1}
-                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">Type</label>
-                            <select
-                                value={gicopType}
-                                onChange={(e) => setGicopType(e.target.value)}
-                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
-                            >
-                                <option value="rappeler">rappeler</option>
-                                <option value="relancer">relancer</option>
-                                <option value="envoyer_devis">envoyer_devis</option>
-                                <option value="fermer">fermer</option>
-                                <option value="archiver">archiver</option>
-                            </select>
-                        </div>
-
-                        {gicopResult && (
-                            <div className={`text-xs px-3 py-2 rounded-lg ${gicopResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                {gicopResult.message}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={gicopSending}
-                            className="w-full py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors"
-                        >
-                            {gicopSending ? 'Envoi…' : 'Envoyer vers gicop.ci'}
-                        </button>
-                    </form>
                 </div>
             </div>
         )}

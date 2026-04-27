@@ -1,21 +1,10 @@
 import axios from 'axios';
-import { FollowUp, FollowUpStatus, FollowUpType } from '@/types/chat';
+import { FollowUp, FollowUpStatus } from '@/types/chat';
 
 const base = process.env.NEXT_PUBLIC_API_URL;
 
 function headers() {
   return { withCredentials: true };
-}
-
-export async function createFollowUp(data: {
-  contact_id?: string;
-  conversation_id?: string;
-  type: FollowUpType;
-  scheduled_at: string;
-  notes?: string;
-}): Promise<FollowUp> {
-  const r = await axios.post(`${base}/follow-ups`, data, headers());
-  return r.data;
 }
 
 export async function getMyFollowUps(status?: FollowUpStatus): Promise<{ data: FollowUp[]; total: number }> {
@@ -45,11 +34,4 @@ export async function completeFollowUp(
 export async function cancelFollowUp(id: string): Promise<FollowUp> {
   const r = await axios.patch(`${base}/follow-ups/${id}/cancel`, {}, headers());
   return r.data;
-}
-
-export async function setConversationOutcome(
-  conversationId: string,
-  result: string,
-): Promise<void> {
-  await axios.patch(`${base}/chats/${conversationId}/outcome`, { result }, headers());
 }

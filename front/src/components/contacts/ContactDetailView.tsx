@@ -28,7 +28,6 @@ import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
 import { logger } from '@/lib/logger';
 import dynamic from 'next/dynamic';
 
-const CreateFollowUpModal = dynamic(() => import('@/components/chat/CreateFollowUpModal'), { ssr: false });
 
 const FOLLOWUP_STATUS_LABELS: Record<FollowUpStatus, string> = {
   planifiee: 'Planifiée',
@@ -205,7 +204,7 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
   const { selectedContactDetail: selectedContact, isLoadingDetail, upsertContact } = useContactStore();
   const { selectConversation, conversations } = useChatStore();
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+
   const [contactFollowUps, setContactFollowUps] = useState<FollowUp[]>([]);
   const [crmFields, setCrmFieldsState] = useState<CrmFieldEntry[]>([]);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -765,14 +764,8 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
 
       {/* ── Relances ── */}
       <div style={{ background: 'white', borderRadius: 16, padding: 18, border: '1px solid #e5e7eb', marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ marginBottom: 14 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>Relances</h3>
-          <button
-            onClick={() => setShowFollowUpModal(true)}
-            style={{ fontSize: 12, fontWeight: 600, color: '#059669', background: '#ecfdf5', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
-          >
-            + Planifier
-          </button>
         </div>
         {contactFollowUps.length === 0 ? (
           <p style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>Aucune relance planifiée</p>
@@ -986,14 +979,6 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
         />
       )}
 
-      {/* Modal relance */}
-      {showFollowUpModal && (
-        <CreateFollowUpModal
-          contactId={selectedContact?.id}
-          onClose={() => setShowFollowUpModal(false)}
-          onCreated={() => selectedContact?.id && void loadFollowUps(selectedContact.id)}
-        />
-      )}
     </div>
   );
 }
