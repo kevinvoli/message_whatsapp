@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronUp, MessageCircle, Phone, Flame } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Phone, Flame } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
 
@@ -23,13 +23,6 @@ interface MissedCall {
   treated: boolean;
 }
 
-interface UnansweredChat {
-  chat_id: string;
-  contact_client: string;
-  unread_count: number;
-  last_activity_at: string;
-}
-
 // ─── Composant ───────────────────────────────────────────────────────────────
 
 export default function PrioritePostePanel() {
@@ -44,19 +37,15 @@ export default function PrioritePostePanel() {
   );
 
   const load = useCallback(async () => {
-    const [missed, unans] = await Promise.allSettled([
+    const result = await Promise.allSettled([
       fetch(`${API_URL}/call-logs/mine/missed`, { credentials: 'include' }).then((r) => r.ok ? r.json() as Promise<MissedCall[]> : []),
-      fetch(`${API_URL}/chats/mine/unanswered`, { credentials: 'include' }).then((r) => r.ok ? r.json() as Promise<UnansweredChat[]> : []),
     ]);
 
-    const missedList = missed.status === 'fulfilled' ? missed.value : [];
-    const unansList  = unans.status  === 'fulfilled' ? unans.value  : [];
-
+    const missedList = result[0].status === 'fulfilled' ? result[0].value : [];
     setMissedCalls(missedList);
-    setUnanswered(unansList);
 
     // Notifier les autres composants du niveau de criticité
-    const total = missedList.length + unansList.length;
+    const total = missedList.length;
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('poste:priority-update', {
         detail: { total, isCritical: total >= PRIORITY_CRITICAL_THRESHOLD },
@@ -86,7 +75,7 @@ export default function PrioritePostePanel() {
     selectConversation(chatId);
   };
 
-  const total = missedCalls.length + unanswered.length + priorityConversations.length;
+  const total = missedCalls.length + priorityConversations.length;
   if (total === 0) return null;
 
   return (
@@ -170,44 +159,6 @@ export default function PrioritePostePanel() {
         </div>
       )}
 
-      {/* Messages non répondus */}
-      {unanswered.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowUnanswered((v) => !v)}
-            className="w-full flex items-center justify-between px-3 py-1 bg-orange-100 text-xs text-orange-700 font-medium"
-          >
-            <span className="flex items-center gap-1">
-              <MessageCircle className="w-3 h-3" />
-              Messages non répondus ({unanswered.length})
-            </span>
-            {showUnanswered ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-          {showUnanswered && (
-            <div className="divide-y divide-orange-100 max-h-36 overflow-y-auto">
-              {unanswered.map((chat) => (
-                <div key={chat.chat_id} className="flex items-center justify-between px-3 py-1.5 gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-gray-700 truncate">{chat.contact_client}</p>
-                    <p className="text-[10px] text-gray-400">{formatDate(chat.last_activity_at)}</p>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">
-                      {chat.unread_count}
-                    </span>
-                    <button
-                      onClick={() => handleOpenChat(chat.chat_id)}
-                      className="text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Ouvrir
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
