@@ -17,6 +17,7 @@ import { ChatContext } from 'src/context/entities/chat-context.entity';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { AssignmentAffinityService } from '../domain/assignment-affinity.service';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 
 export interface AssignConversationResult {
   chat: WhatsappChat;
@@ -52,6 +53,9 @@ export class AssignConversationUseCase {
 
     @Optional()
     private readonly affinityService: AssignmentAffinityService,
+
+    @Optional()
+    private readonly reportService: ConversationReportService,
   ) {}
 
   async execute(
@@ -242,6 +246,8 @@ export class AssignConversationUseCase {
       conversation.read_only = false;
       conversation.assigned_at = new Date();
       conversation.assigned_mode = isAgentOnline ? 'ONLINE' : 'OFFLINE';
+      // Réinitialise le rapport soumis — la conv redevient active et doit être retraitée
+      await this.reportService?.resetSubmissionBulk([conversation.chat_id]);
     } else if (conversation.status === WhatsappChatStatus.EN_ATTENTE && isAgentOnline) {
       // Agent maintenant en ligne → activer la conversation
       transitionStatus(conversation.chat_id, conversation.status, WhatsappChatStatus.ACTIF, 'AssignConversation/permanent-activate');
