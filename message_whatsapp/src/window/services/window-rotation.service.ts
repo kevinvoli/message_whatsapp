@@ -160,6 +160,12 @@ export class WindowRotationService {
     // Initialiser les validations pour les nouvelles conversations actives (bulk)
     await this.validationEngine.initConversationValidationBulk(toInit);
 
+    // Réinitialiser le statut de soumission pour les nouvelles entrées et les promotions
+    // LOCKED→ACTIVE afin qu'un rapport soumis dans un bloc précédent ne déclenche
+    // pas la rotation du nouveau bloc prématurément.
+    const resetChatIds = [...candidates.map((c) => c.chat_id), ...toInit];
+    await this.reportService.resetSubmissionBulk(resetChatIds);
+
     this.logger.log(
       `Fenêtre construite pour poste ${posteId} : ${slottedChats.length} existantes + ${candidates.length} nouvelles (total ${all.length})`,
     );
@@ -557,6 +563,7 @@ export class WindowRotationService {
       // 3. Injecter de nouvelles conversations (non encore dans la fenêtre)
       const slotsUsed = remaining.length;
       const slotsAvailable = quotaTotal - slotsUsed;
+      const injectChatIds: string[] = [];
 
       if (slotsAvailable > 0) {
         const excludedIds = new Set([
@@ -575,6 +582,7 @@ export class WindowRotationService {
         });
 
         const toInject = newCandidates.filter((c) => !excludedIds.has(c.id)).slice(0, slotsAvailable);
+        injectChatIds.push(...toInject.map((c) => c.chat_id));
         const injectAssignments = toInject.map((chat, i) => {
           const newSlot = slotsUsed + i + 1;
           const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
@@ -591,6 +599,10 @@ export class WindowRotationService {
 
         this.logger.log(`${toInject.length} nouvelles conversations injectées pour poste ${posteId}`);
       }
+
+      // Réinitialiser le statut de soumission des nouvelles entrées et des promotions
+      // LOCKED→ACTIVE pour éviter qu'un ancien rapport déclenche la rotation du nouveau bloc.
+      await this.reportService.resetSubmissionBulk([...injectChatIds, ...promotedChatIds]);
 
       this.logger.log(
         `Rotation complète poste ${posteId} — libérées: ${releasedChatIds.length}, promues: ${promotedChatIds.length}`,
@@ -651,6 +663,7 @@ export class WindowRotationService {
 
     // Injecter une nouvelle conversation si de la place est disponible
     const slotsUsed = current.length;
+    const injectChatIds: string[] = [];
     if (slotsUsed < quotaTotal) {
       const existingIds = new Set(current.map((c) => c.id));
       const candidates = await this.chatRepo.find({
@@ -664,6 +677,7 @@ export class WindowRotationService {
       });
 
       const toInject = candidates.filter((c) => !existingIds.has(c.id)).slice(0, quotaTotal - slotsUsed);
+      injectChatIds.push(...toInject.map((c) => c.chat_id));
       const injectAssignments = toInject.map((chat, i) => {
         const newSlot = slotsUsed + i + 1;
         const newStatus = newSlot <= quotaActive ? WindowStatus.ACTIVE : WindowStatus.LOCKED;
@@ -680,5 +694,9 @@ export class WindowRotationService {
         this.logger.log(`${toInject.length} conversation(s) injectée(s) après compactage pour poste ${posteId}`);
       }
     }
+
+    // Réinitialiser le statut de soumission des nouvelles entrées et des promotions
+    // LOCKED→ACTIVE pour éviter qu'un ancien rapport déclenche la rotation du nouveau bloc.
+    await this.reportService.resetSubmissionBulk([...injectChatIds, ...toInit]);
   }
 }

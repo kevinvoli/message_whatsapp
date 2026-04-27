@@ -108,6 +108,19 @@ export class ConversationReportService {
     ]));
   }
 
+  /**
+   * Réinitialise le statut de soumission pour les conversations qui entrent
+   * dans un nouveau bloc de fenêtre glissante, pour éviter qu'un rapport
+   * soumis dans un bloc précédent ne déclenche la rotation prématurément.
+   */
+  async resetSubmissionBulk(chatIds: string[]): Promise<void> {
+    if (chatIds.length === 0) return;
+    await this.repo.update(
+      { chatId: In(chatIds) },
+      { isSubmitted: false, submittedAt: null, submissionStatus: null, submissionError: null },
+    );
+  }
+
   async isReportComplete(chatId: string): Promise<boolean> {
     const report = await this.repo.findOne({ where: { chatId }, select: ['isComplete'] });
     return report?.isComplete ?? false;
