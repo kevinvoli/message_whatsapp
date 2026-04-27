@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Phone, Flame } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
@@ -31,9 +31,11 @@ export default function PrioritePostePanel() {
   const [showPriority, setShowPriority]   = useState(true);
   const [treating, setTreating]           = useState<Record<string, boolean>>({});
 
-  const selectConversation = useChatStore((s) => s.selectConversation);
-  const priorityConversations = useChatStore((s) =>
-    s.conversations.filter((c) => c.is_priority === true),
+  const selectConversation  = useChatStore((s) => s.selectConversation);
+  const conversations       = useChatStore((s) => s.conversations);
+  const priorityConversations = useMemo(
+    () => conversations.filter((c) => c.is_priority === true),
+    [conversations],
   );
 
   const load = useCallback(async () => {
@@ -107,7 +109,7 @@ export default function PrioritePostePanel() {
                 <div key={conv.chat_id} className="flex items-center justify-between px-3 py-1.5 gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-red-700 truncate">{conv.clientName}</p>
-                    <p className="text-[10px] text-gray-400">{conv.last_activity_at ? formatDate(conv.last_activity_at.toISOString()) : ''}</p>
+                    <p className="text-[10px] text-gray-400">{formatDate(conv.last_activity_at)}</p>
                   </div>
                   <button
                     onClick={() => handleOpenChat(conv.chat_id)}
