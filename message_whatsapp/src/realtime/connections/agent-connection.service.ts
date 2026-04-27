@@ -84,8 +84,9 @@ export class AgentConnectionService {
       await client.join(`tenant:${tid}`);
     }
     await client.join(`poste:${posteId}`);
+    await client.join(`commercial:${commercialId}`);
     this.logger.log(
-      `Agent ${commercialId} joined ${tenantIds.length} tenant room(s): ${tenantIds.join(', ')} + poste:${posteId}`,
+      `Agent ${commercialId} joined ${tenantIds.length} tenant room(s): ${tenantIds.join(', ')} + poste:${posteId} + commercial:${commercialId}`,
     );
 
     await this.commercialService.updateStatus(commercialId, true);

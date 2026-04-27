@@ -2,34 +2,45 @@
 
 import { useEffect, useState } from 'react';
 import { getMyProgress, TargetProgress } from '@/lib/targetsApi';
+import { useChatStore } from '@/store/chatStore';
 
 const METRIC_LABELS: Record<string, string> = {
-  conversations: 'Conversations',
-  calls: 'Appels',
-  follow_ups: 'Relances',
-  orders: 'Commandes',
-  relances: 'Relances (alt)',
-  reports_submitted: 'Rapports soumis (GICOP)',
+  conversations:      'Conversations',
+  calls:              'Appels',
+  follow_ups:         'Relances',
+  orders:             'Commandes',
+  relances:           'Relances (alt)',
+  reports_submitted:  'Rapports soumis (GICOP)',
 };
 
 function colorForPct(pct: number) {
   if (pct >= 100) return 'bg-green-500';
-  if (pct >= 70) return 'bg-blue-500';
-  if (pct >= 40) return 'bg-yellow-400';
+  if (pct >= 70)  return 'bg-blue-500';
+  if (pct >= 40)  return 'bg-yellow-400';
   return 'bg-red-400';
 }
 
 export default function ObjectifsPanel() {
-  const [progress, setProgress] = useState<TargetProgress[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const targetProgress    = useChatStore((s) => s.targetProgress);
+  const setTargetProgress = useChatStore((s) => s.setTargetProgress);
+  const [loading, setLoading] = useState(targetProgress === null);
+  const [error,   setError]   = useState('');
 
+  // Charge les objectifs au premier montage uniquement si le store est vide.
+  // Les mises à jour temps-réel arrivent via l'événement socket TARGET_PROGRESS_UPDATE.
   useEffect(() => {
+    if (targetProgress !== null) return;
+    setLoading(true);
     getMyProgress()
-      .then(setProgress)
+      .then((p) => {
+        setTargetProgress(p);
+        setError('');
+      })
       .catch(() => setError('Impossible de charger les objectifs.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const progress: TargetProgress[] = targetProgress ?? [];
 
   if (loading) {
     return (

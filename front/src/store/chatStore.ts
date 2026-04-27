@@ -13,6 +13,7 @@ import { create } from 'zustand';
 import { createSocketSessionSlice, SocketSessionSlice } from '@/modules/realtime/store/socket-session.store';
 import { createMessageSlice, MessageSlice } from '@/modules/chat/store/message.store';
 import { createConversationSlice, ConversationSlice } from '@/modules/conversations/store/conversation.store';
+import type { TargetProgress } from '@/lib/targetsApi';
 
 // ─── Type obligation status ───────────────────────────────────────────────────
 
@@ -33,6 +34,8 @@ export type ChatState = SocketSessionSlice &
   ConversationSlice & {
     obligationStatus: ObligationStatus | null;
     setObligationStatus: (s: ObligationStatus | null) => void;
+    targetProgress: TargetProgress[] | null;
+    setTargetProgress: (p: TargetProgress[] | null) => void;
     reset: () => void;
   };
 
@@ -61,6 +64,7 @@ const initialState = {
   rotationBlocked: null,
   affinityChats: null,
   obligationStatus: null,
+  targetProgress: null,
 };
 
 // ─── Store composé ────────────────────────────────────────────────────────────
@@ -75,6 +79,13 @@ export const useChatStore = create<ChatState>()((...a) => ({
   setObligationStatus: (s) => {
     const [set] = a;
     set({ obligationStatus: s });
+  },
+
+  targetProgress: null,
+
+  setTargetProgress: (p) => {
+    const [set] = a;
+    set({ targetProgress: p });
   },
 
   reset: () => {

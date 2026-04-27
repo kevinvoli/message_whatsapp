@@ -175,6 +175,13 @@ export function handleChatEvent(
       break;
     }
 
+    case 'TARGET_PROGRESS_UPDATE': {
+      const progress = data.payload as import('@/lib/targetsApi').TargetProgress[];
+      chatState.setTargetProgress(progress);
+      logger.debug('TARGET_PROGRESS_UPDATE reçu', { count: progress.length });
+      break;
+    }
+
     case 'CONVERSATION_READONLY':
       upsertConversationPatch(data.payload.chat_id, { readonly: true });
       break;
