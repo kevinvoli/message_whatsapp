@@ -518,15 +518,14 @@ export class WindowRotationService {
           ...submitted.map((c) => c.id),
         ]);
 
-        const newCandidates = await this.chatRepo.find({
-          where: {
-            poste_id: posteId,
-            deletedAt: IsNull(),
-            status: Not(In([WhatsappChatStatus.FERME])),
-          },
-          order: { last_activity_at: 'DESC' },
-          take: slotsAvailable + submitted.length,
-        });
+        const newCandidates = await this.chatRepo
+          .createQueryBuilder('c')
+          .where('c.poste_id = :posteId', { posteId })
+          .andWhere('c.deletedAt IS NULL')
+          .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
+          .orderBy('c.last_activity_at', 'DESC')
+          .take(slotsAvailable + submitted.length)
+          .getMany();
 
         const toInject = newCandidates.filter((c) => !excludedIds.has(c.id)).slice(0, slotsAvailable);
         injectChatIds.push(...toInject.map((c) => c.chat_id));
@@ -610,15 +609,14 @@ export class WindowRotationService {
     const injectChatIds: string[] = [];
     if (slotsUsed < quotaTotal) {
       const existingIds = new Set(current.map((c) => c.id));
-      const candidates = await this.chatRepo.find({
-        where: {
-          poste_id: posteId,
-          deletedAt: IsNull(),
-          status: Not(In([WhatsappChatStatus.FERME])),
-        },
-        order: { last_activity_at: 'DESC' },
-        take: slotsUsed + 5,
-      });
+      const candidates = await this.chatRepo
+        .createQueryBuilder('c')
+        .where('c.poste_id = :posteId', { posteId })
+        .andWhere('c.deletedAt IS NULL')
+        .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
+        .orderBy('c.last_activity_at', 'DESC')
+        .take(slotsUsed + 5)
+        .getMany();
 
       const toInject = candidates.filter((c) => !existingIds.has(c.id)).slice(0, quotaTotal - slotsUsed);
       injectChatIds.push(...toInject.map((c) => c.chat_id));
