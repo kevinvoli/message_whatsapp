@@ -90,7 +90,7 @@ export class WindowRotationService {
 
     const slottedIds = new Set(slottedChats.map((c) => c.id));
 
-    // 3. Candidats non encore slottés
+    // 3. Candidats non encore slottés (hors FERMÉ en premier lieu)
     const unslotted = await this.chatRepo
       .createQueryBuilder('c')
       .where('c.poste_id = :posteId', { posteId })
@@ -100,7 +100,30 @@ export class WindowRotationService {
       .take(needed + slottedChats.length + 5)
       .getMany();
 
-    const candidates = unslotted.filter((c) => !slottedIds.has(c.id)).slice(0, needed);
+    let candidates = unslotted.filter((c) => !slottedIds.has(c.id)).slice(0, needed);
+
+    // Cas : toutes les conversations du poste sont FERMÉ (ex : cron 24h).
+    // On slot quand même les FERMÉ qui ont un rapport soumis — la rotation les libèrera aussitôt.
+    if (candidates.length < needed) {
+      const fermeChats = await this.chatRepo.find({
+        where: { poste_id: posteId, status: WhatsappChatStatus.FERME, deletedAt: IsNull() },
+        order: { last_activity_at: 'DESC' },
+        take: (needed - candidates.length) * 2,
+      });
+      const fermeCandidates = fermeChats.filter((c) => !slottedIds.has(c.id));
+      if (fermeCandidates.length > 0) {
+        const submittedMap = await this.reportService.getSubmittedMapBulk(
+          fermeCandidates.map((c) => c.chat_id),
+        );
+        const fermeWithReport = fermeCandidates.filter((c) => submittedMap.get(c.chat_id) === true);
+        if (fermeWithReport.length > 0) {
+          this.logger.log(
+            `buildWindowForPoste poste=${posteId} : ${fermeWithReport.length} conv FERMÉ+rapport incluses pour permettre la rotation`,
+          );
+          candidates = [...candidates, ...fermeWithReport].slice(0, needed);
+        }
+      }
+    }
 
     if (candidates.length === 0 && slottedChats.length > 0) {
       this.logger.log(`Fenêtre stable pour poste ${posteId} (${slottedChats.length} slots, aucun nouveau candidat)`);
@@ -395,12 +418,13 @@ export class WindowRotationService {
     }
 
     // ── 2. Postes sans window_slot → construire la fenêtre (rattrapage) ────────
+    // Pas de filtre sur status : si toutes les convs sont FERMÉ (cron 24h),
+    // buildWindowForPoste les slotte quand même pour permettre la rotation.
     const uninitRows = await this.chatRepo
       .createQueryBuilder('c')
       .select('DISTINCT c.poste_id', 'posteId')
       .where('c.poste_id IS NOT NULL')
       .andWhere('c.window_slot IS NULL')
-      .andWhere('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
       .andWhere('c.deletedAt IS NULL')
       .getRawMany<{ posteId: string }>();
 
