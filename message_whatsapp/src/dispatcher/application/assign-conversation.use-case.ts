@@ -252,11 +252,14 @@ export class AssignConversationUseCase {
       if (hadSubmittedReport) {
         conversation.is_priority = true;
         await this.reportService?.resetSubmissionBulk([conversation.chat_id]);
-      }
-      // Efface le marqueur RELEASED pour que la conv redevienne visible dans la fenêtre
-      if (conversation.window_status === WindowStatus.RELEASED) {
+        // Retire du slot (LOCKED ou RELEASED) → apparaît non-masquée en tête de liste
         conversation.window_status = null;
-        conversation.window_slot = null;
+        conversation.window_slot   = null;
+        conversation.is_locked     = false;
+      } else if (conversation.window_status === WindowStatus.RELEASED) {
+        // Pas de rapport soumis mais RELEASED → rendre visible quand même
+        conversation.window_status = null;
+        conversation.window_slot   = null;
       }
     } else if (conversation.status === WhatsappChatStatus.EN_ATTENTE && isAgentOnline) {
       // Agent maintenant en ligne → activer la conversation
