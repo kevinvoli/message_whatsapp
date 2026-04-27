@@ -5,6 +5,7 @@ import { AlertCircle, Briefcase, ChevronDown, Loader2, RefreshCw } from 'lucide-
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
 import WorkSchedulePanel from './WorkSchedulePanel';
+import AttendancePanel from './AttendancePanel';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -19,7 +20,7 @@ interface BizContact {
   last_message_date?: string | null;
 }
 
-type Tab = 'prospects' | 'annulee' | 'anciennes' | 'planning';
+type Tab = 'prospects' | 'annulee' | 'anciennes' | 'planning' | 'pointage';
 
 type BizTab = 'prospects' | 'annulee' | 'anciennes';
 
@@ -147,12 +148,24 @@ export default function BusinessMenusPanel() {
         >
           Planning
         </button>
+        <button
+          onClick={() => setTab('pointage')}
+          className={`flex-1 text-[11px] font-medium py-2 border-b-2 transition-colors ${
+            tab === 'pointage'
+              ? 'border-green-600 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Pointage
+        </button>
       </div>
 
       {/* Contenu */}
       <div className="flex-1 overflow-y-auto">
         {tab === 'planning' ? (
           <WorkSchedulePanel />
+        ) : tab === 'pointage' ? (
+          <AttendancePanel />
         ) : (
           <>
             {loading[tab as BizTab] && (

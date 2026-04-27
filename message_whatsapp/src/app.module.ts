@@ -82,6 +82,7 @@ import { CommercialActionGateModule } from './commercial-action-gate/commercial-
 import { IntegrationOutboxModule } from './integration-outbox/integration-outbox.module';
 import { ActionQueueModule } from './action-queue/action-queue.module';
 import { WorkScheduleModule } from './work-schedule/work-schedule.module';
+import { WorkAttendanceModule } from './work-attendance/work-attendance.module';
 
 @Module({
   imports: [
@@ -250,6 +251,7 @@ import { WorkScheduleModule } from './work-schedule/work-schedule.module';
     ActionQueueModule,
     // E07 — Temps de travail et planning
     WorkScheduleModule,
+    WorkAttendanceModule,
   ],
   controllers: [AppController],
   providers: [

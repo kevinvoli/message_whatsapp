@@ -6,6 +6,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { ConversationReport } from 'src/gicop-report/entities/conversation-report.entity';
 import { FollowUp } from 'src/follow-up/entities/follow_up.entity';
 import { CallObligationModule } from 'src/call-obligations/call-obligation.module';
+import { WorkAttendanceModule } from 'src/work-attendance/work-attendance.module';
 import { CommercialActionGateService } from './commercial-action-gate.service';
 import { CommercialActionGateController } from './commercial-action-gate.controller';
 
@@ -13,6 +14,7 @@ import { CommercialActionGateController } from './commercial-action-gate.control
   imports: [
     TypeOrmModule.forFeature([WhatsappCommercial, WhatsappChat, WhatsappMessage, ConversationReport, FollowUp]),
     CallObligationModule,
+    WorkAttendanceModule,
   ],
   controllers: [CommercialActionGateController],
   providers: [CommercialActionGateService],

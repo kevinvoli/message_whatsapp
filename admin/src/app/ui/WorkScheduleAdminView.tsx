@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { CalendarDays, Coffee, Edit2, Loader2, Plus, Trash2, X } from 'lucide-react';
+import { CalendarDays, Clock, Coffee, Edit2, Loader2, Plus, Trash2, X } from 'lucide-react';
 import {
   getAllSchedules,
   createSchedule,
@@ -12,8 +12,32 @@ import {
   DayOfWeek,
   BreakSlot,
 } from '../lib/api/work-schedule.api';
+import {
+  getTodayForAll,
+  TodayAttendanceSummary,
+  AttendanceStatus,
+} from '../lib/api/work-attendance.api';
 import { getCommerciaux } from '../lib/api/commerciaux.api';
 import { Commercial } from '../lib/definitions';
+
+const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
+  not_clocked_in: 'Non pointé',
+  working:        'En service',
+  on_break:       'En pause',
+  done:           'Parti',
+};
+const ATTENDANCE_STATUS_STYLE: Record<AttendanceStatus, string> = {
+  not_clocked_in: 'bg-gray-100 text-gray-600',
+  working:        'bg-green-100 text-green-700',
+  on_break:       'bg-amber-100 text-amber-700',
+  done:           'bg-blue-100 text-blue-700',
+};
+
+function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m}min`;
+}
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
   monday:    'Lundi',
@@ -285,15 +309,81 @@ function ScheduleFormModal({ initial, editId, commerciaux, onClose, onSaved }: S
   );
 }
 
+// ─── Onglet pointages ────────────────────────────────────────────────────────
+
+function AttendanceTab({ commercialMap }: { commercialMap: Map<string, string> }) {
+  const [rows, setRows]       = useState<TodayAttendanceSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await getTodayForAll()); }
+    catch { /* silencieux */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-5 h-5 text-green-600" />
+          <h3 className="text-base font-semibold text-gray-900">Pointages d&apos;aujourd&apos;hui</h3>
+        </div>
+        <button onClick={() => void load()} disabled={loading} className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : <span className="text-xs text-gray-500">↻ Actualiser</span>}
+        </button>
+      </div>
+
+      {rows.length === 0 && !loading ? (
+        <p className="text-sm text-gray-400 text-center py-12">Aucun pointage enregistré aujourd&apos;hui.</p>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Commercial</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Temps travaillé</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((r) => (
+                <tr key={r.commercialId} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {commercialMap.get(r.commercialId) ?? r.commercialId}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ATTENDANCE_STATUS_STYLE[r.status]}`}>
+                      {ATTENDANCE_STATUS_LABELS[r.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {r.minutesWorked > 0 ? formatMinutes(r.minutesWorked) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Vue principale ─────────────────────────────────────────────────────────
 
 export default function WorkScheduleAdminView() {
+  const [activeTab, setActiveTab]     = useState<'schedules' | 'attendance'>('schedules');
   const [schedules, setSchedules]     = useState<WorkSchedule[]>([]);
   const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
   const [loading, setLoading]         = useState(false);
   const [showModal, setShowModal]     = useState(false);
   const [editItem, setEditItem]       = useState<WorkSchedule | null>(null);
   const [deletingId, setDeletingId]   = useState<string | null>(null);
+
+  const commercialMap = new Map(commerciaux.map((c) => [c.id, c.name]));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -321,8 +411,6 @@ export default function WorkScheduleAdminView() {
     finally { setDeletingId(null); }
   };
 
-  const commercialMap = new Map(commerciaux.map((c) => [c.id, c.name]));
-
   const buildInitial = (s: WorkSchedule): FormState => ({
     type:         s.commercialId ? 'commercial' : 'group',
     commercialId: s.commercialId ?? '',
@@ -337,25 +425,42 @@ export default function WorkScheduleAdminView() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Header + Onglets */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <CalendarDays className="w-6 h-6 text-indigo-600" />
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Plannings de travail</h2>
-            <p className="text-sm text-gray-500">{schedules.length} créneau(x) configuré(s)</p>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900">Temps de travail</h2>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" /> Nouveau créneau
-        </button>
+        {activeTab === 'schedules' && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" /> Nouveau créneau
+          </button>
+        )}
       </div>
 
-      {/* Table */}
-      {loading ? (
+      <div className="flex border-b border-gray-200">
+        {([['schedules', 'Plannings'], ['attendance', 'Pointages du jour']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === key
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'attendance' && <AttendanceTab commercialMap={commercialMap} />}
+
+      {/* Table plannings */}
+      {activeTab === 'schedules' && (loading ? (
         <div className="flex items-center justify-center h-32 text-gray-400">
           <Loader2 className="w-6 h-6 animate-spin mr-2" /> Chargement…
         </div>
@@ -446,7 +551,7 @@ export default function WorkScheduleAdminView() {
             </tbody>
           </table>
         </div>
-      )}
+      ))}
 
       {showModal && (
         <ScheduleFormModal

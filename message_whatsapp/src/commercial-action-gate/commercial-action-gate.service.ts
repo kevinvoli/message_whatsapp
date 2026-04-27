@@ -7,6 +7,7 @@ import { WhatsappMessage, MessageDirection } from 'src/whatsapp_message/entities
 import { ConversationReport } from 'src/gicop-report/entities/conversation-report.entity';
 import { FollowUp, FollowUpStatus } from 'src/follow-up/entities/follow_up.entity';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
+import { WorkAttendanceService } from 'src/work-attendance/work-attendance.service';
 
 export type GateStatus = 'allow' | 'warn' | 'block' | 'redirect_to_task';
 
@@ -44,6 +45,7 @@ export class CommercialActionGateService {
     @InjectRepository(FollowUp)
     private readonly followUpRepo: Repository<FollowUp>,
     private readonly callObligationService: CallObligationService,
+    private readonly attendanceService: WorkAttendanceService,
   ) {}
 
   async evaluate(commercialId: string): Promise<GateResult> {
@@ -60,6 +62,7 @@ export class CommercialActionGateService {
       callObligation,
       overdueFollowUps,
       priorityCount,
+      attendanceStatus,
     ] = await Promise.all([
       this.countMissedCalls(posteId),
       this.countUnansweredMessages(posteId, commercialId),
@@ -67,6 +70,7 @@ export class CommercialActionGateService {
       posteId ? this.callObligationService.getStatus(posteId).catch(() => null) : null,
       this.countOverdueFollowUps(commercialId),
       this.countPriorityConvs(posteId, commercialId),
+      this.attendanceService.getCurrentStatus(commercialId).catch(() => null),
     ]);
 
     const blockers: BlockingItem[] = [];
@@ -118,7 +122,24 @@ export class CommercialActionGateService {
       }
     }
 
-    // 5. Conversations actives sans rapport soumis
+    // 5. Présence — non pointé ou en pause
+    if (attendanceStatus === 'not_clocked_in') {
+      blockers.push({
+        code:   'NOT_CLOCKED_IN',
+        label:  'Vous n\'avez pas pointé votre arrivée',
+        count:  1,
+        action: 'Pointer votre arrivée',
+      });
+    } else if (attendanceStatus === 'on_break') {
+      warnings.push({
+        code:   'ON_BREAK',
+        label:  'Vous êtes actuellement en pause',
+        count:  1,
+        action: 'Reprendre le travail',
+      });
+    }
+
+    // 6. Conversations actives sans rapport soumis
     if (withoutReportCount > 0) {
       warnings.push({
         code:   'MISSING_REPORTS',
