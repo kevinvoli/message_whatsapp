@@ -102,24 +102,30 @@ export class WindowRotationService {
     let candidates = unslotted.filter((c) => !slottedIds.has(c.id)).slice(0, needed);
 
     // Cas : pas assez de convs non-FERMÉ pour remplir la fenêtre.
-    // On slot les FERMÉ (avec ou sans rapport) — elles restent visibles pour que
-    // l'utilisateur puisse soumettre leurs rapports avant la rotation.
+    // On inclut les FERMÉ sans rapport (même celles RELEASED par l'ancien code) pour que
+    // l'utilisateur puisse soumettre leurs rapports. Les FERMÉ ayant déjà un rapport sont
+    // exclues pour ne pas déclencher une rotation immédiate en boucle.
     if (candidates.length < needed) {
       const fermeChats = await this.chatRepo
         .createQueryBuilder('c')
         .where('c.poste_id = :posteId', { posteId })
         .andWhere('c.status = :ferme', { ferme: WhatsappChatStatus.FERME })
-        .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
         .andWhere('c.deletedAt IS NULL')
         .orderBy('c.last_activity_at', 'DESC')
         .take((needed - candidates.length) * 2)
         .getMany();
       const fermeCandidates = fermeChats.filter((c) => !slottedIds.has(c.id));
       if (fermeCandidates.length > 0) {
-        this.logger.log(
-          `buildWindowForPoste poste=${posteId} : ${fermeCandidates.length} conv FERMÉ incluses dans la fenêtre`,
+        const submittedMap = await this.reportService.getSubmittedMapBulk(
+          fermeCandidates.map((c) => c.chat_id),
         );
-        candidates = [...candidates, ...fermeCandidates].slice(0, needed);
+        const fermeWithoutReport = fermeCandidates.filter((c) => !submittedMap.get(c.chat_id));
+        if (fermeWithoutReport.length > 0) {
+          this.logger.log(
+            `buildWindowForPoste poste=${posteId} : ${fermeWithoutReport.length} conv FERMÉ sans rapport incluses dans la fenêtre`,
+          );
+          candidates = [...candidates, ...fermeWithoutReport].slice(0, needed);
+        }
       }
     }
 
@@ -518,16 +524,32 @@ export class WindowRotationService {
           ...submitted.map((c) => c.id),
         ]);
 
+        // Convs non-RELEASED + toutes les FERME (même RELEASED par l'ancien code sans rapport).
         const newCandidates = await this.chatRepo
           .createQueryBuilder('c')
           .where('c.poste_id = :posteId', { posteId })
           .andWhere('c.deletedAt IS NULL')
-          .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
+          .andWhere('(c.window_status IS NULL OR c.window_status != :released OR c.status = :ferme)', {
+            released: WindowStatus.RELEASED,
+            ferme: WhatsappChatStatus.FERME,
+          })
           .orderBy('c.last_activity_at', 'DESC')
           .take(slotsAvailable + submitted.length)
           .getMany();
 
-        const toInject = newCandidates.filter((c) => !excludedIds.has(c.id)).slice(0, slotsAvailable);
+        const unexcluded = newCandidates.filter((c) => !excludedIds.has(c.id));
+
+        // Les FERMÉ avec rapport soumis ne doivent pas être ré-injectées (cycle déjà terminé).
+        const fermeCandidates = unexcluded.filter((c) => c.status === WhatsappChatStatus.FERME);
+        let fermeEligible: typeof fermeCandidates = [];
+        if (fermeCandidates.length > 0) {
+          const fermeSubmittedMap = await this.reportService.getSubmittedMapBulk(
+            fermeCandidates.map((c) => c.chat_id),
+          );
+          fermeEligible = fermeCandidates.filter((c) => !fermeSubmittedMap.get(c.chat_id));
+        }
+        const nonFerme = unexcluded.filter((c) => c.status !== WhatsappChatStatus.FERME);
+        const toInject = [...nonFerme, ...fermeEligible].slice(0, slotsAvailable);
         injectChatIds.push(...toInject.map((c) => c.chat_id));
         const injectAssignments = toInject.map((chat, i) => {
           const newSlot = slotsUsed + i + 1;
@@ -609,16 +631,32 @@ export class WindowRotationService {
     const injectChatIds: string[] = [];
     if (slotsUsed < quotaTotal) {
       const existingIds = new Set(current.map((c) => c.id));
-      const candidates = await this.chatRepo
+      // Convs non-RELEASED + toutes les FERME (même RELEASED par l'ancien code sans rapport).
+      const rawCandidates = await this.chatRepo
         .createQueryBuilder('c')
         .where('c.poste_id = :posteId', { posteId })
         .andWhere('c.deletedAt IS NULL')
-        .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
+        .andWhere('(c.window_status IS NULL OR c.window_status != :released OR c.status = :ferme)', {
+          released: WindowStatus.RELEASED,
+          ferme: WhatsappChatStatus.FERME,
+        })
         .orderBy('c.last_activity_at', 'DESC')
         .take(slotsUsed + 5)
         .getMany();
 
-      const toInject = candidates.filter((c) => !existingIds.has(c.id)).slice(0, quotaTotal - slotsUsed);
+      const unexcluded = rawCandidates.filter((c) => !existingIds.has(c.id));
+
+      // Les FERMÉ avec rapport soumis ne doivent pas être ré-injectées.
+      const compactFerme = unexcluded.filter((c) => c.status === WhatsappChatStatus.FERME);
+      let compactFermeEligible: typeof compactFerme = [];
+      if (compactFerme.length > 0) {
+        const compactFermeSubmittedMap = await this.reportService.getSubmittedMapBulk(
+          compactFerme.map((c) => c.chat_id),
+        );
+        compactFermeEligible = compactFerme.filter((c) => !compactFermeSubmittedMap.get(c.chat_id));
+      }
+      const compactNonFerme = unexcluded.filter((c) => c.status !== WhatsappChatStatus.FERME);
+      const toInject = [...compactNonFerme, ...compactFermeEligible].slice(0, quotaTotal - slotsUsed);
       injectChatIds.push(...toInject.map((c) => c.chat_id));
       const injectAssignments = toInject.map((chat, i) => {
         const newSlot = slotsUsed + i + 1;
