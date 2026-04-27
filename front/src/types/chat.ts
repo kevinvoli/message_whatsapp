@@ -416,6 +416,9 @@ export interface Conversation {
   /** Statut de soumission du rapport GICOP */
   report_submission_status?: 'pending' | 'sent' | 'failed' | null;
 
+  /** Conversation rouverte après soumission de rapport — traitement urgent */
+  is_priority?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -917,6 +920,7 @@ export const transformToConversation = (
       : null,
 
     is_locked: raw.is_locked === true,
+    is_priority: raw.is_priority === true,
 
     window_slot: raw.window_slot ?? null,
     window_status: (raw.window_status ?? null) as Conversation['window_status'],

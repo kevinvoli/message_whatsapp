@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronUp, MessageCircle, Phone } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronUp, MessageCircle, Phone, Flame } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
 
@@ -34,12 +34,14 @@ interface UnansweredChat {
 
 export default function PrioritePostePanel() {
   const [missedCalls, setMissedCalls]     = useState<MissedCall[]>([]);
-  const [unanswered, setUnanswered]       = useState<UnansweredChat[]>([]);
   const [showMissed, setShowMissed]       = useState(true);
-  const [showUnanswered, setShowUnanswered] = useState(true);
+  const [showPriority, setShowPriority]   = useState(true);
   const [treating, setTreating]           = useState<Record<string, boolean>>({});
 
   const selectConversation = useChatStore((s) => s.selectConversation);
+  const priorityConversations = useChatStore((s) =>
+    s.conversations.filter((c) => c.is_priority === true),
+  );
 
   const load = useCallback(async () => {
     const [missed, unans] = await Promise.allSettled([
@@ -84,7 +86,7 @@ export default function PrioritePostePanel() {
     selectConversation(chatId);
   };
 
-  const total = missedCalls.length + unanswered.length;
+  const total = missedCalls.length + unanswered.length + priorityConversations.length;
   if (total === 0) return null;
 
   return (
@@ -96,6 +98,40 @@ export default function PrioritePostePanel() {
           Priorités poste ({total})
         </span>
       </div>
+
+      {/* Conversations prioritaires (rouverte après rapport soumis) */}
+      {priorityConversations.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowPriority((v) => !v)}
+            className="w-full flex items-center justify-between px-3 py-1 bg-red-100 text-xs text-red-700 font-medium"
+          >
+            <span className="flex items-center gap-1">
+              <Flame className="w-3 h-3" />
+              Conversations prioritaires ({priorityConversations.length})
+            </span>
+            {showPriority ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          {showPriority && (
+            <div className="divide-y divide-red-100 max-h-36 overflow-y-auto">
+              {priorityConversations.map((conv) => (
+                <div key={conv.chat_id} className="flex items-center justify-between px-3 py-1.5 gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-red-700 truncate">{conv.clientName}</p>
+                    <p className="text-[10px] text-gray-400">{conv.last_activity_at ? formatDate(conv.last_activity_at.toISOString()) : ''}</p>
+                  </div>
+                  <button
+                    onClick={() => handleOpenChat(conv.chat_id)}
+                    className="text-[10px] px-2 py-0.5 bg-red-600 text-white rounded font-medium hover:bg-red-700 transition-colors flex-shrink-0"
+                  >
+                    Ouvrir
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Appels en absence */}
       {missedCalls.length > 0 && (
