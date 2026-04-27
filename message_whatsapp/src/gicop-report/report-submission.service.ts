@@ -8,7 +8,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ContactPhone } from 'src/client-dossier/entities/contact-phone.entity';
 import { ClientDossier } from 'src/client-dossier/entities/client-dossier.entity';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { OrderDossierMirrorWriteService } from 'src/order-write/services/order-dossier-mirror-write.service';
 
 export interface SubmissionResult {
@@ -114,6 +114,17 @@ export class ReportSubmissionService {
         commercialId,
         posteId: chat?.poste_id ?? null,
       });
+
+      // Auto-clore la conversation : le slot reste réservé jusqu'à la rotation
+      // (handleConversationStatusChanged voit isSubmitted=true → pas de release).
+      if (chat) {
+        await this.chatRepo.update({ chat_id: chatId }, { status: WhatsappChatStatus.FERME });
+        this.eventEmitter.emit('conversation.status_changed', {
+          chatId,
+          newStatus: WhatsappChatStatus.FERME,
+          oldStatus: null,
+        });
+      }
     }
     if (chat?.poste_id) {
       this.eventEmitter.emit('conversation.result_set', {

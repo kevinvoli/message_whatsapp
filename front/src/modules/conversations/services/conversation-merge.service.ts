@@ -32,6 +32,12 @@ export function mergeConversationInList(
           ? updated.priority
           : (c.priority ?? updated.priority);
 
+      // Préserver le statut de soumission quand mapConversation ne l'inclut pas (undefined).
+      // mapConversationWithContact fournit la valeur réelle (null ou un statut) → on écrase.
+      const preservedSubmissionStatus = updated.report_submission_status !== undefined
+        ? updated.report_submission_status
+        : c.report_submission_status;
+
       const unreadCount = isSelected ? 0 : (updated.unreadCount ?? 0);
 
       return {
@@ -40,6 +46,7 @@ export function mergeConversationInList(
         messages: preservedMessages,
         contact_summary: preservedContactSummary,
         priority: preservedPriority,
+        report_submission_status: preservedSubmissionStatus,
       };
     })
     .sort((a, b) => {
@@ -72,11 +79,16 @@ export function mergeSelectedConversation(
       ? updated.priority
       : (current.priority ?? updated.priority);
 
+  const preservedSubmissionStatus = updated.report_submission_status !== undefined
+    ? updated.report_submission_status
+    : current.report_submission_status;
+
   const merged: Conversation = {
     ...updated,
     unreadCount: 0,
     contact_summary: preservedContactSummary,
     priority: preservedPriority,
+    report_submission_status: preservedSubmissionStatus,
   };
 
   if (updated.messages && updated.messages.length > 0) {

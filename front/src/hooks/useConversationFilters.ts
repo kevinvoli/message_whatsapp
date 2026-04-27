@@ -11,8 +11,12 @@ export function useConversationFilters(conversations: Conversation[]) {
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
       // En mode fenêtre glissante, les conversations actives (non verrouillées) sont
-      // toujours visibles quel que soit le filtre — elles font partie du bloc de 10.
-      if (conv.window_slot != null && conv.is_locked !== true) return true;
+      // toujours visibles quel que soit le filtre — sauf si le rapport a déjà été
+      // soumis ou si la conversation est fermée (elle passe alors en priorité).
+      if (conv.window_slot != null && conv.is_locked !== true) {
+        if (conv.report_submission_status != null || conv.status === 'fermé') return false;
+        return true;
+      }
 
       switch (filterStatus) {
         case 'unread':  return conv.unreadCount > 0;

@@ -5,7 +5,7 @@
  */
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus, ConversationResult } from './entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
@@ -289,7 +289,7 @@ export class WhatsappChatService {
     const chats = await this.chatRepository.find({
       where: {
         poste_id:    commercial.poste.id,
-        status:      WhatsappChatStatus.ACTIF,
+        status:      In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.FERME]),
         unread_count: MoreThan(0),
       },
       order: { unread_count: 'DESC', last_activity_at: 'DESC' },

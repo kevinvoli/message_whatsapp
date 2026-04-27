@@ -920,7 +920,9 @@ export const transformToConversation = (
 
     window_slot: raw.window_slot ?? null,
     window_status: (raw.window_status ?? null) as Conversation['window_status'],
-    report_submission_status: (raw.report_submission_status ?? null) as Conversation['report_submission_status'],
+    report_submission_status: raw.report_submission_status !== undefined
+      ? (raw.report_submission_status as Conversation['report_submission_status'])
+      : undefined,
     validation_state: Array.isArray(raw.validation_state)
       ? raw.validation_state.map((c: any) => ({
           type: c.type,
