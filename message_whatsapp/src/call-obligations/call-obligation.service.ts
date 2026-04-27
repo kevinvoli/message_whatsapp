@@ -163,24 +163,24 @@ export class CallObligationService {
       return { matched: false, reason: `durée_insuffisante (${params.durationSeconds ?? 0}s < ${MIN_CALL_DURATION_SECONDS}s)` };
     }
 
-    // 2. Résoudre le poste — ID DB2 en priorité, téléphone en fallback
+    // 2. Résoudre le poste — ID DB2 si mapping dispo, sinon fallback téléphone
     let posteId = params.posteId ?? null;
-    if (!posteId) {
-      if (params.idCommercialDb2 != null) {
-        posteId = await this.resolvePosteByCommercialId(params.idCommercialDb2);
-      } else if (params.commercialPhone) {
-        posteId = await this.resolvePosteByCommercialPhone(params.commercialPhone);
-      }
+    if (!posteId && params.idCommercialDb2 != null) {
+      posteId = await this.resolvePosteByCommercialId(params.idCommercialDb2);
+    }
+    if (!posteId && params.commercialPhone) {
+      posteId = await this.resolvePosteByCommercialPhone(params.commercialPhone);
     }
     if (!posteId) {
       return { matched: false, reason: 'poste_introuvable' };
     }
 
-    // 3. Trouver la catégorie du contact — ID DB2 en priorité, téléphone en fallback
+    // 3. Trouver la catégorie du contact — ID DB2 si mapping dispo, sinon fallback téléphone
     let taskCategory: CallTaskCategory | null = null;
     if (params.idClientDb2 != null) {
       taskCategory = await this.resolveContactCategoryById(params.idClientDb2);
-    } else if (params.clientPhone) {
+    }
+    if (!taskCategory && params.clientPhone) {
       taskCategory = await this.resolveContactCategory(params.clientPhone);
     }
     if (!taskCategory) {
