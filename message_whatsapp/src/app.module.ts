@@ -80,6 +80,8 @@ import { OrderReadModule } from './order-read/order-read.module';
 import { BusinessMetricsModule } from './business-metrics/business-metrics.module';
 import { CommercialActionGateModule } from './commercial-action-gate/commercial-action-gate.module';
 import { IntegrationOutboxModule } from './integration-outbox/integration-outbox.module';
+import { ActionQueueModule } from './action-queue/action-queue.module';
+import { WorkScheduleModule } from './work-schedule/work-schedule.module';
 
 @Module({
   imports: [
@@ -244,6 +246,10 @@ import { IntegrationOutboxModule } from './integration-outbox/integration-outbox
     IntegrationOutboxModule,
     // E04 — Gate de priorité commerciale
     CommercialActionGateModule,
+    // E06 — Files d'action commerciale
+    ActionQueueModule,
+    // E07 — Temps de travail et planning
+    WorkScheduleModule,
   ],
   controllers: [AppController],
   providers: [

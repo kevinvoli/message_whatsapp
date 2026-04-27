@@ -69,7 +69,9 @@ export type ViewMode =
   // GICOP — Supervision fermetures + rapports
   | 'gicop-supervision'
   // E02 — Synchronisation DB2 outbox
-  | 'outbox-sync';
+  | 'outbox-sync'
+  // E07 — Plannings de travail
+  | 'work-schedule';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

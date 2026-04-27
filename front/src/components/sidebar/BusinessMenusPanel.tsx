@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Briefcase, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
+import WorkSchedulePanel from './WorkSchedulePanel';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -18,9 +19,11 @@ interface BizContact {
   last_message_date?: string | null;
 }
 
-type Tab = 'prospects' | 'annulee' | 'anciennes';
+type Tab = 'prospects' | 'annulee' | 'anciennes' | 'planning';
 
-const TAB_CONFIG: Record<Tab, { label: string; endpoint: string; badge: string; color: string }> = {
+type BizTab = 'prospects' | 'annulee' | 'anciennes';
+
+const TAB_CONFIG: Record<BizTab, { label: string; endpoint: string; badge: string; color: string }> = {
   prospects:  { label: 'Prospects',         endpoint: 'contact/business/prospects', badge: 'bg-blue-100 text-blue-700',   color: 'blue' },
   annulee:    { label: 'Commandes annulées', endpoint: 'contact/business/annulee',   badge: 'bg-red-100 text-red-700',    color: 'red' },
   anciennes:  { label: 'Anciennes',          endpoint: 'contact/business/anciennes', badge: 'bg-gray-100 text-gray-700',  color: 'gray' },
@@ -75,16 +78,16 @@ function ContactCard({ contact, onOpenConversation }: ContactCardProps) {
 
 export default function BusinessMenusPanel() {
   const [tab, setTab]             = useState<Tab>('prospects');
-  const [data, setData]           = useState<Record<Tab, BizContact[]>>({
+  const [data, setData]           = useState<Record<BizTab, BizContact[]>>({
     prospects: [], annulee: [], anciennes: [],
   });
-  const [counts, setCounts]       = useState<Record<Tab, number>>({ prospects: 0, annulee: 0, anciennes: 0 });
-  const [loading, setLoading]     = useState<Record<Tab, boolean>>({ prospects: false, annulee: false, anciennes: false });
-  const [expanded, setExpanded]   = useState<Record<Tab, boolean>>({ prospects: true, annulee: true, anciennes: true });
+  const [counts, setCounts]       = useState<Record<BizTab, number>>({ prospects: 0, annulee: 0, anciennes: 0 });
+  const [loading, setLoading]     = useState<Record<BizTab, boolean>>({ prospects: false, annulee: false, anciennes: false });
+  const [expanded, setExpanded]   = useState<Record<BizTab, boolean>>({ prospects: true, annulee: true, anciennes: true });
 
   const selectConversation = useChatStore((s) => s.selectConversation);
 
-  const loadTab = useCallback(async (t: Tab) => {
+  const loadTab = useCallback(async (t: BizTab) => {
     setLoading((prev) => ({ ...prev, [t]: true }));
     try {
       const res = await fetch(`${API_URL}/${TAB_CONFIG[t].endpoint}`, { credentials: 'include' });
@@ -98,7 +101,9 @@ export default function BusinessMenusPanel() {
   }, []);
 
   useEffect(() => { void loadTab('prospects'); }, [loadTab]);
-  useEffect(() => { void loadTab(tab); }, [tab, loadTab]);
+  useEffect(() => {
+    if (tab !== 'planning') void loadTab(tab as BizTab);
+  }, [tab, loadTab]);
 
   const handleOpenConversation = (chatId: string) => {
     selectConversation(chatId);
@@ -114,7 +119,7 @@ export default function BusinessMenusPanel() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-100 flex-shrink-0">
-        {(Object.entries(TAB_CONFIG) as [Tab, typeof TAB_CONFIG[Tab]][]).map(([key, cfg]) => (
+        {(Object.entries(TAB_CONFIG) as [BizTab, typeof TAB_CONFIG[BizTab]][]).map(([key, cfg]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -132,48 +137,64 @@ export default function BusinessMenusPanel() {
             )}
           </button>
         ))}
+        <button
+          onClick={() => setTab('planning')}
+          className={`flex-1 text-[11px] font-medium py-2 border-b-2 transition-colors ${
+            tab === 'planning'
+              ? 'border-indigo-600 text-indigo-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Planning
+        </button>
       </div>
 
       {/* Contenu */}
       <div className="flex-1 overflow-y-auto">
-        {loading[tab] && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-          </div>
-        )}
-
-        {!loading[tab] && data[tab].length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-2">
-            <AlertCircle className="w-8 h-8" />
-            <p className="text-xs text-center">
-              {tab === 'prospects' && 'Aucun prospect à relancer dans votre portefeuille.'}
-              {tab === 'annulee' && 'Aucune commande annulée dans votre portefeuille.'}
-              {tab === 'anciennes' && 'Aucune cliente inactive depuis 60 jours.'}
-            </p>
-          </div>
-        )}
-
-        {!loading[tab] && data[tab].length > 0 && (
+        {tab === 'planning' ? (
+          <WorkSchedulePanel />
+        ) : (
           <>
-            <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
-                {data[tab].length} contact{data[tab].length > 1 ? 's' : ''}
-              </span>
-              <button
-                onClick={() => void loadTab(tab)}
-                className="p-0.5 text-gray-400 hover:text-gray-600"
-                title="Rafraîchir"
-              >
-                <RefreshCw className="w-3 h-3" />
-              </button>
-            </div>
-            {data[tab].map((contact) => (
-              <ContactCard
-                key={contact.id}
-                contact={contact}
-                onOpenConversation={handleOpenConversation}
-              />
-            ))}
+            {loading[tab as BizTab] && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+              </div>
+            )}
+
+            {!loading[tab as BizTab] && data[tab as BizTab].length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-2">
+                <AlertCircle className="w-8 h-8" />
+                <p className="text-xs text-center">
+                  {tab === 'prospects' && 'Aucun prospect à relancer dans votre portefeuille.'}
+                  {tab === 'annulee' && 'Aucune commande annulée dans votre portefeuille.'}
+                  {tab === 'anciennes' && 'Aucune cliente inactive depuis 60 jours.'}
+                </p>
+              </div>
+            )}
+
+            {!loading[tab as BizTab] && data[tab as BizTab].length > 0 && (
+              <>
+                <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+                    {data[tab as BizTab].length} contact{data[tab as BizTab].length > 1 ? 's' : ''}
+                  </span>
+                  <button
+                    onClick={() => void loadTab(tab as BizTab)}
+                    className="p-0.5 text-gray-400 hover:text-gray-600"
+                    title="Rafraîchir"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
+                {data[tab as BizTab].map((contact) => (
+                  <ContactCard
+                    key={contact.id}
+                    contact={contact}
+                    onOpenConversation={handleOpenConversation}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
       </div>

@@ -45,6 +45,7 @@ import RankingView from '@/app/ui/RankingView';
 import AiGovernanceView from '@/app/ui/AiGovernanceView';
 import GicopSupervisionView from '@/app/ui/GicopSupervisionView';
 import OutboxSyncView from '@/app/ui/OutboxSyncView';
+import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -213,6 +214,8 @@ export default function AdminDashboard() {
                 return <GicopSupervisionView />;
             case 'outbox-sync':
                 return <OutboxSyncView />;
+            case 'work-schedule':
+                return <WorkScheduleAdminView />;
             default:
                 return null;
         }

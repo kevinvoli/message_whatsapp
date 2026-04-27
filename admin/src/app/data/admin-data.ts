@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope, CalendarDays } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -115,6 +115,13 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'gicop-supervision', name: 'Supervision GICOP', icon: Stethoscope, badge: 'P0' },
       { id: 'outbox-sync', name: 'Sync DB2 (Outbox)', icon: Database, badge: null },
+    ],
+  },
+  {
+    label: 'Planning',
+    icon: CalendarDays,
+    items: [
+      { id: 'work-schedule', name: 'Plannings de travail', icon: CalendarDays, badge: null },
     ],
   },
 ];

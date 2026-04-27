@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy, Briefcase } from 'lucide-react';
+import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy, Briefcase, ListTodo } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
 
 interface UserHeaderProps {
@@ -173,6 +173,18 @@ export default function UserHeader({
                         >
                             <Briefcase className="w-4 h-4" />
                             <span className="text-[10px] mt-0.5 leading-none">Métier</span>
+                        </button>
+                        <button
+                            onClick={() => handleViewChange('action-queue')}
+                            title="Files d'action"
+                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
+                                viewMode === 'action-queue'
+                                    ? 'bg-white text-green-700 shadow-md font-medium'
+                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
+                            }`}
+                        >
+                            <ListTodo className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Files</span>
                         </button>
                     </div>
                 </div>
