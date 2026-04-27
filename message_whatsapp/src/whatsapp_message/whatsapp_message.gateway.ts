@@ -467,6 +467,18 @@ export class WhatsappMessageGateway
       });
     }
 
+    // Pousse d'abord la conversation complète directement au client pour que
+    // selectedConversation soit hydraté AVANT que MESSAGE_LIST ne passe
+    // isLoading à false. Cela permet d'ouvrir une conversation prioritaire
+    // absente du store (ex. : hors de la fenêtre glissante).
+    if (!payload.before) {
+      const lastMsg = await this.messageService.findLastMessageBychat_id(payload.chat_id);
+      client.emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: mapConversation(chat, lastMsg, chat.unread_count ?? 0),
+      });
+    }
+
     client.emit('chat:event', {
       type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
       payload: {

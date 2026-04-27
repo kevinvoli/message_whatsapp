@@ -121,21 +121,33 @@ export const createConversationSlice: StateCreator<
   selectConversation: (chat_id) => {
     set((state) => {
       const conversation = state.conversations.find((c) => c.chat_id === chat_id);
-      if (!conversation) return state;
-      return {
-        selectedConversation: { ...conversation, unreadCount: 0 },
-        conversations: state.conversations.map((c) =>
-          c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
-        ),
+
+      const base = {
         messages: [],
         isLoading: true,
         isLoadingMore: false,
         hasMoreMessages: true,
-        messageIdCache: {
-          ...state.messageIdCache,
-          [chat_id]: new Set<string>(),
-        },
+        messageIdCache: { ...state.messageIdCache, [chat_id]: new Set<string>() },
         replyToMessage: null,
+      };
+
+      if (!conversation) {
+        // Conversation absente du store (ex. : priorité poste hors fenêtre glissante).
+        // On pose un placeholder minimal avec chat_id. Le backend va émettre
+        // CONVERSATION_UPSERT (avant MESSAGE_LIST), ce qui hydratera
+        // selectedConversation via updateConversation grâce à isSelected = true.
+        return {
+          ...base,
+          selectedConversation: { chat_id, unreadCount: 0 } as unknown as Conversation,
+        };
+      }
+
+      return {
+        ...base,
+        selectedConversation: { ...conversation, unreadCount: 0 },
+        conversations: state.conversations.map((c) =>
+          c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
+        ),
       };
     });
 
