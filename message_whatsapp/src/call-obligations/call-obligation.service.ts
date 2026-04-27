@@ -183,8 +183,9 @@ export class CallObligationService {
     if (!taskCategory && params.clientPhone) {
       taskCategory = await this.resolveContactCategory(params.clientPhone);
     }
+    // Client non identifié → bucket JAMAIS_COMMANDE par défaut
     if (!taskCategory) {
-      return { matched: false, reason: 'categorie_contact_inconnue' };
+      taskCategory = CallTaskCategory.JAMAIS_COMMANDE;
     }
 
     // 4. Trouver le batch actif
