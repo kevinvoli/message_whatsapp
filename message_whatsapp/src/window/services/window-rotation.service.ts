@@ -67,9 +67,8 @@ export class WindowRotationService {
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
-    // 1. Libérer seulement les conversations fermées sans rapport soumis.
-    // Une conversation fermée mais déjà soumise doit encore compter dans le bloc de 10.
-    await this.releaseSlotsOfClosedConversations(posteId);
+    // Les conversations FERMÉ conservent leur slot jusqu'à la rotation.
+    // Elles disparaissent seulement quand tous les rapports du bloc sont soumis.
 
     // 2. Lire les conversations slottées restantes (non fermées, non released)
     const slottedChats = await this.chatRepo
@@ -102,9 +101,9 @@ export class WindowRotationService {
 
     let candidates = unslotted.filter((c) => !slottedIds.has(c.id)).slice(0, needed);
 
-    // Cas : toutes les conversations du poste sont FERMÉ (ex : cron 24h).
-    // On slot quand même les FERMÉ qui ont un rapport soumis — la rotation les libèrera aussitôt.
-    // On exclut les RELEASED pour ne pas re-sloter des conversations déjà traitées par une rotation précédente.
+    // Cas : pas assez de convs non-FERMÉ pour remplir la fenêtre.
+    // On slot les FERMÉ (avec ou sans rapport) — elles restent visibles pour que
+    // l'utilisateur puisse soumettre leurs rapports avant la rotation.
     if (candidates.length < needed) {
       const fermeChats = await this.chatRepo
         .createQueryBuilder('c')
@@ -117,16 +116,10 @@ export class WindowRotationService {
         .getMany();
       const fermeCandidates = fermeChats.filter((c) => !slottedIds.has(c.id));
       if (fermeCandidates.length > 0) {
-        const submittedMap = await this.reportService.getSubmittedMapBulk(
-          fermeCandidates.map((c) => c.chat_id),
+        this.logger.log(
+          `buildWindowForPoste poste=${posteId} : ${fermeCandidates.length} conv FERMÉ incluses dans la fenêtre`,
         );
-        const fermeWithReport = fermeCandidates.filter((c) => submittedMap.get(c.chat_id) === true);
-        if (fermeWithReport.length > 0) {
-          this.logger.log(
-            `buildWindowForPoste poste=${posteId} : ${fermeWithReport.length} conv FERMÉ+rapport incluses pour permettre la rotation`,
-          );
-          candidates = [...candidates, ...fermeWithReport].slice(0, needed);
-        }
+        candidates = [...candidates, ...fermeCandidates].slice(0, needed);
       }
     }
 
@@ -160,10 +153,14 @@ export class WindowRotationService {
     // Initialiser les validations pour les nouvelles conversations actives (bulk)
     await this.validationEngine.initConversationValidationBulk(toInit);
 
-    // Réinitialiser le statut de soumission pour les nouvelles entrées et les promotions
+    // Réinitialiser le statut de soumission pour les nouvelles entrées non-FERMÉ et les promotions
     // LOCKED→ACTIVE afin qu'un rapport soumis dans un bloc précédent ne déclenche
     // pas la rotation du nouveau bloc prématurément.
-    const resetChatIds = [...candidates.map((c) => c.chat_id), ...toInit];
+    // Les convs FERMÉ sont exclues : leur rapport soumis doit être conservé pour la rotation.
+    const resetChatIds = [
+      ...candidates.filter((c) => c.status !== WhatsappChatStatus.FERME).map((c) => c.chat_id),
+      ...toInit,
+    ];
     await this.reportService.resetSubmissionBulk(resetChatIds);
 
     this.logger.log(
@@ -172,41 +169,6 @@ export class WindowRotationService {
 
     // Déclencher la rotation si les rapports des 10 conversations actives sont déjà soumis.
     await this.checkAndTriggerRotation(posteId);
-  }
-
-  /**
-   * Libère les slots des conversations fermées (status=fermé) qui ont encore un slot assigné.
-   * Gère le cas de l'auto-fermeture par cron sans événement.
-   */
-  private async releaseSlotsOfClosedConversations(posteId: string): Promise<void> {
-    const closedWithSlot = await this.chatRepo
-      .createQueryBuilder('c')
-      .select('c.id')
-      .addSelect('c.chat_id')
-      .where('c.poste_id = :posteId', { posteId })
-      .andWhere('c.window_slot IS NOT NULL')
-      .andWhere('c.status = :ferme', { ferme: WhatsappChatStatus.FERME })
-      .getMany();
-
-    if (closedWithSlot.length === 0) return;
-
-    const submittedMap = await this.reportService.getSubmittedMapBulk(
-      closedWithSlot.map((c) => c.chat_id),
-    );
-    const ids = closedWithSlot
-      .filter((c) => submittedMap.get(c.chat_id) !== true)
-      .map((c) => c.id);
-    if (ids.length === 0) return;
-
-    // Un seul UPDATE pour les conversations fermees sans rapport soumis.
-    await this.chatRepo
-      .createQueryBuilder()
-      .update()
-      .set({ window_slot: null as any, window_status: WindowStatus.RELEASED, is_locked: false })
-      .whereInIds(ids)
-      .execute();
-
-    this.logger.log(`${ids.length} slot(s) libéré(s) (conversations fermées sans rapport soumis) pour poste ${posteId}`);
   }
 
   /**
@@ -300,7 +262,8 @@ export class WindowRotationService {
 
   /**
    * Écoute la fermeture d'une conversation.
-   * Libère son slot et réinjecte une conversation en fin de fenêtre.
+   * La conversation conserve son slot pour que l'utilisateur puisse soumettre son rapport.
+   * La rotation libèrera toutes les convs du bloc quand les N rapports seront soumis.
    */
   @OnEvent('conversation.status_changed', { async: true })
   async handleConversationStatusChanged(payload: {
@@ -312,24 +275,9 @@ export class WindowRotationService {
     const chat = await this.chatRepo.findOne({ where: { chat_id: payload.chatId } });
     if (!chat?.poste_id || chat.window_slot == null) return;
 
-    const posteId = chat.poste_id;
-    const releasedSlot = chat.window_slot;
-
-    const submittedMap = await this.reportService.getSubmittedMapBulk([chat.chat_id]);
-    if (submittedMap.get(chat.chat_id) === true) {
-      await this.checkAndTriggerRotation(posteId);
-      return;
-    }
-
-    // Libère le slot
-    await this.chatRepo.update(
-      { id: chat.id },
-      { window_slot: null, window_status: WindowStatus.RELEASED, is_locked: false },
-    );
-    this.logger.log(`Slot ${releasedSlot} libéré (conv ${payload.chatId} fermée) pour poste ${posteId}`);
-
-    // Réassigne les slots pour compresser le vide
-    await this.compactSlots(posteId);
+    // La conv FERMÉ conserve son slot : l'utilisateur peut encore soumettre le rapport.
+    // La rotation libèrera toutes les convs du bloc quand les 10 rapports seront soumis.
+    await this.checkAndTriggerRotation(chat.poste_id);
   }
 
   /**
@@ -343,7 +291,6 @@ export class WindowRotationService {
     if (!modeEnabled) return;
 
     const { quotaActive } = await this.capacityService.getQuotas();
-    await this.releaseSlotsOfClosedConversations(posteId);
 
     let activeGroup = await this.chatRepo.find({
       where: {
@@ -633,9 +580,6 @@ export class WindowRotationService {
    */
   private async compactSlots(posteId: string): Promise<void> {
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
-
-    // Libérer d'abord les fermées
-    await this.releaseSlotsOfClosedConversations(posteId);
 
     const current = await this.chatRepo
       .createQueryBuilder('c')
