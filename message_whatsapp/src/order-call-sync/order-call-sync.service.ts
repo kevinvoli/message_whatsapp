@@ -8,9 +8,12 @@ import {
   ORDER_CALL_TYPE_MISSED,
   ORDER_CALL_TYPE_OUTGOING,
 } from 'src/order-read/entities/order-call-log.entity';
+import { OrderCommand } from 'src/order-read/entities/order-command.entity';
+import { GicopUser, GIOCOP_USER_TYPE_CLIENT } from 'src/order-read/entities/giocop-user.entity';
 import { OrderCallSyncCursor } from './entities/order-call-sync-cursor.entity';
 import { IntegrationSyncLogService } from 'src/integration-sync/integration-sync-log.service';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
+import { CallTaskCategory } from 'src/call-obligations/entities/call-task.entity';
 
 const CURSOR_SCOPE = 'global';
 const BATCH_SIZE   = 200;
@@ -124,15 +127,73 @@ export class OrderCallSyncService {
   ): Promise<{ matched: boolean; reason?: string } | null> {
     if (!this.obligationService) return null;
 
+    const resolvedCategory = await this.resolveClientCategory(call.idClient, call.remoteNumber);
+
     return this.obligationService.tryMatchCallToTask({
       callEventId:       call.id,
       durationSeconds:   call.duration,
+      resolvedCategory,
       idCommercialDb2:   call.idCommercial,
       idClientDb2:       call.idClient,
       commercialPhone:   call.localNumber ?? undefined,
       clientPhone:       call.remoteNumber,
       posteId:           null,
     });
+  }
+
+  /**
+   * Détermine la catégorie d'un client depuis DB2.
+   *
+   * Flux :
+   *   1. id_client présent  → cherche directement dans commandes (même ID DB2)
+   *   2. id_client absent   → cherche le client par numéro de téléphone dans users DB2
+   *                           → récupère son id DB2 → cherche dans commandes
+   *
+   *   Aucune commande trouvée            → JAMAIS_COMMANDE
+   *   trueCancel = 1                     → COMMANDE_ANNULEE
+   *   dateLivree IS NOT NULL             → COMMANDE_AVEC_LIVRAISON
+   *   commande existante non finalisée   → JAMAIS_COMMANDE (défaut)
+   */
+  private async resolveClientCategory(
+    idClient: number | null,
+    remoteNumber: string,
+  ): Promise<CallTaskCategory> {
+    if (!this.orderDb) return CallTaskCategory.JAMAIS_COMMANDE;
+
+    const cmdRepo  = this.orderDb.getRepository(OrderCommand);
+    const userRepo = this.orderDb.getRepository(GicopUser);
+
+    let clientIdDb2 = idClient;
+
+    // Fallback : résolution par téléphone si id_client absent
+    if (clientIdDb2 == null && remoteNumber) {
+      const normalized = remoteNumber.replace(/\D/g, '');
+      const user = await userRepo
+        .createQueryBuilder('u')
+        .where('u.type = :type', { type: GIOCOP_USER_TYPE_CLIENT })
+        .andWhere('(u.phone = :phone OR u.phone2 = :phone)', { phone: normalized })
+        .andWhere('u.valid = 1')
+        .select(['u.id'])
+        .getOne();
+
+      clientIdDb2 = user?.id ?? null;
+    }
+
+    if (clientIdDb2 == null) return CallTaskCategory.JAMAIS_COMMANDE;
+
+    const order = await cmdRepo
+      .createQueryBuilder('c')
+      .where('c.idClient = :clientIdDb2', { clientIdDb2 })
+      .andWhere('c.valid = 1')
+      .orderBy('c.dateEnreg', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (!order) return CallTaskCategory.JAMAIS_COMMANDE;
+    if (order.trueCancel === 1) return CallTaskCategory.COMMANDE_ANNULEE;
+    if (order.dateLivree != null) return CallTaskCategory.COMMANDE_AVEC_LIVRAISON;
+
+    return CallTaskCategory.JAMAIS_COMMANDE;
   }
 
   /** Retourne les appels manqués récents (non encore traités) pour un numéro local. */

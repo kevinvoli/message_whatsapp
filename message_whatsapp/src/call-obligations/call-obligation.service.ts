@@ -145,6 +145,8 @@ export class CallObligationService {
   async tryMatchCallToTask(params: {
     callEventId: string;
     durationSeconds: number | null;
+    /** Catégorie déjà résolue en amont (bypasse toute résolution client). */
+    resolvedCategory?: CallTaskCategory | null;
     /** Résolution directe via DB2 (prioritaire). */
     idCommercialDb2?: number | null;
     idClientDb2?: number | null;
@@ -175,9 +177,10 @@ export class CallObligationService {
       return { matched: false, reason: 'poste_introuvable' };
     }
 
-    // 3. Trouver la catégorie du contact — ID DB2 si mapping dispo, sinon fallback téléphone
-    let taskCategory: CallTaskCategory | null = null;
-    if (params.idClientDb2 != null) {
+    // 3. Trouver la catégorie du contact
+    // Priorité : catégorie résolue en amont (DB2 commandes) > ID DB2 mapping > téléphone DB1
+    let taskCategory: CallTaskCategory | null = params.resolvedCategory ?? null;
+    if (!taskCategory && params.idClientDb2 != null) {
       taskCategory = await this.resolveContactCategoryById(params.idClientDb2);
     }
     if (!taskCategory && params.clientPhone) {
