@@ -10,11 +10,10 @@ export function useConversationFilters(conversations: Conversation[]) {
 
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
-      // En mode fenêtre glissante, les conversations actives (non verrouillées) sont
-      // toujours visibles quel que soit le filtre — sauf si le rapport a déjà été
-      // soumis ou si la conversation est fermée (elle passe alors en priorité).
+      // En mode fenêtre glissante, les 10 conversations actives (non verrouillées) sont
+      // toujours visibles quel que soit le filtre. Elles disparaissent toutes ensemble
+      // lors de la rotation (window_slot → null), pas une par une à la soumission.
       if (conv.window_slot != null && conv.is_locked !== true) {
-        if (conv.report_submission_status != null) return false;
         return true;
       }
 
