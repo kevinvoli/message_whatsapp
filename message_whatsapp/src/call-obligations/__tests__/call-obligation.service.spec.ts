@@ -109,6 +109,7 @@ function buildService(
   commercialRepo = makeCommercialRepo(),
   chatRepo = makeChatRepo(),
   posteRepo = makePosteRepo(),
+  systemConfig = { get: jest.fn().mockResolvedValue('true') } as any,
 ): CallObligationService {
   return new CallObligationService(
     batchRepo,
@@ -117,6 +118,7 @@ function buildService(
     commercialRepo,
     chatRepo,
     posteRepo,
+    systemConfig,
   );
 }
 

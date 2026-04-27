@@ -24,7 +24,7 @@ export class ObligationQualityCheckJob implements OnModuleInit {
   }
 
   async run(): Promise<string> {
-    if (!this.obligationService.isEnabled()) return 'Obligations d\'appels désactivées — vérification ignorée';
+    if (!await this.obligationService.isEnabled()) return 'Obligations d\'appels désactivées — vérification ignorée';
     const posteIds = await this.obligationService.getActivePosteIds();
     if (posteIds.length === 0) return 'Aucun batch actif — rien à vérifier';
 

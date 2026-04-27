@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 import {
   CommercialObligationBatch,
   BatchStatus,
@@ -61,12 +62,15 @@ export class CallObligationService {
 
     @InjectRepository(WhatsappPoste)
     private readonly posteRepo: Repository<WhatsappPoste>,
+
+    private readonly systemConfig: SystemConfigService,
   ) {}
 
   // ── Feature flag ─────────────────────────────────────────────────────────
 
-  isEnabled(): boolean {
-    return process.env['FF_CALL_OBLIGATIONS_ENABLED'] === 'true';
+  async isEnabled(): Promise<boolean> {
+    const val = await this.systemConfig.get('FF_CALL_OBLIGATIONS_ENABLED');
+    return val === 'true';
   }
 
   // ── Gestion du batch actif ──────────────────────────────────────────────
@@ -138,7 +142,7 @@ export class CallObligationService {
     posteId?: string | null;
   }): Promise<{ matched: boolean; taskId?: string; reason?: string }> {
 
-    if (!this.isEnabled()) {
+    if (!await this.isEnabled()) {
       return { matched: false, reason: 'feature_disabled' };
     }
 
@@ -247,7 +251,7 @@ export class CallObligationService {
   // ── Postes avec batch actif ──────────────────────────────────────────────
 
   async getActivePosteIds(): Promise<string[]> {
-    if (!this.isEnabled()) return [];
+    if (!await this.isEnabled()) return [];
     const batches = await this.batchRepo.find({
       where: { status: BatchStatus.PENDING },
       select: ['posteId'],

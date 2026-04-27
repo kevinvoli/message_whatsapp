@@ -62,7 +62,7 @@ export class WindowRotationService {
     }
 
     // S'assurer qu'un batch d'obligations est actif pour ce poste
-    if (this.obligationService?.isEnabled()) {
+    if (await this.obligationService?.isEnabled()) {
       await this.obligationService.getOrCreateActiveBatch(posteId);
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
@@ -340,6 +340,33 @@ export class WindowRotationService {
 
     if (submittedCount < requiredCount) return;
 
+    // Vérifier les obligations d'appel du poste avant de déclencher la rotation.
+    if (await this.obligationService?.isEnabled()) {
+      const obligationStatus = await this.obligationService.getStatus(posteId);
+      if (obligationStatus && !obligationStatus.readyForRotation) {
+        const validatedCount =
+          obligationStatus.annulee.done +
+          obligationStatus.livree.done +
+          obligationStatus.sansCommande.done;
+        const totalRequired =
+          obligationStatus.annulee.required +
+          obligationStatus.livree.required +
+          obligationStatus.sansCommande.required;
+        const reason: WindowRotationBlockedPayload['reason'] =
+          validatedCount < totalRequired ? 'call_obligations_incomplete' : 'quality_check_failed';
+        this.logger.log(
+          `Rotation bloquée poste=${posteId} : obligations ${validatedCount}/${totalRequired}, qualité=${obligationStatus.qualityCheckPassed}`,
+        );
+        this.eventEmitter.emit(WINDOW_ROTATION_BLOCKED_EVENT, {
+          posteId,
+          reason,
+          progress: { validated: validatedCount, total: totalRequired },
+          obligations: obligationStatus,
+        } satisfies WindowRotationBlockedPayload);
+        return;
+      }
+    }
+
     this.logger.log(
       `Rotation déclenchée pour poste ${posteId} (${submittedCount}/${activeSlots.length} rapports soumis, seuil: ${requiredCount})`,
     );
@@ -577,7 +604,7 @@ export class WindowRotationService {
       );
 
       // Créer le prochain batch d'obligations pour ce poste (non-bloquant)
-      if (this.obligationService?.isEnabled()) {
+      if (await this.obligationService?.isEnabled()) {
         this.obligationService.getOrCreateActiveBatch(posteId).catch((err) =>
           this.logger.warn(`Impossible de créer le batch d'obligations pour poste ${posteId}`, err),
         );

@@ -10,6 +10,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
+import { SystemConfigModule } from 'src/system-config/system-config.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
       WhatsappPoste,
     ]),
     JorbsModule,
+    SystemConfigModule,
   ],
   controllers: [CallObligationController],
   providers: [CallObligationService, ObligationQualityCheckJob],
