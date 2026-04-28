@@ -15,7 +15,6 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { DispatchSettingsService } from './dispatch-settings.service';
 
 @Injectable()
 export class QueueService implements OnModuleInit {
@@ -39,8 +38,6 @@ export class QueueService implements OnModuleInit {
     private readonly channelRepository: Repository<WhapiChannel>,
 
     private readonly dataSource: DataSource,
-
-    private readonly dispatchSettingsService: DispatchSettingsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -183,7 +180,9 @@ export class QueueService implements OnModuleInit {
    * Among all postes in queue, picks the one with the fewest active chats.
    * Falls back to first in queue (round-robin) if chat counts are equal.
    */
-  async getNextInQueue(): Promise<WhatsappPoste | null> {
+  async getNextInQueue(
+    mode: 'least_loaded' | 'round_robin' = 'least_loaded',
+  ): Promise<WhatsappPoste | null> {
     return await this.queueLock.runExclusive(async () => {
       const allPositions = await this.queueRepository.find({
         order: { position: 'ASC' },
@@ -202,12 +201,9 @@ export class QueueService implements OnModuleInit {
 
       // ─── ÉTAPE 1 : stratégie via queue_positions ──────────────────────────────
       if (candidates.length > 0) {
-        const settings = await this.dispatchSettingsService.getSettings();
-        const queueMode = settings.queue_mode ?? 'least_loaded';
-
         let best = candidates[0];
 
-        if (queueMode === 'round_robin') {
+        if (mode === 'round_robin') {
           // Round-robin pur : toujours le premier de la queue
           this.logger.debug(
             `Poste selectionne (round-robin): ${best.poste.name} (${best.poste.id})`,

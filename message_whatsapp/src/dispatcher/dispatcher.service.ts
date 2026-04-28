@@ -8,6 +8,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
+import { DispatchSettingsService } from './services/dispatch-settings.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { NotificationService } from 'src/notification/notification.service';
@@ -45,7 +46,14 @@ export class DispatcherService {
     private readonly notificationService: NotificationService,
 
     private readonly channelService: ChannelService,
+
+    private readonly dispatchSettingsService: DispatchSettingsService,
   ) {}
+
+  private async getQueueMode(): Promise<'least_loaded' | 'round_robin'> {
+    const settings = await this.dispatchSettingsService.getSettings();
+    return settings.queue_mode ?? 'least_loaded';
+  }
 
   /**
    * 🎯 Décide si un message peut être assigné à un agent
@@ -94,7 +102,8 @@ export class DispatcherService {
       }
     }
     // Mode pool : queue globale
-    return this.queueService.getNextInQueue();
+    const mode = await this.getQueueMode();
+    return this.queueService.getNextInQueue(mode);
   }
 
   private async assignConversationInternal(
@@ -383,7 +392,7 @@ export class DispatcherService {
     // ─── Approche atomique : trouver le prochain poste AVANT d'effacer l'actuel ──
     const oldPosteId = chat.poste_id ?? null;
 
-    const nextPoste = await this.queueService.getNextInQueue();
+    const nextPoste = await this.queueService.getNextInQueue(await this.getQueueMode());
     if (!nextPoste) {
       this.logger.warn(
         `Réinjection impossible (${chat.chat_id}): aucun poste alternatif — deadline étendue +30 min`,
@@ -462,7 +471,7 @@ export class DispatcherService {
       }
     }
 
-    const nextPoste = await this.queueService.getNextInQueue();
+    const nextPoste = await this.queueService.getNextInQueue(await this.getQueueMode());
     if (!nextPoste) {
       this.logger.warn(`⏳ Aucun agent disponible pour orphelin (${chat.chat_id}), reste EN_ATTENTE`);
       return;
@@ -494,7 +503,7 @@ export class DispatcherService {
     if (!oldPoste) {
       return;
     }
-    const nextPoste = await this.queueService.getNextInQueue();
+    const nextPoste = await this.queueService.getNextInQueue(await this.getQueueMode());
     if (!nextPoste) {
       // Aucun agent disponible : notifier l'ancien poste que la conversation
       // passe en attente, sinon elle reste visible comme fantôme sur son interface.
@@ -639,7 +648,7 @@ export class DispatcherService {
 
       const lock = this.getChatDispatchLock(chat.chat_id);
       const assigned = await lock.runExclusive(async () => {
-        const nextAgent = await this.queueService.getNextInQueue();
+        const nextAgent = await this.queueService.getNextInQueue(await this.getQueueMode());
         if (!nextAgent) return false;
 
         const oldPosteId = chat.poste_id;
