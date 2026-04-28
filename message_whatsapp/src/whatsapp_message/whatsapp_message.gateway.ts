@@ -127,6 +127,21 @@ export class WhatsappMessageGateway
     }
 
     const tenantId = tenantIds[0];
+
+    // Purger les sockets fantômes pour ce commercial avant d'enregistrer la nouvelle connexion.
+    // Un socket mort (crash navigateur, coupure réseau) reste dans connectedAgents jusqu'à ce que
+    // Socket.io détecte le timeout ping (~45s). Si le commercial se reconnecte avant ce délai,
+    // le fantôme fait croire que le poste est encore actif quand la vraie connexion se ferme,
+    // ce qui empêche setActive(false) et removeFromQueue d'être appelés.
+    for (const [ghostClientId, ghostAgent] of this.connectedAgents.entries()) {
+      if (ghostAgent.commercialId === commercialId) {
+        this.connectedAgents.delete(ghostClientId);
+        this.logger.warn(
+          `Ghost socket purged: commercial=${commercialId} old=${ghostClientId} new=${client.id}`,
+        );
+      }
+    }
+
     this.connectedAgents.set(client.id, {
       commercialId,
       posteId,
