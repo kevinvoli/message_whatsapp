@@ -10,11 +10,12 @@ function makeCronConfigService() {
 
 // ─── Mock CallObligationService ────────────────────────────────────────────────
 
-function makeObligationService(posteIds: string[] = [], qualityResults: boolean[] = []) {
+function makeObligationService(posteIds: string[] = [], qualityResults: boolean[] = [], enabled = true) {
   let runCallIdx = 0;
   return {
+    isEnabled:         jest.fn().mockResolvedValue(enabled),
     getActivePosteIds: jest.fn().mockResolvedValue(posteIds),
-    runQualityCheck: jest.fn().mockImplementation(async () => qualityResults[runCallIdx++] ?? true),
+    runQualityCheck:   jest.fn().mockImplementation(async () => qualityResults[runCallIdx++] ?? true),
   } as any;
 }
 

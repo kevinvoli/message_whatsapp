@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import {
@@ -13,7 +13,7 @@ import {
   CallTaskStatus,
 } from './entities/call-task.entity';
 import { Contact, ClientCategory } from 'src/contact/entities/contact.entity';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
@@ -303,14 +303,34 @@ export class CallObligationService {
     return { created, alreadyActive };
   }
 
+  // ── Bloc actif ───────────────────────────────────────────────────────────
+
+  /**
+   * OBL-001 — Retourne uniquement les conversations du bloc actif courant.
+   * Seules les conversations window_status=ACTIVE (premier bloc) comptent pour
+   * le contrôle qualité — les conversations LOCKED sont hors scope.
+   */
+  async getActiveBlockConversations(posteId: string): Promise<WhatsappChat[]> {
+    return this.chatRepo.find({
+      where: {
+        poste_id:      posteId,
+        window_status: WindowStatus.ACTIVE,
+        window_slot:   Not(IsNull()),
+      },
+      select: ['id', 'last_client_message_at', 'last_poste_message_at'],
+      order:  { window_slot: 'ASC' },
+    });
+  }
+
   // ── Contrôle qualité à la demande ────────────────────────────────────────
 
+  /**
+   * OBL-002 — Contrôle qualité limité au bloc actif (10 conversations ACTIVE).
+   * N'évalue plus toutes les conversations actives du poste.
+   */
   async runQualityCheck(posteId: string): Promise<boolean> {
-    const activeConvs = await this.chatRepo.find({
-      where: { poste_id: posteId, status: WhatsappChatStatus.ACTIF },
-      select: ['id', 'last_client_message_at', 'last_poste_message_at'],
-    });
-    return this.checkAndRecordQuality(posteId, activeConvs);
+    const blockConvs = await this.getActiveBlockConversations(posteId);
+    return this.checkAndRecordQuality(posteId, blockConvs);
   }
 
   isReadyForRotation(batch: CommercialObligationBatch): boolean {

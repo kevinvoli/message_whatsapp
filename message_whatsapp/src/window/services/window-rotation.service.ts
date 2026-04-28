@@ -346,6 +346,9 @@ export class WindowRotationService {
 
     // Vérifier les obligations d'appel du poste avant de déclencher la rotation.
     if (await this.obligationService?.isEnabled()) {
+      // OBL-003 — Rafraîchir le contrôle qualité sur le bloc actif (activeSlots déjà en mémoire)
+      // avant de lire le statut persisté, pour éviter une valeur périmée.
+      await this.obligationService.checkAndRecordQuality(posteId, activeSlots);
       const obligationStatus = await this.obligationService.getStatus(posteId);
       if (obligationStatus && !obligationStatus.readyForRotation) {
         const validatedCount =

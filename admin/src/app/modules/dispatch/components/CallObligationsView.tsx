@@ -40,6 +40,8 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
   const [loading, setLoading] = useState(false);
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [toggling, setToggling] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [confirmPending, setConfirmPending] = useState<boolean | null>(null); // valeur cible à confirmer
 
   const loadFlag = useCallback(async () => {
     try {
@@ -67,14 +69,27 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
     void load();
   }, [load, loadFlag]);
 
-  const handleToggle = async () => {
+  // OBL-007 — Demander confirmation avant de modifier le flag
+  const handleToggleRequest = () => {
     if (toggling || enabled === null) return;
+    setConfirmPending(!enabled);
+    setToggleError(null);
+  };
+
+  // OBL-006 — Effectuer le toggle après confirmation
+  const handleToggleConfirm = async () => {
+    if (confirmPending === null) return;
+    const newValue = confirmPending;
+    setConfirmPending(null);
     setToggling(true);
+    setToggleError(null);
     try {
-      const newValue = !enabled;
       await updateSystemConfig(FLAG_KEY, String(newValue));
       setEnabled(newValue);
-    } catch { /* silencieux */ } finally {
+      void load(); // recharger les statuts postes après changement
+    } catch {
+      setToggleError('Erreur lors de la mise à jour du flag. Vérifiez votre connexion.');
+    } finally {
       setToggling(false);
     }
   };
@@ -86,16 +101,52 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
 
   return (
     <div className="space-y-4">
+      {/* OBL-007 — Modal de confirmation */}
+      {confirmPending !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+              <h3 className="font-semibold text-gray-900">
+                {confirmPending ? 'Activer les obligations ?' : 'Désactiver les obligations ?'}
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600">
+              {confirmPending
+                ? 'Cette action bloquera la rotation tant que les 15 appels requis et le contrôle qualité du bloc actif ne sont pas validés.'
+                : 'Cette action permettra la rotation sans contrôle des obligations d\'appel.'}
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setConfirmPending(null)}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => void handleToggleConfirm()}
+                className={`flex-1 py-2 rounded-lg text-white text-sm font-medium ${
+                  confirmPending ? 'bg-green-600 hover:bg-green-700' : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
+                {confirmPending ? 'Activer' : 'Désactiver'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Phone className="w-5 h-5 text-orange-600" />
           <h3 className="text-base font-bold text-gray-900">Obligations d'appels GICOP</h3>
         </div>
         <div className="flex items-center gap-2">
-          {/* Toggle ON/OFF */}
+          {/* OBL-006 — Toggle avec loading/erreur */}
           <button
-            onClick={() => void handleToggle()}
+            onClick={handleToggleRequest}
             disabled={toggling || enabled === null}
+            title={enabled ? 'Cliquez pour désactiver' : 'Cliquez pour activer'}
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
               enabled
                 ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100'
@@ -108,7 +159,7 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
               ? <ToggleRight className="w-4 h-4" />
               : <ToggleLeft className="w-4 h-4" />
             }
-            {enabled ? 'Activé' : 'Désactivé'}
+            {toggling ? 'Mise à jour…' : enabled ? 'Activé' : 'Désactivé'}
           </button>
 
           <button onClick={() => void load()} disabled={loading}
@@ -117,6 +168,13 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
           </button>
         </div>
       </div>
+
+      {toggleError && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <XCircle className="w-4 h-4 flex-shrink-0" />
+          {toggleError}
+        </div>
+      )}
 
       {!enabled && enabled !== null && (
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">

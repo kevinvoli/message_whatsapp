@@ -212,10 +212,10 @@ describe('WindowRotationService', () => {
         makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
       );
       const repo = makeChatRepo(chats);
-      // L'obligation service est activé mais autorise la rotation (readyForRotation=true).
       const obligationService = {
-        isEnabled: jest.fn().mockResolvedValue(true),
-        getStatus: jest.fn().mockResolvedValue({ readyForRotation: true }),
+        isEnabled:             jest.fn().mockResolvedValue(true),
+        getStatus:             jest.fn().mockResolvedValue({ readyForRotation: true }),
+        checkAndRecordQuality: jest.fn().mockResolvedValue(true),
         getOrCreateActiveBatch: jest.fn().mockResolvedValue({}),
       };
       const { service } = buildService(repo, {
@@ -230,6 +230,154 @@ describe('WindowRotationService', () => {
       await service.checkAndTriggerRotation('poste-abc');
 
       expect(performRotation).toHaveBeenCalledWith('poste-abc');
+    });
+  });
+
+  // ─── OBL-022 : rotation avec obligations activées/désactivées ────────────────
+
+  describe('OBL-022 — obligations et rotation', () => {
+    function makeObligationService(
+      enabled: boolean,
+      readyForRotation: boolean,
+      qualityOk: boolean,
+      callsDone = 15,
+    ) {
+      const total = 15;
+      const done  = callsDone;
+      return {
+        isEnabled:             jest.fn().mockResolvedValue(enabled),
+        checkAndRecordQuality: jest.fn().mockResolvedValue(qualityOk),
+        getStatus:             jest.fn().mockResolvedValue({
+          readyForRotation,
+          qualityCheckPassed: qualityOk,
+          annulee:      { done: Math.min(done, 5),       required: 5 },
+          livree:       { done: Math.min(done - 5, 5),   required: 5 },
+          sansCommande: { done: Math.min(done - 10, 5),  required: 5 },
+        }),
+        getOrCreateActiveBatch: jest.fn().mockResolvedValue({}),
+      };
+    }
+
+    it('obligations désactivées → rotation sans vérification des obligations', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      const obligSvc = makeObligationService(false, false, false, 0);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(obligSvc.getStatus).not.toHaveBeenCalled();
+      expect(performRotation).toHaveBeenCalledWith('poste-abc');
+    });
+
+    it('obligations activées + appels incomplets → blocage call_obligations_incomplete', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      // Seulement 8 appels validés sur 15
+      const obligSvc = makeObligationService(true, false, false, 8);
+      const { service, emitter } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      jest.spyOn(service, 'performRotation').mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      const blockedCall = (emitter.emit as jest.Mock).mock.calls.find(([e]) => e === 'window.rotation_blocked');
+      expect(blockedCall).toBeDefined();
+      expect(blockedCall![1].reason).toBe('call_obligations_incomplete');
+    });
+
+    it('obligations activées + appels complets + qualité KO → blocage quality_check_failed', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      // 15/15 appels mais qualité KO
+      const obligSvc = makeObligationService(true, false, false, 15);
+      const { service, emitter } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      jest.spyOn(service, 'performRotation').mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      const blockedCall = (emitter.emit as jest.Mock).mock.calls.find(([e]) => e === 'window.rotation_blocked');
+      expect(blockedCall).toBeDefined();
+      expect(blockedCall![1].reason).toBe('quality_check_failed');
+    });
+
+    it('obligations activées + appels complets + qualité OK → rotation', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      const obligSvc = makeObligationService(true, true, true, 15);
+      const { service, emitter } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(performRotation).toHaveBeenCalledWith('poste-abc');
+      expect(emitter.emit).not.toHaveBeenCalledWith('window.rotation_blocked', expect.anything());
+    });
+
+    it('OBL-003 — checkAndRecordQuality est appelé avant getStatus', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      const obligSvc = makeObligationService(true, true, true, 15);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      jest.spyOn(service, 'performRotation').mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      const qualityOrder = (obligSvc.checkAndRecordQuality as jest.Mock).mock.invocationCallOrder[0];
+      const statusOrder  = (obligSvc.getStatus as jest.Mock).mock.invocationCallOrder[0];
+      expect(qualityOrder).toBeLessThan(statusOrder);
+    });
+
+    it('rapports incomplets → obligations non vérifiées', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      const obligSvc = makeObligationService(true, false, false, 0);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: [], // aucun rapport soumis
+      });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(obligSvc.getStatus).not.toHaveBeenCalled();
+      expect(obligSvc.checkAndRecordQuality).not.toHaveBeenCalled();
     });
   });
 

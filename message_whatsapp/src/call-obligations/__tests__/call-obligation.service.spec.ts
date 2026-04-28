@@ -225,18 +225,41 @@ describe('CallObligationService', () => {
       expect(result.reason).toBe('poste_introuvable');
     });
 
-    it('refuse si catégorie contact inconnue', async () => {
-      const contactRepo = makeContactRepo(null);
-      const svc = buildService(undefined, undefined, contactRepo);
+    it('client inconnu → fallback JAMAIS_COMMANDE → valide si batch et tâche dispos', async () => {
+      // OBL-011 : un contact non identifié est catégorisé JAMAIS_COMMANDE par défaut,
+      // pas rejeté. Le service continue jusqu'à trouver (ou pas) une tâche ouverte.
+      const contactRepo  = makeContactRepo(null);  // aucun contact DB1 connu
+      const batchRepo    = makeBatchRepo(makeBatch());
+      const task         = makeTask({ category: CallTaskCategory.JAMAIS_COMMANDE });
+      const taskRepo     = makeTaskRepo(task);
+
+      const svc = buildService(batchRepo, taskRepo, contactRepo);
       const result = await svc.tryMatchCallToTask({
-        clientPhone: '0700000001',
+        clientPhone:     '0700000001',
         commercialPhone: '0700000002',
-        callEventId: 'evt-1',
+        callEventId:     'evt-fallback',
         durationSeconds: 120,
-        posteId: 'poste-1',
+        posteId:         'poste-1',
+      });
+      // Fallback JAMAIS_COMMANDE → tâche trouvée → matched
+      expect(result.matched).toBe(true);
+    });
+
+    it('client inconnu → fallback JAMAIS_COMMANDE → quota atteint → refusé avec raison quota', async () => {
+      const contactRepo = makeContactRepo(null);
+      const batchRepo   = makeBatchRepo(makeBatch());
+      const taskRepo    = makeTaskRepo(null); // aucune tâche PENDING
+
+      const svc = buildService(batchRepo, taskRepo, contactRepo);
+      const result = await svc.tryMatchCallToTask({
+        clientPhone:     '0700000001',
+        commercialPhone: '0700000002',
+        callEventId:     'evt-quota',
+        durationSeconds: 120,
+        posteId:         'poste-1',
       });
       expect(result.matched).toBe(false);
-      expect(result.reason).toBe('categorie_contact_inconnue');
+      expect(result.reason).toContain('quota_');
     });
 
     it('refuse si aucun batch actif', async () => {
@@ -471,6 +494,73 @@ describe('CallObligationService', () => {
       const batch = makeBatch({ annuleeDone: 5, livreeDone: 5, sansCommandeDone: 5, qualityCheckPassed: false });
       const svc = buildService(makeBatchRepo(batch));
       expect(await svc.isPosteReadyForRotation('poste-1')).toBe(false);
+    });
+  });
+
+  // ── OBL-021 : contrôle qualité limité au bloc actif ────────────────────────
+
+  describe('runQualityCheck — bloc actif uniquement (OBL-001 + OBL-002)', () => {
+    function makeActiveChatRepo(chats: WhatsappChat[]) {
+      return { find: jest.fn().mockResolvedValue(chats) } as any;
+    }
+
+    it('passe si toutes les conversations du bloc actif ont une réponse commerciale', async () => {
+      const t = new Date('2026-04-28T10:00:00Z');
+      const chats = [
+        makeChat({ window_status: 'active' as any, window_slot: 1, last_client_message_at: t, last_poste_message_at: new Date(t.getTime() + 60_000) }),
+        makeChat({ id: 'chat-2', window_status: 'active' as any, window_slot: 2, last_client_message_at: null }),
+      ];
+      const batch = makeBatch();
+      const chatRepo = makeActiveChatRepo(chats);
+      const batchRepo = makeBatchRepo(batch);
+      const svc = buildService(batchRepo, undefined, undefined, undefined, chatRepo);
+
+      const result = await svc.runQualityCheck('poste-1');
+      // chatRepo.find appelé avec window_status=ACTIVE (le service appelle getActiveBlockConversations)
+      expect(chatRepo.find).toHaveBeenCalledTimes(1);
+      expect(result).toBe(true);
+      expect(batch.qualityCheckPassed).toBe(true);
+    });
+
+    it('échoue si une conversation du bloc actif a un message client sans réponse', async () => {
+      const clientAt = new Date('2026-04-28T10:00:00Z');
+      const chats = [
+        makeChat({ window_status: 'active' as any, window_slot: 1, last_client_message_at: clientAt, last_poste_message_at: null }),
+      ];
+      const batch = makeBatch();
+      const chatRepo = makeActiveChatRepo(chats);
+      const batchRepo = makeBatchRepo(batch);
+      const svc = buildService(batchRepo, undefined, undefined, undefined, chatRepo);
+
+      const result = await svc.runQualityCheck('poste-1');
+      expect(result).toBe(false);
+      expect(batch.qualityCheckPassed).toBe(false);
+    });
+
+    it('passe si le bloc actif est vide (pas de conversations ACTIVE)', async () => {
+      const chatRepo = makeActiveChatRepo([]);
+      const batch = makeBatch();
+      const batchRepo = makeBatchRepo(batch);
+      const svc = buildService(batchRepo, undefined, undefined, undefined, chatRepo);
+
+      const result = await svc.runQualityCheck('poste-1');
+      expect(result).toBe(true);
+    });
+
+    it('une conversation LOCKED hors bloc ne fait pas échouer le contrôle', async () => {
+      // chatRepo ne retourne que les ACTIVE — le LOCKED n'est pas dans la liste
+      const activeAt = new Date('2026-04-28T09:00:00Z');
+      const chats = [
+        makeChat({ window_status: 'active' as any, window_slot: 1, last_client_message_at: activeAt, last_poste_message_at: new Date(activeAt.getTime() + 3600_000) }),
+      ];
+      // Le LOCKED aurait last_poste_message_at=null — mais il n'est pas dans la liste
+      const batch = makeBatch();
+      const chatRepo = makeActiveChatRepo(chats);
+      const batchRepo = makeBatchRepo(batch);
+      const svc = buildService(batchRepo, undefined, undefined, undefined, chatRepo);
+
+      const result = await svc.runQualityCheck('poste-1');
+      expect(result).toBe(true);
     });
   });
 });
