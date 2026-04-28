@@ -1168,6 +1168,25 @@ export class WhatsappMessageGateway
     );
   }
 
+  /**
+   * Déconnecte de force tous les agents connectés.
+   * Chaque socket.disconnect() déclenche handleDisconnect() qui gère le nettoyage
+   * (setActive false, removeFromQueue, etc.).
+   */
+  public async disconnectAllAgents(): Promise<number> {
+    const clientIds = Array.from(this.connectedAgents.keys());
+    let count = 0;
+    for (const clientId of clientIds) {
+      const socket = this.server.sockets.sockets.get(clientId);
+      if (socket) {
+        socket.disconnect(true);
+        count++;
+      }
+    }
+    this.logger.log(`Admin forced disconnect: ${count} agent(s) disconnected`);
+    return count;
+  }
+
   public async emitConversationReassigned(
     chat: WhatsappChat,
     oldPosteId: string,

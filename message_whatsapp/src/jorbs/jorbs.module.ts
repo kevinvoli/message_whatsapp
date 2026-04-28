@@ -5,6 +5,7 @@ import { CronConfigService } from './cron-config.service';
 import { CronConfigController } from './cron-config.controller';
 import { TasksService } from './tasks.service';
 import { AutoMessageMasterJob } from './auto-message-master.job';
+import { DisconnectAllCommercialsJob } from './disconnect-all-commercials.job';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keyword.entity';
 import { MessageAutoModule } from 'src/message-auto/message-auto.module';
@@ -25,6 +26,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     CronConfigService,
     TasksService,
     AutoMessageMasterJob,
+    DisconnectAllCommercialsJob,
   ],
   exports: [CronConfigService],
 })

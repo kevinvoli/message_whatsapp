@@ -1,7 +1,7 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, LogOut } from 'lucide-react';
 import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial } from '@/app/lib/api';
+import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
@@ -40,8 +40,28 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     getId: (item) => item.id,
   });
 
+  const [disconnecting, setDisconnecting] = useState(false);
   const loading = crudLoading || dataLoading;
   const { addToast } = useToast();
+
+  const handleDisconnectAll = async () => {
+    const connected = commerciaux.filter(c => c.isConnected).length;
+    if (connected === 0) {
+      addToast({ type: 'info', message: 'Aucun commercial connecté.' });
+      return;
+    }
+    if (!window.confirm(`Déconnecter les ${connected} commercial(aux) actuellement en ligne ?`)) return;
+    setDisconnecting(true);
+    try {
+      await runCronNow('disconnect-all');
+      addToast({ type: 'success', message: `${connected} commercial(aux) déconnecté(s).` });
+      await fetchData();
+    } catch {
+      addToast({ type: 'error', message: 'Erreur lors de la déconnexion.' });
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setDataLoading(true);
@@ -285,6 +305,15 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <button
+            onClick={() => void handleDisconnectAll()}
+            disabled={disconnecting}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+            title="Déconnecter tous les commerciaux en ligne"
+          >
+            <LogOut className="w-4 h-4" />
+            {disconnecting ? 'Déconnexion...' : 'Déconnecter tous'}
+          </button>
           <button
             onClick={handleOpenAddModal}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"

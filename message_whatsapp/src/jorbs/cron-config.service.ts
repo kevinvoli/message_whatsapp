@@ -282,6 +282,20 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: null,
     maxSteps: null,
   },
+  'disconnect-all': {
+    label: 'Déconnexion automatique fin de journée',
+    description:
+      "Déconnecte tous les commerciaux connectés à une heure fixe chaque soir. " +
+      "Modifiez l'expression cron pour changer l'heure (ex : \"0 21 * * *\" = chaque jour à 21h).",
+    enabled: true,
+    scheduleType: 'cron',
+    intervalMinutes: null,
+    cronExpression: '0 21 * * *',
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
