@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { WhatsappChatController } from './whatsapp_chat.controller';
 import { WhatsappChatGateway } from './whatsapp_chat.gateway';
@@ -34,7 +34,7 @@ import { CommercialActionGateModule } from 'src/commercial-action-gate/commercia
       WhapiChannel,
     ]),
     ConversationCapacityModule,
-    CommercialActionGateModule,
+    forwardRef(() => CommercialActionGateModule),
   ],
   controllers: [WhatsappChatController],
   providers: [
