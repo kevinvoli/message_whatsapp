@@ -1,7 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ConversationReport, NextAction } from './entities/conversation-report.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { FollowUpService } from 'src/follow-up/follow_up.service';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface UpsertReportDto {
@@ -30,9 +33,16 @@ export interface UpsertReportDto {
 
 @Injectable()
 export class ConversationReportService {
+  private readonly logger = new Logger(ConversationReportService.name);
+
   constructor(
     @InjectRepository(ConversationReport)
     private readonly repo: Repository<ConversationReport>,
+    @InjectRepository(Contact)
+    private readonly contactRepo: Repository<Contact>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepo: Repository<WhatsappChat>,
+    private readonly followUpService: FollowUpService,
   ) {}
 
   async findByChatId(chatId: string): Promise<ConversationReport | null> {
@@ -68,7 +78,29 @@ export class ConversationReportService {
 
     report.isComplete = this.computeComplete(report);
 
-    return this.repo.save(report);
+    const saved = await this.repo.save(report);
+
+    // REL-005 — Idempotence : si le dossier n'a pas créé la relance, l'upsert rapport le fait.
+    if (dto.followUpAt && dto.commercialId) {
+      try {
+        const [contact, chat] = await Promise.all([
+          this.contactRepo.findOne({ where: { chat_id: chatId }, select: ['id'] }),
+          this.chatRepo.findOne({ where: { chat_id: chatId }, select: ['id'] }),
+        ]);
+        await this.followUpService.upsertFromDossierOrReport({
+          contact_id:      contact?.id ?? null,
+          conversation_id: chat?.id ?? null,
+          commercial_id:   dto.commercialId,
+          scheduled_at:    new Date(dto.followUpAt),
+          next_action:     dto.nextAction ?? null,
+          notes:           dto.notes ?? null,
+        });
+      } catch (err) {
+        this.logger.warn(`REL-005 follow-up upsert échoué pour chatId ${chatId}: ${(err as Error).message}`);
+      }
+    }
+
+    return saved;
   }
 
   async validate(chatId: string, validatedById: string): Promise<ConversationReport> {

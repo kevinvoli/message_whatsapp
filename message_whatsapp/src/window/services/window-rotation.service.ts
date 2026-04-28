@@ -6,7 +6,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { WhatsappChat, WindowStatus, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { ValidationEngineService } from './validation-engine.service';
-import { CallObligationService } from 'src/call-obligations/call-obligation.service';
+import { CallObligationService, ObligationStatus } from 'src/call-obligations/call-obligation.service';
 import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 
@@ -29,7 +29,7 @@ export interface WindowRotationBlockedPayload {
   posteId: string;
   reason: 'quality_check_failed' | 'call_obligations_incomplete';
   progress: { submitted: number; total: number };
-  obligations?: object | null;
+  obligations?: ObligationStatus | null;
 }
 
 @Injectable()
@@ -346,10 +346,23 @@ export class WindowRotationService {
 
     // Vérifier les obligations d'appel du poste avant de déclencher la rotation.
     if (await this.obligationService?.isEnabled()) {
-      // OBL-003 — Rafraîchir le contrôle qualité sur le bloc actif (activeSlots déjà en mémoire)
-      // avant de lire le statut persisté, pour éviter une valeur périmée.
-      await this.obligationService.checkAndRecordQuality(posteId, activeSlots);
-      const obligationStatus = await this.obligationService.getStatus(posteId);
+      // OBL-003 — Lire d'abord le statut pour déterminer si les appels sont complets.
+      let obligationStatus = await this.obligationService.getStatus(posteId);
+
+      if (obligationStatus) {
+        const callsComplete =
+          obligationStatus.annulee.done >= obligationStatus.annulee.required &&
+          obligationStatus.livree.done >= obligationStatus.livree.required &&
+          obligationStatus.sansCommande.done >= obligationStatus.sansCommande.required;
+
+        // N'exécuter le contrôle qualité que si les appels sont complets.
+        if (callsComplete) {
+          await this.obligationService.checkAndRecordQuality(posteId, activeSlots);
+          // Relire le statut mis à jour après le contrôle qualité.
+          obligationStatus = await this.obligationService.getStatus(posteId);
+        }
+      }
+
       if (obligationStatus && !obligationStatus.readyForRotation) {
         const validatedCount =
           obligationStatus.annulee.done +

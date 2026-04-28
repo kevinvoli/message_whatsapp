@@ -214,7 +214,13 @@ describe('WindowRotationService', () => {
       const repo = makeChatRepo(chats);
       const obligationService = {
         isEnabled:             jest.fn().mockResolvedValue(true),
-        getStatus:             jest.fn().mockResolvedValue({ readyForRotation: true }),
+        getStatus:             jest.fn().mockResolvedValue({
+          readyForRotation: true,
+          qualityCheckPassed: true,
+          annulee:      { done: 5, required: 5 },
+          livree:       { done: 5, required: 5 },
+          sansCommande: { done: 5, required: 5 },
+        }),
         checkAndRecordQuality: jest.fn().mockResolvedValue(true),
         getOrCreateActiveBatch: jest.fn().mockResolvedValue({}),
       };
@@ -342,11 +348,12 @@ describe('WindowRotationService', () => {
       expect(emitter.emit).not.toHaveBeenCalledWith('window.rotation_blocked', expect.anything());
     });
 
-    it('OBL-003 — checkAndRecordQuality est appelé avant getStatus', async () => {
+    it('OBL-003 — qualité calculée seulement si appels complets, getStatus relu après', async () => {
       const chats = Array.from({ length: 10 }, (_, i) =>
         makeChat({ window_slot: i + 1 }),
       );
       const repo = makeChatRepo(chats);
+      // 15/15 appels → callsComplete = true → checkAndRecordQuality doit être appelé
       const obligSvc = makeObligationService(true, true, true, 15);
       const { service } = buildService(repo, {
         quotaActive: 10,
@@ -357,9 +364,33 @@ describe('WindowRotationService', () => {
 
       await service.checkAndTriggerRotation('poste-abc');
 
+      // getStatus est appelé deux fois : avant (pour vérifier si appels complets) et après (relecture)
+      expect(obligSvc.getStatus).toHaveBeenCalledTimes(2);
+      // checkAndRecordQuality est appelé entre les deux appels à getStatus
       const qualityOrder = (obligSvc.checkAndRecordQuality as jest.Mock).mock.invocationCallOrder[0];
-      const statusOrder  = (obligSvc.getStatus as jest.Mock).mock.invocationCallOrder[0];
-      expect(qualityOrder).toBeLessThan(statusOrder);
+      const status2Order = (obligSvc.getStatus as jest.Mock).mock.invocationCallOrder[1];
+      expect(qualityOrder).toBeLessThan(status2Order);
+    });
+
+    it('OBL-003 — checkAndRecordQuality non appelé si appels incomplets', async () => {
+      const chats = Array.from({ length: 10 }, (_, i) =>
+        makeChat({ window_slot: i + 1 }),
+      );
+      const repo = makeChatRepo(chats);
+      // 8/15 appels → callsComplete = false → checkAndRecordQuality ne doit PAS être appelé
+      const obligSvc = makeObligationService(true, false, false, 8);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        obligationService: obligSvc,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      jest.spyOn(service, 'performRotation').mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(obligSvc.checkAndRecordQuality).not.toHaveBeenCalled();
+      // getStatus appelé une seule fois (pas de relecture après qualité)
+      expect(obligSvc.getStatus).toHaveBeenCalledTimes(1);
     });
 
     it('rapports incomplets → obligations non vérifiées', async () => {
