@@ -29,12 +29,6 @@ export enum ClientCategory {
   COMMANDE_ANNULEE = 'commande_annulee',
 }
 
-export enum CertificationStatus {
-  NON_VERIFIE = 'non_verifie',
-  EN_ATTENTE = 'en_attente',
-  CERTIFIE = 'certifie',
-  REJETE = 'rejete',
-}
 
 @Entity()
 // phone : hot path — appelé sur chaque message entrant (findOrCreate)
@@ -132,12 +126,6 @@ export class Contact {
   @Column({ name: 'client_order_summary', type: 'json', nullable: true })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client_order_summary?: any;
-
-  @Column({ name: 'certification_status', type: 'enum', enum: CertificationStatus, nullable: true, default: null })
-  certification_status?: CertificationStatus | null;
-
-  @Column({ name: 'certified_at', type: 'timestamp', nullable: true, default: null })
-  certified_at?: Date | null;
 
   // ─── P8 — Parrainage ─────────────────────────────────────────────────────────
   @Column({ name: 'referral_code', type: 'varchar', length: 50, nullable: true, default: null })

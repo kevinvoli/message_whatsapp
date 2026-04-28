@@ -83,6 +83,7 @@ import { IntegrationOutboxModule } from './integration-outbox/integration-outbox
 import { ActionQueueModule } from './action-queue/action-queue.module';
 import { WorkScheduleModule } from './work-schedule/work-schedule.module';
 import { WorkAttendanceModule } from './work-attendance/work-attendance.module';
+import { ComplaintsModule } from './complaints/complaints.module';
 
 @Module({
   imports: [
@@ -252,6 +253,8 @@ import { WorkAttendanceModule } from './work-attendance/work-attendance.module';
     // E07 — Temps de travail et planning
     WorkScheduleModule,
     WorkAttendanceModule,
+    // E09 — Plaintes clients
+    ComplaintsModule,
   ],
   controllers: [AppController],
   providers: [

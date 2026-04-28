@@ -72,23 +72,6 @@ function CategoryBadge({ category }: { category?: string | null }) {
   );
 }
 
-function CertifBadge({ status }: { status?: string | null }) {
-  if (!status || status === 'non_verifie') return null;
-  const map: Record<string, string> = {
-    certifie:    'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    en_attente:  'bg-yellow-50 text-yellow-700 border border-yellow-200',
-    rejete:      'bg-red-50 text-red-700 border border-red-200',
-  };
-  const labels: Record<string, string> = {
-    certifie: '✓ Certifié', en_attente: '⏳ En attente', rejete: '✗ Rejeté',
-  };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] ?? 'bg-gray-100 text-gray-700'}`}>
-      {labels[status] ?? status}
-    </span>
-  );
-}
-
 // ─── Modal modification statut + notes ───────────────────────────────────────
 
 interface EditModalProps {
@@ -211,7 +194,6 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
             <CallStatusBadge status={contact.call_status} />
             <ConversionBadge status={contact.conversion_status} />
             <CategoryBadge category={contact.client_category} />
-            <CertifBadge status={contact.certification_status} />
           </div>
         </div>
 
@@ -309,7 +291,7 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
       </div>
 
       {/* Intégration ERP */}
-      {(contact.order_client_id || contact.referral_code || contact.referral_count || contact.certified_at) && (
+      {(contact.order_client_id || contact.referral_code || contact.referral_count) && (
         <div className="bg-white rounded-[18px] p-5 border border-gray-100">
           <h3 className="text-base font-bold text-gray-900 mb-3">Intégration ERP</h3>
           <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
@@ -335,12 +317,6 @@ function ContactDetails({ contact, onEditClick, onViewConversation, onArchive }:
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Commission parrainage</p>
                 <p className="text-gray-800">{contact.referral_commission} FCFA</p>
-              </div>
-            )}
-            {contact.certified_at && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Certifié le</p>
-                <p className="text-gray-800">{formatDateShort(contact.certified_at)}</p>
               </div>
             )}
           </div>

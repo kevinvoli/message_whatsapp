@@ -358,7 +358,6 @@ L'admin doit pouvoir définir si une action IA nécessite :
 
 Les cas suivants doivent être fortement encadrés :
 
-- certification client
 - message automatique sur client mécontent
 - message après litige
 - promesse de prix

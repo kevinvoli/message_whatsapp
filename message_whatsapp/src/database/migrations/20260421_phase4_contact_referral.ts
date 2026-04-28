@@ -4,11 +4,6 @@ export class Phase4ContactReferral1745200000010 implements MigrationInterface {
   name = 'Phase4ContactReferral1745200000010';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    if (!(await queryRunner.hasColumn('contact', 'certified_at'))) {
-      await queryRunner.addColumn('contact', new TableColumn({
-        name: 'certified_at', type: 'timestamp', isNullable: true, default: null,
-      }));
-    }
     if (!(await queryRunner.hasColumn('contact', 'referral_code'))) {
       await queryRunner.addColumn('contact', new TableColumn({
         name: 'referral_code', type: 'varchar', length: '50', isNullable: true, default: null,
@@ -28,7 +23,7 @@ export class Phase4ContactReferral1745200000010 implements MigrationInterface {
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    for (const col of ['certified_at', 'referral_code', 'referral_count', 'referral_commission']) {
+    for (const col of ['referral_code', 'referral_count', 'referral_commission']) {
       if (await queryRunner.hasColumn('contact', col)) {
         await queryRunner.dropColumn('contact', col);
       }

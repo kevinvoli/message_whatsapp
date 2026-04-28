@@ -1148,54 +1148,7 @@ Recording rattache                 : 4.5 / 10
 Monitoring qualite                 : 4 / 10
 ```
 
-### 13.12 Nouveaux comptes certifies
-
-Attendu E-GICOP :
-
-Compte certifie si :
-
-- nom/prenom ;
-- une ou plusieurs adresses ;
-- un ou plusieurs contacts ;
-- une commande livree ;
-- email optionnel ;
-- categories produits ;
-- image avant ;
-- image apres ;
-- controle anti noms invalides ;
-- validation par gestionnaires livraison.
-
-Etat actuel observe :
-
-- `contact`, `client-dossier`, `crm`, `order-read`, `whatsapp_media` fournissent une base.
-- pas de workflow complet de certification observe.
-- pas de validation anti-noms invalides centralisee observee.
-
-Maturite :
-
-```text
-Donnees compte client              : 6 / 10
-Certification compte               : 3 / 10
-Controle qualite livraison         : 3 / 10
-Anti-doublon / anti-noms invalides : 4 / 10
-```
-
-Module recommande :
-
-```text
-client-certification
-```
-
-Avec etats :
-
-```text
-draft
-ready_for_review
-rejected
-certified
-```
-
-### 13.13 Plaintes
+### 13.12 Plaintes
 
 Attendu E-GICOP :
 
@@ -1259,7 +1212,6 @@ Commandes annulees                 : 5 / 10
 Clients a relancer                 : 4.5 / 10
 Erreurs commandes                  : 3.5 / 10
 Appels en absence prioritaires     : 4.5 / 10
-Compte certifie                    : 3.5 / 10
 Plaintes                           : 2.5 / 10
 Pilotage global E-GICOP            : 4.5 / 10
 ```
@@ -1367,7 +1319,7 @@ Livrable :
 Chaque segment client devient une file d'action commerciale.
 ```
 
-### Phase 6 : qualite, comptes certifies et plaintes (jours 70 a 90)
+### Phase 6 : qualite et plaintes (jours 70 a 90)
 
 Objectif : solidifier la relation client.
 
@@ -1375,9 +1327,6 @@ Priorites :
 
 1. Notes client post-conversation.
 2. Plaintes et resolution.
-3. Compte certifie.
-4. Validation gestionnaire livraison.
-5. Anti-doublons et controle qualite des noms/adresses.
 
 Livrable :
 

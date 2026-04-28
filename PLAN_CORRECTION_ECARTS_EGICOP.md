@@ -402,64 +402,7 @@ audio appel
 Chaque segment client devient une file d'action commerciale mesurable.
 ```
 
-## 10. Phase 8 - Comptes certifies
-
-Duree estimee : 2 a 3 semaines
-
-### Objectif
-
-Certifier les comptes clients exploitables commercialement.
-
-### Module a creer
-
-```text
-client-certification
-```
-
-### Etats
-
-```text
-draft
-ready_for_review
-rejected
-certified
-```
-
-### Criteres de certification
-
-1. Nom/prenom valide.
-2. Une ou plusieurs adresses.
-3. Un ou plusieurs contacts.
-4. Une commande livree.
-5. Email optionnel.
-6. Categories produits.
-7. Image avant.
-8. Image apres.
-9. Controle anti-doublon.
-10. Validation gestionnaire livraison.
-
-### Controle anti-noms invalides
-
-Bloquer :
-
-```text
-Mme
-Madame
-Monsieur
-Mlle
-Mademoiselle
-noms contenant uniquement des chiffres
-noms trop courts
-doublons evidents
-```
-
-### Livrable
-
-```text
-Les comptes clients deviennent fiables, certifies et reutilisables.
-```
-
-## 11. Phase 9 - Plaintes
+## 10. Phase 8 - Plaintes
 
 Duree estimee : 2 semaines
 
@@ -565,9 +508,8 @@ Ordre prioritaire :
 4. Obligations d'appel.
 5. Files d'action.
 6. Temps de travail.
-7. Comptes certifies.
-8. Plaintes.
-9. Securite avancee.
+7. Plaintes.
+8. Securite avancee.
 
 ## 14. Jalons 90 jours
 
@@ -619,7 +561,6 @@ Erreurs commandes
 ### Jours 70 a 90
 
 ```text
-Comptes certifies
 Plaintes
 Notes client
 Qualite commerciale
@@ -666,7 +607,7 @@ Apres execution du plan, E-GICOP doit permettre :
 4. Une gestion priorisee des actions commerciales.
 5. Une rotation conversationnelle stable.
 6. Une exploitation des prospects, annules et anciennes clientes.
-7. Une meilleure qualite client via plaintes, notes et comptes certifies.
+7. Une meilleure qualite client via plaintes et notes.
 
 Le niveau de maturite cible apres ces phases :
 

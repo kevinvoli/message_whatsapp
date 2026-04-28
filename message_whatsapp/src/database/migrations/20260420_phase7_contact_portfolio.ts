@@ -8,7 +8,6 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * - portfolio_owner_id nullable → les contacts existants ont NULL (non attribués)
  * - client_category nullable → sera rempli par les webhooks entrants commandes
  * - client_order_summary nullable JSON
- * - certification_status nullable
  */
 export class Phase7ContactPortfolio1745100000002 implements MigrationInterface {
   name = 'Phase7ContactPortfolio1745100000002';
@@ -54,20 +53,6 @@ export class Phase7ContactPortfolio1745100000002 implements MigrationInterface {
       );
     }
 
-    const hasCertif = await queryRunner.hasColumn('contact', 'certification_status');
-    if (!hasCertif) {
-      await queryRunner.addColumn(
-        'contact',
-        new TableColumn({
-          name: 'certification_status',
-          type: 'enum',
-          enum: ['non_verifie', 'en_attente', 'certifie', 'rejete'],
-          isNullable: true,
-          default: null,
-        }),
-      );
-    }
-
     const hasOrderClientId = await queryRunner.hasColumn('contact', 'order_client_id');
     if (!hasOrderClientId) {
       await queryRunner.addColumn(
@@ -84,7 +69,7 @@ export class Phase7ContactPortfolio1745100000002 implements MigrationInterface {
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    for (const col of ['portfolio_owner_id', 'client_category', 'client_order_summary', 'certification_status', 'order_client_id']) {
+    for (const col of ['portfolio_owner_id', 'client_category', 'client_order_summary', 'order_client_id']) {
       if (await queryRunner.hasColumn('contact', col)) {
         await queryRunner.dropColumn('contact', col);
       }

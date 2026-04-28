@@ -314,7 +314,6 @@ export type Channel = {
 
 
 export type ClientCategory = 'jamais_commande' | 'commande_sans_livraison' | 'commande_avec_livraison' | 'commande_annulee';
-export type CertificationStatus = 'non_verifie' | 'en_attente' | 'certifie' | 'rejete';
 
 export type Client = {
   id: string;
@@ -338,8 +337,6 @@ export type Client = {
   updatedAt: string;
   // Champs ERP
   client_category?: ClientCategory | null;
-  certification_status?: CertificationStatus | null;
-  certified_at?: string | null;
   order_client_id?: number | null;
   referral_code?: string | null;
   referral_count?: number | null;

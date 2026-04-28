@@ -35,9 +35,8 @@ P3 = amelioration ou extension fonctionnelle
 | E05 | Obligations d'appel | P1 | Jours 35-60 |
 | E06 | Files d'action commerciale | P1 | Jours 50-75 |
 | E07 | Temps de travail et planning | P2 | Jours 50-75 |
-| E08 | Comptes certifies | P2 | Jours 70-90 |
-| E09 | Plaintes | P2 | Jours 70-90 |
-| E10 | Securite utilisateur | P2 | Jours 70-90 |
+| E08 | Plaintes | P2 | Jours 70-90 |
+| E09 | Securite utilisateur | P2 | Jours 70-90 |
 | E11 | Qualite, observabilite et tests | P0 | Continu |
 
 ## 3. Sprint 1 - Rotation conversationnelle stable
@@ -669,62 +668,7 @@ Criteres d'acceptation :
 - La pause respecte les creneaux du groupe.
 - Les exceptions superviseur sont gerees.
 
-## 10. Sprint 8 - Comptes certifies
-
-### E08-T01 - Creer le module `client-certification`
-
-Priorite : P2  
-Estimation : 2 jours
-
-Etats :
-
-```text
-draft
-ready_for_review
-rejected
-certified
-```
-
-Criteres d'acceptation :
-
-- Workflow complet de certification.
-- Lien avec contact, commandes, adresses et produits.
-
-### E08-T02 - Validation anti-noms invalides
-
-Priorite : P2  
-Estimation : 1 jour
-
-Bloquer :
-
-```text
-Mme
-Madame
-Monsieur
-Mlle
-Mademoiselle
-noms uniquement numeriques
-noms trop courts
-doublons evidents
-```
-
-Criteres d'acceptation :
-
-- Validation backend obligatoire.
-- Message d'erreur clair dans le front.
-
-### E08-T03 - Revue gestionnaire livraison
-
-Priorite : P2  
-Estimation : 2 jours
-
-Criteres d'acceptation :
-
-- Un gestionnaire peut confirmer ou rejeter.
-- Le rejet demande une note.
-- Le compte certifie devient reutilisable commercialement.
-
-## 11. Sprint 9 - Plaintes
+## 10. Sprint 8 - Plaintes
 
 ### E09-T01 - Creer le module `complaints`
 
@@ -891,9 +835,8 @@ Criteres d'acceptation :
 5. `E05-T01` a `E05-T05` : obligations d'appel.
 6. `E06-T01` a `E06-T07` : files d'action.
 7. `E07-T01` a `E07-T03` : temps de travail.
-8. `E08-T01` a `E08-T03` : comptes certifies.
-9. `E09-T01` a `E09-T02` : plaintes.
-10. `E10-T01` a `E10-T04` : securite.
+8. `E09-T01` a `E09-T02` : plaintes.
+9. `E10-T01` a `E10-T04` : securite.
 
 ## 15. Definition of Done globale
 
@@ -953,5 +896,5 @@ Files d'action commerciale exploitables pour prospects, annules, inactifs et err
 ### Jalon 6 - Jour 90
 
 ```text
-Comptes certifies, plaintes, securite utilisateur et qualite commerciale en place.
+Plaintes, securite utilisateur et qualite commerciale en place.
 ```

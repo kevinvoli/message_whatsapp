@@ -468,22 +468,6 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
     );
   };
 
-  const certificationBadge = () => {
-    if (!c.certification_status) return null;
-    const colorMap: Record<string, { bg: string; text: string; label: string }> = {
-      non_verifie: { bg: '#f3f4f6', text: '#6b7280', label: 'Non vérifié' },
-      en_attente:  { bg: '#fff7ed', text: '#ea580c', label: 'En attente' },
-      certifie:    { bg: '#ecfdf5', text: '#059669', label: '✓ Certifié' },
-      rejete:      { bg: '#fef2f2', text: '#dc2626', label: 'Rejeté' },
-    };
-    const item = colorMap[c.certification_status] ?? colorMap['non_verifie'];
-    return (
-      <span style={{ background: item.bg, color: item.text, borderRadius: 999, fontSize: 12, fontWeight: 600, padding: '4px 10px', marginLeft: 6 }}>
-        {item.label}
-      </span>
-    );
-  };
-
   const categoryBadge = () => {
     if (!c.client_category) return null;
     const colorMap: Record<string, { bg: string; text: string; label: string }> = {
@@ -525,7 +509,6 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {callStatusBadge()}
             {conversionBadge()}
-            {certificationBadge()}
             {categoryBadge()}
           </div>
         </div>
@@ -649,9 +632,6 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
             )}
             {c.referral_commission != null && (
               <InfoRow label="Commission" value={`${c.referral_commission} FCFA`} />
-            )}
-            {c.certified_at && (
-              <InfoRow label="Certifié le" value={formatDateShort(c.certified_at)} />
             )}
           </div>
         </div>

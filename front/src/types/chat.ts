@@ -347,8 +347,6 @@ export interface Contact {
 
   // Champs intégration ERP (synchronisés via webhook)
   client_category?: 'jamais_commande' | 'commande_sans_livraison' | 'commande_avec_livraison' | 'commande_annulee' | null;
-  certification_status?: 'non_verifie' | 'en_attente' | 'certifie' | 'rejete' | null;
-  certified_at?: string | null;
   order_client_id?: number | null;
   referral_code?: string | null;
   referral_count?: number | null;
