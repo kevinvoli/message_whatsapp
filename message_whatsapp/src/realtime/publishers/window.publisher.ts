@@ -90,6 +90,6 @@ export class WindowPublisher {
       type: 'WINDOW_BLOCK_PROGRESS',
       payload: progress,
     });
-    this.logger.debug(`WINDOW_BLOCK_PROGRESS → poste:${posteId} (${progress.validated}/${progress.total})`);
+    this.logger.debug(`WINDOW_BLOCK_PROGRESS → poste:${posteId} (${progress.submitted}/${progress.total})`);
   }
 }

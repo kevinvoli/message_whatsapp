@@ -28,7 +28,7 @@ export interface WindowReportSubmittedPayload {
 export interface WindowRotationBlockedPayload {
   posteId: string;
   reason: 'quality_check_failed' | 'call_obligations_incomplete';
-  progress: { validated: number; total: number };
+  progress: { submitted: number; total: number };
   obligations?: object | null;
 }
 
@@ -364,7 +364,7 @@ export class WindowRotationService {
         this.eventEmitter.emit(WINDOW_ROTATION_BLOCKED_EVENT, {
           posteId,
           reason,
-          progress: { validated: validatedCount, total: totalRequired },
+          progress: { submitted: validatedCount, total: totalRequired },
           obligations: obligationStatus,
         } satisfies WindowRotationBlockedPayload);
         return;

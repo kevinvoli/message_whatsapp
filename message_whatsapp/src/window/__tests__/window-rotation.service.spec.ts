@@ -1,6 +1,6 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WhatsappChat, WindowStatus, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WindowRotationService, WINDOW_REPORT_SUBMITTED_EVENT } from '../services/window-rotation.service';
+import { WindowRotationService, WINDOW_REPORT_SUBMITTED_EVENT, WINDOW_ROTATED_EVENT } from '../services/window-rotation.service';
 
 function makeChat(overrides: Partial<WhatsappChat> = {}): WhatsappChat {
   return Object.assign(new WhatsappChat(), {
@@ -25,13 +25,12 @@ function makeChatRepo(chats: WhatsappChat[] = []) {
     addOrderBy: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     addSelect: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
     whereInIds: jest.fn().mockReturnThis(),
     execute: jest.fn().mockResolvedValue({}),
-    getMany: jest.fn().mockImplementation(() =>
-      Promise.resolve(chats.filter((c) => c.status === WhatsappChatStatus.FERME && c.window_slot != null)),
-    ),
+    getMany: jest.fn().mockResolvedValue([]),
     getCount: jest.fn().mockResolvedValue(chats.length),
     getRawMany: jest.fn().mockResolvedValue([{ posteId: 'poste-abc' }]),
   };
@@ -61,7 +60,7 @@ function makeValidationEngine() {
     initConversationValidation: jest.fn().mockResolvedValue(undefined),
     initConversationValidationBulk: jest.fn().mockResolvedValue(undefined),
     onConversationResultSet: jest.fn().mockResolvedValue(true),
-    getBlockProgress: jest.fn().mockResolvedValue({ validated: 0, total: 10 }),
+    getBlockProgress: jest.fn().mockResolvedValue({ submitted: 0, total: 10 }),
   } as any;
 }
 
@@ -71,6 +70,7 @@ function makeReportService(submittedChatIds: string[] = []) {
     getSubmittedMapBulk: jest.fn().mockImplementation((chatIds: string[]) =>
       Promise.resolve(new Map(chatIds.map((chatId) => [chatId, submitted.has(chatId)]))),
     ),
+    resetSubmissionBulk: jest.fn().mockResolvedValue(undefined),
   } as any;
 }
 
@@ -78,6 +78,18 @@ function makeEventEmitter() {
   return {
     emit: jest.fn(),
   } as unknown as EventEmitter2;
+}
+
+/** Mock lockService : exécute toujours le callback (verrou toujours acquis). */
+function makeLockService() {
+  return {
+    tryWithLock: jest.fn().mockImplementation(
+      async (_resource: string, _ttl: number, fn: () => Promise<unknown>) => {
+        const result = await fn();
+        return { acquired: true, result };
+      },
+    ),
+  } as any;
 }
 
 function buildService(
@@ -98,6 +110,7 @@ function buildService(
     makeValidationEngine(),
     emitter,
     reportService,
+    makeLockService(),
     opts.obligationService as any,
   );
   return { service, emitter, reportService };
@@ -194,15 +207,16 @@ describe('WindowRotationService', () => {
       expect(performRotation).not.toHaveBeenCalled();
     });
 
-    it('ignore les obligations d appel pour decider la rotation', async () => {
+    it('declenche la rotation meme si obligation service est actif et readyForRotation est vrai', async () => {
       const chats = Array.from({ length: 10 }, (_, idx) =>
         makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
       );
       const repo = makeChatRepo(chats);
+      // L'obligation service est activé mais autorise la rotation (readyForRotation=true).
       const obligationService = {
-        isEnabled: jest.fn().mockReturnValue(true),
-        checkAndRecordQuality: jest.fn(),
-        isPosteReadyForRotation: jest.fn(),
+        isEnabled: jest.fn().mockResolvedValue(true),
+        getStatus: jest.fn().mockResolvedValue({ readyForRotation: true }),
+        getOrCreateActiveBatch: jest.fn().mockResolvedValue({}),
       };
       const { service } = buildService(repo, {
         quotaActive: 10,
@@ -216,9 +230,6 @@ describe('WindowRotationService', () => {
       await service.checkAndTriggerRotation('poste-abc');
 
       expect(performRotation).toHaveBeenCalledWith('poste-abc');
-      expect(obligationService.isEnabled).not.toHaveBeenCalled();
-      expect(obligationService.checkAndRecordQuality).not.toHaveBeenCalled();
-      expect(obligationService.isPosteReadyForRotation).not.toHaveBeenCalled();
     });
   });
 
@@ -230,16 +241,18 @@ describe('WindowRotationService', () => {
       expect(repo.findOne).not.toHaveBeenCalled();
     });
 
-    it('libere le slot quand la conversation est fermee', async () => {
+    it('conserve le slot et verifie la rotation quand la conversation est fermee', async () => {
+      // La conv FERMÉ conserve son slot — checkAndTriggerRotation est appelé.
+      // La libération (batchRelease) n'intervient qu'au moment de la rotation complète du bloc.
       const chat = makeChat({ window_slot: 3, window_status: WindowStatus.ACTIVE });
       const repo = makeChatRepo([chat]);
       repo.findOne.mockResolvedValue(chat);
       const { service } = buildService(repo);
+      const check = jest.spyOn(service, 'checkAndTriggerRotation').mockResolvedValue(undefined);
+
       await service.handleConversationStatusChanged({ chatId: chat.chat_id, newStatus: 'fermé' });
-      expect(repo.update).toHaveBeenCalledWith(
-        { id: chat.id },
-        { window_slot: null, window_status: WindowStatus.RELEASED, is_locked: false },
-      );
+
+      expect(check).toHaveBeenCalledWith(chat.poste_id);
     });
 
     it('ne libere pas immediatement une conversation fermee dont le rapport est soumis', async () => {
@@ -299,6 +312,133 @@ describe('WindowRotationService', () => {
       await service.autoCheckRotations();
 
       expect(check).toHaveBeenCalledWith('poste-abc');
+    });
+  });
+
+  // ─── E01-T05 : scénarios rotation bloc de 10 ────────────────────────────────
+
+  describe('E01-T05 rotation bloc de 10', () => {
+    it('9 rapports soumis sur 10 ne declenchent pas la rotation', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
+      );
+      // Seulement 9 des 10 conversations ont un rapport soumis.
+      const submittedChatIds = chats.slice(0, 9).map((c) => c.chat_id);
+      const repo = makeChatRepo(chats);
+      const { service } = buildService(repo, { quotaActive: 10, submittedChatIds });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(performRotation).not.toHaveBeenCalled();
+    });
+
+    it('10 conversations actives avec rapports soumis declenchent l emission WINDOW_ROTATED', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
+      );
+      const allChatIds = chats.map((c) => c.chat_id);
+
+      // reportService : toutes les convs actives sont soumises ; find() retourne le bloc actif.
+      const reportService = makeReportService(allChatIds);
+      const repo = makeChatRepo(chats);
+      // find() pour le bloc actif, pour le bloc restant après libération, et pour les candidats.
+      // On retourne une liste vide pour les candidats d'injection (pas d'injection).
+      repo.find
+        .mockResolvedValueOnce(chats)   // bloc actif initial
+        .mockResolvedValueOnce(chats)   // recheck après compactage (même chats)
+        .mockResolvedValueOnce([])      // remaining après batchRelease
+        .mockResolvedValue([]);         // injection — aucun candidat
+
+      const { service, emitter } = buildService(repo, { quotaActive: 10, reportService });
+
+      await service.performRotation('poste-abc');
+
+      expect(emitter.emit).toHaveBeenCalledWith(
+        WINDOW_ROTATED_EVENT,
+        expect.objectContaining({
+          posteId: 'poste-abc',
+          releasedChatIds: expect.arrayContaining(allChatIds),
+        }),
+      );
+    });
+
+    it('10 conversations fermees avec rapports soumis declenchent la rotation', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({
+          window_slot: idx + 1,
+          window_status: WindowStatus.ACTIVE,
+          status: WhatsappChatStatus.FERME,
+        }),
+      );
+      const repo = makeChatRepo(chats);
+      const { service } = buildService(repo, {
+        quotaActive: 10,
+        submittedChatIds: chats.map((c) => c.chat_id),
+      });
+      const performRotation = jest
+        .spyOn(service, 'performRotation')
+        .mockResolvedValue({ releasedChatIds: [], promotedChatIds: [] });
+
+      await service.checkAndTriggerRotation('poste-abc');
+
+      expect(performRotation).toHaveBeenCalledWith('poste-abc');
+    });
+
+    it('les conversations relachees ne reapparaissent pas dans la fenetre apres rotation', async () => {
+      const releasedChats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
+      );
+      const allSubmitted = releasedChats.map((c) => c.chat_id);
+      const reportService = makeReportService(allSubmitted);
+      const repo = makeChatRepo(releasedChats);
+      // Après libération, find() pour les remaining ne retourne aucune conv (toutes relâchées).
+      // find() pour les candidats d'injection ne retourne pas les releasedChats.
+      repo.find
+        .mockResolvedValueOnce(releasedChats)   // bloc actif initial
+        .mockResolvedValueOnce(releasedChats)   // recheck après compactage
+        .mockResolvedValueOnce([])              // remaining vide après batchRelease
+        .mockResolvedValue([]);                 // aucun candidat d'injection
+
+      const { service } = buildService(repo, { quotaActive: 10, reportService });
+
+      const result = await service.performRotation('poste-abc');
+
+      // Les conversations libérées ne doivent pas être dans promotedChatIds.
+      const releasedSet = new Set(allSubmitted);
+      for (const chatId of result.promotedChatIds) {
+        expect(releasedSet.has(chatId)).toBe(false);
+      }
+      expect(result.releasedChatIds).toEqual(expect.arrayContaining(allSubmitted));
+    });
+
+    it('emets WINDOW_ROTATED avec la liste exacte des releasedChatIds', async () => {
+      const chats = Array.from({ length: 10 }, (_, idx) =>
+        makeChat({ window_slot: idx + 1, window_status: WindowStatus.ACTIVE }),
+      );
+      const submittedIds = chats.slice(0, 5).map((c) => c.chat_id);
+      const remainingChats = chats.slice(5);
+      const reportService = makeReportService(submittedIds);
+      const repo = makeChatRepo(chats);
+      repo.find
+        .mockResolvedValueOnce(chats)          // bloc actif initial
+        .mockResolvedValueOnce(chats)          // recheck après compactage
+        .mockResolvedValueOnce(remainingChats) // remaining après batchRelease
+        .mockResolvedValue([]);                // aucun candidat d'injection
+
+      const { service, emitter } = buildService(repo, { quotaActive: 10, reportService });
+
+      await service.performRotation('poste-abc');
+
+      const rotatedCall = (emitter.emit as jest.Mock).mock.calls.find(
+        ([event]) => event === WINDOW_ROTATED_EVENT,
+      );
+      expect(rotatedCall).toBeDefined();
+      const payload = rotatedCall![1];
+      expect(payload.releasedChatIds).toHaveLength(submittedIds.length);
+      expect(payload.releasedChatIds).toEqual(expect.arrayContaining(submittedIds));
     });
   });
 });

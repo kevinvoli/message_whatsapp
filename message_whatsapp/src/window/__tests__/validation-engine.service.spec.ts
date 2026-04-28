@@ -201,7 +201,7 @@ describe('ValidationEngineService', () => {
     it('retourne 0/0 si aucune conversation active', async () => {
       build([], [], []);
       const progress = await service.getBlockProgress('poste-abc');
-      expect(progress.validated).toBe(0);
+      expect(progress.submitted).toBe(0);
     });
 
     it('retourne N/total avec conversations actives et validées', async () => {
@@ -217,7 +217,7 @@ describe('ValidationEngineService', () => {
         makeReportService([activeSubmitted.chat_id]),
       );
       const progress = await service.getBlockProgress('poste-abc');
-      expect(progress.validated).toBe(1);
+      expect(progress.submitted).toBe(1);
       expect(progress.total).toBe(2);
     });
   });
