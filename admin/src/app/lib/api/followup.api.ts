@@ -65,11 +65,11 @@ export async function completeFollowUpAdmin(
   return handleResponse<FollowUp>(response);
 }
 
-export async function cancelFollowUpAdmin(id: string): Promise<FollowUp> {
+export async function cancelFollowUpAdmin(id: string, reason?: string): Promise<FollowUp> {
   const response = await fetch(`${API_BASE_URL}/follow-ups/${id}/cancel`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify(reason ? { reason } : {}),
     credentials: 'include',
   });
   return handleResponse<FollowUp>(response);

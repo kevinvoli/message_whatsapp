@@ -53,6 +53,7 @@ export class FollowUpReminderService {
         notes:        followUp.notes ?? null,
       };
 
+      this.logger.log(`FOLLOW_UP_REMINDER_SENT id=${followUp.id} commercial=${followUp.commercial_id} type=${followUp.type}`);
       this.eventEmitter.emit(FOLLOW_UP_REMINDER_EVENT, payload);
     }
 

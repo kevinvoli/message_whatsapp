@@ -145,6 +145,17 @@ function FollowUpCard({ followUp, onComplete, onCancel }: CardProps) {
         <p className="text-xs text-gray-500 italic">{followUp.notes}</p>
       )}
 
+      {followUp.status === 'annulee' && (
+        <div className="text-xs text-gray-400 space-y-0.5">
+          {followUp.cancelled_by && (
+            <p>Annulée par : <span className="font-medium text-gray-600">{followUp.cancelled_by}</span></p>
+          )}
+          {followUp.cancel_reason && (
+            <p>Motif : <span className="italic text-gray-500">{followUp.cancel_reason}</span></p>
+          )}
+        </div>
+      )}
+
       {!isDone && (
         <div className="flex gap-2 pt-1">
           <button

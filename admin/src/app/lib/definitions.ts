@@ -1072,6 +1072,9 @@ export interface FollowUp {
   status: FollowUpStatus;
   scheduled_at: string;
   completed_at?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
   result?: string | null;
   notes?: string | null;
   createdAt: string;
