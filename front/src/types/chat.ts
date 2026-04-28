@@ -80,7 +80,7 @@ export interface FollowUp {
   updatedAt: string;
 }
 
-export type ViewMode = 'conversations' | 'contacts' | 'relances' | 'objectifs' | 'ranking' | 'menus-metier' | 'action-queue'
+export type ViewMode = 'conversations' | 'contacts' | 'relances' | 'objectifs' | 'ranking' | 'menus-metier' | 'action-queue' | 'dashboard'
 
 export type Priority = "haute" | "moyenne" | "basse";
 

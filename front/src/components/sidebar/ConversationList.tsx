@@ -55,7 +55,7 @@ export default function ConversationList({
                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-red-500" />
                 <span>
                   <span className="font-semibold">
-                    {blockProgress.validated}/{blockProgress.total} rapports soumis - rotation bloquee.
+                    {blockProgress.submitted}/{blockProgress.total} rapports soumis - rotation bloquee.
                   </span>{' '}
                   {ROTATION_BLOCKED_LABELS[rotationBlocked.reason] ?? 'Vérifiez les conditions de rotation.'}
                 </span>

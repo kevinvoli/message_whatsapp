@@ -8,9 +8,9 @@ export default function BlockProgressBar() {
 
   if (!blockProgress || blockProgress.total === 0) return null;
 
-  const { validated, total } = blockProgress;
-  const pct = Math.round((validated / total) * 100);
-  const allDone = validated >= total;
+  const { submitted, total } = blockProgress;
+  const pct = Math.round((submitted / total) * 100);
+  const allDone = submitted >= total;
 
   if (windowRotating) {
     return (
@@ -38,7 +38,7 @@ export default function BlockProgressBar() {
           Bloc en cours
         </span>
         <span className={`text-xs font-semibold ${allDone ? 'text-green-600' : 'text-gray-700'}`}>
-          {validated} / {total}
+          {submitted} / {total}
         </span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">

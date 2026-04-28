@@ -21,7 +21,7 @@ export interface ConversationCursor {
 let typingTimeout: NodeJS.Timeout;
 
 export interface BlockProgress {
-  validated: number;
+  submitted: number;
   total: number;
 }
 
@@ -90,7 +90,7 @@ export const createConversationSlice: StateCreator<
   isLoadingMoreConversations: false,
   conversationCursor: null,
   currentSearch: '',
-  blockProgress: { validated: 0, total: 10 },
+  blockProgress: { submitted: 0, total: 10 },
   windowRotating: false,
   releasingChatIds: [],
   rotationBlocked: null,

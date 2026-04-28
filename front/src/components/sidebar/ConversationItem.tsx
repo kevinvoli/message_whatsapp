@@ -143,7 +143,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         .reduce((sum, k) => sum + Math.max(0, obligationStatus[k].required - obligationStatus[k].done), 0)
     : 0;
   const remainingConvs = isLocked
-    ? Math.max(0, blockProgress.total - blockProgress.validated)
+    ? Math.max(0, blockProgress.total - blockProgress.submitted)
     : 0;
 
   return (
@@ -302,7 +302,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
                 <span>
                   <span className="font-bold text-blue-300">{remainingConvs}</span>
                   {' '}conversation{remainingConvs > 1 ? 's' : ''} a finaliser
-                  {' '}({blockProgress.validated}/{blockProgress.total} rapports soumis)
+                  {' '}({blockProgress.submitted}/{blockProgress.total} rapports soumis)
                 </span>
               </div>
             )}

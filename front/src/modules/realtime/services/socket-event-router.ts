@@ -120,7 +120,7 @@ export function handleChatEvent(
 
       // Mise à jour de la progression du bloc si incluse dans le payload
       if (isNewFormat && raw.blockProgress) {
-        chatState.setBlockProgress(raw.blockProgress as { validated: number; total: number });
+        chatState.setBlockProgress(raw.blockProgress as { submitted: number; total: number });
       }
       break;
     }
@@ -130,7 +130,7 @@ export function handleChatEvent(
       break;
 
     case 'WINDOW_BLOCK_PROGRESS': {
-      const progress = data.payload as { validated: number; total: number };
+      const progress = data.payload as { submitted: number; total: number };
       chatState.setBlockProgress(progress);
       break;
     }
@@ -159,7 +159,7 @@ export function handleChatEvent(
     case 'WINDOW_ROTATION_BLOCKED': {
       const { reason, progress, obligations } = data.payload as {
         reason: 'quality_check_failed' | 'call_obligations_incomplete';
-        progress: { validated: number; total: number };
+        progress: { submitted: number; total: number };
         obligations?: import('@/store/chatStore').ObligationStatus | null;
       };
       chatState.setBlockProgress(progress);

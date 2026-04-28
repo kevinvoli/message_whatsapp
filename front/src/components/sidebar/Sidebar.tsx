@@ -17,6 +17,7 @@ import BusinessMenusPanel from './BusinessMenusPanel';
 import PrioritePostePanel from './PrioritePostePanel';
 import ActionGateBanner from './ActionGateBanner';
 import ActionQueuePanel from './ActionQueuePanel';
+import DashboardPanel from './DashboardPanel';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -121,6 +122,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         <BusinessMenusPanel />
       ) : viewMode === 'action-queue' ? (
         <ActionQueuePanel />
+      ) : viewMode === 'dashboard' ? (
+        <DashboardPanel />
       ) : (
         <FollowUpPanel />
       )}

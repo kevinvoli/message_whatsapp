@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Target, Trophy, Briefcase, ListTodo } from 'lucide-react';
+import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, BarChart2, Trophy, Briefcase, ListTodo } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
 
 interface UserHeaderProps {
@@ -139,16 +139,16 @@ export default function UserHeader({
                     {/* Ligne 2 : Objectifs · Rang · Métier */}
                     <div className="bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
                         <button
-                            onClick={() => handleViewChange('objectifs')}
-                            title="Objectifs"
+                            onClick={() => handleViewChange('dashboard')}
+                            title="Tableau de bord"
                             className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
-                                viewMode === 'objectifs'
+                                viewMode === 'dashboard' || viewMode === 'objectifs'
                                     ? 'bg-white text-green-700 shadow-md font-medium'
                                     : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
                             }`}
                         >
-                            <Target className="w-4 h-4" />
-                            <span className="text-[10px] mt-0.5 leading-none">Objectifs</span>
+                            <BarChart2 className="w-4 h-4" />
+                            <span className="text-[10px] mt-0.5 leading-none">Dashboard</span>
                         </button>
                         <button
                             onClick={() => handleViewChange('ranking')}

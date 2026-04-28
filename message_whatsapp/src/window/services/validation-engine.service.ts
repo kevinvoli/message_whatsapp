@@ -22,7 +22,7 @@ export interface ConversationValidationState {
 }
 
 export interface BlockProgress {
-  validated: number;
+  submitted: number;
   total: number;
 }
 
@@ -221,13 +221,13 @@ export class ValidationEngineService {
       select: ['chat_id'],
     });
 
-    if (activeChats.length === 0) return { validated: 0, total: 0 };
+    if (activeChats.length === 0) return { submitted: 0, total: 0 };
 
     const submittedMap = await this.reportService.getSubmittedMapBulk(
       activeChats.map((c) => c.chat_id),
     );
     const submitted = activeChats.filter((c) => submittedMap.get(c.chat_id) === true).length;
-    return { validated: submitted, total: activeChats.length };
+    return { submitted, total: activeChats.length };
   }
 
   /**
