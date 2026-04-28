@@ -1,6 +1,10 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class UpdateDispatchSettingsDto {
+  @IsOptional()
+  @IsIn(['least_loaded', 'round_robin'])
+  queue_mode?: 'least_loaded' | 'round_robin';
+
   @IsOptional()
   @IsInt()
   @Min(1)

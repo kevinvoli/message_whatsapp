@@ -12,6 +12,14 @@ export class DispatchSettings {
   id: string;
 
   @Column({
+    name: 'queue_mode',
+    type: 'varchar',
+    length: 20,
+    default: 'least_loaded',
+  })
+  queue_mode: 'least_loaded' | 'round_robin';
+
+  @Column({
     name: 'no_reply_reinject_interval_minutes',
     type: 'int',
     default: 5,

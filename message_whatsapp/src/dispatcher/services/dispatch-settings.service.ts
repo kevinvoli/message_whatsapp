@@ -6,6 +6,7 @@ import { DispatchSettingsAudit } from '../entities/dispatch-settings-audit.entit
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 
 const DEFAULTS = {
+  queue_mode: 'least_loaded' as const,
   no_reply_reinject_interval_minutes: 5,
   read_only_check_interval_minutes: 10,
   offline_reinject_cron: '0 9 * * *',

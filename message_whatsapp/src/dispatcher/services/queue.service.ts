@@ -15,6 +15,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { DispatchSettingsService } from './dispatch-settings.service';
 
 @Injectable()
 export class QueueService implements OnModuleInit {
@@ -38,6 +39,8 @@ export class QueueService implements OnModuleInit {
     private readonly channelRepository: Repository<WhapiChannel>,
 
     private readonly dataSource: DataSource,
+
+    private readonly dispatchSettingsService: DispatchSettingsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -197,39 +200,51 @@ export class QueueService implements OnModuleInit {
 
       const candidates = allPositions.filter((qp) => qp.poste && !dedicatedSet.has(qp.poste_id));
 
-      // ─── ÉTAPE 1 : stratégie normale via queue_positions ─────────────────────
+      // ─── ÉTAPE 1 : stratégie via queue_positions ──────────────────────────────
       if (candidates.length > 0) {
-        const posteIds = candidates.map((qp) => qp.poste_id);
-        const chatCounts = await this.chatRepository
-          .createQueryBuilder('chat')
-          .select('chat.poste_id', 'poste_id')
-          .addSelect('COUNT(*)', 'count')
-          .where('chat.poste_id IN (:...posteIds)', { posteIds })
-          .andWhere('chat.status IN (:...statuses)', {
-            statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
-          })
-          .groupBy('chat.poste_id')
-          .getRawMany<{ poste_id: string; count: string }>();
-
-        const countMap = new Map<string, number>();
-        for (const row of chatCounts) {
-          countMap.set(row.poste_id, parseInt(row.count, 10));
-        }
+        const settings = await this.dispatchSettingsService.getSettings();
+        const queueMode = settings.queue_mode ?? 'least_loaded';
 
         let best = candidates[0];
-        let bestCount = countMap.get(best.poste_id) ?? 0;
 
-        for (let i = 1; i < candidates.length; i++) {
-          const count = countMap.get(candidates[i].poste_id) ?? 0;
-          if (count < bestCount) {
-            best = candidates[i];
-            bestCount = count;
+        if (queueMode === 'round_robin') {
+          // Round-robin pur : toujours le premier de la queue
+          this.logger.debug(
+            `Poste selectionne (round-robin): ${best.poste.name} (${best.poste.id})`,
+          );
+        } else {
+          // Least-loaded : poste avec le moins de chats actifs/en-attente
+          const posteIds = candidates.map((qp) => qp.poste_id);
+          const chatCounts = await this.chatRepository
+            .createQueryBuilder('chat')
+            .select('chat.poste_id', 'poste_id')
+            .addSelect('COUNT(*)', 'count')
+            .where('chat.poste_id IN (:...posteIds)', { posteIds })
+            .andWhere('chat.status IN (:...statuses)', {
+              statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+            })
+            .groupBy('chat.poste_id')
+            .getRawMany<{ poste_id: string; count: string }>();
+
+          const countMap = new Map<string, number>();
+          for (const row of chatCounts) {
+            countMap.set(row.poste_id, parseInt(row.count, 10));
           }
+
+          let bestCount = countMap.get(best.poste_id) ?? 0;
+          for (let i = 1; i < candidates.length; i++) {
+            const count = countMap.get(candidates[i].poste_id) ?? 0;
+            if (count < bestCount) {
+              best = candidates[i];
+              bestCount = count;
+            }
+          }
+
+          this.logger.debug(
+            `Poste selectionne (least-loaded): ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs`,
+          );
         }
 
-        this.logger.debug(
-          `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs`,
-        );
         await this.moveToEndInternal(best.poste_id);
         return best.poste;
       }

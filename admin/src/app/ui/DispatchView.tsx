@@ -77,6 +77,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
 
   const [loading, setLoading] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
+  const [savingQueue, setSavingQueue] = useState(false);
   const [redispatching, setRedispatching] = useState(false);
   const [resettingStuck, setResettingStuck] = useState(false);
 
@@ -176,6 +177,25 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       });
     } finally {
       setResettingStuck(false);
+    }
+  };
+
+  // ── Sauvegarde mode queue ──────────────────────────────────────────────────
+
+  const handleSaveQueueMode = async () => {
+    if (!settings) return;
+    try {
+      setSavingQueue(true);
+      const saved = await updateDispatchSettings({ queue_mode: settings.queue_mode });
+      setSettings(saved);
+      addToast({ type: 'success', message: 'Mode de dispatch sauvegardé.' });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur sauvegarde mode dispatch.',
+      });
+    } finally {
+      setSavingQueue(false);
     }
   };
 
@@ -329,6 +349,58 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                 </button>
               </div>
             </div>
+          {/* ── Mode de dispatch ── */}
+          {settings && (
+            <div className="border-b border-gray-100 px-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Mode de dispatch</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Définit comment le prochain poste est choisi à chaque nouveau message.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveQueueMode()}
+                  disabled={savingQueue}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:bg-emerald-300"
+                >
+                  {savingQueue ? 'Sauvegarde...' : 'Sauvegarder'}
+                </button>
+              </div>
+              <div className="mt-3 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSettings({ ...settings, queue_mode: 'least_loaded' })}
+                  className={`flex-1 rounded-lg border-2 px-4 py-3 text-left transition-colors ${
+                    settings.queue_mode === 'least_loaded'
+                      ? 'border-slate-900 bg-slate-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-gray-900">Moins chargé</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Envoie chaque nouveau message au poste ayant le moins de conversations actives.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettings({ ...settings, queue_mode: 'round_robin' })}
+                  className={`flex-1 rounded-lg border-2 px-4 py-3 text-left transition-colors ${
+                    settings.queue_mode === 'round_robin'
+                      ? 'border-slate-900 bg-slate-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-gray-900">Tour à tour</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Envoie les messages en rotation stricte : chaque poste reçoit à son tour, quelle que soit sa charge.
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="max-h-[480px] overflow-y-auto">
             {snapshot?.waiting_items?.length ? (
               <table className="w-full text-sm">
