@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -11,6 +11,7 @@ import { CommercialActionGateService } from './commercial-action-gate.service';
 import { CommercialActionGateController } from './commercial-action-gate.controller';
 import { CommercialActionGateGuard } from './commercial-action-gate.guard';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([WhatsappCommercial, WhatsappChat, WhatsappMessage, ConversationReport, FollowUp]),

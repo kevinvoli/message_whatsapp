@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { WhatsappChatController } from './whatsapp_chat.controller';
 import { WhatsappChatGateway } from './whatsapp_chat.gateway';
@@ -15,7 +15,6 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ConversationReadQueryService } from 'src/conversations/infrastructure/conversation-read-query.service';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
-import { CommercialActionGateModule } from 'src/commercial-action-gate/commercial-action-gate.module';
 
 /**
  * TICKET-06-B — ConversationReadQueryService enregistré ici.
@@ -34,7 +33,6 @@ import { CommercialActionGateModule } from 'src/commercial-action-gate/commercia
       WhapiChannel,
     ]),
     ConversationCapacityModule,
-    forwardRef(() => CommercialActionGateModule),
   ],
   controllers: [WhatsappChatController],
   providers: [
