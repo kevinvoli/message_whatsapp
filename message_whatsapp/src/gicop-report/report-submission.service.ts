@@ -10,6 +10,7 @@ import { ContactPhone } from 'src/client-dossier/entities/contact-phone.entity';
 import { ClientDossier } from 'src/client-dossier/entities/client-dossier.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { IntegrationOutboxService } from 'src/integration-outbox/integration-outbox.service';
+import { FollowUpService } from 'src/follow-up/follow_up.service';
 
 export interface SubmissionResult {
   status: 'sent' | 'pending' | 'failed';
@@ -36,6 +37,7 @@ export class ReportSubmissionService {
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly outboxService: IntegrationOutboxService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly followUpService: FollowUpService,
   ) {}
 
   async submitReport(chatId: string, commercialId: string): Promise<SubmissionResult> {
@@ -81,7 +83,7 @@ export class ReportSubmissionService {
     const [commercial, contact, chat] = await Promise.all([
       this.commercialRepo.findOne({ where: { id: commercialId }, select: ['name', 'phone', 'email'] }),
       this.contactRepo.findOne({ where: { chat_id: chatId }, select: ['id', 'phone'] }),
-      this.chatRepo.findOne({ where: { chat_id: chatId }, select: ['contact_client', 'poste_id'] }),
+      this.chatRepo.findOne({ where: { chat_id: chatId }, select: ['id', 'contact_client', 'poste_id'] }),
     ]);
 
     const extraPhones = contact
@@ -138,6 +140,23 @@ export class ReportSubmissionService {
     }
     if (chat?.poste_id) {
       this.eventEmitter.emit('conversation.result_set', { chatId, posteId: chat.poste_id });
+    }
+
+    // ── Créer/mettre à jour la relance si followUpAt renseigné ───────────────
+    if (isFirstSubmission && report.followUpAt && contact?.id) {
+      try {
+        await this.followUpService.upsertFromDossierOrReport({
+          contact_id:      contact.id,
+          conversation_id: chat?.id ?? null,
+          commercial_id:   commercialId,
+          commercial_name: commercial?.name ?? null,
+          scheduled_at:    report.followUpAt,
+          next_action:     report.nextAction ?? null,
+          notes:           report.notes ?? null,
+        });
+      } catch (err) {
+        this.logger.warn(`follow-up upsert échoué chat=${chatId}: ${(err as Error).message}`);
+      }
     }
 
     this.logger.log(`REPORT_SUBMITTED chat=${chatId} → outbox enqueued (worker prendra en charge DB2 sync)`);

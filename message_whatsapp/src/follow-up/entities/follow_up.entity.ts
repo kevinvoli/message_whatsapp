@@ -60,6 +60,15 @@ export class FollowUp {
   @Column({ name: 'reminded_at', type: 'timestamp', nullable: true, default: null })
   reminded_at?: Date | null;
 
+  @Column({ name: 'cancelled_at', type: 'timestamp', nullable: true, default: null })
+  cancelled_at?: Date | null;
+
+  @Column({ name: 'cancelled_by', type: 'varchar', length: 200, nullable: true, default: null })
+  cancelled_by?: string | null;
+
+  @Column({ name: 'cancel_reason', type: 'varchar', length: 255, nullable: true, default: null })
+  cancel_reason?: string | null;
+
   @Column({ name: 'result', type: 'varchar', length: 255, nullable: true })
   result?: string | null;
 

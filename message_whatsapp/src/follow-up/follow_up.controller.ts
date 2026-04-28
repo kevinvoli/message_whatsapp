@@ -12,6 +12,7 @@ import {
 import { FollowUpService } from './follow_up.service';
 import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { CompleteFollowUpDto } from './dto/complete-follow-up.dto';
+import { CancelFollowUpDto } from './dto/cancel-follow-up.dto';
 import { FollowUpStatus } from './entities/follow_up.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminGuard } from 'src/auth/admin.guard';
@@ -74,9 +75,10 @@ export class FollowUpController {
   @UseGuards(AuthGuard('jwt'))
   cancel(
     @Param('id') id: string,
+    @Body() dto: CancelFollowUpDto,
     @Request() req: { user: JwtUser },
   ) {
-    return this.service.cancel(id, req.user.userId);
+    return this.service.cancel(id, req.user.userId, req.user.name ?? 'Commercial', dto.reason);
   }
 
   /** Relances d'un contact spécifique */
@@ -97,6 +99,8 @@ export class FollowUpController {
     @Query('status') status?: FollowUpStatus,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     return this.service.findAllAdmin(
       contact_id,
@@ -104,6 +108,8 @@ export class FollowUpController {
       status,
       limit ? Math.min(parseInt(limit, 10), 200) : 50,
       offset ? parseInt(offset, 10) : 0,
+      from,
+      to,
     );
   }
 

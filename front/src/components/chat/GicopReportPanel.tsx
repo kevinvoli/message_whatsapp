@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, ChevronDown, ChevronUp, ClipboardList, Loader2, Phone, Plus, Save, Send, Star, Trash2, X } from 'lucide-react';
+import { Bell, CheckCircle, ChevronDown, ChevronUp, ClipboardList, Loader2, Phone, Plus, Save, Send, Star, Trash2, X } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
+import CreateFollowUpModal from './CreateFollowUpModal';
 
 type SubmissionStatus = 'pending' | 'sent' | 'failed' | null;
 
@@ -125,6 +126,7 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
   const [submitting, setSubmitting]             = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>(null);
   const [submissionError, setSubmissionError]   = useState<string | null>(null);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 
   // Charger le statut de soumission
   const loadSubmissionStatus = useCallback(() => {
@@ -507,19 +509,35 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
       </div>
 
       {/* Footer — bouton enregistrer explicite */}
-      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-3">
-        <span className="text-xs text-gray-400">
-          {saved && !dirty ? '✓ Enregistré' : dirty ? 'Modifications non sauvegardées' : ''}
+      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-2">
+        <button
+          onClick={() => setShowFollowUpModal(true)}
+          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 border border-green-200 bg-green-50 rounded-lg hover:bg-green-100 transition-colors flex-shrink-0"
+          title="Planifier une relance pour ce contact"
+        >
+          <Bell className="w-3.5 h-3.5" />
+          Relance
+        </button>
+        <span className="text-xs text-gray-400 flex-1 text-center truncate">
+          {saved && !dirty ? '✓ Enregistré' : dirty ? 'Non sauvegardé' : ''}
         </span>
         <button
           onClick={() => void handleSave()}
           disabled={saving || !dirty}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
         >
           <Save className="w-3.5 h-3.5" />
           {saving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
+
+      {showFollowUpModal && (
+        <CreateFollowUpModal
+          contactId={contact?.id}
+          onClose={() => setShowFollowUpModal(false)}
+          onDone={() => setShowFollowUpModal(false)}
+        />
+      )}
     </div>
   );
 }

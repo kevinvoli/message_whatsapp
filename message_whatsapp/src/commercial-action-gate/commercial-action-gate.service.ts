@@ -235,8 +235,10 @@ export class CommercialActionGateService {
     return this.followUpRepo
       .createQueryBuilder('f')
       .where('f.commercial_id = :id', { id: commercialId })
-      .andWhere('f.status = :status', { status: FollowUpStatus.PLANIFIEE })
-      .andWhere('f.scheduled_at < :now', { now: new Date() })
+      .andWhere(
+        '(f.status = :overdue OR (f.status = :planifiee AND f.scheduled_at < :now))',
+        { overdue: FollowUpStatus.EN_RETARD, planifiee: FollowUpStatus.PLANIFIEE, now: new Date() },
+      )
       .andWhere('f.deleted_at IS NULL')
       .getCount();
   }

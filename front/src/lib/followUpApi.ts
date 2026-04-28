@@ -31,7 +31,20 @@ export async function completeFollowUp(
   return r.data;
 }
 
-export async function cancelFollowUp(id: string): Promise<FollowUp> {
-  const r = await axios.patch(`${base}/follow-ups/${id}/cancel`, {}, headers());
+export async function cancelFollowUp(id: string, reason?: string): Promise<FollowUp> {
+  const r = await axios.patch(`${base}/follow-ups/${id}/cancel`, reason ? { reason } : {}, headers());
+  return r.data;
+}
+
+export interface CreateFollowUpData {
+  contact_id?: string;
+  conversation_id?: string;
+  type: string;
+  scheduled_at: string;
+  notes?: string;
+}
+
+export async function createFollowUp(data: CreateFollowUpData): Promise<FollowUp> {
+  const r = await axios.post(`${base}/follow-ups`, data, headers());
   return r.data;
 }

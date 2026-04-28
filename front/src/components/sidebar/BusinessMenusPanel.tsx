@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Briefcase, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Bell, Briefcase, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
 import WorkSchedulePanel from './WorkSchedulePanel';
 import AttendancePanel from './AttendancePanel';
+import CreateFollowUpModal from '@/components/chat/CreateFollowUpModal';
+import { FollowUpType } from '@/types/chat';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -39,12 +41,19 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 // ─── Composant contact card ─────────────────────────────────────────────────
 
+const TAB_TYPE_MAP: Record<BizTab, FollowUpType> = {
+  prospects: 'relance_sans_commande',
+  annulee:   'relance_post_annulation',
+  anciennes: 'relance_fidelisation',
+};
+
 interface ContactCardProps {
   contact: BizContact;
   onOpenConversation: (chatId: string) => void;
+  onPlanRelance: () => void;
 }
 
-function ContactCard({ contact, onOpenConversation }: ContactCardProps) {
+function ContactCard({ contact, onOpenConversation, onPlanRelance }: ContactCardProps) {
   return (
     <div className="px-3 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
       <div className="flex items-start justify-between gap-2">
@@ -61,6 +70,13 @@ function ContactCard({ contact, onOpenConversation }: ContactCardProps) {
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={onPlanRelance}
+            title="Planifier une relance"
+            className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+          >
+            <Bell className="w-3.5 h-3.5" />
+          </button>
           {contact.chat_id && (
             <button
               onClick={() => onOpenConversation(contact.chat_id!)}
@@ -85,6 +101,7 @@ export default function BusinessMenusPanel() {
   const [counts, setCounts]       = useState<Record<BizTab, number>>({ prospects: 0, annulee: 0, anciennes: 0 });
   const [loading, setLoading]     = useState<Record<BizTab, boolean>>({ prospects: false, annulee: false, anciennes: false });
   const [expanded, setExpanded]   = useState<Record<BizTab, boolean>>({ prospects: true, annulee: true, anciennes: true });
+  const [followUpModal, setFollowUpModal] = useState<{ contactId: string; defaultType: FollowUpType } | null>(null);
 
   const selectConversation = useChatStore((s) => s.selectConversation);
 
@@ -204,6 +221,7 @@ export default function BusinessMenusPanel() {
                     key={contact.id}
                     contact={contact}
                     onOpenConversation={handleOpenConversation}
+                    onPlanRelance={() => setFollowUpModal({ contactId: contact.id, defaultType: TAB_TYPE_MAP[tab as BizTab] })}
                   />
                 ))}
               </>
@@ -211,6 +229,15 @@ export default function BusinessMenusPanel() {
           </>
         )}
       </div>
+
+      {followUpModal && (
+        <CreateFollowUpModal
+          contactId={followUpModal.contactId}
+          defaultType={followUpModal.defaultType}
+          onClose={() => setFollowUpModal(null)}
+          onDone={() => setFollowUpModal(null)}
+        />
+      )}
     </div>
   );
 }

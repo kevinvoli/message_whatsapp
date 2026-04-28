@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { FollowUp, FollowUpStatus } from 'src/follow-up/entities/follow_up.entity';
+import { FollowUpService } from 'src/follow-up/follow_up.service';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { ClientDossier } from './entities/client-dossier.entity';
@@ -42,6 +43,7 @@ export class ClientDossierService {
     @InjectRepository(WhatsappPoste)
     private readonly posteRepo: Repository<WhatsappPoste>,
     private readonly gicopPlatform: GicopPlatformService,
+    private readonly followUpService: FollowUpService,
   ) {}
 
   // ── Méthodes dossier structuré ────────────────────────────────────────────
@@ -108,7 +110,25 @@ export class ClientDossierService {
     if (dto.nextAction !== undefined) dossier.nextAction = dto.nextAction ?? null;
     if (dto.notes !== undefined) dossier.notes = dto.notes ?? null;
 
-    return this.dossierRepo.save(dossier);
+    const saved = await this.dossierRepo.save(dossier);
+
+    if (dto.followUpAt && commercialId) {
+      try {
+        const chatEntity = await this.chatRepo.findOne({ where: { chat_id: chatId }, select: ['id'] });
+        await this.followUpService.upsertFromDossierOrReport({
+          contact_id:      contact.id,
+          conversation_id: chatEntity?.id ?? null,
+          commercial_id:   commercialId,
+          scheduled_at:    new Date(dto.followUpAt),
+          next_action:     dto.nextAction ?? null,
+          notes:           dto.notes ?? null,
+        });
+      } catch (err) {
+        this.logger.warn(`follow-up upsert échoué pour chatId ${chatId}: ${(err as Error).message}`);
+      }
+    }
+
+    return saved;
   }
 
   /**

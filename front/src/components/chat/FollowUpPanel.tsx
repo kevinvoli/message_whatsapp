@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus } from 'lucide-react';
 import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
 import { getMyFollowUps, getDueToday, completeFollowUp, cancelFollowUp } from '@/lib/followUpApi';
 import { formatDate } from '@/lib/dateUtils';
+import CreateFollowUpModal from './CreateFollowUpModal';
 
 const STATUS_LABELS: Record<FollowUpStatus, string> = {
   planifiee: 'Planifiée',
@@ -97,6 +98,7 @@ export default function FollowUpPanel() {
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState<FollowUp | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +116,12 @@ export default function FollowUpPanel() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const handler = () => { void load(); };
+    window.addEventListener('followup:reminder', handler);
+    return () => window.removeEventListener('followup:reminder', handler);
+  }, [load]);
+
   async function handleCancel(id: string) {
     await cancelFollowUp(id);
     load();
@@ -129,9 +137,19 @@ export default function FollowUpPanel() {
           <Bell className="w-5 h-5 text-green-600" />
           <h2 className="text-base font-semibold text-gray-900">Mes relances</h2>
         </div>
-        <button onClick={load} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100" title="Rafraîchir">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700"
+            title="Nouvelle relance"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Nouvelle
+          </button>
+          <button onClick={load} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100" title="Rafraîchir">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -207,6 +225,13 @@ export default function FollowUpPanel() {
         <CompleteModal
           followUp={completing}
           onClose={() => setCompleting(null)}
+          onDone={load}
+        />
+      )}
+
+      {showCreate && (
+        <CreateFollowUpModal
+          onClose={() => setShowCreate(false)}
           onDone={load}
         />
       )}

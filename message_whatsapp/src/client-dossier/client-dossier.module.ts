@@ -11,6 +11,7 @@ import { ContactPhone } from './entities/contact-phone.entity';
 import { ClientDossierService } from './client-dossier.service';
 import { ClientDossierController } from './client-dossier.controller';
 import { GicopPlatformModule } from 'src/gicop-platform/gicop-platform.module';
+import { FollowUpModule } from 'src/follow-up/follow_up.module';
 import { ClosurePortfolioListener } from './listeners/closure-portfolio.listener';
 import { ReportPortfolioListener } from './listeners/report-portfolio.listener';
 
@@ -18,6 +19,7 @@ import { ReportPortfolioListener } from './listeners/report-portfolio.listener';
   imports: [
     TypeOrmModule.forFeature([ClientDossier, ContactPhone, Contact, CallLog, FollowUp, WhatsappChat, WhatsappMessage, WhatsappPoste]),
     GicopPlatformModule,
+    FollowUpModule,
   ],
   controllers: [ClientDossierController],
   providers: [ClientDossierService, ClosurePortfolioListener, ReportPortfolioListener],

@@ -28,7 +28,7 @@ export async function getFollowUpsAdmin(
 }
 
 export async function getDueTodayAdmin(): Promise<FollowUp[]> {
-  const response = await fetch(`${API_BASE_URL}/follow-ups/due-today`, {
+  const response = await fetch(`${API_BASE_URL}/follow-ups/admin/due-today`, {
     method: 'GET',
     credentials: 'include',
   });

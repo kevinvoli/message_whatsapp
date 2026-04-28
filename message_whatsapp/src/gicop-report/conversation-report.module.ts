@@ -15,6 +15,7 @@ import { IntegrationOutboxModule } from 'src/integration-outbox/integration-outb
 import { NotificationModule } from 'src/notification/notification.module';
 import { OutboxProcessorService } from './outbox-processor.service';
 import { OutboxAlertService } from './outbox-alert.service';
+import { FollowUpModule } from 'src/follow-up/follow_up.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { OutboxAlertService } from './outbox-alert.service';
     OrderWriteModule,
     IntegrationOutboxModule,
     NotificationModule,
+    FollowUpModule,
   ],
   controllers: [ConversationReportController],
   providers: [ConversationReportService, ReportSubmissionService, ReportClosureMirrorListener, OutboxProcessorService, OutboxAlertService],

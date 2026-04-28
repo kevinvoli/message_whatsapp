@@ -14,6 +14,7 @@ import {
   Check,
   X as XIcon,
   Sparkles,
+  Bell,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useContactStore } from '@/store/contactStore';
@@ -25,6 +26,7 @@ import { CallLogHistory } from './CallLogHistory';
 import { updateContactCallStatus, getCrmFields, setCrmFields, CrmFieldEntry, CrmRawValue } from '@/lib/contactApi';
 import { getFollowUpsByContact } from '@/lib/followUpApi';
 import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
+import CreateFollowUpModal from '@/components/chat/CreateFollowUpModal';
 import { logger } from '@/lib/logger';
 import dynamic from 'next/dynamic';
 
@@ -204,6 +206,7 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
   const { selectedContactDetail: selectedContact, isLoadingDetail, upsertContact } = useContactStore();
   const { selectConversation, conversations } = useChatStore();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
 
   const [contactFollowUps, setContactFollowUps] = useState<FollowUp[]>([]);
   const [crmFields, setCrmFieldsState] = useState<CrmFieldEntry[]>([]);
@@ -539,11 +542,29 @@ export function ContactDetailView({ onSwitchToConversations }: ContactDetailView
             Voir la conversation
           </button>
           <button
+            onClick={() => setShowFollowUpModal(true)}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 16px', borderRadius: 12, border: '1px solid #d1fae5', fontWeight: 600, cursor: 'pointer', background: '#f0fdf4', color: '#059669', fontSize: 14 }}
+          >
+            <Bell style={{ width: 16, height: 16 }} />
+            Relance
+          </button>
+          <button
             style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: 'none', fontWeight: 600, cursor: 'pointer', background: '#f3f4f6', color: '#111827', fontSize: 14 }}
           >
             Archiver
           </button>
         </div>
+
+        {showFollowUpModal && (
+          <CreateFollowUpModal
+            contactId={c.id}
+            onClose={() => setShowFollowUpModal(false)}
+            onDone={() => {
+              setShowFollowUpModal(false);
+              void loadFollowUps(c.id);
+            }}
+          />
+        )}
 
         {/* Synthèse IA dossier */}
         <div style={{ marginTop: 12 }}>

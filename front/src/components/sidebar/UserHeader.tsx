@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, BarChart2, Trophy, Briefcase, ListTodo } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
+import { getDueToday } from '@/lib/followUpApi';
 
 interface UserHeaderProps {
     conversation: Conversation[];
@@ -38,6 +39,8 @@ export default function UserHeader({
     };
 
     useEffect(() => {
+        getDueToday().then((res) => setReminderCount(res.length)).catch(() => {});
+
         const handler = () => searchRef.current?.focus();
         document.addEventListener('app:focus-search', handler);
 
