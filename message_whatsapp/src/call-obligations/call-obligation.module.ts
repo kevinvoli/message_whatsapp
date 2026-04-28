@@ -13,6 +13,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
 import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CommercialIdentityMapping } from 'src/integration/entities/commercial-i
     ]),
     JorbsModule,
     SystemConfigModule,
+    RedisModule,
   ],
   controllers: [CallObligationController],
   providers: [CallObligationService, ObligationQualityCheckJob],

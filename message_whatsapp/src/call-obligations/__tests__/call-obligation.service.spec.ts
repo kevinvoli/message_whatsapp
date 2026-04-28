@@ -226,12 +226,15 @@ describe('CallObligationService', () => {
     });
 
     it('client inconnu → fallback JAMAIS_COMMANDE → valide si batch et tâche dispos', async () => {
-      // OBL-011 : un contact non identifié est catégorisé JAMAIS_COMMANDE par défaut,
-      // pas rejeté. Le service continue jusqu'à trouver (ou pas) une tâche ouverte.
-      const contactRepo  = makeContactRepo(null);  // aucun contact DB1 connu
+      // OBL-011 : un contact non identifié est catégorisé JAMAIS_COMMANDE par défaut.
+      const contactRepo  = makeContactRepo(null);
       const batchRepo    = makeBatchRepo(makeBatch());
       const task         = makeTask({ category: CallTaskCategory.JAMAIS_COMMANDE });
       const taskRepo     = makeTaskRepo(task);
+      // 1er findOne (idempotence) → null ; 2e (PENDING lookup) → task
+      taskRepo.findOne = jest.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(task);
 
       const svc = buildService(batchRepo, taskRepo, contactRepo);
       const result = await svc.tryMatchCallToTask({
@@ -241,7 +244,6 @@ describe('CallObligationService', () => {
         durationSeconds: 120,
         posteId:         'poste-1',
       });
-      // Fallback JAMAIS_COMMANDE → tâche trouvée → matched
       expect(result.matched).toBe(true);
     });
 
@@ -299,6 +301,10 @@ describe('CallObligationService', () => {
       const task = makeTask({ category: CallTaskCategory.COMMANDE_ANNULEE });
       const batchRepo = makeBatchRepo(batch);
       const taskRepo = makeTaskRepo(task);
+      // 1er findOne (idempotence) → null ; 2e (PENDING task) → task
+      taskRepo.findOne = jest.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(task);
       const contactRepo = makeContactRepo(makeContact());
 
       const svc = buildService(batchRepo, taskRepo, contactRepo);
@@ -324,6 +330,10 @@ describe('CallObligationService', () => {
       const contact = makeContact({ client_category: ClientCategory.JAMAIS_COMMANDE });
       const batchRepo = makeBatchRepo(batch);
       const taskRepo = makeTaskRepo(task);
+      // 1er findOne (idempotence) → null ; 2e (PENDING task) → task
+      taskRepo.findOne = jest.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(task);
       const contactRepo = makeContactRepo(contact);
 
       const svc = buildService(batchRepo, taskRepo, contactRepo);
@@ -494,6 +504,62 @@ describe('CallObligationService', () => {
       const batch = makeBatch({ annuleeDone: 5, livreeDone: 5, sansCommandeDone: 5, qualityCheckPassed: false });
       const svc = buildService(makeBatchRepo(batch));
       expect(await svc.isPosteReadyForRotation('poste-1')).toBe(false);
+    });
+  });
+
+  // ── OBL-023 : idempotence callEventId ────────────────────────────────────
+
+  describe('tryMatchCallToTask — idempotence callEventId (OBL-008)', () => {
+    it('refuse un appel dont le callEventId a déjà validé une tâche', async () => {
+      const batch   = makeBatch();
+      const contact = makeContact();
+      // La tâche déjà traitée avec ce callEventId
+      const doneTask = makeTask({ status: CallTaskStatus.DONE, callEventId: 'evt-deja-vu' });
+
+      const batchRepo   = makeBatchRepo(batch);
+      const taskRepo    = makeTaskRepo(doneTask);
+      // findOne retourne la tâche existante pour l'idempotence check
+      taskRepo.findOne = jest.fn()
+        .mockResolvedValueOnce(doneTask)   // vérification idempotence → trouvée
+        .mockResolvedValue(makeTask());    // jamais atteint
+
+      const contactRepo = makeContactRepo(contact);
+      const svc = buildService(batchRepo, taskRepo, contactRepo);
+
+      const result = await svc.tryMatchCallToTask({
+        callEventId:     'evt-deja-vu',
+        durationSeconds: 120,
+        posteId:         'poste-1',
+        clientPhone:     '0700000001',
+      });
+
+      expect(result.matched).toBe(false);
+      expect(result.reason).toBe('appel_deja_traite');
+    });
+
+    it('accepte un callEventId nouveau (pas encore dans le batch)', async () => {
+      const batch   = makeBatch();
+      const task    = makeTask({ category: CallTaskCategory.COMMANDE_ANNULEE });
+      const contact = makeContact();
+
+      const batchRepo   = makeBatchRepo(batch);
+      const taskRepo    = makeTaskRepo(task);
+      // Première findOne (idempotence) → null ; deuxième (PENDING task) → task
+      taskRepo.findOne = jest.fn()
+        .mockResolvedValueOnce(null)  // pas encore utilisé
+        .mockResolvedValueOnce(task); // tâche PENDING disponible
+
+      const contactRepo = makeContactRepo(contact);
+      const svc = buildService(batchRepo, taskRepo, contactRepo);
+
+      const result = await svc.tryMatchCallToTask({
+        callEventId:     'evt-nouveau',
+        durationSeconds: 120,
+        posteId:         'poste-1',
+        clientPhone:     '0700000001',
+      });
+
+      expect(result.matched).toBe(true);
     });
   });
 

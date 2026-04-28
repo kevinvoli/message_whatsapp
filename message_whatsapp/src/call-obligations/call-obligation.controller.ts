@@ -67,4 +67,15 @@ export class CallObligationController {
     const passed = await this.service.runQualityCheck(posteId);
     return { posteId, qualityCheckPassed: passed };
   }
+
+  /**
+   * OBL-012 — Détail des tâches du batch actif d'un poste — admin.
+   * GET /call-obligations/poste/:posteId/tasks
+   */
+  @Get('poste/:posteId/tasks')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Tâches du batch actif d\'un poste (admin)' })
+  getTasksByPoste(@Param('posteId') posteId: string) {
+    return this.service.getTasksByPoste(posteId);
+  }
 }

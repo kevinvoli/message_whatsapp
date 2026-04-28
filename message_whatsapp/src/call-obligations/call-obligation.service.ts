@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { v4 as uuidv4 } from 'uuid';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import {
@@ -72,6 +73,9 @@ export class CallObligationService {
     private readonly commercialMappingRepo: Repository<CommercialIdentityMapping>,
 
     private readonly systemConfig: SystemConfigService,
+
+    @Optional()
+    private readonly lockService: DistributedLockService | null = null,
   ) {}
 
   // ── Feature flag ─────────────────────────────────────────────────────────
@@ -84,49 +88,65 @@ export class CallObligationService {
   // ── Gestion du batch actif ──────────────────────────────────────────────
 
   async getOrCreateActiveBatch(posteId: string): Promise<CommercialObligationBatch> {
-    const existing = await this.batchRepo.findOne({
-      where: { posteId, status: BatchStatus.PENDING },
-    });
-    if (existing) return existing;
+    // OBL-010 — Lock distribué pour éviter deux créations simultanées sur le même poste
+    const doCreate = async (): Promise<CommercialObligationBatch> => {
+      const existing = await this.batchRepo.findOne({
+        where: { posteId, status: BatchStatus.PENDING },
+      });
+      if (existing) return existing;
 
-    const lastBatch = await this.batchRepo.findOne({
-      where: { posteId },
-      order: { batchNumber: 'DESC' },
-    });
+      const lastBatch = await this.batchRepo.findOne({
+        where: { posteId },
+        order: { batchNumber: 'DESC' },
+      });
 
-    const batchNumber = (lastBatch?.batchNumber ?? 0) + 1;
+      const batchNumber = (lastBatch?.batchNumber ?? 0) + 1;
 
-    const batch = await this.batchRepo.save(
-      this.batchRepo.create({
-        id: uuidv4(),
-        posteId,
-        batchNumber,
-        status: BatchStatus.PENDING,
-      }),
-    );
+      const batch = await this.batchRepo.save(
+        this.batchRepo.create({
+          id: uuidv4(),
+          posteId,
+          batchNumber,
+          status: BatchStatus.PENDING,
+        }),
+      );
 
-    // Créer 15 tâches vides (5 × 3 catégories)
-    const tasks: Partial<CallTask>[] = [
-      ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
-        id: uuidv4(), batchId: batch.id, posteId,
-        category: CallTaskCategory.COMMANDE_ANNULEE,
-        status: CallTaskStatus.PENDING,
-      })),
-      ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
-        id: uuidv4(), batchId: batch.id, posteId,
-        category: CallTaskCategory.COMMANDE_AVEC_LIVRAISON,
-        status: CallTaskStatus.PENDING,
-      })),
-      ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
-        id: uuidv4(), batchId: batch.id, posteId,
-        category: CallTaskCategory.JAMAIS_COMMANDE,
-        status: CallTaskStatus.PENDING,
-      })),
-    ];
+      const tasks: Partial<CallTask>[] = [
+        ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
+          id: uuidv4(), batchId: batch.id, posteId,
+          category: CallTaskCategory.COMMANDE_ANNULEE,
+          status: CallTaskStatus.PENDING,
+        })),
+        ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
+          id: uuidv4(), batchId: batch.id, posteId,
+          category: CallTaskCategory.COMMANDE_AVEC_LIVRAISON,
+          status: CallTaskStatus.PENDING,
+        })),
+        ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
+          id: uuidv4(), batchId: batch.id, posteId,
+          category: CallTaskCategory.JAMAIS_COMMANDE,
+          status: CallTaskStatus.PENDING,
+        })),
+      ];
 
-    await this.taskRepo.save(tasks as CallTask[]);
-    this.logger.log(`Batch #${batchNumber} créé pour poste ${posteId} — 15 tâches`);
-    return batch;
+      await this.taskRepo.save(tasks as CallTask[]);
+      this.logger.log(`Batch #${batchNumber} créé pour poste ${posteId} — 15 tâches`);
+      return batch;
+    };
+
+    if (this.lockService) {
+      const { acquired, result } = await this.lockService.tryWithLock(
+        `call-obligation-batch:${posteId}`,
+        10_000,
+        doCreate,
+      );
+      if (acquired && result) return result;
+      // Lock non acquis → un autre processus crée le batch : on relit
+      return (await this.batchRepo.findOne({ where: { posteId, status: BatchStatus.PENDING } }))
+        ?? (await doCreate());
+    }
+
+    return doCreate();
   }
 
   async getActiveBatch(posteId: string): Promise<CommercialObligationBatch | null> {
@@ -195,6 +215,14 @@ export class CallObligationService {
     const batch = await this.getActiveBatch(posteId);
     if (!batch) {
       return { matched: false, reason: 'aucun_batch_actif' };
+    }
+
+    // 4b. OBL-008 — Idempotence : vérifier que cet appel n'a pas déjà validé une tâche
+    const alreadyUsed = await this.taskRepo.findOne({
+      where: { batchId: batch.id, callEventId: params.callEventId },
+    });
+    if (alreadyUsed) {
+      return { matched: false, reason: 'appel_deja_traite' };
     }
 
     // 5. Trouver une tâche PENDING de cette catégorie
@@ -274,6 +302,23 @@ export class CallObligationService {
       qualityCheckPassed: batch.qualityCheckPassed,
       readyForRotation: this.isBatchReady(batch),
     };
+  }
+
+  // ── Détail tâches par poste ──────────────────────────────────────────────
+
+  async getTasksByPoste(posteId: string): Promise<{
+    batchId: string | null;
+    batchNumber: number | null;
+    tasks: CallTask[];
+  }> {
+    const batch = await this.getActiveBatch(posteId);
+    if (!batch) return { batchId: null, batchNumber: null, tasks: [] };
+
+    const tasks = await this.taskRepo.find({
+      where: { batchId: batch.id },
+      order: { category: 'ASC', status: 'ASC' },
+    });
+    return { batchId: batch.id, batchNumber: batch.batchNumber, tasks };
   }
 
   // ── Postes avec batch actif ──────────────────────────────────────────────

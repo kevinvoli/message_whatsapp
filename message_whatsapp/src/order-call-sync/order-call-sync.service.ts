@@ -51,10 +51,16 @@ export class OrderCallSyncService {
     const cursor = await this.getOrCreateCursor();
     const callRepo = this.orderDb.getRepository(OrderCallLog);
 
-    // Lecture incrémentale : appels postérieurs au curseur
+    // OBL-009 — Lecture incrémentale avec tie-breaker sur id pour éviter les pertes
+    // quand plusieurs appels ont le même timestamp.
+    const since    = cursor.lastCallTimestamp ?? new Date(0);
+    const lastId   = cursor.lastCallId ?? '';
     const qb = callRepo
       .createQueryBuilder('c')
-      .where('c.call_timestamp > :since', { since: cursor.lastCallTimestamp ?? new Date(0) })
+      .where(
+        '(c.call_timestamp > :since OR (c.call_timestamp = :since AND c.id > :lastId))',
+        { since, lastId },
+      )
       .orderBy('c.call_timestamp', 'ASC')
       .addOrderBy('c.id', 'ASC')
       .take(BATCH_SIZE);
