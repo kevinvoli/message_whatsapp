@@ -18,19 +18,6 @@ import { NotificationService } from 'src/notification/notification.service';
 // Valeurs par défaut par clé
 // ─────────────────────────────────────────────────────────────────────────────
 const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
-  'sla-checker': {
-    label: 'Vérificateur SLA — réinjection conversations non lues',
-    description:
-      'Vérifie toutes les N minutes les conversations avec des messages non lus depuis plus de N minutes et les réinjecte dans la queue. N doit être strictement supérieur à 120. Désactivé automatiquement entre 21h et 5h.',
-    enabled: true,
-    scheduleType: 'interval',
-    intervalMinutes: 121,
-    cronExpression: null,
-    ttlDays: null,
-    delayMinSeconds: null,
-    delayMaxSeconds: null,
-    maxSteps: null,
-  },
   'read-only-enforcement': {
     label: 'Fermeture automatique — sans réponse commerciale',
     description:
@@ -392,15 +379,6 @@ export class CronConfigService implements OnModuleInit {
       }
     }
 
-    // Validation intervalle SLA checker — minimum 121 min pour éviter la surcharge socket
-    if (key === 'sla-checker' && dto.intervalMinutes !== undefined) {
-      if (dto.intervalMinutes <= 120) {
-        throw new BadRequestException(
-          `L'intervalle du SLA checker doit être strictement supérieur à 120 minutes (reçu : ${dto.intervalMinutes})`,
-        );
-      }
-    }
-
     // Validation croisée delay_min < delay_max pour auto-message
     if (key === 'auto-message') {
       const finalMin = dto.delayMinSeconds ?? config.delayMinSeconds ?? 1;
@@ -625,8 +603,7 @@ export class CronConfigService implements OnModuleInit {
     const byKey = Object.fromEntries(configs.map((c) => [c.key, c]));
 
     return {
-      no_reply_reinject_interval_minutes:
-        byKey['sla-checker']?.intervalMinutes ?? 40,
+      no_reply_reinject_interval_minutes: 0,
       read_only_check_interval_minutes:
         byKey['read-only-enforcement']?.intervalMinutes ?? 10,
       offline_reinject_cron:
@@ -653,12 +630,6 @@ export class CronConfigService implements OnModuleInit {
   }): Promise<void> {
     const updates: Array<{ key: string; dto: UpdateCronConfigDto }> = [];
 
-    if (patch.no_reply_reinject_interval_minutes !== undefined) {
-      updates.push({
-        key: 'sla-checker',
-        dto: { intervalMinutes: patch.no_reply_reinject_interval_minutes },
-      });
-    }
     if (patch.read_only_check_interval_minutes !== undefined) {
       updates.push({
         key: 'read-only-enforcement',

@@ -20,7 +20,6 @@ import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_comm
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { QueueService } from '../dispatcher/services/queue.service';
 import { DispatcherService } from '../dispatcher/dispatcher.service';
-import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
@@ -79,7 +78,6 @@ export class WhatsappMessageGateway
     private readonly posteService: WhatsappPosteService,
     private readonly queueService: QueueService,
     private readonly dispatcherService: DispatcherService,
-    private readonly jobRunner: FirstResponseTimeoutJob,
     private readonly autoMessageService: MessageAutoService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
@@ -165,8 +163,6 @@ export class WhatsappMessageGateway
         `Queue disabled for poste ${posteId}, skip enqueue on connect`,
       );
     }
-    await this.jobRunner.startAgentSlaMonitor(posteId);
-
     await this.emitQueueUpdate('agent_connected');
     await this.sendConversationsToClient(client);
   }
@@ -285,7 +281,6 @@ export class WhatsappMessageGateway
       );
       await this.posteService.setActive(agent.posteId, false);
       await this.queueService.removeFromQueue(agent.posteId);
-      this.jobRunner.stopAgentSlaMonitor(agent.posteId);
     }
 
     // Si la queue est vide apres la deconnexion, remplir avec tous les postes

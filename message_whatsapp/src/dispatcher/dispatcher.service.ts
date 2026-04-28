@@ -5,7 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -17,8 +17,6 @@ import { ChannelService } from 'src/channel/channel.service';
 export class DispatcherService {
   private readonly logger = new Logger(DispatcherService.name);
   private readonly chatDispatchLocks = new Map<string, Mutex>();
-  /** S3 — mutex léger pour éviter l'overlap du cron SLA */
-  private isSlaRunning = false;
 
   private getChatDispatchLock(chatId: string): Mutex {
     let mutex = this.chatDispatchLocks.get(chatId);
@@ -539,83 +537,6 @@ export class DispatcherService {
       oldPoste,
       nextPoste.id,
     );
-  }
-
-  async jobRunnertcheque(poste_id: string) {
-    const now = new Date();
-
-    const chats = await this.chatRepository.find({
-      where: {
-        poste_id: poste_id,
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-        unread_count: MoreThan(0),
-      },
-    });
-    this.logger.debug(
-      `Verification SLA reponses (${poste_id}) - ${chats.length} conversations`,
-    );
-
-    for (const chat of chats) {
-      await this.reinjectConversation(chat);
-    }
-  }
-
-  /**
-   * Vérifie le SLA sur TOUS les postes — utilisé par le cron centralisé.
-   * @param thresholdMinutes Seuil configurable depuis le panel admin (= intervalMinutes du cron).
-   *   Réinjecte uniquement les conversations avec unread_count > 0 dont le dernier message
-   *   client date de plus de N minutes — i.e. le commercial n'a pas LU depuis N minutes.
-   */
-  async jobRunnerAllPostes(thresholdMinutes = 121): Promise<string> {
-    // S3 — mutex léger : si le cycle précédent n'est pas terminé, on saute
-    if (this.isSlaRunning) {
-      this.logger.warn('SLA checker déjà en cours — cycle ignoré');
-      return 'Ignoré — cycle précédent encore en cours';
-    }
-    this.isSlaRunning = true;
-
-    try {
-      // Réinjection si le client attend depuis plus de thresholdMinutes sans que
-      // le commercial ait lu la conversation (unread_count > 0).
-      // On utilise last_client_message_at plutôt que first_response_deadline_at :
-      // on ne se base plus sur une deadline interne mais sur l'attente réelle du client.
-      const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
-      const chats = await this.chatRepository.find({
-        where: {
-          status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
-          unread_count: MoreThan(0),
-          last_client_message_at: LessThan(threshold), // pas lu depuis N minutes
-        },
-        order: { last_client_message_at: 'ASC' },
-        take: 50,
-      });
-      this.logger.debug(`Vérification SLA globale — ${chats.length} conversation(s) ciblée(s)`);
-
-      // S1 — on collecte les réassignations sans émettre pendant la boucle DB
-      const reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }> = [];
-      let reinjected = 0;
-
-      for (const chat of chats) {
-        try {
-          const result = await this.reinjectConversation(chat, true); // skipEmit
-          if (result) {
-            reassignments.push({ chatId: chat.chat_id, ...result });
-            reinjected++;
-          }
-        } catch (err) {
-          this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
-        }
-      }
-
-      // S1 — une seule vague d'émissions après la boucle, 2 requêtes bulk au lieu de 2N
-      if (reassignments.length > 0) {
-        await this.messageGateway.emitBatchReassignments(reassignments);
-      }
-
-      return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
-    } finally {
-      this.isSlaRunning = false;
-    }
   }
 
   async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
