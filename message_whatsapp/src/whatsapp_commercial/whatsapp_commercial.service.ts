@@ -393,6 +393,10 @@ export class WhatsappCommercialService {
       user.phone = updateWhatsappCommercialDto.phone ?? null;
     }
 
+    if (updateWhatsappCommercialDto.commercial_type !== undefined) {
+      user.commercial_type = updateWhatsappCommercialDto.commercial_type ?? null;
+    }
+
     if (updateWhatsappCommercialDto.poste_id !== undefined) {
       if (updateWhatsappCommercialDto.poste_id === null) {
         user.poste = null;

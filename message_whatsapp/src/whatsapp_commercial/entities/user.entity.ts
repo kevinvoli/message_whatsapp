@@ -66,6 +66,14 @@ export class WhatsappCommercial {
   @Column({ type: 'boolean', default: false })
   isConnected: boolean;
 
+  @Column({
+    type: 'enum',
+    enum: ['trainee', 'vendeuse_confirmee', 'superviseur', 'admin'],
+    nullable: true,
+    default: null,
+  })
+  commercial_type?: 'trainee' | 'vendeuse_confirmee' | 'superviseur' | 'admin' | null;
+
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
 

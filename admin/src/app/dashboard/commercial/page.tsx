@@ -46,6 +46,8 @@ import AiGovernanceView from '@/app/ui/AiGovernanceView';
 import GicopSupervisionView from '@/app/ui/GicopSupervisionView';
 import OutboxSyncView from '@/app/ui/OutboxSyncView';
 import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
+import ComplaintsView from '@/app/modules/dispatch/components/ComplaintsView';
+import LoginLogsView from '@/app/ui/LoginLogsView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -216,6 +218,10 @@ export default function AdminDashboard() {
                 return <OutboxSyncView />;
             case 'work-schedule':
                 return <WorkScheduleAdminView />;
+            case 'complaints':
+                return <ComplaintsView />;
+            case 'login-logs':
+                return <LoginLogsView />;
             default:
                 return null;
         }

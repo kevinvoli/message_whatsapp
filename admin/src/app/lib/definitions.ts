@@ -71,7 +71,11 @@ export type ViewMode =
   // E02 — Synchronisation DB2 outbox
   | 'outbox-sync'
   // E07 — Plannings de travail
-  | 'work-schedule';
+  | 'work-schedule'
+  // E08 — Plaintes clients
+  | 'complaints'
+  // E10-T04 — Journal des connexions
+  | 'login-logs';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

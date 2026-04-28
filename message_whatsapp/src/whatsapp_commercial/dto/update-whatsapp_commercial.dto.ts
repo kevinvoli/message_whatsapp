@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   MinLength,
@@ -31,4 +32,8 @@ export class UpdateWhatsappCommercialDto {
   @IsOptional()
   @IsString()
   phone?: string | null;
+
+  @IsOptional()
+  @IsIn(['trainee', 'vendeuse_confirmee', 'superviseur', 'admin', null])
+  commercial_type?: 'trainee' | 'vendeuse_confirmee' | 'superviseur' | 'admin' | null;
 }
