@@ -209,7 +209,7 @@ describe('CallObligationService', () => {
         durationSeconds: 45,
       });
       expect(result.matched).toBe(false);
-      expect(result.reason).toContain('durée_insuffisante');
+      expect(result.reason).toContain('duree_insuffisante');
     });
 
     it('refuse si poste introuvable', async () => {

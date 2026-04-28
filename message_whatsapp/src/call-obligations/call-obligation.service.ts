@@ -130,7 +130,7 @@ export class CallObligationService {
       ];
 
       await this.taskRepo.save(tasks as CallTask[]);
-      this.logger.log(`Batch #${batchNumber} créé pour poste ${posteId} — 15 tâches`);
+      this.logger.log(`CALL_OBLIGATION_BATCH_CREATED posteId=${posteId} batchId=${batch.id} batchNumber=${batchNumber} tasks=15`);
       return batch;
     };
 
@@ -182,7 +182,8 @@ export class CallObligationService {
 
     // 1. Vérifier la durée minimale
     if (!params.durationSeconds || params.durationSeconds < MIN_CALL_DURATION_SECONDS) {
-      return { matched: false, reason: `durée_insuffisante (${params.durationSeconds ?? 0}s < ${MIN_CALL_DURATION_SECONDS}s)` };
+      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} reason=duree_insuffisante duration=${params.durationSeconds ?? 0}s`);
+      return { matched: false, reason: 'duree_insuffisante' };
     }
 
     // 2. Résoudre le poste — ID DB2 si mapping dispo, sinon fallback téléphone
@@ -194,6 +195,7 @@ export class CallObligationService {
       posteId = await this.resolvePosteByCommercialPhone(params.commercialPhone);
     }
     if (!posteId) {
+      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} reason=poste_introuvable`);
       return { matched: false, reason: 'poste_introuvable' };
     }
 
@@ -214,6 +216,7 @@ export class CallObligationService {
     // 4. Trouver le batch actif
     const batch = await this.getActiveBatch(posteId);
     if (!batch) {
+      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} posteId=${posteId} reason=aucun_batch_actif`);
       return { matched: false, reason: 'aucun_batch_actif' };
     }
 
@@ -222,6 +225,7 @@ export class CallObligationService {
       where: { batchId: batch.id, callEventId: params.callEventId },
     });
     if (alreadyUsed) {
+      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} posteId=${posteId} batchId=${batch.id} reason=appel_deja_traite`);
       return { matched: false, reason: 'appel_deja_traite' };
     }
 
@@ -230,7 +234,8 @@ export class CallObligationService {
       where: { batchId: batch.id, category: taskCategory, status: CallTaskStatus.PENDING },
     });
     if (!task) {
-      return { matched: false, reason: `quota_${taskCategory}_atteint` };
+      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} posteId=${posteId} batchId=${batch.id} reason=quota_categorie_atteint category=${taskCategory}`);
+      return { matched: false, reason: 'quota_categorie_atteint' };
     }
 
     // 6. Valider la tâche
@@ -246,20 +251,19 @@ export class CallObligationService {
     batch[counterField] = (batch[counterField] as number) + 1;
 
     // 8. Vérifier si le batch est complet
-    if (
+    const callsComplete =
       batch.annuleeDone >= REQUIRED_PER_CATEGORY &&
       batch.livreeDone >= REQUIRED_PER_CATEGORY &&
-      batch.sansCommandeDone >= REQUIRED_PER_CATEGORY
-    ) {
+      batch.sansCommandeDone >= REQUIRED_PER_CATEGORY;
+
+    if (callsComplete) {
       batch.status = BatchStatus.COMPLETE;
       batch.completedAt = new Date();
-      this.logger.log(`Batch #${batch.batchNumber} COMPLÉTÉ pour poste ${posteId}`);
+      this.logger.log(`CALL_OBLIGATION_BATCH_CALLS_COMPLETE posteId=${posteId} batchId=${batch.id} batchNumber=${batch.batchNumber}`);
     }
     await this.batchRepo.save(batch);
 
-    this.logger.log(
-      `Tâche validée: poste=${posteId} catégorie=${taskCategory} durée=${params.durationSeconds}s (batch #${batch.batchNumber})`,
-    );
+    this.logger.log(`CALL_OBLIGATION_MATCHED callEventId=${params.callEventId} posteId=${posteId} batchId=${batch.id} batchNumber=${batch.batchNumber} category=${taskCategory} durationSeconds=${params.durationSeconds}`);
     return { matched: true, taskId: task.id };
   }
 
@@ -282,7 +286,7 @@ export class CallObligationService {
       await this.batchRepo.save(batch);
     }
 
-    this.logger.log(`Contrôle qualité poste ${posteId} : ${passed ? 'PASSÉ' : 'ÉCHOUÉ'}`);
+    this.logger.log(`${passed ? 'CALL_OBLIGATION_QUALITY_PASSED' : 'CALL_OBLIGATION_QUALITY_FAILED'} posteId=${posteId} blockSize=${activeConvs.length}`);
     return passed;
   }
 
@@ -292,6 +296,10 @@ export class CallObligationService {
     const batch = await this.getActiveBatch(posteId);
     if (!batch) return null;
 
+    const readyForRotation = this.isBatchReady(batch);
+    if (readyForRotation) {
+      this.logger.log(`CALL_OBLIGATION_READY_FOR_ROTATION posteId=${posteId} batchId=${batch.id} batchNumber=${batch.batchNumber}`);
+    }
     return {
       batchId: batch.id,
       batchNumber: batch.batchNumber,
@@ -300,7 +308,7 @@ export class CallObligationService {
       livree:       { done: batch.livreeDone,        required: REQUIRED_PER_CATEGORY },
       sansCommande: { done: batch.sansCommandeDone,  required: REQUIRED_PER_CATEGORY },
       qualityCheckPassed: batch.qualityCheckPassed,
-      readyForRotation: this.isBatchReady(batch),
+      readyForRotation,
     };
   }
 

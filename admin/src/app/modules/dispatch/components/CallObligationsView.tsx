@@ -55,6 +55,14 @@ interface SyncStatus {
   syncLog: Record<string, number>;
 }
 
+interface SyncLogEntry {
+  id: string;
+  entityId: string;
+  status: string;
+  lastError: string | null;
+  createdAt: string;
+}
+
 const CATEGORY_LABELS: Record<CallTask['category'], string> = {
   COMMANDE_ANNULEE:        'Annulée',
   COMMANDE_AVEC_LIVRAISON: 'Livrée',
@@ -98,6 +106,14 @@ async function fetchSyncStatus(): Promise<SyncStatus | null> {
   } catch { return null; }
 }
 
+async function fetchRecentRejections(): Promise<SyncLogEntry[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/order-sync/failed`, { credentials: 'include' });
+    if (!res.ok) return [];
+    return await res.json() as SyncLogEntry[];
+  } catch { return []; }
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 
 export default function CallObligationsView({ postes }: { postes: { id: string; name: string }[] }) {
@@ -112,6 +128,8 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
   const [loadingTasks, setLoadingTasks] = useState<string | null>(null);
   const [qualityRunning, setQualityRunning] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [rejections, setRejections] = useState<SyncLogEntry[]>([]);
+  const [showRejections, setShowRejections] = useState(false);
 
   const loadFlag = useCallback(async () => {
     try {
@@ -123,16 +141,18 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [results, sync] = await Promise.all([
+    const [results, sync, failed] = await Promise.all([
       Promise.all(postes.map(async (p) => ({
         posteId: p.id,
         posteName: p.name,
         obligation: await fetchObligation(p.id),
       }))),
       fetchSyncStatus(),
+      fetchRecentRejections(),
     ]);
     setRows(results);
     setSyncStatus(sync);
+    setRejections(failed);
     setLoading(false);
   }, [postes]);
 
@@ -266,6 +286,32 @@ export default function CallObligationsView({ postes }: { postes: { id: string; 
             </span>
           )}
           <span className="text-xs text-gray-400 ml-auto">{syncStatus.db2.processedCount.toLocaleString()} appels traités</span>
+        </div>
+      )}
+
+      {/* OBL-018 — Rejets récents */}
+      {rejections.length > 0 && (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 overflow-hidden">
+          <button
+            onClick={() => setShowRejections((v) => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 text-sm text-orange-700 font-medium hover:bg-orange-100"
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {rejections.length} appel{rejections.length > 1 ? 's' : ''} non comptabilisé{rejections.length > 1 ? 's' : ''}
+            </span>
+            {showRejections ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+          {showRejections && (
+            <div className="border-t border-orange-200 divide-y divide-orange-100 max-h-48 overflow-y-auto">
+              {rejections.slice(0, 20).map((r) => (
+                <div key={r.id} className="flex items-center justify-between px-3 py-1.5 text-xs">
+                  <span className="font-mono text-gray-600 truncate">{r.entityId}</span>
+                  <span className="text-orange-600 ml-2 flex-shrink-0">{r.lastError ?? '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

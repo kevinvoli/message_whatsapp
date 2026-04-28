@@ -76,18 +76,27 @@ export class OrderCallSyncService {
     let errors = 0;
 
     for (const call of calls) {
+      let logId: string | null = null;
       try {
-        await this.processCall(call);
+        const log = await this.processCall(call);
+        logId = log.id;
 
         if (this.isEligibleForObligation(call)) {
           const result = await this.matchObligation(call);
-          if (result?.matched) obligationsMatched++;
+          if (result?.matched) {
+            obligationsMatched++;
+            await this.syncLog.markSuccess(logId);
+          } else if (result && !result.matched) {
+            // OBL-018 — Tracer les rejets pour diagnostic admin
+            await this.syncLog.markFailed(logId, result.reason ?? 'unknown');
+          }
         }
       } catch (err) {
         errors++;
         this.logger.error(
           `Erreur traitement appel ${call.id}: ${(err as Error).message}`,
         );
+        if (logId) await this.syncLog.markFailed(logId, (err as Error).message).catch(() => {});
       }
     }
 
@@ -109,9 +118,9 @@ export class OrderCallSyncService {
     return { processed: calls.length, obligations: obligationsMatched, errors };
   }
 
-  /** Traite un appel : crée un log de sync local. */
-  private async processCall(call: OrderCallLog): Promise<void> {
-    await this.syncLog.createPending('call_validation', call.id, 'call_logs');
+  /** Traite un appel : crée un log de sync local. Retourne le log créé pour suivi statut. */
+  private async processCall(call: OrderCallLog): Promise<{ id: string }> {
+    return this.syncLog.createPending('call_validation', call.id, 'call_logs');
   }
 
   /**
