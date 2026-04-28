@@ -107,8 +107,8 @@ export default function ObligationProgressBar() {
             }
             <span>
               {status.qualityCheckPassed
-                ? 'Qualite messages bloc actif : OK'
-                : 'Qualite messages : repondez aux clients du bloc actif'
+                ? 'Qualité messages bloc actif : OK'
+                : 'Qualité messages : répondez aux clients du bloc actif'
               }
             </span>
           </div>

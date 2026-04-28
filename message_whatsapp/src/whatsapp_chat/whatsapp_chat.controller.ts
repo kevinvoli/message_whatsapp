@@ -11,6 +11,7 @@ import {
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { CommercialActionGateGuard } from 'src/commercial-action-gate/commercial-action-gate.guard';
 import { IsEnum, IsNotEmpty } from 'class-validator';
 import { ConversationResult } from './entities/whatsapp_chat.entity';
 
@@ -94,7 +95,7 @@ export class WhatsappChatController {
 
   /** Enregistre le résultat métier d'une conversation (commercial JWT ou admin) */
   @Patch(':id/outcome')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), CommercialActionGateGuard)
   setOutcome(
     @Param('id') id: string,
     @Body() dto: SetOutcomeDto,

@@ -23,6 +23,7 @@ import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
+import { CommercialActionGateGuard } from 'src/commercial-action-gate/commercial-action-gate.guard';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
@@ -126,7 +127,7 @@ export class WhatsappMessageController {
   }
 
   @Post('media')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), CommercialActionGateGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadMedia(
     @UploadedFile() file: Express.Multer.File,

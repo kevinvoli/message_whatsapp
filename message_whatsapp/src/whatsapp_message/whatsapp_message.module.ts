@@ -55,6 +55,7 @@ import { ConversationReportModule } from 'src/gicop-report/conversation-report.m
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
 import { ConversationClosureModule } from 'src/conversation-closure/conversation-closure.module';
+import { CommercialActionGateModule } from 'src/commercial-action-gate/commercial-action-gate.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { ConversationClosureModule } from 'src/conversation-closure/conversation
     ClientDossierModule,
     ConversationClosureModule,
     TargetsModule,
+    CommercialActionGateModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

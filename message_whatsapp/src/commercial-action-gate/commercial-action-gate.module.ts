@@ -9,6 +9,7 @@ import { CallObligationModule } from 'src/call-obligations/call-obligation.modul
 import { WorkAttendanceModule } from 'src/work-attendance/work-attendance.module';
 import { CommercialActionGateService } from './commercial-action-gate.service';
 import { CommercialActionGateController } from './commercial-action-gate.controller';
+import { CommercialActionGateGuard } from './commercial-action-gate.guard';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { CommercialActionGateController } from './commercial-action-gate.control
     WorkAttendanceModule,
   ],
   controllers: [CommercialActionGateController],
-  providers: [CommercialActionGateService],
-  exports: [CommercialActionGateService],
+  providers: [CommercialActionGateService, CommercialActionGateGuard],
+  exports: [CommercialActionGateService, CommercialActionGateGuard],
 })
 export class CommercialActionGateModule {}
