@@ -180,9 +180,7 @@ export class QueueService implements OnModuleInit {
    * Among all postes in queue, picks the one with the fewest active chats.
    * Falls back to first in queue (round-robin) if chat counts are equal.
    */
-  async getNextInQueue(
-    mode: 'least_loaded' | 'round_robin' = 'least_loaded',
-  ): Promise<WhatsappPoste | null> {
+  async getNextInQueue(): Promise<WhatsappPoste | null> {
     return await this.queueLock.runExclusive(async () => {
       const allPositions = await this.queueRepository.find({
         order: { position: 'ASC' },
@@ -201,6 +199,13 @@ export class QueueService implements OnModuleInit {
 
       // ─── ÉTAPE 1 : stratégie via queue_positions ──────────────────────────────
       if (candidates.length > 0) {
+        // Lire le mode directement via DataSource — évite toute injection croisée
+        // (QueueService est exporté dans plusieurs modules qui n'ont pas DispatchSettingsService)
+        const modeRows = await this.dataSource.query<{ queue_mode: string }[]>(
+          'SELECT queue_mode FROM dispatch_settings LIMIT 1',
+        );
+        const mode = (modeRows[0]?.queue_mode ?? 'least_loaded') as 'least_loaded' | 'round_robin';
+
         let best = candidates[0];
 
         if (mode === 'round_robin') {
