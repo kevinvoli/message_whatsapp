@@ -31,8 +31,9 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
       // noResponseThresholdMinutes : seuil de redispatch (défaut 60 min, configurable).
       // intervalMinutes : fréquence du cron (configurable librement) — ces deux valeurs sont indépendantes.
       const config = await this.cronConfigService.findByKey('sla-checker');
-      const thresholdMinutes = config.noResponseThresholdMinutes ?? 60;
-      return this.dispatcher.jobRunnerAllPostes(thresholdMinutes);
+      const thresholdMinutes = config.noResponseThresholdMinutes ?? 15;
+      const batchSize = config.maxSteps ?? 300;
+      return this.dispatcher.jobRunnerAllPostes(thresholdMinutes, batchSize);
     });
     this.cronConfigService.registerPreviewHandler('sla-checker', () =>
       this.previewExpiredSla(),

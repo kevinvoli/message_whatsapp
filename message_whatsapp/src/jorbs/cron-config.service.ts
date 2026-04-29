@@ -21,16 +21,16 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
   'sla-checker': {
     label: 'Vérificateur SLA — réinjection conversations non lues',
     description:
-      'Vérifie toutes les N minutes les conversations avec des messages non lus depuis plus de X minutes (seuil configurable, défaut 60 min) et les réinjecte dans la queue. Désactivé automatiquement entre 21h et 5h.',
+      'Toutes les 30 min, récupère les conversations non lues depuis plus de 15 min (seuil configurable) et rééquilibre la charge entre postes par batch de 300 (maxSteps). Désactivé automatiquement entre 21h et 5h.',
     enabled: true,
     scheduleType: 'interval',
-    intervalMinutes: 60,
+    intervalMinutes: 30,
     cronExpression: null,
     ttlDays: null,
     delayMinSeconds: null,
     delayMaxSeconds: null,
-    maxSteps: null,
-    noResponseThresholdMinutes: 60,
+    maxSteps: 300,
+    noResponseThresholdMinutes: 15,
   },
   'read-only-enforcement': {
     label: 'Fermeture automatique — sans réponse commerciale',

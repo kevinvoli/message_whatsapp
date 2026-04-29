@@ -34,9 +34,19 @@ interface MetaTokenRow {
 }
 interface MetaTokenPreview { total: number; channels: MetaTokenRow[] }
 
+interface UnreadRebalancePosteRow {
+  poste_id: string; name: string; current_load: number; target_load: number; excess: number;
+}
+interface UnreadRebalancePreview {
+  total_eligible: number;
+  threshold_minutes: number;
+  target_load: number;
+  postes_snapshot: UnreadRebalancePosteRow[];
+}
+
 interface NoPreview { available: false; message: string }
 
-type CronPreviewData = ReinjectionPreview | ReadOnlyPreview | SlaCheckerPreview | WebhookPurgePreview | MetaTokenPreview | NoPreview | null;
+type CronPreviewData = ReinjectionPreview | ReadOnlyPreview | SlaCheckerPreview | WebhookPurgePreview | MetaTokenPreview | UnreadRebalancePreview | NoPreview | null;
 
 // ─── Modal de confirmation ────────────────────────────────────────────────────
 
@@ -138,6 +148,60 @@ function PreviewModal({
                       </td>
                       <td className="px-3 py-2 text-gray-500">
                         {c.last_client_message_at ? formatRelativeDate(c.last_client_message_at) : <span className="italic text-gray-400">jamais</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (cronKey === 'unread-rebalance') {
+      const d = data as UnreadRebalancePreview;
+      return (
+        <div>
+          <p className="text-sm text-gray-700 mb-3">
+            <strong>{d.total_eligible}</strong> conversation{d.total_eligible !== 1 ? 's' : ''} non lue{d.total_eligible !== 1 ? 's' : ''} éligible{d.total_eligible !== 1 ? 's' : ''} (seuil : {d.threshold_minutes} min).
+            Charge cible : <strong>{d.target_load}</strong> conversation{d.target_load !== 1 ? 's' : ''} / poste.
+          </p>
+          {d.postes_snapshot.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">Moins de 2 postes actifs — équilibrage non applicable.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Poste</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Charge actuelle</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Cible</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Excédent</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {d.postes_snapshot.map((p) => (
+                    <tr key={p.poste_id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-800">{p.name}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 font-bold text-[10px] ${
+                          p.current_load > p.target_load
+                            ? 'bg-red-100 text-red-700'
+                            : p.current_load < p.target_load
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {p.current_load}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-[10px]">{p.target_load}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {p.excess > 0
+                          ? <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-bold text-[10px]">-{p.excess}</span>
+                          : <span className="text-gray-300">—</span>}
                       </td>
                     </tr>
                   ))}
