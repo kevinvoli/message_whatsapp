@@ -5,7 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -547,7 +547,7 @@ export class DispatcherService {
     const chats = await this.chatRepository.find({
       where: {
         poste_id: poste_id,
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
+        status: WhatsappChatStatus.ACTIF,
         unread_count: MoreThan(0),
       },
     });
@@ -582,7 +582,7 @@ export class DispatcherService {
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
       const chats = await this.chatRepository.find({
         where: {
-          status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
+          status: WhatsappChatStatus.ACTIF,
           unread_count: MoreThan(0),
           last_client_message_at: LessThan(threshold), // pas lu depuis N minutes
         },

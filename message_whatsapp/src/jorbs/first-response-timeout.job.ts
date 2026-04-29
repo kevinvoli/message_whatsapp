@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { In, LessThan, MoreThan, Repository } from 'typeorm';
+import { LessThan, MoreThan, Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
 @Injectable()
@@ -50,7 +50,7 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
 
     const chats = await this.chatRepo.find({
       where: {
-        status: In([WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.ACTIF]),
+        status: WhatsappChatStatus.ACTIF,
         unread_count: MoreThan(0),
         last_client_message_at: LessThan(threshold),
       },
