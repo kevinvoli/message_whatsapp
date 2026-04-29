@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CronConfig } from './entities/cron-config.entity';
 import { CronConfigService } from './cron-config.service';
 import { CronConfigController } from './cron-config.controller';
+import { DisconnectAllCommercialsJob } from './disconnect-all-commercials.job';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { LoggingModule } from 'src/logging/logging.module';
@@ -20,6 +21,7 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
   controllers: [CronConfigController],
   providers: [
     CronConfigService,
+    DisconnectAllCommercialsJob,
   ],
   exports: [CronConfigService],
 })

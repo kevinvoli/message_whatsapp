@@ -1,10 +1,11 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone, Users } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone, Users, LogOut } from 'lucide-react';
 import { PerformanceCommercial, Poste, ClientSummary } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api/commerciaux.api';
 import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
 import { getPostes } from '@/app/lib/api/postes.api';
 import { searchClientsAdmin } from '@/app/lib/api/clients.api';
+import { runCronNow } from '@/app/lib/api/crons.api';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -85,6 +86,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   const [portfolioClients, setPortfolioClients] = useState<ClientSummary[]>([]);
   const [portfolioTotal, setPortfolioTotal] = useState(0);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const loadPortfolioForCommercial = useCallback(async (commercialId: string) => {
     setPortfolioLoading(true);
@@ -98,6 +100,20 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
       setPortfolioLoading(false);
     }
   }, []);
+
+  const handleDisconnectAll = async () => {
+    if (!window.confirm('Déconnecter tous les commerciaux actuellement connectés ?')) return;
+    setDisconnecting(true);
+    try {
+      await runCronNow('disconnect-all');
+      addToast({ type: 'success', message: 'Tous les commerciaux ont été déconnectés.' });
+      void fetchData();
+    } catch {
+      addToast({ type: 'error', message: 'Échec de la déconnexion.' });
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   logger.debug("Commerciaux loaded", { count: commerciaux.length });
 
@@ -241,7 +257,18 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => void handleDisconnectAll()}
+          disabled={disconnecting}
+          title="Déconnecter tous les commerciaux"
+          aria-label="Déconnecter tous les commerciaux"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <LogOut className="w-4 h-4" />
+          {disconnecting ? 'Déconnexion…' : 'Déconnecter tous'}
+        </button>
         <button
           type="button"
           onClick={() => void fetchData()}

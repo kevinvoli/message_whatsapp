@@ -96,6 +96,19 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: null,
     maxSteps: null,
   },
+  'disconnect-all': {
+    label: 'Déconnexion automatique fin de journée',
+    description:
+      'Déconnecte tous les commerciaux connectés à la fin de la journée. Peut aussi être déclenché manuellement depuis le panel admin.',
+    enabled: true,
+    scheduleType: 'cron',
+    intervalMinutes: null,
+    cronExpression: '0 21 * * *',
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import { QueuePublisher } from 'src/realtime/publishers/queue.publisher';
 import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WindowRotationService } from 'src/window/services/window-rotation.service';
 import { ValidationEngineService } from 'src/window/services/validation-engine.service';
+import { RealtimeServerService } from 'src/realtime/realtime-server.service';
 
 export interface AgentSession {
   commercialId: string;
@@ -51,6 +52,7 @@ export class AgentConnectionService {
     private readonly queuePublisher: QueuePublisher,
     private readonly windowRotation: WindowRotationService,
     private readonly validationEngine: ValidationEngineService,
+    private readonly realtimeServerService: RealtimeServerService,
   ) {}
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
@@ -78,6 +80,17 @@ export class AgentConnectionService {
     }
 
     const tenantId = tenantIds[0];
+
+    // Purge des sockets fantômes du même commercial (connexion morte non nettoyée)
+    for (const [ghostId, ghostSession] of this.connectedAgents.entries()) {
+      if (ghostSession.commercialId === commercialId) {
+        this.connectedAgents.delete(ghostId);
+        this.logger.warn(
+          `Ghost socket purged: commercial=${commercialId} old=${ghostId} new=${client.id}`,
+        );
+      }
+    }
+
     this.connectedAgents.set(client.id, { commercialId, posteId, tenantId, tenantIds });
 
     for (const tid of tenantIds) {
@@ -155,6 +168,29 @@ export class AgentConnectionService {
     }
 
     await this.emitQueueUpdate('agent_disconnected');
+  }
+
+  // ─── Admin actions ──────────────────────────────────────────────────────────
+
+  /**
+   * Déconnecte tous les agents actuellement connectés.
+   * Retourne le nombre de sockets effectivement fermés.
+   */
+  async disconnectAllAgents(): Promise<number> {
+    const server = this.realtimeServerService.getServer();
+    const socketIds = Array.from(this.connectedAgents.keys());
+    let count = 0;
+    for (const socketId of socketIds) {
+      const socket = server.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.disconnect(true);
+        count++;
+      } else {
+        this.connectedAgents.delete(socketId);
+      }
+    }
+    this.logger.warn(`disconnectAllAgents: ${count} socket(s) déconnecté(s)`);
+    return count;
   }
 
   // ─── Lookups ────────────────────────────────────────────────────────────────
