@@ -38,6 +38,7 @@ const WhatsAppPage = () => {
 
   // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)
   const isInitialSearchMount = useRef(true);
+  const isInitialFilterMount = useRef(true);
 
   // Protection de route
   useEffect(() => {
@@ -72,13 +73,23 @@ const WhatsAppPage = () => {
       return;
     }
     const timer = setTimeout(() => {
-      loadConversations(searchQuery);
+      loadConversations(searchQuery || undefined, filterStatus === 'unread');
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, loadConversations]);
 
-  // Le filtre de statut reste côté client : le backend renvoie tous les statuts.
-  // La recherche textuelle est désormais gérée par le serveur.
+  // Filtre "non lus" : rechargement côté serveur pour inclure toutes les conversations
+  // non lues du poste, même au-delà de la limite de pagination (300).
+  // Les autres filtres restent côté client.
+  useEffect(() => {
+    if (isInitialFilterMount.current) {
+      isInitialFilterMount.current = false;
+      return;
+    }
+    loadConversations(searchQuery || undefined, filterStatus === 'unread');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus]);
+
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
       switch (filterStatus) {

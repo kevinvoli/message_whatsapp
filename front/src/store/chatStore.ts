@@ -45,8 +45,8 @@ interface ChatState {
 
   // Actions
   setSocket: (socket: Socket | null) => void;
-  /** Recharge depuis la page 1. Si search est fourni, le backend filtre côté serveur. */
-  loadConversations: (search?: string) => void;
+  /** Recharge depuis la page 1. Si search est fourni, le backend filtre côté serveur. Si unreadOnly, le backend retourne uniquement les conversations non lues (toutes, sans pagination). */
+  loadConversations: (search?: string, unreadOnly?: boolean) => void;
   loadMoreConversations: () => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
@@ -143,13 +143,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSocket: (socket) => set({ socket }),
 
-  loadConversations: (search?: string) => {
+  loadConversations: (search?: string, unreadOnly?: boolean) => {
     const { socket } = get();
     if (!socket) return;
     const searchTerm = search ?? '';
     set({ isLoading: true, conversationCursor: null, hasMoreConversations: false, currentSearch: searchTerm });
-    const payload = searchTerm ? { search: searchTerm } : undefined;
-    socket.emit("conversations:get", payload);
+    const payload: { search?: string; unreadOnly?: boolean } = {};
+    if (searchTerm) payload.search = searchTerm;
+    if (unreadOnly) payload.unreadOnly = true;
+    socket.emit("conversations:get", Object.keys(payload).length > 0 ? payload : undefined);
   },
 
   loadMoreConversations: () => {

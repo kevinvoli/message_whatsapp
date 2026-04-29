@@ -338,6 +338,7 @@ export class WhatsappMessageGateway
     agent: { posteId: string; tenantIds: string[] },
     searchTerm?: string,
     cursor?: { activityAt: string; chatId: string },
+    unreadOnly = false,
   ) {
     const isFirstPage = !cursor;
 
@@ -347,16 +348,17 @@ export class WhatsappMessageGateway
     const isDedicated = dedicatedChannelIds.length > 0;
 
     // Inclure TOUS les statuts (actif, attente, fermé, converti…).
-    // Limite : 300 conversations par page (keyset pagination) sauf en mode dédié.
+    // Limite : 300 conversations par page (keyset pagination) sauf en mode dédié ou filtre unread.
     let { chats, hasMore } = await this.chatService.findByPosteId(
       agent.posteId,
       [],
       isDedicated ? 10_000 : 300,
-      isDedicated ? undefined : cursor, // pas de curseur en mode dédié
+      isDedicated || unreadOnly ? undefined : cursor,
+      unreadOnly,
     );
 
-    // Poste dédié : pas de scroll infini
-    if (isDedicated) hasMore = false;
+    // Poste dédié ou filtre non-lus : pas de scroll infini
+    if (isDedicated || unreadOnly) hasMore = false;
 
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
@@ -503,6 +505,7 @@ export class WhatsappMessageGateway
     @MessageBody() payload?: {
       search?: string;
       cursor?: { activityAt: string; chatId: string };
+      unreadOnly?: boolean;
     },
   ) {
     if (!this.throttle.allow(client.id, 'conversations:get')) {
@@ -516,6 +519,7 @@ export class WhatsappMessageGateway
         agent,
         payload?.search,
         payload?.cursor,
+        payload?.unreadOnly,
       );
     } catch (err) {
       this.logger.error(

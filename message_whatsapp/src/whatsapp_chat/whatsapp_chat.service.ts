@@ -59,7 +59,9 @@ export class WhatsappChatService {
     excludeStatuses: string[] = ['fermé', 'converti'],
     limit = 300,
     cursor?: { activityAt: string; chatId: string },
+    unreadOnly = false,
   ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
+    const effectiveLimit = unreadOnly ? 5_000 : limit;
     const qb = this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
@@ -68,13 +70,17 @@ export class WhatsappChatService {
       .andWhere('chat.deletedAt IS NULL')
       .orderBy('chat.last_activity_at', 'DESC')
       .addOrderBy('chat.chat_id', 'DESC')
-      .limit(limit + 1); // +1 pour détecter hasMore
+      .limit(effectiveLimit + 1); // +1 pour détecter hasMore
 
     if (excludeStatuses.length > 0) {
       qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });
     }
 
-    if (cursor) {
+    if (unreadOnly) {
+      qb.andWhere('chat.unread_count > 0');
+    }
+
+    if (cursor && !unreadOnly) {
       qb.andWhere(
         '(chat.last_activity_at < :activityAt OR (chat.last_activity_at = :activityAt AND chat.chat_id < :chatId))',
         { activityAt: new Date(cursor.activityAt), chatId: cursor.chatId },
@@ -82,8 +88,8 @@ export class WhatsappChatService {
     }
 
     const rows = await qb.getMany();
-    const hasMore = rows.length > limit;
-    return { chats: hasMore ? rows.slice(0, limit) : rows, hasMore };
+    const hasMore = rows.length > effectiveLimit;
+    return { chats: hasMore ? rows.slice(0, effectiveLimit) : rows, hasMore };
   }
 
   /**
