@@ -899,12 +899,12 @@ export async function getCronPreview(key: string): Promise<unknown> {
     return handleResponse<unknown>(response);
 }
 
-export async function runCronNow(key: string): Promise<void> {
+export async function runCronNow(key: string): Promise<{ ok: boolean; ranAt: string; report: string }> {
     const response = await fetch(`${API_BASE_URL}/cron-configs/${key}/run`, {
         method: 'POST',
         credentials: 'include',
     });
-    await handleResponse<{ ok: boolean; ranAt: string }>(response);
+    return handleResponse<{ ok: boolean; ranAt: string; report: string }>(response);
 }
 
 // ─── System Config ────────────────────────────────────────────────────────────

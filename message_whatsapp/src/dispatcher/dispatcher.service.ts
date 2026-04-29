@@ -593,18 +593,56 @@ export class DispatcherService {
         return 'Aucune conversation éligible';
       }
 
-      this.logger.log(`SLA checker : ${chats.length} conversation(s) à réinjecter dans la queue`);
+      this.logger.log(`SLA checker : ${chats.length} conversation(s) à analyser (seuil ${thresholdMinutes} min)`);
 
       const reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }> = [];
-      let reinjected = 0;
+      let dispatched = 0;
+      let skippedDedicated = 0;
+      let skippedNoAlternative = 0;
+      let skippedNoQueue = 0;
 
       for (const chat of chats) {
         try {
-          const result = await this.reinjectConversation(chat, true);
-          if (result) {
-            reassignments.push({ chatId: chat.chat_id, ...result });
-            reinjected++;
+          // Vérif canal dédié
+          const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
+          if (channelId) {
+            const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
+            if (dedicatedPosteId) {
+              skippedDedicated++;
+              continue;
+            }
           }
+
+          // Vérif alternatives dans la queue
+          if (chat.poste_id) {
+            const alternatives = await this.queueService.countQueuedPostesExcluding(chat.poste_id);
+            if (alternatives === 0) {
+              skippedNoAlternative++;
+              continue;
+            }
+          }
+
+          // Dispatch via la queue
+          const nextPoste = await this.queueService.getNextInQueue();
+          if (!nextPoste) {
+            skippedNoQueue++;
+            continue;
+          }
+
+          const oldPosteId = chat.poste_id!;
+          await this.chatRepository.update(chat.id, {
+            poste: nextPoste,
+            poste_id: nextPoste.id,
+            assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
+            status: nextPoste.is_active
+              ? WhatsappChatStatus.ACTIF
+              : WhatsappChatStatus.EN_ATTENTE,
+            assigned_at: new Date(),
+            first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
+          });
+
+          reassignments.push({ chatId: chat.chat_id, oldPosteId, newPosteId: nextPoste.id });
+          dispatched++;
         } catch (err) {
           this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
         }
@@ -614,7 +652,15 @@ export class DispatcherService {
         await this.messageGateway.emitBatchReassignments(reassignments);
       }
 
-      return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
+      const summary = [
+        `${dispatched} dispatchée(s)`,
+        skippedDedicated > 0 ? `${skippedDedicated} canal dédié (non déplaçables)` : '',
+        skippedNoAlternative > 0 ? `${skippedNoAlternative} aucun autre poste en queue` : '',
+        skippedNoQueue > 0 ? `${skippedNoQueue} queue vide` : '',
+      ].filter(Boolean).join(' | ');
+
+      this.logger.log(`SLA checker résultat : ${summary}`);
+      return summary;
     } finally {
       this.isSlaRunning = false;
     }

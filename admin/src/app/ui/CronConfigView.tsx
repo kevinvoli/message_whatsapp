@@ -479,9 +479,9 @@ function ConfigPanel({
   const handleConfirmRun = async () => {
     setRunning(true);
     try {
-      await runCronNow(config.key);
+      const result = await runCronNow(config.key);
       setPreviewOpen(false);
-      addToast({ type: 'success', message: `"${config.label}" exécuté immédiatement.` });
+      addToast({ type: 'success', message: result.report || `"${config.label}" exécuté.` });
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : "Erreur d'exécution." });
     } finally {

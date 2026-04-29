@@ -453,16 +453,37 @@ export class CronConfigService implements OnModuleInit {
     return saved;
   }
 
-  async runNow(key: string): Promise<{ ok: boolean; ranAt: string }> {
+  async runNow(key: string): Promise<{ ok: boolean; ranAt: string; report: string }> {
     const config = await this.findByKey(key);
     const handler = this.handlers.get(key);
     if (!handler) {
       throw new NotFoundException(`Aucun handler enregistré pour la clé "${key}"`);
     }
     this.logger.log(`Running cron "${key}" immediately`);
-    await handler();
+
+    let report = 'Exécution terminée';
+    let success = true;
+    try {
+      const result = await handler();
+      if (typeof result === 'string') report = result;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Cron "${key}" runNow failed: ${msg}`);
+      report = `Erreur : ${msg}`;
+      success = false;
+    }
+
+    this.lastRunReports.set(key, { report, ranAt: new Date() });
     await this.updateLastRunAt(config);
-    return { ok: true, ranAt: new Date().toISOString() };
+    if (this.notificationService) {
+      void this.notificationService.create(
+        success ? 'info' : 'alert',
+        `CRON ${key} (manuel)`,
+        report,
+      ).catch(() => undefined);
+    }
+
+    return { ok: success, ranAt: new Date().toISOString(), report };
   }
 
   // ─────────────────────────── Scheduling public ───────────────────────────
