@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus, Calendar } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus, Calendar, User } from 'lucide-react';
 import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
 import { getMyFollowUps, getDueToday, completeFollowUp, cancelFollowUp, rescheduleFollowUp } from '@/lib/followUpApi';
 import { formatDate } from '@/lib/dateUtils';
@@ -398,7 +398,18 @@ function FollowUpCard({ followUp: fu, onComplete, onCancel, onReschedule, highli
             </span>
             <span className="text-xs text-gray-500">{FOLLOW_UP_TYPE_LABELS[fu.type]}</span>
           </div>
-          <p className="text-xs text-gray-500">
+          {fu.contact_name ? (
+            <div className="flex items-center gap-1 mt-1">
+              <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
+              <span className="text-xs font-medium text-gray-800 truncate">{fu.contact_name}</span>
+              {fu.contact_phone && (
+                <span className="text-xs text-gray-400 truncate">· {fu.contact_phone}</span>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic mt-0.5">Contact non lié</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
             <Clock className="w-3 h-3 inline mr-1" />
             {formatDate(fu.scheduled_at)}
           </p>

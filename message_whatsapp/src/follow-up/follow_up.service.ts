@@ -71,7 +71,7 @@ export class FollowUpService {
     status?: FollowUpStatus,
     limit = 50,
     offset = 0,
-  ): Promise<{ data: FollowUp[]; total: number }> {
+  ): Promise<{ data: Array<FollowUp & { contact_name: string | null; contact_phone: string | null }>; total: number }> {
     const where: Record<string, unknown> = { commercial_id };
     if (status) where.status = status;
 
@@ -81,10 +81,23 @@ export class FollowUpService {
       take: limit,
       skip: offset,
     });
-    return { data, total };
+
+    const contactIds = [...new Set(data.map((f) => f.contact_id).filter(Boolean) as string[])];
+    const contacts = contactIds.length > 0
+      ? await this.contactRepo.find({ where: { id: In(contactIds) }, select: ['id', 'name', 'phone'] })
+      : [];
+    const contactMap = new Map(contacts.map((c) => [c.id, c]));
+
+    const enriched = data.map((f) => ({
+      ...f,
+      contact_name:  f.contact_id ? (contactMap.get(f.contact_id)?.name ?? null) : null,
+      contact_phone: f.contact_id ? (contactMap.get(f.contact_id)?.phone ?? null) : null,
+    }));
+
+    return { data: enriched, total };
   }
 
-  async findDueToday(commercial_id?: string): Promise<FollowUp[]> {
+  async findDueToday(commercial_id?: string): Promise<Array<FollowUp & { contact_name: string | null; contact_phone: string | null }>> {
     const now = new Date();
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
@@ -100,7 +113,19 @@ export class FollowUpService {
       qb.andWhere('f.commercial_id = :commercial_id', { commercial_id });
     }
 
-    return qb.getMany();
+    const data = await qb.getMany();
+
+    const contactIds = [...new Set(data.map((f) => f.contact_id).filter(Boolean) as string[])];
+    const contacts = contactIds.length > 0
+      ? await this.contactRepo.find({ where: { id: In(contactIds) }, select: ['id', 'name', 'phone'] })
+      : [];
+    const contactMap = new Map(contacts.map((c) => [c.id, c]));
+
+    return data.map((f) => ({
+      ...f,
+      contact_name:  f.contact_id ? (contactMap.get(f.contact_id)?.name ?? null) : null,
+      contact_phone: f.contact_id ? (contactMap.get(f.contact_id)?.phone ?? null) : null,
+    }));
   }
 
   async complete(id: string, commercial_id: string, dto: CompleteFollowUpDto): Promise<FollowUp> {

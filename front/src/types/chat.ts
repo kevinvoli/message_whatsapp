@@ -70,6 +70,8 @@ export interface FollowUp {
   conversation_id?: string | null;
   commercial_id?: string | null;
   commercial_name?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
   type: FollowUpType;
   status: FollowUpStatus;
   scheduled_at: string;
