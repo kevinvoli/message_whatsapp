@@ -29,7 +29,7 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
         return `Ignoré — hors plage horaire (${hour}h, actif 5h–21h)`;
       }
       // noResponseThresholdMinutes : seuil de redispatch (défaut 60 min, configurable).
-      // intervalMinutes : fréquence du cron (≥ 121 min) — ces deux valeurs sont indépendantes.
+      // intervalMinutes : fréquence du cron (configurable librement) — ces deux valeurs sont indépendantes.
       const config = await this.cronConfigService.findByKey('sla-checker');
       const thresholdMinutes = config.noResponseThresholdMinutes ?? 60;
       return this.dispatcher.jobRunnerAllPostes(thresholdMinutes);
