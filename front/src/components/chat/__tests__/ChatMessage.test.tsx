@@ -15,7 +15,7 @@ vi.mock('../LocationMapThumb', () => ({
 }));
 
 vi.mock('../../helper/mediaBubble', () => ({
-  MediaBubble: ({ media }: { media: { url: string } }) => <div data-testid="media-bubble">{media.url}</div>,
+  MediaBubble: ({ children }: { children: React.ReactNode }) => <div data-testid="media-bubble">{children}</div>,
 }));
 
 vi.mock('@/lib/dateUtils', () => ({
@@ -104,8 +104,8 @@ describe('ChatMessage', () => {
     expect(screen.queryByText('[Localisation]')).not.toBeInTheDocument();
   });
 
-  it('message avec replyTo affiche le message cité', () => {
-    const msg = makeMsg({ replyTo: { id: 'orig', text: 'Message original', from_me: true } as never });
+  it('message avec quotedMessage affiche le message cité', () => {
+    const msg = makeMsg({ quotedMessage: { id: 'orig', text: 'Message original', from_me: true, from_name: 'Moi' } as never });
     render(<ChatMessage msg={msg} index={0} />);
     expect(screen.getByText('Message original')).toBeInTheDocument();
   });

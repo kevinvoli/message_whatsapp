@@ -86,12 +86,23 @@ describe('ConversationSlice — updateConversation', () => {
     expect(useChatStore.getState().conversations[0].clientName).toBe('Nouveau');
   });
 
-  it('ajoute la conversation si elle n\'existe pas', () => {
+  it('ne modifie pas la liste si la conversation n\'existe pas et n\'est pas sélectionnée', () => {
     act(() => {
-      useChatStore.setState({ conversations: [] });
+      useChatStore.setState({ conversations: [], selectedConversation: null });
       useChatStore.getState().updateConversation(makeConv({ chat_id: 'c-new' }));
     });
-    expect(useChatStore.getState().conversations).toHaveLength(1);
+    expect(useChatStore.getState().conversations).toHaveLength(0);
+  });
+
+  it('met à jour selectedConversation si conversation absente mais sélectionnée', () => {
+    act(() => {
+      useChatStore.setState({
+        conversations: [],
+        selectedConversation: makeConv({ chat_id: 'c-new' }),
+      });
+      useChatStore.getState().updateConversation(makeConv({ chat_id: 'c-new', clientName: 'Hydraté' }));
+    });
+    expect(useChatStore.getState().selectedConversation?.clientName).toBe('Hydraté');
   });
 });
 
@@ -118,24 +129,47 @@ describe('ConversationSlice — typing', () => {
 });
 
 describe('ConversationSlice — updateConversationContactSummary', () => {
-  it('fusionne le contact summary', () => {
+  it('fusionne le contact_summary de la conversation', () => {
     act(() => {
-      useChatStore.setState({ conversations: [makeConv({ chat_id: 'c1' })] });
-      useChatStore.getState().updateConversationContactSummary('c1', { clientName: 'Mis à jour' });
+      useChatStore.setState({ conversations: [makeConv({ chat_id: 'c1', contact_summary: null })] });
+      useChatStore.getState().updateConversationContactSummary('c1', { phone: '0612345678' } as never);
     });
     const conv = useChatStore.getState().conversations.find((c) => c.chat_id === 'c1');
-    expect(conv?.clientName).toBe('Mis à jour');
+    expect((conv as never as { contact_summary: { phone: string } })?.contact_summary?.phone).toBe('0612345678');
+  });
+
+  it('ne modifie pas les autres conversations', () => {
+    act(() => {
+      useChatStore.setState({ conversations: [
+        makeConv({ chat_id: 'c1' }),
+        makeConv({ chat_id: 'c2', clientName: 'Autre' }),
+      ]});
+      useChatStore.getState().updateConversationContactSummary('c1', { phone: '0600000000' } as never);
+    });
+    const c2 = useChatStore.getState().conversations.find((c) => c.chat_id === 'c2');
+    expect(c2?.clientName).toBe('Autre');
   });
 });
 
 describe('ConversationSlice — changeConversationStatus', () => {
-  it('change le statut d\'une conversation', () => {
+  it('émet CONVERSATION_STATUS_CHANGE via socket', () => {
+    const mockSocket = { emit: vi.fn() };
     act(() => {
-      useChatStore.setState({ conversations: [makeConv({ chat_id: 'c1', status: 'actif' })] });
+      useChatStore.setState({ socket: mockSocket as never });
       useChatStore.getState().changeConversationStatus('c1', 'attente');
     });
-    const conv = useChatStore.getState().conversations.find((c) => c.chat_id === 'c1');
-    expect(conv?.status).toBe('attente');
+    expect(mockSocket.emit).toHaveBeenCalledWith('chat:event', {
+      type: 'CONVERSATION_STATUS_CHANGE',
+      payload: { chat_id: 'c1', status: 'attente' },
+    });
+  });
+
+  it('ne fait rien si pas de socket', () => {
+    act(() => {
+      useChatStore.setState({ socket: null });
+      useChatStore.getState().changeConversationStatus('c1', 'attente');
+    });
+    // Pas d'erreur levée
   });
 });
 
