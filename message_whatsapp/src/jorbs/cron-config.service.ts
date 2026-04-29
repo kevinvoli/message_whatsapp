@@ -306,7 +306,7 @@ export class CronConfigService implements OnModuleInit {
   private readonly logger = new Logger(CronConfigService.name);
 
   /** Handlers enregistrés par les job services via registerHandler() */
-  private readonly handlers = new Map<string, () => Promise<string | void>>();
+  private readonly handlers = new Map<string, (manual?: boolean) => Promise<string | void>>();
 
   /** Preview handlers — retournent des infos sans exécuter d'action */
   private readonly previewHandlers = new Map<string, () => Promise<unknown>>();
@@ -342,7 +342,7 @@ export class CronConfigService implements OnModuleInit {
    * Appelé par chaque job service dans son onModuleInit() pour s'enregistrer.
    * CronConfigService ne stocke aucune référence aux services de jobs.
    */
-  registerHandler(key: string, fn: () => Promise<string | void>): void {
+  registerHandler(key: string, fn: (manual?: boolean) => Promise<string | void>): void {
     this.handlers.set(key, fn);
     this.logger.log(`Handler registered for cron key="${key}"`);
   }
@@ -464,7 +464,7 @@ export class CronConfigService implements OnModuleInit {
     let report = 'Exécution terminée';
     let success = true;
     try {
-      const result = await handler();
+      const result = await handler(true); // manual = true → bypass plage horaire
       if (typeof result === 'string') report = result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

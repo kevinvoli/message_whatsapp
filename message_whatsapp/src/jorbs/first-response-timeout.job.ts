@@ -19,14 +19,16 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.cronConfigService.registerHandler('sla-checker', async () => {
-      // Désactivé entre 21h et 5h — tous les commerciaux sont hors ligne
-      const hour = new Date().getHours();
-      if (hour >= 21 || hour < 5) {
-        this.logger.debug(
-          `SLA checker ignoré — hors plage horaire (${hour}h, plage active : 5h–21h)`,
-        );
-        return `Ignoré — hors plage horaire (${hour}h, actif 5h–21h)`;
+    this.cronConfigService.registerHandler('sla-checker', async (manual = false) => {
+      // Plage horaire ignorée pour les exécutions manuelles (bouton admin)
+      if (!manual) {
+        const hour = new Date().getHours();
+        if (hour >= 21 || hour < 5) {
+          this.logger.debug(
+            `SLA checker ignoré — hors plage horaire (${hour}h, plage active : 5h–21h)`,
+          );
+          return `Ignoré — hors plage horaire (${hour}h, actif 5h–21h)`;
+        }
       }
       // noResponseThresholdMinutes : seuil de redispatch (défaut 60 min, configurable).
       // intervalMinutes : fréquence du cron (configurable librement) — ces deux valeurs sont indépendantes.
