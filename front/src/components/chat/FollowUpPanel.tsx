@@ -1,11 +1,29 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus, Calendar, User } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus, Calendar, User, ExternalLink } from 'lucide-react';
 import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
 import { getMyFollowUps, getDueToday, completeFollowUp, cancelFollowUp, rescheduleFollowUp } from '@/lib/followUpApi';
 import { formatDate } from '@/lib/dateUtils';
 import CreateFollowUpModal from './CreateFollowUpModal';
+
+const RESULT_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: '', label: '— Choisir un résultat —' },
+  { value: 'commande_passee', label: 'Commande passée' },
+  { value: 'rappel_planifie', label: 'Client à rappeler' },
+  { value: 'pas_interesse', label: 'Pas intéressé' },
+  { value: 'injoignable', label: 'Injoignable' },
+  { value: 'sans_suite', label: 'Sans suite' },
+];
+
+function formatOverdueDuration(scheduledAt: string): string {
+  const diffMs = Date.now() - new Date(scheduledAt).getTime();
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays >= 1) return `${diffDays}j de retard`;
+  if (diffH >= 1) return `${diffH}h de retard`;
+  return 'Quelques minutes de retard';
+}
 
 const STATUS_LABELS: Record<FollowUpStatus, string> = {
   planifiee: 'Planifiée',
@@ -31,11 +49,17 @@ function CompleteModal({ followUp, onClose, onDone }: CompleteModalProps) {
   const [result, setResult] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
+    if (!result) {
+      setError('Veuillez choisir un résultat.');
+      return;
+    }
+    setError(null);
     setSaving(true);
     try {
-      await completeFollowUp(followUp.id, { result: result || undefined, notes: notes || undefined });
+      await completeFollowUp(followUp.id, { result, notes: notes || undefined });
       onDone();
       onClose();
     } finally {
@@ -54,14 +78,23 @@ function CompleteModal({ followUp, onClose, onDone }: CompleteModalProps) {
         </div>
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Résultat (optionnel)</label>
-            <input
-              type="text"
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Résultat <span className="text-red-500">*</span>
+            </label>
+            <select
               value={result}
-              onChange={(e) => setResult(e.target.value)}
-              placeholder="Ex: Commande passée, rappel…"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-            />
+              onChange={(e) => {
+                setResult(e.target.value);
+                if (e.target.value) setError(null);
+              }}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              required
+            >
+              {RESULT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Notes (optionnel)</label>
@@ -215,7 +248,11 @@ function RescheduleModal({ followUp, onClose, onDone }: RescheduleModalProps) {
   );
 }
 
-export default function FollowUpPanel() {
+interface FollowUpPanelProps {
+  onOpenConversation?: (conversationId: string) => void;
+}
+
+export default function FollowUpPanel({ onOpenConversation }: FollowUpPanelProps = {}) {
   const [dueToday, setDueToday] = useState<FollowUp[]>([]);
   const [all, setAll] = useState<FollowUp[]>([]);
   const [filterStatus, setFilterStatus] = useState<FollowUpStatus | 'all'>('all');
@@ -289,6 +326,7 @@ export default function FollowUpPanel() {
                   onComplete={() => setCompleting(fu)}
                   onCancel={() => setCancelling(fu)}
                   onReschedule={() => setRescheduling(fu)}
+                  onOpenConversation={onOpenConversation}
                   highlight
                 />
               ))}
@@ -328,6 +366,7 @@ export default function FollowUpPanel() {
                   onComplete={() => setCompleting(fu)}
                   onCancel={() => setCancelling(fu)}
                   onReschedule={() => setRescheduling(fu)}
+                  onOpenConversation={onOpenConversation}
                 />
               ))}
               {all.length > 20 && !showAll && (
@@ -383,10 +422,11 @@ interface CardProps {
   onComplete: () => void;
   onCancel: () => void;
   onReschedule: () => void;
+  onOpenConversation?: (conversationId: string) => void;
   highlight?: boolean;
 }
 
-function FollowUpCard({ followUp: fu, onComplete, onCancel, onReschedule, highlight }: CardProps) {
+function FollowUpCard({ followUp: fu, onComplete, onCancel, onReschedule, onOpenConversation, highlight }: CardProps) {
   const isDone = fu.status === 'effectuee' || fu.status === 'annulee';
   return (
     <div className={`bg-white rounded-lg border p-3 ${highlight ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
@@ -413,8 +453,23 @@ function FollowUpCard({ followUp: fu, onComplete, onCancel, onReschedule, highli
             <Clock className="w-3 h-3 inline mr-1" />
             {formatDate(fu.scheduled_at)}
           </p>
+          {fu.status === 'en_retard' && (
+            <p className="text-xs font-semibold text-red-600 mt-0.5">
+              ⚠ {formatOverdueDuration(fu.scheduled_at)}
+            </p>
+          )}
           {fu.notes && (
             <p className="text-xs text-gray-600 mt-1 truncate">{fu.notes}</p>
+          )}
+          {fu.conversation_id && onOpenConversation && (
+            <button
+              onClick={() => onOpenConversation(fu.conversation_id!)}
+              title="Voir la conversation"
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 mt-1.5"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Voir la conversation
+            </button>
           )}
         </div>
         {!isDone && (

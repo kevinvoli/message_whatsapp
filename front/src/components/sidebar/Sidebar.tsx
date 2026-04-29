@@ -62,7 +62,16 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { logout } = useAuth();
   const typingStatus = useChatStore((state) => state.typingStatus);
+  const conversationsFromStore = useChatStore((state) => state.conversations);
+  const selectConversation = useChatStore((state) => state.selectConversation);
   const [showOutbound, setShowOutbound] = useState(false);
+
+  const handleOpenConversationById = React.useCallback((conversationId: string) => {
+    const conv = conversationsFromStore.find((c) => c.id === conversationId);
+    if (!conv) return;
+    selectConversation(conv.chat_id);
+    onViewModeChange?.('conversations');
+  }, [conversationsFromStore, selectConversation, onViewModeChange]);
 
   // Handlers
 
@@ -125,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       ) : viewMode === 'dashboard' ? (
         <DashboardPanel />
       ) : (
-        <FollowUpPanel />
+        <FollowUpPanel onOpenConversation={handleOpenConversationById} />
       )}
 
       {showOutbound && (

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
-import { IsNull, LessThanOrEqual, In } from 'typeorm';
+import { IsNull, LessThanOrEqual, In, LessThan } from 'typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FollowUp, FollowUpStatus } from './entities/follow_up.entity';
@@ -29,13 +29,15 @@ export class FollowUpReminderService {
   @Cron('*/5 * * * *')
   async sendReminders(): Promise<void> {
     const now = new Date();
+    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
     const dues = await this.repo.find({
       where: [
         { status: FollowUpStatus.PLANIFIEE, scheduled_at: LessThanOrEqual(now), reminded_at: IsNull() },
         { status: FollowUpStatus.EN_RETARD, reminded_at: IsNull() },
+        { status: FollowUpStatus.EN_RETARD, reminded_at: LessThan(thirtyMinutesAgo) },
       ],
-      select: ['id', 'commercial_id', 'scheduled_at', 'type', 'notes'],
+      select: ['id', 'commercial_id', 'scheduled_at', 'type', 'notes', 'reminded_at'],
     });
 
     if (dues.length === 0) return;
@@ -53,7 +55,10 @@ export class FollowUpReminderService {
         notes:        followUp.notes ?? null,
       };
 
-      this.logger.log(`FOLLOW_UP_REMINDER_SENT id=${followUp.id} commercial=${followUp.commercial_id} type=${followUp.type}`);
+      const isRenotification = followUp.reminded_at !== null;
+      this.logger.log(
+        `FOLLOW_UP_REMINDER_SENT id=${followUp.id} commercial=${followUp.commercial_id} type=${followUp.type}${isRenotification ? ' [RE-NOTIF]' : ''}`,
+      );
       this.eventEmitter.emit(FOLLOW_UP_REMINDER_EVENT, payload);
     }
 
