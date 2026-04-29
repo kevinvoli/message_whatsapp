@@ -2,8 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
-import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { LessThan, MoreThan, Repository } from 'typeorm';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
 @Injectable()
@@ -48,17 +48,25 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     conversations: { chat_id: string; name: string; status: string; last_client_message_at: Date | null; minutes_waiting: number }[];
   }> {
     const config = await this.cronConfigService.findByKey('sla-checker');
-    const thresholdMinutes = config.noResponseThresholdMinutes ?? 60;
+    const thresholdMinutes = config.noResponseThresholdMinutes ?? 15;
     const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
 
-    const chats = await this.chatRepo.find({
-      where: {
-        status: WhatsappChatStatus.ACTIF,
-        unread_count: MoreThan(0),
-        last_client_message_at: LessThan(threshold),
-      },
-      order: { last_client_message_at: 'ASC' },
-    });
+    const dedicatedExclusion = `(
+      (chat.channel_id IS NULL OR chat.channel_id NOT IN
+        (SELECT c.channel_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
+      AND (chat.poste_id IS NULL OR chat.poste_id NOT IN
+        (SELECT c.poste_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
+    )`;
+
+    const chats = await this.chatRepo
+      .createQueryBuilder('chat')
+      .where('chat.unread_count > 0')
+      .andWhere('chat.last_client_message_at < :threshold', { threshold })
+      .andWhere('chat.deletedAt IS NULL')
+      .andWhere(dedicatedExclusion)
+      .orderBy('chat.last_client_message_at', 'ASC')
+      .getMany();
+
     return {
       total: chats.length,
       threshold_minutes: thresholdMinutes,

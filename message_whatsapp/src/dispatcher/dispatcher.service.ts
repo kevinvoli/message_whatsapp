@@ -587,8 +587,13 @@ export class DispatcherService {
 
       const posteIds = queuedPostes.map((p) => p.id);
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
-      const dedicatedExclusion = `(chat.channel_id IS NULL OR chat.channel_id NOT IN
-        (SELECT c.channel_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))`;
+      // Exclut : conversations venant d'un canal dédié OU assignées à un poste dédié
+      const dedicatedExclusion = `(
+        (chat.channel_id IS NULL OR chat.channel_id NOT IN
+          (SELECT c.channel_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
+        AND (chat.poste_id IS NULL OR chat.poste_id NOT IN
+          (SELECT c.poste_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
+      )`;
 
       // ── 2. Nombre de convs éligibles par poste ───────────────────────────────
       const countRows = await this.chatRepository
@@ -596,12 +601,8 @@ export class DispatcherService {
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
         .where('chat.poste_id IN (:...posteIds)', { posteIds })
-        .andWhere('chat.status IN (:...statuses)', {
-          statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
-        })
         .andWhere('chat.unread_count > 0')
         .andWhere('chat.last_client_message_at < :threshold', { threshold })
-        .andWhere('chat.read_only = :readOnly', { readOnly: false })
         .andWhere('chat.deletedAt IS NULL')
         .andWhere(dedicatedExclusion)
         .groupBy('chat.poste_id')
@@ -650,12 +651,8 @@ export class DispatcherService {
         const srcChats = await this.chatRepository
           .createQueryBuilder('chat')
           .where('chat.poste_id = :posteId', { posteId: srcPoste.id })
-          .andWhere('chat.status IN (:...statuses)', {
-            statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
-          })
           .andWhere('chat.unread_count > 0')
           .andWhere('chat.last_client_message_at < :threshold', { threshold })
-          .andWhere('chat.read_only = :readOnly', { readOnly: false })
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
           .orderBy('chat.last_client_message_at', 'ASC')
