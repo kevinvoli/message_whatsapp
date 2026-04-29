@@ -560,10 +560,10 @@ export class DispatcherService {
   }
 
   /**
-   * Réinjecte dans la file d'attente les conversations non lues depuis plus de
-   * thresholdMinutes — exactement comme un nouveau message entrant.
-   * Chaque conversation passe par getNextInQueue() pour être assignée au prochain
-   * poste disponible dans la queue, sans logique d'équilibrage manuel.
+   * Sélectionne les conversations non lues depuis plus de thresholdMinutes,
+   * SAUF celles dont le canal source est dédié à un poste (filtre SQL).
+   * Les conversations éligibles sont réinjectées dans le processus de dispatch
+   * normal : getNextInQueue() distribue uniquement vers les postes en file d'attente.
    */
   async jobRunnerAllPostes(thresholdMinutes = 15, batchSize = 300): Promise<string> {
     if (this.isSlaRunning) {
@@ -575,6 +575,7 @@ export class DispatcherService {
     try {
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
 
+      // Exclure au niveau SQL les convs dont le canal est dédié à un poste
       const chats = await this.chatRepository
         .createQueryBuilder('chat')
         .where('chat.status IN (:...statuses)', {
@@ -585,46 +586,30 @@ export class DispatcherService {
         .andWhere('chat.read_only = :readOnly', { readOnly: false })
         .andWhere('chat.poste_id IS NOT NULL')
         .andWhere('chat.deletedAt IS NULL')
+        .andWhere(
+          `(chat.channel_id IS NULL OR chat.channel_id NOT IN
+            (SELECT c.channel_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))`,
+        )
         .orderBy('chat.last_client_message_at', 'ASC')
         .take(batchSize)
         .getMany();
 
       if (chats.length === 0) {
-        return 'Aucune conversation éligible';
+        return 'Aucune conversation éligible (hors canaux dédiés)';
       }
 
-      this.logger.log(`SLA checker : ${chats.length} conversation(s) à analyser (seuil ${thresholdMinutes} min)`);
+      this.logger.log(
+        `SLA checker : ${chats.length} conversation(s) éligibles à redistribuer (seuil ${thresholdMinutes} min)`,
+      );
 
       const reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }> = [];
       let dispatched = 0;
-      let skippedDedicated = 0;
-      let skippedNoAlternative = 0;
       let skippedNoQueue = 0;
 
       for (const chat of chats) {
         try {
-          // Vérif canal dédié
-          const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
-          if (channelId) {
-            const dedicatedPosteId = await this.channelService.getDedicatedPosteId(channelId);
-            if (dedicatedPosteId) {
-              skippedDedicated++;
-              continue;
-            }
-          }
-
-          // Vérif alternatives dans la queue
-          if (chat.poste_id) {
-            const alternatives = await this.queueService.countQueuedPostesExcluding(chat.poste_id);
-            if (alternatives === 0) {
-              skippedNoAlternative++;
-              continue;
-            }
-          }
-
-          // Dispatch via la queue
           const nextPoste = await this.queueService.getNextInQueue();
-          if (!nextPoste) {
+          if (!nextPoste || nextPoste.id === chat.poste_id) {
             skippedNoQueue++;
             continue;
           }
@@ -654,9 +639,7 @@ export class DispatcherService {
 
       const summary = [
         `${dispatched} dispatchée(s)`,
-        skippedDedicated > 0 ? `${skippedDedicated} canal dédié (non déplaçables)` : '',
-        skippedNoAlternative > 0 ? `${skippedNoAlternative} aucun autre poste en queue` : '',
-        skippedNoQueue > 0 ? `${skippedNoQueue} queue vide` : '',
+        skippedNoQueue > 0 ? `${skippedNoQueue} ignorée(s) — file d'attente vide` : '',
       ].filter(Boolean).join(' | ');
 
       this.logger.log(`SLA checker résultat : ${summary}`);
