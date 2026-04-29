@@ -2,6 +2,7 @@ import { Global, Logger, Module, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from './order-db.constants';
+import { OrderDbRepository } from './order-db.repository';
 // Entités DB2 — déclarées explicitement pour que getRepository() fonctionne
 // sans ambiguïté. synchronize: false → aucune migration générée.
 import { OrderCommand } from 'src/order-read/entities/order-command.entity';
@@ -73,7 +74,7 @@ const availableProvider: Provider = {
 @Global()
 @Module({
   imports:   [ConfigModule],
-  providers: [orderDbProvider, availableProvider],
-  exports:   [ORDER_DB_DATA_SOURCE, ORDER_DB_AVAILABLE],
+  providers: [orderDbProvider, availableProvider, OrderDbRepository],
+  exports:   [ORDER_DB_DATA_SOURCE, ORDER_DB_AVAILABLE, OrderDbRepository],
 })
 export class OrderDbModule {}

@@ -206,15 +206,17 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    console.log("verification de webhooks", mode, token, challenge);
-    
+    this.auditLogger.debug(
+      `WEBHOOK_VERIFY provider=messenger mode=${mode} token=*** challenge=***`,
+    );
+
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('messenger', token);
-    console.log("verification matchsDb", matchesDb);
+      this.auditLogger.debug(
+        `WEBHOOK_VERIFY_RESULT provider=messenger matches=${matchesDb}`,
+      );
 
       if (matchesDb) {
-    console.log("verification token if:", challenge);
-
         return challenge;
       }
     }

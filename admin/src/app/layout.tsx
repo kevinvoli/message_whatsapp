@@ -4,6 +4,8 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ToastProvider } from "./ui/ToastProvider";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { QueryProvider } from "./components/QueryProvider";
 
 export const metadata: Metadata = {
   title: "Gicop Cosmetics",
@@ -20,7 +22,11 @@ export default function RootLayout({
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
       >
-        <ToastProvider>{children}</ToastProvider>
+        <ErrorBoundary>
+          <QueryProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </QueryProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
