@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { In, LessThan, Repository } from 'typeorm';
@@ -200,6 +200,22 @@ export class FollowUpService {
     if (result.affected && result.affected > 0) {
       this.logger.log(`markOverdue: ${result.affected} relance(s) marquée(s) EN_RETARD`);
     }
+  }
+
+  async reschedule(id: string, commercial_id: string, newDate: Date): Promise<FollowUp> {
+    const entity = await this.repo.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException(`Relance ${id} introuvable`);
+    if (entity.commercial_id !== commercial_id) throw new NotFoundException(`Relance ${id} introuvable`);
+    if (entity.status === FollowUpStatus.EFFECTUEE || entity.status === FollowUpStatus.ANNULEE) {
+      throw new BadRequestException('Impossible de reprogrammer une relance terminée');
+    }
+
+    entity.scheduled_at = newDate;
+    entity.status       = FollowUpStatus.PLANIFIEE;
+    entity.reminded_at  = null;
+    const saved = await this.repo.save(entity);
+    this.logger.log(`FOLLOW_UP_RESCHEDULED id=${saved.id} commercial=${saved.commercial_id} new_date=${saved.scheduled_at.toISOString()}`);
+    return saved;
   }
 
   async countOverdueByCommercial(commercial_id: string): Promise<number> {

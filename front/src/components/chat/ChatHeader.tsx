@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers } from 'lucide-react';
+import { MessageCircle, User, Clock, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers, Bell } from 'lucide-react';
 import {
   Conversation,
   ConversationStatus,
@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 
 const GicopReportPanel = dynamic(() => import('./GicopReportPanel'), { ssr: false });
 const CatalogModal = dynamic(() => import('./CatalogModal'), { ssr: false });
+const CreateFollowUpModal = dynamic(() => import('./CreateFollowUpModal'), { ssr: false });
 import { getStatusBadge } from '@/lib/utils';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 import { useChatStore } from '@/store/chatStore';
@@ -90,6 +91,7 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
     const [summary, setSummary] = useState<AiSummaryData | null>(null);
     const [loadingSummary, setLoadingSummary] = useState(false);
     const [showCatalog, setShowCatalog] = useState(false);
+    const [showFollowUp, setShowFollowUp] = useState(false);
 
     const handleFetchSummary = async () => {
       setShowSummaryModal(true);
@@ -174,6 +176,15 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                         <Layers className="w-3.5 h-3.5" />
                         Catalogue
                     </button>
+                    {/* Bouton relance */}
+                    <button
+                        onClick={() => setShowFollowUp(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                        title="Créer une relance"
+                    >
+                        <Bell className="w-3.5 h-3.5" />
+                        Relance
+                    </button>
                     {/* Bouton résumé IA */}
                     <button
                         onClick={() => void handleFetchSummary()}
@@ -225,6 +236,15 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                 chatId={currentConv.chat_id}
                 onSend={(mediaUrl, text) => onCatalogSend?.(mediaUrl, text)}
                 onClose={() => setShowCatalog(false)}
+            />
+        )}
+
+        {/* Modal nouvelle relance */}
+        {showFollowUp && (
+            <CreateFollowUpModal
+                conversationId={currentConv.id}
+                onClose={() => setShowFollowUp(false)}
+                onDone={() => setShowFollowUp(false)}
             />
         )}
 

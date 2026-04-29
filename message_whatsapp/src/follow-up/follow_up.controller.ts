@@ -13,6 +13,7 @@ import { FollowUpService } from './follow_up.service';
 import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { CompleteFollowUpDto } from './dto/complete-follow-up.dto';
 import { CancelFollowUpDto } from './dto/cancel-follow-up.dto';
+import { RescheduleFollowUpDto } from './dto/reschedule-follow-up.dto';
 import { FollowUpStatus } from './entities/follow_up.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminGuard } from 'src/auth/admin.guard';
@@ -79,6 +80,17 @@ export class FollowUpController {
     @Request() req: { user: JwtUser },
   ) {
     return this.service.cancel(id, req.user.userId, req.user.name ?? 'Commercial', dto.reason);
+  }
+
+  /** Reprogrammer une relance */
+  @Patch(':id/reschedule')
+  @UseGuards(AuthGuard('jwt'))
+  reschedule(
+    @Param('id') id: string,
+    @Body() dto: RescheduleFollowUpDto,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.service.reschedule(id, req.user.userId, new Date(dto.scheduled_at));
   }
 
   /** Relances d'un contact spécifique */

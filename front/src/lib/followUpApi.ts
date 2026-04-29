@@ -48,3 +48,8 @@ export async function createFollowUp(data: CreateFollowUpData): Promise<FollowUp
   const r = await axios.post(`${base}/follow-ups`, data, headers());
   return r.data;
 }
+
+export async function rescheduleFollowUp(id: string, scheduled_at: string): Promise<FollowUp> {
+  const r = await axios.patch(`${base}/follow-ups/${id}/reschedule`, { scheduled_at }, headers());
+  return r.data;
+}

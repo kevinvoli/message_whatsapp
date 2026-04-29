@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, Plus, Calendar } from 'lucide-react';
 import { FollowUp, FollowUpStatus, FOLLOW_UP_TYPE_LABELS } from '@/types/chat';
-import { getMyFollowUps, getDueToday, completeFollowUp, cancelFollowUp } from '@/lib/followUpApi';
+import { getMyFollowUps, getDueToday, completeFollowUp, cancelFollowUp, rescheduleFollowUp } from '@/lib/followUpApi';
 import { formatDate } from '@/lib/dateUtils';
 import CreateFollowUpModal from './CreateFollowUpModal';
 
@@ -91,12 +91,138 @@ function CompleteModal({ followUp, onClose, onDone }: CompleteModalProps) {
   );
 }
 
+interface CancelModalProps {
+  followUp: FollowUp;
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function CancelModal({ followUp, onClose, onDone }: CancelModalProps) {
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await cancelFollowUp(followUp.id, reason || undefined);
+      onDone();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">Annuler la relance</h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Motif (optionnel)</label>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Ex: Client non disponible, doublon…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Retour
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            <XCircle className="w-4 h-4" />
+            {saving ? 'Annulation…' : 'Confirmer l\'annulation'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface RescheduleModalProps {
+  followUp: FollowUp;
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function RescheduleModal({ followUp, onClose, onDone }: RescheduleModalProps) {
+  const [date, setDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!date) { setError('Veuillez choisir une date.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await rescheduleFollowUp(followUp.id, new Date(date).toISOString());
+      onDone();
+      onClose();
+    } catch {
+      setError('Erreur lors de la reprogrammation.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-600" />
+            <h2 className="text-base font-semibold text-gray-900">Reprogrammer la relance</h2>
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Nouvelle date et heure</label>
+          <input
+            type="datetime-local"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+          />
+          {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+        </div>
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Clock className="w-4 h-4" />
+            {saving ? 'Enregistrement…' : 'Reprogrammer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FollowUpPanel() {
   const [dueToday, setDueToday] = useState<FollowUp[]>([]);
   const [all, setAll] = useState<FollowUp[]>([]);
   const [filterStatus, setFilterStatus] = useState<FollowUpStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState<FollowUp | null>(null);
+  const [cancelling, setCancelling] = useState<FollowUp | null>(null);
+  const [rescheduling, setRescheduling] = useState<FollowUp | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -121,11 +247,6 @@ export default function FollowUpPanel() {
     window.addEventListener('followup:reminder', handler);
     return () => window.removeEventListener('followup:reminder', handler);
   }, [load]);
-
-  async function handleCancel(id: string) {
-    await cancelFollowUp(id);
-    load();
-  }
 
   const filtered = showAll ? all : all.slice(0, 20);
 
@@ -166,7 +287,8 @@ export default function FollowUpPanel() {
                   key={fu.id}
                   followUp={fu}
                   onComplete={() => setCompleting(fu)}
-                  onCancel={() => handleCancel(fu.id)}
+                  onCancel={() => setCancelling(fu)}
+                  onReschedule={() => setRescheduling(fu)}
                   highlight
                 />
               ))}
@@ -204,7 +326,8 @@ export default function FollowUpPanel() {
                   key={fu.id}
                   followUp={fu}
                   onComplete={() => setCompleting(fu)}
-                  onCancel={() => handleCancel(fu.id)}
+                  onCancel={() => setCancelling(fu)}
+                  onReschedule={() => setRescheduling(fu)}
                 />
               ))}
               {all.length > 20 && !showAll && (
@@ -229,6 +352,22 @@ export default function FollowUpPanel() {
         />
       )}
 
+      {cancelling && (
+        <CancelModal
+          followUp={cancelling}
+          onClose={() => setCancelling(null)}
+          onDone={load}
+        />
+      )}
+
+      {rescheduling && (
+        <RescheduleModal
+          followUp={rescheduling}
+          onClose={() => setRescheduling(null)}
+          onDone={load}
+        />
+      )}
+
       {showCreate && (
         <CreateFollowUpModal
           onClose={() => setShowCreate(false)}
@@ -243,10 +382,11 @@ interface CardProps {
   followUp: FollowUp;
   onComplete: () => void;
   onCancel: () => void;
+  onReschedule: () => void;
   highlight?: boolean;
 }
 
-function FollowUpCard({ followUp: fu, onComplete, onCancel, highlight }: CardProps) {
+function FollowUpCard({ followUp: fu, onComplete, onCancel, onReschedule, highlight }: CardProps) {
   const isDone = fu.status === 'effectuee' || fu.status === 'annulee';
   return (
     <div className={`bg-white rounded-lg border p-3 ${highlight ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
@@ -274,6 +414,13 @@ function FollowUpCard({ followUp: fu, onComplete, onCancel, highlight }: CardPro
               className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
             >
               <CheckCircle className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onReschedule}
+              title="Reprogrammer"
+              className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Calendar className="w-4 h-4" />
             </button>
             <button
               onClick={onCancel}
