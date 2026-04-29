@@ -5,7 +5,6 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
@@ -34,9 +33,6 @@ export class DispatcherService {
 
     @InjectRepository(WhatsappPoste)
     private readonly posteRepository: Repository<WhatsappPoste>,
-
-    @InjectRepository(WhapiChannel)
-    private readonly channelRepository: Repository<WhapiChannel>,
 
     private readonly queueService: QueueService,
 
@@ -564,9 +560,10 @@ export class DispatcherService {
   }
 
   /**
-   * Vérifie le SLA sur TOUS les postes et équilibre la charge entre eux.
-   * Sélectionne toutes les conversations non lues > thresholdMinutes sur les postes
-   * pool (non dédiés), calcule la charge cible et redistribue de façon greedy.
+   * Réinjecte dans la file d'attente les conversations non lues depuis plus de
+   * thresholdMinutes — exactement comme un nouveau message entrant.
+   * Chaque conversation passe par getNextInQueue() pour être assignée au prochain
+   * poste disponible dans la queue, sans logique d'équilibrage manuel.
    */
   async jobRunnerAllPostes(thresholdMinutes = 15, batchSize = 300): Promise<string> {
     if (this.isSlaRunning) {
@@ -576,36 +573,17 @@ export class DispatcherService {
     this.isSlaRunning = true;
 
     try {
-      // Exclure les postes dédiés à un canal (leurs convs ne doivent pas migrer)
-      const dedicatedRows = await this.channelRepository
-        .createQueryBuilder('c')
-        .select('DISTINCT c.poste_id', 'poste_id')
-        .where('c.poste_id IS NOT NULL')
-        .getRawMany<{ poste_id: string }>();
-      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
-
-      const allPostes = await this.posteRepository.find({
-        where: { is_active: true, is_queue_enabled: true },
-      });
-      const eligiblePostes = allPostes.filter((p) => !dedicatedSet.has(p.id));
-
-      if (eligiblePostes.length < 2) {
-        this.logger.debug(`SLA checker ignoré — moins de 2 postes actifs pool (${eligiblePostes.length})`);
-        return `Ignoré — moins de 2 postes actifs (${eligiblePostes.length})`;
-      }
-
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
-      const eligiblePosteIds = eligiblePostes.map((p) => p.id);
 
       const chats = await this.chatRepository
         .createQueryBuilder('chat')
-        .where('chat.poste_id IN (:...posteIds)', { posteIds: eligiblePosteIds })
+        .where('chat.status IN (:...statuses)', {
+          statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+        })
         .andWhere('chat.unread_count > 0')
         .andWhere('chat.last_client_message_at < :threshold', { threshold })
         .andWhere('chat.read_only = :readOnly', { readOnly: false })
-        .andWhere('chat.status IN (:...statuses)', {
-          statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
-        })
+        .andWhere('chat.poste_id IS NOT NULL')
         .andWhere('chat.deletedAt IS NULL')
         .orderBy('chat.last_client_message_at', 'ASC')
         .take(batchSize)
@@ -615,73 +593,20 @@ export class DispatcherService {
         return 'Aucune conversation éligible';
       }
 
-      // Calcul charge actuelle par poste
-      const chargeMap = new Map<string, number>();
-      for (const p of eligiblePostes) chargeMap.set(p.id, 0);
-      for (const c of chats) {
-        if (c.poste_id) chargeMap.set(c.poste_id, (chargeMap.get(c.poste_id) ?? 0) + 1);
-      }
-
-      const targetLoad = Math.ceil(chats.length / eligiblePostes.length);
-      this.logger.log(`SLA équilibrage : ${chats.length} conv, ${eligiblePostes.length} postes, cible ${targetLoad}/poste`);
-
-      const overloaded = eligiblePostes
-        .filter((p) => (chargeMap.get(p.id) ?? 0) > targetLoad)
-        .sort((a, b) => (chargeMap.get(b.id) ?? 0) - (chargeMap.get(a.id) ?? 0));
-
-      if (overloaded.length === 0) {
-        return `Charge déjà équilibrée (cible ${targetLoad}/poste, ${chats.length} conv)`;
-      }
-
-      const underloaded = eligiblePostes
-        .filter((p) => (chargeMap.get(p.id) ?? 0) < targetLoad)
-        .sort((a, b) => (chargeMap.get(a.id) ?? 0) - (chargeMap.get(b.id) ?? 0));
-
-      // Index des conversations par poste (oldest-first pour prioriser les plus anciennes)
-      const chatsByPoste = new Map<string, WhatsappChat[]>();
-      for (const chat of chats) {
-        if (!chat.poste_id) continue;
-        const arr = chatsByPoste.get(chat.poste_id) ?? [];
-        arr.push(chat);
-        chatsByPoste.set(chat.poste_id, arr);
-      }
+      this.logger.log(`SLA checker : ${chats.length} conversation(s) à réinjecter dans la queue`);
 
       const reassignments: Array<{ chatId: string; oldPosteId: string; newPosteId: string }> = [];
-      let moved = 0;
-      let underIdx = 0;
+      let reinjected = 0;
 
-      for (const overPoste of overloaded) {
-        const excess = (chargeMap.get(overPoste.id) ?? 0) - targetLoad;
-        if (excess <= 0) continue;
-        const chatsToMove = (chatsByPoste.get(overPoste.id) ?? []).slice(0, excess);
-
-        for (const chat of chatsToMove) {
-          while (
-            underIdx < underloaded.length &&
-            (chargeMap.get(underloaded[underIdx].id) ?? 0) >= targetLoad
-          ) {
-            underIdx++;
+      for (const chat of chats) {
+        try {
+          const result = await this.reinjectConversation(chat, true);
+          if (result) {
+            reassignments.push({ chatId: chat.chat_id, ...result });
+            reinjected++;
           }
-          if (underIdx >= underloaded.length) break;
-
-          const targetPoste = underloaded[underIdx];
-          const oldPosteId = chat.poste_id!;
-
-          await this.chatRepository.update(chat.id, {
-            poste: targetPoste,
-            poste_id: targetPoste.id,
-            assigned_mode: targetPoste.is_active ? 'ONLINE' : 'OFFLINE',
-            status: targetPoste.is_active
-              ? WhatsappChatStatus.ACTIF
-              : WhatsappChatStatus.EN_ATTENTE,
-            assigned_at: new Date(),
-            first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-          });
-
-          reassignments.push({ chatId: chat.chat_id, oldPosteId, newPosteId: targetPoste.id });
-          chargeMap.set(oldPosteId, (chargeMap.get(oldPosteId) ?? 0) - 1);
-          chargeMap.set(targetPoste.id, (chargeMap.get(targetPoste.id) ?? 0) + 1);
-          moved++;
+        } catch (err) {
+          this.logger.warn(`SLA reinject error (chat ${chat.id}): ${String(err)}`);
         }
       }
 
@@ -689,7 +614,7 @@ export class DispatcherService {
         await this.messageGateway.emitBatchReassignments(reassignments);
       }
 
-      return `${moved} conversation(s) rééquilibrée(s) sur ${chats.length} ciblée(s) (seuil ${thresholdMinutes} min, cible ${targetLoad}/poste)`;
+      return `${reinjected} conversation(s) réinjectée(s) sur ${chats.length} ciblée(s)`;
     } finally {
       this.isSlaRunning = false;
     }
