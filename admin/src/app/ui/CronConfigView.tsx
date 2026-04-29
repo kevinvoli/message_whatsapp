@@ -22,9 +22,9 @@ interface ReadOnlyPreview { total: number; conversations: ReadOnlyRow[] }
 
 interface SlaCheckerRow {
   chat_id: string; name: string; status: string;
-  first_response_deadline_at: string | null; minutes_overdue: number;
+  last_client_message_at: string | null; minutes_waiting: number;
 }
-interface SlaCheckerPreview { total: number; conversations: SlaCheckerRow[] }
+interface SlaCheckerPreview { total: number; threshold_minutes: number; conversations: SlaCheckerRow[] }
 
 interface WebhookPurgePreview { total: number; ttlDays: number; cutoffDate: string }
 
@@ -111,7 +111,7 @@ function PreviewModal({
       return (
         <div>
           <p className="text-sm text-gray-700 mb-3">
-            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront réinjectées (délai de première réponse dépassé).
+            <strong>{d.total}</strong> conversation{d.total !== 1 ? 's' : ''} seront redispatchées (messages non lus depuis plus de {d.threshold_minutes} min).
           </p>
           {d.total === 0 ? (
             <p className="text-xs text-gray-400 italic">Aucune conversation concernée.</p>
@@ -122,7 +122,8 @@ function PreviewModal({
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold text-gray-500">Client</th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-500">Statut</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-500">Dépassement</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-500">En attente</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500">Dernier msg client</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -133,7 +134,10 @@ function PreviewModal({
                         <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 font-semibold text-[10px] uppercase">{c.status}</span>
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-semibold text-[10px]">{c.minutes_overdue} min</span>
+                        <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-semibold text-[10px]">{c.minutes_waiting} min</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">
+                        {c.last_client_message_at ? formatRelativeDate(c.last_client_message_at) : <span className="italic text-gray-400">jamais</span>}
                       </td>
                     </tr>
                   ))}
@@ -322,13 +326,14 @@ function ConfigPanel({
 }) {
   const { addToast } = useToast();
 
-  const [enabled, setEnabled]                 = useState(config.enabled);
-  const [intervalMinutes, setIntervalMinutes] = useState(config.intervalMinutes ?? 5);
-  const [cronExpression, setCronExpression]   = useState(config.cronExpression ?? '');
-  const [ttlDays, setTtlDays]                 = useState(config.ttlDays ?? (config.key === 'read-only-enforcement' ? 24 : config.key === 'meta-token-refresh' ? 7 : 14));
-  const [delayMin, setDelayMin]               = useState(config.delayMinSeconds ?? 20);
-  const [delayMax, setDelayMax]               = useState(config.delayMaxSeconds ?? 45);
-  const [maxSteps, setMaxSteps]               = useState(config.maxSteps ?? 3);
+  const [enabled, setEnabled]                           = useState(config.enabled);
+  const [intervalMinutes, setIntervalMinutes]           = useState(config.intervalMinutes ?? 5);
+  const [cronExpression, setCronExpression]             = useState(config.cronExpression ?? '');
+  const [ttlDays, setTtlDays]                           = useState(config.ttlDays ?? (config.key === 'read-only-enforcement' ? 24 : config.key === 'meta-token-refresh' ? 7 : 14));
+  const [delayMin, setDelayMin]                         = useState(config.delayMinSeconds ?? 20);
+  const [delayMax, setDelayMax]                         = useState(config.delayMaxSeconds ?? 45);
+  const [maxSteps, setMaxSteps]                         = useState(config.maxSteps ?? 3);
+  const [unreadThreshold, setUnreadThreshold]           = useState(config.noResponseThresholdMinutes ?? 60);
 
   const [saving,    setSaving]    = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -347,6 +352,7 @@ function ConfigPanel({
     setDelayMin(config.delayMinSeconds ?? 20);
     setDelayMax(config.delayMaxSeconds ?? 45);
     setMaxSteps(config.maxSteps ?? 3);
+    setUnreadThreshold(config.noResponseThresholdMinutes ?? 60);
   }, [config]);
 
   const busy = saving || resetting || running;
@@ -364,6 +370,9 @@ function ConfigPanel({
         payload.delayMinSeconds = delayMin;
         payload.delayMaxSeconds = delayMax;
         payload.maxSteps        = maxSteps;
+      }
+      if (config.key === 'sla-checker') {
+        payload.noResponseThresholdMinutes = unreadThreshold;
       }
       const updated = await updateCronConfig(config.key, payload);
       onUpdate(updated);
@@ -476,6 +485,24 @@ function ConfigPanel({
                 className="w-full rounded-md border border-gray-200 px-3 py-2 font-mono text-sm focus:border-slate-400 focus:outline-none"
               />
               <p className="mt-1 text-[11px] text-gray-400">Format : min heure jour mois jour-semaine</p>
+            </div>
+          )}
+
+          {/* Seuil redispatch non lus — sla-checker */}
+          {config.key === 'sla-checker' && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Seuil redispatch (minutes)
+              </label>
+              <input
+                type="number" min={5} max={480}
+                value={unreadThreshold}
+                onChange={(e) => setUnreadThreshold(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Redispatche les conversations avec messages non lus depuis plus de {unreadThreshold} min.
+              </p>
             </div>
           )}
 

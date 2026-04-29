@@ -28,10 +28,10 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
         );
         return `Ignoré — hors plage horaire (${hour}h, actif 5h–21h)`;
       }
-      // Le seuil de non-lecture est égal à intervalMinutes (configurable depuis le panel admin).
-      // Garantit que le seuil ≥ 121 min (déjà validé à l'écriture dans CronConfigService).
+      // noResponseThresholdMinutes : seuil de redispatch (défaut 60 min, configurable).
+      // intervalMinutes : fréquence du cron (≥ 121 min) — ces deux valeurs sont indépendantes.
       const config = await this.cronConfigService.findByKey('sla-checker');
-      const thresholdMinutes = config.intervalMinutes ?? 121;
+      const thresholdMinutes = config.noResponseThresholdMinutes ?? 60;
       return this.dispatcher.jobRunnerAllPostes(thresholdMinutes);
     });
     this.cronConfigService.registerPreviewHandler('sla-checker', () =>
@@ -45,7 +45,7 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     conversations: { chat_id: string; name: string; status: string; last_client_message_at: Date | null; minutes_waiting: number }[];
   }> {
     const config = await this.cronConfigService.findByKey('sla-checker');
-    const thresholdMinutes = config.intervalMinutes ?? 121;
+    const thresholdMinutes = config.noResponseThresholdMinutes ?? 60;
     const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
 
     const chats = await this.chatRepo.find({
