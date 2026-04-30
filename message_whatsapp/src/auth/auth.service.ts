@@ -4,11 +4,13 @@ import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_comme
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { AuthUser } from './shared/base-auth-user.types';
 import { BaseAuthService, UserLookupService } from './shared/base-auth.service';
+import { SystemConfigService } from '../system-config/system-config.service';
 
 @Injectable()
 export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
   constructor(
     private readonly usersService: WhatsappCommercialService,
+    private readonly systemConfig: SystemConfigService,
     jwtService: JwtService,
   ) {
     super(jwtService, { accessTokenExpiry: '7d', refreshTokenExpiry: '7d' });
@@ -25,13 +27,19 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
     const isValid = await entity.validatePassword(password);
     if (!isValid) return null;
 
+    const [startRaw, endRaw] = await Promise.all([
+      this.systemConfig.get('LOGIN_HOUR_START'),
+      this.systemConfig.get('LOGIN_HOUR_END'),
+    ]);
+    const startHour = parseInt(startRaw ?? '5',  10);
+    const endHour   = parseInt(endRaw   ?? '21', 10);
+
     const hour = new Date().getHours();
-    if (hour >= 21 || hour < 5) {
-      if (!entity.allowOutsideHours) {
-        throw new UnauthorizedException(
-          'Connexion refusée — hors des heures de travail (5h–21h)',
-        );
-      }
+    const outsideHours = hour >= endHour || hour < startHour;
+    if (outsideHours && !entity.allowOutsideHours) {
+      throw new UnauthorizedException(
+        `Connexion refusée — hors des heures de travail (${startHour}h–${endHour}h)`,
+      );
     }
 
     return this.toAuthUser(entity);

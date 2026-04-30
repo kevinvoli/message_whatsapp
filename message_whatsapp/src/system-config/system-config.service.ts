@@ -43,6 +43,10 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'FF_SHADOW_UNIFIED', label: 'Mode shadow (routing parallèle)', category: 'feature_flags', description: 'true / false' },
   { key: 'FF_UNIFIED_WHAPI_PCT', label: 'Pourcentage trafic Whapi unifié', category: 'feature_flags', description: '0–100' },
 
+  // ─── Accès / Horaires de connexion ──────────────────────────────────────────
+  { key: 'LOGIN_HOUR_START', label: 'Heure de début des connexions', category: 'access', description: 'Heure (0–23) à partir de laquelle les commerciaux peuvent se connecter (défaut : 5)' },
+  { key: 'LOGIN_HOUR_END',   label: 'Heure de fin des connexions',   category: 'access', description: 'Heure (0–23) après laquelle les connexions sont bloquées (défaut : 21)' },
+
 ];
 
 
