@@ -23,7 +23,7 @@ export class WhatsappTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'channel_id', type: 'char', length: 36, nullable: false })
+  @Column({ name: 'channel_id', type: 'varchar', length: 36, nullable: false })
   channelId: string;
 
   @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })

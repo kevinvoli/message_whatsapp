@@ -16,7 +16,7 @@ export class OutboundHsm1746000000001 implements MigrationInterface {
           },
           {
             name: 'channel_id',
-            type: 'char',
+            type: 'varchar',
             length: '36',
             isNullable: false,
           },
