@@ -20,6 +20,8 @@ const buildController = () =>
     new WebhookMetricsService(),
     {} as any,
     {} as any,
+    {} as any, // templateService
+    { server: { emit: jest.fn() } } as any, // gateway
   );
 
 describe('Webhook crypto', () => {

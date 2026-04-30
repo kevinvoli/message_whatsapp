@@ -180,8 +180,54 @@ export class WhatsappChatService {
     }
   }
 
+  /**
+   * Find-or-create d'un chat pour une conversation sortante initiée par l'admin.
+   *
+   * Contrairement à `findOrCreateChat`, cette méthode ne requiert pas de poste_id :
+   * l'admin initie la conversation depuis le panel, le chat est créé en statut EN_ATTENTE
+   * et sera dispatché ultérieurement selon les règles habituelles.
+   */
+  async findOrCreateChatForOutbound(params: {
+    chat_id: string;
+    contactName: string;
+    channelId: string;
+  }): Promise<WhatsappChat> {
+    const existing = await this.chatRepository.findOne({
+      where: { chat_id: params.chat_id },
+      relations: ['poste', 'channel'],
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const newChat = this.chatRepository.create({
+      chat_id: params.chat_id,
+      name: params.contactName,
+      type: 'private',
+      chat_pic: '',
+      chat_pic_full: '',
+      is_pinned: false,
+      is_muted: false,
+      mute_until: null,
+      is_archived: false,
+      unread_count: 0,
+      unread_mention: false,
+      read_only: false,
+      not_spam: true,
+      poste: undefined,
+      poste_id: null,
+      channel_id: params.channelId,
+      contact_client: params.chat_id.split('@')[0],
+      last_activity_at: new Date(),
+      status: WhatsappChatStatus.EN_ATTENTE,
+    });
+
+    return this.chatRepository.save(newChat);
+  }
+
   /* =======================
-   * 👁️ CHAT OUVERT (READ ALL)
+   * CHAT OUVERT (READ ALL)
    * ======================= */
   async markChatAsRead(chat_id: string): Promise<void> {
     // Ancrage explicite de updatedAt pour bloquer ON UPDATE CURRENT_TIMESTAMP côté MySQL.

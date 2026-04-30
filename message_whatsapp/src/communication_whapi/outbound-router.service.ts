@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommunicationWhapiService } from './communication_whapi.service';
 import { CommunicationMetaService } from './communication_meta.service';
 import { CommunicationMessengerService } from './communication_messenger.service';
@@ -211,6 +211,79 @@ export class OutboundRouterService {
       address: data.address,
     });
     return { providerMessageId: result.message.id, provider: 'whapi' };
+  }
+
+  /**
+   * Route l'envoi d'un message template HSM selon le provider du canal.
+   * - meta : POST graph.facebook.com (template)
+   * - whapi : POST gate.whapi.cloud/messages/hsm
+   * - autres providers : non supporté
+   */
+  async sendTemplateMessage(data: {
+    to: string;
+    channelId: string;
+    templateName: string;
+    languageCode: string;
+    bodyParameters?: string[];
+  }): Promise<OutboundSendResponse> {
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+
+    channel.token = channel.token?.trim();
+    const provider = channel.provider ?? 'whapi';
+
+    if (provider === 'meta') {
+      if (!channel.external_id) {
+        throw new NotFoundException(
+          `Channel ${data.channelId} missing external_id (phone_number_id) for Meta`,
+        );
+      }
+
+      this.logger.log(
+        `OUTBOUND_TEMPLATE_ROUTE provider=meta channel=${data.channelId} template=${data.templateName}`,
+        OutboundRouterService.name,
+      );
+
+      const result = await this.metaService.sendTemplateMessage({
+        to: data.to,
+        phoneNumberId: channel.external_id,
+        accessToken: channel.token,
+        templateName: data.templateName,
+        languageCode: data.languageCode,
+        bodyParameters: data.bodyParameters,
+      });
+
+      return {
+        providerMessageId: result.providerMessageId,
+        provider: 'meta',
+      };
+    }
+
+    if (provider === 'whapi') {
+      this.logger.log(
+        `OUTBOUND_TEMPLATE_ROUTE provider=whapi channel=${data.channelId} template=${data.templateName}`,
+        OutboundRouterService.name,
+      );
+
+      const result = await this.whapiService.sendHsmToWhapiChannel({
+        to: data.to,
+        channelId: data.channelId,
+        templateName: data.templateName,
+        languageCode: data.languageCode,
+        bodyParameters: data.bodyParameters,
+      });
+
+      return {
+        providerMessageId: result.message.id,
+        provider: 'whapi',
+      };
+    }
+
+    throw new BadRequestException(
+      `Template HSM non supporté pour le provider "${provider}". Seuls meta et whapi sont supportés.`,
+    );
   }
 
   async sendMediaMessage(data: {

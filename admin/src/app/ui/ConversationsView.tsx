@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getPostes, getChatStatsByCommercial, patchChat } from '@/app/lib/api';
+import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getPostes, getChatStatsByCommercial, patchChat, getChannels } from '@/app/lib/api';
 import { Spinner } from './Spinner';
-import { CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import { Channel, CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import OutboundMessageModal from './OutboundMessageModal';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
@@ -60,10 +61,15 @@ export default function ConversationsView({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const mediaInputRef = useRef<HTMLInputElement>(null);
 
-    // Chargement initial des postes et commerciaux (une seule fois)
+    // Modal "Nouveau message sortant"
+    const [showOutboundModal, setShowOutboundModal] = useState(false);
+    const [channels, setChannels] = useState<Channel[]>([]);
+
+    // Chargement initial des postes, commerciaux et canaux (une seule fois)
     useEffect(() => {
         void getPostes().then(setPostes).catch(() => {});
         void getChatStatsByCommercial().then(setCommerciaux).catch(() => {});
+        void getChannels().then(setChannels).catch(() => {});
     }, []);
 
     // Mise à jour des filtres si les props initiales changent (navigation depuis Postes/Commerciaux)
@@ -404,13 +410,22 @@ export default function ConversationsView({
 
     return (
         <div className="h-full flex flex-col gap-3">
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2">
+                <button
+                    type="button"
+                    onClick={() => setShowOutboundModal(true)}
+                    title="Initier une conversation sortante"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 text-sm font-medium transition-colors"
+                >
+                    <Send className="w-4 h-4" />
+                    Nouveau message
+                </button>
                 {onRefresh && (
                     <button
                         type="button"
                         onClick={onRefresh}
-                        title="Rafraîchir"
-                        aria-label="Rafraîchir"
+                        title="Rafraichir"
+                        aria-label="Rafraichir"
                         className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800"
                     >
                         <RefreshCw className="w-4 h-4" />
@@ -960,6 +975,26 @@ export default function ConversationsView({
                 )}
             </div>
             </div>
+
+            {/* Modal d'initiation de conversation sortante */}
+            {showOutboundModal && (
+                <OutboundMessageModal
+                    channels={channels}
+                    onClose={() => setShowOutboundModal(false)}
+                    onSuccess={(newChatId) => {
+                        setShowOutboundModal(false);
+                        // Rafraichir la liste des conversations puis selectionner le chat cree
+                        void (async () => {
+                            await loadChats(limit, offset);
+                            setChats((prev) => {
+                                const found = prev.find((c) => c.chat_id === newChatId);
+                                if (found) setSelectedChat(found);
+                                return prev;
+                            });
+                        })();
+                    }}
+                />
+            )}
         </div>
     );
 }

@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -629,6 +629,97 @@ export async function sendAdminMedia(
         credentials: 'include',
     });
     return handleResponse<{ success: boolean; message_id: string }>(response);
+}
+
+/**
+ * Initie une conversation sortante vers un contact inconnu de la plateforme.
+ *
+ * @param payload.channel_id    - channel_id du canal d'envoi
+ * @param payload.recipient     - Numéro E.164 sans "+" pour WhatsApp/Meta, PSID pour Messenger
+ * @param payload.text          - Texte libre (requis si template_id absent)
+ * @param payload.template_id   - UUID du template HSM (requis pour Meta hors fenêtre 24h)
+ * @param payload.template_params - Valeurs des paramètres body du template ({{1}}, {{2}}...)
+ * @param payload.contact_name  - Nom optionnel pour le contact créé à la volée
+ */
+export async function initiateOutboundConversation(payload: {
+    channel_id: string;
+    recipient: string;
+    text?: string;
+    template_id?: string;
+    template_params?: string[];
+    contact_name?: string;
+}): Promise<{ chatId: string; messageId: string; contactId: string }> {
+    const response = await fetch(`${API_BASE_URL}/messages/outbound-init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<{ chatId: string; messageId: string; contactId: string }>(response);
+}
+
+/**
+ * Récupère les templates WhatsApp d'un canal.
+ * @param channelId - UUID de l'entité WhapiChannel (id, pas channel_id)
+ * @param status    - Filtre optionnel : APPROVED, PENDING, REJECTED
+ */
+export async function getWhatsappTemplates(
+    channelId: string,
+    status?: string,
+): Promise<WhatsappTemplate[]> {
+    const params = new URLSearchParams({ channel_id: channelId });
+    if (status) params.set('status', status);
+    const response = await fetch(`${API_BASE_URL}/messages/templates?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<WhatsappTemplate[]>(response);
+}
+
+/**
+ * Crée un nouveau template WhatsApp.
+ */
+export async function createWhatsappTemplate(payload: {
+    channelId: string;
+    name: string;
+    language?: string;
+    category?: string;
+    status?: string;
+    components?: any;
+    externalId?: string;
+}): Promise<WhatsappTemplate> {
+    const response = await fetch(`${API_BASE_URL}/messages/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    return handleResponse<WhatsappTemplate>(response);
+}
+
+/**
+ * Re-soumet un template rejeté à Meta sans créer de doublon.
+ * PATCH /messages/templates/:id/resubmit
+ *
+ * @param id      - UUID du template rejeté à re-soumettre
+ * @param updates - Champs optionnels à modifier avant re-soumission (name, language, category, components)
+ */
+export async function resubmitWhatsappTemplate(
+    id: string,
+    updates?: {
+        name?: string;
+        language?: string;
+        category?: string;
+        components?: any;
+    },
+): Promise<WhatsappTemplate> {
+    const response = await fetch(`${API_BASE_URL}/messages/templates/${id}/resubmit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates ?? {}),
+        credentials: 'include',
+    });
+    return handleResponse<WhatsappTemplate>(response);
 }
 
 // Auth-related functions that do not send Authorization header automatically (login/logout explicit)

@@ -57,6 +57,7 @@ import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idem
 import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
+import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     JorbsModule,
     NotificationModule,
     SystemAlertModule,
+    WhatsappTemplateModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

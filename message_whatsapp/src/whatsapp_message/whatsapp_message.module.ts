@@ -39,6 +39,7 @@ import { CallLogModule } from 'src/call-log/call_log.module';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
+import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     JorbsModule,
     NotificationModule,
     SystemAlertModule,
+    WhatsappTemplateModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

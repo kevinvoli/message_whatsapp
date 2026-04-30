@@ -463,6 +463,94 @@ export class CommunicationWhapiService {
     }
   }
 
+  /**
+   * Envoie un message template HSM via Whapi.
+   * POST https://gate.whapi.cloud/messages/hsm
+   */
+  async sendHsmToWhapiChannel(data: {
+    to: string;
+    channelId: string;
+    templateName: string;
+    languageCode: string;
+    bodyParameters?: string[];
+  }): Promise<WhapiSendMessageResponse> {
+    const to = this.validateWhapiRecipient(data.to);
+
+    const channel = await this.channelRepository.findOne({
+      where: { channel_id: data.channelId },
+    });
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+    const token = channel.token;
+
+    const templatePayload: Record<string, any> = {
+      to,
+      template: {
+        name: data.templateName,
+        language: { code: data.languageCode },
+        ...(data.bodyParameters && data.bodyParameters.length > 0
+          ? {
+              parameters: {
+                body: {
+                  parameters: data.bodyParameters.map((text) => ({
+                    type: 'text',
+                    text,
+                  })),
+                },
+              },
+            }
+          : {}),
+      },
+    };
+
+    let attempt = 0;
+    while (attempt <= this.maxRetries) {
+      try {
+        const response = await axios.post<WhapiSendMessageResponse>(
+          'https://gate.whapi.cloud/messages/hsm',
+          templatePayload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+        return response.data;
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status;
+        const kind = this.classifyFailure(axiosError);
+        const lastAttempt = attempt >= this.maxRetries;
+
+        if (kind === 'transient' && !lastAttempt) {
+          const delayMs = 250 * Math.pow(2, attempt);
+          this.logger.warn(
+            `Whapi HSM transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) channel=${data.channelId} status=${statusCode ?? 'unknown'}`,
+            CommunicationWhapiService.name,
+          );
+          await this.delay(delayMs);
+          attempt += 1;
+          continue;
+        }
+
+        this.logger.error(
+          `Whapi HSM outbound failed (channel=${data.channelId}, kind=${kind}, status=${statusCode ?? 'unknown'})`,
+          axiosError.stack,
+          CommunicationWhapiService.name,
+        );
+        throw new WhapiOutboundError(
+          'Whapi HSM outbound delivery failed',
+          kind,
+          statusCode,
+        );
+      }
+    }
+
+    throw new WhapiOutboundError('Whapi HSM outbound delivery failed', 'transient');
+  }
+
   generateWhapiMessageId(): string {
     const part = (len: number) =>
       Math.random()

@@ -27,6 +27,8 @@ import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
+import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { json } from 'stream/consumers';
 
 @Controller('webhooks')
@@ -41,6 +43,8 @@ export class WhapiController {
     private readonly metricsService: WebhookMetricsService,
     private readonly unifiedIngressService: UnifiedIngressService,
     private readonly channelService: ChannelService,
+    private readonly templateService: WhatsappTemplateService,
+    private readonly gateway: WhatsappMessageGateway,
   ) {}
 
   @Post('whapi')
@@ -528,6 +532,47 @@ export class WhapiController {
     // console.log("affichage du post:2",request);
 
     this.assertPayloadSize(request.rawBody);
+
+    // Détecter le field AVANT assertMetaPayload car la structure de
+    // message_template_status_update diffère (pas de phone_number_id).
+    const rawEntry = (payload as any)?.entry?.[0];
+    const rawChange = rawEntry?.changes?.[0];
+    const rawField: string | undefined = rawChange?.field;
+
+    // Traitement spécifique : notification de statut de template HSM
+    if (rawField === 'message_template_status_update') {
+      if (!WhapiController.HSM_TEMPLATES_ENABLED) {
+        this.auditLogger.log(
+          `WEBHOOK_TEMPLATE_STATUS_UPDATE_IGNORED FF_HSM_TEMPLATES=false request_id=${requestId}`,
+        );
+        this.healthService.record(provider, true, Date.now() - startedAt);
+        return { status: 'ignored', reason: 'ff_hsm_templates_disabled' };
+      }
+      const wabaId: string | undefined = rawEntry?.id;
+      // Valider la signature HMAC si possible (résoudre le canal par WABA ID)
+      const sigChannel = wabaId
+        ? await this.channelService.findChannelByExternalId('meta', wabaId)
+        : null;
+      this.assertMetaSignature(
+        headers,
+        request.rawBody,
+        payload,
+        sigChannel?.meta_app_secret,
+      );
+      this.auditLogger.log(
+        `WEBHOOK_TEMPLATE_STATUS_UPDATE request_id=${requestId} waba_id=${wabaId ?? 'unknown'}`,
+      );
+      // Traitement asynchrone — on retourne 200 immédiatement
+      void this.handleTemplateStatusUpdate(rawChange?.value).catch(
+        (err: Error) => {
+          this.auditLogger.error(
+            `TEMPLATE_STATUS_UPDATE_ERROR waba_id=${wabaId ?? 'unknown'} error=${err.message}`,
+          );
+        },
+      );
+      this.healthService.record(provider, true, Date.now() - startedAt);
+      return { status: 'ok' };
+    }
 
     const metaPayload = this.assertMetaPayload(payload);
 
@@ -1186,6 +1231,66 @@ export class WhapiController {
     );
   }
 
+  /**
+   * Traite un événement `message_template_status_update` envoyé par Meta.
+   * Met à jour le statut du template en DB et notifie l'admin via WebSocket.
+   *
+   * Structure attendue de `value` :
+   * {
+   *   event: 'APPROVED' | 'REJECTED' | 'PENDING_DELETION',
+   *   message_template_name: string,
+   *   message_template_language: string,
+   *   message_template_id: string,
+   *   reason: string | null
+   * }
+   */
+  private async handleTemplateStatusUpdate(value: any): Promise<void> {
+    if (!value || typeof value !== 'object') {
+      this.auditLogger.warn('TEMPLATE_STATUS_UPDATE: payload value manquant ou invalide');
+      return;
+    }
+
+    const externalId: string | undefined = value.message_template_id
+      ? String(value.message_template_id)
+      : undefined;
+    const event: string | undefined = value.event;
+    const templateName: string | undefined = value.message_template_name;
+    const reason: string | null = value.reason ?? null;
+
+    if (!externalId || !event) {
+      this.auditLogger.warn(
+        `TEMPLATE_STATUS_UPDATE: champs obligatoires manquants message_template_id=${externalId ?? 'missing'} event=${event ?? 'missing'}`,
+      );
+      return;
+    }
+
+    const updated = await this.templateService.updateStatusByExternalId(
+      externalId,
+      event,
+      reason,
+    );
+
+    if (!updated) {
+      this.auditLogger.warn(
+        `TEMPLATE_STATUS_UPDATE: template non trouvé en DB pour external_id=${externalId} — statut non mis à jour`,
+      );
+      return;
+    }
+
+    // Notifier l'admin en temps réel via WebSocket (room globale)
+    this.gateway.server.emit('admin:template_status_update', {
+      templateId: updated.id,
+      externalId,
+      name: templateName ?? updated.name,
+      status: updated.status,
+      rejectionReason: updated.rejectionReason ?? null,
+    });
+
+    this.auditLogger.log(
+      `TEMPLATE_STATUS_UPDATE: external_id=${externalId} → status=${updated.status}`,
+    );
+  }
+
   private buildAuditEventKey(
     provider: 'whapi' | 'meta',
     payload: WhapiWebhookPayload | MetaWebhookPayload,
@@ -1206,4 +1311,7 @@ export class WhapiController {
     const channelId = value?.metadata?.phone_number_id ?? 'unknown';
     return `${provider}:${channelId}:${entry?.changes?.[0]?.field ?? 'unknown'}:${id}`;
   }
+
+  /** HSM templates désactivés en dur — changer false en true pour activer */
+  private static readonly HSM_TEMPLATES_ENABLED = false;
 }

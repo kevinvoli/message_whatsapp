@@ -30,6 +30,7 @@ export type ViewMode =
   | 'rapports'
   | 'postes'
   | 'canaux'
+  | 'templates'
   | 'automessages'
   | 'conversations'
   | 'queue'
@@ -130,6 +131,28 @@ export type Channel = {
   poste?: Poste | null;
   no_read_only?: boolean;
   no_close?: boolean;
+};
+
+// ============================================
+// TEMPLATES HSM WHATSAPP
+// ============================================
+
+export type WhatsappTemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type WhatsappTemplate = {
+  id: string;
+  channelId: string;
+  name: string;
+  language: string;
+  category?: string | null;
+  status: WhatsappTemplateStatus;
+  /** Structure JSON des composants (header, body, footer, buttons) */
+  components?: any | null;
+  externalId?: string | null;
+  /** Motif de rejet fourni par Meta (null si non rejecte) */
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AutoMessageTriggerType =

@@ -3,8 +3,19 @@
 import React, { useEffect, useState } from 'react';
 import {
     navigationItems,
-    navigationGroups
+    navigationGroups as allNavigationGroups
 } from '@/app/data/admin-data';
+
+/** HSM templates désactivés en dur — changer false en true pour activer */
+const HSM_TEMPLATES_ENABLED = false;
+
+/** Navigation filtrée selon les feature flags actifs. */
+const navigationGroups = HSM_TEMPLATES_ENABLED
+    ? allNavigationGroups
+    : allNavigationGroups.map(group => ({
+        ...group,
+        items: group.items.filter(item => item.id !== 'templates'),
+    })).filter(group => group.items.length > 0);
 import Navigation from '@/app/ui/Navigation';
 import Header from '@/app/ui/Header';
 import OverviewView from '@/app/ui/OverviewView';
@@ -16,6 +27,7 @@ import ClientsView from '@/app/ui/ClientsView';
 import RapportsView from '@/app/ui/RapportsView';
 import PostesView from '@/app/ui/PostesView';
 import ChannelsView from '@/app/ui/ChannelsView';
+import TemplatesView from '@/app/ui/TemplatesView';
 import MessageAutoView from '@/app/ui/MessageAutoView';
 import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
@@ -99,6 +111,8 @@ export default function AdminDashboard() {
                 return <GoNoGoView />;
             case 'canaux':
                 return <ChannelsView />;
+            case 'templates':
+                return HSM_TEMPLATES_ENABLED ? <TemplatesView /> : null;
             case 'automessages':
                 return <MessageAutoView />;
             case 'conversations':

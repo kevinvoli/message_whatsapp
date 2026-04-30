@@ -4,6 +4,7 @@ import {
   Param,
   UseGuards,
   Post,
+  Patch,
   Body,
   UseInterceptors,
   UploadedFile,
@@ -24,6 +25,7 @@ import { WhatsappMessageGateway } from './whatsapp_message.gateway';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
+import { CreateOutboundMessageDto } from './dto/create-outbound-message.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { Repository } from 'typeorm';
@@ -32,6 +34,9 @@ import { CommunicationMetaService } from 'src/communication_whapi/communication_
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { Request, Response } from 'express';
+import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-whatsapp-template.dto';
+import { UpdateWhatsappTemplateDto } from 'src/whatsapp_template/dto/update-whatsapp-template.dto';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
 
@@ -44,6 +49,9 @@ function detectMediaType(mimeType: string): MediaType {
 
 @Controller('messages')
 export class WhatsappMessageController {
+  /** HSM templates désactivés en dur — changer false en true pour activer */
+  private static readonly HSM_TEMPLATES_ENABLED = false;
+
   constructor(
     private readonly messageService: WhatsappMessageService,
     private readonly gateway: WhatsappMessageGateway,
@@ -54,6 +62,7 @@ export class WhatsappMessageController {
     private readonly metaService: CommunicationMetaService,
     private readonly messengerService: CommunicationMessengerService,
     private readonly whapiService: CommunicationWhapiService,
+    private readonly templateService: WhatsappTemplateService,
   ) {}
 
   @Post()
@@ -74,6 +83,96 @@ export class WhatsappMessageController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  /**
+   * Initie une conversation sortante vers un contact inconnu de la plateforme.
+   *
+   * L'admin fournit le canal, le destinataire et soit :
+   * - text : texte libre (OK pour whapi, risqué pour meta hors fenêtre 24h)
+   * - template_id + template_params : template HSM approuvé (obligatoire meta hors fenêtre 24h)
+   *
+   * Le contact et le chat sont créés à la volée si nécessaire.
+   */
+  @Post('outbound-init')
+  @UseGuards(AdminGuard)
+  async initiateOutbound(@Body() dto: CreateOutboundMessageDto) {
+    try {
+      return await this.messageService.createOutboundInitMessage({
+        channelId: dto.channel_id,
+        recipient: dto.recipient,
+        text: dto.text,
+        templateId: dto.template_id,
+        templateParams: dto.template_params,
+        contactName: dto.contact_name,
+      });
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: err instanceof Error ? err.message : 'Erreur lors de l\'initiation de la conversation',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
+   * Liste les templates WhatsApp d'un canal.
+   * GET /messages/templates?channel_id=xxx&status=APPROVED
+   *
+   * Le channel_id passé ici est l'UUID de l'entité WhapiChannel (id).
+   * Note : cet endpoint est placé AVANT les routes dynamiques (:chat_id)
+   * pour éviter la collision de routing.
+   */
+  @Get('templates')
+  @UseGuards(AdminGuard)
+  async getTemplates(
+    @Query('channel_id') channelId: string,
+    @Query('status') status?: string,
+  ) {
+    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
+      throw new NotFoundException('Fonctionnalité templates HSM non activée');
+    }
+    if (!channelId) {
+      throw new BadRequestException('channel_id est requis');
+    }
+    return this.templateService.findAllByChannel(channelId, status);
+  }
+
+  /**
+   * Crée un nouveau template WhatsApp.
+   * POST /messages/templates
+   */
+  @Post('templates')
+  @UseGuards(AdminGuard)
+  async createTemplate(@Body() dto: CreateWhatsappTemplateDto) {
+    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
+      throw new NotFoundException('Fonctionnalité templates HSM non activée');
+    }
+    return this.templateService.create(dto);
+  }
+
+  /**
+   * Re-soumet un template rejeté à Meta sans créer de doublon.
+   * PATCH /messages/templates/:id/resubmit
+   *
+   * - Vérifie que le template est en statut REJECTED (sinon 400).
+   * - Vérifie que le canal est bien Meta (sinon 400).
+   * - Applique les modifications optionnelles du body avant re-soumission.
+   * - Met à jour le template existant en DB : status → PENDING, rejectionReason → null.
+   */
+  @Patch('templates/:id/resubmit')
+  @UseGuards(AdminGuard)
+  async resubmitTemplate(
+    @Param('id') id: string,
+    @Body() dto: UpdateWhatsappTemplateDto,
+  ) {
+    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
+      throw new NotFoundException('Fonctionnalité templates HSM non activée');
+    }
+    return this.templateService.resubmit(id, dto);
   }
 
   @Post('location')

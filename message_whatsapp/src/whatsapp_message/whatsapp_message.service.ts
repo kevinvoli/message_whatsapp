@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -23,6 +23,7 @@ import {
   WhatsappMedia,
   WhatsappMediaType,
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
+import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -46,6 +47,7 @@ export class WhatsappMessageService {
     private readonly chatRepository: Repository<WhatsappChat>,
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
+    private readonly templateService: WhatsappTemplateService,
   ) {}
 
   private resolveIncomingText(message: WhapiMessage): string {
@@ -507,6 +509,162 @@ export class WhatsappMessageService {
       relations: ['chat', 'medias', 'channel', 'poste', 'commercial'],
     });
     return result!;
+  }
+
+  /**
+   * Initie une conversation sortante vers un contact qui peut ne pas exister en BDD.
+   *
+   * Contrairement à `createAgentMessage`, cette méthode :
+   * - Ne requiert pas de chat existant (find-or-create du chat et du contact)
+   * - Ne vérifie pas la fenêtre de réponse de 24h (c'est une initiation, pas une réponse)
+   * - Ne requiert pas de poste_id (la conversation sera dispatchée ultérieurement)
+   *
+   * @returns { chatId, messageId, contactId }
+   */
+  async createOutboundInitMessage(data: {
+    channelId: string;
+    recipient: string;
+    text?: string;
+    templateId?: string;
+    templateParams?: string[];
+    contactName?: string;
+  }): Promise<{ chatId: string; messageId: string; contactId: string }> {
+    // Validation : au moins text ou templateId requis
+    if (!data.text && !data.templateId) {
+      throw new BadRequestException(
+        'text ou template_id est requis pour initier une conversation sortante',
+      );
+    }
+
+    const traceId = this.buildTraceId(undefined, data.recipient);
+
+    // 1. Récupérer et valider le canal
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) {
+      throw new NotFoundException(`Canal ${data.channelId} introuvable`);
+    }
+
+    const provider = channel.provider ?? 'whapi';
+
+    // 2. Valider le format du destinataire selon le provider
+    if (provider === 'whapi' || provider === 'meta') {
+      // Numéro E.164 sans le "+" : uniquement des chiffres, 7 à 15 caractères
+      if (!/^\d{7,15}$/.test(data.recipient)) {
+        throw new Error(
+          `FORMAT_INVALIDE: Le destinataire doit être un numéro au format international sans "+" (ex: 2250700000000). Reçu: "${data.recipient}"`,
+        );
+      }
+    }
+
+    // 3. Construire le chat_id selon le provider
+    let chatId: string;
+    if (provider === 'whapi' || provider === 'meta') {
+      chatId = `${data.recipient}@s.whatsapp.net`;
+    } else if (provider === 'messenger') {
+      chatId = data.recipient.includes('@') ? data.recipient : `${data.recipient}@messenger`;
+    } else if (provider === 'instagram') {
+      chatId = data.recipient.includes('@') ? data.recipient : `${data.recipient}@instagram`;
+    } else if (provider === 'telegram') {
+      chatId = data.recipient.includes('@') ? data.recipient : `${data.recipient}@telegram`;
+    } else {
+      chatId = `${data.recipient}@s.whatsapp.net`;
+    }
+
+    const contactName = data.contactName?.trim() || data.recipient;
+
+    this.logger.log(
+      `OUTBOUND_INIT_REQUEST trace=${traceId} provider=${provider} recipient=${data.recipient} chat_id=${chatId} mode=${data.templateId ? 'template' : 'text'}`,
+    );
+
+    // 4. Créer ou récupérer le contact
+    const contact = await this.contactService.findOrCreate(
+      data.recipient,
+      chatId,
+      contactName,
+    );
+
+    // 5. Créer ou récupérer le chat
+    const chat = await this.chatService.findOrCreateChatForOutbound({
+      chat_id: chatId,
+      contactName,
+      channelId: channel.channel_id,
+    });
+
+    let sendResponse: Awaited<ReturnType<OutboundRouterService['sendTextMessage']>>;
+    let persistedText: string;
+
+    // 6. Envoyer le message via le router (template ou texte libre)
+    if (data.templateId) {
+      // Mode template HSM
+      const template = await this.templateService.findOne(data.templateId);
+      if (!template) {
+        throw new NotFoundException(`Template ${data.templateId} introuvable`);
+      }
+
+      sendResponse = await this.outboundRouter.sendTemplateMessage({
+        to: data.recipient,
+        channelId: data.channelId,
+        templateName: template.name,
+        languageCode: template.language,
+        bodyParameters: data.templateParams ?? [],
+      });
+
+      persistedText = `[Template: ${template.name}]`;
+    } else {
+      // Mode texte libre
+      sendResponse = await this.outboundRouter.sendTextMessage({
+        to: data.recipient,
+        text: data.text!,
+        channelId: data.channelId,
+      });
+
+      persistedText = data.text!;
+    }
+
+    this.logger.log(
+      `OUTBOUND_INIT_PROVIDER_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
+    );
+
+    // 7. Persister le message en BDD
+    const messageEntity = this.messageRepository.create({
+      message_id: sendResponse.providerMessageId ?? `agent_init_${Date.now()}`,
+      external_id: sendResponse.providerMessageId,
+      provider: sendResponse.provider,
+      provider_message_id: sendResponse.providerMessageId,
+      poste_id: null,
+      direction: MessageDirection.OUT,
+      from_me: true,
+      timestamp: new Date(),
+      status: WhatsappMessageStatus.SENT,
+      source: 'agent_web',
+      text: persistedText,
+      chat,
+      poste: chat.poste ?? undefined,
+      from: data.recipient,
+      from_name: contactName,
+      channel,
+      commercial: null,
+      contact: null,
+      dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
+    });
+
+    const savedMessage = await this.messageRepository.save(messageEntity);
+
+    // 8. Mettre à jour l'activité du chat
+    await this.chatRepository.update(
+      { chat_id: chatId },
+      { last_activity_at: new Date() },
+    );
+
+    this.logger.log(
+      `OUTBOUND_INIT_PERSISTED trace=${traceId} db_message_id=${savedMessage.id} chat_id=${chatId}`,
+    );
+
+    return {
+      chatId,
+      messageId: savedMessage.id,
+      contactId: contact.id,
+    };
   }
 
   private async persistFailedAgentMessage(

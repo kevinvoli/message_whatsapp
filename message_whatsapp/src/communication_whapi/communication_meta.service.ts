@@ -454,6 +454,105 @@ export class CommunicationMetaService {
     });
   }
 
+  /**
+   * Envoie un message template HSM via l'API Meta WhatsApp Cloud.
+   * POST https://graph.facebook.com/{version}/{phoneNumberId}/messages
+   * type: "template"
+   */
+  async sendTemplateMessage(data: {
+    to: string;
+    phoneNumberId: string;
+    accessToken: string;
+    templateName: string;
+    languageCode: string;
+    bodyParameters?: string[];
+  }): Promise<{ providerMessageId: string }> {
+    const to = this.validateRecipient(data.to);
+    const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
+
+    const components: any[] = [];
+    if (data.bodyParameters && data.bodyParameters.length > 0) {
+      components.push({
+        type: 'body',
+        parameters: data.bodyParameters.map((text) => ({
+          type: 'text',
+          text,
+        })),
+      });
+    }
+
+    const payload: Record<string, any> = {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: data.templateName,
+        language: { code: data.languageCode },
+        ...(components.length > 0 ? { components } : {}),
+      },
+    };
+
+    let attempt = 0;
+    while (attempt <= this.maxRetries) {
+      try {
+        const response = await axios.post(url, payload, {
+          headers: {
+            Authorization: `Bearer ${data.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const messageId = response.data?.messages?.[0]?.id;
+        if (!messageId) {
+          throw new WhapiOutboundError(
+            'Meta template response missing message id',
+            'permanent',
+          );
+        }
+
+        return { providerMessageId: messageId };
+      } catch (error) {
+        if (error instanceof WhapiOutboundError) throw error;
+
+        const axiosError = error as AxiosError;
+        const statusCode = axiosError.response?.status;
+        const responseData = axiosError.response?.data as
+          | { error?: { message?: string; type?: string; code?: number; fbtrace_id?: string } }
+          | undefined;
+        const metaMessage =
+          responseData?.error?.message ?? axiosError.message ?? 'unknown_error';
+        const metaCode = responseData?.error?.code;
+        const metaTraceId = responseData?.error?.fbtrace_id;
+        const kind = this.classifyFailure(axiosError);
+        const lastAttempt = attempt >= this.maxRetries;
+
+        if (kind === 'transient' && !lastAttempt) {
+          const delayMs = 250 * Math.pow(2, attempt);
+          this.logger.warn(
+            `Meta template transient error, retrying (${attempt + 1}/${this.maxRetries + 1}) phone_number_id=${data.phoneNumberId} status=${statusCode ?? 'unknown'}`,
+            CommunicationMetaService.name,
+          );
+          await this.delay(delayMs);
+          attempt += 1;
+          continue;
+        }
+
+        this.logger.error(
+          `Meta template outbound failed (phone_number_id=${data.phoneNumberId}, kind=${kind}, status=${statusCode ?? 'unknown'}, code=${metaCode ?? 'unknown'}, trace=${metaTraceId ?? 'unknown'}, message=${metaMessage})`,
+          axiosError.stack,
+          CommunicationMetaService.name,
+        );
+        throw new WhapiOutboundError(
+          `Meta template delivery failed: ${metaMessage}`,
+          kind,
+          statusCode,
+        );
+      }
+    }
+
+    throw new WhapiOutboundError('Meta template delivery failed', 'transient');
+  }
+
   async sendLocationMessage(data: {
     to: string;
     phoneNumberId: string;
