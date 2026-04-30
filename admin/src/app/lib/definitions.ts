@@ -452,6 +452,7 @@ export type PerformanceCommercial = {
   name: string;
   email: string;
   isConnected: boolean;
+  allowOutsideHours: boolean;
   poste_name: string;
   poste_id: string | null;
   nbChatsActifs: number;

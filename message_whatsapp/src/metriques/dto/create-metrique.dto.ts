@@ -172,6 +172,10 @@ export class PerformanceCommercialDto {
   @IsBoolean()
   isConnected: boolean;
 
+  @ApiProperty({ description: 'Autorisation connexion hors horaires' })
+  @IsBoolean()
+  allowOutsideHours: boolean;
+
   @ApiProperty({ description: 'Nom du poste' })
   @IsString()
   poste_name: string;

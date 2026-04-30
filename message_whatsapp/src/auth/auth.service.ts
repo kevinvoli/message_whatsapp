@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
@@ -16,6 +16,25 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
 
   protected getUserService(): UserLookupService<WhatsappCommercial> {
     return this.usersService;
+  }
+
+  override async validate(email: string, password: string): Promise<AuthUser | null> {
+    const entity = await this.usersService.findOneByEmailWithPassword(email);
+    if (!entity) return null;
+
+    const isValid = await entity.validatePassword(password);
+    if (!isValid) return null;
+
+    const hour = new Date().getHours();
+    if (hour >= 21 || hour < 5) {
+      if (!entity.allowOutsideHours) {
+        throw new UnauthorizedException(
+          'Connexion refusée — hors des heures de travail (5h–21h)',
+        );
+      }
+    }
+
+    return this.toAuthUser(entity);
   }
 
   protected toAuthUser(user: WhatsappCommercial): AuthUser {

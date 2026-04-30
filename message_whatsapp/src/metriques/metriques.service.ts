@@ -405,10 +405,11 @@ export class MetriquesService {
         'commercial.id               as id',
         'commercial.name             as name',
         'commercial.email            as email',
-        'commercial.isConnected      as isConnected',
-        'commercial.lastConnectionAt as lastConnectionAt',
-        'poste.name                  as poste_name',
-        'poste.id                    as poste_id',
+        'commercial.isConnected        as isConnected',
+        'commercial.lastConnectionAt   as lastConnectionAt',
+        'commercial.allowOutsideHours  as allowOutsideHours',
+        'poste.name                    as poste_name',
+        'poste.id                      as poste_id',
       ])
       .where('commercial.deletedAt IS NULL')
       .getRawMany();
@@ -503,13 +504,14 @@ export class MetriquesService {
         const nbMessagesRecus   = msgInMap.get(perf.poste_id)   ?? 0;
         const nbMessagesEnvoyes = msgOutMap.get(perf.id)         ?? 0;
         return {
-          id:               perf.id,
-          name:             perf.name,
-          email:            perf.email,
-          isConnected:      Boolean(perf.isConnected),
-          lastConnectionAt: perf.lastConnectionAt,
-          poste_name:       perf.poste_name || 'Non assigné',
-          poste_id:         perf.poste_id,
+          id:                perf.id,
+          name:              perf.name,
+          email:             perf.email,
+          isConnected:       Boolean(perf.isConnected),
+          lastConnectionAt:  perf.lastConnectionAt,
+          allowOutsideHours: Boolean(perf.allowOutsideHours),
+          poste_name:        perf.poste_name || 'Non assigné',
+          poste_id:          perf.poste_id,
           nbChatsActifs:    chatsMap.get(perf.poste_id)   ?? 0,
           nbMessagesEnvoyes,
           nbMessagesRecus,

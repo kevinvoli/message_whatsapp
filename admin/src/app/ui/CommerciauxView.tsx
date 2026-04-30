@@ -93,6 +93,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   const [formPosteId, setFormPosteId] = useState<string | null>(null);
   const [formPassword, setFormPassword] = useState<string>('');
   const [formEmail, setFormEmail] = useState('');
+  const [formAllowOutsideHours, setFormAllowOutsideHours] = useState(false);
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
@@ -161,10 +162,11 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
       addToast({ type: 'error', message: "L'ID du commercial est manquant." });
       return;
     }
-    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null } = {
+    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null; allowOutsideHours?: boolean } = {
       name: formName,
       email: formEmail,
       poste_id: formPosteId,
+      allowOutsideHours: formAllowOutsideHours,
     };
     if (formPassword) {
       payload.password = formPassword;
@@ -201,6 +203,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     setFormPassword('');
     setFormPosteId(commercial?.poste_id || null);
     setFormIsActive(true);
+    setFormAllowOutsideHours(commercial.allowOutsideHours ?? false);
     setShowEditModal(true);
     clearStatus();
   };
@@ -381,12 +384,19 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
 
                     {/* Statut */}
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.isConnected
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                        }`}>
-                        {commercial.isConnected ? 'En ligne' : 'Hors ligne'}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.isConnected
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                          }`}>
+                          {commercial.isConnected ? 'En ligne' : 'Hors ligne'}
+                        </span>
+                        {commercial.allowOutsideHours && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            Hors horaires
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Poste */}
@@ -733,6 +743,26 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
               </option>
             ))}
           </select>
+        </div>
+        <div className="mb-4 flex items-center justify-between rounded border border-purple-200 bg-purple-50 px-3 py-3">
+          <div>
+            <p className="text-sm font-bold text-gray-700">Connexion hors horaires</p>
+            <p className="text-xs text-gray-500">Autorise la connexion entre 21h et 5h</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormAllowOutsideHours((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              formAllowOutsideHours ? 'bg-purple-600' : 'bg-gray-300'
+            }`}
+            aria-pressed={formAllowOutsideHours}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                formAllowOutsideHours ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
       </EntityFormModal>
     </div>

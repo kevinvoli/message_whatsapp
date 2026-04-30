@@ -62,6 +62,9 @@ export class WhatsappCommercial {
   @Column({ type: 'boolean', default: false })
   isConnected: boolean;
 
+  @Column({ type: 'boolean', default: false, name: 'allow_outside_hours' })
+  allowOutsideHours: boolean;
+
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
 

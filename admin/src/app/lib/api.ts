@@ -95,7 +95,7 @@ export async function deletePoste(id: string): Promise<{ message: string }> {
 
 export async function updateCommercial(
   id: string,
-  payload: { name?: string; email?: string; password?: string; poste_id?: string | null; is_active?: boolean },
+  payload: { name?: string; email?: string; password?: string; poste_id?: string | null; is_active?: boolean; allowOutsideHours?: boolean },
 ): Promise<Commercial> {
     const response = await fetch(`${API_BASE_URL}/users/${id}`, {
         method: 'PATCH',

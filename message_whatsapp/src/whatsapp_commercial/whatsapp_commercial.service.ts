@@ -370,6 +370,10 @@ export class WhatsappCommercialService {
       }
     }
 
+    if (updateWhatsappCommercialDto.allowOutsideHours !== undefined) {
+      user.allowOutsideHours = updateWhatsappCommercialDto.allowOutsideHours;
+    }
+
     const updatedUser = await this.whatsappCommercialRepository.save(user);
 
     return this.toSafeUser(updatedUser);
