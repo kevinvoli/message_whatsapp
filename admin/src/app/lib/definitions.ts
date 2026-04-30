@@ -1129,3 +1129,22 @@ export interface ClientDossier {
   follow_ups?: FollowUp[];
   timeline?: TimelineEvent[];
 }
+
+// ============================================
+// OUTBOUND — Initier une conversation sortante
+// ============================================
+
+export interface OutboundConversationDto {
+  channel_id: string;
+  recipient: string;
+  text: string;
+}
+
+export interface OutboundConversationResult {
+  success: boolean;
+  message_id: string;
+  chat_id: string;
+}
+
+// Alias pour compatibilité
+export type WhatsappTemplateStatus = TemplateStatus;

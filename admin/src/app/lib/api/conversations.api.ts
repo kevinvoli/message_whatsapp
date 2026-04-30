@@ -123,3 +123,17 @@ export async function patchChat(chatId: string, data: Partial<{ read_only: boole
     });
     if (!response.ok) throw new Error('Erreur mise à jour conversation');
 }
+
+export async function initiateOutboundConversation(data: {
+    channel_id: string;
+    recipient: string;
+    text: string;
+}): Promise<{ success: boolean; message_id: string; chat_id: string }> {
+    const response = await fetch(`${API_BASE_URL}/messages/outbound-init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include',
+    });
+    return handleResponse<{ success: boolean; message_id: string; chat_id: string }>(response);
+}

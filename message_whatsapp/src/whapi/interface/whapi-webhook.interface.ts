@@ -15,7 +15,8 @@ export type WhapiEventType =
   | 'orders'
   | 'products'
   | 'catalogs'
-  | 'invites';
+  | 'invites'
+  | 'message_template_status_update';
 
 export type WhapiMessageType =
   | 'text'

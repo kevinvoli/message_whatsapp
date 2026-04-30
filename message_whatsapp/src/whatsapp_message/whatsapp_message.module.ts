@@ -56,6 +56,7 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
 import { ConversationClosureModule } from 'src/conversation-closure/conversation-closure.module';
 import { CommercialActionGateModule } from 'src/commercial-action-gate/commercial-action-gate.module';
+import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { CommercialActionGateModule } from 'src/commercial-action-gate/commercia
     ConversationClosureModule,
     TargetsModule,
     CommercialActionGateModule,
+    WhatsappTemplateModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

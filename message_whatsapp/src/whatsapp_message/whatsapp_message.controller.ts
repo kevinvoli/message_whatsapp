@@ -4,6 +4,7 @@ import {
   Param,
   UseGuards,
   Post,
+  Patch,
   Body,
   UseInterceptors,
   UploadedFile,
@@ -25,6 +26,9 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
 import { CommercialActionGateGuard } from 'src/commercial-action-gate/commercial-action-gate.guard';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
+import { CreateOutboundMessageDto } from './dto/create-outbound-message.dto';
+import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-whatsapp-template.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { Repository } from 'typeorm';
@@ -45,6 +49,9 @@ function detectMediaType(mimeType: string): MediaType {
 
 @Controller('messages')
 export class WhatsappMessageController {
+  /** Feature flag — templates HSM désactivés par défaut */
+  private static readonly HSM_TEMPLATES_ENABLED = false;
+
   constructor(
     private readonly messageService: WhatsappMessageService,
     private readonly gateway: WhatsappMessageGateway,
@@ -55,6 +62,7 @@ export class WhatsappMessageController {
     private readonly metaService: CommunicationMetaService,
     private readonly messengerService: CommunicationMessengerService,
     private readonly whapiService: CommunicationWhapiService,
+    private readonly templateService: WhatsappTemplateService,
   ) {}
 
   @Post()
@@ -75,6 +83,72 @@ export class WhatsappMessageController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  // ─── Outbound init — premier message vers un client non enregistré ──────────
+
+  @Post('outbound-init')
+  @UseGuards(AdminGuard)
+  async initiateOutbound(@Body() dto: CreateOutboundMessageDto) {
+    if (!dto.channel_id || !dto.recipient || !dto.text) {
+      throw new BadRequestException('channel_id, recipient et text sont requis');
+    }
+    try {
+      const message = await this.messageService.createOutboundInitMessage({
+        channelId: dto.channel_id,
+        recipient: dto.recipient,
+        text: dto.text,
+      });
+      return {
+        success: true,
+        message_id: message.id,
+        chat_id: message.chat?.chat_id ?? null,
+      };
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: err instanceof Error ? err.message : 'Erreur envoi outbound',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // ─── Templates HSM (désactivés par défaut via feature flag) ─────────────────
+
+  @Get('templates')
+  @UseGuards(AdminGuard)
+  async getTemplates(@Query('tenant_id') tenantId?: string) {
+    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
+      return [];
+    }
+    return this.templateService.findAll(tenantId);
+  }
+
+  @Post('templates')
+  @UseGuards(AdminGuard)
+  async createTemplate(@Body() dto: CreateWhatsappTemplateDto) {
+    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
+      throw new HttpException(
+        'Templates HSM désactivés',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+    return this.templateService.create(dto);
+  }
+
+  @Patch('templates/:id/resubmit')
+  @UseGuards(AdminGuard)
+  async resubmitTemplate(@Param('id') id: string) {
+    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
+      throw new HttpException(
+        'Templates HSM désactivés',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+    return this.templateService.resubmit(id);
   }
 
   @Post('media/admin')

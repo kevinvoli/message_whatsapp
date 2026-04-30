@@ -107,6 +107,66 @@ export class WhatsappMessageService {
     }
   }
 
+  /**
+   * Initie une conversation sortante vers un client non enregistré.
+   * Pas de vérification de fenêtre de réponse — c'est un premier contact.
+   */
+  async createOutboundInitMessage(data: {
+    channelId: string;
+    recipient: string;
+    text: string;
+  }): Promise<WhatsappMessage> {
+    const traceId = this.buildTraceId(undefined, data.recipient);
+    this.logger.log(
+      `OUTBOUND_INIT_REQUEST trace=${traceId} recipient=${data.recipient} channelId=${data.channelId}`,
+    );
+
+    const chat = await this.chatService.findOrCreateChatForOutbound(
+      data.recipient,
+      data.channelId,
+    );
+
+    const sendResponse = await this.outboundRouter.sendTextMessage({
+      to: data.recipient,
+      text: data.text,
+      channelId: data.channelId,
+    });
+
+    this.logger.log(
+      `OUTBOUND_INIT_PROVIDER_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
+    );
+
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) {
+      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    }
+
+    const messageEntity = this.messageRepository.create({
+      message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
+      external_id: sendResponse.providerMessageId,
+      provider: sendResponse.provider,
+      provider_message_id: sendResponse.providerMessageId,
+      direction: MessageDirection.OUT,
+      from_me: true,
+      timestamp: new Date(),
+      status: WhatsappMessageStatus.SENT,
+      source: 'admin_outbound',
+      text: data.text,
+      chat,
+      channel,
+      from: data.recipient,
+      from_name: data.recipient,
+      poste_id: null,
+      dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
+    });
+
+    const saved = await this.messageRepository.save(messageEntity);
+    this.logger.log(
+      `OUTBOUND_INIT_PERSISTED trace=${traceId} db_message_id=${saved.id}`,
+    );
+    return saved;
+  }
+
   async createAgentMessage(data: {
     chat_id: string;
     text: string;

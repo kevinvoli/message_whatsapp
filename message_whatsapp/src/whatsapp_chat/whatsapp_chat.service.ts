@@ -57,6 +57,45 @@ export class WhatsappChatService {
     return this.readQuery.getTotalUnreadForPoste(poste_id);
   }
 
+  /**
+   * Trouve ou crée une conversation pour un envoi sortant (outbound-init).
+   * Aucun poste n'est assigné — la conversation attend le dispatch.
+   */
+  async findOrCreateChatForOutbound(
+    phone: string,
+    channelId: string,
+  ): Promise<WhatsappChat> {
+    const chat_id = `${phone}@s.whatsapp.net`;
+    const existing = await this.chatRepository.findOne({
+      where: { chat_id },
+      relations: ['poste', 'channel'],
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const newChat = this.chatRepository.create({
+      chat_id,
+      name: phone,
+      type: 'private',
+      chat_pic: '',
+      chat_pic_full: '',
+      is_pinned: false,
+      is_muted: false,
+      mute_until: null,
+      is_archived: false,
+      unread_count: 0,
+      unread_mention: false,
+      read_only: false,
+      not_spam: true,
+      contact_client: phone,
+      channel_id: channelId,
+      last_activity_at: new Date(),
+    });
+
+    return this.chatRepository.save(newChat);
+  }
+
   async findOrCreateChat(
     chat_id: string,
     from: string,

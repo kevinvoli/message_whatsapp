@@ -38,6 +38,9 @@ import { json } from 'stream/consumers';
 @SkipThrottle()
 @Controller('webhooks')
 export class WhapiController {
+  /** Feature flag — templates HSM désactivés par défaut */
+  private static readonly HSM_TEMPLATES_ENABLED = false;
+
   private readonly auditLogger = new Logger('WebhookAudit');
 
   constructor(
@@ -149,6 +152,9 @@ export class WhapiController {
             eventType,
             enqueuedAt: Date.now(),
           });
+          break;
+        case 'message_template_status_update':
+          // HSM désactivé par défaut — statut de template ignoré
           break;
         case 'events':
         case 'polls':
