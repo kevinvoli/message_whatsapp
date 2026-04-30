@@ -37,6 +37,7 @@ import { ReadOnlyEnforcementJob } from 'src/jorbs/read-only-enforcement.job';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     CallLogModule,
     JorbsModule,
     NotificationModule,
+    WhatsappTemplateModule,
   ],
   controllers: [DispatcherController],
   providers: [
