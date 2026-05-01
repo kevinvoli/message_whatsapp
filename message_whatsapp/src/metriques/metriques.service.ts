@@ -87,15 +87,30 @@ export class MetriquesService {
   ): { dateStart: Date; dateEnd: Date } {
     const from = dateFrom || undefined;
     const to   = dateTo   || undefined;
+
+    // Helper : construit un dateStart a 00:00:00.000 en heure locale a partir de YYYY-MM-DD
+    const toStartOfDay = (s: string): Date => {
+      const d = new Date(s);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    // Helper : construit un dateEnd a 23:59:59.999 en heure locale a partir de YYYY-MM-DD
+    const toEndOfDay = (s: string): Date => {
+      const d = new Date(s);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
     if (from && to) {
-      return { dateStart: new Date(from), dateEnd: new Date(to) };
+      return { dateStart: toStartOfDay(from), dateEnd: toEndOfDay(to) };
     }
     // Fallback : une seule date fournie => journee complete sur cette date
     if (from) {
-      return { dateStart: new Date(from), dateEnd: new Date(from) };
+      return { dateStart: toStartOfDay(from), dateEnd: toEndOfDay(from) };
     }
     if (to) {
-      return { dateStart: new Date(to), dateEnd: new Date(to) };
+      return { dateStart: toStartOfDay(to), dateEnd: toEndOfDay(to) };
     }
     return { dateStart: this.periodeToDateStart(periode), dateEnd: new Date() };
   }
