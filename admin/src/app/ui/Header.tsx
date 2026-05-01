@@ -124,7 +124,12 @@ export default function Header({
                                 <input
                                     type="date"
                                     value={dateFrom ?? ''}
-                                    onChange={(e) => setDateFrom?.(e.target.value)}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDateFrom?.(val);
+                                        // Date unique : aligner dateTo si non renseigné
+                                        if (val && !dateTo) setDateTo?.(val);
+                                    }}
                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                     title="Date de début"
                                 />
@@ -132,7 +137,12 @@ export default function Header({
                                 <input
                                     type="date"
                                     value={dateTo ?? ''}
-                                    onChange={(e) => setDateTo?.(e.target.value)}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDateTo?.(val);
+                                        // Date unique : aligner dateFrom si non renseigné
+                                        if (val && !dateFrom) setDateFrom?.(val);
+                                    }}
                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                     title="Date de fin"
                                 />

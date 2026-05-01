@@ -85,8 +85,17 @@ export class MetriquesService {
     dateFrom?: string,
     dateTo?: string,
   ): { dateStart: Date; dateEnd: Date } {
-    if (dateFrom && dateTo) {
-      return { dateStart: new Date(dateFrom), dateEnd: new Date(dateTo) };
+    const from = dateFrom || undefined;
+    const to   = dateTo   || undefined;
+    if (from && to) {
+      return { dateStart: new Date(from), dateEnd: new Date(to) };
+    }
+    // Fallback : une seule date fournie => journee complete sur cette date
+    if (from) {
+      return { dateStart: new Date(from), dateEnd: new Date(from) };
+    }
+    if (to) {
+      return { dateStart: new Date(to), dateEnd: new Date(to) };
     }
     return { dateStart: this.periodeToDateStart(periode), dateEnd: new Date() };
   }
