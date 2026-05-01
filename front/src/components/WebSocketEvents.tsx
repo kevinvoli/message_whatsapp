@@ -99,7 +99,7 @@ const WebSocketEvents = () => {
             if (Notification.permission === 'granted') {
               new Notification('Nouveau message', {
                 body: message.text || 'Media recu',
-                icon: '/favicon.ico',
+                icon: '/icon.png',
               });
               // requestPermission() ne peut être appelé que depuis un geste utilisateur
               // → la demande est faite au login, pas ici
