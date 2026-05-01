@@ -44,8 +44,10 @@ export class MetriquesController {
   })
   async getPerformanceCommerciaux(
     @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ): Promise<PerformanceCommercialDto[]> {
-    return this.metriquesService.getPerformanceCommerciaux(periode);
+    return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo);
   }
 
   @Get('channels')
