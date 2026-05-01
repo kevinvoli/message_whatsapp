@@ -199,34 +199,31 @@ export class MetriquesService {
 
   private async getMetriquesConversations(dateStart: Date, dateEnd: Date) {
     try {
-      // Requete 1 : total conversations dans la periode
+      // Requete 1 : total conversations AYANT EU une activite client dans la periode
+      // Critere : last_client_message_at tombe dans [dateStart, dateEnd]
+      // Cela inclut les vieilles conversations dont le client a recrit dans la periode
       const totalResult = await this.chatRepository
         .createQueryBuilder('chat')
         .select('COUNT(*)', 'total')
         .where('chat.deletedAt IS NULL')
-        .andWhere('chat.createdAt >= :dateStart', { dateStart })
-        .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
+        .andWhere('chat.last_client_message_at IS NOT NULL')
+        .andWhere('chat.last_client_message_at >= :dateStart', { dateStart })
+        .andWhere('chat.last_client_message_at <= :dateEnd', { dateEnd })
         .getRawOne();
 
       const totalConversations = parseInt(totalResult?.total) || 0;
 
-      // Requete 2 : contacts dont le PREMIER chat (MIN createdAt) tombe dans la periode
-      // => nouveaux clients : toutes leurs conversations sont dans la periode
+      // Requete 2 : parmi ces chats, ceux dont le chat a ete CREE dans la periode
+      // => nouveau client : premiere interaction dans la periode
       const nouveauxResult = await this.chatRepository
         .createQueryBuilder('chat')
-        .select('COUNT(DISTINCT chat.contact_client)', 'nouveaux')
+        .select('COUNT(*)', 'nouveaux')
         .where('chat.deletedAt IS NULL')
-        .andWhere('chat.createdAt >= :dateStart', { dateStart })
-        .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
-        .andWhere(
-          `chat.contact_client NOT IN (
-            SELECT DISTINCT c2.contact_client
-            FROM whatsapp_chat c2
-            WHERE c2.deletedAt IS NULL
-              AND c2.createdAt < :dateStartExcl
-          )`,
-          { dateStartExcl: dateStart },
-        )
+        .andWhere('chat.last_client_message_at IS NOT NULL')
+        .andWhere('chat.last_client_message_at >= :dateStart', { dateStart })
+        .andWhere('chat.last_client_message_at <= :dateEnd', { dateEnd })
+        .andWhere('chat.createdAt >= :dateStartNew', { dateStartNew: dateStart })
+        .andWhere('chat.createdAt <= :dateEndNew', { dateEndNew: dateEnd })
         .getRawOne();
 
       const conversationsNouveauxClients = parseInt(nouveauxResult?.nouveaux) || 0;
