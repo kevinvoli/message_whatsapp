@@ -213,15 +213,13 @@ export class MetriquesService {
 
       const totalConversations = parseInt(totalResult?.total) || 0;
 
-      // Requete 2 : parmi ces chats, ceux dont le chat a ete CREE dans la periode
-      // => nouveau client : premiere interaction dans la periode
+      // Requete 2 : chats crees dans la periode = nouveaux clients
+      // Meme critere que getMetriquesContacts() (contact.createdAt) pour aligner les deux cards
+      // Un webhook cree simultanement un contact et un chat => createdAt identiques
       const nouveauxResult = await this.chatRepository
         .createQueryBuilder('chat')
         .select('COUNT(*)', 'nouveaux')
         .where('chat.deletedAt IS NULL')
-        .andWhere('chat.last_client_message_at IS NOT NULL')
-        .andWhere('chat.last_client_message_at >= :dateStart', { dateStart })
-        .andWhere('chat.last_client_message_at <= :dateEnd', { dateEnd })
         .andWhere('chat.createdAt >= :dateStartNew', { dateStartNew: dateStart })
         .andWhere('chat.createdAt <= :dateEndNew', { dateEndNew: dateEnd })
         .getRawOne();
