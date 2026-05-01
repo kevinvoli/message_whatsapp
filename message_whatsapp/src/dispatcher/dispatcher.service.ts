@@ -166,6 +166,7 @@ export class DispatcherService {
       }
       conversation.unread_count += 1;
       conversation.last_activity_at = new Date();
+      conversation.last_client_message_at = new Date(); // Cas 1 : mise a jour manquante — corrige la derive metrique
       if (
         !conversation.first_response_deadline_at &&
         !conversation.last_poste_message_at
