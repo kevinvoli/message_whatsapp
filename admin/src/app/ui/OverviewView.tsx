@@ -39,12 +39,14 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today', date
   const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[] | null>(null);
   const [webhookMetrics, setWebhookMetrics] = useState<WebhookMetricsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [computedAt, setComputedAt] = useState<Date | null>(null);
   const [fromSnapshot, setFromSnapshot] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(false);
     setMetriques(null);
     setPerformanceCommercial(null);
     setStatutChannels(null);
@@ -53,7 +55,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today', date
     // Chargement progressif : chaque section s'affiche dès qu'elle arrive
     const globalesP = getOverviewSection<MetriquesGlobales>('globales', selectedPeriod, dateFrom, dateTo)
       .then((data) => { setMetriques(data); setLoading(false); })
-      .catch(() => { setMetriques(undefined as unknown as MetriquesGlobales); setLoading(false); });
+      .catch(() => { setError(true); setLoading(false); });
 
     const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', selectedPeriod, dateFrom, dateTo)
       .then((data) => setPerformanceCommercial(data))
@@ -194,8 +196,30 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today', date
     </div>
   );
 
-  if (loading || !metriques) {
+  if (loading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+  }
+
+  if (error || !metriques) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <p className="text-gray-900 font-semibold text-lg mb-1">Impossible de charger les donnees</p>
+          <p className="text-gray-500 text-sm mb-4">Une erreur est survenue lors de la recuperation des metriques.</p>
+          <button
+            type="button"
+            onClick={() => void fetchData()}
+            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 flex items-center gap-2 mx-auto"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Reessayer
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

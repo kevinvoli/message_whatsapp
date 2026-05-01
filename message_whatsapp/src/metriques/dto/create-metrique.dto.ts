@@ -66,6 +66,10 @@ export class MetriquesGlobalesDto {
   @IsNumber()
   tempsReponseMoyen: number;
 
+  @ApiProperty({ description: 'Messages en attente de traitement' })
+  @IsNumber()
+  messagesEnAttente: number;
+
   // ========== MÉTRIQUES CHATS ==========
   @ApiProperty({ description: 'Nombre total de conversations' })
   @IsNumber()

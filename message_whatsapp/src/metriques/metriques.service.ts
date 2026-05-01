@@ -189,6 +189,7 @@ export class MetriquesService {
       messagesAujourdhui: totalMessages,
       tauxReponse,
       tempsReponseMoyen: parseInt(tempsReponse?.avg_seconds) || 0,
+      messagesEnAttente: 0, // champ requis par le frontend, sans implementation specifique
     };
   }
 
@@ -197,41 +198,52 @@ export class MetriquesService {
   // ---------------------------------------------------------------------------
 
   private async getMetriquesConversations(dateStart: Date, dateEnd: Date) {
-    const totalResult = await this.chatRepository
-      .createQueryBuilder('chat')
-      .select('COUNT(*)', 'total')
-      .where('chat.deletedAt IS NULL')
-      .andWhere('chat.createdAt >= :dateStart', { dateStart })
-      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
-      .getRawOne();
+    try {
+      // Requete 1 : total conversations dans la periode
+      const totalResult = await this.chatRepository
+        .createQueryBuilder('chat')
+        .select('COUNT(*)', 'total')
+        .where('chat.deletedAt IS NULL')
+        .andWhere('chat.createdAt >= :dateStart', { dateStart })
+        .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
+        .getRawOne();
 
-    const totalConversations = parseInt(totalResult?.total) || 0;
+      const totalConversations = parseInt(totalResult?.total) || 0;
 
-    // Nouveaux clients = contacts dont AUCUN chat n'existait avant dateStart
-    const nouveauxResult = await this.chatRepository
-      .createQueryBuilder('chat')
-      .select('COUNT(*)', 'nouveaux')
-      .where('chat.deletedAt IS NULL')
-      .andWhere('chat.createdAt >= :dateStart', { dateStart })
-      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
-      .andWhere(
-        `NOT EXISTS (
-          SELECT 1 FROM whatsapp_chat c2
-          WHERE c2.contact_client = chat.contact_client
-            AND c2.deleted_at IS NULL
-            AND c2.created_at < :dateStartSub
-        )`,
-        { dateStartSub: dateStart },
-      )
-      .getRawOne();
+      // Requete 2 : contacts dont le PREMIER chat (MIN createdAt) tombe dans la periode
+      // => nouveaux clients : toutes leurs conversations sont dans la periode
+      const nouveauxResult = await this.chatRepository
+        .createQueryBuilder('chat')
+        .select('COUNT(DISTINCT chat.contact_client)', 'nouveaux')
+        .where('chat.deletedAt IS NULL')
+        .andWhere('chat.createdAt >= :dateStart', { dateStart })
+        .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
+        .andWhere(
+          `chat.contact_client NOT IN (
+            SELECT DISTINCT c2.contact_client
+            FROM whatsapp_chat c2
+            WHERE c2.deleted_at IS NULL
+              AND c2.created_at < :dateStartExcl
+          )`,
+          { dateStartExcl: dateStart },
+        )
+        .getRawOne();
 
-    const conversationsNouveauxClients = parseInt(nouveauxResult?.nouveaux) || 0;
+      const conversationsNouveauxClients = parseInt(nouveauxResult?.nouveaux) || 0;
 
-    return {
-      totalConversations,
-      conversationsNouveauxClients,
-      conversationsAnciensClients: Math.max(0, totalConversations - conversationsNouveauxClients),
-    };
+      return {
+        totalConversations,
+        conversationsNouveauxClients,
+        conversationsAnciensClients: Math.max(0, totalConversations - conversationsNouveauxClients),
+      };
+    } catch {
+      // En cas d'erreur SQL (ex: table vide, permission), retourner des valeurs neutres
+      return {
+        totalConversations: 0,
+        conversationsNouveauxClients: 0,
+        conversationsAnciensClients: 0,
+      };
+    }
   }
 
   // ---------------------------------------------------------------------------
