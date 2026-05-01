@@ -8,6 +8,10 @@ import { exportData, EXPORTABLE_VIEWS, ExportFormat } from '@/app/lib/exportServ
 interface HeaderProps {
     selectedPeriod: string;
     setSelectedPeriod: (value: string) => void;
+    dateFrom?: string;
+    setDateFrom?: (value: string) => void;
+    dateTo?: string;
+    setDateTo?: (value: string) => void;
     viewMode: string;
     navigationItems: NavigationItem[];
     notifications?: Notification[];
@@ -38,6 +42,10 @@ const EXPORT_FORMATS: { key: ExportFormat; label: string; ext: string }[] = [
 export default function Header({
     selectedPeriod,
     setSelectedPeriod,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
     viewMode,
     navigationItems,
     notifications = [],
@@ -99,16 +107,38 @@ export default function Header({
                     <p className="text-sm text-gray-600">Gestion et suivi en temps reel</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <select
-                        value={selectedPeriod}
-                        onChange={(e) => setSelectedPeriod(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="today">Aujourd&apos;hui</option>
-                        <option value="week">Cette semaine</option>
-                        <option value="month">Ce mois</option>
-                        <option value="year">Cette annee</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={selectedPeriod}
+                            onChange={(e) => setSelectedPeriod(e.target.value)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="today">Aujourd&apos;hui</option>
+                            <option value="week">Cette semaine</option>
+                            <option value="month">Ce mois</option>
+                            <option value="year">Cette annee</option>
+                            <option value="custom">Personnalisé</option>
+                        </select>
+                        {selectedPeriod === 'custom' && (
+                            <>
+                                <input
+                                    type="date"
+                                    value={dateFrom ?? ''}
+                                    onChange={(e) => setDateFrom?.(e.target.value)}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    title="Date de début"
+                                />
+                                <span className="text-gray-500 text-sm">→</span>
+                                <input
+                                    type="date"
+                                    value={dateTo ?? ''}
+                                    onChange={(e) => setDateTo?.(e.target.value)}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    title="Date de fin"
+                                />
+                            </>
+                        )}
+                    </div>
 
                     {/* Notifications bell */}
                     <div className="relative" ref={panelRef}>

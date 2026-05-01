@@ -13,6 +13,7 @@ import {
 import { AuthAdminService } from './auth_admin.service';
 import { AdminService } from '../admin/admin.service';
 import { LoginDto } from '../auth/shared/login.dto';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 
@@ -21,6 +22,7 @@ export class AuthAdminController {
   constructor(
     private authAdminService: AuthAdminService,
     private adminService: AdminService,
+    private readonly connectionLogService: ConnectionLogService,
   ) {}
 
   @Post('login')
@@ -52,6 +54,9 @@ export class AuthAdminController {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
+
+    // Log connexion admin
+    void this.connectionLogService.logLogin(admin.id, 'admin');
 
     return { admin };
   }
@@ -108,7 +113,13 @@ export class AuthAdminController {
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt-admin'))
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Request() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Log déconnexion admin
+    void this.connectionLogService.logLogout(req.user.userId, 'admin');
+
     res.clearCookie('AuthenticationAdmin');
     res.clearCookie('RefreshAdmin');
     return { message: 'Successfully logged out as admin' };

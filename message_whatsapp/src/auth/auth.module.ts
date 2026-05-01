@@ -7,11 +7,13 @@ import { SystemConfigModule } from '../system-config/system-config.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 
 @Module({
   imports: [
     WhatsappCommercialModule,
     SystemConfigModule,
+    ConnectionLogModule,
     PassportModule,
     ConfigModule,
     JwtModule.registerAsync({

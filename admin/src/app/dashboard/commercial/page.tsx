@@ -46,6 +46,8 @@ import { getAdminProfile } from '@/app/lib/api';
 
 export default function AdminDashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('today');
+    const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
+    const [dateTo, setDateTo] = useState<string | undefined>(undefined);
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [adminProfile, setAdminProfile] = useState<{ id: string; name: string; email: string } | null>(null);
@@ -92,9 +94,9 @@ export default function AdminDashboard() {
     const renderContent = () => {
         switch(viewMode) {
             case 'overview':
-                return <OverviewView selectedPeriod={selectedPeriod} />;
+                return <OverviewView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} />;
             case 'commerciaux':
-                return <CommerciauxView selectedPeriod={selectedPeriod} onViewConversations={handleViewCommercialConversations} />;
+                return <CommerciauxView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} onViewConversations={handleViewCommercialConversations} />;
             case 'postes':
                 return <PostesView onViewConversations={handleViewPosteConversations} />;
             case 'queue':
@@ -175,6 +177,10 @@ export default function AdminDashboard() {
                 <Header
                     selectedPeriod={selectedPeriod}
                     setSelectedPeriod={setSelectedPeriod}
+                    dateFrom={dateFrom}
+                    setDateFrom={setDateFrom}
+                    dateTo={dateTo}
+                    setDateTo={setDateTo}
                     viewMode={viewMode}
                     navigationItems={navigationItems}
                     notifications={notifications}

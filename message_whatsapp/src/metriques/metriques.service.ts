@@ -8,6 +8,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { MoreThanOrEqual, Repository } from 'typeorm';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import {
   ChargePosteDto,
   MetriquesGlobalesDto,
@@ -43,6 +44,7 @@ export class MetriquesService {
 
     @InjectRepository(QueuePosition)
     private queueRepository: Repository<QueuePosition>,
+    private readonly connectionLogService: ConnectionLogService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -108,6 +110,7 @@ export class MetriquesService {
         metriquesPostes,
         metriquesChannels,
         chargePostes,
+        metriquesConversations,
       ] = await Promise.all([
         this.getMetriquesMessages(dateStart, dateEnd),
         this.getMetriquesChats(dateStart, dateEnd),
@@ -116,6 +119,7 @@ export class MetriquesService {
         this.getMetriquesPostes(),
         this.getMetriquesChannels(),
         this.getChargeParPoste(dateStart, dateEnd),
+        this.getMetriquesConversations(dateStart, dateEnd),
       ]);
 
       return {
@@ -126,6 +130,7 @@ export class MetriquesService {
         ...metriquesPostes,
         ...metriquesChannels,
         chargePostes,
+        ...metriquesConversations,
       };
   }
 
@@ -188,6 +193,48 @@ export class MetriquesService {
   }
 
   // ---------------------------------------------------------------------------
+  // Private — Conversations (nouveaux vs anciens clients)
+  // ---------------------------------------------------------------------------
+
+  private async getMetriquesConversations(dateStart: Date, dateEnd: Date) {
+    const totalResult = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(*)', 'total')
+      .where('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
+      .getRawOne();
+
+    const totalConversations = parseInt(totalResult?.total) || 0;
+
+    // Nouveaux clients = contacts dont AUCUN chat n'existait avant dateStart
+    const nouveauxResult = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(*)', 'nouveaux')
+      .where('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM whatsapp_chat c2
+          WHERE c2.contact_client = chat.contact_client
+            AND c2.deleted_at IS NULL
+            AND c2.created_at < :dateStartSub
+        )`,
+        { dateStartSub: dateStart },
+      )
+      .getRawOne();
+
+    const conversationsNouveauxClients = parseInt(nouveauxResult?.nouveaux) || 0;
+
+    return {
+      totalConversations,
+      conversationsNouveauxClients,
+      conversationsAnciensClients: Math.max(0, totalConversations - conversationsNouveauxClients),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // Private — Chats
   // AVANT : 6 requêtes COUNT séparées sur la même table
   // APRÈS  : 2 requêtes (1 agrégation conditionnelle + 1 AVG)
@@ -204,6 +251,8 @@ export class MetriquesService {
       .addSelect('SUM(CASE WHEN chat.unread_count > 0       THEN 1 ELSE 0 END)',           'non_lus')
       .addSelect('SUM(CASE WHEN chat.is_archived = 1        THEN 1 ELSE 0 END)',           'archives')
       .addSelect('SUM(CASE WHEN chat.poste_id IS NOT NULL   THEN 1 ELSE 0 END)',           'assignes')
+      .addSelect('SUM(CASE WHEN chat.unread_count = 0 AND chat.last_poste_message_at IS NULL THEN 1 ELSE 0 END)', 'lus_sans_reponse')
+      .addSelect('SUM(CASE WHEN chat.unread_count = 0 AND chat.last_poste_message_at IS NOT NULL THEN 1 ELSE 0 END)', 'lus_avec_reponse')
       .where('chat.deletedAt IS NULL')
       .andWhere('chat.createdAt >= :dateStart', { dateStart })
       .andWhere('chat.createdAt <= :dateEnd',   { dateEnd })
@@ -235,6 +284,8 @@ export class MetriquesService {
       chatsArchives:   parseInt(stats?.archives)   || 0,
       tauxAssignation: totalChats > 0 ? Math.round((chatsAssignes / totalChats) * 100) : 0,
       tempsPremiereReponse: parseInt(tempsPremiereReponse?.avg_seconds) || 0,
+      chatsLusSansReponse: parseInt(stats?.lus_sans_reponse) || 0,
+      chatsLusAvecReponse: parseInt(stats?.lus_avec_reponse) || 0,
     };
   }
 
@@ -420,7 +471,7 @@ export class MetriquesService {
     const commercialIds = commerciaux.map((c) => c.id);
 
     // ── Requêtes 2-5 en parallèle : chacune cible un index précis ──────────────
-    const [msgInRows, msgOutRows, chatsActifsRows, tempsRows] = await Promise.all([
+    const [msgInRows, msgOutRows, chatsActifsRows, tempsRows, connectionMinutesMap] = await Promise.all([
 
       // Req 2 — Messages IN par poste (utilise IDX_msg_poste_dir_time)
       posteIds.length > 0
@@ -491,6 +542,16 @@ export class MetriquesService {
             .groupBy('msg_out.poste_id')
             .getRawMany()
         : Promise.resolve([]),
+
+      // Req 6 — Minutes de connexion par commercial
+      commercialIds.length > 0
+        ? this.connectionLogService.getBulkConnectionMinutes(
+            commercialIds,
+            'commercial',
+            dateStart,
+            dateEnd,
+          )
+        : Promise.resolve(new Map<string, number>()),
     ]);
 
     // ── Lookup Maps O(1) ──────────────────────────────────────────────────────
@@ -518,7 +579,8 @@ export class MetriquesService {
           tauxReponse:      nbMessagesRecus > 0
             ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100)
             : 0,
-          tempsReponseMoyen: tempsParPoste.get(perf.poste_id) ?? 0,
+          tempsReponseMoyen:      tempsParPoste.get(perf.poste_id) ?? 0,
+          totalConnectionMinutes: connectionMinutesMap.get(perf.id) ?? 0,
         };
       })
       .sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);

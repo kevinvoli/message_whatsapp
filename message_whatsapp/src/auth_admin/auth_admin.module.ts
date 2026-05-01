@@ -9,10 +9,12 @@ import { AuthAdminController } from './auth_admin.controller';
 import { JwtAdminStrategy } from './jwt_admin.strategy';
 import { AdminModule } from '../admin/admin.module';
 import { AdminTokenRefreshInterceptor } from './token-refresh.interceptor';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 
 @Module({
   imports: [
     AdminModule,
+    ConnectionLogModule,
     PassportModule,
     ConfigModule,
     JwtModule.registerAsync({

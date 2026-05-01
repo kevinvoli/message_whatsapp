@@ -12,14 +12,17 @@ import { MessageAutoModule } from 'src/message-auto/message-auto.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 import { LoggingModule } from 'src/logging/logging.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CronConfig, WhatsappChat, AutoMessageKeyword]),
+    TypeOrmModule.forFeature([CronConfig, WhatsappChat, AutoMessageKeyword, WhatsappCommercial]),
     forwardRef(() => MessageAutoModule),
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,
     NotificationModule,
+    ConnectionLogModule,
   ],
   controllers: [CronConfigController],
   providers: [

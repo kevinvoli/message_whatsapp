@@ -11,10 +11,12 @@ import { EntityFormModal } from './crud/EntityFormModal';
 interface CommerciauxViewProps {
   onRefresh?: () => void;
   selectedPeriod?: string;
+  dateFrom?: string;
+  dateTo?: string;
   onViewConversations?: (commercialId: string, posteId: string) => void;
 }
 
-export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', onViewConversations }: CommerciauxViewProps) {
+export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', dateFrom, dateTo, onViewConversations }: CommerciauxViewProps) {
   const [commerciaux, setCommerciaux] = useState<PerformanceCommercial[]>([]);
   const [postes, setPostes] = useState<Poste[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -67,7 +69,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     setDataLoading(true);
     try {
       const [commerciauxData, postesData] = await Promise.all([
-        getPerformanceCommerciaux(selectedPeriod),
+        getPerformanceCommerciaux(selectedPeriod, dateFrom, dateTo),
         getPostes(),
       ]);
       setCommerciaux(commerciauxData);
@@ -78,7 +80,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
     } finally {
       setDataLoading(false);
     }
-  }, [addToast, selectedPeriod]);
+  }, [addToast, selectedPeriod, dateFrom, dateTo]);
 
   refreshRef.current = fetchData;
 
@@ -341,13 +343,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux réponse</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temps moy.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Heures co.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {dataLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={10} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                       <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -359,7 +362,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </tr>
               ) : commerciauxFiltres.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
                   </td>
                 </tr>
@@ -457,6 +460,15 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600">
                         {formatDate(commercial.lastConnectionAt)}
+                      </span>
+                    </td>
+
+                    {/* Heures de connexion */}
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-900">
+                        {commercial.totalConnectionMinutes != null
+                          ? formatTemps(commercial.totalConnectionMinutes * 60)
+                          : '-'}
                       </span>
                     </td>
 

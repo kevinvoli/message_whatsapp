@@ -10,6 +10,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { AnalyticsSnapshot } from './entities/analytics-snapshot.entity';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
 
 @Module({
@@ -24,6 +25,7 @@ import { AnalyticsSnapshotService } from './analytics-snapshot.service';
       QueuePosition,
       AnalyticsSnapshot,
     ]),
+    ConnectionLogModule,
   ],
   controllers: [MetriquesController],
   providers: [MetriquesService, AnalyticsSnapshotService],

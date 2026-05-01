@@ -800,8 +800,11 @@ export async function getMetriquesGlobales(): Promise<MetriquesGlobales> {
 /**
  * Récupère la performance détaillée de tous les commerciaux
  */
-export async function getPerformanceCommerciaux(periode = 'today'): Promise<PerformanceCommercial[]> {
-    const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux?periode=${periode}`, {
+export async function getPerformanceCommerciaux(periode = 'today', dateFrom?: string, dateTo?: string): Promise<PerformanceCommercial[]> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
     });

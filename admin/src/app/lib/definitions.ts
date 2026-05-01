@@ -421,6 +421,13 @@ export type MetriquesGlobales = {
   totalChannels: number;
   channelsActifs: number;
 
+  // Métriques Conversations
+  totalConversations: number;
+  conversationsNouveauxClients: number;
+  conversationsAnciensClients: number;
+  chatsLusSansReponse: number;
+  chatsLusAvecReponse: number;
+
   // Métriques Performance
   messagesEnAttente: number;
   tauxAssignation: number;
@@ -484,6 +491,7 @@ export type PerformanceCommercial = {
   tauxReponse: number;
   tempsReponseMoyen: number;
   lastConnectionAt: string | null;
+  totalConnectionMinutes?: number;
 };
 
 /**

@@ -28,9 +28,11 @@ const PERIODE_CHART_LABELS: Record<string, string> = {
 interface OverviewViewProps {
   onRefresh?: () => void;
   selectedPeriod?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
-export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: OverviewViewProps) {
+export default function OverviewView({ onRefresh, selectedPeriod = 'today', dateFrom, dateTo }: OverviewViewProps) {
   const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
   const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[] | null>(null);
   const [statutChannels, setStatutChannels] = useState<StatutChannel[] | null>(null);
@@ -49,19 +51,19 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
     setPerformanceTemporelle(null);
 
     // Chargement progressif : chaque section s'affiche dès qu'elle arrive
-    const globalesP = getOverviewSection<MetriquesGlobales>('globales', selectedPeriod)
+    const globalesP = getOverviewSection<MetriquesGlobales>('globales', selectedPeriod, dateFrom, dateTo)
       .then((data) => { setMetriques(data); setLoading(false); })
       .catch(() => { setMetriques(undefined as unknown as MetriquesGlobales); setLoading(false); });
 
-    const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', selectedPeriod)
+    const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', selectedPeriod, dateFrom, dateTo)
       .then((data) => setPerformanceCommercial(data))
       .catch(() => setPerformanceCommercial([]));
 
-    const channelsP = getOverviewSection<StatutChannel[]>('channels', selectedPeriod)
+    const channelsP = getOverviewSection<StatutChannel[]>('channels', selectedPeriod, dateFrom, dateTo)
       .then((data) => setStatutChannels(data))
       .catch(() => setStatutChannels([]));
 
-    const temporelleP = getOverviewSection<PerformanceTemporelle[]>('temporelle', selectedPeriod)
+    const temporelleP = getOverviewSection<PerformanceTemporelle[]>('temporelle', selectedPeriod, dateFrom, dateTo)
       .then((data) => setPerformanceTemporelle(data))
       .catch(() => setPerformanceTemporelle([]));
 
@@ -70,7 +72,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
       .catch(() => setWebhookMetrics(null));
 
     await Promise.allSettled([globalesP, commerciauxP, channelsP, temporelleP, webhookP]);
-  }, [selectedPeriod]);
+  }, [selectedPeriod, dateFrom, dateTo]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -380,6 +382,43 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
           </div>
           <p className="text-xl font-bold text-gray-900">{metriques.chatsArchives}</p>
           <p className="text-xs text-gray-700 mt-1">{metriques.chatsFermes} fermés</p>
+        </div>
+      </div>
+
+      {/* Métriques Conversations */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Total Conversations */}
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-teal-600" />
+            </div>
+          </div>
+          <h3 className="text-gray-600 text-xs mb-1">Total Conversations</h3>
+          <p className="text-2xl font-bold text-gray-900">
+            {(metriques.totalConversations ?? metriques.totalChats).toLocaleString()}
+          </p>
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <span className="text-teal-600">{metriques.conversationsNouveauxClients ?? 0} nouveaux clients</span>
+            <span className="text-gray-500">{metriques.conversationsAnciensClients ?? 0} anciens</span>
+          </div>
+        </div>
+
+        {/* Conversations lues */}
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-indigo-600" />
+            </div>
+          </div>
+          <h3 className="text-gray-600 text-xs mb-1">Conversations lues</h3>
+          <p className="text-2xl font-bold text-gray-900">
+            {((metriques.chatsLusSansReponse ?? 0) + (metriques.chatsLusAvecReponse ?? 0)).toLocaleString()}
+          </p>
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <span className="text-indigo-600">{metriques.chatsLusAvecReponse ?? 0} avec réponse</span>
+            <span className="text-orange-500">{metriques.chatsLusSansReponse ?? 0} sans réponse</span>
+          </div>
         </div>
       </div>
 

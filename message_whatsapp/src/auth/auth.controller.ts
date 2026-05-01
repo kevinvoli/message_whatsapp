@@ -12,10 +12,14 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private readonly connectionLogService: ConnectionLogService,
+  ) {}
 
   @Post('login')
   async login(
@@ -32,6 +36,9 @@ export class AuthController {
     }
 
     const { accessToken, refreshToken } = this.authService.login(user);
+
+    // Log connexion commercial
+    void this.connectionLogService.logLogin(user.id, 'commercial');
 
     res.cookie('Authentication', accessToken, {
       httpOnly: true,
@@ -62,7 +69,13 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Request() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Log déconnexion commercial
+    void this.connectionLogService.logLogout(req.user.userId, 'commercial');
+
     res.clearCookie('Authentication');
     res.clearCookie('Refresh');
     return { message: 'Successfully logged out' };

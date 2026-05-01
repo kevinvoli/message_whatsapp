@@ -91,6 +91,27 @@ export class MetriquesGlobalesDto {
   @IsNumber()
   chatsArchives: number;
 
+
+  @ApiProperty({ description: 'Total conversations sur la période' })
+  @IsNumber()
+  totalConversations: number;
+
+  @ApiProperty({ description: 'Conversations avec nouveaux clients' })
+  @IsNumber()
+  conversationsNouveauxClients: number;
+
+  @ApiProperty({ description: 'Conversations avec anciens clients' })
+  @IsNumber()
+  conversationsAnciensClients: number;
+
+  @ApiProperty({ description: 'Conversations lues sans réponse du poste' })
+  @IsNumber()
+  chatsLusSansReponse: number;
+
+  @ApiProperty({ description: 'Conversations lues avec réponse du poste' })
+  @IsNumber()
+  chatsLusAvecReponse: number;
+
   // ========== MÉTRIQUES COMMERCIAUX ==========
   @ApiProperty({ description: 'Nombre total de commerciaux' })
   @IsNumber()
@@ -209,6 +230,11 @@ export class PerformanceCommercialDto {
   @IsOptional()
   @IsString()
   lastConnectionAt?: string | null;
+
+  @ApiProperty({ description: 'Minutes de connexion totales', required: false })
+  @IsOptional()
+  @IsNumber()
+  totalConnectionMinutes?: number;
 }
 
 /**
