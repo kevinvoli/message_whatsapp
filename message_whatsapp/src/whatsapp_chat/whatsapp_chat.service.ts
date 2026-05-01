@@ -62,10 +62,9 @@ export class WhatsappChatService {
    * Aucun poste n'est assigné — la conversation attend le dispatch.
    */
   async findOrCreateChatForOutbound(
-    phone: string,
-    channelId: string,
+    params: { chat_id: string; contactName?: string; channelId: string },
   ): Promise<WhatsappChat> {
-    const chat_id = `${phone}@s.whatsapp.net`;
+    const { chat_id, contactName, channelId } = params;
     const existing = await this.chatRepository.findOne({
       where: { chat_id },
       relations: ['poste', 'channel'],
@@ -74,9 +73,10 @@ export class WhatsappChatService {
       return existing;
     }
 
+    const phone = chat_id.split('@')[0];
     const newChat = this.chatRepository.create({
       chat_id,
-      name: phone,
+      name: contactName ?? phone,
       type: 'private',
       chat_pic: '',
       chat_pic_full: '',
@@ -90,6 +90,7 @@ export class WhatsappChatService {
       not_spam: true,
       contact_client: phone,
       channel_id: channelId,
+      status: WhatsappChatStatus.EN_ATTENTE,
       last_activity_at: new Date(),
     });
 

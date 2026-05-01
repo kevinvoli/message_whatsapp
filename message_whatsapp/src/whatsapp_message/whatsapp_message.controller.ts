@@ -29,6 +29,7 @@ import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { CreateOutboundMessageDto } from './dto/create-outbound-message.dto';
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-whatsapp-template.dto';
+import { UpdateWhatsappTemplateDto } from 'src/whatsapp_template/dto/update-whatsapp-template.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { Repository } from 'typeorm';
@@ -90,19 +91,26 @@ export class WhatsappMessageController {
   @Post('outbound-init')
   @UseGuards(AdminGuard)
   async initiateOutbound(@Body() dto: CreateOutboundMessageDto) {
-    if (!dto.channel_id || !dto.recipient || !dto.text) {
-      throw new BadRequestException('channel_id, recipient et text sont requis');
+    if (!dto.channel_id || !dto.recipient) {
+      throw new BadRequestException('channel_id et recipient sont requis');
+    }
+    if (!dto.text && !dto.template_id) {
+      throw new BadRequestException('text ou template_id est requis');
     }
     try {
-      const message = await this.messageService.createOutboundInitMessage({
+      const result = await this.messageService.createOutboundInitMessage({
         channelId: dto.channel_id,
         recipient: dto.recipient,
         text: dto.text,
+        templateId: dto.template_id,
+        templateParams: dto.template_params,
+        contactName: dto.contact_name,
       });
       return {
         success: true,
-        message_id: message.id,
-        chat_id: message.chat?.chat_id ?? null,
+        chatId: result.chatId,
+        messageId: result.messageId,
+        contactId: result.contactId,
       };
     } catch (err) {
       if (err instanceof HttpException) throw err;
@@ -120,35 +128,30 @@ export class WhatsappMessageController {
 
   @Get('templates')
   @UseGuards(AdminGuard)
-  async getTemplates(@Query('tenant_id') tenantId?: string) {
+  async getTemplates(@Query('channel_id') channelId?: string, @Query('status') status?: string) {
     if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
       return [];
     }
-    return this.templateService.findAll(tenantId);
+    if (!channelId) return [];
+    return this.templateService.findAllByChannel(channelId, status);
   }
 
   @Post('templates')
   @UseGuards(AdminGuard)
   async createTemplate(@Body() dto: CreateWhatsappTemplateDto) {
     if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
-      throw new HttpException(
-        'Templates HSM désactivés',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw new NotFoundException('Templates HSM désactivés');
     }
     return this.templateService.create(dto);
   }
 
   @Patch('templates/:id/resubmit')
   @UseGuards(AdminGuard)
-  async resubmitTemplate(@Param('id') id: string) {
+  async resubmitTemplate(@Param('id') id: string, @Body() dto?: UpdateWhatsappTemplateDto) {
     if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
-      throw new HttpException(
-        'Templates HSM désactivés',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw new NotFoundException('Templates HSM désactivés');
     }
-    return this.templateService.resubmit(id);
+    return this.templateService.resubmit(id, dto);
   }
 
   @Post('media/admin')

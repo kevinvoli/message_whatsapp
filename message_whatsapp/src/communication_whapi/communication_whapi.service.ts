@@ -424,4 +424,32 @@ export class CommunicationWhapiService {
       throw new NotFoundException(new Error(error));
     }
   }
+
+  async sendHsmToWhapiChannel(data: {
+    to: string;
+    channelId: string;
+    templateName: string;
+    languageCode: string;
+    bodyParameters?: string[];
+  }): Promise<any> {
+    const channel = await this.channelRepository.findOne({ where: { channel_id: data.channelId } });
+    if (!channel) throw new NotFoundException(`Canal ${data.channelId} introuvable`);
+
+    const params = (data.bodyParameters ?? []).map(text => ({ type: 'text', text }));
+    const payload: any = {
+      to: data.to,
+      template: {
+        name: data.templateName,
+        language: { code: data.languageCode },
+      },
+    };
+    if (params.length > 0) {
+      payload.template.parameters = { body: { parameters: params } };
+    }
+
+    const response = await axios.post('https://gate.whapi.cloud/messages/hsm', payload, {
+      headers: { Authorization: `Bearer ${channel.token}` },
+    });
+    return response.data;
+  }
 }

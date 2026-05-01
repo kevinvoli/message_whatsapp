@@ -1,11 +1,31 @@
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { WhatsappTemplateStatus } from '../entities/whatsapp_template.entity';
+
 export class CreateWhatsappTemplateDto {
-  tenant_id?: string;
-  channel_id?: string;
+  @IsString()
+  @IsNotEmpty()
+  channelId: string;
+
+  @IsString()
+  @IsNotEmpty()
   name: string;
-  category: string;
-  language: string;
-  body_text: string;
-  header_type?: string;
-  header_content?: string;
-  footer_text?: string;
+
+  @IsString()
+  @IsOptional()
+  language?: string;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
+
+  @IsEnum(WhatsappTemplateStatus)
+  @IsOptional()
+  status?: WhatsappTemplateStatus;
+
+  @IsOptional()
+  components?: any;
+
+  @IsString()
+  @IsOptional()
+  externalId?: string;
 }

@@ -914,27 +914,21 @@ export interface Role {
 // PHASE 4 — Templates HSM
 // ============================================
 
-export type TemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'IN_APPEAL' | 'FLAGGED' | 'DELETED';
-export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+export type WhatsappTemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-export interface WhatsappTemplate {
+export type WhatsappTemplate = {
   id: string;
-  tenant_id: string;
-  channel_id: string;
+  channelId: string;
   name: string;
-  meta_template_id: string | null;
-  category: TemplateCategory;
   language: string;
-  status: TemplateStatus;
-  header_type: string | null;
-  header_content: string | null;
-  body_text: string;
-  footer_text: string | null;
-  buttons: Record<string, unknown>[] | null;
-  rejection_reason: string | null;
+  category?: string | null;
+  status: WhatsappTemplateStatus;
+  components?: any | null;
+  externalId?: string | null;
+  rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
-}
+};
 
 // ============================================
 // PHASE 4 — Broadcasts
@@ -1142,9 +1136,10 @@ export interface OutboundConversationDto {
 
 export interface OutboundConversationResult {
   success: boolean;
-  message_id: string;
-  chat_id: string;
+  chatId: string;
+  messageId: string;
+  contactId: string;
 }
 
-// Alias pour compatibilité
-export type WhatsappTemplateStatus = TemplateStatus;
+// Ancien alias conservé pour compatibilité rétroactive
+export type TemplateStatus = WhatsappTemplateStatus;

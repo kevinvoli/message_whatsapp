@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -24,6 +24,7 @@ import {
   WhatsappMediaType,
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
+import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 @Injectable()
 export class WhatsappMessageService {
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
@@ -46,6 +47,7 @@ export class WhatsappMessageService {
     private readonly chatRepository: Repository<WhatsappChat>,
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
+    private readonly templateService: WhatsappTemplateService,
   ) {}
 
   private resolveIncomingText(message: WhapiMessage): string {
@@ -109,63 +111,109 @@ export class WhatsappMessageService {
 
   /**
    * Initie une conversation sortante vers un client non enregistré.
-   * Pas de vérification de fenêtre de réponse — c'est un premier contact.
+   * Supporte l'envoi texte libre et l'envoi via template HSM.
    */
   async createOutboundInitMessage(data: {
     channelId: string;
     recipient: string;
-    text: string;
-  }): Promise<WhatsappMessage> {
+    text?: string;
+    templateId?: string;
+    templateParams?: string[];
+    contactName?: string;
+  }): Promise<{ chatId: string; messageId: string; contactId: string }> {
+    if (!data.text && !data.templateId) {
+      throw new BadRequestException('text ou templateId requis');
+    }
+
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+
+    // Validation E.164 pour whapi/meta
+    if (['whapi', 'meta'].includes(channel.provider ?? '')) {
+      if (!/^\d{7,15}$/.test(data.recipient)) {
+        throw new BadRequestException('Numéro invalide — format E.164 requis (chiffres uniquement, 7-15 digits)');
+      }
+    }
+
+    // Construire chat_id selon provider
+    let chatId: string;
+    switch (channel.provider) {
+      case 'messenger': chatId = `${data.recipient}@messenger`; break;
+      case 'instagram': chatId = `${data.recipient}@instagram`; break;
+      case 'telegram':  chatId = `${data.recipient}@telegram`; break;
+      default:          chatId = `${data.recipient}@s.whatsapp.net`;
+    }
+
     const traceId = this.buildTraceId(undefined, data.recipient);
     this.logger.log(
-      `OUTBOUND_INIT_REQUEST trace=${traceId} recipient=${data.recipient} channelId=${data.channelId}`,
+      `OUTBOUND_INIT_REQUEST trace=${traceId} recipient=${data.recipient} channelId=${data.channelId} templateId=${data.templateId ?? 'none'}`,
     );
 
-    const chat = await this.chatService.findOrCreateChatForOutbound(
-      data.recipient,
-      data.channelId,
-    );
+    // Contact
+    const contact = await this.contactService.findOrCreate(data.recipient, chatId, data.contactName);
 
-    const sendResponse = await this.outboundRouter.sendTextMessage({
-      to: data.recipient,
-      text: data.text,
+    // Chat
+    const chat = await this.chatService.findOrCreateChatForOutbound({
+      chat_id: chatId,
+      contactName: data.contactName,
       channelId: data.channelId,
     });
 
-    this.logger.log(
-      `OUTBOUND_INIT_PROVIDER_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
-    );
+    let providerMessageId: string;
 
-    const channel = await this.channelService.findOne(data.channelId);
-    if (!channel) {
-      throw new NotFoundException(`Channel ${data.channelId} introuvable`);
+    if (data.templateId) {
+      const template = await this.templateService.findOne(data.templateId);
+      if (!template) throw new NotFoundException(`Template ${data.templateId} introuvable`);
+
+      const sent = await this.outboundRouter.sendTemplateMessage({
+        to: data.recipient,
+        channelId: data.channelId,
+        templateName: template.name,
+        languageCode: template.language,
+        bodyParameters: data.templateParams,
+      });
+      providerMessageId = sent.providerMessageId;
+    } else {
+      const sent = await this.outboundRouter.sendTextMessage({
+        to: data.recipient,
+        text: data.text!,
+        channelId: data.channelId,
+      });
+      providerMessageId = sent.providerMessageId;
     }
 
+    this.logger.log(
+      `OUTBOUND_INIT_PROVIDER_OK trace=${traceId} providerMessageId=${providerMessageId}`,
+    );
+
     const messageEntity = this.messageRepository.create({
-      message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
-      external_id: sendResponse.providerMessageId,
-      provider: sendResponse.provider,
-      provider_message_id: sendResponse.providerMessageId,
+      message_id: providerMessageId ?? `agent_${Date.now()}`,
+      external_id: providerMessageId,
+      provider: channel.provider ?? 'whapi',
+      provider_message_id: providerMessageId,
       direction: MessageDirection.OUT,
       from_me: true,
       timestamp: new Date(),
       status: WhatsappMessageStatus.SENT,
       source: 'admin_outbound',
-      text: data.text,
+      text: data.text ?? (data.templateId ? `[Template: ${data.templateId}]` : ''),
       chat,
       channel,
       from: data.recipient,
-      from_name: data.recipient,
+      from_name: data.contactName ?? data.recipient,
       poste_id: null,
       dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
     });
 
     const saved = await this.messageRepository.save(messageEntity);
+    await this.chatRepository.update({ chat_id: chatId }, { last_activity_at: new Date() });
+
     this.logger.log(
       `OUTBOUND_INIT_PERSISTED trace=${traceId} db_message_id=${saved.id}`,
     );
-    return saved;
+    return { chatId, messageId: saved.id, contactId: contact.id };
   }
+
 
   async createAgentMessage(data: {
     chat_id: string;

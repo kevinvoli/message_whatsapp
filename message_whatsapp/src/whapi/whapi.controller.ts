@@ -33,6 +33,8 @@ import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { json } from 'stream/consumers';
+import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 
 // Les webhooks reçoivent un volume légitime élevé — exemptés du throttler global
 @SkipThrottle()
@@ -53,6 +55,8 @@ export class WhapiController {
     private readonly channelService: ChannelService,
     @InjectQueue(WEBHOOK_PROCESSING_QUEUE)
     private readonly webhookQueue: Queue<WebhookJobData>,
+    private readonly templateService: WhatsappTemplateService,
+    private readonly gateway: WhatsappMessageGateway,
   ) {}
 
   @Post('whapi')
@@ -154,7 +158,10 @@ export class WhapiController {
           });
           break;
         case 'message_template_status_update':
-          // HSM désactivé par défaut — statut de template ignoré
+          if (!WhapiController.HSM_TEMPLATES_ENABLED) {
+            break;
+          }
+          this.handleTemplateStatusUpdate(payload).catch(() => {});
           break;
         case 'events':
         case 'polls':
@@ -1239,5 +1246,31 @@ export class WhapiController {
       value?.messages?.[0]?.id ?? value?.statuses?.[0]?.id ?? 'unknown';
     const channelId = value?.metadata?.phone_number_id ?? 'unknown';
     return `${provider}:${channelId}:${entry?.changes?.[0]?.field ?? 'unknown'}:${id}`;
+  }
+
+  private async handleTemplateStatusUpdate(payload: any): Promise<void> {
+    try {
+      // Le payload Whapi pour message_template_status_update a une structure différente de Meta
+      // On essaie les deux formats
+      const value = payload?.value ?? payload;
+      const externalId = value?.message_template_id?.toString() ?? value?.id?.toString();
+      const event = value?.event ?? value?.new_quality_score ?? 'UNKNOWN';
+      const reason = value?.reason ?? undefined;
+
+      if (!externalId) return;
+
+      const updated = await this.templateService.updateStatusByExternalId(externalId, event, reason);
+      if (updated) {
+        this.gateway.server.emit('admin:template_status_update', {
+          templateId: updated.id,
+          externalId: updated.externalId,
+          name: updated.name,
+          status: updated.status,
+          rejectionReason: updated.rejectionReason,
+        });
+      }
+    } catch (err) {
+      // Fire & forget — ne pas laisser une erreur de template crasher le webhook
+    }
   }
 }

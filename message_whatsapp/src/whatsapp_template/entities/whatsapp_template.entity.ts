@@ -1,77 +1,48 @@
-import {
-  Column,
-  CreateDateColumn,
-  DeleteDateColumn,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
-export type TemplateStatus =
-  | 'PENDING'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'PAUSED'
-  | 'DISABLED'
-  | 'IN_APPEAL'
-  | 'FLAGGED'
-  | 'DELETED';
+export enum WhatsappTemplateStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
 
-export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
-
-@Entity({ name: 'whatsapp_template' })
-@Index('IDX_template_tenant', ['tenantId'])
-@Index('IDX_template_status', ['status'])
+@Entity('whatsapp_template')
 export class WhatsappTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tenant_id', type: 'varchar', length: 36, nullable: true })
-  tenantId: string | null;
+  @Column({ name: 'channel_id', type: 'varchar', length: 36, nullable: false })
+  channelId: string;
 
-  @Column({ name: 'channel_id', type: 'varchar', length: 100, nullable: true })
-  channelId: string | null;
-
-  @Column({ name: 'name', type: 'varchar', length: 255 })
+  @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
   name: string;
 
-  @Column({ name: 'meta_template_id', type: 'varchar', length: 100, nullable: true })
-  metaTemplateId: string | null;
-
-  @Column({ name: 'category', type: 'varchar', length: 50 })
-  category: TemplateCategory;
-
-  @Column({ name: 'language', type: 'varchar', length: 10, default: 'fr' })
+  @Column({ name: 'language', type: 'varchar', length: 10, nullable: false, default: 'fr' })
   language: string;
 
-  @Column({ name: 'status', type: 'varchar', length: 20, default: 'PENDING' })
-  status: TemplateStatus;
+  @Column({ name: 'category', type: 'varchar', length: 50, nullable: true })
+  category: string | null;
 
-  @Column({ name: 'header_type', type: 'varchar', length: 50, nullable: true })
-  headerType: string | null;
+  @Column({ name: 'status', type: 'enum', enum: WhatsappTemplateStatus, default: WhatsappTemplateStatus.PENDING, nullable: false })
+  status: WhatsappTemplateStatus;
 
-  @Column({ name: 'header_content', type: 'text', nullable: true })
-  headerContent: string | null;
+  @Column({ name: 'components', type: 'json', nullable: true })
+  components: any | null;
 
-  @Column({ name: 'body_text', type: 'text' })
-  bodyText: string;
+  @Column({ name: 'external_id', type: 'varchar', length: 191, nullable: true })
+  externalId: string | null;
 
-  @Column({ name: 'footer_text', type: 'varchar', length: 255, nullable: true })
-  footerText: string | null;
-
-  @Column({ name: 'buttons', type: 'json', nullable: true })
-  buttons: Record<string, unknown>[] | null;
-
-  @Column({ name: 'rejection_reason', type: 'text', nullable: true })
+  @Column({ name: 'rejection_reason', type: 'varchar', length: 500, nullable: true })
   rejectionReason: string | null;
+
+  @ManyToOne(() => WhapiChannel, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'channel_id', referencedColumnName: 'id' })
+  channel: WhapiChannel;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date | null;
 }

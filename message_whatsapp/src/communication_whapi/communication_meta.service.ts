@@ -481,23 +481,32 @@ export class CommunicationMetaService {
   /**
    * P4.2/P4.3 — Envoi d'un template HSM via l'API Meta.
    * Utilisé pour les broadcasts et les réponses hors-fenêtre.
+   * Supporte deux conventions : language/variables (broadcasts) et languageCode/bodyParameters (outbound-init).
    */
   async sendTemplateMessage(data: {
     to: string;
     phoneNumberId: string;
     accessToken: string;
     templateName: string;
-    language: string;
+    language?: string;
+    languageCode?: string;
     variables?: Record<string, string>;
+    bodyParameters?: string[];
   }): Promise<{ providerMessageId: string }> {
     const to = this.validateRecipient(data.to);
     const url = `https://graph.facebook.com/${this.META_API_VERSION}/${data.phoneNumberId}/messages`;
+    const langCode = data.languageCode ?? data.language ?? 'fr';
 
-    // Construire les composants body (paramètres positionnels)
-    const bodyParams = Object.values(data.variables ?? {}).map((value) => ({
-      type: 'text',
-      text: String(value),
-    }));
+    // Priorité bodyParameters (tableau) sur variables (objet)
+    let bodyParams: { type: string; text: string }[];
+    if (data.bodyParameters && data.bodyParameters.length > 0) {
+      bodyParams = data.bodyParameters.map((text) => ({ type: 'text', text }));
+    } else {
+      bodyParams = Object.values(data.variables ?? {}).map((value) => ({
+        type: 'text',
+        text: String(value),
+      }));
+    }
 
     const payload: Record<string, any> = {
       messaging_product: 'whatsapp',
@@ -506,7 +515,7 @@ export class CommunicationMetaService {
       type: 'template',
       template: {
         name: data.templateName,
-        language: { code: data.language },
+        language: { code: langCode },
         components: bodyParams.length > 0
           ? [{ type: 'body', parameters: bodyParams }]
           : [],

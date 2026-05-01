@@ -127,13 +127,16 @@ export async function patchChat(chatId: string, data: Partial<{ read_only: boole
 export async function initiateOutboundConversation(data: {
     channel_id: string;
     recipient: string;
-    text: string;
-}): Promise<{ success: boolean; message_id: string; chat_id: string }> {
+    text?: string;
+    template_id?: string;
+    template_params?: string[];
+    contact_name?: string;
+}): Promise<{ chatId: string; messageId: string; contactId: string }> {
     const response = await fetch(`${API_BASE_URL}/messages/outbound-init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
         credentials: 'include',
     });
-    return handleResponse<{ success: boolean; message_id: string; chat_id: string }>(response);
+    return handleResponse<{ chatId: string; messageId: string; contactId: string }>(response);
 }

@@ -2,10 +2,17 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhatsappTemplate } from './entities/whatsapp_template.entity';
 import { WhatsappTemplateService } from './whatsapp_template.service';
+import { WhatsappTemplateController } from './whatsapp_template.controller';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { LoggingModule } from 'src/logging/logging.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WhatsappTemplate])],
+  imports: [
+    TypeOrmModule.forFeature([WhatsappTemplate, WhapiChannel]),
+    LoggingModule,
+  ],
+  controllers: [WhatsappTemplateController],
   providers: [WhatsappTemplateService],
-  exports: [WhatsappTemplateService],
+  exports: [WhatsappTemplateService, TypeOrmModule],
 })
 export class WhatsappTemplateModule {}

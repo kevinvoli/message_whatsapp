@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommunicationWhapiService } from './communication_whapi.service';
 import { CommunicationMetaService } from './communication_meta.service';
 import { CommunicationMessengerService } from './communication_messenger.service';
@@ -344,5 +344,42 @@ export class OutboundRouterService {
       providerMediaId: mediaInfo.mediaId ?? null,
       mediaUrl: mediaInfo.link ?? null,
     };
+  }
+
+  async sendTemplateMessage(data: {
+    to: string;
+    channelId: string;
+    templateName: string;
+    languageCode: string;
+    bodyParameters?: string[];
+  }): Promise<OutboundSendResponse> {
+    const channel = await this.channelService.findOne(data.channelId);
+    if (!channel) throw new NotFoundException(`Canal ${data.channelId} introuvable`);
+
+    if (channel.provider === 'meta') {
+      if (!channel.external_id) throw new BadRequestException('Canal Meta sans phoneNumberId');
+      const result = await this.metaService.sendTemplateMessage({
+        to: data.to,
+        phoneNumberId: channel.external_id,
+        accessToken: channel.token,
+        templateName: data.templateName,
+        languageCode: data.languageCode,
+        bodyParameters: data.bodyParameters,
+      });
+      return { providerMessageId: result.providerMessageId, provider: 'meta' };
+    }
+
+    if (channel.provider === 'whapi') {
+      const result = await this.whapiService.sendHsmToWhapiChannel({
+        to: data.to,
+        channelId: data.channelId,
+        templateName: data.templateName,
+        languageCode: data.languageCode,
+        bodyParameters: data.bodyParameters,
+      });
+      return { providerMessageId: result?.message?.id ?? result?.id ?? 'unknown', provider: 'whapi' };
+    }
+
+    throw new BadRequestException(`Provider ${channel.provider} ne supporte pas les templates`);
   }
 }

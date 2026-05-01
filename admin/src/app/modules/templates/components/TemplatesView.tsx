@@ -1,30 +1,17 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { PlusCircle, Trash2, FileText, EyeOff, Eye, X, Image as ImageIcon, Video as VideoIcon, FileText as DocIcon } from 'lucide-react';
-import { WhatsappTemplate, TemplateStatus, TemplateCategory } from '@/app/lib/definitions';
-import { getTemplates, createTemplate, disableTemplate, deleteTemplate } from '@/app/lib/api/templates.api';
+import { PlusCircle, Trash2, FileText, Eye, X, RefreshCw } from 'lucide-react';
+import { WhatsappTemplate, WhatsappTemplateStatus } from '@/app/lib/definitions';
+import { getWhatsappTemplates, createWhatsappTemplate, resubmitWhatsappTemplate } from '@/app/lib/api/templates.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { Spinner } from '@/app/ui/Spinner';
 import { formatDateShort } from '@/app/lib/dateUtils';
 
-const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID ?? 'default';
-
-const STATUS_CONFIG: Record<TemplateStatus, { label: string; className: string }> = {
-  PENDING:    { label: 'En attente',   className: 'bg-yellow-100 text-yellow-700' },
-  APPROVED:   { label: 'Approuvé',     className: 'bg-green-100 text-green-700' },
-  REJECTED:   { label: 'Rejeté',       className: 'bg-red-100 text-red-700' },
-  PAUSED:     { label: 'Pausé',        className: 'bg-orange-100 text-orange-700' },
-  DISABLED:   { label: 'Désactivé',    className: 'bg-gray-100 text-gray-500' },
-  IN_APPEAL:  { label: 'En appel',     className: 'bg-blue-100 text-blue-700' },
-  FLAGGED:    { label: 'Signalé',      className: 'bg-red-100 text-red-600' },
-  DELETED:    { label: 'Supprimé',     className: 'bg-gray-100 text-gray-400' },
-};
-
-const CATEGORY_LABELS: Record<TemplateCategory, string> = {
-  MARKETING:      'Marketing',
-  UTILITY:        'Utilitaire',
-  AUTHENTICATION: 'Authentification',
+const STATUS_CONFIG: Record<WhatsappTemplateStatus, { label: string; className: string }> = {
+  PENDING:  { label: 'En attente', className: 'bg-yellow-100 text-yellow-700' },
+  APPROVED: { label: 'Approuvé',   className: 'bg-green-100 text-green-700' },
+  REJECTED: { label: 'Rejeté',     className: 'bg-red-100 text-red-700' },
 };
 
 const LANGUAGES = [
@@ -34,24 +21,58 @@ const LANGUAGES = [
   { value: 'es', label: 'Espagnol' },
 ];
 
+const CATEGORIES = ['MARKETING', 'UTILITY', 'AUTHENTICATION'];
+
 const DEFAULT_FORM = {
-  channel_id: '',
+  channelId: '',
   name: '',
-  category: 'UTILITY' as TemplateCategory,
+  category: 'UTILITY',
   language: 'fr',
-  body_text: '',
-  header_type: '',
-  header_content: '',
-  footer_text: '',
+  bodyText: '',
+  headerType: '',
+  headerContent: '',
+  footerText: '',
 };
+
+function buildComponents(bodyText: string, headerType: string, headerContent: string, footerText: string): any[] {
+  const components: any[] = [];
+  if (headerType) {
+    const header: any = { type: 'HEADER', format: headerType };
+    if (headerType === 'TEXT') header.text = headerContent;
+    else if (headerContent) header.example = { header_url: [headerContent] };
+    components.push(header);
+  }
+  if (bodyText) components.push({ type: 'BODY', text: bodyText });
+  if (footerText) components.push({ type: 'FOOTER', text: footerText });
+  return components;
+}
+
+function getBodyText(components: any): string {
+  if (!Array.isArray(components)) return '';
+  const body = components.find((c: any) => c.type === 'BODY');
+  return body?.text ?? '';
+}
+
+function getHeader(components: any): { format: string; text?: string } | null {
+  if (!Array.isArray(components)) return null;
+  const h = components.find((c: any) => c.type === 'HEADER');
+  return h ? { format: h.format ?? 'TEXT', text: h.text } : null;
+}
+
+function getFooterText(components: any): string {
+  if (!Array.isArray(components)) return '';
+  const f = components.find((c: any) => c.type === 'FOOTER');
+  return f?.text ?? '';
+}
 
 function renderBodyPreview(body: string): string {
   return body.replace(/\{\{(\d+)\}\}/g, (_, n) => `[var${n}]`);
 }
 
 function TemplatePreviewModal({ template, onClose }: { template: WhatsappTemplate; onClose: () => void }) {
-  const previewText = renderBodyPreview(template.body_text);
-  const hasHeader = template.header_type && template.header_type !== '';
+  const bodyText = getBodyText(template.components);
+  const header = getHeader(template.components);
+  const footerText = getFooterText(template.components);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -63,7 +84,7 @@ function TemplatePreviewModal({ template, onClose }: { template: WhatsappTemplat
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_CONFIG[template.status].className}`}>
                 {STATUS_CONFIG[template.status].label}
               </span>
-              <span className="text-xs text-gray-400">{CATEGORY_LABELS[template.category]} · {template.language.toUpperCase()}</span>
+              <span className="text-xs text-gray-400">{template.category ?? '—'} · {template.language.toUpperCase()}</span>
             </div>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
@@ -71,56 +92,42 @@ function TemplatePreviewModal({ template, onClose }: { template: WhatsappTemplat
           </button>
         </div>
 
-        {/* Phone mockup */}
-        <div className="bg-[#ECE5DD] px-6 py-8 min-h-[300px] flex items-start justify-end">
+        <div className="bg-[#ECE5DD] px-6 py-8 min-h-[200px] flex items-start justify-end">
           <div className="bg-white rounded-xl rounded-tr-none shadow-sm max-w-[85%] overflow-hidden">
-            {/* Header */}
-            {hasHeader && (
+            {header && (
               <div className="bg-gray-100">
-                {template.header_type === 'TEXT' ? (
-                  <div className="px-3 pt-3 pb-1 font-semibold text-sm text-gray-900">{template.header_content || 'Entête'}</div>
-                ) : template.header_type === 'IMAGE' ? (
-                  <div className="flex items-center justify-center h-32 bg-gray-200 gap-2 text-gray-400 text-xs">
-                    <ImageIcon className="w-6 h-6" /> {template.header_content ? 'Image' : 'Image'}
+                {header.format === 'TEXT' ? (
+                  <div className="px-3 pt-3 pb-1 font-semibold text-sm text-gray-900">{header.text ?? 'Entête'}</div>
+                ) : (
+                  <div className="flex items-center justify-center h-24 bg-gray-200 text-gray-400 text-xs">
+                    [{header.format}]
                   </div>
-                ) : template.header_type === 'VIDEO' ? (
-                  <div className="flex items-center justify-center h-32 bg-gray-800 gap-2 text-gray-400 text-xs">
-                    <VideoIcon className="w-6 h-6 text-white" /> <span className="text-white">Vidéo</span>
-                  </div>
-                ) : template.header_type === 'DOCUMENT' ? (
-                  <div className="flex items-center gap-2 px-3 py-3 bg-blue-50 border-b border-blue-100">
-                    <DocIcon className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm text-blue-700">{template.header_content || 'Document'}</span>
-                  </div>
-                ) : null}
+                )}
               </div>
             )}
-            {/* Body */}
             <div className="px-3 py-2.5">
-              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{previewText}</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{renderBodyPreview(bodyText)}</p>
             </div>
-            {/* Footer */}
-            {template.footer_text && (
+            {footerText && (
               <div className="px-3 pb-2.5">
-                <p className="text-xs text-gray-400 italic">{template.footer_text}</p>
+                <p className="text-xs text-gray-400 italic">{footerText}</p>
               </div>
             )}
-            {/* Timestamp */}
             <div className="px-3 pb-2 text-right">
               <span className="text-[10px] text-gray-400">10:30</span>
             </div>
           </div>
         </div>
 
-        {template.rejection_reason && (
+        {template.rejectionReason && (
           <div className="px-5 py-3 bg-red-50 border-t border-red-100">
-            <p className="text-xs text-red-700"><strong>Motif de rejet :</strong> {template.rejection_reason}</p>
+            <p className="text-xs text-red-700"><strong>Motif de rejet :</strong> {template.rejectionReason}</p>
           </div>
         )}
 
         <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 text-xs text-gray-400 flex justify-between">
           <span>Créé le {formatDateShort(template.createdAt)}</span>
-          <span className="font-mono">{template.meta_template_id ? `Meta ID: ${template.meta_template_id}` : 'Non soumis à Meta'}</span>
+          <span className="font-mono">{template.externalId ? `Meta ID: ${template.externalId}` : 'Non soumis à Meta'}</span>
         </div>
       </div>
     </div>
@@ -128,61 +135,57 @@ function TemplatePreviewModal({ template, onClose }: { template: WhatsappTemplat
 }
 
 export default function TemplatesView() {
+  const [channelId, setChannelId] = useState('');
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState<TemplateStatus | ''>('');
+  const [filter, setFilter] = useState<WhatsappTemplateStatus | ''>('');
   const [previewTemplate, setPreviewTemplate] = useState<WhatsappTemplate | null>(null);
   const { addToast } = useToast();
 
   const load = useCallback(async () => {
+    if (!channelId) return;
     setLoading(true);
-    try { setTemplates(await getTemplates(TENANT_ID)); }
+    try { setTemplates(await getWhatsappTemplates(channelId)); }
     catch { addToast({ message: 'Erreur chargement templates', type: 'error' }); }
     finally { setLoading(false); }
-  }, [addToast]);
+  }, [channelId, addToast]);
 
   useEffect(() => { void load(); }, [load]);
 
   const handleCreate = async () => {
+    if (!form.channelId || !form.name || !form.bodyText) {
+      addToast({ message: 'Canal, nom et corps du message requis', type: 'error' });
+      return;
+    }
     setSaving(true);
     try {
-      await createTemplate({
-        tenant_id: TENANT_ID,
-        channel_id: form.channel_id,
+      await createWhatsappTemplate({
+        channelId: form.channelId,
         name: form.name.toLowerCase().replace(/\s+/g, '_'),
-        category: form.category,
         language: form.language,
-        body_text: form.body_text,
-        header_type: form.header_type || undefined,
-        header_content: form.header_content || undefined,
-        footer_text: form.footer_text || undefined,
+        category: form.category || undefined,
+        components: buildComponents(form.bodyText, form.headerType, form.headerContent, form.footerText),
       });
       addToast({ message: 'Template créé', type: 'success' });
       setShowForm(false);
-      void load();
+      setForm(DEFAULT_FORM);
+      if (channelId === form.channelId) void load();
     } catch (e: unknown) {
       addToast({ message: e instanceof Error ? e.message : 'Erreur', type: 'error' });
     } finally { setSaving(false); }
   };
 
-  const handleDisable = async (t: WhatsappTemplate) => {
+  const handleResubmit = async (t: WhatsappTemplate) => {
     try {
-      await disableTemplate(t.id, TENANT_ID);
-      addToast({ message: 'Template désactivé', type: 'success' });
+      await resubmitWhatsappTemplate(t.id);
+      addToast({ message: 'Template resoumis à Meta', type: 'success' });
       void load();
-    } catch { addToast({ message: 'Erreur désactivation', type: 'error' }); }
-  };
-
-  const handleDelete = async (t: WhatsappTemplate) => {
-    if (!confirm(`Supprimer le template "${t.name}" ?`)) return;
-    try {
-      await deleteTemplate(t.id, TENANT_ID);
-      addToast({ message: 'Template supprimé', type: 'success' });
-      void load();
-    } catch { addToast({ message: 'Erreur suppression', type: 'error' }); }
+    } catch (e: unknown) {
+      addToast({ message: e instanceof Error ? e.message : 'Erreur resoumission', type: 'error' });
+    }
   };
 
   const displayed = filter ? templates.filter(t => t.status === filter) : templates;
@@ -199,12 +202,23 @@ export default function TemplatesView() {
         </button>
       </div>
 
-      {/* Filter bar */}
+      {/* Filtre par canal */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-gray-700 shrink-0">Canal (UUID) :</label>
+        <input
+          className="border rounded-lg px-3 py-1.5 text-sm font-mono w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={channelId}
+          onChange={e => setChannelId(e.target.value)}
+          placeholder="UUID du canal WhapiChannel"
+        />
+      </div>
+
+      {/* Filtre par statut */}
       <div className="flex gap-2 flex-wrap">
         <button onClick={() => setFilter('')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${filter === '' ? 'bg-blue-600 text-white' : 'bg-white border text-gray-600 hover:bg-gray-50'}`}>
           Tous ({templates.length})
         </button>
-        {(['APPROVED', 'PENDING', 'REJECTED', 'PAUSED', 'DISABLED'] as TemplateStatus[]).map(s => {
+        {(Object.keys(STATUS_CONFIG) as WhatsappTemplateStatus[]).map(s => {
           const count = templates.filter(t => t.status === s).length;
           if (count === 0) return null;
           const cfg = STATUS_CONFIG[s];
@@ -216,28 +230,27 @@ export default function TemplatesView() {
         })}
       </div>
 
+      {/* Formulaire de création */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold">Nouveau template HSM</h3>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ID Canal *</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm font-mono" value={form.channel_id} onChange={e => setForm(f => ({ ...f, channel_id: e.target.value }))} placeholder="UUID du canal" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">ID Canal (UUID) *</label>
+              <input className="w-full border rounded-lg px-3 py-2 text-sm font-mono" value={form.channelId} onChange={e => setForm(f => ({ ...f, channelId: e.target.value }))} placeholder="UUID du canal" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Promo Ramadan (converti en snake_case)" />
+              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Promo Ramadan → converti en snake_case" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-                <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value as TemplateCategory }))}>
-                  {(Object.entries(CATEGORY_LABELS) as [TemplateCategory, string][]).map(([v, l]) => (
-                    <option key={v} value={v}>{l}</option>
-                  ))}
+                <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
@@ -250,14 +263,14 @@ export default function TemplatesView() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Corps du message *</label>
-              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} value={form.body_text} onChange={e => setForm(f => ({ ...f, body_text: e.target.value }))} placeholder="Bonjour {{1}}, votre commande {{2}} est prête..." />
+              <textarea className="w-full border rounded-lg px-3 py-2 text-sm" rows={4} value={form.bodyText} onChange={e => setForm(f => ({ ...f, bodyText: e.target.value }))} placeholder="Bonjour {{1}}, votre commande {{2}} est prête..." />
               <p className="text-xs text-gray-400 mt-1">Utilisez {`{{1}}`}, {`{{2}}`}... pour les variables dynamiques</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type entête</label>
-                <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.header_type} onChange={e => setForm(f => ({ ...f, header_type: e.target.value }))}>
+                <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.headerType} onChange={e => setForm(f => ({ ...f, headerType: e.target.value }))}>
                   <option value="">Aucun</option>
                   <option value="TEXT">Texte</option>
                   <option value="IMAGE">Image</option>
@@ -265,22 +278,22 @@ export default function TemplatesView() {
                   <option value="DOCUMENT">Document</option>
                 </select>
               </div>
-              {form.header_type && (
+              {form.headerType && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Contenu entête</label>
-                  <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.header_content} onChange={e => setForm(f => ({ ...f, header_content: e.target.value }))} placeholder={form.header_type === 'TEXT' ? 'Titre...' : 'URL...'} />
+                  <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.headerContent} onChange={e => setForm(f => ({ ...f, headerContent: e.target.value }))} placeholder={form.headerType === 'TEXT' ? 'Titre...' : 'URL...'} />
                 </div>
               )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Pied de page</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.footer_text} onChange={e => setForm(f => ({ ...f, footer_text: e.target.value }))} placeholder="Répondez STOP pour vous désabonner" />
+              <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.footerText} onChange={e => setForm(f => ({ ...f, footerText: e.target.value }))} placeholder="Répondez STOP pour vous désabonner" />
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Annuler</button>
-              <button onClick={handleCreate} disabled={saving || !form.name || !form.body_text} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={() => { setShowForm(false); setForm(DEFAULT_FORM); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Annuler</button>
+              <button onClick={handleCreate} disabled={saving || !form.name || !form.bodyText || !form.channelId} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {saving ? 'Création...' : 'Créer'}
               </button>
             </div>
@@ -288,8 +301,11 @@ export default function TemplatesView() {
         </div>
       )}
 
+      {/* Liste des templates */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        {loading ? (
+        {!channelId ? (
+          <div className="text-center py-12 text-gray-400 text-sm">Entrez un UUID de canal pour charger les templates</div>
+        ) : loading ? (
           <div className="flex justify-center py-12"><Spinner /></div>
         ) : displayed.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -300,6 +316,7 @@ export default function TemplatesView() {
           <div className="divide-y divide-gray-100">
             {displayed.map(t => {
               const sc = STATUS_CONFIG[t.status];
+              const bodyText = getBodyText(t.components);
               return (
                 <div key={t.id} className="p-5 hover:bg-gray-50">
                   <div className="flex items-start justify-between gap-4">
@@ -307,15 +324,11 @@ export default function TemplatesView() {
                       <div className="flex items-center gap-3 mb-1">
                         <span className="font-semibold text-gray-900 font-mono">{t.name}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${sc.className}`}>{sc.label}</span>
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{CATEGORY_LABELS[t.category]}</span>
+                        {t.category && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t.category}</span>}
                         <span className="text-xs text-gray-400">{t.language.toUpperCase()}</span>
                       </div>
-                      {t.header_type && (
-                        <p className="text-xs text-gray-400 mb-1">Entête: {t.header_type} {t.header_content ? `— ${t.header_content.slice(0, 40)}` : ''}</p>
-                      )}
-                      <p className="text-sm text-gray-600 line-clamp-2 mb-1">{t.body_text}</p>
-                      {t.footer_text && <p className="text-xs text-gray-400 italic">{t.footer_text}</p>}
-                      {t.rejection_reason && <p className="text-xs text-red-500 mt-1">Motif rejet: {t.rejection_reason}</p>}
+                      {bodyText && <p className="text-sm text-gray-600 line-clamp-2 mb-1">{bodyText}</p>}
+                      {t.rejectionReason && <p className="text-xs text-red-500 mt-1">Motif rejet: {t.rejectionReason}</p>}
                       <p className="text-xs text-gray-400 mt-2">{formatDateShort(t.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -326,12 +339,18 @@ export default function TemplatesView() {
                       >
                         <Eye className="w-3.5 h-3.5" /> Aperçu
                       </button>
-                      {t.status === 'APPROVED' && (
-                        <button onClick={() => handleDisable(t)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600 px-2 py-1 rounded hover:bg-orange-50">
-                          <EyeOff className="w-3.5 h-3.5" /> Désactiver
+                      {t.status === 'REJECTED' && (
+                        <button
+                          onClick={() => handleResubmit(t)}
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-green-600 px-2 py-1 rounded hover:bg-green-50"
+                          title="Resoumettre à Meta"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Resoumettre
                         </button>
                       )}
-                      <button onClick={() => handleDelete(t)} className="text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => { /* delete non disponible */ }} className="text-gray-300 cursor-not-allowed" title="Suppression non disponible">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>

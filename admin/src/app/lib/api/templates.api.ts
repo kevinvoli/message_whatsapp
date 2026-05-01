@@ -1,69 +1,46 @@
 import { WhatsappTemplate } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
-export async function getWhatsappTemplates(tenantId?: string): Promise<WhatsappTemplate[]> {
-  const params = tenantId ? `?tenant_id=${encodeURIComponent(tenantId)}` : '';
-  const r = await fetch(`${API_BASE_URL}/messages/templates${params}`, {
+export async function getWhatsappTemplates(channelId: string, status?: string): Promise<WhatsappTemplate[]> {
+  const params = new URLSearchParams({ channel_id: channelId });
+  if (status) params.set('status', status);
+  const r = await fetch(`${API_BASE_URL}/messages/templates?${params.toString()}`, {
     credentials: 'include',
   });
   return handleResponse<WhatsappTemplate[]>(r);
 }
 
-export async function createWhatsappTemplate(data: {
-  tenant_id?: string;
-  channel_id?: string;
+export async function createWhatsappTemplate(payload: {
+  channelId: string;
   name: string;
-  category: string;
-  language: string;
-  body_text: string;
-  header_type?: string;
-  header_content?: string;
-  footer_text?: string;
+  language?: string;
+  category?: string;
+  components?: any;
+  externalId?: string;
 }): Promise<WhatsappTemplate> {
   const r = await fetch(`${API_BASE_URL}/messages/templates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   return handleResponse<WhatsappTemplate>(r);
 }
 
-export async function resubmitWhatsappTemplate(id: string): Promise<WhatsappTemplate> {
+export async function resubmitWhatsappTemplate(
+  id: string,
+  updates?: { name?: string; language?: string; category?: string; components?: any },
+): Promise<WhatsappTemplate> {
   const r = await fetch(`${API_BASE_URL}/messages/templates/${id}/resubmit`, {
     method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
+    body: updates ? JSON.stringify(updates) : undefined,
   });
   return handleResponse<WhatsappTemplate>(r);
 }
 
-// Fonctions conservees pour compatibilite retroactive avec TemplatesView existant
-export async function getTemplates(tenantId: string): Promise<WhatsappTemplate[]> {
-  return getWhatsappTemplates(tenantId);
-}
-
-export async function createTemplate(data: {
-  tenant_id: string;
-  channel_id?: string;
-  name: string;
-  category: string;
-  language: string;
-  body_text: string;
-  header_type?: string;
-  header_content?: string;
-  footer_text?: string;
-}): Promise<WhatsappTemplate> {
-  return createWhatsappTemplate(data);
-}
-
-export async function disableTemplate(id: string, _tenantId: string): Promise<void> {
-  const r = await fetch(`${API_BASE_URL}/messages/templates/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
-  if (!r.ok) throw new Error(`Erreur ${r.status}`);
-}
-
-export async function deleteTemplate(id: string, tenantId: string): Promise<void> {
-  return disableTemplate(id, tenantId);
+// Alias rétrocompatibilité
+export async function getTemplates(channelId: string): Promise<WhatsappTemplate[]> {
+  return getWhatsappTemplates(channelId);
 }
