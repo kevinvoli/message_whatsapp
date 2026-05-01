@@ -222,8 +222,8 @@ export class MetriquesService {
           `chat.contact_client NOT IN (
             SELECT DISTINCT c2.contact_client
             FROM whatsapp_chat c2
-            WHERE c2.deleted_at IS NULL
-              AND c2.created_at < :dateStartExcl
+            WHERE c2.deletedAt IS NULL
+              AND c2.createdAt < :dateStartExcl
           )`,
           { dateStartExcl: dateStart },
         )
