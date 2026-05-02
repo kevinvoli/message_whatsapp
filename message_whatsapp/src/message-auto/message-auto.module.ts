@@ -36,6 +36,7 @@ import { AutoMessageScopeConfig } from './entities/auto-message-scope-config.ent
 import { AutoMessageScopeConfigService } from './auto-message-scope-config.service';
 import { AutoMessageKeyword } from './entities/auto-message-keyword.entity';
 import { BusinessHoursConfig } from './entities/business-hours-config.entity';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { BusinessHoursService } from './business-hours.service';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
@@ -64,6 +65,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       ProviderChannel,
       Contact,
       WhatsappMedia,
+      DispatchSettings,
     ]),
     forwardRef(() => WhatsappMessageModule),
     LoggingModule,

@@ -32,6 +32,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 import { MessageAuto } from 'src/message-auto/entities/message-auto.entity';
 import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keyword.entity';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
@@ -64,6 +65,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
       MessageAuto,
       AutoMessageKeyword,
       WhatsappMedia,
+      DispatchSettings,
     ]),
     WhatsappChatModule,
     forwardRef(() => DispatcherModule),

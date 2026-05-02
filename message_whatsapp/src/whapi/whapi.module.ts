@@ -54,6 +54,7 @@ import { CommunicationTelegramService } from 'src/communication_whapi/communicat
 import { InboundMessageService } from 'src/webhooks/inbound-message.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { WebhookIdempotencyService } from 'src/webhooks/idempotency/webhook-idempotency.service';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.registry';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
@@ -75,6 +76,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
       AutoMessageKeyword,
       AutoMessageScopeConfig,
       WebhookEventLog,
+      DispatchSettings,
     ]),
     DispatcherModule,
     WhatsappMessageModule,
