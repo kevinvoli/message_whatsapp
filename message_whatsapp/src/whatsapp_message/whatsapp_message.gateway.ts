@@ -892,13 +892,6 @@ export class WhatsappMessageGateway
 
       sendSucceeded = true;
 
-      // no_read_only activé → jamais en lecture seule après envoi commercial
-      const readOnlyBlocked = chat.last_msg_client_channel_id
-        ? await this.channelService.isReadOnlyBlocked(chat.last_msg_client_channel_id)
-        : false;
-      if (!readOnlyBlocked) {
-        chat.read_only = true;
-      }
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'MESSAGE_ADD',
         payload: { ...this.mapMessage(message), tempId: payload.tempId },
@@ -908,10 +901,12 @@ export class WhatsappMessageGateway
         this.messageService.findLastMessageBychat_id(chat.chat_id),
         this.chatService.findBychat_id(chat.chat_id),
       ]);
-      // createAgentMessage a mis unread_count = 0 en DB (poste_id non null).
-      // On utilise la colonne DB plutôt que countUnreadMessages() pour éviter
-      // d'émettre 0 à tort si des messages entrants sont en statut READ.
+      // createAgentMessage a déjà mis à jour read_only et unread_count en DB.
+      // On relit les valeurs fraîches pour rester cohérent avec la logique compteur.
       const unreadCount = freshChatAfterSend?.unread_count ?? 0;
+      if (freshChatAfterSend) {
+        chat.read_only = freshChatAfterSend.read_only;
+      }
 
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'CONVERSATION_UPSERT',

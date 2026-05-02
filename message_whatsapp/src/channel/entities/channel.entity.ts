@@ -120,6 +120,15 @@ export class WhapiChannel {
   no_read_only: boolean;
 
   /**
+   * Nombre de messages commerciaux autorisés avant lecture seule.
+   * NULL = suivre le paramètre global (dispatch_settings.read_only_max_messages).
+   * 0    = jamais en lecture seule (override canal).
+   * N    = lecture seule après N messages sans réponse client.
+   */
+  @Column({ name: 'read_only_after_messages', type: 'int', nullable: true, default: null })
+  readOnlyAfterMessages: number | null;
+
+  /**
    * Bloque la fermeture automatique ou manuelle des conversations de ce channel.
    * true  = jamais fermé (cron inactivité, action manuelle commercial).
    * false = comportement par défaut.

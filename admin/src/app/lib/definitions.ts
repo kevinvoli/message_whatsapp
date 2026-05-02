@@ -131,6 +131,7 @@ export type Channel = {
   poste?: Poste | null;
   no_read_only?: boolean;
   no_close?: boolean;
+  readOnlyAfterMessages?: number | null;
 };
 
 // ============================================
@@ -356,6 +357,7 @@ export type DispatchSettings = {
   auto_message_delay_min_seconds: number;
   auto_message_delay_max_seconds: number;
   auto_message_max_steps: number;
+  readOnlyMaxMessages?: number;
 };
 
 export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';

@@ -4,6 +4,7 @@ import { ChannelController } from './channel.controller';
 import { MetaTokenService } from './meta-token.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WhapiChannel } from './entities/channel.entity';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
@@ -14,7 +15,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste]),
+    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste, DispatchSettings]),
     LoggingModule,
     JorbsModule,
   ],

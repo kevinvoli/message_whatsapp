@@ -213,9 +213,20 @@ export class WhatsappMessageService {
           // N'actualise last_poste_message_at que pour les vrais agents humains.
           // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
           ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),
-          // Le commercial vient de répondre → lecture seule jusqu'à la prochaine réponse client
+          // Le commercial vient de répondre → lecture seule paramétrée selon la limite configurée
           // Exception : canal dédié → jamais en lecture seule
-          ...(data.poste_id && !channel.poste_id ? { read_only: true } : {}),
+          ...(data.poste_id && !channel.poste_id
+            ? await (async () => {
+                const limit = await this.channelService.resolveReadOnlyLimit(channel.channel_id);
+                if (limit === 0) return {};
+                const chatFresh = await this.chatRepository.findOne({ where: { chat_id: chat.chat_id } });
+                const newCount = ((chatFresh?.poste_message_count_since_last_client ?? 0) + 1);
+                return {
+                  poste_message_count_since_last_client: newCount,
+                  read_only: newCount >= limit,
+                };
+              })()
+            : {}),
           last_activity_at: new Date(),
         },
       );
@@ -386,8 +397,19 @@ export class WhatsappMessageService {
         {
           unread_count: 0,
           last_poste_message_at: messageEntity.createdAt,
-          // Canal dédié → jamais en lecture seule
-          ...(channel.poste_id ? {} : { read_only: true }),
+          // Canal dédié → jamais en lecture seule ; sinon : logique compteur
+          ...(data.poste_id && !channel.poste_id
+            ? await (async () => {
+                const limit = await this.channelService.resolveReadOnlyLimit(channel.channel_id);
+                if (limit === 0) return {};
+                const chatFresh = await this.chatRepository.findOne({ where: { chat_id: chat.chat_id } });
+                const newCount = ((chatFresh?.poste_message_count_since_last_client ?? 0) + 1);
+                return {
+                  poste_message_count_since_last_client: newCount,
+                  read_only: newCount >= limit,
+                };
+              })()
+            : {}),
           last_activity_at: new Date(),
         },
       );
@@ -499,7 +521,18 @@ export class WhatsappMessageService {
       { chat_id: chat.chat_id },
       {
         ...(data.poste_id ? { unread_count: 0, last_poste_message_at: messageEntity.createdAt } : {}),
-        ...(data.poste_id && !channel.poste_id ? { read_only: true } : {}),
+        ...(data.poste_id && !channel.poste_id
+          ? await (async () => {
+              const limit = await this.channelService.resolveReadOnlyLimit(channel.channel_id);
+              if (limit === 0) return {};
+              const chatFresh = await this.chatRepository.findOne({ where: { chat_id: chat.chat_id } });
+              const newCount = ((chatFresh?.poste_message_count_since_last_client ?? 0) + 1);
+              return {
+                poste_message_count_since_last_client: newCount,
+                read_only: newCount >= limit,
+              };
+            })()
+          : {}),
         last_activity_at: new Date(),
       },
     );

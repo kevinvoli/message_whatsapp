@@ -210,6 +210,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         auto_message_delay_min_seconds: settings.auto_message_delay_min_seconds,
         auto_message_delay_max_seconds: settings.auto_message_delay_max_seconds,
         auto_message_max_steps: settings.auto_message_max_steps,
+        readOnlyMaxMessages: settings.readOnlyMaxMessages,
       });
       setSettings(saved);
       const auditData = await loadAudit({ offset: 0 });
@@ -534,6 +535,27 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                       />
                       <p className="mt-1 text-[11px] text-gray-400">
                         Au-dela, le chat passe en lecture seule.
+                      </p>
+                    </div>
+
+                    {/* Nombre de messages avant lecture seule */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Messages autorises avant lecture seule
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        value={settings.readOnlyMaxMessages ?? 1}
+                        onChange={(e) =>
+                          setSettings({ ...settings, readOnlyMaxMessages: Number(e.target.value) })
+                        }
+                      />
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        0 = desactive, 1 = comportement actuel, N = N messages avant lecture seule.
+                        Peut etre surcharge par canal.
                       </p>
                     </div>
                   </div>

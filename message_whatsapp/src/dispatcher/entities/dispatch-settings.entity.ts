@@ -57,6 +57,10 @@ export class DispatchSettings {
   @Column({ name: 'auto_message_max_steps', type: 'int', default: 3 })
   auto_message_max_steps: number;
 
+  /** Nombre de messages commerciaux autorisés globalement avant lecture seule (0 = désactivé, 1 = défaut) */
+  @Column({ name: 'read_only_max_messages', type: 'int', default: 1 })
+  readOnlyMaxMessages: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

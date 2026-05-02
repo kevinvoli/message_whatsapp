@@ -174,6 +174,7 @@ export class InboundMessageService {
           const isReopenedCycle = !!conversation.last_poste_message_at;
           await this.chatService.update(conversation.chat_id, {
             read_only: false,
+            poste_message_count_since_last_client: 0,
             last_client_message_at: clientMessageAt,
             waiting_client_reply: false,
             ...(isReopenedCycle

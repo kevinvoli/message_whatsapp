@@ -40,4 +40,10 @@ export class UpdateDispatchSettingsDto {
   @Min(1)
   @Max(10)
   auto_message_max_steps?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  readOnlyMaxMessages?: number;
 }

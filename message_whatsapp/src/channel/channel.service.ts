@@ -11,6 +11,7 @@ import { IsNull, Repository } from 'typeorm';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
@@ -31,6 +32,8 @@ export class ChannelService implements OnModuleInit {
     private readonly metaTokenService: MetaTokenService,
     private readonly telegramService: CommunicationTelegramService,
     private readonly logger: AppLogger,
+    @InjectRepository(DispatchSettings)
+    private readonly dispatchSettingsRepository: Repository<DispatchSettings>,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -504,6 +507,22 @@ export class ChannelService implements OnModuleInit {
       select: ['channel_id', 'no_read_only'],
     });
     return !!ch?.no_read_only;
+  }
+
+  /**
+   * Résout la limite de messages avant lecture seule pour un canal donné.
+   * Priorité : no_read_only=true → 0 | readOnlyAfterMessages non null → valeur canal | sinon → global
+   */
+  async resolveReadOnlyLimit(channelId: string): Promise<number> {
+    if (!channelId) return 1;
+    const ch = await this.channelRepository.findOne({ where: { channel_id: channelId } });
+    if (!ch) return 1;
+    if (ch.no_read_only) return 0;
+    if (ch.readOnlyAfterMessages !== null && ch.readOnlyAfterMessages !== undefined) {
+      return ch.readOnlyAfterMessages;
+    }
+    const settings = await this.dispatchSettingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } });
+    return settings?.readOnlyMaxMessages ?? 1;
   }
 
   /**

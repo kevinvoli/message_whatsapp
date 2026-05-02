@@ -452,6 +452,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [assigningPosteId, setAssigningPosteId] = useState<string>('');
   const [assignNoReadOnly, setAssignNoReadOnly] = useState(false);
   const [assignNoClose, setAssignNoClose] = useState(false);
+  const [assignReadOnlyAfterMessages, setAssignReadOnlyAfterMessages] = useState<number | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
 
   const openAssignModal = async (channel: Channel) => {
@@ -459,6 +460,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setAssigningPosteId(channel.poste_id ?? '');
     setAssignNoReadOnly(channel.no_read_only ?? false);
     setAssignNoClose(channel.no_close ?? false);
+    setAssignReadOnlyAfterMessages(channel.readOnlyAfterMessages ?? null);
     setPostesLoading(true);
     try {
       const data = await getPostes();
@@ -476,9 +478,9 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     try {
       const [assigned, flagsUpdated] = await Promise.all([
         assignChannelToPoste(assignModal.channel.channel_id, assigningPosteId || null),
-        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose }),
+        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose, readOnlyAfterMessages: assignReadOnlyAfterMessages }),
       ]);
-      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close };
+      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close, readOnlyAfterMessages: flagsUpdated.readOnlyAfterMessages ?? null };
       setItems((prev) => prev.map((c) => (c.id === merged.id ? merged : c)));
       addToast({ type: 'success', message: 'Paramètres du canal enregistrés.' });
       setAssignModal(null);
@@ -839,6 +841,26 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                   <span className="block text-xs text-gray-400 mt-0.5">La conversation ne peut pas être fermée manuellement ni par le cron d&apos;inactivité.</span>
                 </span>
               </label>
+              {/* Override limite messages avant lecture seule */}
+              <div className="pt-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Override limite messages avant lecture seule
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Laisser vide pour suivre le global"
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                  value={assignReadOnlyAfterMessages ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAssignReadOnlyAfterMessages(val === '' ? null : Number(val));
+                  }}
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Vide = suivre le paramètre global. 0 = désactivé. N = N messages avant lecture seule.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">

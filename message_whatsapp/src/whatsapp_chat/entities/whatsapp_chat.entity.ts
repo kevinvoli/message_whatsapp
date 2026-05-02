@@ -178,6 +178,13 @@ export class WhatsappChat {
   @Column({ name: 'read_only', type: 'boolean', default: false })
   read_only: boolean;
 
+  @Column({
+    name: 'poste_message_count_since_last_client',
+    type: 'int',
+    default: 0,
+  })
+  poste_message_count_since_last_client: number;
+
   @Column({ name: 'not_spam', type: 'boolean', default: true })
   not_spam: boolean;
 
