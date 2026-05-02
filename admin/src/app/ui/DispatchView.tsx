@@ -78,6 +78,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [loading, setLoading] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
   const [savingQueue, setSavingQueue] = useState(false);
+  const [savingReadOnly, setSavingReadOnly] = useState(false);
   const [redispatching, setRedispatching] = useState(false);
   const [resettingStuck, setResettingStuck] = useState(false);
 
@@ -199,6 +200,25 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     }
   };
 
+  // ── Sauvegarde Lecture seule ───────────────────────────────────────────────
+
+  const handleSaveReadOnly = async () => {
+    if (!settings) return;
+    try {
+      setSavingReadOnly(true);
+      const saved = await updateDispatchSettings({ readOnlyMaxMessages: settings.readOnlyMaxMessages });
+      setSettings(saved);
+      addToast({ type: 'success', message: 'Parametre lecture seule sauvegarde.' });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur sauvegarde lecture seule.',
+      });
+    } finally {
+      setSavingReadOnly(false);
+    }
+  };
+
   // ── Sauvegarde Messages auto ───────────────────────────────────────────────
 
   const handleSaveAutoMessages = async () => {
@@ -210,7 +230,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
         auto_message_delay_min_seconds: settings.auto_message_delay_min_seconds,
         auto_message_delay_max_seconds: settings.auto_message_delay_max_seconds,
         auto_message_max_steps: settings.auto_message_max_steps,
-        readOnlyMaxMessages: settings.readOnlyMaxMessages,
       });
       setSettings(saved);
       const auditData = await loadAudit({ offset: 0 });
@@ -402,6 +421,45 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
             </div>
           )}
 
+          {/* ── Lecture seule ── */}
+          {settings && (
+            <div className="border-b border-gray-100 px-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Lecture seule</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Nombre de messages qu&apos;un commercial peut envoyer avant que la conversation passe en lecture seule.
+                    0 = désactivé. Peut être surchargé par canal.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveReadOnly()}
+                  disabled={savingReadOnly}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:bg-emerald-300 shrink-0"
+                >
+                  {savingReadOnly ? 'Sauvegarde...' : 'Sauvegarder'}
+                </button>
+              </div>
+              <div className="mt-3 max-w-xs">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Messages avant lecture seule
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  value={settings.readOnlyMaxMessages ?? 1}
+                  onChange={(e) => setSettings({ ...settings, readOnlyMaxMessages: Number(e.target.value) })}
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  0 = désactivé — 1 = comportement actuel (défaut) — N = N messages autorisés
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="max-h-[480px] overflow-y-auto">
             {snapshot?.waiting_items?.length ? (
               <table className="w-full text-sm">
@@ -538,26 +596,6 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                       </p>
                     </div>
 
-                    {/* Nombre de messages avant lecture seule */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Messages autorises avant lecture seule
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                        value={settings.readOnlyMaxMessages ?? 1}
-                        onChange={(e) =>
-                          setSettings({ ...settings, readOnlyMaxMessages: Number(e.target.value) })
-                        }
-                      />
-                      <p className="mt-1 text-[11px] text-gray-400">
-                        0 = desactive, 1 = comportement actuel, N = N messages avant lecture seule.
-                        Peut etre surcharge par canal.
-                      </p>
-                    </div>
                   </div>
                 </div>
 
