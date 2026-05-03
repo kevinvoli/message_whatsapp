@@ -582,11 +582,6 @@ export class DispatcherService {
         .map((qp) => qp.poste)
         .filter((p): p is WhatsappPoste => p != null);
 
-      if (queuedPostes.length < 2) {
-        return `File d'attente insuffisante — ${queuedPostes.length} poste(s) disponible(s)`;
-      }
-
-      const posteIds = queuedPostes.map((p) => p.id);
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
       // Exclut : conversations venant d'un canal dédié OU assignées à un poste dédié
       const dedicatedExclusion = `(
@@ -596,7 +591,39 @@ export class DispatcherService {
           (SELECT c.poste_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
       )`;
 
-      // ── 2. Nombre de convs éligibles — postes de la queue ───────────────────
+      // ── 2. Convs non lues sur postes offline/bloqués (hors queue) ───────────
+      // Détectés EN PREMIER pour ne pas être bloqués par le guard queuedPostes.length < 2.
+      // Ces postes ne figurent pas dans queuedPostes → invisibles sans ce bloc.
+      const unavailableCountRows = await this.chatRepository
+        .createQueryBuilder('chat')
+        .innerJoin('chat.poste', 'poste')
+        .select('chat.poste_id', 'poste_id')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('chat.unread_count > 0')
+        .andWhere('chat.last_client_message_at < :threshold', { threshold })
+        .andWhere('chat.deletedAt IS NULL')
+        .andWhere('poste.is_queue_enabled = false')
+        .andWhere(dedicatedExclusion)
+        .groupBy('chat.poste_id')
+        .getRawMany<{ poste_id: string; cnt: string }>();
+
+      const unavailablePosteIds = unavailableCountRows.map((r) => r.poste_id);
+      const unavailablePostes = unavailablePosteIds.length > 0
+        ? await this.posteRepository.findBy({ id: In(unavailablePosteIds) })
+        : [];
+
+      // Guard : queue vide → impossible de redistribuer
+      if (queuedPostes.length === 0) {
+        return 'File d\'attente vide — aucun poste actif disponible';
+      }
+      // Guard : queue trop petite ET aucun poste offline/bloqué à vider → rien à faire
+      if (queuedPostes.length < 2 && unavailablePostes.length === 0) {
+        return `File d'attente insuffisante — ${queuedPostes.length} poste(s) disponible(s)`;
+      }
+
+      const posteIds = queuedPostes.map((p) => p.id);
+
+      // ── 3. Nombre de convs éligibles — postes de la queue ───────────────────
       const countRows = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
@@ -612,28 +639,7 @@ export class DispatcherService {
       const countMap = new Map<string, number>();
       for (const p of queuedPostes) countMap.set(p.id, 0);
       for (const row of countRows) countMap.set(row.poste_id, parseInt(row.cnt, 10));
-
-      // ── 2b. Convs non lues sur postes offline/bloqués (hors queue) ──────────
-      // Ces postes ne figurent pas dans queuedPostes → leurs conv sont ignorées
-      // sans ce bloc. On les ajoute comme sources supplémentaires (jamais destinations).
-      const unavailableCountRows = await this.chatRepository
-        .createQueryBuilder('chat')
-        .innerJoin('chat.poste', 'poste')
-        .select('chat.poste_id', 'poste_id')
-        .addSelect('COUNT(*)', 'cnt')
-        .where('chat.unread_count > 0')
-        .andWhere('chat.last_client_message_at < :threshold', { threshold })
-        .andWhere('chat.deletedAt IS NULL')
-        .andWhere('(poste.is_active = false OR poste.is_queue_enabled = false)')
-        .andWhere(dedicatedExclusion)
-        .groupBy('chat.poste_id')
-        .getRawMany<{ poste_id: string; cnt: string }>();
-
-      const unavailablePosteIds = unavailableCountRows.map((r) => r.poste_id);
-      const unavailablePostes = unavailablePosteIds.length > 0
-        ? await this.posteRepository.findBy({ id: In(unavailablePosteIds) })
-        : [];
-
+      // Ajouter les comptes des postes offline/bloqués dans le total
       for (const row of unavailableCountRows) {
         countMap.set(row.poste_id, parseInt(row.cnt, 10));
       }
