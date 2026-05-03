@@ -5,7 +5,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { Mutex } from 'async-mutex';
 import { QueueService } from './services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
@@ -596,7 +596,7 @@ export class DispatcherService {
           (SELECT c.poste_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
       )`;
 
-      // ── 2. Nombre de convs éligibles par poste ───────────────────────────────
+      // ── 2. Nombre de convs éligibles — postes de la queue ───────────────────
       const countRows = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
@@ -613,23 +613,51 @@ export class DispatcherService {
       for (const p of queuedPostes) countMap.set(p.id, 0);
       for (const row of countRows) countMap.set(row.poste_id, parseInt(row.cnt, 10));
 
+      // ── 2b. Convs non lues sur postes offline/bloqués (hors queue) ──────────
+      // Ces postes ne figurent pas dans queuedPostes → leurs conv sont ignorées
+      // sans ce bloc. On les ajoute comme sources supplémentaires (jamais destinations).
+      const unavailableCountRows = await this.chatRepository
+        .createQueryBuilder('chat')
+        .innerJoin('chat.poste', 'poste')
+        .select('chat.poste_id', 'poste_id')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('chat.unread_count > 0')
+        .andWhere('chat.last_client_message_at < :threshold', { threshold })
+        .andWhere('chat.deletedAt IS NULL')
+        .andWhere('(poste.is_active = false OR poste.is_queue_enabled = false)')
+        .andWhere(dedicatedExclusion)
+        .groupBy('chat.poste_id')
+        .getRawMany<{ poste_id: string; cnt: string }>();
+
+      const unavailablePosteIds = unavailableCountRows.map((r) => r.poste_id);
+      const unavailablePostes = unavailablePosteIds.length > 0
+        ? await this.posteRepository.findBy({ id: In(unavailablePosteIds) })
+        : [];
+
+      for (const row of unavailableCountRows) {
+        countMap.set(row.poste_id, parseInt(row.cnt, 10));
+      }
+
       const totalEligible = [...countMap.values()].reduce((a, b) => a + b, 0);
       if (totalEligible === 0) {
         return 'Aucune conversation éligible (hors canaux dédiés)';
       }
 
+      // target calculé sur les postes de la queue uniquement (destinations)
       const target = Math.ceil(totalEligible / queuedPostes.length);
 
-      // Postes surchargés (excess > 0) triés du plus au moins chargé
-      const overloaded = queuedPostes
-        .filter((p) => (countMap.get(p.id) ?? 0) > target)
-        .sort((a, b) => (countMap.get(b.id) ?? 0) - (countMap.get(a.id) ?? 0));
+      // Postes surchargés : queue au-dessus du target + tous les postes offline/bloqués
+      // Les postes offline/bloqués ont un target effectif de 0 : toutes leurs conv doivent partir
+      const overloaded = [
+        ...queuedPostes.filter((p) => (countMap.get(p.id) ?? 0) > target),
+        ...unavailablePostes,
+      ].sort((a, b) => (countMap.get(b.id) ?? 0) - (countMap.get(a.id) ?? 0));
 
       if (overloaded.length === 0) {
         return `Charge déjà équilibrée — ${target} conv/poste (${totalEligible} conv, ${queuedPostes.length} postes)`;
       }
 
-      // Postes sous-chargés (manque > 0) triés du moins au plus chargé
+      // Postes sous-chargés : uniquement les postes de la queue (destinations)
       const underloaded = queuedPostes
         .filter((p) => (countMap.get(p.id) ?? 0) < target)
         .sort((a, b) => (countMap.get(a.id) ?? 0) - (countMap.get(b.id) ?? 0));
@@ -644,8 +672,11 @@ export class DispatcherService {
       let dispatched = 0;
       let underIdx = 0;
 
+      const unavailablePosteIdSet = new Set(unavailablePosteIds);
       for (const srcPoste of overloaded) {
-        const excess = (countMap.get(srcPoste.id) ?? 0) - target;
+        // Postes offline/bloqués : target effectif = 0 (toutes les conv doivent partir)
+        const srcTarget = unavailablePosteIdSet.has(srcPoste.id) ? 0 : target;
+        const excess = (countMap.get(srcPoste.id) ?? 0) - srcTarget;
         if (excess <= 0 || underIdx >= underloaded.length) continue;
 
         // Convs les plus anciennes de ce poste surchargé (oldest-first)
