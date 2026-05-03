@@ -1,0 +1,52 @@
+[
+  {
+    "id": "vc000001-0001-4000-8000-000000000001",
+    "criterion_type": "rapport_soumis",
+    "label": "Rapport soumis",
+    "is_required": 1,
+    "is_active": 1,
+    "sort_order": 1,
+    "created_at": "2026-01-01 08:00:00",
+    "updated_at": "2026-01-01 08:00:00"
+  },
+  {
+    "id": "vc000001-0002-4000-8000-000000000002",
+    "criterion_type": "appel_effectue",
+    "label": "Appel effectue (>=90s)",
+    "is_required": 1,
+    "is_active": 1,
+    "sort_order": 2,
+    "created_at": "2026-01-01 08:00:00",
+    "updated_at": "2026-01-01 08:00:00"
+  },
+  {
+    "id": "vc000001-0003-4000-8000-000000000003",
+    "criterion_type": "message_envoye",
+    "label": "Message envoye",
+    "is_required": 1,
+    "is_active": 1,
+    "sort_order": 3,
+    "created_at": "2026-01-01 08:00:00",
+    "updated_at": "2026-01-01 08:00:00"
+  },
+  {
+    "id": "vc000001-0004-4000-8000-000000000004",
+    "criterion_type": "commande_saisie",
+    "label": "Commande saisie",
+    "is_required": 0,
+    "is_active": 1,
+    "sort_order": 4,
+    "created_at": "2026-01-01 08:00:00",
+    "updated_at": "2026-01-01 08:00:00"
+  },
+  {
+    "id": "vc000001-0005-4000-8000-000000000005",
+    "criterion_type": "rdv_confirme",
+    "label": "RDV confirme",
+    "is_required": 0,
+    "is_active": 1,
+    "sort_order": 5,
+    "created_at": "2026-01-01 08:00:00",
+    "updated_at": "2026-01-01 08:00:00"
+  }
+]
