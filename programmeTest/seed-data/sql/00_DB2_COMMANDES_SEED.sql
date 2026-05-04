@@ -8,7 +8,7 @@ SET NAMES utf8mb4;
 -- Table: users
 -- 210 enregistrement(s)
 
-INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
+INSERT IGNORE INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
   (101, 0, 1, 'DEV001', 'COULIBALY', 'Aminata', '+2250701234501', NULL, 1, 1),
   (102, 0, 2, 'DEV002', 'DIALLO', 'Fatou', '+2250701234502', NULL, 1, 1),
   (103, 0, 3, 'DEV003', 'TRAORE', 'Mariame', '+2250701234503', NULL, 1, 1),
@@ -60,7 +60,7 @@ INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `p
   (1044, 1, NULL, NULL, 'BARRY', 'Ibrahim', '22500000044', NULL, 1, 1),
   (1045, 1, NULL, NULL, 'BAMBA', 'Seydou', '22500000045', NULL, 1, 1);
 
-INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
+INSERT IGNORE INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
   (1046, 1, NULL, NULL, 'KONAN', 'Lamine', '22500000046', NULL, 1, 1),
   (1047, 1, NULL, NULL, 'SANGARE', 'Abdoulaye', '22500000047', NULL, 1, 1),
   (1048, 1, NULL, NULL, 'CISSE', 'Ousmane', '22500000048', NULL, 1, 1),
@@ -112,7 +112,7 @@ INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `p
   (1094, 1, NULL, NULL, 'BARRY', 'Ibrahim', '22500000094', NULL, 1, 1),
   (1095, 1, NULL, NULL, 'BAMBA', 'Seydou', '22500000095', NULL, 1, 1);
 
-INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
+INSERT IGNORE INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
   (1096, 1, NULL, NULL, 'KONAN', 'Lamine', '22500000096', NULL, 1, 1),
   (1097, 1, NULL, NULL, 'SANGARE', 'Abdoulaye', '22500000097', NULL, 1, 1),
   (1098, 1, NULL, NULL, 'CISSE', 'Ousmane', '22500000098', NULL, 1, 1),
@@ -164,7 +164,7 @@ INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `p
   (1144, 1, NULL, NULL, 'BARRY', 'Ibrahim', '22500000144', NULL, 1, 1),
   (1145, 1, NULL, NULL, 'BAMBA', 'Seydou', '22500000145', NULL, 1, 1);
 
-INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
+INSERT IGNORE INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
   (1146, 1, NULL, NULL, 'KONAN', 'Lamine', '22500000146', NULL, 1, 1),
   (1147, 1, NULL, NULL, 'SANGARE', 'Abdoulaye', '22500000147', NULL, 1, 1),
   (1148, 1, NULL, NULL, 'CISSE', 'Ousmane', '22500000148', NULL, 1, 1),
@@ -216,7 +216,7 @@ INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `p
   (1194, 1, NULL, NULL, 'BARRY', 'Ibrahim', '22500000394', NULL, 1, 1),
   (1195, 1, NULL, NULL, 'BAMBA', 'Seydou', '22500000395', NULL, 1, 1);
 
-INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
+INSERT IGNORE INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `phone`, `phone2`, `statut`, `valid`) VALUES
   (1196, 1, NULL, NULL, 'KONAN', 'Lamine', '22500000396', NULL, 1, 1),
   (1197, 1, NULL, NULL, 'SANGARE', 'Abdoulaye', '22500000397', NULL, 1, 1),
   (1198, 1, NULL, NULL, 'CISSE', 'Ousmane', '22500000398', NULL, 1, 1),
@@ -231,7 +231,7 @@ INSERT INTO `users` (`id`, `type`, `id_poste`, `device_id`, `nom`, `prenoms`, `p
 -- Table: commandes
 -- 200 enregistrement(s)
 
-INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
+INSERT IGNORE INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
   (10001, 1002, 102, 2, 'GICOP-10001', 'REF00001', 'mobile_money', '2026-02-02 14:00:00', NULL, NULL, '2025-07-02 10:00:00', '2026-02-02 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'Terrain'),
   (10002, 1003, 103, 3, 'GICOP-10002', 'REF00002', 'virement', '2026-03-03 14:00:00', NULL, NULL, '2025-08-03 10:00:00', '2026-03-03 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'Telephone'),
   (10003, 1004, 104, 4, 'GICOP-10003', 'REF00003', 'cheque', '2026-04-04 14:00:00', NULL, NULL, '2025-09-04 10:00:00', '2026-04-04 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'Referral'),
@@ -283,7 +283,7 @@ INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero
   (10049, 1050, 105, 5, 'GICOP-10049', 'REF00049', 'mobile_money', '2026-02-22 14:00:00', NULL, NULL, '2025-06-22 10:00:00', '2026-02-22 16:00:00', 4, 0, 1, 1, 0, 1, 0, NULL, 5, 1, NULL, 'Terrain'),
   (10050, 1051, 101, 1, 'GICOP-10050', 'REF00050', 'virement', '2026-03-23 14:00:00', NULL, NULL, '2025-07-23 10:00:00', '2026-03-23 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'Telephone');
 
-INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
+INSERT IGNORE INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
   (10051, 1052, 102, 2, 'GICOP-10051', 'REF00051', 'cheque', '2026-04-24 14:00:00', NULL, NULL, '2025-08-24 10:00:00', '2026-04-24 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'Referral'),
   (10052, 1053, 103, 3, 'GICOP-10052', 'REF00052', 'especes', '2026-01-25 14:00:00', NULL, NULL, '2025-09-25 10:00:00', '2026-01-25 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'WhatsApp'),
   (10053, 1054, 104, 4, 'GICOP-10053', 'REF00053', 'mobile_money', '2026-02-26 14:00:00', NULL, NULL, '2025-10-26 10:00:00', '2026-02-26 16:00:00', 4, 0, 1, 1, 0, 0, 0, NULL, 5, 1, NULL, 'Terrain'),
@@ -335,7 +335,7 @@ INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero
   (10099, 1100, 105, 5, 'GICOP-10099', 'REF00099', 'cheque', NULL, NULL, NULL, '2025-07-16 10:00:00', NULL, 3, 0, 1, 0, 0, 0, 0, NULL, 3, 1, NULL, 'Referral'),
   (10100, 1101, 101, 1, 'GICOP-10100', 'REF00100', 'especes', NULL, NULL, NULL, '2025-08-17 10:00:00', NULL, 3, 0, 1, 0, 0, 0, 0, NULL, 3, 1, NULL, 'WhatsApp');
 
-INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
+INSERT IGNORE INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
   (10101, 1102, 102, 2, 'GICOP-10101', 'REF00101', 'mobile_money', NULL, NULL, NULL, '2025-09-18 10:00:00', NULL, 3, 0, 1, 0, 0, 0, 0, NULL, 3, 1, NULL, 'Terrain'),
   (10102, 1103, 103, 3, 'GICOP-10102', 'REF00102', 'virement', NULL, NULL, NULL, '2025-10-19 10:00:00', NULL, 3, 0, 1, 0, 0, 0, 0, NULL, 3, 1, NULL, 'Telephone'),
   (10103, 1104, 104, 4, 'GICOP-10103', 'REF00103', 'cheque', NULL, NULL, NULL, '2025-11-20 10:00:00', NULL, 3, 0, 1, 0, 0, 0, 0, NULL, 3, 1, NULL, 'Referral'),
@@ -387,7 +387,7 @@ INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero
   (10149, 1150, 105, 5, 'GICOP-10149', 'REF00149', 'mobile_money', NULL, '2026-02-10 09:00:00', 'Erreur de commande', '2025-08-10 10:00:00', NULL, 6, 1, 1, 0, 0, 0, 0, NULL, 6, 1, NULL, 'Terrain'),
   (10150, 1001, 101, 1, 'GICOP-10150', 'REF00150', 'virement', NULL, '2026-02-11 09:00:00', 'Annulation volontaire', '2025-09-11 10:00:00', NULL, 6, 1, 1, 0, 0, 0, 0, NULL, 6, 1, NULL, 'Telephone');
 
-INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
+INSERT IGNORE INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero_gicop`, `reference`, `payment_method`, `date_livraison`, `date_annulation`, `motif_annulation`, `date_enreg`, `date_livree`, `etat`, `true_cancel`, `is_order_confirmed`, `is_order_prepared`, `is_on_temp`, `arappeler`, `prospected`, `date_prospected`, `statut`, `valid`, `remarque`, `origine`) VALUES
   (10151, 1002, 102, 2, 'GICOP-10151', 'REF00151', 'cheque', NULL, '2026-02-12 09:00:00', 'Produit non disponible', '2025-10-12 10:00:00', NULL, 6, 1, 1, 0, 0, 0, 0, NULL, 6, 1, NULL, 'Referral'),
   (10152, 1003, 103, 3, 'GICOP-10152', 'REF00152', 'especes', NULL, '2026-02-13 09:00:00', 'Delai trop long', '2025-11-13 10:00:00', NULL, 6, 1, 1, 0, 0, 0, 0, NULL, 6, 1, NULL, 'WhatsApp'),
   (10153, 1004, 104, 4, 'GICOP-10153', 'REF00153', 'mobile_money', NULL, '2026-02-14 09:00:00', 'Prix non conforme', '2025-12-14 10:00:00', NULL, 6, 1, 1, 0, 0, 0, 0, NULL, 6, 1, NULL, 'Terrain'),
@@ -442,7 +442,7 @@ INSERT INTO `commandes` (`id`, `id_client`, `id_commercial`, `id_poste`, `numero
 -- Table: call_logs
 -- 200 enregistrement(s)
 
-INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
+INSERT IGNORE INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
   ('cl0001-0001-4000-8000-000000000001', 102, 1002, 'DEV002', 'outgoing', '22500000002', '22500000001', '+2250700000001', NULL, 133, '2026-05-02 09:00:00', 'CI', 'Orange CI', 1, '2026-05-02 09:00:00'),
   ('cl0002-0001-4000-8000-000000000002', 103, 1003, 'DEV003', 'outgoing', '22500000003', '22500000002', '+2250700000002', NULL, 176, '2026-04-03 10:00:00', 'CI', 'Moov Africa', 0, '2026-04-03 10:00:00'),
   ('cl0003-0001-4000-8000-000000000003', 104, 1004, 'DEV004', 'outgoing', '22500000004', '22500000003', '+2250700000003', 'Mamadou Kone', 219, '2026-05-04 11:00:00', 'CI', 'MTN CI', 1, '2026-05-04 11:00:00'),
@@ -494,7 +494,7 @@ INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_
   ('cl0049-0001-4000-8000-000000000049', 105, 1050, 'DEV005', 'outgoing', '22500000005', '22500000049', '+2250700000049', NULL, 153, '2026-05-22 17:00:00', 'CI', 'Orange CI', 0, '2026-05-22 17:00:00'),
   ('cl0050-0001-4000-8000-000000000050', 101, 1051, 'DEV001', 'outgoing', '22500000001', '22500000050', '+2250700000050', NULL, 196, '2026-04-23 08:00:00', 'CI', 'Moov Africa', 0, '2026-04-23 08:00:00');
 
-INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
+INSERT IGNORE INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
   ('cl0051-0001-4000-8000-000000000051', 102, 1052, 'DEV002', 'outgoing', '22500000002', '22500000051', '+2250700000051', 'Sory Kouassi', 239, '2026-05-24 09:00:00', 'CI', 'MTN CI', 1, '2026-05-24 09:00:00'),
   ('cl0052-0001-4000-8000-000000000052', 103, 1053, 'DEV003', 'outgoing', '22500000003', '22500000052', '+2250700000052', NULL, 282, '2026-04-25 10:00:00', 'CI', 'Orange CI', 0, '2026-04-25 10:00:00'),
   ('cl0053-0001-4000-8000-000000000053', 104, 1054, 'DEV004', 'outgoing', '22500000004', '22500000053', '+2250700000053', NULL, 325, '2026-05-26 11:00:00', 'CI', 'Moov Africa', 1, '2026-05-26 11:00:00'),
@@ -546,7 +546,7 @@ INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_
   ('cl0099-0001-4000-8000-000000000099', 105, 1100, 'DEV005', 'outgoing', '22500000005', '22500000099', '+2250700000099', 'Ousmane Bah', 259, '2026-05-16 17:00:00', 'CI', 'MTN CI', 0, '2026-05-16 17:00:00'),
   ('cl0100-0001-4000-8000-000000000100', 101, 1101, 'DEV001', 'outgoing', '22500000001', '22500000100', '+2250700000100', NULL, 302, '2026-04-17 08:00:00', 'CI', 'Orange CI', 0, '2026-04-17 08:00:00');
 
-INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
+INSERT IGNORE INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
   ('cl0101-0001-4000-8000-000000000101', 102, 1102, 'DEV002', 'outgoing', '22500000002', '22500000101', '+2250700000101', NULL, 345, '2026-05-18 09:00:00', 'CI', 'Moov Africa', 1, '2026-05-18 09:00:00'),
   ('cl0102-0001-4000-8000-000000000102', 103, 1103, 'DEV003', 'outgoing', '22500000003', '22500000102', '+2250700000102', 'Ibrahim Koita', 388, '2026-04-19 10:00:00', 'CI', 'MTN CI', 0, '2026-04-19 10:00:00'),
   ('cl0103-0001-4000-8000-000000000103', 104, 1104, 'DEV004', 'outgoing', '22500000004', '22500000103', '+2250700000103', NULL, 431, '2026-05-20 11:00:00', 'CI', 'Orange CI', 1, '2026-05-20 11:00:00'),
@@ -598,7 +598,7 @@ INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_
   ('cl0149-0001-4000-8000-000000000149', 105, NULL, 'DEV005', 'missed', '22500000005', '22500000149', '+2250700000149', NULL, 0, '2026-05-10 17:00:00', 'CI', 'Moov Africa', 0, '2026-05-10 17:00:00'),
   ('cl0150-0001-4000-8000-000000000150', 101, NULL, 'DEV001', 'missed', '22500000001', '22500000150', '+2250700000150', 'Boubacar Coulibaly', 0, '2026-04-11 08:00:00', 'CI', 'MTN CI', 0, '2026-04-11 08:00:00');
 
-INSERT INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
+INSERT IGNORE INTO `call_logs` (`id`, `id_commercial`, `id_client`, `device_id`, `call_type`, `local_number`, `remote_number`, `remote_number_formatted`, `contact_name`, `duration`, `call_timestamp`, `country_code`, `operator`, `sim_slot`, `received_at`) VALUES
   ('cl0151-0001-4000-8000-000000000151', 102, NULL, 'DEV002', 'missed', '22500000002', '22500000151', '+2250700000151', NULL, 0, '2026-05-12 09:00:00', 'CI', 'Orange CI', 1, '2026-05-12 09:00:00'),
   ('cl0152-0001-4000-8000-000000000152', 103, NULL, 'DEV003', 'missed', '22500000003', '22500000152', '+2250700000152', NULL, 0, '2026-04-13 10:00:00', 'CI', 'Moov Africa', 0, '2026-04-13 10:00:00'),
   ('cl0153-0001-4000-8000-000000000153', 104, NULL, 'DEV004', 'missed', '22500000004', '22500000153', '+2250700000153', 'Fode Kone', 0, '2026-05-14 11:00:00', 'CI', 'MTN CI', 1, '2026-05-14 11:00:00'),
