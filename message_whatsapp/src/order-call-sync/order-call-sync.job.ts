@@ -9,18 +9,19 @@ export class OrderCallSyncJob {
 
   constructor(private readonly syncService: OrderCallSyncService) {}
 
-  /** Lecture incrémentale des appels depuis DB2 toutes les 5 minutes. */
+  /** Sync DB2 → DB1 toutes les 5 minutes : mapping commerciaux puis appels. */
   @Cron('*/5 * * * *')
   async run(): Promise<void> {
     if (this.running) {
-      this.logger.debug('Sync call_logs déjà en cours — skip');
+      this.logger.debug('Sync DB2 déjà en cours — skip');
       return;
     }
     this.running = true;
     try {
+      await this.syncService.syncCommercialMapping();
       await this.syncService.syncNewCalls();
     } catch (err) {
-      this.logger.error(`Erreur sync call_logs: ${(err as Error).message}`);
+      this.logger.error(`Erreur sync DB2: ${(err as Error).message}`);
     } finally {
       this.running = false;
     }
