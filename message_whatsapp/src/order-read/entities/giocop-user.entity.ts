@@ -55,8 +55,8 @@ export class GicopUser {
   valid: number;
 }
 
-/** Type commercial dans la table users DB2. */
-export const GIOCOP_USER_TYPE_COMMERCIAL = 0;
+/** Type commercial dans la table users DB2 (type=1 + id_poste IS NOT NULL). */
+export const GIOCOP_USER_TYPE_COMMERCIAL = 1;
 
-/** Type client dans la table users DB2. */
-export const GIOCOP_USER_TYPE_CLIENT = 1;
+/** Type client dans la table users DB2 (type=0 + id_poste IS NULL). */
+export const GIOCOP_USER_TYPE_CLIENT = 0;
