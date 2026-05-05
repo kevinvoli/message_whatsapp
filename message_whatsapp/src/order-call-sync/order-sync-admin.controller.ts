@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { OrderCallSyncService } from './order-call-sync.service';
@@ -31,5 +31,11 @@ export class OrderSyncAdminController {
   @ApiOperation({ summary: 'Entrées du journal de sync en échec (admin)' })
   async getFailed() {
     return this.syncLog.findFailed(50);
+  }
+
+  @Post('sync-commercial-mapping')
+  @ApiOperation({ summary: 'Synchronise commercial_identity_mapping depuis DB2 (admin)' })
+  async syncCommercialMapping() {
+    return this.callSync.syncCommercialMapping();
   }
 }

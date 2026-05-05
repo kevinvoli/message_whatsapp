@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, MoreThan, Repository } from 'typeorm';
+import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
   OrderCallLog,
@@ -9,11 +9,17 @@ import {
   ORDER_CALL_TYPE_OUTGOING,
 } from 'src/order-read/entities/order-call-log.entity';
 import { OrderCommand } from 'src/order-read/entities/order-command.entity';
-import { GicopUser, GIOCOP_USER_TYPE_CLIENT } from 'src/order-read/entities/giocop-user.entity';
+import {
+  GicopUser,
+  GIOCOP_USER_TYPE_CLIENT,
+  GIOCOP_USER_TYPE_COMMERCIAL,
+} from 'src/order-read/entities/giocop-user.entity';
 import { OrderCallSyncCursor } from './entities/order-call-sync-cursor.entity';
 import { IntegrationSyncLogService } from 'src/integration-sync/integration-sync-log.service';
 import { CallObligationService } from 'src/call-obligations/call-obligation.service';
 import { CallTaskCategory } from 'src/call-obligations/entities/call-task.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
 
 const CURSOR_SCOPE = 'global';
 const BATCH_SIZE   = 200;
@@ -31,6 +37,12 @@ export class OrderCallSyncService {
 
     @InjectRepository(OrderCallSyncCursor)
     private readonly cursorRepo: Repository<OrderCallSyncCursor>,
+
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
+
+    @InjectRepository(CommercialIdentityMapping)
+    private readonly mappingRepo: Repository<CommercialIdentityMapping>,
 
     private readonly syncLog: IntegrationSyncLogService,
 
@@ -257,6 +269,85 @@ export class OrderCallSyncService {
       );
     }
     return cursor;
+  }
+
+  /**
+   * Synchronise la table `commercial_identity_mapping` (DB1) en appariant
+   * les commerciaux DB1 (WhatsappCommercial) avec les utilisateurs DB2 (GicopUser)
+   * via le numéro de téléphone normalisé (chiffres uniquement).
+   *
+   * Idempotent : met à jour uniquement si external_id ou commercial_name ont changé.
+   */
+  async syncCommercialMapping(): Promise<{ synced: number; skipped: number; errors: number }> {
+    if (!this.dbAvailable || !this.orderDb) {
+      return { synced: 0, skipped: 0, errors: 0 };
+    }
+
+    // DB1 : tous les commerciaux actifs avec un numéro de téléphone
+    const commercials = await this.commercialRepo.find({
+      where: { deletedAt: IsNull() },
+      select: ['id', 'name', 'phone'],
+    });
+
+    // DB2 : utilisateurs commerciaux (type=1, id_poste IS NOT NULL, valid=1)
+    const userRepo = this.orderDb.getRepository(GicopUser);
+    const db2Users = await userRepo
+      .createQueryBuilder('u')
+      .where('u.type = :type', { type: GIOCOP_USER_TYPE_COMMERCIAL })
+      .andWhere('u.idPoste IS NOT NULL')
+      .andWhere('u.valid = 1')
+      .select(['u.id', 'u.phone'])
+      .getMany();
+
+    // Index par téléphone normalisé (chiffres uniquement)
+    const db2ByPhone = new Map<string, number>();
+    for (const u of db2Users) {
+      if (u.phone) db2ByPhone.set(u.phone.replace(/\D/g, ''), u.id);
+    }
+
+    // Mappings existants en DB1 pour détection des mises à jour
+    const existingMappings = await this.mappingRepo.find();
+    const mappingByCommercialId = new Map(existingMappings.map(m => [m.commercial_id, m]));
+
+    let synced = 0, skipped = 0, errors = 0;
+
+    for (const commercial of commercials) {
+      try {
+        if (!commercial.phone) { skipped++; continue; }
+
+        const db2Id = db2ByPhone.get(commercial.phone.replace(/\D/g, ''));
+        if (db2Id == null) { skipped++; continue; }
+
+        const existing = mappingByCommercialId.get(commercial.id);
+        if (existing) {
+          if (existing.external_id !== db2Id || existing.commercial_name !== commercial.name) {
+            existing.external_id = db2Id;
+            existing.commercial_name = commercial.name;
+            await this.mappingRepo.save(existing);
+            synced++;
+          } else {
+            skipped++;
+          }
+        } else {
+          await this.mappingRepo.save(
+            this.mappingRepo.create({
+              commercial_id:   commercial.id,
+              external_id:     db2Id,
+              commercial_name: commercial.name,
+            }),
+          );
+          synced++;
+        }
+      } catch (err) {
+        errors++;
+        this.logger.error(`Erreur mapping commercial ${commercial.id}: ${(err as Error).message}`);
+      }
+    }
+
+    this.logger.log(
+      `Sync commercial_identity_mapping — ${synced} sync, ${skipped} ignorés, ${errors} erreurs`,
+    );
+    return { synced, skipped, errors };
   }
 
   /** Statut courant pour le panneau admin. */

@@ -6,6 +6,17 @@ Le système lit les appels depuis la table `call_logs` de **DB2** (plateforme co
 
 ---
 
+## Convention des types dans `users` DB2
+
+| Valeur | `id_poste` | Rôle |
+|--------|-----------|------|
+| `type = 1` | `IS NOT NULL` | **Commercial** |
+| `type = 0` | `IS NULL` | **Client** |
+
+> ⚠ Les seeds de test avaient ces valeurs inversées. Le fichier `FIX_DB2_USERS_TYPE.sql` corrige la table `users` DB2 si nécessaire.
+
+---
+
 ## Conditions requises pour qu'un appel compte
 
 ### Conditions générales (valables pour les 3 catégories)
@@ -14,7 +25,7 @@ Le système lit les appels depuis la table `call_logs` de **DB2** (plateforme co
 |-----------|---------------|--------|
 | `call_logs.call_type` | `'outgoing'` | Seuls les appels sortants comptent |
 | `call_logs.duration` | `>= 90` secondes | Durée minimale obligatoire |
-| `call_logs.id_commercial` | ID DB2 du commercial | Permet de retrouver le poste |
+| `call_logs.id_commercial` | ID DB2 du commercial | Permet de retrouver le poste via `commercial_identity_mapping` |
 | `call_logs.call_timestamp` | > dernier timestamp du curseur | Sinon ignoré (déjà traité) |
 
 ### Ce qui détermine la catégorie (lu dans `commandes` DB2)
@@ -25,7 +36,7 @@ Le système lit les appels depuis la table `call_logs` de **DB2** (plateforme co
 | `commande_avec_livraison` | Client a une commande avec `date_livree IS NOT NULL` ET `true_cancel = 0` ET `valid = 1` |
 | `jamais_commande` | Aucune commande `valid = 1` trouvée pour ce client |
 
-> **Remarque** : si `id_client` est absent dans `call_logs`, le système cherche le client par `remote_number` dans la table `users` DB2. Si aucun client n'est trouvé, la catégorie par défaut est `jamais_commande`.
+> **Résolution client** : si `id_client` est absent dans `call_logs`, le système cherche le client par `remote_number` dans `users` DB2 **avec `type = 0` et `id_poste IS NULL`**. Si aucun client n'est trouvé, la catégorie par défaut est `jamais_commande`.
 
 ---
 
@@ -48,13 +59,13 @@ WHERE c.email = 'aminata.coulibaly@gicop.ci'; -- ← changer l'email
 
 ### Correspondance commerciaux (données de seed)
 
-| Commercial | Email | `id_commercial_db2` |
-|-----------|-------|-------------------|
-| Aminata Coulibaly | aminata.coulibaly@gicop.ci | `101` |
-| Fatou Diallo | fatou.diallo@gicop.ci | `102` |
-| Mariame Traore | mariame.traore@gicop.ci | `103` |
-| Binta Kone | binta.kone@gicop.ci | `104` |
-| Adama Sangare | adama.sangare@gicop.ci | `105` |
+| Commercial | Email | `id_commercial_db2` | `local_number_sim` |
+|-----------|-------|-------------------|--------------------|
+| Aminata Coulibaly | aminata.coulibaly@gicop.ci | `101` | `+2250701234501` |
+| Fatou Diallo | fatou.diallo@gicop.ci | `102` | `+2250701234502` |
+| Mariame Traore | mariame.traore@gicop.ci | `103` | `+2250701234503` |
+| Binta Kone | binta.kone@gicop.ci | `104` | `+2250701234504` |
+| Adama Sangare | adama.sangare@gicop.ci | `105` | `+2250701234505` |
 
 ---
 
@@ -74,9 +85,9 @@ Remplace les variables avant d'exécuter :
 > Le client appelé doit avoir une commande avec `true_cancel = 1`.
 
 ```sql
--- 1. Créer un client test dans DB2
-INSERT INTO users (id, type, nom, prenoms, phone, statut, valid)
-VALUES (99001, 1, 'Client', 'TestAnnule', '2250799001001', 1, 1);
+-- 1. Créer un client test dans DB2 (type = 0, id_poste IS NULL = client)
+INSERT INTO users (id, type, id_poste, nom, prenoms, phone, statut, valid)
+VALUES (99001, 0, NULL, 'Client', 'TestAnnule', '2250799001001', 1, 1);
 
 -- 2. Créer une commande annulée pour ce client
 INSERT INTO commandes (id, id_client, id_commercial, valid, true_cancel, statut, date_enreg)
@@ -102,9 +113,9 @@ VALUES (
 > Le client appelé doit avoir une commande avec `date_livree IS NOT NULL` et `true_cancel = 0`.
 
 ```sql
--- 1. Créer un client test dans DB2
-INSERT INTO users (id, type, nom, prenoms, phone, statut, valid)
-VALUES (99002, 1, 'Client', 'TestLivre', '2250799002002', 1, 1);
+-- 1. Créer un client test dans DB2 (type = 0, id_poste IS NULL = client)
+INSERT INTO users (id, type, id_poste, nom, prenoms, phone, statut, valid)
+VALUES (99002, 0, NULL, 'Client', 'TestLivre', '2250799002002', 1, 1);
 
 -- 2. Créer une commande livrée pour ce client
 INSERT INTO commandes (id, id_client, id_commercial, valid, true_cancel, date_livree, statut, date_enreg)
@@ -130,9 +141,9 @@ VALUES (
 > Le client appelé ne doit avoir **aucune** commande valide dans DB2.
 
 ```sql
--- 1. Créer un client test sans commande dans DB2
-INSERT INTO users (id, type, nom, prenoms, phone, statut, valid)
-VALUES (99003, 1, 'Client', 'TestSansCommande', '2250799003003', 1, 1);
+-- 1. Créer un client test sans commande dans DB2 (type = 0, id_poste IS NULL = client)
+INSERT INTO users (id, type, id_poste, nom, prenoms, phone, statut, valid)
+VALUES (99003, 0, NULL, 'Client', 'TestSansCommande', '2250799003003', 1, 1);
 
 -- Pas de commande à créer : l'absence de commande = jamais_commande automatiquement
 
@@ -195,9 +206,9 @@ Une fois les 3 tâches à `done`, **la rotation se déclenche automatiquement** 
 
 ```sql
 -- Sur DB2 — supprimer les données de test
-DELETE FROM call_logs  WHERE id_client IN (99001, 99002, 99003);
-DELETE FROM commandes  WHERE id_client IN (99001, 99002, 99003);
-DELETE FROM users      WHERE id IN (99001, 99002, 99003);
+DELETE FROM call_logs WHERE id_client IN (99001, 99002, 99003);
+DELETE FROM commandes WHERE id_client IN (99001, 99002, 99003);
+DELETE FROM users     WHERE id IN (99001, 99002, 99003);
 ```
 
 ---
@@ -207,8 +218,9 @@ DELETE FROM users      WHERE id IN (99001, 99002, 99003);
 | Symptôme dans `integration_sync_log` | Cause | Solution |
 |--------------------------------------|-------|---------|
 | `status = 'failed'` / `duree_insuffisante` | `duration < 90` | Mettre `duration >= 90` |
-| `status = 'failed'` / `poste_introuvable` | `id_commercial` absent ou non mappé | Vérifier `commercial_identity_mapping.external_id` en DB1 |
+| `status = 'failed'` / `poste_introuvable` | `id_commercial` absent ou non mappé dans `commercial_identity_mapping` | Exécuter le SQL de sync du mapping |
 | `status = 'failed'` / `aucun_batch_actif` | Pas de batch `pending` pour ce poste | Créer un batch via le service d'obligations |
 | `status = 'failed'` / `quota_categorie_atteint` | La catégorie est déjà complète (5/5) | Aucune action nécessaire — quota atteint |
 | `status = 'failed'` / `appel_deja_traite` | L'`id` de l'appel est en doublon | Utiliser `UUID()` pour garantir l'unicité |
 | Appel non trouvé dans le sync | `call_timestamp` antérieur au curseur | Utiliser `NOW()` comme timestamp |
+| Catégorie toujours `jamais_commande` | `type` des clients incorrect dans DB2 | Exécuter `FIX_DB2_USERS_TYPE.sql` |
