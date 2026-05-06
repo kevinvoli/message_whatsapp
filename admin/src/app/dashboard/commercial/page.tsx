@@ -54,7 +54,7 @@ import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
 import WebhooksView from '@/app/modules/webhooks/components/WebhooksView';
 import BroadcastsView from '@/app/modules/broadcasts/components/BroadcastsView';
-import TemplatesView from '@/app/modules/templates/components/TemplatesView';
+import TemplatesView from '@/app/ui/templates/TemplatesView';
 import { useNotifications } from '@/app/modules/notifications/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
