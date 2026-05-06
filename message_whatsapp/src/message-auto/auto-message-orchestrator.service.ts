@@ -309,12 +309,19 @@ export class AutoMessageOrchestrator implements OnModuleInit {
     // 🚀 Envoi réel (sendAutoMessage gère le typing WA + déverrouillage frontend)
     await this.messageAutoService.sendAutoMessage(chatId, nextStep);
 
-    // 🔒 Mise à jour BDD post-envoi
+    // 🔒 Mise à jour BDD post-envoi — read_only levé pour laisser l'agent écrire
     await this.chatService.update(chatId, {
       auto_message_step: nextStep,
       waiting_client_reply: true,
       last_auto_message_sent_at: new Date(),
+      read_only: false,
     });
+
+    // Notifie le frontend que la conversation est déverrouillée
+    const unlockedChat = await this.chatService.findBychat_id(chatId);
+    if (unlockedChat) {
+      this.gateway.emitConversationReadonly({ ...unlockedChat, read_only: false } as WhatsappChat);
+    }
   }
 
   private randomBetween(min: number, max: number): number {
