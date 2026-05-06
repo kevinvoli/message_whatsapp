@@ -24,7 +24,6 @@ Le système lit les appels depuis la table `call_logs` de **DB2** (plateforme co
 | Champ DB2 | Valeur requise | Raison |
 |-----------|---------------|--------|
 | `call_logs.call_type` | `'outgoing'` | Seuls les appels sortants comptent |
-| `call_logs.duration` | `>= 90` secondes | Durée minimale obligatoire |
 | `call_logs.id_commercial` | ID DB2 du commercial | Permet de retrouver le poste via `commercial_identity_mapping` |
 | `call_logs.call_timestamp` | > dernier timestamp du curseur | Sinon ignoré (déjà traité) |
 
@@ -217,7 +216,6 @@ DELETE FROM users     WHERE id IN (99001, 99002, 99003);
 
 | Symptôme dans `integration_sync_log` | Cause | Solution |
 |--------------------------------------|-------|---------|
-| `status = 'failed'` / `duree_insuffisante` | `duration < 90` | Mettre `duration >= 90` |
 | `status = 'failed'` / `poste_introuvable` | `id_commercial` absent ou non mappé dans `commercial_identity_mapping` | Exécuter le SQL de sync du mapping |
 | `status = 'failed'` / `aucun_batch_actif` | Pas de batch `pending` pour ce poste | Créer un batch via le service d'obligations |
 | `status = 'failed'` / `quota_categorie_atteint` | La catégorie est déjà complète (5/5) | Aucune action nécessaire — quota atteint |

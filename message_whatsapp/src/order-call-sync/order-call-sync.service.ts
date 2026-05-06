@@ -4,7 +4,6 @@ import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
   OrderCallLog,
-  ORDER_CALL_MIN_DURATION_SEC,
   ORDER_CALL_TYPE_MISSED,
   ORDER_CALL_TYPE_OUTGOING,
 } from 'src/order-read/entities/order-call-log.entity';
@@ -136,14 +135,13 @@ export class OrderCallSyncService {
   }
 
   /**
-   * Éligible obligation : sortant ('outgoing') + durée >= 90s.
+   * Éligible obligation : sortant ('outgoing') uniquement.
    * Un appel manqué ('missed') ne compte jamais dans les obligations.
    * id_commercial est préféré mais on accepte aussi le fallback par localNumber.
    */
   private isEligibleForObligation(call: OrderCallLog): boolean {
     return (
       call.callType === ORDER_CALL_TYPE_OUTGOING &&
-      call.duration >= ORDER_CALL_MIN_DURATION_SEC &&
       (call.idCommercial != null || Boolean(call.localNumber))
     );
   }

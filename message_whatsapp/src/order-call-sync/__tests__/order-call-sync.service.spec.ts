@@ -4,13 +4,13 @@
  * Vérifie que syncNewCalls() :
  *  - utilise le tie-breaker (timestamp = X AND id > Y) pour ne pas perdre
  *    des appels ayant le même timestamp
- *  - filtre correctement les appels outgoing ≥ 90s
- *  - ignore les appels missed ou trop courts
+ *  - filtre correctement les appels outgoing (sans condition de durée)
+ *  - ignore les appels missed
  *  - avance le curseur après chaque batch
  */
 
 import { OrderCallSyncService } from '../order-call-sync.service';
-import { ORDER_CALL_TYPE_OUTGOING, ORDER_CALL_MIN_DURATION_SEC } from 'src/order-read/entities/order-call-log.entity';
+import { ORDER_CALL_TYPE_OUTGOING } from 'src/order-read/entities/order-call-log.entity';
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ function makeCall(overrides: Record<string, unknown> = {}) {
   return {
     id:           'call-1',
     callType:     ORDER_CALL_TYPE_OUTGOING,
-    duration:     ORDER_CALL_MIN_DURATION_SEC, // 90s
+    duration:     10,
     callTimestamp: new Date('2026-04-28T10:00:00Z'),
     idCommercial: 1,
     idClient:     null,
@@ -187,23 +187,14 @@ describe('OrderCallSyncService — curseur avec tie-breaker (OBL-009)', () => {
 });
 
 describe('OrderCallSyncService — filtrage obligations (OBL-024)', () => {
-  it('appel outgoing ≥ 90s → eligible pour obligation', async () => {
-    const call = makeCall({ callType: ORDER_CALL_TYPE_OUTGOING, duration: 90 });
+  it('appel outgoing → eligible pour obligation (quelle que soit la durée)', async () => {
+    const call = makeCall({ callType: ORDER_CALL_TYPE_OUTGOING, duration: 5 });
     const obligationService = makeObligationService(true);
     const { svc } = buildService([call], makeCursor(), obligationService);
 
     const result = await svc.syncNewCalls();
     expect(obligationService.tryMatchCallToTask).toHaveBeenCalledTimes(1);
     expect(result.obligations).toBe(1);
-  });
-
-  it('appel outgoing 89s → non eligible (trop court)', async () => {
-    const call = makeCall({ callType: ORDER_CALL_TYPE_OUTGOING, duration: 89 });
-    const obligationService = makeObligationService();
-    const { svc } = buildService([call], makeCursor(), obligationService);
-
-    await svc.syncNewCalls();
-    expect(obligationService.tryMatchCallToTask).not.toHaveBeenCalled();
   });
 
   it('appel missed → non eligible', async () => {
