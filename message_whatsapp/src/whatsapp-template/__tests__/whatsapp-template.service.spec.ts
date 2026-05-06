@@ -11,6 +11,7 @@ import {
   TemplateStatus,
   TemplateCategory,
 } from '../entities/whatsapp-template.entity';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 const makeRepo = () => ({
   create: jest.fn((dto) => ({ ...dto })),
@@ -18,12 +19,17 @@ const makeRepo = () => ({
   findOne: jest.fn(),
   find: jest.fn().mockResolvedValue([]),
   update: jest.fn().mockResolvedValue(undefined),
+  merge: jest.fn((target, source) => ({ ...target, ...source })),
   createQueryBuilder: jest.fn().mockReturnValue({
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue([]),
   }),
+});
+
+const makeChannelRepo = () => ({
+  findOne: jest.fn(),
 });
 
 describe('WhatsappTemplateService (P4.2)', () => {
@@ -36,6 +42,7 @@ describe('WhatsappTemplateService (P4.2)', () => {
       providers: [
         WhatsappTemplateService,
         { provide: getRepositoryToken(WhatsappTemplate), useValue: repo },
+        { provide: getRepositoryToken(WhapiChannel), useValue: makeChannelRepo() },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();

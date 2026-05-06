@@ -911,7 +911,7 @@ export interface Role {
 }
 
 // ============================================
-// PHASE 4 — Templates HSM
+// PHASE 4 — Templates HSM (ancien modèle Whapi)
 // ============================================
 
 export type WhatsappTemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -923,12 +923,53 @@ export type WhatsappTemplate = {
   language: string;
   category?: string | null;
   status: WhatsappTemplateStatus;
-  components?: any | null;
+  components?: unknown | null;
   externalId?: string | null;
   rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+// ============================================
+// SPRINT 1 — Templates HSM Meta (nouveau modèle admin /admin/templates)
+// ============================================
+
+export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+export type TemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'IN_APPEAL' | 'FLAGGED' | 'DELETED';
+export type TemplateHeaderType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+
+export interface HsmTemplate {
+  id: string;
+  tenant_id: string;
+  channel_id: string | null;
+  name: string;
+  category: TemplateCategory;
+  language: string;
+  status: TemplateStatus;
+  rejected_reason: string | null;
+  meta_template_id: string | null;
+  base_model: string | null;
+  header_type: TemplateHeaderType | null;
+  header_text: string | null;
+  header_example: string | null;
+  header_content: string | null;
+  body_text: string;
+  body_example_variables: string[] | null;
+  footer_text: string | null;
+  parameters: Record<string, unknown>[] | null;
+  buttons: Record<string, unknown>[] | null;
+  submitted_at: string | null;
+  submission_error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateBaseModel {
+  key: string;
+  label: string;
+  category: TemplateCategory;
+  components: string[];
+}
 
 // ============================================
 // PHASE 4 — Broadcasts
@@ -1141,5 +1182,3 @@ export interface OutboundConversationResult {
   contactId: string;
 }
 
-// Ancien alias conservé pour compatibilité rétroactive
-export type TemplateStatus = WhatsappTemplateStatus;

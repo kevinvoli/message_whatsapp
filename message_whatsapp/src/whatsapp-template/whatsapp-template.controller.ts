@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Param,
   Body,
@@ -12,21 +13,20 @@ import {
 } from '@nestjs/common';
 import { WhatsappTemplateService } from './whatsapp-template.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
+import { UpdateTemplateDto } from './dto/update-template.dto';
 import { TemplateCategory, TemplateStatus } from './entities/whatsapp-template.entity';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { AuthGuard } from '@nestjs/passport';
-
-/**
- * P4.2 — Endpoints HSM Templates
- *
- * Admin : CRUD complet sur /admin/templates
- * Agent : lecture sur /templates  (sélection lors de l'envoi)
- */
 
 @Controller('admin/templates')
 @UseGuards(AdminGuard)
 export class WhatsappTemplateAdminController {
   constructor(private readonly service: WhatsappTemplateService) {}
+
+  @Get('base-models')
+  getBaseModels() {
+    return this.service.getBaseModels();
+  }
 
   @Post()
   create(@Body() dto: CreateTemplateDto) {
@@ -49,6 +49,20 @@ export class WhatsappTemplateAdminController {
     return this.service.findOne(id, tenantId);
   }
 
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @Query('tenant_id') tenantId: string,
+    @Body() dto: UpdateTemplateDto,
+  ) {
+    return this.service.update(id, tenantId, dto);
+  }
+
+  @Post(':id/submit')
+  submit(@Param('id') id: string, @Query('tenant_id') tenantId: string) {
+    return this.service.submitToMeta(id, tenantId);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   disable(@Param('id') id: string, @Query('tenant_id') tenantId: string) {
@@ -56,7 +70,6 @@ export class WhatsappTemplateAdminController {
   }
 }
 
-/** Agent — lecture seule des templates APPROUVÉS */
 @Controller('templates')
 @UseGuards(AuthGuard('jwt'))
 export class WhatsappTemplateAgentController {

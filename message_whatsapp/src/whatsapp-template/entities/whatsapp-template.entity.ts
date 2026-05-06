@@ -103,6 +103,24 @@ export class WhatsappTemplate {
   @Column({ type: 'json', nullable: true })
   buttons: Record<string, unknown>[] | null;
 
+  @Column({ name: 'base_model', type: 'varchar', length: 50, nullable: true })
+  baseModel: string | null;
+
+  @Column({ name: 'header_text', type: 'varchar', length: 60, nullable: true })
+  headerText: string | null;
+
+  @Column({ name: 'header_example', type: 'varchar', length: 255, nullable: true })
+  headerExample: string | null;
+
+  @Column({ name: 'body_example_variables', type: 'json', nullable: true })
+  bodyExampleVariables: string[] | null;
+
+  @Column({ name: 'submitted_at', type: 'datetime', nullable: true })
+  submittedAt: Date | null;
+
+  @Column({ name: 'submission_error', type: 'text', nullable: true })
+  submissionError: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
