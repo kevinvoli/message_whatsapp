@@ -52,7 +52,21 @@ export class WhatsappTemplateService {
 
   async create(dto: CreateTemplateDto): Promise<WhatsappTemplate> {
     const entity = this.repo.create({
-      ...dto,
+      tenant_id: dto.tenant_id,
+      channel_id: dto.channel_id,
+      name: dto.name,
+      category: dto.category,
+      language: dto.language,
+      header_type: dto.header_type,
+      header_content: dto.header_content,
+      body_text: dto.body_text,
+      footer_text: dto.footer_text,
+      parameters: dto.parameters,
+      buttons: dto.buttons,
+      baseModel: dto.base_model ?? null,
+      headerText: dto.header_text ?? null,
+      headerExample: dto.header_example ?? null,
+      bodyExampleVariables: dto.body_example_variables ?? null,
       status: TemplateStatus.PENDING,
     });
     const saved = await this.repo.save(entity);

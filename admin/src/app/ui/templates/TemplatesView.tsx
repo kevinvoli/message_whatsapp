@@ -19,6 +19,7 @@ import {
   TemplateHeaderType,
   TemplateStatus,
   HsmTemplate,
+  Channel,
 } from '@/app/lib/definitions';
 import {
   createHsmTemplate,
@@ -28,6 +29,7 @@ import {
   submitHsmTemplate,
   updateHsmTemplate,
 } from '@/app/lib/api/hsm-templates.api';
+import { getChannels } from '@/app/lib/api/channels.api';
 import { formatDate } from '@/app/lib/dateUtils';
 import { useToast } from '@/app/ui/ToastProvider';
 import TemplatePreview from './TemplatePreview';
@@ -152,6 +154,7 @@ function hasComponent(components: string[], needle: string): boolean {
 }
 
 interface FormState {
+  channel_id: string;
   name: string;
   language: string;
   header_text: string;
@@ -167,6 +170,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
+  channel_id: '',
   name: '',
   language: 'fr',
   header_text: '',
@@ -206,6 +210,7 @@ function templateToForm(t: HsmTemplate): FormState {
   }
 
   return {
+    channel_id: t.channel_id ?? '',
     name: t.name,
     language: t.language,
     header_text: t.header_text ?? '',
@@ -255,6 +260,7 @@ function buildPayload(
 
   return {
     tenant_id: TENANT_ID,
+    channel_id: form.channel_id || null,
     name: form.name.trim(),
     language: form.language,
     category: model.category,
@@ -353,6 +359,7 @@ interface Step2FormProps {
   onBack?: () => void;
   saving: boolean;
   isEdit: boolean;
+  metaChannels: Channel[];
 }
 
 function Step2Form({
@@ -364,6 +371,7 @@ function Step2Form({
   onBack,
   saving,
   isEdit,
+  metaChannels,
 }: Step2FormProps) {
   const components = model.components;
   const varCount = extractVarCount(form.body_text);
@@ -417,6 +425,31 @@ function Step2Form({
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Formulaire — 60% */}
         <div className="flex-[3] space-y-5 min-w-0">
+          {/* Canal Meta */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Canal Meta <span className="text-gray-400 font-normal">(requis pour soumettre)</span>
+            </label>
+            {metaChannels.length === 0 ? (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Aucun canal Meta configur&eacute;. Ajoutez un canal Meta dans &quot;Canaux&quot; avant de soumettre.
+              </p>
+            ) : (
+              <select
+                value={form.channel_id}
+                onChange={(e) => onChange({ channel_id: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+              >
+                <option value="">— Aucun canal s&eacute;lectionn&eacute; —</option>
+                {metaChannels.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label ?? c.channel_id}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           {/* Nom */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -659,6 +692,7 @@ export default function TemplatesView() {
   const [loadingList, setLoadingList] = useState(true);
   const [baseModels, setBaseModels] = useState<TemplateBaseModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [metaChannels, setMetaChannels] = useState<Channel[]>([]);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<HsmTemplate | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -671,8 +705,12 @@ export default function TemplatesView() {
   const loadTemplates = useCallback(async () => {
     setLoadingList(true);
     try {
-      const data = await getHsmTemplates(TENANT_ID);
+      const [data, channels] = await Promise.all([
+        getHsmTemplates(TENANT_ID),
+        getChannels(),
+      ]);
       setTemplates(data);
+      setMetaChannels(channels.filter((c) => c.provider === 'meta'));
     } catch {
       addToast({ type: 'error', message: 'Impossible de charger les templates.' });
     } finally {
@@ -849,6 +887,7 @@ export default function TemplatesView() {
           onBack={() => setViewState('create-step1')}
           saving={saving}
           isEdit={false}
+          metaChannels={metaChannels}
         />
       </div>
     );
@@ -875,6 +914,7 @@ export default function TemplatesView() {
           onCancel={() => { setViewState('list'); setEditingTemplate(null); }}
           saving={saving}
           isEdit={true}
+          metaChannels={metaChannels}
         />
       </div>
     );

@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsArray,
   IsEnum,
-  IsObject,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateTemplateDto {
@@ -48,4 +48,23 @@ export class CreateTemplateDto {
   @IsOptional()
   @IsArray()
   buttons?: Record<string, unknown>[] | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  base_model?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  header_text?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  header_example?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  body_example_variables?: string[] | null;
 }
