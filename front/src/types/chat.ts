@@ -419,6 +419,12 @@ export interface Conversation {
   /** Conversation rouverte après soumission de rapport — traitement urgent */
   is_priority?: boolean;
 
+  /** Provider du canal associé (meta, whapi, etc.) */
+  channel_provider?: string | null;
+
+  /** Date d'expiration de la fenêtre 24h côté Meta (ISO string) */
+  customerWindowExpiresAt?: string | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -605,7 +611,9 @@ interface RawConversationData {
 
   status?: ConversationStatus | string;
   channel_id?: string;
-  channel?: { poste_id?: string | null } | null;
+  channel?: { poste_id?: string | null; provider?: string | null } | null;
+  channel_provider?: string | null;
+  customer_window_expires_at?: string | null;
 
   // 🆕 Champs d'appel
   call_status?: CallStatus;
@@ -922,6 +930,9 @@ export const transformToConversation = (
 
     is_locked: raw.is_locked === true,
     is_priority: raw.is_priority === true,
+
+    channel_provider: raw.channel_provider ?? raw.channel?.provider ?? null,
+    customerWindowExpiresAt: raw.customer_window_expires_at ?? null,
 
     window_slot: raw.window_slot ?? null,
     window_status: (raw.window_status ?? null) as Conversation['window_status'],

@@ -61,6 +61,9 @@ export class ChatContext {
   @Column({ name: 'whatsapp_chat_id', type: 'char', length: 36, nullable: true })
   whatsappChatId?: string | null;
 
+  @Column({ name: 'customer_window_expires_at', type: 'datetime', nullable: true })
+  customerWindowExpiresAt?: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

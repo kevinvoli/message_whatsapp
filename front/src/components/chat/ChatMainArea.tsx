@@ -74,6 +74,8 @@ export default function ChatMainArea({ onOpenContact }: { onOpenContact?: () => 
 
             <ChatInput
               chat_id={selectedConversation?.chat_id}
+              channelId={selectedConversation?.source ?? null}
+              channelProvider={selectedConversation?.channel_provider ?? null}
               onSendMessage={sendMessage}
               onTypingStart={onTypingStart}
               onTypingStop={onTypingStop}

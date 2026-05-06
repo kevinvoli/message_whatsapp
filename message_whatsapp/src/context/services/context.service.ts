@@ -19,6 +19,7 @@ export interface UpdateChatContextDto {
   lastPosteMessageAt?: Date | null;
   lastActivityAt?: Date | null;
   whatsappChatId?: string | null;
+  customerWindowExpiresAt?: Date | null;
 }
 
 export interface FindChatContextsPage {

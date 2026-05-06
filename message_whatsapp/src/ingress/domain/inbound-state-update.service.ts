@@ -40,6 +40,7 @@ export class InboundStateUpdateService {
     chatContext?: ChatContext,
   ): Promise<void> {
     const clientMessageAt = savedMessage.timestamp ?? new Date();
+    const windowExpires = new Date(clientMessageAt.getTime() + 24 * 60 * 60 * 1000);
 
     if (chatContext) {
       // ── Chemin isolé (CTX-C3) — met à jour uniquement ce contexte ──────────
@@ -47,6 +48,7 @@ export class InboundStateUpdateService {
         readOnly: false,
         lastClientMessageAt: clientMessageAt,
         lastActivityAt: clientMessageAt,
+        customerWindowExpiresAt: windowExpires,
       });
       this.logger.debug(
         `CTX state update isolé: chatContext=${chatContext.id} chat_id=${conversation.chat_id}`,
@@ -56,11 +58,13 @@ export class InboundStateUpdateService {
       await this.chatService.update(conversation.chat_id, {
         read_only: false,
         last_client_message_at: clientMessageAt,
+        customerWindowExpiresAt: windowExpires,
       });
     }
 
     // Mise à jour en mémoire pour cohérence avec les étapes suivantes du pipeline
     conversation.read_only = false;
     conversation.last_client_message_at = clientMessageAt;
+    conversation.customerWindowExpiresAt = windowExpires;
   }
 }

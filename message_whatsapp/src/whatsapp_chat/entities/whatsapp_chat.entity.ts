@@ -247,6 +247,9 @@ export class WhatsappChat {
   @Column({ name: 'window_status', type: 'enum', enum: WindowStatus, nullable: true, default: null })
   window_status: WindowStatus | null;
 
+  @Column({ name: 'customer_window_expires_at', type: 'datetime', nullable: true })
+  customerWindowExpiresAt: Date | null;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

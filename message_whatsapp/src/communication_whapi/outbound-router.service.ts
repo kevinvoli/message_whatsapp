@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CommunicationWhapiService } from './communication_whapi.service';
 import { CommunicationMetaService } from './communication_meta.service';
 import { CommunicationMessengerService } from './communication_messenger.service';
@@ -7,6 +9,7 @@ import { CommunicationTelegramService } from './communication_telegram.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { OutboundSendResponse } from './dto/outbound-send-response.dto';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
 @Injectable()
 export class OutboundRouterService {
@@ -18,6 +21,8 @@ export class OutboundRouterService {
     private readonly telegramService: CommunicationTelegramService,
     private readonly channelService: ChannelService,
     private readonly logger: AppLogger,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepo: Repository<WhatsappChat>,
   ) {}
 
   async sendTextMessage(data: {
@@ -42,6 +47,14 @@ export class OutboundRouterService {
         throw new NotFoundException(
           `Channel ${data.channelId} missing external_id (phone_number_id) for Meta`,
         );
+      }
+
+      const chat = await this.chatRepo.findOne({
+        where: { chat_id: data.to, channel_id: channel.channel_id },
+        select: ['customerWindowExpiresAt'],
+      });
+      if (chat && chat.customerWindowExpiresAt && chat.customerWindowExpiresAt < new Date()) {
+        throw new BadRequestException('META_WINDOW_EXPIRED');
       }
 
       this.logger.log(

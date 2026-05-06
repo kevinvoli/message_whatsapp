@@ -8,6 +8,7 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { CannedResponseMenu } from './CannedResponseMenu';
 import { useAuth } from '@/contexts/AuthProvider';
+import TemplateSelectorModal from './TemplateSelectorModal';
 
 const LocationPickerModal = dynamic(() => import('./LocationPickerModal'), { ssr: false });
 
@@ -18,6 +19,8 @@ interface ChatInputProps {
   onTypingStart: (chat_id: string) => void;
   onTypingStop: (chat_id: string) => void;
   chat_id?: string | null;
+  channelId?: string | null;
+  channelProvider?: string | null;
   isConnected: boolean;
   disabled?: boolean;
   windowExpired?: boolean;
@@ -98,6 +101,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onTypingStart,
   onTypingStop,
   chat_id,
+  channelId,
+  channelProvider,
   isConnected,
   disabled = false,
   windowExpired = false,
@@ -130,6 +135,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const replyToMessage = useChatStore((s) => s.replyToMessage);
   const clearReplyTo = useChatStore((s) => s.clearReplyTo);
   const { user } = useAuth();
+
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   const cannedPrefix = message.startsWith('/') ? message.slice(1) : null;
 
@@ -405,18 +412,51 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   // Fenêtre de messagerie expirée → afficher uniquement la bannière, pas l'input
   if (windowExpired) {
+    const isMeta = channelProvider === 'meta';
     return (
-      <div className="bg-orange-50 border-t border-orange-200 p-4">
-        <div className="max-w-4xl mx-auto flex items-center gap-3 text-orange-700">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Fenêtre de messagerie expirée</p>
-            <p className="text-xs text-orange-600">
-              Le client n&apos;a pas écrit depuis plus de 23h. En attente d&apos;un message de sa part pour reprendre la conversation.
-            </p>
+      <>
+        {showTemplateModal && chat_id && channelId && (
+          <TemplateSelectorModal
+            chatId={chat_id}
+            channelId={channelId}
+            onClose={() => setShowTemplateModal(false)}
+            onSent={() => setShowTemplateModal(false)}
+          />
+        )}
+        <div className="bg-orange-50 border-t border-orange-200 p-4">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-orange-600" />
+            <div className="flex-1">
+              {isMeta ? (
+                <>
+                  <p className="text-sm font-semibold text-orange-700">
+                    Fenetre de 24h expiree — utilisez un template pour reprendre contact
+                  </p>
+                  <p className="text-xs text-orange-600">
+                    La fenetre de messagerie Meta est fermee. Seul un template approuve peut initier la reprise.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-orange-700">Fenetre de messagerie expiree</p>
+                  <p className="text-xs text-orange-600">
+                    Le client n&apos;a pas ecrit depuis plus de 23h. En attente d&apos;un message de sa part pour reprendre la conversation.
+                  </p>
+                </>
+              )}
+            </div>
+            {isMeta && chat_id && channelId && (
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(true)}
+                className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+              >
+                Envoyer un template
+              </button>
+            )}
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
