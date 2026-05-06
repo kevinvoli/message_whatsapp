@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, LogIn } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, LogIn, Settings } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -72,6 +72,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'crm', name: 'Champs CRM', icon: Database, badge: null },
       { id: 'follow-ups', name: 'Relances', icon: PhoneCall, badge: null },
+      { id: 'relance-config', name: 'Config relances auto', icon: Settings, badge: null },
       { id: 'targets', name: 'Objectifs', icon: Target, badge: null },
     ],
   },

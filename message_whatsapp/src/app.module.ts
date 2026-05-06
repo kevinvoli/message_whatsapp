@@ -84,6 +84,7 @@ import { ActionQueueModule } from './action-queue/action-queue.module';
 import { WorkScheduleModule } from './work-schedule/work-schedule.module';
 import { WorkAttendanceModule } from './work-attendance/work-attendance.module';
 import { ComplaintsModule } from './complaints/complaints.module';
+import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
 
 @Module({
   imports: [
@@ -255,6 +256,8 @@ import { ComplaintsModule } from './complaints/complaints.module';
     WorkAttendanceModule,
     // E09 — Plaintes clients
     ComplaintsModule,
+    // Sprint 3 — Paramètres plateforme (relances automatiques)
+    PlatformSettingsModule,
   ],
   controllers: [AppController],
   providers: [

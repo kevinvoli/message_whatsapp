@@ -51,9 +51,13 @@ function makeContactRepo() {
   return { find: jest.fn().mockResolvedValue([]) } as any;
 }
 
+function makeMappingRepo() {
+  return { find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), save: jest.fn(), remove: jest.fn(), create: jest.fn() } as any;
+}
+
 function build(existing: FollowUp | null = null): { service: FollowUpService; repo: ReturnType<typeof makeRepo> } {
   const repo = makeRepo(existing);
-  const service = new FollowUpService(repo, makeContactRepo(), makeEventEmitter());
+  const service = new FollowUpService(repo, makeContactRepo(), makeMappingRepo(), makeEventEmitter());
   return { service, repo };
 }
 

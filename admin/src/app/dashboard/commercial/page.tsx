@@ -48,6 +48,7 @@ import OutboxSyncView from '@/app/ui/OutboxSyncView';
 import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
 import ComplaintsView from '@/app/modules/dispatch/components/ComplaintsView';
 import LoginLogsView from '@/app/ui/LoginLogsView';
+import RelanceConfigView from '@/app/ui/RelanceConfigView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
 import RolesView from '@/app/modules/rbac/components/RolesView';
@@ -222,6 +223,8 @@ export default function AdminDashboard() {
                 return <ComplaintsView />;
             case 'login-logs':
                 return <LoginLogsView />;
+            case 'relance-config':
+                return <RelanceConfigView />;
             default:
                 return null;
         }

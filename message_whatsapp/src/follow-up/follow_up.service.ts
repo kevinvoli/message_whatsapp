@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { In, LessThan, Repository } from 'typeorm';
 import { FollowUp, FollowUpStatus, FollowUpType } from './entities/follow_up.entity';
+import { FollowUpTemplateMapping } from './entities/follow-up-template-mapping.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { CompleteFollowUpDto } from './dto/complete-follow-up.dto';
@@ -36,6 +37,8 @@ export class FollowUpService {
     private readonly repo: Repository<FollowUp>,
     @InjectRepository(Contact)
     private readonly contactRepo: Repository<Contact>,
+    @InjectRepository(FollowUpTemplateMapping)
+    private readonly mappingRepo: Repository<FollowUpTemplateMapping>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -247,6 +250,41 @@ export class FollowUpService {
     return this.repo.count({
       where: { commercial_id, status: FollowUpStatus.EN_RETARD },
     });
+  }
+
+  async getMappings(): Promise<FollowUpTemplateMapping[]> {
+    return this.mappingRepo.find({ order: { followUpType: 'ASC' } });
+  }
+
+  async upsertMapping(
+    followUpType: FollowUpType,
+    templateId: string,
+    templateName: string,
+    languageCode = 'fr',
+  ): Promise<FollowUpTemplateMapping> {
+    const existing = await this.mappingRepo.findOne({ where: { followUpType } });
+
+    if (existing) {
+      existing.templateId   = templateId;
+      existing.templateName = templateName;
+      existing.languageCode = languageCode;
+      return this.mappingRepo.save(existing);
+    }
+
+    const entity = this.mappingRepo.create({
+      followUpType,
+      templateId,
+      templateName,
+      languageCode,
+      active: 1,
+    });
+    return this.mappingRepo.save(entity);
+  }
+
+  async deleteMapping(followUpType: FollowUpType): Promise<void> {
+    const existing = await this.mappingRepo.findOne({ where: { followUpType } });
+    if (!existing) throw new NotFoundException(`Mapping pour ${followUpType} introuvable`);
+    await this.mappingRepo.remove(existing);
   }
 
   /**

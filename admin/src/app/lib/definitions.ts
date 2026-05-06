@@ -75,7 +75,9 @@ export type ViewMode =
   // E08 — Plaintes clients
   | 'complaints'
   // E10-T04 — Journal des connexions
-  | 'login-logs';
+  | 'login-logs'
+  // Sprint 3 — Config relances auto
+  | 'relance-config';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -1180,5 +1182,16 @@ export interface OutboundConversationResult {
   chatId: string;
   messageId: string;
   contactId: string;
+}
+
+// ============================================
+// SPRINT 3 — Config relances auto
+// ============================================
+
+export interface FollowUpTemplateMappingDto {
+  follow_up_type: string;
+  template_id: string;
+  template_name: string;
+  language_code: string;
 }
 

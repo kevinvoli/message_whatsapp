@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   UseGuards,
@@ -14,7 +16,8 @@ import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { CompleteFollowUpDto } from './dto/complete-follow-up.dto';
 import { CancelFollowUpDto } from './dto/cancel-follow-up.dto';
 import { RescheduleFollowUpDto } from './dto/reschedule-follow-up.dto';
-import { FollowUpStatus } from './entities/follow_up.entity';
+import { UpsertFollowUpTemplateMappingDto } from './dto/upsert-follow-up-template-mapping.dto';
+import { FollowUpStatus, FollowUpType } from './entities/follow_up.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminGuard } from 'src/auth/admin.guard';
 
@@ -130,5 +133,33 @@ export class FollowUpController {
   @UseGuards(AdminGuard)
   dueTodayAdmin() {
     return this.service.findDueToday();
+  }
+
+  // ── Admin — Mappings templates ───────────────────────────────────────────────
+
+  @Get('admin/follow-up-mappings')
+  @UseGuards(AdminGuard)
+  getMappings() {
+    return this.service.getMappings();
+  }
+
+  @Put('admin/follow-up-mappings/:follow_up_type')
+  @UseGuards(AdminGuard)
+  upsertMapping(
+    @Param('follow_up_type') followUpType: FollowUpType,
+    @Body() dto: UpsertFollowUpTemplateMappingDto,
+  ) {
+    return this.service.upsertMapping(
+      followUpType,
+      dto.template_id,
+      dto.template_name,
+      dto.language_code,
+    );
+  }
+
+  @Delete('admin/follow-up-mappings/:follow_up_type')
+  @UseGuards(AdminGuard)
+  deleteMapping(@Param('follow_up_type') followUpType: FollowUpType) {
+    return this.service.deleteMapping(followUpType);
   }
 }

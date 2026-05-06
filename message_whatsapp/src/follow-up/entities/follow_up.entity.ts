@@ -75,6 +75,12 @@ export class FollowUp {
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes?: string | null;
 
+  @Column({ name: 'last_template_sent_at', type: 'datetime', nullable: true, default: null })
+  lastTemplateSentAt?: Date | null;
+
+  @Column({ name: 'template_provider_message_id', type: 'varchar', length: 100, nullable: true, default: null })
+  templateProviderMessageId?: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
