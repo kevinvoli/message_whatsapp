@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { ConversationValidation } from '../entities/conversation-validation.entity';
 import { ValidationCriterionConfig } from '../entities/validation-criterion-config.entity';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -39,6 +40,7 @@ export class ValidationEngineService {
     private readonly chatRepo: Repository<WhatsappChat>,
     private readonly systemConfig: SystemConfigService,
     private readonly reportService: ConversationReportService,
+    @Optional() private readonly lockService: DistributedLockService,
   ) {}
 
   async getActiveCriteria(): Promise<ValidationCriterionConfig[]> {
@@ -237,6 +239,18 @@ export class ValidationEngineService {
    */
   @Cron(CronExpression.EVERY_HOUR)
   async handleExternalCriterionTimeout(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock(
+        'cron:validation-external-timeout', 120_000,
+        () => this._handleExternalCriterionTimeout(),
+      );
+      if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:validation-external-timeout'); }
+      return;
+    }
+    await this._handleExternalCriterionTimeout();
+  }
+
+  private async _handleExternalCriterionTimeout(): Promise<void> {
     const raw = await this.systemConfig.get('WINDOW_EXTERNAL_TIMEOUT_HOURS');
     const hours = raw ? parseInt(raw, 10) : 0;
     if (hours <= 0) return;

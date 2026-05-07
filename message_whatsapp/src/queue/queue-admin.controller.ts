@@ -7,6 +7,7 @@ import {
   NotFoundException,
   BadRequestException,
   UseGuards,
+  Optional,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -19,6 +20,7 @@ import {
   OUTBOUND_WEBHOOK_QUEUE,
 } from './queue.constants';
 import { DeadLetterPayload } from './dead-letter.service';
+import { AgentPresenceService } from 'src/redis/agent-presence.service';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -29,6 +31,7 @@ export class QueueAdminController {
     @InjectQueue(BROADCAST_QUEUE) private readonly broadcastQueue: Queue,
     @InjectQueue(SENTIMENT_QUEUE) private readonly sentimentQueue: Queue,
     @InjectQueue(OUTBOUND_WEBHOOK_QUEUE) private readonly outboundQueue: Queue,
+    @Optional() private readonly presenceService: AgentPresenceService,
   ) {}
 
   @Get('queue-stats')
@@ -113,5 +116,18 @@ export class QueueAdminController {
     await job.remove();
 
     return { replayed: true, originalQueue: data.originalQueue, jobName: data.jobName };
+  }
+
+  @Get('agents/online')
+  async getOnlineAgents() {
+    if (!this.presenceService) {
+      return { source: 'unavailable', agents: [] };
+    }
+    const agents = await this.presenceService.getPresentAgents();
+    return {
+      source: process.env['REDIS_PRESENCE_ENABLED'] === 'true' ? 'redis' : 'memory',
+      count: agents.length,
+      agents,
+    };
   }
 }

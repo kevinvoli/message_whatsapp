@@ -6,6 +6,7 @@ import { OrderCallSyncJob } from './order-call-sync.job';
 import { OrderSyncAdminController } from './order-sync-admin.controller';
 import { IntegrationSyncModule } from 'src/integration-sync/integration-sync.module';
 import { CallObligationModule } from 'src/call-obligations/call-obligation.module';
+import { RedisModule } from 'src/redis/redis.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
 
@@ -14,6 +15,7 @@ import { CommercialIdentityMapping } from 'src/integration/entities/commercial-i
     TypeOrmModule.forFeature([OrderCallSyncCursor, WhatsappCommercial, CommercialIdentityMapping]),
     IntegrationSyncModule,
     CallObligationModule,
+    RedisModule,
   ],
   controllers: [OrderSyncAdminController],
   providers: [OrderCallSyncService, OrderCallSyncJob],

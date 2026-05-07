@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { Cron } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -38,6 +39,7 @@ export class FlowPollingJob {
     private readonly convService: BotConversationService,
     private readonly eventEmitter: EventEmitter2,
     @InjectDataSource() private readonly dataSource: DataSource,
+    @Optional() private readonly lockService: DistributedLockService,
   ) {}
 
   /**
@@ -46,6 +48,15 @@ export class FlowPollingJob {
    */
   @Cron('*/30 * * * * *')
   async resumeExpiredWaitingSessions(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock('cron:flowbot-waiting-delay', 45_000, () => this._resumeExpiredWaitingSessions());
+      if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:flowbot-waiting-delay'); }
+      return;
+    }
+    await this._resumeExpiredWaitingSessions();
+  }
+
+  private async _resumeExpiredWaitingSessions(): Promise<void> {
     const sessions = await this.sessionService.findExpiredWaitingDelay(WAIT_DELAY_THRESHOLD_SECONDS);
     if (!sessions.length) return;
 
@@ -71,6 +82,15 @@ export class FlowPollingJob {
    */
   @Cron('0 * * * * *')
   async checkNoResponseSessions(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock('cron:flowbot-no-response', 90_000, () => this._checkNoResponseSessions());
+      if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:flowbot-no-response'); }
+      return;
+    }
+    await this._checkNoResponseSessions();
+  }
+
+  private async _checkNoResponseSessions(): Promise<void> {
     const sessions = await this.sessionService.findExpiredWaitingReply(NO_RESPONSE_THRESHOLD_SECONDS);
     if (!sessions.length) return;
 
@@ -112,6 +132,15 @@ export class FlowPollingJob {
    */
   @Cron('0 */5 * * * *')
   async pollQueueWait(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock('cron:flowbot-queue-wait', 450_000, () => this._pollQueueWait());
+      if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:flowbot-queue-wait'); }
+      return;
+    }
+    await this._pollQueueWait();
+  }
+
+  private async _pollQueueWait(): Promise<void> {
     const match = await this.triggerService.findActiveFlowForTriggerType(FlowTriggerType.QUEUE_WAIT);
     if (!match) return;
 
@@ -155,6 +184,15 @@ export class FlowPollingJob {
    */
   @Cron('30 */5 * * * *')
   async pollInactivity(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock('cron:flowbot-inactivity', 450_000, () => this._pollInactivity());
+      if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:flowbot-inactivity'); }
+      return;
+    }
+    await this._pollInactivity();
+  }
+
+  private async _pollInactivity(): Promise<void> {
     const match = await this.triggerService.findActiveFlowForTriggerType(FlowTriggerType.INACTIVITY);
     if (!match) return;
 

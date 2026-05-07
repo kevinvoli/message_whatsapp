@@ -17,6 +17,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 
 const DEFAULT_QUOTA_ACTIVE = 10;
 
@@ -45,7 +46,20 @@ export class QueueService implements OnModuleInit {
 
     @Optional()
     private readonly systemConfig: SystemConfigService,
+
+    @Optional()
+    private readonly lockService: DistributedLockService,
   ) {}
+
+  private async withDistributedLock<T>(resource: string, ttl: number, fn: () => Promise<T>): Promise<T> {
+    if (!this.lockService) return fn();
+    const t0 = Date.now();
+    return this.lockService.withLock(resource, ttl, async () => {
+      const dt = Date.now() - t0;
+      if (dt > 100) this.logger.warn(`LOCK_SLOW ${resource}: ${dt}ms`);
+      return fn();
+    });
+  }
 
   async onModuleInit(): Promise<void> {
     await this.resetQueueState();
@@ -127,8 +141,8 @@ export class QueueService implements OnModuleInit {
    * If the user is already in the queue, they are not added again.
    */
   async addPosteToQueue(posteId: string): Promise<QueuePosition | null> {
-    return this.queueLock.runExclusive(async () =>
-      this.addPosteToQueueInternal(posteId),
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(() => this.addPosteToQueueInternal(posteId)),
     );
   }
 
@@ -177,8 +191,8 @@ export class QueueService implements OnModuleInit {
   }
 
   async removeFromQueue(posteId: string): Promise<void> {
-    return this.queueLock.runExclusive(async () =>
-      this.removeFromQueueInternal(posteId),
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(() => this.removeFromQueueInternal(posteId)),
     );
   }
 
@@ -188,7 +202,8 @@ export class QueueService implements OnModuleInit {
    * Falls back to first in queue (round-robin) if chat counts are equal.
    */
   async getNextInQueue(): Promise<WhatsappPoste | null> {
-    return await this.queueLock.runExclusive(async () => {
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(async () => {
       const allPositions = await this.queueRepository.find({
         order: { position: 'ASC' },
         relations: ['poste'],
@@ -313,7 +328,8 @@ export class QueueService implements OnModuleInit {
         `Fallback BDD → poste ${bestFallback.name} (${bestFallback.id}) avec ${bestFallbackCount} chats actifs`,
       );
       return bestFallback;
-    });
+      }),
+    );
   }
 
   async getQueuePositions(): Promise<QueuePosition[]> {
@@ -359,9 +375,9 @@ export class QueueService implements OnModuleInit {
   }
 
   async moveToEnd(poste_id: string): Promise<void> {
-    await this.queueLock.runExclusive(async () => {
-      await this.moveToEndInternal(poste_id);
-    });
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(() => this.moveToEndInternal(poste_id)),
+    );
   }
 
   /**
@@ -371,7 +387,8 @@ export class QueueService implements OnModuleInit {
    * l'ajouter serait inutile et tromperait le dispatcher.
    */
   async fillQueueWithAllPostes(): Promise<void> {
-    await this.queueLock.runExclusive(async () => {
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(async () => {
       // Récupérer les IDs de postes dédiés (canaux exclusifs) à exclure de la queue pool
       const dedicatedRows = await this.channelRepository
         .createQueryBuilder('c')
@@ -398,7 +415,8 @@ export class QueueService implements OnModuleInit {
         count: postesWithCommercial.length,
         reason: 'no_active_agents',
       });
-    });
+      }),
+    );
   }
 
   /**
@@ -442,7 +460,8 @@ export class QueueService implements OnModuleInit {
   }
 
   async syncQueueWithActivePostes(): Promise<void> {
-    await this.queueLock.runExclusive(async () => {
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(async () => {
       // Exclure les postes dédiés de la queue pool
       const dedicatedRows = await this.channelRepository
         .createQueryBuilder('c')
@@ -479,7 +498,8 @@ export class QueueService implements OnModuleInit {
         active_count: activePostes.length,
         queue_count: queue.length,
       });
-    });
+      }),
+    );
   }
 
   /**
@@ -516,41 +536,47 @@ export class QueueService implements OnModuleInit {
   }
 
   async blockPoste(posteId: string): Promise<void> {
-    await this.queueLock.runExclusive(async () => {
-      await this.posteRepository.update(posteId, { is_queue_enabled: false });
-      await this.removeFromQueueInternal(posteId);
-      this.logQueueEvent('block', { poste_id: posteId });
-    });
+    return this.withDistributedLock(`dispatcher:poste:${posteId}`, 10_000, () =>
+      this.queueLock.runExclusive(async () => {
+        await this.posteRepository.update(posteId, { is_queue_enabled: false });
+        await this.removeFromQueueInternal(posteId);
+        this.logQueueEvent('block', { poste_id: posteId });
+      }),
+    );
   }
 
   async unblockPoste(posteId: string): Promise<void> {
-    await this.queueLock.runExclusive(async () => {
-      await this.posteRepository.update(posteId, { is_queue_enabled: true });
-      const poste = await this.posteRepository.findOne({
-        where: { id: posteId },
-      });
-      if (poste?.is_active) {
-        await this.addPosteToQueueInternal(posteId);
-      }
-      this.logQueueEvent('unblock', { poste_id: posteId });
-    });
+    return this.withDistributedLock(`dispatcher:poste:${posteId}`, 10_000, () =>
+      this.queueLock.runExclusive(async () => {
+        await this.posteRepository.update(posteId, { is_queue_enabled: true });
+        const poste = await this.posteRepository.findOne({
+          where: { id: posteId },
+        });
+        if (poste?.is_active) {
+          await this.addPosteToQueueInternal(posteId);
+        }
+        this.logQueueEvent('unblock', { poste_id: posteId });
+      }),
+    );
   }
 
   async resetQueueState(): Promise<void> {
-    await this.queueLock.runExclusive(async () => {
-      await this.queueRepository.clear();
-      await this.posteRepository
-        .createQueryBuilder()
-        .update(WhatsappPoste)
-        .set({ is_active: false })
-        .execute();
-      await this.commercialRepository
-        .createQueryBuilder()
-        .update(WhatsappCommercial)
-        .set({ isConnected: false })
-        .execute();
+    return this.withDistributedLock('dispatcher:queue', 10_000, () =>
+      this.queueLock.runExclusive(async () => {
+        await this.queueRepository.clear();
+        await this.posteRepository
+          .createQueryBuilder()
+          .update(WhatsappPoste)
+          .set({ is_active: false })
+          .execute();
+        await this.commercialRepository
+          .createQueryBuilder()
+          .update(WhatsappCommercial)
+          .set({ isConnected: false })
+          .execute();
 
-      this.logger.warn('QUEUE_BOOTSTRAP reset completed');
-    });
+        this.logger.warn('QUEUE_BOOTSTRAP reset completed');
+      }),
+    );
   }
 }

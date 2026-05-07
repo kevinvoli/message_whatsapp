@@ -37,6 +37,7 @@ import { FlowSessionCleanerJob } from './jobs/flow-session-cleaner.job';
 import { FlowBotController } from './flowbot.controller';
 import { ContextModule } from 'src/context/context.module';
 import { AiAssistantModule } from 'src/ai-assistant/ai-assistant.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 const ENTITIES = [
   BotConversation,
@@ -71,6 +72,7 @@ const SERVICES = [
     TypeOrmModule.forFeature(ENTITIES),
     ContextModule,
     AiAssistantModule,
+    RedisModule,
     // ✅ EventEmitterModule est global — pas besoin de l'importer ici
     // ❌ INTERDIT : WhatsappChatModule, WhatsappMessageModule, DispatcherModule
   ],

@@ -61,6 +61,7 @@ describe('QueueService', () => {
       { createQueryBuilder: () => ({ select: () => ({ where: () => ({ getRawMany: () => Promise.resolve([]) }) }) }) } as any, // channelRepository
       dataSource as any,
       null as any, // systemConfig (optional)
+      null as any, // lockService (optional)
     );
   });
 

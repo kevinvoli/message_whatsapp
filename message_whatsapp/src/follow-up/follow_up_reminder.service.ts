@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
 import { IsNull, LessThanOrEqual, In, LessThan } from 'typeorm';
@@ -37,10 +38,23 @@ export class FollowUpReminderService {
     private readonly eventEmitter: EventEmitter2,
     private readonly platformSettings: PlatformSettingsService,
     private readonly outboundRouter: OutboundRouterService,
+    @Optional() private readonly lockService: DistributedLockService,
   ) {}
 
   @Cron('*/5 * * * *')
   async sendReminders(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock(
+        'cron:follow-up-reminders', 450_000,
+        () => this._sendReminders(),
+      );
+      if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:follow-up-reminders'); }
+      return;
+    }
+    await this._sendReminders();
+  }
+
+  private async _sendReminders(): Promise<void> {
     const now = new Date();
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 

@@ -21,6 +21,7 @@ import { MetaTokenService } from 'src/channel/meta-token.service';
 import { ChannelProviderRegistry } from 'src/channel/domain/channel-provider.registry';
 import { ResolveTenantUseCase } from 'src/channel/application/resolve-tenant.use-case';
 import { LoggingModule } from 'src/logging/logging.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     ]),
     PlatformSettingsModule,
     LoggingModule,
+    RedisModule,
   ],
   controllers: [FollowUpController],
   providers: [

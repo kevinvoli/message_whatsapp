@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { AgentPresenceService } from 'src/redis/agent-presence.service';
 import { Socket } from 'socket.io';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
@@ -53,6 +54,7 @@ export class AgentConnectionService {
     private readonly windowRotation: WindowRotationService,
     private readonly validationEngine: ValidationEngineService,
     private readonly realtimeServerService: RealtimeServerService,
+    @Optional() private readonly agentPresenceService: AgentPresenceService,
   ) {}
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
@@ -92,6 +94,7 @@ export class AgentConnectionService {
     }
 
     this.connectedAgents.set(client.id, { commercialId, posteId, tenantId, tenantIds });
+    await this.agentPresenceService?.setPresent(commercialId, posteId, tenantId ?? '');
 
     for (const tid of tenantIds) {
       await client.join(`tenant:${tid}`);
@@ -134,6 +137,7 @@ export class AgentConnectionService {
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
+    await this.agentPresenceService?.setAbsent(agent.commercialId);
     this.connectedAgents.delete(client.id);
     await this.commercialService.updateStatus(agent.commercialId, false);
 

@@ -2,6 +2,7 @@ import { Module, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { DistributedLockService } from './distributed-lock.service';
+import { AgentPresenceService } from './agent-presence.service';
 
 /**
  * CTX-F1 — RedisModule
@@ -42,7 +43,8 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
       },
     },
     DistributedLockService,
+    AgentPresenceService,
   ],
-  exports: [REDIS_CLIENT, DistributedLockService],
+  exports: [REDIS_CLIENT, DistributedLockService, AgentPresenceService],
 })
 export class RedisModule {}

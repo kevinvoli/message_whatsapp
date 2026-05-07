@@ -54,6 +54,7 @@ import { ContactAssignmentAffinity } from './entities/contact-assignment-affinit
 import { AssignmentAffinityService } from './domain/assignment-affinity.service';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { ConversationReportModule } from 'src/gicop-report/conversation-report.m
     SystemConfigModule,
     ConversationReportModule,
     WhatsappTemplateModule,
+    RedisModule,
   ],
   controllers: [DispatcherController],
   providers: [

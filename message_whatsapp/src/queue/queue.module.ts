@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullMQShutdownService } from './bullmq-shutdown.service';
 import { DeadLetterService } from './dead-letter.service';
 import { QueueAdminController } from './queue-admin.controller';
+import { RedisModule } from 'src/redis/redis.module';
 import {
   WEBHOOK_PROCESSING_QUEUE,
   BROADCAST_QUEUE,
@@ -48,6 +49,7 @@ export {
     BullModule.registerQueue({ name: BROADCAST_QUEUE }),
     BullModule.registerQueue({ name: SENTIMENT_QUEUE }),
     BullModule.registerQueue({ name: OUTBOUND_WEBHOOK_QUEUE }),
+    RedisModule,
   ],
   controllers: [QueueAdminController],
   providers: [BullMQShutdownService, DeadLetterService],
