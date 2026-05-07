@@ -35,6 +35,9 @@ export class WhapiChannel {
   @Column({ name: 'external_id', type: 'varchar', length: 191, nullable: true })
   external_id?: string | null;
 
+  @Column({ name: 'waba_id', type: 'varchar', length: 64, nullable: true })
+  waba_id?: string | null;
+
   @Column({
     name: 'channel_id',
     type: 'varchar',

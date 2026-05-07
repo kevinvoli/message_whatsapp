@@ -295,6 +295,7 @@ export type Channel = {
   label?: string | null;
   provider?: ProviderType | null;
   external_id?: string | null;
+  waba_id?: string | null;
   channel_id: string;
   token: string;
   meta_app_id?: string | null;

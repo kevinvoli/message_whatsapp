@@ -182,7 +182,14 @@ export class WhatsappTemplateService {
       throw new BadRequestException('Canal Meta requis pour soumettre un template');
     }
 
-    const wabaId = channel.external_id;
+    const wabaId = channel.waba_id ?? channel.external_id;
+
+    if (!wabaId) {
+      throw new BadRequestException(
+        'Canal Meta sans WABA ID (waba_id) — configurez-le dans les paramètres du canal',
+      );
+    }
+
     const token = channel.token;
 
     const components: Record<string, unknown>[] = [];

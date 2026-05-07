@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  CheckCircle,
   ChevronLeft,
   Eye,
   Loader2,
@@ -29,7 +30,7 @@ import {
   submitHsmTemplate,
   updateHsmTemplate,
 } from '@/app/lib/api/hsm-templates.api';
-import { getChannels } from '@/app/lib/api/channels.api';
+import { getChannels, updateChannel } from '@/app/lib/api/channels.api';
 import { formatDate } from '@/app/lib/dateUtils';
 import { useToast } from '@/app/ui/ToastProvider';
 import TemplatePreview from './TemplatePreview';
@@ -348,6 +349,68 @@ function Step1ModelSelect({ models, selectedKey, onSelect, onNext, loading }: St
   );
 }
 
+// ─── Mise à jour inline du WABA ID ───────────────────────────────────────────
+
+interface WabaIdInlineUpdaterProps {
+  channel: Channel;
+  onUpdated: (updated: Channel) => void;
+}
+
+function WabaIdInlineUpdater({ channel, onUpdated }: WabaIdInlineUpdaterProps) {
+  const [wabaInput, setWabaInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    const trimmed = wabaInput.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const updated = await updateChannel(channel.id, { waba_id: trimmed } as Partial<Channel>);
+      onUpdated(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+        Ce canal n&apos;a pas de WABA ID — la soumission à Meta échouera sans lui.
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={wabaInput}
+          onChange={(e) => { setWabaInput(e.target.value); setSaved(false); }}
+          placeholder="Ex: 987654321098765"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || !wabaInput.trim()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-60 transition-colors whitespace-nowrap"
+        >
+          {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Mettre à jour
+        </button>
+        {saved && !saving && (
+          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" aria-label="Sauvegardé" />
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Etape 2 — Remplir le contenu ─────────────────────────────────────────────
 
 interface Step2FormProps {
@@ -360,6 +423,7 @@ interface Step2FormProps {
   saving: boolean;
   isEdit: boolean;
   metaChannels: Channel[];
+  onChannelUpdated: (updated: Channel) => void;
 }
 
 function Step2Form({
@@ -372,8 +436,10 @@ function Step2Form({
   saving,
   isEdit,
   metaChannels,
+  onChannelUpdated,
 }: Step2FormProps) {
   const components = model.components;
+  const selectedChannel = metaChannels.find((c) => c.id === form.channel_id) ?? null;
   const varCount = extractVarCount(form.body_text);
 
   const previewHeaderType = (): TemplateHeaderType | null => {
@@ -435,18 +501,31 @@ function Step2Form({
                 Aucun canal Meta configur&eacute;. Ajoutez un canal Meta dans &quot;Canaux&quot; avant de soumettre.
               </p>
             ) : (
-              <select
-                value={form.channel_id}
-                onChange={(e) => onChange({ channel_id: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-              >
-                <option value="">— Aucun canal s&eacute;lectionn&eacute; —</option>
-                {metaChannels.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label ?? c.channel_id}
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={form.channel_id}
+                  onChange={(e) => onChange({ channel_id: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="">— Aucun canal s&eacute;lectionn&eacute; —</option>
+                  {metaChannels.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label ?? c.channel_id}{c.waba_id ? '' : ' ⚠ sans WABA ID'}
+                    </option>
+                  ))}
+                </select>
+                {selectedChannel && !selectedChannel.waba_id && (
+                  <WabaIdInlineUpdater
+                    channel={selectedChannel}
+                    onUpdated={onChannelUpdated}
+                  />
+                )}
+                {selectedChannel?.waba_id && (
+                  <p className="mt-1 text-xs text-green-700">
+                    WABA ID&nbsp;: <span className="font-mono">{selectedChannel.waba_id}</span>
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -888,6 +967,9 @@ export default function TemplatesView() {
           saving={saving}
           isEdit={false}
           metaChannels={metaChannels}
+          onChannelUpdated={(updated) =>
+            setMetaChannels((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+          }
         />
       </div>
     );
@@ -915,6 +997,9 @@ export default function TemplatesView() {
           saving={saving}
           isEdit={true}
           metaChannels={metaChannels}
+          onChannelUpdated={(updated) =>
+            setMetaChannels((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+          }
         />
       </div>
     );

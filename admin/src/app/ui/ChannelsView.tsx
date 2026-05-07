@@ -21,6 +21,7 @@ type ChannelCreateInput = {
   provider?: ProviderType;
   channel_id?: string;
   external_id?: string;
+  waba_id?: string;
   is_business?: boolean;
   meta_app_id?: string;
   meta_app_secret?: string;
@@ -80,6 +81,7 @@ interface DynamicFieldsProps {
   provider: ProviderType;
   channelId: string;
   externalId: string;
+  wabaId: string;
   isBusiness: boolean;
   metaAppId: string;
   metaAppSecret: string;
@@ -87,6 +89,7 @@ interface DynamicFieldsProps {
   idPrefix: string;
   onChannelId: (v: string) => void;
   onExternalId: (v: string) => void;
+  onWabaId: (v: string) => void;
   onIsBusiness: (v: boolean) => void;
   onMetaAppId: (v: string) => void;
   onMetaAppSecret: (v: string) => void;
@@ -160,8 +163,8 @@ function VerifyTokenField({
 }
 
 function DynamicFields({
-  provider, channelId, externalId, isBusiness, metaAppId, metaAppSecret, verifyToken, idPrefix,
-  onChannelId, onExternalId, onIsBusiness, onMetaAppId, onMetaAppSecret, onVerifyToken,
+  provider, channelId, externalId, wabaId, isBusiness, metaAppId, metaAppSecret, verifyToken, idPrefix,
+  onChannelId, onExternalId, onWabaId, onIsBusiness, onMetaAppId, onMetaAppSecret, onVerifyToken,
 }: DynamicFieldsProps) {
   const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
   const labelClass = 'mb-2 block text-sm font-bold text-gray-700';
@@ -181,6 +184,21 @@ function DynamicFields({
             placeholder="Ex: 123456789012345"
             value={channelId}
             onChange={(e) => onChannelId(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor={`${idPrefix}-waba-id`} className={labelClass}>
+            WABA ID <span className="text-red-500">*</span>
+            <span className="ml-1 font-normal text-gray-400 text-xs">(whatsapp_business_account_id — requis pour les templates)</span>
+          </label>
+          <input
+            type="text"
+            id={`${idPrefix}-waba-id`}
+            className={inputClass}
+            placeholder="Ex: 987654321098765"
+            value={wabaId}
+            onChange={(e) => onWabaId(e.target.value)}
             required
           />
         </div>
@@ -348,6 +366,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [formLabel, setFormLabel] = useState('');
   const [formChannelId, setFormChannelId] = useState('');
   const [formExternalId, setFormExternalId] = useState('');
+  const [formWabaId, setFormWabaId] = useState('');
   const [formToken, setFormToken] = useState('');
   const [formIsBusiness, setFormIsBusiness] = useState(false);
   const [formMetaAppId, setFormMetaAppId] = useState('');
@@ -373,6 +392,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         ...metaCredentials,
         channel_id: formChannelId.trim(),
         external_id: formExternalId.trim() || formChannelId.trim(),
+        waba_id: formWabaId.trim() || undefined,
         is_business: true,
       };
     }
@@ -392,6 +412,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormLabel('');
     setFormChannelId('');
     setFormExternalId('');
+    setFormWabaId('');
     setFormToken('');
     setFormIsBusiness(false);
     setFormMetaAppId('');
@@ -413,6 +434,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormLabel(channel.label ?? '');
     setFormChannelId(channel.channel_id ?? '');
     setFormExternalId(channel.external_id ?? '');
+    setFormWabaId(channel.waba_id ?? '');
     setFormToken(channel.token);
     setFormIsBusiness(channel.is_business);
     setFormMetaAppId(channel.meta_app_id ?? '');
@@ -545,6 +567,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         provider={formProvider}
         channelId={formChannelId}
         externalId={formExternalId}
+        wabaId={formWabaId}
         isBusiness={formIsBusiness}
         metaAppId={formMetaAppId}
         metaAppSecret={formMetaAppSecret}
@@ -552,6 +575,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         idPrefix={idPrefix}
         onChannelId={setFormChannelId}
         onExternalId={setFormExternalId}
+        onWabaId={setFormWabaId}
         onIsBusiness={setFormIsBusiness}
         onMetaAppId={setFormMetaAppId}
         onMetaAppSecret={setFormMetaAppSecret}
