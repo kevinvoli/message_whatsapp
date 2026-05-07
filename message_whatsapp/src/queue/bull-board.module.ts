@@ -8,7 +8,7 @@ import {
   SENTIMENT_QUEUE,
   OUTBOUND_WEBHOOK_QUEUE,
   DEAD_LETTER_QUEUE,
-} from './queue.module';
+} from './queue.constants';
 
 @Module({
   imports: [

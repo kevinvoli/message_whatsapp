@@ -26,7 +26,7 @@ import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { WEBHOOK_PROCESSING_QUEUE } from 'src/queue/queue.module';
+import { WEBHOOK_PROCESSING_QUEUE } from 'src/queue/queue.constants';
 import { WebhookJobData } from 'src/queue/jobs/webhook-processing.job';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';

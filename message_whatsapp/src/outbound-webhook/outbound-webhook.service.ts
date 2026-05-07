@@ -11,7 +11,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { OutboundWebhook } from './entities/outbound-webhook.entity';
 import { OutboundWebhookLog, WebhookDeliveryStatus } from './entities/outbound-webhook-log.entity';
-import { OUTBOUND_WEBHOOK_QUEUE } from 'src/queue/queue.module';
+import { OUTBOUND_WEBHOOK_QUEUE } from 'src/queue/queue.constants';
 
 interface OutboundWebhookJobPayload {
   webhookId: string;

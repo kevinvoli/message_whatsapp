@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { WhapiService } from 'src/whapi/whapi.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
-import { WEBHOOK_PROCESSING_QUEUE } from '../queue.module';
+import { WEBHOOK_PROCESSING_QUEUE } from '../queue.constants';
 import { WebhookJobData } from '../jobs/webhook-processing.job';
 import { DeadLetterService } from '../dead-letter.service';
 

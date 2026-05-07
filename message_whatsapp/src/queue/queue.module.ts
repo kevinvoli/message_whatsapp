@@ -4,17 +4,21 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullMQShutdownService } from './bullmq-shutdown.service';
 import { DeadLetterService } from './dead-letter.service';
 import { QueueAdminController } from './queue-admin.controller';
-import { BROADCAST_QUEUE } from 'src/broadcast/broadcast.service';
-import { SENTIMENT_QUEUE } from 'src/sentiment/sentiment.constants';
+import {
+  WEBHOOK_PROCESSING_QUEUE,
+  BROADCAST_QUEUE,
+  OUTBOUND_WEBHOOK_QUEUE,
+  DEAD_LETTER_QUEUE,
+  SENTIMENT_QUEUE,
+} from './queue.constants';
 
-export const WEBHOOK_PROCESSING_QUEUE = 'webhook-processing';
-export const OUTBOUND_WEBHOOK_QUEUE = 'outbound-webhook-delivery';
-export const DEAD_LETTER_QUEUE = 'dead-letter';
-
-// Ré-export pour que QueueAdminController et BullBoardSetupModule puissent importer
-// depuis un seul point sans dépendance circulaire
-export { BROADCAST_QUEUE } from 'src/broadcast/broadcast.service';
-export { SENTIMENT_QUEUE } from 'src/sentiment/sentiment.constants';
+export {
+  WEBHOOK_PROCESSING_QUEUE,
+  BROADCAST_QUEUE,
+  OUTBOUND_WEBHOOK_QUEUE,
+  DEAD_LETTER_QUEUE,
+  SENTIMENT_QUEUE,
+} from './queue.constants';
 
 @Module({
   imports: [

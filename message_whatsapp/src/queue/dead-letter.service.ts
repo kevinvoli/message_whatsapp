@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Job, Queue } from 'bullmq';
-import { DEAD_LETTER_QUEUE } from './queue.module';
+import { DEAD_LETTER_QUEUE } from './queue.constants';
 
 export interface DeadLetterPayload {
   originalQueue: string;

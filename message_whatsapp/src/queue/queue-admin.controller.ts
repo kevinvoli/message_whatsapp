@@ -17,7 +17,7 @@ import {
   BROADCAST_QUEUE,
   SENTIMENT_QUEUE,
   OUTBOUND_WEBHOOK_QUEUE,
-} from './queue.module';
+} from './queue.constants';
 import { DeadLetterPayload } from './dead-letter.service';
 
 @Controller('admin')
