@@ -30,7 +30,7 @@ import {
   submitHsmTemplate,
   updateHsmTemplate,
 } from '@/app/lib/api/hsm-templates.api';
-import { fetchChannelWabaId, getChannels } from '@/app/lib/api/channels.api';
+import { fetchChannelWabaId, getChannels, updateChannel } from '@/app/lib/api/channels.api';
 import { formatDate } from '@/app/lib/dateUtils';
 import { useToast } from '@/app/ui/ToastProvider';
 import TemplatePreview from './TemplatePreview';
@@ -357,12 +357,15 @@ interface WabaIdInlineUpdaterProps {
 }
 
 function WabaIdInlineUpdater({ channel, onUpdated }: WabaIdInlineUpdaterProps) {
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [manualInput, setManualInput] = useState('');
+  const [showManual, setShowManual] = useState(false);
 
   const handleFetch = async () => {
-    setLoading(true);
+    setFetching(true);
     setError(null);
     setDone(false);
     try {
@@ -370,9 +373,28 @@ function WabaIdInlineUpdater({ channel, onUpdated }: WabaIdInlineUpdaterProps) {
       onUpdated(updated);
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la récupération Meta');
+      const msg = err instanceof Error ? err.message : 'Erreur Meta';
+      setError(msg);
+      setShowManual(true);
     } finally {
-      setLoading(false);
+      setFetching(false);
+    }
+  };
+
+  const handleManualSave = async () => {
+    const trimmed = manualInput.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await updateChannel(channel.id, { waba_id: trimmed } as Partial<Channel>);
+      onUpdated(updated);
+      setDone(true);
+      setShowManual(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -382,24 +404,61 @@ function WabaIdInlineUpdater({ channel, onUpdated }: WabaIdInlineUpdaterProps) {
         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
         Ce canal n&apos;a pas de WABA ID — requis pour soumettre des templates à Meta.
       </div>
-      <div className="flex items-center gap-2">
+
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
           onClick={handleFetch}
-          disabled={loading}
+          disabled={fetching || saving}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-60 transition-colors"
         >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+          {fetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Récupérer depuis Meta
         </button>
-        {done && !loading && (
+        <button
+          type="button"
+          onClick={() => setShowManual((v) => !v)}
+          className="text-xs text-amber-700 underline hover:no-underline"
+        >
+          Saisir manuellement
+        </button>
+        {done && !fetching && (
           <span className="flex items-center gap-1 text-xs text-green-700">
             <CheckCircle className="w-3.5 h-3.5" />
-            WABA ID récupéré
+            WABA ID enregistré
           </span>
         )}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {error && (
+        <p className="text-xs text-red-600">
+          {error}
+          {!showManual && (
+            <> — <button type="button" onClick={() => setShowManual(true)} className="underline">Saisir manuellement</button></>
+          )}
+        </p>
+      )}
+
+      {showManual && (
+        <div className="flex items-center gap-2 pt-1">
+          <input
+            type="text"
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            placeholder="Ex: 987654321098765"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+          />
+          <button
+            type="button"
+            onClick={handleManualSave}
+            disabled={saving || !manualInput.trim()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 text-white text-xs font-medium hover:bg-gray-800 disabled:opacity-60 transition-colors whitespace-nowrap"
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Sauvegarder
+          </button>
+        </div>
+      )}
     </div>
   );
 }
