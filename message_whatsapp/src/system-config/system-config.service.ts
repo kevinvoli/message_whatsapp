@@ -1,7 +1,9 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, Optional, Inject } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 import { SystemConfig } from './entities/system-config.entity';
 import { ChannelService } from 'src/channel/channel.service';
 
@@ -130,11 +132,13 @@ export class SystemConfigService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SystemConfigService.name);
 
   private channelService: ChannelService | null = null;
+  private readonly CONFIG_CACHE_TTL = 120;
 
   constructor(
     @InjectRepository(SystemConfig)
     private readonly repo: Repository<SystemConfig>,
     private readonly moduleRef: ModuleRef,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
 
   private getChannelService(): ChannelService {
@@ -196,8 +200,19 @@ export class SystemConfigService implements OnApplicationBootstrap {
   }
 
   async get(key: string): Promise<string | null> {
+    if (this.redis) {
+      const cached = await this.redis.get('config:' + key);
+      if (cached !== null) return cached;
+    }
+
     const cfg = await this.repo.findOne({ where: { configKey: key } });
-    return cfg?.configValue ?? process.env[key] ?? null;
+    const val = cfg?.configValue ?? process.env[key] ?? null;
+
+    if (this.redis && val !== null) {
+      await this.redis.setex('config:' + key, this.CONFIG_CACHE_TTL, val);
+    }
+
+    return val;
   }
 
   async set(key: string, value: string): Promise<SystemConfig> {
@@ -228,12 +243,25 @@ export class SystemConfigService implements OnApplicationBootstrap {
 
     // Patch process.env immédiatement
     process.env[key] = value;
+
+    if (this.redis) {
+      await this.redis.del('config:' + key);
+    }
+
     return cfg;
   }
 
   async setBulk(entries: { key: string; value: string }[]): Promise<void> {
     for (const { key, value } of entries) {
       await this.set(key, value);
+    }
+  }
+
+  async flushCache(): Promise<void> {
+    if (!this.redis) return;
+    const keys = await this.redis.keys('config:*');
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
     }
   }
 

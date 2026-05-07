@@ -7,8 +7,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import { createHmac } from 'crypto';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { OutboundWebhook } from './entities/outbound-webhook.entity';
 import { OutboundWebhookLog, WebhookDeliveryStatus } from './entities/outbound-webhook-log.entity';
+import { OUTBOUND_WEBHOOK_QUEUE, OutboundWebhookJobPayload } from './workers/outbound-webhook.worker';
 import {
   IsString,
   IsArray,
@@ -87,12 +90,16 @@ export class UpdateWebhookDto {
 @Injectable()
 export class OutboundWebhookService {
   private readonly logger = new Logger(OutboundWebhookService.name);
+  private readonly bullmqEnabled =
+    process.env['BULLMQ_OUTBOUND_WEBHOOK_ENABLED'] === 'true';
 
   constructor(
     @InjectRepository(OutboundWebhook)
     private readonly webhookRepo: Repository<OutboundWebhook>,
     @InjectRepository(OutboundWebhookLog)
     private readonly logRepo: Repository<OutboundWebhookLog>,
+    @InjectQueue(OUTBOUND_WEBHOOK_QUEUE)
+    private readonly outboundQueue: Queue<OutboundWebhookJobPayload>,
   ) {}
 
   // ─── CRUD ─────────────────────────────────────────────────────────────────
@@ -161,11 +168,50 @@ export class OutboundWebhookService {
         }),
       );
 
-      // Envoyer de façon asynchrone sans bloquer
-      this.deliverWithRetry(wh, log, payload).catch((err) => {
-        this.logger.error(`deliverWithRetry unhandled: ${err}`);
-      });
+      if (this.bullmqEnabled) {
+        await this.outboundQueue.add(
+          'deliver',
+          { webhookId: wh.id, logId: log.id, event, payload },
+          {
+            attempts: wh.max_retries ?? 3,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: { count: 500, age: 86400 },
+            removeOnFail: { count: 2000, age: 604800 },
+          },
+        );
+      } else {
+        this.deliverWithRetry(wh, log, payload).catch((err) => {
+          this.logger.error(`deliverWithRetry unhandled: ${err}`);
+        });
+      }
     }
+  }
+
+  // ─── Livraison via job (appelée par le worker BullMQ) ────────────────────
+
+  async processJobDelivery(
+    webhookId: string,
+    logId: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const wh = await this.webhookRepo
+      .createQueryBuilder('wh')
+      .addSelect('wh.secret')
+      .where('wh.id = :id', { id: webhookId })
+      .getOne();
+    if (!wh) {
+      this.logger.warn(`processJobDelivery: webhook ${webhookId} introuvable`);
+      return;
+    }
+
+    const log = await this.logRepo.findOne({ where: { id: logId } });
+    if (!log) {
+      this.logger.warn(`processJobDelivery: log ${logId} introuvable`);
+      return;
+    }
+
+    await this.deliverWithRetry(wh, log, payload);
   }
 
   // ─── Livraison avec retry ─────────────────────────────────────────────────

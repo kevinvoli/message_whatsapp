@@ -9,6 +9,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Inject, Logger, Optional } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import type Redis from 'ioredis';
@@ -74,6 +75,8 @@ export class WhatsappMessageGateway
   private readonly pendingCooldownMs = 1500; // bloquer les contenus identiques pendant 1,5s
   private recentTempIds = new Map<string, NodeJS.Timeout>();
   private readonly tempIdRetentionMs = 10000;
+  private readonly dedupeEnabled: boolean =
+    process.env['REDIS_SEND_DEDUPE_ENABLED'] === 'true';
 
   constructor(
     private readonly messageService: WhatsappMessageService,
@@ -258,7 +261,7 @@ export class WhatsappMessageGateway
       cursor?: { activityAt: string; chatId: string };
     },
   ) {
-    if (!this.throttle.allow(client.id, 'conversations:get')) {
+    if (!await this.throttle.allow(client.id, 'conversations:get')) {
       return this.emitRateLimited(client, 'conversations:get');
     }
     await this.agentConnectionService.sendConversationsToClient(client, payload?.search, payload?.cursor);
@@ -270,7 +273,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
-    if (!this.throttle.allow(client.id, 'contact:get_detail')) {
+    if (!await this.throttle.allow(client.id, 'contact:get_detail')) {
       return this.emitRateLimited(client, 'contact:get_detail');
     }
     const contact = await this.contactService.findOneByChatId(payload.chat_id);
@@ -282,7 +285,7 @@ export class WhatsappMessageGateway
 
   @SubscribeMessage(SOCKET_CLIENT_EVENTS.CONTACTS_GET)
   async handleGetContacts(@ConnectedSocket() client: Socket) {
-    if (!this.throttle.allow(client.id, 'contacts:get')) {
+    if (!await this.throttle.allow(client.id, 'contacts:get')) {
       return this.emitRateLimited(client, 'contacts:get');
     }
     this.logger.debug(`Contacts list requested (${client.id})`);
@@ -295,7 +298,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { contact_id: string },
   ) {
-    if (!this.throttle.allow(client.id, 'call_logs:get')) {
+    if (!await this.throttle.allow(client.id, 'call_logs:get')) {
       return this.emitRateLimited(client, 'call_logs:get');
     }
     const logs = await this.callLogService.findByContactId(payload.contact_id);
@@ -311,7 +314,7 @@ export class WhatsappMessageGateway
     @MessageBody()
     data: { type: string; payload?: { chat_id?: string; status?: string } },
   ) {
-    if (!this.throttle.allow(client.id, 'chat:event')) {
+    if (!await this.throttle.allow(client.id, 'chat:event')) {
       return this.emitRateLimited(client, 'chat:event');
     }
 
@@ -432,7 +435,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; limit?: number; before?: string },
   ) {
-    if (!this.throttle.allow(client.id, 'messages:get')) {
+    if (!await this.throttle.allow(client.id, 'messages:get')) {
       return this.emitRateLimited(client, 'messages:get');
     }
     const agent = this.agentConnectionService.getAgent(client.id);
@@ -503,7 +506,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
-    if (!this.throttle.allow(client.id, 'messages:read')) {
+    if (!await this.throttle.allow(client.id, 'messages:read')) {
       return this.emitRateLimited(client, 'messages:read');
     }
     const tenantIds = this.getTenantIds(client);
@@ -542,7 +545,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; text: string; tempId: string; quotedMessageId?: string },
   ) {
-    if (!this.throttle.allow(client.id, 'message:send')) {
+    if (!await this.throttle.allow(client.id, 'message:send')) {
       return this.emitRateLimited(client, 'message:send');
     }
   
@@ -550,26 +553,62 @@ export class WhatsappMessageGateway
     const agent = this.agentConnectionService.getAgent(client.id);
     if (!agent) return;
 
-    if (payload.tempId && this.recentTempIds.has(payload.tempId)) {
-      this.logger.warn(
-        `Duplicate tempId ignored (${payload.chat_id}) tempId=${payload.tempId}`,
-      );
-      return;
-    }
-
-    if (payload.tempId) {
-      this.markTempId(payload.tempId);
-    }
-
     const normalizedText = (payload.text ?? '').trim();
-    const pendingKey = `${payload.chat_id}:${normalizedText}`;
-    if (this.pendingAgentMessages.has(pendingKey)) {
-      this.logger.warn(
-        `Duplicate send blocked (${payload.chat_id}) text="${normalizedText}"`,
+
+    if (this.dedupeEnabled && this.redis) {
+      if (payload.tempId) {
+        const tempOk = await this.redis.set(
+          'dedupe:send:temp:' + payload.tempId,
+          '1',
+          'EX',
+          30,
+          'NX',
+        );
+        if (tempOk === null) {
+          this.logger.warn(
+            `Duplicate tempId ignored (Redis) (${payload.chat_id}) tempId=${payload.tempId}`,
+          );
+          return;
+        }
+      }
+
+      const textHash = createHash('sha256').update(normalizedText).digest('hex').slice(0, 16);
+      const textOk = await this.redis.set(
+        'dedupe:send:text:' + payload.chat_id + ':' + textHash,
+        '1',
+        'EX',
+        5,
+        'NX',
       );
-      return;
+      if (textOk === null) {
+        this.logger.warn(
+          `Duplicate send blocked (Redis) (${payload.chat_id}) text="${normalizedText}"`,
+        );
+        return;
+      }
+    } else {
+      if (payload.tempId && this.recentTempIds.has(payload.tempId)) {
+        this.logger.warn(
+          `Duplicate tempId ignored (${payload.chat_id}) tempId=${payload.tempId}`,
+        );
+        return;
+      }
+
+      if (payload.tempId) {
+        this.markTempId(payload.tempId);
+      }
     }
-    this.markPendingKey(pendingKey);
+
+    const pendingKey = `${payload.chat_id}:${normalizedText}`;
+    if (!this.dedupeEnabled || !this.redis) {
+      if (this.pendingAgentMessages.has(pendingKey)) {
+        this.logger.warn(
+          `Duplicate send blocked (${payload.chat_id}) text="${normalizedText}"`,
+        );
+        return;
+      }
+      this.markPendingKey(pendingKey);
+    }
 
     let sendSucceeded = false;
 
@@ -703,10 +742,12 @@ export class WhatsappMessageGateway
         payload: mapConversation(chat, lastMessage, unreadCount),
       });
     } finally {
-      if (sendSucceeded) {
-        this.schedulePendingRelease(pendingKey);
-      } else {
-        this.releasePendingKey(pendingKey);
+      if (!this.dedupeEnabled || !this.redis) {
+        if (sendSucceeded) {
+          this.schedulePendingRelease(pendingKey);
+        } else {
+          this.releasePendingKey(pendingKey);
+        }
       }
     }
   }

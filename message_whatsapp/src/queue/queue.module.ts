@@ -15,6 +15,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 export const WEBHOOK_PROCESSING_QUEUE = 'webhook-processing';
 export const BROADCAST_QUEUE = 'broadcast-sending';
+export const OUTBOUND_WEBHOOK_QUEUE = 'outbound-webhook-delivery';
 
 @Module({
   imports: [

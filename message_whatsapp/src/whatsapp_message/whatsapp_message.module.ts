@@ -57,6 +57,7 @@ import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
 import { ConversationClosureModule } from 'src/conversation-closure/conversation-closure.module';
 import { CommercialActionGateModule } from 'src/commercial-action-gate/commercial-action-gate.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     TargetsModule,
     CommercialActionGateModule,
     WhatsappTemplateModule,
+    RedisModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

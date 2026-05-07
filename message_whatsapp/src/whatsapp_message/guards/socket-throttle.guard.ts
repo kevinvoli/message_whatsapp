@@ -1,4 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 interface TokenBucket {
   tokens: number;
@@ -15,6 +18,7 @@ export class SocketThrottleGuard {
   private readonly logger = new Logger(SocketThrottleGuard.name);
   private readonly buckets = new Map<string, TokenBucket>();
   private cleanupTimer: ReturnType<typeof setInterval>;
+  private readonly redisEnabled: boolean;
 
   private readonly limits: Record<string, ThrottleConfig> = {
     'message:send': { maxRequests: 10, windowMs: 10_000 },
@@ -25,8 +29,11 @@ export class SocketThrottleGuard {
     'contacts:get': { maxRequests: 10, windowMs: 10_000 },
   };
 
-  constructor() {
-    // Cleanup stale buckets every 60s
+  constructor(
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
+    private readonly config: ConfigService,
+  ) {
+    this.redisEnabled = config.get<string>('REDIS_SOCKET_THROTTLE_ENABLED') === 'true';
     this.cleanupTimer = setInterval(() => this.cleanup(), 60_000);
   }
 
@@ -34,26 +41,39 @@ export class SocketThrottleGuard {
     clearInterval(this.cleanupTimer);
   }
 
-  /**
-   * Returns true if the request is allowed, false if throttled.
-   */
-  allow(clientId: string, event: string): boolean {
-    const config = this.limits[event];
-    if (!config) return true; // No limit configured for this event
+  async allow(clientId: string, event: string): Promise<boolean> {
+    const cfg = this.limits[event];
+    if (!cfg) return true;
+
+    if (this.redisEnabled && this.redis) {
+      const key = `throttle:socket:${clientId}:${event}`;
+      const ttlSec = Math.ceil(cfg.windowMs / 1000);
+
+      const pipeline = this.redis.pipeline();
+      pipeline.incr(key);
+      pipeline.expire(key, ttlSec, 'NX');
+      const results = await pipeline.exec();
+
+      const count = results?.[0]?.[1] as number | null;
+      if (count !== null && count > cfg.maxRequests) {
+        this.logger.warn(`RATE_LIMITED client=${clientId} event=${event}`);
+        return false;
+      }
+      return true;
+    }
 
     const key = `${clientId}:${event}`;
     const now = Date.now();
     let bucket = this.buckets.get(key);
 
     if (!bucket) {
-      bucket = { tokens: config.maxRequests, lastRefill: now };
+      bucket = { tokens: cfg.maxRequests, lastRefill: now };
       this.buckets.set(key, bucket);
     }
 
-    // Refill tokens based on elapsed time
     const elapsed = now - bucket.lastRefill;
-    if (elapsed >= config.windowMs) {
-      bucket.tokens = config.maxRequests;
+    if (elapsed >= cfg.windowMs) {
+      bucket.tokens = cfg.maxRequests;
       bucket.lastRefill = now;
     }
 
@@ -66,9 +86,6 @@ export class SocketThrottleGuard {
     return false;
   }
 
-  /**
-   * Remove a client's buckets (on disconnect).
-   */
   removeClient(clientId: string): void {
     for (const key of this.buckets.keys()) {
       if (key.startsWith(`${clientId}:`)) {
@@ -79,7 +96,7 @@ export class SocketThrottleGuard {
 
   private cleanup(): void {
     const now = Date.now();
-    const maxAge = 120_000; // 2 minutes
+    const maxAge = 120_000;
     for (const [key, bucket] of this.buckets) {
       if (now - bucket.lastRefill > maxAge) {
         this.buckets.delete(key);

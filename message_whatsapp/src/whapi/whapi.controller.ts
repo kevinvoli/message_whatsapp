@@ -85,7 +85,7 @@ export class WhapiController {
     this.auditLogger.log(
       `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=whapi tenant_id=${tenantId} event_key=${auditEventKey}`,
     );
-    this.rateLimit('whapi', request, tenantId);
+    await this.rateLimit('whapi', request, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
     const degraded = this.healthService.isDegraded(provider);
@@ -273,7 +273,7 @@ export class WhapiController {
       `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=messenger tenant_id=${tenantId} page_id=${pageId} entries=${entries.length}`,
     );
 
-    this.rateLimitService.assertRateLimits(provider, null, tenantId);
+    await this.rateLimitService.assertRateLimits(provider, null, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
     const degraded = this.healthService.isDegraded(provider);
@@ -389,7 +389,7 @@ export class WhapiController {
       `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=telegram bot_id=${botId} tenant_id=${tenantId} update_id=${payload.update_id}`,
     );
 
-    this.rateLimitService.assertRateLimits(provider, null, tenantId);
+    await this.rateLimitService.assertRateLimits(provider, null, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
 
@@ -484,7 +484,7 @@ export class WhapiController {
       `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=instagram tenant_id=${tenantId} ig_account_id=${igAccountId}`,
     );
 
-    this.rateLimitService.assertRateLimits(provider, null, tenantId);
+    await this.rateLimitService.assertRateLimits(provider, null, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
 
@@ -591,7 +591,7 @@ export class WhapiController {
     this.auditLogger.log(
       `WEBHOOK_ACCEPTED correlationId=${correlationId} provider=meta tenant_id=${tenantId} event_key=${auditEventKey}`,
     );
-    this.rateLimit('meta', request, tenantId);
+    await this.rateLimit('meta', request, tenantId);
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
     const degraded = this.healthService.isDegraded(provider);
@@ -1065,11 +1065,11 @@ export class WhapiController {
     return false;
   }
 
-  private rateLimit(
+  private async rateLimit(
     provider: string,
     request: Request,
     tenantId?: string | null,
-  ): void {
+  ): Promise<void> {
     const ipHeader = request.headers['x-forwarded-for'];
     const ip = Array.isArray(ipHeader)
       ? ipHeader[0]
@@ -1077,7 +1077,7 @@ export class WhapiController {
         ? ipHeader.split(',')[0]?.trim()
         : null;
     const resolvedIp = ip || request.ip || null;
-    this.rateLimitService.assertRateLimits(provider, resolvedIp, tenantId);
+    await this.rateLimitService.assertRateLimits(provider, resolvedIp, tenantId);
   }
 
   private assertPayloadSize(rawBody?: Buffer): void {

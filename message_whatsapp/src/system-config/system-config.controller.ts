@@ -60,4 +60,12 @@ export class SystemConfigController {
     await this.svc.setBulk(dto.entries);
     return { updated: dto.entries.length };
   }
+
+  /** Vide le cache Redis des clés de config. */
+  @Post('flush-cache')
+  @UseGuards(AdminGuard)
+  async flushCache() {
+    await this.svc.flushCache();
+    return { flushed: true };
+  }
 }
