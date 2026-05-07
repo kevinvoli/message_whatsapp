@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { OrderCallSyncService } from './order-call-sync.service';
 
+
 @Injectable()
 export class OrderCallSyncJob implements OnApplicationBootstrap {
   private readonly logger = new Logger(OrderCallSyncJob.name);
