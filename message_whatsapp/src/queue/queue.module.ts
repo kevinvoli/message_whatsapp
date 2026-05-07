@@ -1,21 +1,20 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-
-/**
- * P2.1 — QueueModule
- *
- * Module global BullMQ branché sur Redis.
- * Si REDIS_HOST n'est pas configuré, les jobs sont ignorés silencieusement
- * (le contrôleur webhook gardera son comportement synchrone actuel).
- *
- * Queues disponibles :
- *   - WEBHOOK_PROCESSING_QUEUE : traitement asynchrone des webhooks entrants
- */
+import { BullMQShutdownService } from './bullmq-shutdown.service';
+import { DeadLetterService } from './dead-letter.service';
+import { QueueAdminController } from './queue-admin.controller';
+import { BROADCAST_QUEUE } from 'src/broadcast/broadcast.service';
+import { SENTIMENT_QUEUE } from 'src/sentiment/sentiment.constants';
 
 export const WEBHOOK_PROCESSING_QUEUE = 'webhook-processing';
-export const BROADCAST_QUEUE = 'broadcast-sending';
 export const OUTBOUND_WEBHOOK_QUEUE = 'outbound-webhook-delivery';
+export const DEAD_LETTER_QUEUE = 'dead-letter';
+
+// Ré-export pour que QueueAdminController et BullBoardSetupModule puissent importer
+// depuis un seul point sans dépendance circulaire
+export { BROADCAST_QUEUE } from 'src/broadcast/broadcast.service';
+export { SENTIMENT_QUEUE } from 'src/sentiment/sentiment.constants';
 
 @Module({
   imports: [
@@ -40,8 +39,14 @@ export const OUTBOUND_WEBHOOK_QUEUE = 'outbound-webhook-delivery';
       },
     }),
     BullModule.registerQueue({ name: WEBHOOK_PROCESSING_QUEUE }),
-    // BROADCAST_QUEUE est enregistré dans BroadcastModule — pas de double enregistrement
+    BullModule.registerQueue({ name: DEAD_LETTER_QUEUE }),
+    // Enregistrés ici pour que QueueAdminController puisse injecter les instances
+    BullModule.registerQueue({ name: BROADCAST_QUEUE }),
+    BullModule.registerQueue({ name: SENTIMENT_QUEUE }),
+    BullModule.registerQueue({ name: OUTBOUND_WEBHOOK_QUEUE }),
   ],
-  exports: [BullModule],
+  controllers: [QueueAdminController],
+  providers: [BullMQShutdownService, DeadLetterService],
+  exports: [BullModule, BullMQShutdownService, DeadLetterService],
 })
 export class QueueModule {}

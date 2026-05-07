@@ -85,6 +85,8 @@ import { WorkScheduleModule } from './work-schedule/work-schedule.module';
 import { WorkAttendanceModule } from './work-attendance/work-attendance.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
+import { QueueModule } from './queue/queue.module';
+import { BullBoardSetupModule } from './queue/bull-board.module';
 
 @Module({
   imports: [
@@ -258,6 +260,10 @@ import { PlatformSettingsModule } from './platform-settings/platform-settings.mo
     ComplaintsModule,
     // Sprint 3 — Paramètres plateforme (relances automatiques)
     PlatformSettingsModule,
+    // Sprint 3 Redis — BullMQ (shutdown gracieux + DLQ + admin)
+    QueueModule,
+    // Bull Board UI — activé seulement si BULL_BOARD_ENABLED=true
+    ...(process.env.BULL_BOARD_ENABLED === 'true' ? [BullBoardSetupModule] : []),
   ],
   controllers: [AppController],
   providers: [

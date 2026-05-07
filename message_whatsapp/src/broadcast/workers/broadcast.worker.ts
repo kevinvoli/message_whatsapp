@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Job } from 'bullmq';
 import { BROADCAST_QUEUE } from '../broadcast.service';
+import { DeadLetterService } from 'src/queue/dead-letter.service';
 import {
   WhatsappBroadcastRecipient,
   RecipientStatus,
@@ -48,6 +49,7 @@ export class BroadcastWorker extends WorkerHost {
     private readonly channelRepo: Repository<WhapiChannel>,
 
     private readonly metaService: CommunicationMetaService,
+    private readonly dlqService: DeadLetterService,
   ) {
     super();
   }
@@ -55,69 +57,79 @@ export class BroadcastWorker extends WorkerHost {
   async process(job: Job<SendBatchJobData>): Promise<void> {
     const { broadcastId, recipientIds, channelId, templateId } = job.data;
 
-    // Vérifier que le broadcast n'est pas annulé/pausé
-    const broadcast = await this.broadcastRepo.findOne({ where: { id: broadcastId } });
-    if (!broadcast || broadcast.status === BroadcastStatus.CANCELLED || broadcast.status === BroadcastStatus.PAUSED) {
-      this.logger.warn(`Broadcast ${broadcastId} ${broadcast?.status ?? 'introuvable'} — batch ignoré`);
-      return;
-    }
-
-    const [recipients, template, channel] = await Promise.all([
-      this.recipientRepo.findByIds(recipientIds),
-      this.templateRepo.findOne({ where: { id: templateId } }),
-      this.channelRepo.findOne({ where: { channel_id: channelId } }),
-    ]);
-
-    if (!template || !channel) {
-      this.logger.error(`Broadcast ${broadcastId}: template ou channel introuvable`);
-      return;
-    }
-
-    let sentCount = 0;
-    let failedCount = 0;
-
-    for (const recipient of recipients) {
-      try {
-        const result = await this.metaService.sendTemplateMessage({
-          to: recipient.phone,
-          phoneNumberId: channel.external_id ?? channelId,
-          accessToken: channel.token,
-          templateName: template.name,
-          language: template.language,
-          variables: recipient.variables ?? {},
-        });
-
-        await this.recipientRepo.update(recipient.id, {
-          status: RecipientStatus.SENT,
-          provider_message_id: result.providerMessageId,
-          sent_at: new Date(),
-        });
-        sentCount++;
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        await this.recipientRepo.update(recipient.id, {
-          status: RecipientStatus.FAILED,
-          error_message: errorMsg.slice(0, 255),
-        });
-        failedCount++;
-        this.logger.warn(
-          `Broadcast ${broadcastId} recipient ${recipient.phone} failed: ${errorMsg}`,
-        );
+    try {
+      // Vérifier que le broadcast n'est pas annulé/pausé
+      const broadcast = await this.broadcastRepo.findOne({ where: { id: broadcastId } });
+      if (!broadcast || broadcast.status === BroadcastStatus.CANCELLED || broadcast.status === BroadcastStatus.PAUSED) {
+        this.logger.warn(`Broadcast ${broadcastId} ${broadcast?.status ?? 'introuvable'} — batch ignoré`);
+        return;
       }
+
+      const [recipients, template, channel] = await Promise.all([
+        this.recipientRepo.findByIds(recipientIds),
+        this.templateRepo.findOne({ where: { id: templateId } }),
+        this.channelRepo.findOne({ where: { channel_id: channelId } }),
+      ]);
+
+      if (!template || !channel) {
+        this.logger.error(`Broadcast ${broadcastId}: template ou channel introuvable`);
+        return;
+      }
+
+      let sentCount = 0;
+      let failedCount = 0;
+
+      for (const recipient of recipients) {
+        try {
+          const result = await this.metaService.sendTemplateMessage({
+            to: recipient.phone,
+            phoneNumberId: channel.external_id ?? channelId,
+            accessToken: channel.token,
+            templateName: template.name,
+            language: template.language,
+            variables: recipient.variables ?? {},
+          });
+
+          await this.recipientRepo.update(recipient.id, {
+            status: RecipientStatus.SENT,
+            provider_message_id: result.providerMessageId,
+            sent_at: new Date(),
+          });
+          sentCount++;
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          await this.recipientRepo.update(recipient.id, {
+            status: RecipientStatus.FAILED,
+            error_message: errorMsg.slice(0, 255),
+          });
+          failedCount++;
+          this.logger.warn(
+            `Broadcast ${broadcastId} recipient ${recipient.phone} failed: ${errorMsg}`,
+          );
+        }
+      }
+
+      // Mise à jour des compteurs du broadcast
+      await this.broadcastRepo.increment({ id: broadcastId }, 'sent_count', sentCount);
+      if (failedCount > 0) {
+        await this.broadcastRepo.increment({ id: broadcastId }, 'failed_count', failedCount);
+      }
+
+      // Vérifier si le broadcast est terminé
+      await this.checkCompletion(broadcastId);
+
+      this.logger.log(
+        `Broadcast ${broadcastId} batch done: ${sentCount} envoyés, ${failedCount} échoués`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `BroadcastWorker job=${job.id} attempt=${job.attemptsMade + 1} error=${err instanceof Error ? err.message : String(err)}`,
+      );
+      if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
+        await this.dlqService.enqueue(BROADCAST_QUEUE, job, err);
+      }
+      throw err;
     }
-
-    // Mise à jour des compteurs du broadcast
-    await this.broadcastRepo.increment({ id: broadcastId }, 'sent_count', sentCount);
-    if (failedCount > 0) {
-      await this.broadcastRepo.increment({ id: broadcastId }, 'failed_count', failedCount);
-    }
-
-    // Vérifier si le broadcast est terminé
-    await this.checkCompletion(broadcastId);
-
-    this.logger.log(
-      `Broadcast ${broadcastId} batch done: ${sentCount} envoyés, ${failedCount} échoués`,
-    );
   }
 
   private async checkCompletion(broadcastId: string): Promise<void> {

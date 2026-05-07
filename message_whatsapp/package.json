@@ -25,6 +25,9 @@
         "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js"
     },
     "dependencies": {
+        "@bull-board/api": "^7.0.0",
+        "@bull-board/express": "^7.0.0",
+        "@bull-board/nestjs": "^7.0.0",
         "@nestjs/bullmq": "^11.0.4",
         "@nestjs/common": "^11.0.1",
         "@nestjs/config": "^4.0.2",

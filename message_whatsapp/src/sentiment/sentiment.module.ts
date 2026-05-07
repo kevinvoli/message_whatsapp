@@ -6,11 +6,13 @@ import { SentimentService } from './sentiment.service';
 import { SentimentWorker } from './sentiment.worker';
 import { SentimentListener } from './sentiment.listener';
 import { SENTIMENT_QUEUE } from './sentiment.constants';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: SENTIMENT_QUEUE }),
     TypeOrmModule.forFeature([WhatsappMessage]),
+    QueueModule,
   ],
   providers: [SentimentService, SentimentWorker, SentimentListener],
   exports: [SentimentService],

@@ -3,8 +3,9 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { WhapiService } from 'src/whapi/whapi.service';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
-import { WEBHOOK_PROCESSING_QUEUE, } from '../queue.module';
+import { WEBHOOK_PROCESSING_QUEUE } from '../queue.module';
 import { WebhookJobData } from '../jobs/webhook-processing.job';
+import { DeadLetterService } from '../dead-letter.service';
 
 /**
  * P2.1 — WebhookWorker
@@ -24,6 +25,7 @@ export class WebhookWorker extends WorkerHost {
   constructor(
     private readonly whapiService: WhapiService,
     private readonly unifiedIngressService: UnifiedIngressService,
+    private readonly dlqService: DeadLetterService,
   ) {
     super();
   }
@@ -86,7 +88,10 @@ export class WebhookWorker extends WorkerHost {
       this.logger.error(
         `WORKER_ERROR job=${job.id} provider=${provider} attempt=${job.attemptsMade + 1} error=${message}`,
       );
-      throw err; // BullMQ reprend en charge le retry
+      if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
+        await this.dlqService.enqueue(WEBHOOK_PROCESSING_QUEUE, job, err);
+      }
+      throw err;
     }
   }
 }

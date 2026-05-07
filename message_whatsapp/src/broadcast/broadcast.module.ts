@@ -10,6 +10,7 @@ import { BroadcastController } from './broadcast.controller';
 import { BroadcastWorker } from './workers/broadcast.worker';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
 import { LoggingModule } from 'src/logging/logging.module';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     ]),
     BullModule.registerQueue({ name: BROADCAST_QUEUE }),
     LoggingModule,
+    QueueModule,
   ],
   controllers: [BroadcastController],
   providers: [BroadcastService, BroadcastWorker, CommunicationMetaService],

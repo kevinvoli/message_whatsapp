@@ -6,6 +6,7 @@ import { Job } from 'bullmq';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { SentimentService } from './sentiment.service';
 import { SENTIMENT_QUEUE, SentimentJobPayload } from './sentiment.constants';
+import { DeadLetterService } from 'src/queue/dead-letter.service';
 
 @Processor(SENTIMENT_QUEUE, { concurrency: 5 })
 export class SentimentWorker extends WorkerHost {
@@ -15,6 +16,7 @@ export class SentimentWorker extends WorkerHost {
     private readonly sentimentService: SentimentService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepo: Repository<WhatsappMessage>,
+    private readonly dlqService: DeadLetterService,
   ) {
     super();
   }
@@ -22,15 +24,25 @@ export class SentimentWorker extends WorkerHost {
   async process(job: Job<SentimentJobPayload>): Promise<void> {
     const { messageId, text } = job.data;
 
-    const result = this.sentimentService.analyze(text);
+    try {
+      const result = this.sentimentService.analyze(text);
 
-    await this.messageRepo.update(messageId, {
-      sentiment_score: result.score,
-      sentiment_label: result.label,
-    });
+      await this.messageRepo.update(messageId, {
+        sentiment_score: result.score,
+        sentiment_label: result.label,
+      });
 
-    this.logger.debug(
-      `Sentiment [${messageId}]: ${result.label} (score=${result.score})`,
-    );
+      this.logger.debug(
+        `Sentiment [${messageId}]: ${result.label} (score=${result.score})`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `SentimentWorker job=${job.id} messageId=${messageId} attempt=${job.attemptsMade + 1} error=${err instanceof Error ? err.message : String(err)}`,
+      );
+      if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
+        await this.dlqService.enqueue(SENTIMENT_QUEUE, job, err);
+      }
+      throw err;
+    }
   }
 }
