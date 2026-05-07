@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
+import { FLOWBOT_DELAYED_QUEUE } from 'src/queue/queue.constants';
 import { FlowNode, FlowNodeType } from '../entities/flow-node.entity';
 import { FlowEdge } from '../entities/flow-edge.entity';
 import { FlowSession, FlowSessionStatus } from '../entities/flow-session.entity';
@@ -48,7 +52,13 @@ export class FlowEngineService {
     private readonly sessionRepo: Repository<FlowSession>,
     @InjectRepository(FlowSessionLog)
     private readonly logRepo: Repository<FlowSessionLog>,
+    @Optional() @InjectQueue(FLOWBOT_DELAYED_QUEUE) private readonly delayedQueue: Queue | null,
+    private readonly configService: ConfigService,
   ) {}
+
+  private get delayedEnabled(): boolean {
+    return this.configService.get<string>('BULLMQ_FLOWBOT_DELAYED_ENABLED') === 'true';
+  }
 
   // ─── Point d'entrée principal ─────────────────────────────────────────────
 
@@ -156,6 +166,14 @@ export class FlowEngineService {
 
     session.status = FlowSessionStatus.ACTIVE;
     await this.sessionService.save(session);
+
+    // Annuler le job no-response-check en attente si le feature flag est actif
+    if (this.delayedEnabled && this.delayedQueue) {
+      try {
+        const job = await this.delayedQueue.getJob(`no-response-check:${sessionId}`);
+        if (job) await job.remove();
+      } catch { /* ignore — le job a peut-être déjà été exécuté ou supprimé */ }
+    }
 
     if (!session.currentNodeId) {
       this.logger.warn(`resumeSession: session ${sessionId} sans currentNodeId`);
@@ -415,6 +433,20 @@ export class FlowEngineService {
     session.status = FlowSessionStatus.WAITING_REPLY;
     await this.sessionService.save(session);
     await this.writeLog(session, node, null, 'waiting_reply', null);
+
+    if (this.delayedEnabled && this.delayedQueue) {
+      const NO_RESPONSE_DELAY_MS = 1800 * 1000; // 30 min
+      await this.delayedQueue.add(
+        'no-response-check',
+        { sessionId: session.id, conversationId: session.conversationId },
+        {
+          delay: NO_RESPONSE_DELAY_MS,
+          jobId: `no-response-check:${session.id}`,
+          removeOnComplete: true,
+          removeOnFail: { count: 100 },
+        },
+      );
+    }
   }
 
   private async executeCondition(
@@ -507,6 +539,21 @@ export class FlowEngineService {
     session.status = FlowSessionStatus.WAITING_DELAY;
     await this.sessionService.save(session);
     await this.writeLog(session, node, null, 'waiting_delay', String(node.config.delaySeconds ?? 0));
+
+    if (this.delayedEnabled && this.delayedQueue) {
+      const waitConfig = node.config as { delaySeconds?: number };
+      const delayMs = (waitConfig.delaySeconds ?? 30) * 1000;
+      await this.delayedQueue.add(
+        'resume-waiting-delay',
+        { sessionId: session.id },
+        {
+          delay: delayMs,
+          jobId: `resume-waiting-delay:${session.id}`,
+          removeOnComplete: true,
+          removeOnFail: { count: 100 },
+        },
+      );
+    }
   }
 
   private async executeAction(
@@ -570,6 +617,21 @@ export class FlowEngineService {
     session.variables = { ...session.variables, __delay_until: Date.now() + delayMs };
     await this.sessionService.save(session);
     await this.writeLog(session, node, null, 'delay_start', String(delayMs));
+
+    if (this.delayedEnabled && this.delayedQueue) {
+      const delayUntil = session.variables.__delay_until as number;
+      const remainingMs = Math.max(0, delayUntil - Date.now());
+      await this.delayedQueue.add(
+        'resume-waiting-delay',
+        { sessionId: session.id },
+        {
+          delay: remainingMs,
+          jobId: `resume-waiting-delay:${session.id}`,
+          removeOnComplete: true,
+          removeOnFail: { count: 100 },
+        },
+      );
+    }
   }
 
   /**

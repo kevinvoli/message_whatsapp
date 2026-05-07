@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
+import { FLOWBOT_DELAYED_QUEUE } from 'src/queue/queue.constants';
 
 // Entités
 import { BotConversation } from './entities/bot-conversation.entity';
@@ -32,6 +34,9 @@ import { FlowBotExtensionListener } from './listeners/flowbot-extension.listener
 // Jobs
 import { FlowPollingJob } from './jobs/flow-polling.job';
 import { FlowSessionCleanerJob } from './jobs/flow-session-cleaner.job';
+
+// Workers
+import { FlowbotDelayedWorker } from './workers/flowbot-delayed.worker';
 
 // Controller
 import { FlowBotController } from './flowbot.controller';
@@ -73,6 +78,7 @@ const SERVICES = [
     ContextModule,
     AiAssistantModule,
     RedisModule,
+    BullModule.registerQueue({ name: FLOWBOT_DELAYED_QUEUE }),
     // ✅ EventEmitterModule est global — pas besoin de l'importer ici
     // ❌ INTERDIT : WhatsappChatModule, WhatsappMessageModule, DispatcherModule
   ],
@@ -82,6 +88,7 @@ const SERVICES = [
     FlowBotExtensionListener,
     FlowPollingJob,
     FlowSessionCleanerJob,
+    FlowbotDelayedWorker,
   ],
   controllers: [FlowBotController],
   exports: [
