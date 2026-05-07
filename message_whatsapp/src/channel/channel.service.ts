@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
+import axios, { AxiosError } from 'axios';
 
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
@@ -252,5 +254,82 @@ export class ChannelService implements OnModuleInit {
       throw new NotFoundException(`Channel with ID ${id} not found`);
     }
     return { deleted: true };
+  }
+
+  // ── Récupération automatique du WABA ID depuis l'API Meta ─────────────────
+
+  /**
+   * Interroge l'API Graph Facebook pour récupérer le `whatsapp_business_account_id`
+   * associé au `phone_number_id` du canal, puis le persiste dans `waba_id`.
+   *
+   * Réservé aux canaux de type `provider = 'meta'`.
+   */
+  async fetchAndSaveWabaId(channelUuid: string): Promise<WhapiChannel> {
+    const channel = await this.channelRepository.findOne({ where: { id: channelUuid } });
+
+    if (!channel) {
+      throw new NotFoundException(`Canal ${channelUuid} introuvable`);
+    }
+
+    if (channel.provider !== 'meta') {
+      throw new BadRequestException(
+        `Le canal ${channelUuid} (provider: ${channel.provider ?? 'inconnu'}) n'est pas de type Meta`,
+      );
+    }
+
+    if (!channel.channel_id) {
+      throw new BadRequestException(
+        `Le canal ${channelUuid} n'a pas de phone_number_id (channel_id) configuré`,
+      );
+    }
+
+    const META_API_VERSION = process.env.META_API_VERSION ?? 'v20.0';
+    const url = `https://graph.facebook.com/${META_API_VERSION}/${channel.channel_id}`;
+
+    try {
+      const response = await axios.get<{
+        whatsapp_business_account_id?: string;
+        id: string;
+      }>(url, {
+        params: { fields: 'whatsapp_business_account_id' },
+        headers: { Authorization: `Bearer ${channel.token}` },
+      });
+
+      const wabaId = response.data.whatsapp_business_account_id;
+
+      if (!wabaId) {
+        throw new BadRequestException('WABA ID introuvable dans la réponse Meta');
+      }
+
+      channel.waba_id = wabaId;
+      await this.channelRepository.save(channel);
+
+      this.logger.log(
+        `WABA ID ${wabaId} récupéré et enregistré pour le canal ${channelUuid}`,
+        ChannelService.name,
+      );
+
+      return channel;
+    } catch (err: unknown) {
+      if (err instanceof BadRequestException) {
+        throw err;
+      }
+      if (err instanceof AxiosError) {
+        const metaMessage = (err.response?.data as { error?: { message?: string } } | undefined)
+          ?.error?.message;
+        const msg = metaMessage ?? err.message ?? "Impossible de joindre l'API Meta";
+        this.logger.error(
+          `Échec récupération WABA ID pour canal ${channelUuid}: ${msg}`,
+          ChannelService.name,
+        );
+        throw new BadRequestException(`Meta: ${msg}`);
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Erreur inattendue fetchAndSaveWabaId canal ${channelUuid}: ${msg}`,
+        ChannelService.name,
+      );
+      throw new BadRequestException(`Erreur lors de la récupération du WABA ID: ${msg}`);
+    }
   }
 }

@@ -80,4 +80,10 @@ export class ChannelController {
       throw new BadRequestException(message);
     }
   }
+
+  @Post(':id/fetch-waba-id')
+  @UseGuards(AdminGuard)
+  fetchWabaId(@Param('id') id: string) {
+    return this.communicationWhapiService.fetchAndSaveWabaId(id);
+  }
 }

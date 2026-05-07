@@ -52,6 +52,14 @@ export async function deleteChannel(id: string): Promise<{ message: string }> {
     return handleResponse<{ message: string }>(response);
 }
 
+export async function fetchChannelWabaId(id: string): Promise<Channel> {
+    const response = await fetch(`${API_BASE_URL}/channel/${encodeURIComponent(id)}/fetch-waba-id`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<Channel>(response);
+}
+
 /**
  * Assigne ou désassigne un poste dédié à un channel.
  * @param channelId - channel_id du canal (ex: phone_number_id Meta)
