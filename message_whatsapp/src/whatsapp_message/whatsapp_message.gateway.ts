@@ -67,6 +67,7 @@ export class WhatsappMessageGateway
   server: Server;
 
   private readonly logger = new Logger(WhatsappMessageGateway.name);
+  private adapterActive = false;
 
   private typingChats = new Set<string>(); // 💡 Track chats en typing
   private pendingAgentMessages = new Map<string, NodeJS.Timeout | null>();
@@ -115,20 +116,28 @@ export class WhatsappMessageGateway
   ) {}
 
   afterInit(server: Server): void {
-    // P2.3 — Redis adapter pour Socket.io cross-instance
     if (this.redis) {
-      try {
-        // Créer deux connexions dédiées : pub + sub
-        const pubClient = this.redis.duplicate();
-        const subClient = this.redis.duplicate();
-        server.adapter(createAdapter(pubClient, subClient));
-        this.logger.log('Socket.io Redis adapter activé (broadcasts cross-instance)');
-      } catch (err) {
-        this.logger.warn(`Socket.io Redis adapter échec : ${(err as Error).message} — fallback in-memory`);
-      }
+      this.initRedisAdapter(server).catch((err) =>
+        this.logger.warn(`Socket.IO Redis adapter init failed: ${(err as Error).message} — fallback in-memory`),
+      );
     }
     this.realtimeServerService.setServer(server);
     this.systemAlert.setSocketServer(server);
+  }
+
+  private async initRedisAdapter(server: Server): Promise<void> {
+    const pubClient = this.redis!.duplicate();
+    const subClient = this.redis!.duplicate();
+
+    pubClient.on('error', (err) => this.logger.warn(`Redis pub: ${err.message}`));
+    subClient.on('error', (err) => this.logger.warn(`Redis sub: ${err.message}`));
+
+    // Déclenche la connexion (lazyConnect) et attend que les deux clients soient prêts
+    await Promise.all([pubClient.ping(), subClient.ping()]);
+
+    server.adapter(createAdapter(pubClient, subClient));
+    this.adapterActive = true;
+    this.logger.log('Socket.IO Redis adapter activé (broadcasts cross-instance)');
   }
 
   // ======================================================

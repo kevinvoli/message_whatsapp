@@ -29,8 +29,9 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
         }
         const port = config.get<number>('REDIS_PORT') ?? 6379;
         const password = config.get<string>('REDIS_PASSWORD') || undefined;
+        const keyPrefix = config.get<string>('REDIS_KEY_PREFIX') || undefined;
 
-        const client = new Redis({ host, port, password, lazyConnect: true });
+        const client = new Redis({ host, port, password, keyPrefix, lazyConnect: true });
 
         client.on('connect', () => logger.log(`Redis connecté (${host}:${port})`));
         client.on('error', (err: Error) =>

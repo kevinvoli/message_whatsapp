@@ -25,8 +25,10 @@ export const BROADCAST_QUEUE = 'broadcast-sending';
         const host = config.get<string>('REDIS_HOST');
         const port = config.get<number>('REDIS_PORT') ?? 6379;
         const password = config.get<string>('REDIS_PASSWORD') || undefined;
+        const prefix = config.get<string>('BULLMQ_PREFIX') || undefined;
         return {
           connection: { host: host ?? 'localhost', port, password },
+          ...(prefix && { prefix }),
           defaultJobOptions: {
             attempts: 3,
             backoff: { type: 'exponential', delay: 1000 },
@@ -37,7 +39,7 @@ export const BROADCAST_QUEUE = 'broadcast-sending';
       },
     }),
     BullModule.registerQueue({ name: WEBHOOK_PROCESSING_QUEUE }),
-    BullModule.registerQueue({ name: BROADCAST_QUEUE }),
+    // BROADCAST_QUEUE est enregistré dans BroadcastModule — pas de double enregistrement
   ],
   exports: [BullModule],
 })
