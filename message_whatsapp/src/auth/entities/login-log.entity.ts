@@ -8,13 +8,13 @@ export class LoginLog {
   id: string;
 
   @Index('IDX_login_log_user')
-  @Column({ type: 'varchar', length: 36 })
+  @Column({ name: 'user_id', type: 'varchar', length: 36 })
   userId: string;
 
-  @Column({ type: 'varchar', length: 200, nullable: true })
+  @Column({ name: 'user_name', type: 'varchar', length: 200, nullable: true })
   userName: string | null;
 
-  @Column({ type: 'varchar', length: 36, nullable: true })
+  @Column({ name: 'poste_id', type: 'varchar', length: 36, nullable: true })
   posteId: string | null;
 
   @Column({ type: 'varchar', length: 45, nullable: true })
@@ -26,7 +26,7 @@ export class LoginLog {
   @Column({ type: 'varchar', length: 200, nullable: true })
   localisation: string | null;
 
-  @Column({ type: 'enum', enum: ['none', 'sent', 'verified', 'failed'], default: 'none' })
+  @Column({ name: 'otp_status', type: 'enum', enum: ['none', 'sent', 'verified', 'failed'], default: 'none' })
   otpStatus: OtpStatus;
 
   @Index('IDX_login_log_login_at')
