@@ -21,10 +21,12 @@ export class Phase7bAiProviders1745372800001 implements MigrationInterface {
       true,
     );
 
-    await qr.addColumn(
-      'ai_module_config',
-      new TableColumn({ name: 'provider_id', type: 'char', length: '36', isNullable: true }),
-    );
+    if (!(await qr.hasColumn('ai_module_config', 'provider_id'))) {
+      await qr.addColumn(
+        'ai_module_config',
+        new TableColumn({ name: 'provider_id', type: 'char', length: '36', isNullable: true }),
+      );
+    }
   }
 
   async down(qr: QueryRunner): Promise<void> {
