@@ -12,6 +12,7 @@ import {
 import { ValidationEngineService } from 'src/window/services/validation-engine.service';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
+import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
 
 export interface ConversationQueryResult {
   conversations: ReturnType<typeof mapConversationWithContact>[];
@@ -31,6 +32,7 @@ export class SocketConversationQueryService {
     private readonly validationEngine: ValidationEngineService,
     private readonly capacityService: ConversationCapacityService,
     private readonly reportService: ConversationReportService,
+    private readonly socketListCacheService: SocketListCacheService,
   ) {}
 
   /**
@@ -39,6 +41,22 @@ export class SocketConversationQueryService {
    * Mode glissant désactivé : 50 max, triées par last_activity_at DESC, sans validation.
    */
   async loadConversationsForPoste(
+    posteId: string,
+    tenantIds: string[],
+    searchTerm?: string,
+    cursor?: { activityAt: string; chatId: string },
+  ): Promise<ConversationQueryResult> {
+    if (searchTerm) {
+      return this.loadConversationsForPosteInternal(posteId, tenantIds, searchTerm, cursor);
+    }
+    return this.socketListCacheService.getConversations(
+      posteId,
+      cursor,
+      () => this.loadConversationsForPosteInternal(posteId, tenantIds, searchTerm, cursor),
+    );
+  }
+
+  private async loadConversationsForPosteInternal(
     posteId: string,
     tenantIds: string[],
     searchTerm?: string,

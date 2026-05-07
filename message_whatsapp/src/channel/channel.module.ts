@@ -28,6 +28,7 @@ import { ResolveTenantUseCase } from './application/resolve-tenant.use-case';
 import { MetaProviderAdapter } from './adapters/meta-provider.adapter';
 import { ChannelHealthService } from './channel-health.service';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 /**
  * TICKET-05-B/C — Tous les providers sont enregistrés dans le module.
@@ -44,6 +45,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
     WhatsappChatModule,
     FlowBotModule,
     SystemAlertModule,
+    RedisModule,
   ],
   controllers: [ChannelController],
   providers: [

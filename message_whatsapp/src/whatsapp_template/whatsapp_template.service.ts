@@ -1,12 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import axios from 'axios';
+import Redis from 'ioredis';
 import { WhatsappTemplate, WhatsappTemplateStatus } from './entities/whatsapp_template.entity';
 import { CreateWhatsappTemplateDto } from './dto/create-whatsapp-template.dto';
 import { UpdateWhatsappTemplateDto } from './dto/update-whatsapp-template.dto';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 @Injectable()
 export class WhatsappTemplateService {
@@ -18,7 +20,24 @@ export class WhatsappTemplateService {
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
     private readonly logger: AppLogger,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
+
+  private async cachedGet<T>(key: string, ttl: number, loader: () => Promise<T>): Promise<T> {
+    if (this.redis) {
+      const raw = await this.redis.get(key);
+      if (raw !== null) return JSON.parse(raw) as T;
+      const value = await loader();
+      await this.redis.setex(key, ttl, JSON.stringify(value));
+      return value;
+    }
+    return loader();
+  }
+
+  private async invalidateTemplateKeys(templateId: string): Promise<void> {
+    if (!this.redis) return;
+    await this.redis.del(`template:id:${templateId}`);
+  }
 
   async findAllByChannel(channelId: string, status?: string): Promise<WhatsappTemplate[]> {
     const where: any = { channelId };
@@ -27,7 +46,9 @@ export class WhatsappTemplateService {
   }
 
   async findOne(id: string): Promise<WhatsappTemplate | null> {
-    return this.templateRepository.findOne({ where: { id } });
+    return this.cachedGet<WhatsappTemplate | null>(`template:id:${id}`, 300, () =>
+      this.templateRepository.findOne({ where: { id } }),
+    );
   }
 
   async findByExternalId(externalId: string): Promise<WhatsappTemplate | null> {
@@ -35,9 +56,11 @@ export class WhatsappTemplateService {
   }
 
   async findApprovedByName(channelId: string, name: string): Promise<WhatsappTemplate | null> {
-    return this.templateRepository.findOne({
-      where: { channelId, name, status: WhatsappTemplateStatus.APPROVED },
-    });
+    return this.cachedGet<WhatsappTemplate | null>(`template:approved:${channelId}:${name}`, 300, () =>
+      this.templateRepository.findOne({
+        where: { channelId, name, status: WhatsappTemplateStatus.APPROVED },
+      }),
+    );
   }
 
   async create(dto: CreateWhatsappTemplateDto): Promise<WhatsappTemplate> {
@@ -88,7 +111,12 @@ export class WhatsappTemplateService {
       template.rejectionReason = rejectionReason ?? null;
     }
 
-    return this.templateRepository.save(template);
+    const saved = await this.templateRepository.save(template);
+    await this.invalidateTemplateKeys(saved.id);
+    if (this.redis) {
+      await this.redis.del(`template:approved:${saved.channelId}:${saved.name}`);
+    }
+    return saved;
   }
 
   async resubmit(id: string, updates?: UpdateWhatsappTemplateDto): Promise<WhatsappTemplate> {
@@ -119,7 +147,12 @@ export class WhatsappTemplateService {
     template.status = WhatsappTemplateStatus.PENDING;
     template.rejectionReason = null;
 
-    return this.templateRepository.save(template);
+    const saved = await this.templateRepository.save(template);
+    await this.invalidateTemplateKeys(saved.id);
+    if (this.redis) {
+      await this.redis.del(`template:approved:${saved.channelId}:${saved.name}`);
+    }
+    return saved;
   }
 
   private async submitToMeta(

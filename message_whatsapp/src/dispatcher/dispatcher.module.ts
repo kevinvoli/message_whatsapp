@@ -55,6 +55,7 @@ import { AssignmentAffinityService } from './domain/assignment-affinity.service'
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 import { RedisModule } from 'src/redis/redis.module';
+import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
 
 @Module({
   imports: [
@@ -117,6 +118,7 @@ import { RedisModule } from 'src/redis/redis.module';
     ChannelProviderRegistry,
     ResolveTenantUseCase,
     AssignmentAffinityService,
+    SocketListCacheService,
   ],
   exports: [
     DispatcherService,

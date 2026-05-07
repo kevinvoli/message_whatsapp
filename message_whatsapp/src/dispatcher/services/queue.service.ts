@@ -18,6 +18,7 @@ import {
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
+import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
 
 const DEFAULT_QUOTA_ACTIVE = 10;
 
@@ -49,6 +50,9 @@ export class QueueService implements OnModuleInit {
 
     @Optional()
     private readonly lockService: DistributedLockService,
+
+    @Optional()
+    private readonly socketListCacheService: SocketListCacheService,
   ) {}
 
   private async withDistributedLock<T>(resource: string, ttl: number, fn: () => Promise<T>): Promise<T> {
@@ -133,6 +137,7 @@ export class QueueService implements OnModuleInit {
       poste_id: posteId,
       position: saved.position,
     });
+    await this.socketListCacheService?.invalidateQueuePositions();
     return saved;
   }
 
@@ -182,6 +187,7 @@ export class QueueService implements OnModuleInit {
         poste_id: posteId,
         removed_position: removedPosition,
       });
+      await this.socketListCacheService?.invalidateQueuePositions();
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -333,10 +339,12 @@ export class QueueService implements OnModuleInit {
   }
 
   async getQueuePositions(): Promise<QueuePosition[]> {
-    return await this.queueRepository.find({
-      order: { position: 'ASC' },
-      relations: ['poste'],
-    });
+    if (this.socketListCacheService) {
+      return this.socketListCacheService.getQueuePositions(() =>
+        this.queueRepository.find({ order: { position: 'ASC' }, relations: ['poste'] }),
+      );
+    }
+    return this.queueRepository.find({ order: { position: 'ASC' }, relations: ['poste'] });
   }
 
   private async moveToEndInternal(poste_id: string): Promise<void> {
@@ -372,6 +380,7 @@ export class QueueService implements OnModuleInit {
       poste_id,
       new_position: newPosition,
     });
+    await this.socketListCacheService?.invalidateQueuePositions();
   }
 
   async moveToEnd(poste_id: string): Promise<void> {

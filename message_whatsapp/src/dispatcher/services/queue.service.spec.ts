@@ -62,6 +62,7 @@ describe('QueueService', () => {
       dataSource as any,
       null as any, // systemConfig (optional)
       null as any, // lockService (optional)
+      null as any, // socketListCacheService (optional)
     );
   });
 

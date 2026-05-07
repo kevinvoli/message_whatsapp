@@ -58,6 +58,7 @@ import { ConversationClosureModule } from 'src/conversation-closure/conversation
 import { CommercialActionGateModule } from 'src/commercial-action-gate/commercial-action-gate.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { RedisModule } from 'src/redis/redis.module';
+import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
 
 @Module({
   imports: [
@@ -129,6 +130,7 @@ import { RedisModule } from 'src/redis/redis.module';
     ChannelProviderRegistry,
     ResolveTenantUseCase,
     FlowbotOutboundListener,
+    SocketListCacheService,
   ],
   exports: [
     WhatsappMessageGateway,

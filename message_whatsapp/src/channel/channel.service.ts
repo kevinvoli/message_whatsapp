@@ -1,12 +1,15 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
+import Redis from 'ioredis';
 
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { WhapiChannel } from './entities/channel.entity';
@@ -14,6 +17,7 @@ import { ProviderChannel } from './entities/provider-channel.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { ChannelProviderRegistry } from './domain/channel-provider.registry';
 import { ResolveTenantUseCase } from './application/resolve-tenant.use-case';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 /**
  * TICKET-05-C-CLEANUP — `ChannelService` ne contient plus de délégations pures.
@@ -39,7 +43,28 @@ export class ChannelService implements OnModuleInit {
     private readonly logger: AppLogger,
     private readonly providerRegistry: ChannelProviderRegistry,
     private readonly resolveTenantUseCase: ResolveTenantUseCase,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
+
+  private async cachedGet<T>(key: string, ttl: number, loader: () => Promise<T>): Promise<T> {
+    if (this.redis) {
+      const raw = await this.redis.get(key);
+      if (raw !== null) return JSON.parse(raw) as T;
+      const value = await loader();
+      await this.redis.setex(key, ttl, JSON.stringify(value));
+      return value;
+    }
+    return loader();
+  }
+
+  private async invalidateChannelKeys(channelId: string): Promise<void> {
+    if (!this.redis) return;
+    await this.redis.del(
+      `channel:id:${channelId}`,
+      `channel:dedicated:${channelId}`,
+      `channel:is_dedicated:${channelId}`,
+    );
+  }
 
   async onModuleInit(): Promise<void> {
     try {
@@ -77,23 +102,27 @@ export class ChannelService implements OnModuleInit {
    */
   async getDedicatedPosteId(channelId: string): Promise<string | null> {
     if (!channelId) return null;
-    const result = await this.channelRepository
-      .createQueryBuilder('c')
-      .select('c.poste_id', 'poste_id')
-      .where('c.channel_id = :channelId', { channelId })
-      .getRawOne<{ poste_id: string | null }>();
-    return result?.poste_id ?? null;
+    return this.cachedGet<string | null>(`channel:dedicated:${channelId}`, 60, async () => {
+      const result = await this.channelRepository
+        .createQueryBuilder('c')
+        .select('c.poste_id', 'poste_id')
+        .where('c.channel_id = :channelId', { channelId })
+        .getRawOne<{ poste_id: string | null }>();
+      return result?.poste_id ?? null;
+    });
   }
 
   /**
    * Retourne les channel_id de tous les channels dédiés à un poste donné.
    */
   async getDedicatedChannelIdsForPoste(posteId: string): Promise<string[]> {
-    const channels = await this.channelRepository.find({
-      where: { poste_id: posteId },
-      select: ['channel_id'],
+    return this.cachedGet<string[]>(`poste:dedicated_channels:${posteId}`, 60, async () => {
+      const channels = await this.channelRepository.find({
+        where: { poste_id: posteId },
+        select: ['channel_id'],
+      });
+      return channels.map((c) => c.channel_id);
     });
-    return channels.map((c) => c.channel_id);
   }
 
   /**
@@ -102,11 +131,13 @@ export class ChannelService implements OnModuleInit {
    */
   async isChannelDedicated(channelId: string): Promise<boolean> {
     if (!channelId) return false;
-    const ch = await this.channelRepository.findOne({
-      where: { channel_id: channelId },
-      select: ['channel_id', 'poste_id'],
+    return this.cachedGet<boolean>(`channel:is_dedicated:${channelId}`, 60, async () => {
+      const ch = await this.channelRepository.findOne({
+        where: { channel_id: channelId },
+        select: ['channel_id', 'poste_id'],
+      });
+      return !!ch?.poste_id;
     });
-    return !!ch?.poste_id;
   }
 
   /**
@@ -156,11 +187,15 @@ export class ChannelService implements OnModuleInit {
   }
 
   async findOne(id: string) {
-    return this.channelRepository.findOne({ where: { channel_id: id } });
+    return this.cachedGet<WhapiChannel | null>(`channel:id:${id}`, 120, () =>
+      this.channelRepository.findOne({ where: { channel_id: id } }),
+    );
   }
 
   async findByChannelId(channel_id: string) {
-    return this.channelRepository.findOne({ where: { channel_id } });
+    return this.cachedGet<WhapiChannel | null>(`channel:id:${channel_id}`, 120, () =>
+      this.channelRepository.findOne({ where: { channel_id } }),
+    );
   }
 
   /**
@@ -239,20 +274,38 @@ export class ChannelService implements OnModuleInit {
     }
 
     const strategy = this.providerRegistry.get(channel.provider ?? '');
+    let result: WhapiChannel;
     if (strategy) {
-      return strategy.update(channel, dto);
+      result = await strategy.update(channel, dto);
+    } else {
+      Object.assign(channel, dto);
+      result = await this.channelRepository.save(channel);
     }
 
-    // Fallback conservateur pour les providers non encore enregistrés
-    Object.assign(channel, dto);
-    return this.channelRepository.save(channel);
+    if (channel.channel_id) {
+      await this.invalidateChannelKeys(channel.channel_id);
+    }
+    if (channel.poste_id && this.redis) {
+      await this.redis.del(`poste:dedicated_channels:${channel.poste_id}`);
+    }
+
+    return result;
   }
 
   async remove(id: string) {
+    const channel = await this.channelRepository.findOne({ where: { id }, select: ['channel_id', 'poste_id'] });
     const result = await this.channelRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`Channel with ID ${id} not found`);
     }
+
+    if (channel?.channel_id) {
+      await this.invalidateChannelKeys(channel.channel_id);
+    }
+    if (channel?.poste_id && this.redis) {
+      await this.redis.del(`poste:dedicated_channels:${channel.poste_id}`);
+    }
+
     return { deleted: true };
   }
 
