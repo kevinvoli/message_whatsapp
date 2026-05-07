@@ -6,7 +6,6 @@ import { OrderCallSyncService } from './order-call-sync.service';
 export class OrderCallSyncJob implements OnApplicationBootstrap {
   private readonly logger = new Logger(OrderCallSyncJob.name);
   private running = false;
-
   
   constructor(private readonly syncService: OrderCallSyncService) {}
 
