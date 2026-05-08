@@ -75,6 +75,7 @@ import { ConversationClosureModule } from './conversation-closure/conversation-c
 import { OrderDbModule } from './order-db/order-db.module';
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
 import { OrderCallSyncModule } from './order-call-sync/order-call-sync.module';
+import { CallDeviceModule } from './call-device/call-device.module';
 import { OrderWriteModule } from './order-write/order-write.module';
 import { OrderReadModule } from './order-read/order-read.module';
 import { BusinessMetricsModule } from './business-metrics/business-metrics.module';

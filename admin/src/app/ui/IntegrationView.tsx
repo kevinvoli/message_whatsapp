@@ -17,8 +17,9 @@ import {
   SyncCallsResult,
 } from '../lib/api/integration.api';
 import { formatDate } from '../lib/dateUtils';
+import CallDevicesView from './CallDevicesView';
 
-type Tab = 'clients' | 'commercials';
+type Tab = 'clients' | 'commercials' | 'appareils';
 
 export default function IntegrationView() {
   const [tab, setTab] = useState<Tab>('clients');
@@ -183,7 +184,7 @@ export default function IntegrationView() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
-        {(['clients', 'commercials'] as Tab[]).map((t) => (
+        {(['clients', 'commercials', 'appareils'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -193,7 +194,7 @@ export default function IntegrationView() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t === 'clients' ? `Clients (${clientMappings.length})` : `Commerciaux (${commercialMappings.length})`}
+            {t === 'clients' ? `Clients (${clientMappings.length})` : t === 'commercials' ? `Commerciaux (${commercialMappings.length})` : 'Appareils'}
           </button>
         ))}
       </div>
@@ -321,6 +322,11 @@ export default function IntegrationView() {
             </div>
           </div>
         </div>
+      )}
+
+
+      {tab === 'appareils' && (
+        <CallDevicesView />
       )}
 
       {/* Modal commercial */}

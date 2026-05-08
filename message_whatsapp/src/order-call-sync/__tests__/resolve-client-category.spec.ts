@@ -64,6 +64,7 @@ function buildService(orderDb: ReturnType<typeof makeOrderDb> | null) {
     null as any, // cursorRepo — non utilisé par resolveClientCategory
     null as any, // commercialRepo
     null as any, // mappingRepo
+    null as any, // callDeviceRepo — non utilisé par resolveClientCategory
     null as any, // syncLog
     undefined as any, // obligationService
     null as any, // callEventService — non utilisé par resolveClientCategory

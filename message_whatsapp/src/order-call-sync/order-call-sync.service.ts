@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
@@ -24,9 +25,10 @@ import {
   OrderCommandStatus,
   ORDER_COMMAND_STATUS_ETAT_RETOUR,
 } from 'src/order-read/entities/order-command-status.entity';
+import { CallDevice } from 'src/call-device/entities/call-device.entity';
 
-const CURSOR_SCOPE           = 'global';
-const BATCH_SIZE             = 200;
+const CURSOR_SCOPE            = 'global';
+const BATCH_SIZE              = 200;
 const CURSOR_LOOKBACK_MINUTES = 10;
 
 @Injectable()
@@ -49,6 +51,9 @@ export class OrderCallSyncService {
     @InjectRepository(CommercialIdentityMapping)
     private readonly mappingRepo: Repository<CommercialIdentityMapping>,
 
+    @InjectRepository(CallDevice)
+    private readonly callDeviceRepo: Repository<CallDevice>,
+
     private readonly syncLog: IntegrationSyncLogService,
 
     @Optional()
@@ -57,24 +62,16 @@ export class OrderCallSyncService {
     private readonly callEventService: CallEventService,
   ) {}
 
-  /**
-   * Lit les nouveaux appels depuis DB2 (depuis le curseur) et les traite.
-   * Idempotent : les appels déjà traités sont ignorés via le curseur.
-   */
   async syncNewCalls(): Promise<{ processed: number; obligations: number; errors: number }> {
     if (!this.dbAvailable || !this.orderDb) {
-      this.logger.debug('DB2 non disponible — sync appels ignorée');
+      this.logger.debug('DB2 non disponible - sync appels ignoree');
       return { processed: 0, obligations: 0, errors: 0 };
     }
 
     const cursor = await this.getOrCreateCursor();
     const callRepo = this.orderDb.getRepository(OrderCallLog);
 
-    // OBL-009 — Lecture incrémentale avec fenêtre de tolérance (lookback).
-    // La clause WHERE part de (since - LOOKBACK) pour rattraper les insertions tardives.
-    // La déduplication via existsForEntity() évite le double traitement des appels déjà connus.
-    const since    = cursor.lastCallTimestamp ?? new Date(0);
-    const lastId   = cursor.lastCallId ?? '';
+    const since           = cursor.lastCallTimestamp ?? new Date(0);
     const lookbackMinutes = Math.max(
       0,
       Number(process.env['ORDER_CALL_SYNC_LOOKBACK_MINUTES'] ?? String(CURSOR_LOOKBACK_MINUTES)),
@@ -91,14 +88,13 @@ export class OrderCallSyncService {
     const calls = await qb.getMany();
 
     if (calls.length === 0) {
-      this.logger.debug('Sync call_logs DB2 — aucun nouvel appel');
+      this.logger.debug('Sync call_logs DB2 - aucun nouvel appel');
       return { processed: 0, obligations: 0, errors: 0 };
     }
 
     let obligationsMatched = 0;
     let errors = 0;
 
-    // Pré-résolution batch des mappings commercial DB2 → DB1 UUID (évite N+1)
     const commercialDb2Ids = [...new Set(
       calls.map((c) => c.idCommercial).filter((id): id is number => id != null),
     )];
@@ -110,10 +106,11 @@ export class OrderCallSyncService {
     );
 
     for (const call of calls) {
-      // Ingestion dans call_event DB1 (INSERT IGNORE — idempotent sur external_id)
       const commercialIdDb1 = call.idCommercial != null
         ? (commercialIdByDb2Id.get(call.idCommercial) ?? null)
         : null;
+
+      // D2 - passer deviceId dans ingestFromDb2
       await this.callEventService.ingestFromDb2({
         externalId:      String(call.id),
         commercialPhone: call.localNumber ?? '',
@@ -122,11 +119,20 @@ export class OrderCallSyncService {
         callStatus:      call.callType,
         durationSeconds: call.duration,
         eventAt:         call.callTimestamp,
+        deviceId:        call.deviceId ?? null,
       });
+
+      // D4 - Auto-decouverte device : UPSERT silencieux sur call_device
+      if (call.deviceId) {
+        try {
+          await this.upsertCallDevice(call.deviceId, call.callTimestamp);
+        } catch {
+          // silencieux - ne bloque pas la sync
+        }
+      }
 
       let logId: string | null = null;
       try {
-        // T5 — déduplication : skip les appels déjà synchronisés avec succès
         const alreadyDone = await this.syncLog.existsForEntity('call_validation', call.id);
         if (alreadyDone) continue;
 
@@ -139,7 +145,6 @@ export class OrderCallSyncService {
             obligationsMatched++;
             await this.syncLog.markSuccess(logId);
           } else if (result && !result.matched) {
-            // OBL-018 — Rejet métier (pas d'erreur technique) : is_business_rejection = true
             await this.syncLog.markFailed(logId, result.reason ?? 'unknown', true);
           }
         }
@@ -152,7 +157,6 @@ export class OrderCallSyncService {
       }
     }
 
-    // Avancer le curseur
     const last = calls[calls.length - 1];
     await this.cursorRepo.update(
       { scope: CURSOR_SCOPE },
@@ -164,22 +168,38 @@ export class OrderCallSyncService {
     );
 
     this.logger.log(
-      `Sync call_logs DB2 — ${calls.length} appels traités, ${obligationsMatched} obligations, ${errors} erreurs`,
+      `Sync call_logs DB2 - ${calls.length} appels traites, ${obligationsMatched} obligations, ${errors} erreurs`,
     );
 
     return { processed: calls.length, obligations: obligationsMatched, errors };
   }
 
-  /** Traite un appel : crée un log de sync local. Retourne le log créé pour suivi statut. */
+  /** D4 - Insere ou met a jour l'entree call_device pour ce device_id. */
+  private async upsertCallDevice(deviceId: string, callTimestamp: Date): Promise<void> {
+    const existing = await this.callDeviceRepo.findOne({ where: { deviceId } });
+    if (existing) {
+      existing.lastSeen  = callTimestamp > existing.lastSeen ? callTimestamp : existing.lastSeen;
+      existing.callCount += 1;
+      await this.callDeviceRepo.save(existing);
+    } else {
+      await this.callDeviceRepo.save(
+        this.callDeviceRepo.create({
+          id:        uuidv4(),
+          deviceId,
+          label:     null,
+          posteId:   null,
+          firstSeen: callTimestamp,
+          lastSeen:  callTimestamp,
+          callCount: 1,
+        }),
+      );
+    }
+  }
+
   private async processCall(call: OrderCallLog): Promise<{ id: string }> {
     return this.syncLog.createPending('call_validation', call.id, 'call_logs');
   }
 
-  /**
-   * Éligible obligation : sortant ('outgoing') uniquement.
-   * Un appel manqué ('missed') ne compte jamais dans les obligations.
-   * id_commercial est préféré mais on accepte aussi le fallback par localNumber.
-   */
   private isEligibleForObligation(call: OrderCallLog): boolean {
     return (
       call.callType === ORDER_CALL_TYPE_OUTGOING &&
@@ -187,7 +207,6 @@ export class OrderCallSyncService {
     );
   }
 
-  /** Envoie l'appel au moteur d'obligations GICOP. */
   private async matchObligation(
     call: OrderCallLog,
   ): Promise<{ matched: boolean; reason?: string } | null> {
@@ -195,31 +214,29 @@ export class OrderCallSyncService {
 
     const resolvedCategory = await this.resolveClientCategory(call.idClient, call.remoteNumber);
 
+    // D7 - Fallback device->poste : si device_id connu et associe a un poste dans call_device
+    let devicePosteId: string | null = null;
+    if (call.deviceId) {
+      try {
+        const device = await this.callDeviceRepo.findOne({ where: { deviceId: call.deviceId } });
+        devicePosteId = device?.posteId ?? null;
+      } catch {
+        // silencieux
+      }
+    }
+
     return this.obligationService.tryMatchCallToTask({
-      callEventId:       call.id,
-      durationSeconds:   call.duration,
+      callEventId:     call.id,
+      durationSeconds: call.duration,
       resolvedCategory,
-      idCommercialDb2:   call.idCommercial,
-      idClientDb2:       call.idClient,
-      commercialPhone:   call.localNumber ?? undefined,
-      clientPhone:       call.remoteNumber,
-      posteId:           null,
+      idCommercialDb2: call.idCommercial,
+      idClientDb2:     call.idClient,
+      commercialPhone: call.localNumber ?? undefined,
+      clientPhone:     call.remoteNumber,
+      posteId:         devicePosteId,
     });
   }
 
-  /**
-   * Détermine la catégorie d'un client depuis DB2.
-   *
-   * Flux :
-   *   1. id_client présent  → cherche directement dans commandes (même ID DB2)
-   *   2. id_client absent   → cherche le client par numéro de téléphone dans users DB2
-   *                           → récupère son id DB2 → cherche dans commandes
-   *
-   *   Aucune commande trouvée            → JAMAIS_COMMANDE
-   *   trueCancel = 1                     → COMMANDE_ANNULEE
-   *   dateLivree IS NOT NULL             → COMMANDE_AVEC_LIVRAISON
-   *   commande existante non finalisée   → JAMAIS_COMMANDE (défaut)
-   */
   private async resolveClientCategory(
     idClient: number | null,
     remoteNumber: string,
@@ -231,9 +248,8 @@ export class OrderCallSyncService {
 
     let clientIdDb2 = idClient;
 
-    // Fallback : résolution par téléphone si id_client absent
     if (clientIdDb2 == null && remoteNumber) {
-      const normalized = remoteNumber.replace(/\D/g, '');
+      const normalized = remoteNumber.replace(/D/g, '');
       const user = await userRepo
         .createQueryBuilder('u')
         .where('u.type = :type', { type: GIOCOP_USER_TYPE_CLIENT })
@@ -258,7 +274,6 @@ export class OrderCallSyncService {
     if (!order) return CallTaskCategory.JAMAIS_COMMANDE;
     if (order.trueCancel === 1) return CallTaskCategory.COMMANDE_ANNULEE;
 
-    // T7 — Vérifier si le dernier statut de livraison indique un retour (etat 2, 4, 99)
     const statusRepo = this.orderDb.getRepository(OrderCommandStatus);
     const latestStatus = await statusRepo
       .createQueryBuilder('s')
@@ -278,7 +293,6 @@ export class OrderCallSyncService {
     return CallTaskCategory.JAMAIS_COMMANDE;
   }
 
-  /** Retourne les appels manqués récents (non encore traités) pour un numéro local. */
   async getMissedCallsSince(localNumber: string, since: Date): Promise<OrderCallLog[]> {
     if (!this.orderDb) return [];
 
@@ -286,7 +300,7 @@ export class OrderCallSyncService {
     return callRepo.find({
       where: {
         localNumber,
-        callType:      ORDER_CALL_TYPE_MISSED,   // 'missed'
+        callType:      ORDER_CALL_TYPE_MISSED,
         callTimestamp: MoreThan(since),
       },
       order: { callTimestamp: 'DESC' },
@@ -294,7 +308,6 @@ export class OrderCallSyncService {
     });
   }
 
-  /** Compte les appels manqués depuis N heures pour un numéro local. */
   async countMissedCallsSince(localNumber: string, hours = 24): Promise<number> {
     if (!this.orderDb) return 0;
 
@@ -326,25 +339,16 @@ export class OrderCallSyncService {
     return cursor;
   }
 
-  /**
-   * Synchronise la table `commercial_identity_mapping` (DB1) en appariant
-   * les commerciaux DB1 (WhatsappCommercial) avec les utilisateurs DB2 (GicopUser)
-   * via le numéro de téléphone normalisé (chiffres uniquement).
-   *
-   * Idempotent : met à jour uniquement si external_id ou commercial_name ont changé.
-   */
   async syncCommercialMapping(): Promise<{ synced: number; skipped: number; errors: number }> {
     if (!this.dbAvailable || !this.orderDb) {
       return { synced: 0, skipped: 0, errors: 0 };
     }
 
-    // DB1 : tous les commerciaux actifs avec un numéro de téléphone
     const commercials = await this.commercialRepo.find({
       where: { deletedAt: IsNull() },
       select: ['id', 'name', 'phone'],
     });
 
-    // DB2 : utilisateurs commerciaux (type=1, id_poste IS NOT NULL, valid=1)
     const userRepo = this.orderDb.getRepository(GicopUser);
     const db2Users = await userRepo
       .createQueryBuilder('u')
@@ -354,13 +358,11 @@ export class OrderCallSyncService {
       .select(['u.id', 'u.phone'])
       .getMany();
 
-    // Index par téléphone normalisé (chiffres uniquement)
     const db2ByPhone = new Map<string, number>();
     for (const u of db2Users) {
-      if (u.phone) db2ByPhone.set(u.phone.replace(/\D/g, ''), u.id);
+      if (u.phone) db2ByPhone.set(u.phone.replace(/D/g, ''), u.id);
     }
 
-    // Mappings existants en DB1 pour détection des mises à jour
     const existingMappings = await this.mappingRepo.find();
     const mappingByCommercialId = new Map(existingMappings.map(m => [m.commercial_id, m]));
 
@@ -370,7 +372,7 @@ export class OrderCallSyncService {
       try {
         if (!commercial.phone) { skipped++; continue; }
 
-        const db2Id = db2ByPhone.get(commercial.phone.replace(/\D/g, ''));
+        const db2Id = db2ByPhone.get(commercial.phone.replace(/D/g, ''));
         if (db2Id == null) { skipped++; continue; }
 
         const existing = mappingByCommercialId.get(commercial.id);
@@ -400,12 +402,11 @@ export class OrderCallSyncService {
     }
 
     this.logger.log(
-      `Sync commercial_identity_mapping — ${synced} sync, ${skipped} ignorés, ${errors} erreurs`,
+      `Sync commercial_identity_mapping - ${synced} sync, ${skipped} ignores, ${errors} erreurs`,
     );
     return { synced, skipped, errors };
   }
 
-  /** Statut courant pour le panneau admin. */
   async getStatus(): Promise<{
     dbAvailable: boolean;
     lastSyncAt: Date | null;

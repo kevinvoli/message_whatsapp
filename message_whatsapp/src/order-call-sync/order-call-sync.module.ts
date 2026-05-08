@@ -10,10 +10,16 @@ import { WindowModule } from 'src/window/window.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
+import { CallDeviceModule } from 'src/call-device/call-device.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([OrderCallSyncCursor, WhatsappCommercial, CommercialIdentityMapping]),
+    TypeOrmModule.forFeature([
+      OrderCallSyncCursor,
+      WhatsappCommercial,
+      CommercialIdentityMapping,
+    ]),
+    CallDeviceModule,
     IntegrationSyncModule,
     CallObligationModule,
     WindowModule,

@@ -77,7 +77,9 @@ export type ViewMode =
   // E10-T04 — Journal des connexions
   | 'login-logs'
   // Sprint 3 — Config relances auto
-  | 'relance-config';
+  | 'relance-config'
+  // Device-Poste mapping
+  | 'call-devices';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 

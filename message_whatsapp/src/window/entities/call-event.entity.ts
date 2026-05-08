@@ -48,6 +48,9 @@ export class CallEvent {
   @Column({ name: 'commercial_id', type: 'char', length: 36, nullable: true })
   commercial_id: string | null;
 
+  @Column({ name: 'device_id', type: 'varchar', length: 64, nullable: true })
+  device_id: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 }

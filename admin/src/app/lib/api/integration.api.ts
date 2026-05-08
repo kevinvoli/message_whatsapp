@@ -110,3 +110,44 @@ export async function triggerSyncCommercialMapping(): Promise<{ synced: number; 
     }),
   );
 }
+
+export interface CallDevice {
+  id: string;
+  deviceId: string;
+  label: string | null;
+  posteId: string | null;
+  firstSeen: string;
+  lastSeen: string;
+  callCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getCallDevices(): Promise<CallDevice[]> {
+  return handleResponse<CallDevice[]>(
+    await fetch(`${API_BASE_URL}/admin/call-devices`, { credentials: 'include' }),
+  );
+}
+
+export async function updateCallDevice(
+  deviceId: string,
+  payload: { label?: string | null; posteId?: string | null },
+): Promise<CallDevice> {
+  return handleResponse<CallDevice>(
+    await fetch(`${API_BASE_URL}/admin/call-devices/${encodeURIComponent(deviceId)}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function dissociateCallDevice(deviceId: string): Promise<CallDevice> {
+  return handleResponse<CallDevice>(
+    await fetch(`${API_BASE_URL}/admin/call-devices/${encodeURIComponent(deviceId)}/poste`, {
+      method: 'DELETE',
+      credentials: 'include',
+    }),
+  );
+}

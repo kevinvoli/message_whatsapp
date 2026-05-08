@@ -33,6 +33,7 @@ export class CallEventService {
     callStatus:      string;
     durationSeconds: number;
     eventAt:         Date;
+    deviceId?:       string | null;
   }): Promise<void> {
     await this.callEventRepo
       .createQueryBuilder()
@@ -46,6 +47,7 @@ export class CallEventService {
         call_status:      params.callStatus,
         duration_seconds: params.durationSeconds,
         event_at:         params.eventAt,
+        device_id:        params.deviceId ?? null,
       })
       .orIgnore()
       .execute();

@@ -117,12 +117,19 @@ function buildService(
   const mappingRepo      = { findBy: jest.fn().mockResolvedValue([]) } as any;
   const callEventService = { ingestFromDb2: jest.fn().mockResolvedValue(undefined) } as any;
 
+  const callDeviceRepo = {
+    findOne: jest.fn().mockResolvedValue(null),
+    save:    jest.fn().mockResolvedValue({}),
+    create:  jest.fn().mockImplementation((x: unknown) => x),
+  } as any;
+
   const svc = new OrderCallSyncService(
     orderDb as any,
     true,
     cursorRepo,
     commercialRepo,
     mappingRepo,
+    callDeviceRepo,
     syncLog,
     obligationService,
     callEventService,
@@ -184,7 +191,7 @@ describe('OrderCallSyncService — curseur avec fenêtre de tolérance (OBL-009)
     const svc = new OrderCallSyncService(
       null, false,
       {} as any, {} as any, {} as any, {} as any,
-      undefined as any, {} as any,
+      {} as any, undefined as any, {} as any,
     );
     const result = await svc.syncNewCalls();
     expect(result).toEqual({ processed: 0, obligations: 0, errors: 0 });
