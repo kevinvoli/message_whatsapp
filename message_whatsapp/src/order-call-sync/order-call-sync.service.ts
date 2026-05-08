@@ -260,16 +260,42 @@ export class OrderCallSyncService {
   }
 
   /**
-   * Recalcule call_device.call_count depuis call_event en une seule requête.
-   * Idempotent — corrige les valeurs historiquement sur-comptées.
+   * Recalcule call_device.call_count depuis DB2 (source de vérité).
+   * Utilise une requête SQL brute sur DB2 pour éviter tout problème de résolution
+   * de noms de colonnes TypeORM. Crée les entrées call_device manquantes (UPSERT).
    */
   private async recalculateDeviceCounts(): Promise<void> {
-    await this.callDeviceRepo.query(`
-      UPDATE call_device cd
-      SET cd.call_count = (
-        SELECT COUNT(*) FROM call_event ce WHERE ce.device_id = cd.device_id
-      )
-    `);
+    if (!this.orderDb) return;
+
+    const rows = await this.orderDb.query(
+      `SELECT device_id AS deviceId, COUNT(*) AS cnt
+       FROM call_logs
+       WHERE device_id IS NOT NULL AND device_id != ''
+       GROUP BY device_id`,
+    ) as Array<{ deviceId: string; cnt: string }>;
+
+    this.logger.log(`recalculateDeviceCounts: ${rows.length} device(s) trouvé(s) dans DB2 call_logs`);
+
+    for (const { deviceId, cnt } of rows) {
+      const callCount = Number(cnt);
+      const result = await this.callDeviceRepo.update({ deviceId }, { callCount });
+      if ((result.affected ?? 0) === 0) {
+        const now = new Date();
+        await this.callDeviceRepo.save(
+          this.callDeviceRepo.create({
+            deviceId,
+            label:     null,
+            posteId:   null,
+            firstSeen: now,
+            lastSeen:  now,
+            callCount,
+          }),
+        );
+        this.logger.log(`recalculateDeviceCounts: call_device créé automatiquement — ${deviceId} (${callCount} appels)`);
+      } else {
+        this.logger.debug(`recalculateDeviceCounts: ${deviceId} → ${callCount} appels`);
+      }
+    }
   }
 
   private async processCall(call: OrderCallLog): Promise<{ id: string }> {
