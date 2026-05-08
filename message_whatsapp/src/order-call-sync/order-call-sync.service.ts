@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
@@ -94,19 +94,21 @@ export class OrderCallSyncService {
     let obligationsMatched = 0;
     let errors = 0;
 
-    const commercialDb2Ids = [...new Set(
-      calls.map((c) => c.idCommercial).filter((id): id is number => id != null),
-    )];
-    const commercialMappings = commercialDb2Ids.length > 0
-      ? await this.mappingRepo.findBy({ external_id: In(commercialDb2Ids) })
-      : [];
-    const commercialIdByDb2Id = new Map(
-      commercialMappings.map((m) => [m.external_id, m.commercial_id]),
+    // Pré-résolution batch local_number → commercial DB1 UUID (évite N+1)
+    const allCommercialsDb1 = await this.commercialRepo.find({
+      where: { deletedAt: IsNull() },
+      select: ['id', 'phone'],
+    });
+    const commercialByPhone = new Map(
+      allCommercialsDb1
+        .filter((c) => c.phone)
+        .map((c) => [c.phone!.replace(/\D/g, ''), c.id]),
     );
 
     for (const call of calls) {
-      const commercialIdDb1 = call.idCommercial != null
-        ? (commercialIdByDb2Id.get(call.idCommercial) ?? null)
+      const normalizedLocal = call.localNumber?.replace(/\D/g, '') ?? '';
+      const commercialIdDb1 = normalizedLocal
+        ? (commercialByPhone.get(normalizedLocal) ?? null)
         : null;
 
       // D2 - passer deviceId dans ingestFromDb2
@@ -199,10 +201,7 @@ export class OrderCallSyncService {
   }
 
   private isEligibleForObligation(call: OrderCallLog): boolean {
-    return (
-      call.callType === ORDER_CALL_TYPE_OUTGOING &&
-      (call.idCommercial != null || Boolean(call.localNumber))
-    );
+    return call.callType === ORDER_CALL_TYPE_OUTGOING && Boolean(call.localNumber);
   }
 
   private async matchObligation(
@@ -210,7 +209,7 @@ export class OrderCallSyncService {
   ): Promise<{ matched: boolean; reason?: string } | null> {
     if (!this.obligationService) return null;
 
-    const resolvedCategory = await this.resolveClientCategory(call.idClient, call.remoteNumber);
+    const resolvedCategory = await this.resolveClientCategory(call.remoteNumber);
 
     // D7 - Fallback device->poste : si device_id connu et associe a un poste dans call_device
     let devicePosteId: string | null = null;
@@ -227,27 +226,22 @@ export class OrderCallSyncService {
       callEventId:     call.id,
       durationSeconds: call.duration,
       resolvedCategory,
-      idCommercialDb2: call.idCommercial,
-      idClientDb2:     call.idClient,
       commercialPhone: call.localNumber ?? undefined,
       clientPhone:     call.remoteNumber,
       posteId:         devicePosteId,
     });
   }
 
-  private async resolveClientCategory(
-    idClient: number | null,
-    remoteNumber: string,
-  ): Promise<CallTaskCategory> {
+  private async resolveClientCategory(remoteNumber: string): Promise<CallTaskCategory> {
     if (!this.orderDb) return CallTaskCategory.JAMAIS_COMMANDE;
 
     const cmdRepo  = this.orderDb.getRepository(OrderCommand);
     const userRepo = this.orderDb.getRepository(GicopUser);
 
-    let clientIdDb2 = idClient;
+    let clientIdDb2: number | null = null;
 
-    if (clientIdDb2 == null && remoteNumber) {
-      const normalized = remoteNumber.replace(/D/g, '');
+    if (remoteNumber) {
+      const normalized = remoteNumber.replace(/\D/g, '');
       const user = await userRepo
         .createQueryBuilder('u')
         .where('u.type = :type', { type: GIOCOP_USER_TYPE_CLIENT })
@@ -358,7 +352,7 @@ export class OrderCallSyncService {
 
     const db2ByPhone = new Map<string, number>();
     for (const u of db2Users) {
-      if (u.phone) db2ByPhone.set(u.phone.replace(/D/g, ''), u.id);
+      if (u.phone) db2ByPhone.set(u.phone.replace(/\D/g, ''), u.id);
     }
 
     const existingMappings = await this.mappingRepo.find();
@@ -370,7 +364,7 @@ export class OrderCallSyncService {
       try {
         if (!commercial.phone) { skipped++; continue; }
 
-        const db2Id = db2ByPhone.get(commercial.phone.replace(/D/g, ''));
+        const db2Id = db2ByPhone.get(commercial.phone.replace(/\D/g, ''));
         if (db2Id == null) { skipped++; continue; }
 
         const existing = mappingByCommercialId.get(commercial.id);

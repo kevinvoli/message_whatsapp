@@ -17,8 +17,6 @@ import { Contact, ClientCategory } from 'src/contact/entities/contact.entity';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
-import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
 
 const REQUIRED_PER_CATEGORY = 5;
 const MIN_CALL_DURATION_SECONDS = 90;
@@ -65,12 +63,6 @@ export class CallObligationService {
 
     @InjectRepository(WhatsappPoste)
     private readonly posteRepo: Repository<WhatsappPoste>,
-
-    @InjectRepository(ClientIdentityMapping)
-    private readonly clientMappingRepo: Repository<ClientIdentityMapping>,
-
-    @InjectRepository(CommercialIdentityMapping)
-    private readonly commercialMappingRepo: Repository<CommercialIdentityMapping>,
 
     private readonly systemConfig: SystemConfigService,
 
@@ -165,12 +157,8 @@ export class CallObligationService {
   async tryMatchCallToTask(params: {
     callEventId: string;
     durationSeconds: number | null;
-    /** Catégorie déjà résolue en amont (bypasse toute résolution client). */
+    /** Catégorie résolue en amont via DB2 commandes (bypasse la résolution DB1). */
     resolvedCategory?: CallTaskCategory | null;
-    /** Résolution directe via DB2 (prioritaire). */
-    idCommercialDb2?: number | null;
-    idClientDb2?: number | null;
-    /** Fallback par téléphone quand les IDs DB2 ne sont pas disponibles. */
     clientPhone?: string;
     commercialPhone?: string;
     posteId?: string | null;
@@ -186,11 +174,8 @@ export class CallObligationService {
       return { matched: false, reason: 'duree_insuffisante' };
     }
 
-    // 2. Résoudre le poste — ID DB2 si mapping dispo, sinon fallback téléphone
+    // 2. Résoudre le poste via téléphone commercial ou device-poste mapping
     let posteId = params.posteId ?? null;
-    if (!posteId && params.idCommercialDb2 != null) {
-      posteId = await this.resolvePosteByCommercialId(params.idCommercialDb2);
-    }
     if (!posteId && params.commercialPhone) {
       posteId = await this.resolvePosteByCommercialPhone(params.commercialPhone);
     }
@@ -200,11 +185,8 @@ export class CallObligationService {
     }
 
     // 3. Trouver la catégorie du contact
-    // Priorité : catégorie résolue en amont (DB2 commandes) > ID DB2 mapping > téléphone DB1
+    // Priorité : catégorie résolue en amont (DB2 commandes) > téléphone DB1
     let taskCategory: CallTaskCategory | null = params.resolvedCategory ?? null;
-    if (!taskCategory && params.idClientDb2 != null) {
-      taskCategory = await this.resolveContactCategoryById(params.idClientDb2);
-    }
     if (!taskCategory && params.clientPhone) {
       taskCategory = await this.resolveContactCategory(params.clientPhone);
     }
@@ -436,30 +418,4 @@ export class CallObligationService {
     return commercial?.poste?.id ?? null;
   }
 
-  private async resolvePosteByCommercialId(idCommercialDb2: number): Promise<string | null> {
-    const mapping = await this.commercialMappingRepo.findOne({
-      where: { external_id: idCommercialDb2 },
-      select: ['commercial_id'],
-    });
-    if (!mapping) return null;
-    const commercial = await this.commercialRepo.findOne({
-      where: { id: mapping.commercial_id },
-      relations: { poste: true },
-    });
-    return commercial?.poste?.id ?? null;
-  }
-
-  private async resolveContactCategoryById(idClientDb2: number): Promise<CallTaskCategory | null> {
-    const mapping = await this.clientMappingRepo.findOne({
-      where: { external_id: idClientDb2 },
-      select: ['contact_id'],
-    });
-    if (!mapping) return null;
-    const contact = await this.contactRepo.findOne({
-      where: { id: mapping.contact_id },
-      select: ['client_category'],
-    });
-    if (!contact?.client_category) return null;
-    return CATEGORY_MAP[contact.client_category] ?? null;
-  }
 }

@@ -3,45 +3,17 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 /**
  * Entité read-only mappant la table `call_logs` de DB2 (base commandes).
  * NE JAMAIS écrire dans cette table — source de vérité appartenant à la plateforme commande.
- *
  * Utilisée via DataSource.getRepository(OrderCallLog) sur la connexion ORDER_DB_DATA_SOURCE.
- *
- * ── Colonnes manquantes à demander à l'équipe DB2 ──────────────────────────────
- *   id_commercial INT NULL  — FK vers le commercial DB2 (même id que dans order_commands).
- *                             Permet la résolution directe via commercial_identity_mapping
- *                             sans passer par local_number (fragile si SIM non remontée).
- *
- *   id_client     INT NULL  — FK vers le client DB2 (même id que dans order_commands).
- *                             Actuellement on résout via remote_number → Contact.phone
- *                             mais c'est fragile si le numéro est reformaté ou inconnu.
- *
- * Une fois ajoutées, décommenter les champs idCommercial et idClient ci-dessous
- * et activer les index correspondants.
- * ───────────────────────────────────────────────────────────────────────────────
+ * Résolution du commercial : local_number → WhatsappCommercial.phone
+ * Résolution du client     : remote_number → GicopUser.phone → commandes DB2
  */
 @Entity('call_logs')
-@Index('idx_device',      ['deviceId'])
-@Index('idx_timestamp',   ['callTimestamp'])
-@Index('idx_call_type',   ['callType'])
-@Index('idx_commercial',  ['idCommercial'])
-@Index('idx_client',      ['idClient'])
+@Index('idx_device',    ['deviceId'])
+@Index('idx_timestamp', ['callTimestamp'])
+@Index('idx_call_type', ['callType'])
 export class OrderCallLog {
   @PrimaryColumn({ name: 'id', type: 'varchar', length: 36 })
   id: string;
-
-  /**
-   * FK commercial DB2 (users.id) — résolution directe via commercial_identity_mapping.
-   * Plus fiable que local_number (qui peut être absent si la SIM ne remonte pas son numéro).
-   */
-  @Column({ name: 'id_commercial', type: 'int', nullable: true })
-  idCommercial: number | null;
-
-  /**
-   * FK client DB2 (users.id) — résolution directe via client_identity_mapping.
-   * Plus fiable que remote_number (qui peut être reformaté ou inconnu).
-   */
-  @Column({ name: 'id_client', type: 'int', nullable: true })
-  idClient: number | null;
 
   /** Identifiant du dispositif (téléphone du commercial). */
   @Column({ name: 'device_id', type: 'varchar', length: 100 })
