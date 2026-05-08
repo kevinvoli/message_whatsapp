@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { RefreshCw, Loader2, CheckCircle, AlertTriangle, Database } from 'lucide-react';
 import {
   ClientMapping,
   CommercialMapping,
@@ -10,7 +11,12 @@ import {
   getCommercialMappings,
   upsertCommercialMapping,
   deleteCommercialMapping,
+  getOrderSyncStatus,
+  triggerSyncCalls,
+  OrderSyncStatus,
+  SyncCallsResult,
 } from '../lib/api/integration.api';
+import { formatDate } from '../lib/dateUtils';
 
 type Tab = 'clients' | 'commercials';
 
@@ -19,6 +25,10 @@ export default function IntegrationView() {
   const [clientMappings, setClientMappings] = useState<ClientMapping[]>([]);
   const [commercialMappings, setCommercialMappings] = useState<CommercialMapping[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<OrderSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [lastResult, setLastResult] = useState<SyncCallsResult | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Client form
   const [showClientModal, setShowClientModal] = useState(false);
@@ -31,8 +41,12 @@ export default function IntegrationView() {
   const [commercialSaving, setCommercialSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([getClientMappings(), getCommercialMappings()])
-      .then(([c, co]) => { setClientMappings(c); setCommercialMappings(co); })
+    Promise.all([getClientMappings(), getCommercialMappings(), getOrderSyncStatus()])
+      .then(([c, co, status]) => {
+        setClientMappings(c);
+        setCommercialMappings(co);
+        setSyncStatus(status);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -76,6 +90,22 @@ export default function IntegrationView() {
     }
   };
 
+  const handleSyncCalls = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    setLastResult(null);
+    try {
+      const result = await triggerSyncCalls();
+      setLastResult(result);
+      const freshStatus = await getOrderSyncStatus();
+      setSyncStatus(freshStatus);
+    } catch (err) {
+      setSyncError((err as Error).message ?? 'Erreur inconnue');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) return <div className="p-6 text-gray-500">Chargement…</div>;
 
   return (
@@ -95,6 +125,60 @@ export default function IntegrationView() {
           <li>Les appels téléphoniques sont lus depuis <code className="bg-emerald-100 px-1 rounded">call_logs</code> via un job incrémental — sans webhook.</li>
           <li>Ces mappings sont requis pour convertir les UUID internes en ID entiers lors des écritures miroir.</li>
         </ul>
+      </div>
+
+      {/* Synchronisation manuelle */}
+      <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-900">Synchronisation appels DB2</span>
+            {syncStatus && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                syncStatus.db2.dbAvailable
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                {syncStatus.db2.dbAvailable ? 'Connecté' : 'Déconnecté'}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => void handleSyncCalls()}
+            disabled={syncing || !syncStatus?.db2.dbAvailable}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Synchronisation…</>
+              : <><RefreshCw className="w-4 h-4" /> Synchroniser maintenant</>
+            }
+          </button>
+        </div>
+
+        {syncStatus && (
+          <p className="text-xs text-gray-500">
+            Dernier passage : {syncStatus.db2.lastSyncAt ? formatDate(syncStatus.db2.lastSyncAt) : 'jamais'}
+            {' · '}
+            {syncStatus.db2.processedCount.toLocaleString('fr-FR')} appels traités au total
+          </p>
+        )}
+
+        {lastResult && (
+          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span>
+              {lastResult.processed} appels traités · {lastResult.obligations} obligations créées
+              {lastResult.errors > 0 && ` · ${lastResult.errors} erreurs`}
+            </span>
+          </div>
+        )}
+
+        {syncError && (
+          <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{syncError}</span>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

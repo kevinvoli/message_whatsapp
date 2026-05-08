@@ -38,4 +38,10 @@ export class OrderSyncAdminController {
   async syncCommercialMapping() {
     return this.callSync.syncCommercialMapping();
   }
+
+  @Post('sync-calls')
+  @ApiOperation({ summary: 'Déclenche manuellement la synchronisation des appels DB2 (admin)' })
+  async syncCalls() {
+    return this.callSync.syncNewCalls();
+  }
 }

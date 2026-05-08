@@ -71,3 +71,42 @@ export async function deleteCommercialMapping(id: string): Promise<void> {
     credentials: 'include',
   });
 }
+
+export interface OrderSyncStatus {
+  db2: {
+    dbAvailable: boolean;
+    lastSyncAt: string | null;
+    processedCount: number;
+  };
+  syncLog: Record<string, number>;
+}
+
+export interface SyncCallsResult {
+  processed: number;
+  obligations: number;
+  errors: number;
+}
+
+export async function getOrderSyncStatus(): Promise<OrderSyncStatus> {
+  return handleResponse<OrderSyncStatus>(
+    await fetch(`${API_BASE_URL}/admin/order-sync/status`, { credentials: 'include' }),
+  );
+}
+
+export async function triggerSyncCalls(): Promise<SyncCallsResult> {
+  return handleResponse<SyncCallsResult>(
+    await fetch(`${API_BASE_URL}/admin/order-sync/sync-calls`, {
+      method: 'POST',
+      credentials: 'include',
+    }),
+  );
+}
+
+export async function triggerSyncCommercialMapping(): Promise<{ synced: number; skipped: number; errors: number }> {
+  return handleResponse<{ synced: number; skipped: number; errors: number }>(
+    await fetch(`${API_BASE_URL}/admin/order-sync/sync-commercial-mapping`, {
+      method: 'POST',
+      credentials: 'include',
+    }),
+  );
+}

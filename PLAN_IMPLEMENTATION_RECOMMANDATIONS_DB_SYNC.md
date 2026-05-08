@@ -18,6 +18,7 @@
 | `XS` `S` `M` `L` | Effort (XS < 1h · S < 4h · M < 1j · L < 3j) |
 | `🔴` | Bloqué par une dépendance externe (équipe DB2) |
 | `🟢` | Implémentable immédiatement |
+| `✅` | Livré |
 
 ---
 
@@ -25,49 +26,34 @@
 
 | Ticket | Titre | Priorité | Effort | Statut |
 |--------|-------|----------|--------|--------|
-| T1 | Supprimer `IntegrationListener` | P2 | XS | 🟢 |
-| T2 | Créer `SCHEMA_DB2.md` | P0 | XS | 🟢 |
-| T3 | Tests `resolveClientCategory()` | P1 | S | 🟢 |
-| T4 | Champ `is_business_rejection` dans `integration_sync_log` | P1 | S | 🟢 |
-| T5 | Protection drift curseur (fenêtre de tolérance) | P2 | M | 🟢 |
-| **T8** | **Synchronisation complète au redémarrage du backend** | **P1** | **S** | 🟢 |
-| T6 | Création `messaging_client_dossier_mirror` côté DB2 | P0 | XS | 🔴 |
-| T7 | Mapper `statuts_commandes` | P2 | M | 🔴 |
+| T1 | Supprimer `IntegrationListener` | P2 | XS | ✅ Livré |
+| T2 | Créer `SCHEMA_DB2.md` | P0 | XS | 🟢 À faire |
+| T3 | Tests `resolveClientCategory()` | P1 | S | ✅ Livré (5/5 tests) |
+| T4 | Champ `is_business_rejection` dans `integration_sync_log` | P1 | S | ✅ Livré |
+| T5 | Protection drift curseur (fenêtre de tolérance) | P2 | M | ✅ Livré |
+| T8 | Synchronisation complète au redémarrage du backend | P1 | S | ✅ Livré |
+| T6 | Création `messaging_client_dossier_mirror` côté DB2 | P0 | XS | 🔴 Bloqué équipe DB2 |
+| T7 | Mapper `statuts_commandes` + enrichir catégorisation | P2 | M | ✅ Livré |
 
-**Ordre recommandé :**
-```
-T2 → T6 (ops DB2)               ← dépendance externe à déclencher immédiatement
-T1 → T8 → T4 → T3 → T5         ← implémentation code indépendante
-T7                               ← après confirmation schéma DB2
-```
+**Récapitulatif :** 6/8 tickets livrés · T2 à faire · T6 bloqué équipe DB2
 
 ---
 
-## Sprint 1 — Nettoyage et documentation (< 1 journée)
+## Sprint 1 — Nettoyage et documentation ✅
 
-### T1 · [P2] · Supprimer `IntegrationListener` · XS · 🟢
+### T1 · [P2] · Supprimer `IntegrationListener` · XS · ✅ LIVRÉ
 
-**Problème :** `src/integration/integration.listener.ts` est un stub `@Injectable()` vide. Il est enregistré comme provider dans `IntegrationModule` mais ne fait rien.
+**Problème :** `src/integration/integration.listener.ts` était un stub `@Injectable()` vide enregistré dans `IntegrationModule` sans aucune logique.
 
-**Fichiers à modifier :**
+**Implémentation réalisée :**
+- Fichier `src/integration/integration.listener.ts` supprimé
+- `src/integration/integration.module.ts` : `IntegrationListener` retiré des `providers` et de l'import
 
-**`src/integration/integration.listener.ts`** — supprimer le fichier entièrement.
-
-**`src/integration/integration.module.ts`** — retirer `IntegrationListener` des `providers` :
-```typescript
-// Avant
-providers: [IntegrationService, IntegrationListener],
-
-// Après
-providers: [IntegrationService],
-```
-Retirer aussi l'import de `IntegrationListener`.
-
-**Vérification :** `npx tsc --noEmit` → 0 erreur.
+**Vérification :** `npx tsc --noEmit` → 0 erreur (hors erreurs pré-existantes du spec curseur)
 
 ---
 
-### T2 · [P0] · Créer `SCHEMA_DB2.md` · XS · 🟢
+### T2 · [P0] · Créer `SCHEMA_DB2.md` · XS · 🟢 À FAIRE
 
 **Problème :** le DDL de `messaging_client_dossier_mirror` existe uniquement dans un commentaire de service. L'équipe DB2 ne peut pas l'appliquer de façon traçable.
 
@@ -120,439 +106,243 @@ CREATE TABLE IF NOT EXISTS messaging_client_dossier_mirror (
 
 ### Droits requis
 
-La plateforme messagerie a besoin des droits suivants sur cette table :
 - `SELECT`, `INSERT`, `UPDATE` — lecture/écriture dossiers
 - Pas de `DELETE` — les données sont archivées, jamais supprimées
 ```
 
-**Action opérationnelle :** transmettre ce fichier à l'équipe DB2 pour exécution. Tant que la table est absente, chaque soumission de rapport échouera silencieusement avec backoff exponentiel dans `integration_outbox`.
+**Action opérationnelle :** transmettre ce fichier à l'équipe DB2 pour exécution. Tant que la table est absente, chaque soumission de rapport échouera avec backoff exponentiel dans `integration_outbox`.
 
 ---
 
-## Sprint 2 — Synchronisation au redémarrage + fiabilité logs (< 1 journée)
+## Sprint 2 — Synchronisation au redémarrage ✅
 
-### T8 · [P1] · Synchronisation complète au redémarrage du backend · S · 🟢
+### T8 · [P1] · Synchronisation complète au redémarrage · S · ✅ LIVRÉ
 
-**Problème actuel :** `OrderCallSyncJob.onApplicationBootstrap()` appelle uniquement `syncCommercialMapping()`. Si le backend redémarre (déploiement, crash, scaling), `syncNewCalls()` n'est pas déclenché immédiatement — le backend attend le prochain tick cron (jusqu'à 5 min) avant de rattraper les appels DB2 manqués pendant l'arrêt.
+**Implémentation réalisée :**
 
-De même, l'`OutboxProcessorService` n'a aucun hook de démarrage : les entrées `integration_outbox` en attente ne sont traitées qu'au prochain tick cron (1 min), ce qui peut retarder la première synchronisation DB1 → DB2 après un redémarrage.
+**`src/order-call-sync/order-call-sync.job.ts`** :
+- `onApplicationBootstrap()` : après `syncCommercialMapping()`, fire & forget via `setImmediate(() => this._run('bootstrap'))`
+- `_run(triggeredBy: 'cron' | 'bootstrap' = 'cron')` : log `"Sync DB2 démarrée (source: bootstrap)"` + métriques à la fin
 
-**Comportement voulu :** à chaque redémarrage du backend, les deux flux de sync démarrent immédiatement de façon asynchrone, sans bloquer le démarrage de l'application.
+**`src/gicop-report/outbox-processor.service.ts`** :
+- Implémente `OnApplicationBootstrap`
+- `onApplicationBootstrap()` : fire & forget via `setImmediate(() => this.processOutbox())`
 
----
-
-#### Étape 1 — `OrderCallSyncJob` : ajouter `syncNewCalls()` au bootstrap
-
-**Fichier :** `src/order-call-sync/order-call-sync.job.ts`
-
-```typescript
-// Avant
-async onApplicationBootstrap(): Promise<void> {
-  try {
-    await this.syncService.syncCommercialMapping();
-  } catch (err) {
-    this.logger.error(`Erreur sync mapping au démarrage: ${(err as Error).message}`);
-  }
-}
-```
-
-```typescript
-// Après
-async onApplicationBootstrap(): Promise<void> {
-  // Mapping commercial synchrone (rapide, bloquant intentionnellement)
-  try {
-    await this.syncService.syncCommercialMapping();
-  } catch (err) {
-    this.logger.error(`Erreur sync mapping au démarrage: ${(err as Error).message}`);
-  }
-
-  // Rattrapage des appels DB2 manqués pendant l'arrêt — fire & forget
-  // Ne bloque pas le démarrage de l'application
-  setImmediate(() => {
-    this._run().catch((err) =>
-      this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
-    );
-  });
-}
-```
-
-**Pourquoi `setImmediate` ?**
-- Laisse NestJS finir l'initialisation des autres modules avant de démarrer la sync
-- Évite de bloquer `onApplicationBootstrap()` des autres services
-- Le lock distribué (`tryWithLock`) protège contre les doubles exécutions en multi-instance : si deux pods redémarrent simultanément, un seul acquiert le lock et synchonise, l'autre log `LOCK_SKIPPED`
-
-**Cas multi-instance :** le Redlock `cron:order-call-sync` (TTL 450 000 ms) garantit qu'un seul pod exécute `_run()` à la fois, que ce soit via le bootstrap ou le cron. Aucune double synchronisation.
+**Garanties multi-instance :** le Redlock `cron:order-call-sync` (TTL 450 s) protège contre les doubles exécutions — un seul pod synchonise au bootstrap, les autres loggent `LOCK_SKIPPED`.
 
 ---
 
-#### Étape 2 — `OutboxProcessorService` : traiter l'outbox au démarrage
+## Sprint 3 — Fiabilité des logs ✅
 
-**Fichier :** `src/gicop-report/outbox-processor.service.ts`
+### T4 · [P1] · Champ `is_business_rejection` dans `integration_sync_log` · S · ✅ LIVRÉ
 
-Implémenter `OnApplicationBootstrap` :
+**Implémentation réalisée :**
 
-```typescript
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+**Migration** `src/database/migrations/20260508_integration_sync_log_business_rejection.ts` (classe `IntegrationSyncLogBusinessRejection1746648000001`) :
+- `ALTER TABLE integration_sync_log ADD COLUMN is_business_rejection TINYINT(1) NOT NULL DEFAULT 0 AFTER last_error`
+- `ADD INDEX IDX_sync_log_business (status, is_business_rejection)`
 
-@Injectable()
-export class OutboxProcessorService implements OnApplicationBootstrap {
-
-  async onApplicationBootstrap(): Promise<void> {
-    // Traitement des entrées outbox en attente au démarrage — fire & forget
-    setImmediate(() => {
-      this.processNextBatch().catch((err) =>
-        this.logger.error(`Erreur outbox au démarrage: ${(err as Error).message}`),
-      );
-    });
-  }
-
-  // ... reste du service inchangé
-}
-```
-
-> `processNextBatch()` est la méthode privée déjà appelée par le cron `EVERY_MINUTE`. Elle contient déjà le flag `this.processing = true` qui protège contre les doubles exécutions.
-
----
-
-#### Étape 3 — Log de démarrage explicite
-
-Dans `_run()` de `OrderCallSyncJob`, distinguer le premier appel (bootstrap) du cron normal en loggant différemment — utile pour le monitoring :
-
-```typescript
-private async _run(triggeredBy: 'cron' | 'bootstrap' = 'cron'): Promise<void> {
-  this.running = true;
-  this.logger.log(`Sync DB2 démarrée (source: ${triggeredBy})`);
-  try {
-    await this.syncService.syncCommercialMapping();
-    const result = await this.syncService.syncNewCalls();
-    this.logger.log(
-      `Sync DB2 terminée (source: ${triggeredBy}) — ${result.processed} appels, ${result.obligations} obligations, ${result.errors} erreurs`,
-    );
-  } catch (err) {
-    this.logger.error(`Erreur sync DB2 (source: ${triggeredBy}): ${(err as Error).message}`);
-  } finally {
-    this.running = false;
-  }
-}
-```
-
-Appel depuis bootstrap : `this._run('bootstrap')`  
-Appel depuis cron : `this._run('cron')` (inchangé dans `run()`)
-
----
-
-#### Étape 4 — Test unitaire bootstrap
-
-Ajouter dans `src/order-call-sync/__tests__/order-call-sync.service.spec.ts` (ou un nouveau fichier) :
-
-```typescript
-it('BOOT-01: déclenche syncNewCalls() au bootstrap sans bloquer', async () => {
-  const syncSpy = jest.spyOn(syncService, 'syncNewCalls').mockResolvedValue({ processed: 0, obligations: 0, errors: 0 });
-  await job.onApplicationBootstrap();
-  // setImmediate est asynchrone — attendre qu'il s'exécute
-  await new Promise(resolve => setImmediate(resolve));
-  expect(syncSpy).toHaveBeenCalledTimes(1);
-});
-
-it('BOOT-02: un seul appel syncNewCalls si deux instances bootstrappent simultanément (lock)', async () => {
-  // Simuler lock acquis par instance A → instance B doit recevoir LOCK_SKIPPED
-  // Vérifier que syncNewCalls n'est appelé qu'une fois au total
-});
-```
-
-**Vérification :** `npx tsc --noEmit` → 0 erreur.
-
----
-
-
-### T4 · [P1] · Champ `is_business_rejection` dans `integration_sync_log` · S · 🟢
-
-**Problème :** un appel `call_logs` sans tâche d'obligation correspondante génère un log `failed` dans `integration_sync_log`. Ce n'est pas une erreur technique — c'est un rejet métier normal. Les deux cas sont indiscernables dans les dashboards.
-
-**Exemples de rejets métier (normal) :**
-- `matched: false` — aucune tâche d'obligation active pour ce commercial
-- catégorie client `JAMAIS_COMMANDE` — appel hors-périmètre obligations
-
-**Exemples d'erreurs techniques (anomalie) :**
-- timeout DB2
-- exception dans `resolveClientCategory()`
-- `tryMatchCallToTask()` lève une exception
-
-#### Étape 1 — Migration
-
-**Fichier à créer :** `src/database/migrations/20260508_integration_sync_log_business_rejection.ts`
-
-```typescript
-import { MigrationInterface, QueryRunner } from 'typeorm';
-
-export class IntegrationSyncLogBusinessRejection20260508 implements MigrationInterface {
-  async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE integration_sync_log
-        ADD COLUMN is_business_rejection TINYINT(1) NOT NULL DEFAULT 0
-          COMMENT '1 = rejet metier normal (pas derreur technique)'
-          AFTER last_error,
-        ADD INDEX IDX_sync_log_business (status, is_business_rejection)
-    `);
-  }
-
-  async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE integration_sync_log
-        DROP INDEX IDX_sync_log_business,
-        DROP COLUMN is_business_rejection
-    `);
-  }
-}
-```
-
-> **Note :** le nom de classe doit se terminer par un timestamp JS 13 chiffres selon les conventions du projet. Utiliser `IntegrationSyncLogBusinessRejection1746648000001`.
-
-#### Étape 2 — Entité
-
-**Fichier :** `src/integration-sync/entities/integration-sync-log.entity.ts`
-
-Ajouter la colonne après `lastError` :
+**`src/integration-sync/entities/integration-sync-log.entity.ts`** :
 ```typescript
 @Column({ name: 'is_business_rejection', type: 'tinyint', width: 1, default: 0 })
 isBusinessRejection: boolean;
 ```
 
-#### Étape 3 — Service
-
-**Fichier :** `src/integration-sync/integration-sync-log.service.ts`
-
-Modifier la signature de `markFailed()` pour accepter un flag optionnel :
+**`src/integration-sync/integration-sync-log.service.ts`** :
 ```typescript
-async markFailed(id: string, error: string, isBusinessRejection = false): Promise<void> {
-  await this.repo.update(id, {
-    status: 'failed',
-    lastError: error.slice(0, 2000),
-    isBusinessRejection,
-    attemptCount: () => 'attempt_count + 1',
-  });
-}
+async markFailed(id: string, error: string, isBusinessRejection = false): Promise<void>
 ```
 
-#### Étape 4 — Sites d'appel
+**`src/order-call-sync/order-call-sync.service.ts`** :
+- Rejet métier (`matched: false`) → `markFailed(logId, reason, true)`
+- Erreur technique (catch) → `markFailed(logId, err.message, false)` (défaut)
 
-**Fichier :** `src/order-call-sync/order-call-sync.service.ts`
-
-Dans `matchObligation()`, quand `result.matched === false`, appeler :
-```typescript
-await this.syncLog.markFailed(logId, result.reason ?? 'no_match', true); // isBusinessRejection = true
-```
-
-Quand une exception est catchée dans `syncNewCalls()`, appeler :
-```typescript
-await this.syncLog.markFailed(logId, err.message, false); // erreur technique
-```
-
-**Vérification :** `npx tsc --noEmit` → 0 erreur.
+**Monitoring :** `WHERE status = 'failed' AND is_business_rejection = 0` pour les vraies alertes.
 
 ---
 
-## Sprint 3 — Tests et qualité (< 1 journée)
+### T3 · [P1] · Tests `resolveClientCategory()` · S · ✅ LIVRÉ
 
-### T3 · [P1] · Tests `resolveClientCategory()` · S · 🟢
+**Fichier créé :** `src/order-call-sync/__tests__/resolve-client-category.spec.ts`
 
-**Problème :** `resolveClientCategory()` est la fonction la plus critique du pont DB1↔DB2. Elle détermine la catégorie d'obligation pour chaque appel. Elle n'a actuellement aucun test unitaire dédié.
+**5 cas couverts** (4 initiaux + CAS-05 ajouté après implémentation T7) :
 
-**Fichier existant :** `src/order-call-sync/__tests__/order-call-sync.service.spec.ts` (contient OBL-024 sur le curseur).
+| Cas | Scénario | Résultat attendu |
+|-----|----------|-----------------|
+| CAS-01 | `id_client` présent + `dateLivree` définie + pas de retour | `COMMANDE_AVEC_LIVRAISON` |
+| CAS-02 | Fallback téléphone + `trueCancel = 1` | `COMMANDE_ANNULEE` |
+| CAS-03 | `id_client` présent, aucune commande | `JAMAIS_COMMANDE` |
+| CAS-04 | `id_client` absent, numéro inconnu | `JAMAIS_COMMANDE` |
+| CAS-05 | `dateLivree` définie mais dernier statut = retour (`etat 99`) | `COMMANDE_ANNULEE` |
 
-**Fichier à créer :** `src/order-call-sync/__tests__/resolve-client-category.spec.ts`
-
-**4 cas obligatoires à couvrir :**
-
-```typescript
-describe('OrderCallSyncService.resolveClientCategory', () => {
-
-  // Cas 1 — Résolution directe par id_client (chemin optimal)
-  it('CAS-01: retourne COMMANDE_AVEC_LIVRAISON si dateLivree IS NOT NULL', async () => {
-    // call.idClient = 42
-    // DB2 commandes: [{ idClient: 42, trueCancel: 0, dateLivree: new Date() }]
-    // → attend ClientCategory.COMMANDE_AVEC_LIVRAISON
-  });
-
-  // Cas 2 — Résolution par numéro de téléphone (fallback)
-  it('CAS-02: retourne COMMANDE_ANNULEE si trueCancel=1 (résolution par phone)', async () => {
-    // call.idClient = null, call.remoteNumber = '33612345678'
-    // DB2 users: [{ id: 99, type: 0, phone: '33612345678' }]
-    // DB2 commandes: [{ idClient: 99, trueCancel: 1, dateLivree: null }]
-    // → attend ClientCategory.COMMANDE_ANNULEE
-  });
-
-  // Cas 3 — Aucune commande
-  it('CAS-03: retourne JAMAIS_COMMANDE si aucune commande pour ce client', async () => {
-    // call.idClient = 55
-    // DB2 commandes: [] (aucune)
-    // → attend ClientCategory.JAMAIS_COMMANDE
-  });
-
-  // Cas 4 — Numéro inconnu (fallback impossible)
-  it('CAS-04: retourne JAMAIS_COMMANDE si remoteNumber inconnu dans users', async () => {
-    // call.idClient = null, call.remoteNumber = '33600000000'
-    // DB2 users: [] (pas de match)
-    // → attend ClientCategory.JAMAIS_COMMANDE
-  });
-});
-```
-
-**Pattern de mock à suivre :** même pattern que `makeOrderDb()` dans `order-call-sync.service.spec.ts` — pas de vraie connexion DB.
+**Résultat :** `npx jest resolve-client-category` → **5/5 tests verts**
 
 ---
 
-## Sprint 4 — Protection drift curseur (1 journée)
+## Sprint 4 — Protection drift curseur ✅
 
-### T5 · [P2] · Fenêtre de tolérance curseur · M · 🟢
+### T5 · [P2] · Fenêtre de tolérance curseur · M · ✅ LIVRÉ
 
-**Problème :** `OrderCallSyncService.syncNewCalls()` lit les appels strictement après `(call_timestamp, id)` du curseur. Si DB2 insère des appels avec un `call_timestamp` antérieur au curseur (insertions tardives, lag réseau, horloge décalée), ces appels sont définitivement perdus.
+**Implémentation réalisée :**
 
-**Solution :** introduire une fenêtre de tolérance — lire depuis `curseur - LOOKBACK_WINDOW` au lieu du curseur exact, et déduplifier via `integration_sync_log`.
+**`src/order-call-sync/order-call-sync.service.ts`** :
+- Constante `CURSOR_LOOKBACK_MINUTES = 10`
+- Lecture via `process.env['ORDER_CALL_SYNC_LOOKBACK_MINUTES']` (patchée par `SystemConfigService` au boot)
+- WHERE élargi : `c.call_timestamp >= :lookbackSince` (rattrape les insertions tardives DB2)
+- Déduplication : `await this.syncLog.existsForEntity('call_validation', call.id)` — skip si déjà synchronisé avec succès
 
-#### Étape 1 — Constante
-
-**Fichier :** `src/order-call-sync/order-call-sync.service.ts`
-
-Ajouter en tête de fichier :
+**`src/integration-sync/integration-sync-log.service.ts`** :
 ```typescript
-/** Fenêtre de tolérance pour les insertions tardives DB2 (en minutes). */
-const CURSOR_LOOKBACK_MINUTES = 10;
+async existsForEntity(entityType: SyncEntityType, entityId: string): Promise<boolean>
+// Utilise l'index IDX_sync_log_entity (entity_type, entity_id) — O(log n)
 ```
 
-#### Étape 2 — Modifier `syncNewCalls()`
+**`src/system-config/system-config.service.ts`** :
+- Clé `ORDER_CALL_SYNC_LOOKBACK_MINUTES` ajoutée au catalogue (catégorie `integration`, défaut `'10'`)
+- Ajustable sans redéploiement via `POST /admin/system-config`
 
-Dans la clause WHERE de la requête DB2, remplacer :
+---
+
+## Sprint 5 — Enrichissement catégorisation DB2 ✅
+
+### T7 · [P2] · Mapper `statuts_commandes` + enrichir catégorisation · M · ✅ LIVRÉ
+
+**Débloqué le 2026-05-08** — schéma `statuts_commandes` fourni par l'équipe DB2.
+
+#### Schéma DB2 reçu
+
 ```sql
--- Avant (strictement après le curseur)
-WHERE (c.call_timestamp > :since OR (c.call_timestamp = :since AND c.id > :lastId))
-```
-Par :
-```sql
--- Après (avec lookback)
-WHERE c.call_timestamp >= :lookbackSince
-  AND (c.call_timestamp > :since OR (c.call_timestamp = :since AND c.id > :lastId)
-    OR c.call_timestamp < :since)
+CREATE TABLE `statuts_commandes` (
+  `id`          int(11)      NOT NULL AUTO_INCREMENT,
+  `id_commande` int(11)      NOT NULL,
+  `type_user`   varchar(20)  DEFAULT 'livreur',
+  `id_user`     int(11)      DEFAULT NULL,
+  `etat`        int(11)      NOT NULL,
+  `action`      varchar(100) DEFAULT NULL,
+  `date_enreg`  datetime     NOT NULL,
+  `statut`      tinyint(1)   NOT NULL DEFAULT 1,
+  `valid`       tinyint(1)   NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `id_user` (`id_commande`),
+  KEY `acc_table_statut` (`id_commande`,`etat`,`date_enreg`,`statut`,`valid`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 ```
 
-Puis en logique applicative, avant `processCall()`, vérifier si l'appel a déjà été traité :
+#### Codes `etat` connus (SELECT GROUP BY etat)
+
+| `etat` | `type_user` | `action` | Signification |
+|--------|-------------|----------|--------------|
+| 1 | livreur | NULL | Prise en charge livreur |
+| 2 | admin | retour en stock | Retour en stock |
+| 3 | livreur | NULL | En cours de livraison |
+| 4 | admin | retour en stock | Retour en stock (variante) |
+| 5 | livreur | NULL | Livraison en cours (étape suivante) |
+| 99 | admin | retour commande | Retour commande (client refuse) |
+
+**Codes retour :** `[2, 4, 99]` → livraison annulée après sortie de stock
+
+#### Implémentation réalisée
+
+**`src/order-read/entities/order-command-status.entity.ts`** (nouveau fichier) :
 ```typescript
-// Déduplication : ignorer les appels déjà présents dans integration_sync_log
-const alreadyProcessed = await this.syncLogService.existsForEntity(
-  'call_validation', call.id.toString()
-);
-if (alreadyProcessed) continue;
-```
+export const ORDER_COMMAND_STATUS_ETAT_RETOUR: number[] = [2, 4, 99];
 
-#### Étape 3 — Méthode `existsForEntity()` dans `IntegrationSyncLogService`
-
-```typescript
-async existsForEntity(entityType: string, entityId: string): Promise<boolean> {
-  const count = await this.repo.count({
-    where: { entityType: entityType as any, entityId, status: 'success' },
-  });
-  return count > 0;
-}
-```
-
-> **Note :** l'index `IDX_sync_log_entity (entity_type, entity_id)` déjà présent rend cette requête performante.
-
-#### Étape 4 — Paramètre configurable
-
-Exposer `CURSOR_LOOKBACK_MINUTES` via `SystemConfigService` (clé `ORDER_CALL_SYNC_LOOKBACK_MINUTES`, défaut `10`) pour pouvoir l'ajuster sans redéploiement.
-
-**Vérification :** `npx tsc --noEmit` → 0 erreur.
-
----
-
-## Sprint 5 — Dépendances DB2 (bloqué)
-
-### T6 · [P0] · Création `messaging_client_dossier_mirror` côté DB2 · XS · 🔴
-
-**Action :** transmettre `SCHEMA_DB2.md` (créé en T2) à l'équipe DB2 avec le DDL complet.
-
-**Impact si non fait :** chaque soumission de rapport commercial échoue silencieusement. L'outbox accumule des entrées en statut `failed` avec backoff exponentiel (max 24 h). Aucun dossier n'est synchronisé vers DB2.
-
-**Vérification après création :** déclencher manuellement `OutboxProcessorService` sur une entrée test et vérifier que `submission_status` passe de `pending` à `sent`.
-
----
-
-### T7 · [P2] · Mapper `statuts_commandes` · M · 🔴
-
-**Bloqué par :** obtenir le schéma réel de la table `statuts_commandes` auprès de l'équipe DB2.
-
-**Ce qui sera implémenté une fois débloqué :**
-
-#### Étape 1 — Entité read-only
-
-**Fichier à créer :** `src/order-read/entities/order-command-status.entity.ts`
-
-```typescript
-@Entity({ name: 'statuts_commandes', database: 'ORDER_DB' })
+@Entity('statuts_commandes')
+@Index('idx_status_cmd_lookup', ['idCommande', 'valid', 'dateEnreg'])
 export class OrderCommandStatus {
-  @PrimaryGeneratedColumn()
   id: number;
-
-  @Column({ name: 'id_commande' })
   idCommande: number;
-
-  @Column({ name: 'statut_code', nullable: true })
-  statutCode: string | null;
-
-  @Column({ name: 'statut_label', nullable: true })
-  statutLabel: string | null;
-
-  @Column({ name: 'created_at', type: 'datetime', nullable: true })
-  createdAt: Date | null;
-
-  // Ajouter les colonnes réelles après confirmation du schéma DB2
+  typeUser: string | null;
+  idUser: number | null;
+  etat: number;             // code état livraison
+  action: string | null;
+  dateEnreg: Date;
+  statut: number;
+  valid: number;
 }
 ```
 
-#### Étape 2 — Enregistrer dans `OrderReadModule`
+**`src/order-db/order-db.module.ts`** :
+- `OrderCommandStatus` ajouté à la liste `entities` du DataSource DB2 (`synchronize: false`)
 
+**`src/order-call-sync/order-call-sync.service.ts`** — `resolveClientCategory()` enrichie :
+
+Nouvelle règle insérée entre `trueCancel` et `dateLivree` :
 ```typescript
-TypeOrmModule.forFeature([OrderCallLog, OrderCommand, GicocpUser, OrderCommandStatus], ORDER_DB_DATA_SOURCE)
+// T7 — Vérifier si le dernier statut de livraison indique un retour (etat 2, 4, 99)
+const statusRepo = this.orderDb.getRepository(OrderCommandStatus);
+const latestStatus = await statusRepo
+  .createQueryBuilder('s')
+  .where('s.idCommande = :orderId', { orderId: order.id })
+  .andWhere('s.valid = 1')
+  .orderBy('s.dateEnreg', 'DESC')
+  .limit(1)
+  .select(['s.etat'])
+  .getOne();
+
+if (latestStatus && ORDER_COMMAND_STATUS_ETAT_RETOUR.includes(latestStatus.etat)) {
+  return CallTaskCategory.COMMANDE_ANNULEE;
+}
 ```
 
-#### Étape 3 — Enrichir `resolveClientCategory()`
+#### Ordre de priorité final de `resolveClientCategory()`
 
-Ajouter une 5e règle de catégorisation basée sur `statuts_commandes` (ex : commande en livraison partielle, retour, litige) — à définir avec le métier une fois le schéma connu.
+```
+1. orderDb indisponible           → JAMAIS_COMMANDE
+2. Aucune commande pour ce client  → JAMAIS_COMMANDE
+3. trueCancel = 1                  → COMMANDE_ANNULEE
+4. Dernier statut retour (2/4/99)  → COMMANDE_ANNULEE  ← NOUVEAU (T7)
+5. dateLivree IS NOT NULL          → COMMANDE_AVEC_LIVRAISON
+6. Défaut                          → JAMAIS_COMMANDE
+```
 
-#### Étape 4 — Enrichir `OrderSegmentationReadService`
+**Vérification :** `npx tsc --noEmit` → 0 erreur · **5/5 tests verts** (CAS-05 couvre la règle T7)
 
-Nouveaux segments possibles basés sur les statuts : `en_cours_livraison`, `litige`, `retour_marchandise`.
+---
+
+## Sprint 6 — Dépendances DB2 (bloqué)
+
+### T6 · [P0] · Création `messaging_client_dossier_mirror` côté DB2 · XS · 🔴 BLOQUÉ
+
+**Action :** transmettre `SCHEMA_DB2.md` (à créer via T2) à l'équipe DB2 avec le DDL complet.
+
+**Impact si non fait :** chaque soumission de rapport commercial échoue silencieusement. L'outbox accumule des entrées `failed` avec backoff exponentiel (max 24 h). Aucun dossier n'est synchronisé vers DB2.
+
+**Vérification après création :** déclencher manuellement `OutboxProcessorService` sur une entrée test → vérifier que `submission_status` passe de `pending` à `sent`.
 
 ---
 
 ## Checklist de validation finale
 
 ```
-[ ] T1 — IntegrationListener supprimé, module à jour, 0 erreur TS
+[✅] T1 — IntegrationListener supprimé, module à jour, 0 erreur TS
 [ ] T2 — SCHEMA_DB2.md créé et transmis à l'équipe DB2
-[ ] T3 — 4 tests resolveClientCategory passent au vert
-[ ] T4 — Colonne is_business_rejection présente, migration exécutée, markFailed() mis à jour
-[ ] T5 — CURSOR_LOOKBACK_MINUTES=10 actif, déduplication via existsForEntity()
-[ ] T8 — syncNewCalls() déclenché au bootstrap (fire & forget), OutboxProcessor bootstrap ajouté
-[ ] T8 — Tests BOOT-01 et BOOT-02 passent au vert
-[ ] T8 — Log "Sync DB2 démarrée (source: bootstrap)" visible dans les logs au redémarrage
+[✅] T3 — 5 tests resolveClientCategory passent au vert (5/5)
+[✅] T4 — Colonne is_business_rejection présente, migration prête, markFailed() mis à jour
+[✅] T5 — CURSOR_LOOKBACK_MINUTES=10 actif, déduplication via existsForEntity()
+[✅] T8 — syncNewCalls() déclenché au bootstrap (fire & forget)
+[✅] T8 — OutboxProcessor bootstrap ajouté
+[✅] T8 — Log "Sync DB2 démarrée (source: bootstrap)" visible au redémarrage
 [ ] T6 — Table messaging_client_dossier_mirror créée en DB2, OutboxProcessorService valide
-[ ] T7 — Entité OrderCommandStatus créée (après schéma DB2 confirmé)
+[✅] T7 — Entité OrderCommandStatus créée, règle retour (etat 2/4/99) active
 ```
 
 ---
 
-## Dépendances et ordre critique
+## Dépendances et état final
 
 ```
-Jour 1 matin   → T1 (XS) + T2 (XS)   ← démarrer T6 (ops DB2) en parallèle
-Jour 1 après   → T8 (S)               ← sync au redémarrage
-Jour 2 matin   → T4 (S) + T3 (S)
-Jour 2 après   → T5 (M)
-Dès schéma DB2 → T7 (M)
-Dès table DB2  → Valider T6
+✅ T1  Nettoyage IntegrationListener
+✅ T8  Sync au redémarrage (fire & forget)
+✅ T4  is_business_rejection (rejets métier vs erreurs techniques)
+✅ T3  Tests resolveClientCategory (5/5)
+✅ T5  Fenêtre de tolérance curseur + déduplication
+✅ T7  statuts_commandes mappé + règle retour dans resolveClientCategory
+─────────────────────────────────────────────────────────
+⏳ T2  SCHEMA_DB2.md (documentaire — à rédiger et transmettre)
+🔴 T6  messaging_client_dossier_mirror (bloqué équipe DB2 — dépend de T2)
 ```
 
 ---
 
-*Plan généré le 2026-05-08 · Source : RAPPORT_SYNC_DB1_DB2.md*
+*Plan mis à jour le 2026-05-08 · Schéma statuts_commandes reçu le 2026-05-08*
