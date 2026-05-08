@@ -91,9 +91,10 @@ function makeCursorRepo(cursor: ReturnType<typeof makeCursor>) {
 
 function makeSyncLog() {
   return {
-    createPending: jest.fn().mockResolvedValue({}),
-    markSuccess:   jest.fn().mockResolvedValue({}),
-    markFailed:    jest.fn().mockResolvedValue({}),
+    createPending:   jest.fn().mockResolvedValue({ id: 'log-1' }),
+    markSuccess:     jest.fn().mockResolvedValue({}),
+    markFailed:      jest.fn().mockResolvedValue({}),
+    existsForEntity: jest.fn().mockResolvedValue(false),
   } as any;
 }
 
@@ -109,16 +110,22 @@ function buildService(
   cursor: ReturnType<typeof makeCursor>,
   obligationService = makeObligationService(),
 ) {
-  const orderDb     = makeOrderDb(calls);
-  const cursorRepo  = makeCursorRepo(cursor);
-  const syncLog     = makeSyncLog();
+  const orderDb          = makeOrderDb(calls);
+  const cursorRepo       = makeCursorRepo(cursor);
+  const syncLog          = makeSyncLog();
+  const commercialRepo   = { find: jest.fn().mockResolvedValue([]) } as any;
+  const mappingRepo      = { findBy: jest.fn().mockResolvedValue([]) } as any;
+  const callEventService = { ingestFromDb2: jest.fn().mockResolvedValue(undefined) } as any;
 
   const svc = new OrderCallSyncService(
     orderDb as any,
-    true, // dbAvailable
+    true,
     cursorRepo,
+    commercialRepo,
+    mappingRepo,
     syncLog,
     obligationService,
+    callEventService,
   );
 
   return { svc, orderDb, cursorRepo, syncLog };
@@ -126,8 +133,8 @@ function buildService(
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('OrderCallSyncService — curseur avec tie-breaker (OBL-009)', () => {
-  it('utilise le tie-breaker (timestamp = X AND id > Y) dans la requête', async () => {
+describe('OrderCallSyncService — curseur avec fenêtre de tolérance (OBL-009)', () => {
+  it('utilise call_timestamp >= lookbackSince dans la requête', async () => {
     const cursor = makeCursor({
       lastCallTimestamp: new Date('2026-04-28T10:00:00Z'),
       lastCallId: 'call-42',
@@ -139,12 +146,12 @@ describe('OrderCallSyncService — curseur avec tie-breaker (OBL-009)', () => {
 
     const qb = orderDb._qb;
     const whereCall = (qb.where as jest.Mock).mock.calls[0];
-    expect(whereCall[0]).toContain('call_timestamp = :since');
-    expect(whereCall[0]).toContain('c.id > :lastId');
-    expect(whereCall[1]).toMatchObject({ lastId: 'call-42' });
+    expect(whereCall[0]).toContain('call_timestamp');
+    expect(whereCall[0]).toContain('lookbackSince');
+    expect(whereCall[1]).toHaveProperty('lookbackSince');
   });
 
-  it('quand le curseur est vierge, utilise new Date(0) et id vide', async () => {
+  it('quand le curseur est vierge, lookbackSince est proche de epoch', async () => {
     const cursor = makeCursor({ lastCallTimestamp: null, lastCallId: null });
     const calls  = [makeCall()];
     const { svc, orderDb } = buildService(calls, cursor);
@@ -153,7 +160,8 @@ describe('OrderCallSyncService — curseur avec tie-breaker (OBL-009)', () => {
 
     const qb = orderDb._qb;
     const whereCall = (qb.where as jest.Mock).mock.calls[0];
-    expect(whereCall[1]).toMatchObject({ lastId: '' });
+    const lookbackSince: Date = whereCall[1].lookbackSince;
+    expect(lookbackSince.getTime()).toBeLessThan(60_000); // proche de epoch (< 1 min)
   });
 
   it('avance le curseur avec le timestamp et l\'id du dernier appel traité', async () => {
@@ -173,7 +181,11 @@ describe('OrderCallSyncService — curseur avec tie-breaker (OBL-009)', () => {
   });
 
   it('ne traite rien si DB2 indisponible', async () => {
-    const svc = new OrderCallSyncService(null, false, {} as any, {} as any, undefined as any);
+    const svc = new OrderCallSyncService(
+      null, false,
+      {} as any, {} as any, {} as any, {} as any,
+      undefined as any, {} as any,
+    );
     const result = await svc.syncNewCalls();
     expect(result).toEqual({ processed: 0, obligations: 0, errors: 0 });
   });

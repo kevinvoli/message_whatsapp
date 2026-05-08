@@ -13,17 +13,10 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     @Optional() private readonly lockService: DistributedLockService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    try {
-      await this.syncService.syncCommercialMapping();
-    } catch (err) {
-      this.logger.error(`Erreur sync mapping au démarrage: ${(err as Error).message}`);
-    }
-    setImmediate(() => {
-      this._run('bootstrap').catch((err) =>
-        this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
-      );
-    });
+  onApplicationBootstrap(): void {
+    this._run('bootstrap').catch((err) =>
+      this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
+    );
   }
 
   /** Sync DB2 → DB1 toutes les 5 minutes : mapping commerciaux puis appels. */
