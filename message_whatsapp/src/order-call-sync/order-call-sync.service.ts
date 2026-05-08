@@ -5,6 +5,7 @@ import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
   OrderCallLog,
+  ORDER_CALL_MIN_DURATION_SEC,
   ORDER_CALL_TYPE_MISSED,
   ORDER_CALL_TYPE_OUTGOING,
 } from 'src/order-read/entities/order-call-log.entity';
@@ -385,6 +386,81 @@ export class OrderCallSyncService {
     if (order.dateLivree != null) return CallTaskCategory.COMMANDE_AVEC_LIVRAISON;
 
     return CallTaskCategory.JAMAIS_COMMANDE;
+  }
+
+  /**
+   * Scanne call_event (DB1) pour les appels outgoing ≥ 90s non encore validés,
+   * résout le poste via commercial_id ou device_id→call_device, et retente le
+   * matching d'obligation. Ne dépend pas du curseur DB2 — couvre les appels historiques.
+   */
+  async retryUnmatchedObligations(): Promise<{ retried: number; matched: number }> {
+    if (!this.obligationService) return { retried: 0, matched: 0 };
+    if (!await this.obligationService.isEnabled()) return { retried: 0, matched: 0 };
+
+    const candidates = await this.callEventService.findEligibleForRetry({
+      callStatus:         ORDER_CALL_TYPE_OUTGOING,
+      minDurationSeconds: ORDER_CALL_MIN_DURATION_SEC,
+      limit:              100,
+    });
+
+    if (candidates.length === 0) return { retried: 0, matched: 0 };
+    this.logger.log(`retryUnmatchedObligations: ${candidates.length} appel(s) candidat(s)`);
+
+    let retried = 0;
+    let matched = 0;
+
+    for (const event of candidates) {
+      let posteId: string | null = null;
+
+      // Résolution 1 : commercial_id → WhatsappCommercial → poste
+      if (event.commercial_id) {
+        const commercial = await this.commercialRepo.findOne({
+          where:     { id: event.commercial_id },
+          relations: { poste: true },
+        });
+        posteId = commercial?.poste?.id ?? null;
+      }
+
+      // Résolution 2 (fallback) : device_id → call_device → poste associé
+      if (!posteId && event.device_id) {
+        const device = await this.callDeviceRepo.findOne({ where: { deviceId: event.device_id } });
+        posteId = device?.posteId ?? null;
+      }
+
+      if (!posteId) continue; // Attribution impossible — sera retenté au prochain cycle
+
+      retried++;
+      const log = await this.syncLog.createPending('call_validation', event.external_id, 'call_event');
+
+      try {
+        const result = await this.obligationService.tryMatchCallToTask({
+          callEventId:     event.external_id,
+          durationSeconds: event.duration_seconds,
+          clientPhone:     event.client_phone,
+          commercialPhone: event.commercial_phone,
+          posteId,
+        });
+
+        if (result.matched) {
+          matched++;
+          await this.syncLog.markSuccess(log.id);
+        } else {
+          await this.syncLog.markFailed(log.id, result.reason ?? 'unknown', true);
+        }
+      } catch (err) {
+        await this.syncLog.markFailed(log.id, (err as Error).message);
+        this.logger.error(
+          `retryUnmatchedObligations erreur ${event.external_id}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    if (retried > 0) {
+      this.logger.log(
+        `retryUnmatchedObligations: ${retried} retentative(s), ${matched} obligation(s) validée(s)`,
+      );
+    }
+    return { retried, matched };
   }
 
   async getMissedCallsSince(localNumber: string, since: Date): Promise<OrderCallLog[]> {

@@ -39,6 +39,35 @@ export class CallEventService {
     return updated;
   }
 
+  /**
+   * Retourne les call_events éligibles pour un retry de matching d'obligation :
+   * - type d'appel et durée minimale respectés
+   * - au moins un identifiant d'attribution (commercial_id ou device_id)
+   * - aucune entrée 'success' dans integration_sync_log pour cet external_id
+   */
+  async findEligibleForRetry(opts: {
+    callStatus: string;
+    minDurationSeconds: number;
+    limit?: number;
+  }): Promise<CallEvent[]> {
+    return this.callEventRepo
+      .createQueryBuilder('e')
+      .where('e.call_status = :status', { status: opts.callStatus })
+      .andWhere('e.duration_seconds >= :minDuration', { minDuration: opts.minDurationSeconds })
+      .andWhere('(e.commercial_id IS NOT NULL OR e.device_id IS NOT NULL)')
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM integration_sync_log l
+          WHERE l.entity_type = 'call_validation'
+            AND l.entity_id = e.external_id
+            AND l.status = 'success'
+        )`,
+      )
+      .orderBy('e.event_at', 'DESC')
+      .take(opts.limit ?? 100)
+      .getMany();
+  }
+
   /** Historique des appels (admin). */
   async findAll(limit = 50, offset = 0): Promise<[CallEvent[], number]> {
     return this.callEventRepo.findAndCount({

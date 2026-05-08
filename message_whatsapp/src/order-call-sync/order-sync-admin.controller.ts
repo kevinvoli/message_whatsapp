@@ -44,4 +44,10 @@ export class OrderSyncAdminController {
   async syncCalls() {
     return this.callSync.syncNewCalls();
   }
+
+  @Post('retry-obligations')
+  @ApiOperation({ summary: 'Retente le matching obligations pour les appels historiques non validés (admin)' })
+  async retryObligations() {
+    return this.callSync.retryUnmatchedObligations();
+  }
 }

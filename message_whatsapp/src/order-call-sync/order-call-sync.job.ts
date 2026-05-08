@@ -37,6 +37,28 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     await this._run();
   }
 
+  /** Retry obligations toutes les 5 min pour couvrir les appels historiques. */
+  @Cron('0 */5 * * * *')
+  async retryObligations(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock(
+        'cron:retry-obligations', 270_000,
+        () => this._runRetry(),
+      );
+      if (!acquired) this.logger.debug('LOCK_SKIPPED cron:retry-obligations');
+      return;
+    }
+    await this._runRetry();
+  }
+
+  private async _runRetry(): Promise<void> {
+    try {
+      await this.syncService.retryUnmatchedObligations();
+    } catch (err) {
+      this.logger.error(`Erreur retryObligations: ${(err as Error).message}`);
+    }
+  }
+
   private async _run(triggeredBy: 'cron' | 'bootstrap' = 'cron'): Promise<void> {
     this.running = true;
     try {
