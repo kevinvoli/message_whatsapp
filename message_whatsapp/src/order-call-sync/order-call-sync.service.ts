@@ -184,14 +184,17 @@ export class OrderCallSyncService {
     }
 
     const last = calls[calls.length - 1];
-    await this.cursorRepo.update(
-      { scope: CURSOR_SCOPE },
-      {
-        lastCallTimestamp: last.callTimestamp,
-        lastCallId:        last.id,
-        processedCount:    () => `processed_count + ${newCalls}`,
-      },
-    );
+    await Promise.all([
+      this.cursorRepo.update(
+        { scope: CURSOR_SCOPE },
+        {
+          lastCallTimestamp: last.callTimestamp,
+          lastCallId:        last.id,
+          processedCount:    () => `processed_count + ${newCalls}`,
+        },
+      ),
+      this.recalculateDeviceCounts().catch(() => {}),
+    ]);
 
     this.logger.log(
       `Sync call_logs DB2 - ${newCalls} nouveaux / ${calls.length} lus, ${obligationsMatched} obligations, ${errors} erreurs`,
@@ -200,13 +203,14 @@ export class OrderCallSyncService {
     return { processed: newCalls, obligations: obligationsMatched, errors };
   }
 
-  /** D4 - Insere ou met a jour l'entree call_device pour ce device_id. */
+  /** D4 — Insère ou met à jour first_seen/last_seen pour ce device_id. */
   private async upsertCallDevice(deviceId: string, callTimestamp: Date): Promise<void> {
     const existing = await this.callDeviceRepo.findOne({ where: { deviceId } });
     if (existing) {
-      existing.lastSeen  = callTimestamp > existing.lastSeen ? callTimestamp : existing.lastSeen;
-      existing.callCount += 1;
-      await this.callDeviceRepo.save(existing);
+      if (callTimestamp > existing.lastSeen) {
+        existing.lastSeen = callTimestamp;
+        await this.callDeviceRepo.save(existing);
+      }
     } else {
       await this.callDeviceRepo.save(
         this.callDeviceRepo.create({
@@ -215,10 +219,23 @@ export class OrderCallSyncService {
           posteId:   null,
           firstSeen: callTimestamp,
           lastSeen:  callTimestamp,
-          callCount: 1,
+          callCount: 0,
         }),
       );
     }
+  }
+
+  /**
+   * Recalcule call_device.call_count depuis call_event en une seule requête.
+   * Idempotent — corrige les valeurs historiquement sur-comptées.
+   */
+  private async recalculateDeviceCounts(): Promise<void> {
+    await this.callDeviceRepo.query(`
+      UPDATE call_device cd
+      SET cd.call_count = (
+        SELECT COUNT(*) FROM call_event ce WHERE ce.device_id = cd.device_id
+      )
+    `);
   }
 
   private async processCall(call: OrderCallLog): Promise<{ id: string }> {
