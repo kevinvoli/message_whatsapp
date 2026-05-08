@@ -17,6 +17,28 @@ export class CallEventService {
     return this.callEventRepo.count();
   }
 
+  /** Retourne les external_id des call_event sans device_id (pour backfill). */
+  async getExternalIdsWithoutDeviceId(limit = 500): Promise<string[]> {
+    const rows = await this.callEventRepo
+      .createQueryBuilder('e')
+      .select('e.external_id')
+      .where('e.device_id IS NULL')
+      .take(limit)
+      .getMany();
+    return rows.map((r) => r.external_id);
+  }
+
+  /** Met à jour device_id pour une liste de lignes (backfill historique). */
+  async applyDeviceIdBatch(updates: Array<{ externalId: string; deviceId: string }>): Promise<number> {
+    if (updates.length === 0) return 0;
+    let updated = 0;
+    for (const { externalId, deviceId } of updates) {
+      const res = await this.callEventRepo.update({ external_id: externalId }, { device_id: deviceId });
+      updated += res.affected ?? 0;
+    }
+    return updated;
+  }
+
   /** Historique des appels (admin). */
   async findAll(limit = 50, offset = 0): Promise<[CallEvent[], number]> {
     return this.callEventRepo.findAndCount({

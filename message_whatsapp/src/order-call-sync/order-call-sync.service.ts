@@ -84,10 +84,18 @@ export class OrderCallSyncService {
       .addOrderBy('c.id', 'ASC')
       .take(BATCH_SIZE);
 
+    // Backfill device_id pour les call_event historiques (avant la migration)
+    await this.backfillNullDeviceIds().catch((err: Error) =>
+      this.logger.warn(`backfillNullDeviceIds: ${err.message}`),
+    );
+
     const calls = await qb.getMany();
 
     if (calls.length === 0) {
       this.logger.debug('Sync call_logs DB2 - aucun nouvel appel');
+      await this.recalculateDeviceCounts().catch((err: Error) =>
+        this.logger.warn(`recalculateDeviceCounts: ${err.message}`),
+      );
       return { processed: 0, obligations: 0, errors: 0 };
     }
 
@@ -224,6 +232,30 @@ export class OrderCallSyncService {
           callCount: 0,
         }),
       );
+    }
+  }
+
+  /**
+   * Backfill call_event.device_id pour les lignes insérées avant la migration.
+   * Lit les external_id sans device_id depuis DB1, retrouve le device_id dans DB2,
+   * et met à jour DB1 en batch.
+   */
+  private async backfillNullDeviceIds(): Promise<void> {
+    if (!this.orderDb) return;
+
+    const externalIds = await this.callEventService.getExternalIdsWithoutDeviceId(500);
+    if (externalIds.length === 0) return;
+
+    const callRepo = this.orderDb.getRepository(OrderCallLog);
+    const db2Calls = await callRepo.findBy({ id: In(externalIds) });
+
+    const updates = db2Calls
+      .filter((c) => c.deviceId)
+      .map((c) => ({ externalId: String(c.id), deviceId: c.deviceId }));
+
+    if (updates.length > 0) {
+      const n = await this.callEventService.applyDeviceIdBatch(updates);
+      this.logger.log(`backfillNullDeviceIds — ${n} call_event mis à jour`);
     }
   }
 
