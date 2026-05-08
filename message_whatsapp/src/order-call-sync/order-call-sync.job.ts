@@ -19,8 +19,8 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     );
   }
 
-  /** Sync DB2 → DB1 toutes les 5 minutes : mapping commerciaux puis appels. */
-  @Cron('*/5 * * * *')
+  /** Sync DB2 → DB1 toutes les 30 secondes : mapping commerciaux puis appels. */
+  @Cron('*/30 * * * * *')
   async run(): Promise<void> {
     if (this.running) {
       this.logger.debug('Sync DB2 déjà en cours — skip');
@@ -28,7 +28,7 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     }
     if (this.lockService) {
       const { acquired } = await this.lockService.tryWithLock(
-        'cron:order-call-sync', 450_000,
+        'cron:order-call-sync', 29_000,
         () => this._run(),
       );
       if (!acquired) { this.logger.debug('LOCK_SKIPPED cron:order-call-sync'); }

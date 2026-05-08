@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
@@ -94,7 +94,7 @@ export class OrderCallSyncService {
     let obligationsMatched = 0;
     let errors = 0;
 
-    // Pré-résolution batch local_number → commercial DB1 UUID (évite N+1)
+    // Pré-résolution 1 : local_number → commercial DB1 UUID (par téléphone)
     const allCommercialsDb1 = await this.commercialRepo.find({
       where: { deletedAt: IsNull() },
       select: ['id', 'phone'],
@@ -105,11 +105,34 @@ export class OrderCallSyncService {
         .map((c) => [c.phone!.replace(/\D/g, ''), c.id]),
     );
 
+    // Pré-résolution 2 : device_id → commercial connecté au poste (fallback)
+    const allDevices = await this.callDeviceRepo.find({
+      where: { posteId: Not(IsNull()) },
+      select: ['deviceId', 'posteId'],
+    });
+    const posteIds = [...new Set(allDevices.map((d) => d.posteId!))];
+    const connectedAtPoste = posteIds.length > 0
+      ? await this.commercialRepo.find({
+          where: { poste: { id: In(posteIds) }, isConnected: true, deletedAt: IsNull() },
+          relations: ['poste'],
+          select: { id: true, poste: { id: true } },
+        })
+      : [];
+    const commercialByPosteId = new Map(
+      connectedAtPoste.filter((c) => c.poste?.id).map((c) => [c.poste!.id, c.id]),
+    );
+    const commercialByDevice = new Map(
+      allDevices
+        .filter((d) => d.posteId && commercialByPosteId.has(d.posteId))
+        .map((d) => [d.deviceId, commercialByPosteId.get(d.posteId!)!]),
+    );
+
     for (const call of calls) {
       const normalizedLocal = call.localNumber?.replace(/\D/g, '') ?? '';
-      const commercialIdDb1 = normalizedLocal
-        ? (commercialByPhone.get(normalizedLocal) ?? null)
-        : null;
+      const commercialIdDb1 =
+        (normalizedLocal ? commercialByPhone.get(normalizedLocal) : undefined)
+        ?? commercialByDevice.get(call.deviceId)
+        ?? null;
 
       // D2 - passer deviceId dans ingestFromDb2
       await this.callEventService.ingestFromDb2({

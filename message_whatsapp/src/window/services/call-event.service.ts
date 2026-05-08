@@ -51,5 +51,15 @@ export class CallEventService {
       })
       .orIgnore()
       .execute();
+
+    // Backfill commercial_id sur les lignes déjà présentes mais sans attribution
+    if (params.commercialId) {
+      await this.callEventRepo
+        .createQueryBuilder()
+        .update(CallEvent)
+        .set({ commercial_id: params.commercialId })
+        .where('external_id = :eid AND commercial_id IS NULL', { eid: params.externalId })
+        .execute();
+    }
   }
 }
