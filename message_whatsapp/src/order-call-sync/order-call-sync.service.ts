@@ -28,7 +28,7 @@ import { CallDevice } from 'src/call-device/entities/call-device.entity';
 
 const CURSOR_SCOPE            = 'global';
 const BATCH_SIZE              = 200;
-const CURSOR_LOOKBACK_MINUTES = 10;
+const CURSOR_LOOKBACK_MINUTES = 2;
 
 @Injectable()
 export class OrderCallSyncService {
@@ -91,8 +91,9 @@ export class OrderCallSyncService {
       return { processed: 0, obligations: 0, errors: 0 };
     }
 
+    let newCalls          = 0;
     let obligationsMatched = 0;
-    let errors = 0;
+    let errors             = 0;
 
     // Pré-résolution 1 : local_number → commercial DB1 UUID (par téléphone)
     const allCommercialsDb1 = await this.commercialRepo.find({
@@ -160,6 +161,7 @@ export class OrderCallSyncService {
         const alreadyDone = await this.syncLog.existsForEntity('call_validation', call.id);
         if (alreadyDone) continue;
 
+        newCalls++;
         const log = await this.processCall(call);
         logId = log.id;
 
@@ -187,15 +189,15 @@ export class OrderCallSyncService {
       {
         lastCallTimestamp: last.callTimestamp,
         lastCallId:        last.id,
-        processedCount:    () => `processed_count + ${calls.length}`,
+        processedCount:    () => `processed_count + ${newCalls}`,
       },
     );
 
     this.logger.log(
-      `Sync call_logs DB2 - ${calls.length} appels traites, ${obligationsMatched} obligations, ${errors} erreurs`,
+      `Sync call_logs DB2 - ${newCalls} nouveaux / ${calls.length} lus, ${obligationsMatched} obligations, ${errors} erreurs`,
     );
 
-    return { processed: calls.length, obligations: obligationsMatched, errors };
+    return { processed: newCalls, obligations: obligationsMatched, errors };
   }
 
   /** D4 - Insere ou met a jour l'entree call_device pour ce device_id. */
@@ -427,11 +429,14 @@ export class OrderCallSyncService {
     lastSyncAt: Date | null;
     processedCount: number;
   }> {
-    const cursor = await this.cursorRepo.findOne({ where: { scope: CURSOR_SCOPE } });
+    const [cursor, callEventCount] = await Promise.all([
+      this.cursorRepo.findOne({ where: { scope: CURSOR_SCOPE } }),
+      this.callEventService.count(),
+    ]);
     return {
       dbAvailable:    this.dbAvailable,
       lastSyncAt:     cursor?.updatedAt ?? null,
-      processedCount: cursor?.processedCount ?? 0,
+      processedCount: callEventCount,
     };
   }
 }

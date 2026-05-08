@@ -12,6 +12,11 @@ export class CallEventService {
     private readonly callEventRepo: Repository<CallEvent>,
   ) {}
 
+  /** Nombre total d'appels ingérés depuis DB2. */
+  async count(): Promise<number> {
+    return this.callEventRepo.count();
+  }
+
   /** Historique des appels (admin). */
   async findAll(limit = 50, offset = 0): Promise<[CallEvent[], number]> {
     return this.callEventRepo.findAndCount({
