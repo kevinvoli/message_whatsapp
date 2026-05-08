@@ -193,7 +193,9 @@ export class OrderCallSyncService {
           processedCount:    () => `processed_count + ${newCalls}`,
         },
       ),
-      this.recalculateDeviceCounts().catch(() => {}),
+      this.recalculateDeviceCounts().catch((err: Error) =>
+        this.logger.warn(`recalculateDeviceCounts: ${err.message}`),
+      ),
     ]);
 
     this.logger.log(

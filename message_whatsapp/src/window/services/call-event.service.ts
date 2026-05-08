@@ -66,5 +66,15 @@ export class CallEventService {
         .where('external_id = :eid AND commercial_id IS NULL', { eid: params.externalId })
         .execute();
     }
+
+    // Backfill device_id sur les lignes insérées avant la migration (device_id = NULL)
+    if (params.deviceId) {
+      await this.callEventRepo
+        .createQueryBuilder()
+        .update(CallEvent)
+        .set({ device_id: params.deviceId })
+        .where('external_id = :eid AND device_id IS NULL', { eid: params.externalId })
+        .execute();
+    }
   }
 }
