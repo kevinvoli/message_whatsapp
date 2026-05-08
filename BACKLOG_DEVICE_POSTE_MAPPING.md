@@ -13,13 +13,13 @@
 
 | Ticket | Titre | Effort | Statut |
 |--------|-------|--------|--------|
-| D1 | `device_id` dans `call_event` — migration + entité | XS | 🔴 À faire |
-| D2 | Passer `device_id` dans `ingestFromDb2()` | XS | 🔴 À faire |
-| D3 | Table `call_device` + entité — annuaire des appareils | S | 🔴 À faire |
-| D4 | Auto-découverte devices dans la sync | S | 🔴 À faire |
-| D5 | Endpoints admin device-poste | S | 🔴 À faire |
-| D6 | Vue admin `CallDevicesView.tsx` | M | 🔴 À faire |
-| D7 | Fallback device→poste dans `matchObligation()` | S | 🔴 À faire |
+| D1 | `device_id` dans `call_event` — migration + entité | XS | ✅ Code livré · ✅ Migration déployée |
+| D2 | Passer `device_id` dans `ingestFromDb2()` | XS | ✅ Livré |
+| D3 | Table `call_device` + entité — annuaire des appareils | S | ✅ Code livré · ✅ Migration déployée |
+| D4 | Auto-découverte devices dans la sync | S | ✅ Livré |
+| D5 | Endpoints admin device-poste | S | ✅ Livré |
+| D6 | Vue admin `CallDevicesView.tsx` | M | ✅ Livré |
+| D7 | Fallback device→poste dans `matchObligation()` | S | ✅ Livré |
 
 ---
 

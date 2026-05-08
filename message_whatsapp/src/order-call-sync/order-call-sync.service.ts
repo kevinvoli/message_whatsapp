@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
@@ -184,7 +183,6 @@ export class OrderCallSyncService {
     } else {
       await this.callDeviceRepo.save(
         this.callDeviceRepo.create({
-          id:        uuidv4(),
           deviceId,
           label:     null,
           posteId:   null,
