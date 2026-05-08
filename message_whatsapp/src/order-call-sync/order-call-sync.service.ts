@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
+import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
   OrderCallLog,
@@ -52,6 +53,8 @@ export class OrderCallSyncService {
 
     @Optional()
     private readonly obligationService: CallObligationService,
+
+    private readonly callEventService: CallEventService,
   ) {}
 
   /**
@@ -95,7 +98,32 @@ export class OrderCallSyncService {
     let obligationsMatched = 0;
     let errors = 0;
 
+    // Pré-résolution batch des mappings commercial DB2 → DB1 UUID (évite N+1)
+    const commercialDb2Ids = [...new Set(
+      calls.map((c) => c.idCommercial).filter((id): id is number => id != null),
+    )];
+    const commercialMappings = commercialDb2Ids.length > 0
+      ? await this.mappingRepo.findBy({ external_id: In(commercialDb2Ids) })
+      : [];
+    const commercialIdByDb2Id = new Map(
+      commercialMappings.map((m) => [m.external_id, m.commercial_id]),
+    );
+
     for (const call of calls) {
+      // Ingestion dans call_event DB1 (INSERT IGNORE — idempotent sur external_id)
+      const commercialIdDb1 = call.idCommercial != null
+        ? (commercialIdByDb2Id.get(call.idCommercial) ?? null)
+        : null;
+      await this.callEventService.ingestFromDb2({
+        externalId:      String(call.id),
+        commercialPhone: call.localNumber ?? '',
+        commercialId:    commercialIdDb1 ?? null,
+        clientPhone:     call.remoteNumber,
+        callStatus:      call.callType,
+        durationSeconds: call.duration,
+        eventAt:         call.callTimestamp,
+      });
+
       let logId: string | null = null;
       try {
         // T5 — déduplication : skip les appels déjà synchronisés avec succès
