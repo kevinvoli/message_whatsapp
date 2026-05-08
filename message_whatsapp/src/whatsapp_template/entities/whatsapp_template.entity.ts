@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 export enum WhatsappTemplateStatus {
@@ -12,22 +12,24 @@ export class WhatsappTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'channel_id', type: 'varchar', length: 36, nullable: false })
+  @Index('IDX_whatsapp_template_channel_id')
+  @Column({ name: 'channel_id', type: 'varchar', length: 36 })
   channelId: string;
 
-  @Column({ name: 'name', type: 'varchar', length: 100, nullable: false })
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @Column({ name: 'language', type: 'varchar', length: 10, nullable: false, default: 'fr' })
+  @Column({ type: 'varchar', length: 10, default: 'fr' })
   language: string;
 
-  @Column({ name: 'category', type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   category: string | null;
 
-  @Column({ name: 'status', type: 'enum', enum: WhatsappTemplateStatus, default: WhatsappTemplateStatus.PENDING, nullable: false })
+  @Index('IDX_whatsapp_template_channel_status')
+  @Column({ type: 'enum', enum: WhatsappTemplateStatus, default: WhatsappTemplateStatus.PENDING })
   status: WhatsappTemplateStatus;
 
-  @Column({ name: 'components', type: 'json', nullable: true })
+  @Column({ type: 'json', nullable: true })
   components: any | null;
 
   @Column({ name: 'external_id', type: 'varchar', length: 191, nullable: true })
@@ -36,13 +38,13 @@ export class WhatsappTemplate {
   @Column({ name: 'rejection_reason', type: 'varchar', length: 500, nullable: true })
   rejectionReason: string | null;
 
-  @ManyToOne(() => WhapiChannel, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'channel_id', referencedColumnName: 'id' })
-  channel: WhapiChannel;
-
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @ManyToOne(() => WhapiChannel, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'channel_id', referencedColumnName: 'id' })
+  channel: WhapiChannel | null;
 }

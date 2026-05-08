@@ -4,15 +4,33 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Send, Loader2 } from 'lucide-react';
 import { initiateOutboundConversation } from '@/app/lib/api/conversations.api';
 import { getWhatsappTemplates } from '@/app/lib/api/templates.api';
-import { Channel, WhatsappTemplate } from '@/app/lib/definitions';
+import { Channel, ProviderType, WhatsappTemplate } from '@/app/lib/definitions';
 
 interface OutboundMessageModalProps {
+  channels: Channel[];
   onClose: () => void;
-  onSuccess?: (chatId: string) => void;
-  channels?: Channel[];
+  onSuccess: (chatId: string) => void;
 }
 
 const E164_REGEX = /^\d{7,15}$/;
+
+const PROVIDER_BADGE_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
+  meta:      { bg: 'bg-blue-100',    text: 'text-blue-700',    label: 'META'      },
+  whapi:     { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'WHAPI'     },
+  messenger: { bg: 'bg-indigo-100',  text: 'text-indigo-700',  label: 'MESSENGER' },
+  instagram: { bg: 'bg-pink-100',    text: 'text-pink-700',    label: 'INSTAGRAM' },
+  telegram:  { bg: 'bg-sky-100',     text: 'text-sky-700',     label: 'TELEGRAM'  },
+};
+
+function ProviderInlineBadge({ provider }: { provider: ProviderType | null | undefined }) {
+  const key = provider ?? 'whapi';
+  const cfg = PROVIDER_BADGE_CONFIG[key] ?? PROVIDER_BADGE_CONFIG['whapi'];
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${cfg.bg} ${cfg.text}`}>
+      {cfg.label}
+    </span>
+  );
+}
 
 function extractPlaceholderCount(components: any): number {
   if (!components) return 0;
@@ -28,7 +46,7 @@ function getBodyText(components: any): string {
   return body?.text ?? '';
 }
 
-export default function OutboundMessageModal({ onClose, onSuccess, channels = [] }: OutboundMessageModalProps) {
+export default function OutboundMessageModal({ onClose, onSuccess, channels }: OutboundMessageModalProps) {
   const [selectedChannelId, setSelectedChannelId] = useState(channels[0]?.channel_id ?? '');
   const [recipient, setRecipient] = useState('');
   const [contactName, setContactName] = useState('');
@@ -109,7 +127,7 @@ export default function OutboundMessageModal({ onClose, onSuccess, channels = []
         template_params: isTemplateMode && templateParams.length > 0 ? templateParams : undefined,
         contact_name: contactName.trim() || undefined,
       });
-      onSuccess?.(result.chatId);
+      onSuccess(result.chatId);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'envoi");
@@ -118,7 +136,10 @@ export default function OutboundMessageModal({ onClose, onSuccess, channels = []
     }
   };
 
-  const placeholderPhone = isTemplateMode ? 'ex: 2250712345678' : 'ex: +225 07 12 34 56 78';
+  const provider = selectedChannel?.provider ?? null;
+  const placeholderPhone = (provider === 'whapi' || provider === 'meta')
+    ? 'Numéro WhatsApp (ex: 33612345678)'
+    : 'Numéro de téléphone';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -136,20 +157,36 @@ export default function OutboundMessageModal({ onClose, onSuccess, channels = []
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {channels.length > 1 && (
+          {channels.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Canal</label>
-              <select
-                value={selectedChannelId}
-                onChange={e => setSelectedChannelId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {channels.map(ch => (
-                  <option key={ch.channel_id} value={ch.channel_id}>
-                    {ch.label ?? ch.channel_id} ({ch.provider ?? 'whapi'})
-                  </option>
-                ))}
-              </select>
+              {channels.length === 1 ? (
+                <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                  <ProviderInlineBadge provider={channels[0].provider} />
+                  <span className="truncate">{channels[0].label ?? channels[0].channel_id}</span>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {channels.map(ch => (
+                    <button
+                      key={ch.channel_id}
+                      type="button"
+                      onClick={() => setSelectedChannelId(ch.channel_id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                        selectedChannelId === ch.channel_id
+                          ? 'border-blue-500 bg-blue-50 text-blue-800'
+                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <ProviderInlineBadge provider={ch.provider} />
+                      <span className="truncate flex-1 text-left">{ch.label ?? ch.channel_id}</span>
+                      {selectedChannelId === ch.channel_id && (
+                        <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

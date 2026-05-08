@@ -40,7 +40,3 @@ export async function resubmitWhatsappTemplate(
   return handleResponse<WhatsappTemplate>(r);
 }
 
-// Alias rétrocompatibilité
-export async function getTemplates(channelId: string): Promise<WhatsappTemplate[]> {
-  return getWhatsappTemplates(channelId);
-}

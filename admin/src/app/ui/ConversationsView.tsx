@@ -950,7 +950,10 @@ export default function ConversationsView({
                 <OutboundMessageModal
                     onClose={() => setShowOutboundModal(false)}
                     channels={channels}
-                    onSuccess={() => setShowOutboundModal(false)}
+                    onSuccess={(_chatId: string) => {
+                        setShowOutboundModal(false);
+                        void loadChats(limit, offset);
+                    }}
                 />
             )}
         </div>

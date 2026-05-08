@@ -34,6 +34,7 @@ import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { json } from 'stream/consumers';
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { WhatsappTemplateStatus } from 'src/whatsapp_template/entities/whatsapp_template.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 
 // Les webhooks reçoivent un volume légitime élevé — exemptés du throttler global
@@ -159,6 +160,7 @@ export class WhapiController {
           break;
         case 'message_template_status_update':
           if (!WhapiController.HSM_TEMPLATES_ENABLED) {
+            this.auditLogger.log('WEBHOOK_IGNORED provider=whapi event=message_template_status_update reason=ff_hsm_templates_disabled');
             break;
           }
           this.handleTemplateStatusUpdate(payload).catch(() => {});
@@ -561,6 +563,17 @@ export class WhapiController {
     // console.log("affichage du post:2",request);
 
     this.assertPayloadSize(request.rawBody);
+
+    // Détection précoce des webhooks template_status_update (structure différente de messages)
+    const rawChange = (payload as any)?.entry?.[0]?.changes?.[0];
+    if (rawChange?.field === 'message_template_status_update') {
+      if (!WhapiController.HSM_TEMPLATES_ENABLED) {
+        this.auditLogger.log('WEBHOOK_IGNORED provider=meta event=message_template_status_update reason=ff_hsm_templates_disabled');
+        return { status: 'ignored', reason: 'ff_hsm_templates_disabled' };
+      }
+      this.handleTemplateStatusUpdate(rawChange.value).catch(() => {});
+      return { status: 'ok' };
+    }
 
     const metaPayload = this.assertMetaPayload(payload);
 
@@ -1248,29 +1261,24 @@ export class WhapiController {
     return `${provider}:${channelId}:${entry?.changes?.[0]?.field ?? 'unknown'}:${id}`;
   }
 
-  private async handleTemplateStatusUpdate(payload: any): Promise<void> {
-    try {
-      // Le payload Whapi pour message_template_status_update a une structure différente de Meta
-      // On essaie les deux formats
-      const value = payload?.value ?? payload;
-      const externalId = value?.message_template_id?.toString() ?? value?.id?.toString();
-      const event = value?.event ?? value?.new_quality_score ?? 'UNKNOWN';
-      const reason = value?.reason ?? undefined;
+  private async handleTemplateStatusUpdate(value: any): Promise<void> {
+    const externalId = value?.message_template_id?.toString() ?? value?.id?.toString();
+    const event = value?.event?.toLowerCase() ?? value?.status?.toLowerCase();
+    const reason = value?.reason ?? null;
+    if (!externalId || !event) return;
 
-      if (!externalId) return;
+    const statusMap: Record<string, WhatsappTemplateStatus> = {
+      approved: WhatsappTemplateStatus.APPROVED,
+      rejected: WhatsappTemplateStatus.REJECTED,
+      pending: WhatsappTemplateStatus.PENDING,
+    };
+    const status = statusMap[event];
+    if (!status) return;
 
-      const updated = await this.templateService.updateStatusByExternalId(externalId, event, reason);
-      if (updated) {
-        this.gateway.server.emit('admin:template_status_update', {
-          templateId: updated.id,
-          externalId: updated.externalId,
-          name: updated.name,
-          status: updated.status,
-          rejectionReason: updated.rejectionReason,
-        });
-      }
-    } catch (err) {
-      // Fire & forget — ne pas laisser une erreur de template crasher le webhook
-    }
+    await this.templateService.updateStatusByExternalId(externalId, status, reason);
+
+    this.gateway?.server?.emit('admin:template_status_update', {
+      externalId, status, rejectionReason: reason,
+    });
   }
 }

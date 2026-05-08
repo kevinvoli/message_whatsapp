@@ -4,9 +4,8 @@ export class OutboundHsm1746000000001 implements MigrationInterface {
   name = 'OutboundHsm1746000000001';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS \`whatsapp_template\``);
     await queryRunner.query(`
-      CREATE TABLE \`whatsapp_template\` (
+      CREATE TABLE IF NOT EXISTS \`whatsapp_template\` (
         \`id\`               varchar(36)  NOT NULL,
         \`channel_id\`       varchar(36)  NOT NULL,
         \`name\`             varchar(100) NOT NULL,

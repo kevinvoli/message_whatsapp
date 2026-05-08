@@ -1,7 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import axios from 'axios';
+import { ConfigService } from '@nestjs/config';
+import axios, { AxiosError } from 'axios';
 import Redis from 'ioredis';
 import { WhatsappTemplate, WhatsappTemplateStatus } from './entities/whatsapp_template.entity';
 import { CreateWhatsappTemplateDto } from './dto/create-whatsapp-template.dto';
@@ -12,8 +13,6 @@ import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 @Injectable()
 export class WhatsappTemplateService {
-  private readonly META_API_VERSION = 'v19.0';
-
   constructor(
     @InjectRepository(WhatsappTemplate)
     private readonly templateRepository: Repository<WhatsappTemplate>,
@@ -21,6 +20,7 @@ export class WhatsappTemplateService {
     private readonly channelRepository: Repository<WhapiChannel>,
     private readonly logger: AppLogger,
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
+    private readonly configService: ConfigService,
   ) {}
 
   private async cachedGet<T>(key: string, ttl: number, loader: () => Promise<T>): Promise<T> {
@@ -34,9 +34,10 @@ export class WhatsappTemplateService {
     return loader();
   }
 
-  private async invalidateTemplateKeys(templateId: string): Promise<void> {
+  private async invalidateTemplateKeys(templateId: string, channelId: string, name: string): Promise<void> {
     if (!this.redis) return;
     await this.redis.del(`template:id:${templateId}`);
+    await this.redis.del(`template:approved:${channelId}:${name}`);
   }
 
   async findAllByChannel(channelId: string, status?: string): Promise<WhatsappTemplate[]> {
@@ -79,14 +80,15 @@ export class WhatsappTemplateService {
 
     if (channel.provider === 'meta') {
       try {
-        const result = await this.submitToMeta(
+        const externalId = await this.submitToMeta(
           { name: dto.name, language: dto.language ?? 'fr', category: dto.category, components: dto.components },
           channel,
         );
-        template.externalId = result.id;
+        template.externalId = externalId;
         template.status = WhatsappTemplateStatus.PENDING;
       } catch (err) {
         this.logger.warn(`submitToMeta failed: ${(err as Error).message}`, 'WhatsappTemplateService');
+        template.externalId = null;
       }
     } else {
       template.status = WhatsappTemplateStatus.APPROVED;
@@ -97,38 +99,36 @@ export class WhatsappTemplateService {
 
   async updateStatusByExternalId(
     externalId: string,
-    event: string,
+    status: WhatsappTemplateStatus | string,
     rejectionReason?: string,
-  ): Promise<WhatsappTemplate | null> {
+  ): Promise<void> {
     const template = await this.findByExternalId(externalId);
-    if (!template) return null;
-
-    if (event === 'APPROVED') {
-      template.status = WhatsappTemplateStatus.APPROVED;
-      template.rejectionReason = null;
-    } else if (event === 'REJECTED' || event === 'DISABLED') {
-      template.status = WhatsappTemplateStatus.REJECTED;
-      template.rejectionReason = rejectionReason ?? null;
+    if (!template) {
+      this.logger.warn(
+        `updateStatusByExternalId: template externalId=${externalId} introuvable`,
+        'WhatsappTemplateService',
+      );
+      return;
     }
 
-    const saved = await this.templateRepository.save(template);
-    await this.invalidateTemplateKeys(saved.id);
-    if (this.redis) {
-      await this.redis.del(`template:approved:${saved.channelId}:${saved.name}`);
-    }
-    return saved;
+    await this.templateRepository.update(
+      { id: template.id },
+      { status: status as WhatsappTemplateStatus, rejectionReason: rejectionReason ?? null },
+    );
+
+    await this.invalidateTemplateKeys(template.id, template.channelId, template.name);
   }
 
   async resubmit(id: string, updates?: UpdateWhatsappTemplateDto): Promise<WhatsappTemplate> {
     const template = await this.findOne(id);
     if (!template) throw new NotFoundException(`Template ${id} introuvable`);
     if (template.status !== WhatsappTemplateStatus.REJECTED) {
-      throw new BadRequestException('Seuls les templates REJECTED peuvent être resoumis');
+      throw new BadRequestException('Template doit être REJECTED pour resoumission');
     }
 
     const channel = await this.channelRepository.findOne({ where: { id: template.channelId } });
     if (!channel || channel.provider !== 'meta') {
-      throw new BadRequestException('La resoumission est uniquement possible pour les canaux Meta');
+      throw new BadRequestException('Resoumission uniquement pour Meta');
     }
 
     if (updates) {
@@ -138,27 +138,25 @@ export class WhatsappTemplateService {
       if (updates.components !== undefined) template.components = updates.components ?? null;
     }
 
-    const result = await this.submitToMeta(
+    const externalId = await this.submitToMeta(
       { name: template.name, language: template.language, category: template.category ?? undefined, components: template.components },
       channel,
     );
 
-    template.externalId = result.id;
+    template.externalId = externalId;
     template.status = WhatsappTemplateStatus.PENDING;
     template.rejectionReason = null;
 
     const saved = await this.templateRepository.save(template);
-    await this.invalidateTemplateKeys(saved.id);
-    if (this.redis) {
-      await this.redis.del(`template:approved:${saved.channelId}:${saved.name}`);
-    }
+    await this.invalidateTemplateKeys(saved.id, saved.channelId, saved.name);
     return saved;
   }
 
   private async submitToMeta(
-    data: { name: string; language: string; category?: string; components?: any },
+    data: { name: string; language?: string; category?: string; components?: any },
     channel: WhapiChannel,
-  ): Promise<{ id: string }> {
+  ): Promise<string> {
+    const META_API_VERSION = this.configService.get<string>('META_API_VERSION') ?? 'v19.0';
     const wabaId = channel.external_id;
     const token = channel.token;
 
@@ -166,8 +164,11 @@ export class WhatsappTemplateService {
       throw new BadRequestException('Canal Meta sans WABA ID ou token');
     }
 
-    const url = `https://graph.facebook.com/${this.META_API_VERSION}/${wabaId}/message_templates`;
-    const payload: any = { name: data.name, language: data.language };
+    const url = `https://graph.facebook.com/${META_API_VERSION}/${wabaId}/message_templates`;
+    const payload: any = {
+      name: data.name,
+      language: data.language ?? 'fr',
+    };
     if (data.category) payload.category = data.category;
     if (data.components) payload.components = data.components;
 
@@ -175,11 +176,12 @@ export class WhatsappTemplateService {
       const response = await axios.post(url, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return { id: response.data.id };
+      return response.data.id as string;
     } catch (err: any) {
-      const msg = err?.response?.data?.error?.message ?? (err as Error).message;
+      const axiosError = err as AxiosError<{ error?: { message?: string } }>;
+      const msg = axiosError.response?.data?.error?.message ?? (err as Error).message;
       this.logger.error(`Meta template submission failed: ${msg}`, undefined, 'WhatsappTemplateService');
-      throw new BadRequestException(`Erreur Meta API: ${msg}`);
+      throw new BadRequestException(msg ?? 'Meta API error');
     }
   }
 }
