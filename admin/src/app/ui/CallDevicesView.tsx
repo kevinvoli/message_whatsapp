@@ -8,15 +8,15 @@ import {
   updateCallDevice,
   dissociateCallDevice,
 } from '../lib/api/integration.api';
-import { getChannels } from '../lib/api/channels.api';
-import { Channel } from '../lib/definitions';
+import { getPostes } from '../lib/api/postes.api';
+import { Poste } from '../lib/definitions';
 import { formatDate } from '../lib/dateUtils';
 
 type FilterType = 'all' | 'associated' | 'unassociated';
 
 export default function CallDevicesView() {
   const [devices, setDevices]   = useState<CallDevice[]>([]);
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [postes, setPostes] = useState<Poste[]>([]);
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<FilterType>('all');
   const [edits, setEdits]       = useState<Record<string, { label: string; posteId: string }>>({});
@@ -24,10 +24,10 @@ export default function CallDevicesView() {
   const [saved, setSaved]       = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    Promise.all([getCallDevices(), getChannels()])
-      .then(([devs, chans]) => {
+    Promise.all([getCallDevices(), getPostes()])
+      .then(([devs, pts]) => {
         setDevices(devs);
-        setChannels(chans);
+        setPostes(pts);
         const initialEdits: Record<string, { label: string; posteId: string }> = {};
         for (const d of devs) {
           initialEdits[d.deviceId] = { label: d.label ?? '', posteId: d.posteId ?? '' };
@@ -167,9 +167,9 @@ export default function CallDevicesView() {
                           className="border border-gray-300 rounded-lg px-2 py-1 text-xs min-w-[160px] focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                           <option value="">-- Aucun poste --</option>
-                          {channels.map((ch) => (
-                            <option key={ch.channel_id} value={ch.channel_id}>
-                              {ch.label ?? ch.channel_id}
+                          {postes.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.code})
                             </option>
                           ))}
                         </select>
