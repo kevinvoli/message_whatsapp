@@ -19,6 +19,11 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     } catch (err) {
       this.logger.error(`Erreur sync mapping au démarrage: ${(err as Error).message}`);
     }
+    setImmediate(() => {
+      this._run('bootstrap').catch((err) =>
+        this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
+      );
+    });
   }
 
   /** Sync DB2 → DB1 toutes les 5 minutes : mapping commerciaux puis appels. */
@@ -39,11 +44,15 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     await this._run();
   }
 
-  private async _run(): Promise<void> {
+  private async _run(triggeredBy: 'cron' | 'bootstrap' = 'cron'): Promise<void> {
     this.running = true;
     try {
+      this.logger.log(`Sync DB2 démarrée (source: ${triggeredBy})`);
       await this.syncService.syncCommercialMapping();
-      await this.syncService.syncNewCalls();
+      const result = await this.syncService.syncNewCalls();
+      this.logger.log(
+        `Sync DB2 terminée (source: ${triggeredBy}) — ${result.processed} appels, ${result.obligations} obligations, ${result.errors} erreurs`,
+      );
     } catch (err) {
       this.logger.error(`Erreur sync DB2: ${(err as Error).message}`);
     } finally {

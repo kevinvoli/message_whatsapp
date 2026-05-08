@@ -37,6 +37,9 @@ export class IntegrationSyncLog {
   @Column({ name: 'last_error', type: 'text', nullable: true })
   lastError: string | null;
 
+  @Column({ name: 'is_business_rejection', type: 'tinyint', width: 1, default: 0 })
+  isBusinessRejection: boolean;
+
   @Column({ name: 'synced_at', type: 'timestamp', nullable: true })
   syncedAt: Date | null;
 

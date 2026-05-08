@@ -8,6 +8,7 @@ import { OrderDbRepository } from './order-db.repository';
 import { OrderCommand } from 'src/order-read/entities/order-command.entity';
 import { OrderCallLog } from 'src/order-read/entities/order-call-log.entity';
 import { GicopUser } from 'src/order-read/entities/giocop-user.entity';
+import { OrderCommandStatus } from 'src/order-read/entities/order-command-status.entity';
 import { MessagingClientDossierMirror } from 'src/order-write/entities/messaging-client-dossier-mirror.entity';
 
 const logger = new Logger('OrderDbModule');
@@ -39,7 +40,7 @@ const orderDbProvider: Provider = {
       password: config.get<string>('ORDER_DB_PASSWORD') ,
       database: config.get<string>('ORDER_DB_NAME') ,
       // Entités DB2 connues — synchronize: false garantit aucune DDL
-      entities:          [OrderCommand, OrderCallLog, GicopUser, MessagingClientDossierMirror],
+      entities:          [OrderCommand, OrderCallLog, GicopUser, OrderCommandStatus, MessagingClientDossierMirror],
       synchronize:       false,   // JAMAIS de migration sur DB2
       migrationsRun:     false,   // JAMAIS de migration sur DB2
       logging:           false,

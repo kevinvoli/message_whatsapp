@@ -33,13 +33,14 @@ export class IntegrationSyncLogService {
     });
   }
 
-  async markFailed(id: string, error: string): Promise<void> {
+  async markFailed(id: string, error: string, isBusinessRejection = false): Promise<void> {
     const log = await this.repo.findOne({ where: { id } });
     if (!log) return;
     await this.repo.update(id, {
-      status:       'failed',
-      lastError:    error.slice(0, 2000),
-      attemptCount: log.attemptCount + 1,
+      status:              'failed',
+      lastError:           error.slice(0, 2000),
+      attemptCount:        log.attemptCount + 1,
+      isBusinessRejection,
     });
   }
 
@@ -72,6 +73,14 @@ export class IntegrationSyncLogService {
       .groupBy('l.status')
       .getRawMany<{ status: string; count: string }>();
     return Object.fromEntries(rows.map((r) => [r.status, Number(r.count)]));
+  }
+
+  /** Vérifie si une entité a déjà été synchronisée avec succès (déduplication). */
+  async existsForEntity(entityType: SyncEntityType, entityId: string): Promise<boolean> {
+    const count = await this.repo.count({
+      where: { entityType, entityId, status: 'success' },
+    });
+    return count > 0;
   }
 
   /** Purge les entrées success de plus de N jours. */

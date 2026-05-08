@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -17,7 +17,7 @@ import { ConversationReport } from './entities/conversation-report.entity';
  * À l'échec, met à jour conversation_report.submission_status = 'failed'.
  */
 @Injectable()
-export class OutboxProcessorService {
+export class OutboxProcessorService implements OnApplicationBootstrap {
   private readonly logger = new Logger(OutboxProcessorService.name);
   private processing = false;
 
@@ -27,6 +27,14 @@ export class OutboxProcessorService {
     @InjectRepository(ConversationReport)
     private readonly reportRepo: Repository<ConversationReport>,
   ) {}
+
+  onApplicationBootstrap(): void {
+    setImmediate(() => {
+      this.processOutbox().catch((err) =>
+        this.logger.error(`Erreur outbox au démarrage: ${(err as Error).message}`),
+      );
+    });
+  }
 
   @Cron(CronExpression.EVERY_MINUTE)
   async processOutbox(): Promise<void> {

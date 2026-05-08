@@ -19,9 +19,14 @@ import { CallObligationService } from 'src/call-obligations/call-obligation.serv
 import { CallTaskCategory } from 'src/call-obligations/entities/call-task.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
+import {
+  OrderCommandStatus,
+  ORDER_COMMAND_STATUS_ETAT_RETOUR,
+} from 'src/order-read/entities/order-command-status.entity';
 
-const CURSOR_SCOPE = 'global';
-const BATCH_SIZE   = 200;
+const CURSOR_SCOPE           = 'global';
+const BATCH_SIZE             = 200;
+const CURSOR_LOOKBACK_MINUTES = 10;
 
 @Injectable()
 export class OrderCallSyncService {
@@ -62,16 +67,20 @@ export class OrderCallSyncService {
     const cursor = await this.getOrCreateCursor();
     const callRepo = this.orderDb.getRepository(OrderCallLog);
 
-    // OBL-009 — Lecture incrémentale avec tie-breaker sur id pour éviter les pertes
-    // quand plusieurs appels ont le même timestamp.
+    // OBL-009 — Lecture incrémentale avec fenêtre de tolérance (lookback).
+    // La clause WHERE part de (since - LOOKBACK) pour rattraper les insertions tardives.
+    // La déduplication via existsForEntity() évite le double traitement des appels déjà connus.
     const since    = cursor.lastCallTimestamp ?? new Date(0);
     const lastId   = cursor.lastCallId ?? '';
+    const lookbackMinutes = Math.max(
+      0,
+      Number(process.env['ORDER_CALL_SYNC_LOOKBACK_MINUTES'] ?? String(CURSOR_LOOKBACK_MINUTES)),
+    );
+    const lookbackSince = new Date(since.getTime() - lookbackMinutes * 60_000);
+
     const qb = callRepo
       .createQueryBuilder('c')
-      .where(
-        '(c.call_timestamp > :since OR (c.call_timestamp = :since AND c.id > :lastId))',
-        { since, lastId },
-      )
+      .where('c.call_timestamp >= :lookbackSince', { lookbackSince })
       .orderBy('c.call_timestamp', 'ASC')
       .addOrderBy('c.id', 'ASC')
       .take(BATCH_SIZE);
@@ -89,6 +98,10 @@ export class OrderCallSyncService {
     for (const call of calls) {
       let logId: string | null = null;
       try {
+        // T5 — déduplication : skip les appels déjà synchronisés avec succès
+        const alreadyDone = await this.syncLog.existsForEntity('call_validation', call.id);
+        if (alreadyDone) continue;
+
         const log = await this.processCall(call);
         logId = log.id;
 
@@ -98,8 +111,8 @@ export class OrderCallSyncService {
             obligationsMatched++;
             await this.syncLog.markSuccess(logId);
           } else if (result && !result.matched) {
-            // OBL-018 — Tracer les rejets pour diagnostic admin
-            await this.syncLog.markFailed(logId, result.reason ?? 'unknown');
+            // OBL-018 — Rejet métier (pas d'erreur technique) : is_business_rejection = true
+            await this.syncLog.markFailed(logId, result.reason ?? 'unknown', true);
           }
         }
       } catch (err) {
@@ -216,6 +229,22 @@ export class OrderCallSyncService {
 
     if (!order) return CallTaskCategory.JAMAIS_COMMANDE;
     if (order.trueCancel === 1) return CallTaskCategory.COMMANDE_ANNULEE;
+
+    // T7 — Vérifier si le dernier statut de livraison indique un retour (etat 2, 4, 99)
+    const statusRepo = this.orderDb.getRepository(OrderCommandStatus);
+    const latestStatus = await statusRepo
+      .createQueryBuilder('s')
+      .where('s.idCommande = :orderId', { orderId: order.id })
+      .andWhere('s.valid = 1')
+      .orderBy('s.dateEnreg', 'DESC')
+      .limit(1)
+      .select(['s.etat'])
+      .getOne();
+
+    if (latestStatus && ORDER_COMMAND_STATUS_ETAT_RETOUR.includes(latestStatus.etat)) {
+      return CallTaskCategory.COMMANDE_ANNULEE;
+    }
+
     if (order.dateLivree != null) return CallTaskCategory.COMMANDE_AVEC_LIVRAISON;
 
     return CallTaskCategory.JAMAIS_COMMANDE;

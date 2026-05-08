@@ -58,6 +58,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
   { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP / GICOP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant) + POST /webhooks/gicop', isSecret: true },
   { key: 'GICOP_WEBHOOK_VERIFY_TOKEN', label: 'Token vérification webhook GICOP', category: 'integration', description: 'Token pour le GET /webhooks/gicop?hub.verify_token=... (si vide, utilise INTEGRATION_SECRET)', isSecret: true },
+  { key: 'ORDER_CALL_SYNC_LOOKBACK_MINUTES', label: 'Fenêtre de tolérance sync appels (min)', category: 'integration', description: 'Minutes de recul pour rattraper les appels DB2 insérés tardivement (défaut : 10)', defaultValue: '10' },
 
   // ─── Formule de classement des commerciaux ────────────────────────────────────
   {
