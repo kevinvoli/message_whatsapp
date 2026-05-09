@@ -37,6 +37,7 @@ interface SyncStatus {
 interface SyncDiagnostics {
   callStatusDistribution: Array<{ status: string; count: number }>;
   deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
+  retrySteps: { total: number; withStatus: number; withDuration: number; withAttribution: number; withoutSuccess: number };
   activeBatchPosteIds: string[];
   obligationServiceWired: boolean;
   featureFlagEnabled: boolean;
@@ -506,17 +507,31 @@ export default function GicopSupervisionView() {
                         {diagnostics.activeBatchPosteIds.length}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Éligibles au retry</span>
-                      <span className={diagnostics.eligibleForRetry > 0 ? 'text-blue-600 font-semibold' : 'text-gray-500 font-semibold'}>
-                        {diagnostics.eligibleForRetry}
-                      </span>
-                    </div>
                     {diagnostics.activeBatchPosteIds.length === 0 && (
                       <p className="text-orange-600 font-semibold">⚠ Aucun batch actif — cliquer sur &quot;Initialiser les batches&quot;</p>
                     )}
-                    {diagnostics.eligibleForRetry === 0 && diagnostics.callStatusDistribution.some(d => d.status !== d.status.toLowerCase()) && (
-                      <p className="text-red-600 font-semibold">⚠ Normaliser call_status d&apos;abord (étape 1)</p>
+                  </div>
+
+                  {/* Breakdown retry */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="font-semibold text-gray-600 mb-2">Entonnoir retry (filtre par filtre)</p>
+                    {([
+                      { label: 'Total call_event',                      value: diagnostics.retrySteps.total,           ok: diagnostics.retrySteps.total > 0 },
+                      { label: '→ call_status = outgoing',              value: diagnostics.retrySteps.withStatus,      ok: diagnostics.retrySteps.withStatus > 0 },
+                      { label: '→ duration_seconds ≥ 90s',              value: diagnostics.retrySteps.withDuration,    ok: diagnostics.retrySteps.withDuration > 0 },
+                      { label: '→ commercial_id ou device_id non nul', value: diagnostics.retrySteps.withAttribution, ok: diagnostics.retrySteps.withAttribution > 0 },
+                      { label: '→ pas encore en succès (éligibles)',    value: diagnostics.retrySteps.withoutSuccess,  ok: diagnostics.retrySteps.withoutSuccess > 0 },
+                    ] as const).map(({ label, value, ok }) => (
+                      <div key={label} className="flex justify-between py-0.5">
+                        <span className={`text-gray-600 ${!ok && value !== undefined ? 'font-semibold text-red-600' : ''}`}>{label}</span>
+                        <span className={`font-semibold ${ok ? 'text-green-700' : 'text-red-600'}`}>{value}</span>
+                      </div>
+                    ))}
+                    {diagnostics.retrySteps.withDuration === 0 && diagnostics.retrySteps.withStatus > 0 && (
+                      <p className="text-red-600 font-semibold mt-2">⚠ Tous les appels outgoing ont une durée &lt; 90s — vérifier le champ &quot;duration&quot; dans DB2</p>
+                    )}
+                    {diagnostics.retrySteps.withAttribution === 0 && diagnostics.retrySteps.withDuration > 0 && (
+                      <p className="text-red-600 font-semibold mt-2">⚠ commercial_id et device_id sont NULL pour tous les appels — les appels ne sont pas attribués</p>
                     )}
                   </div>
                 </div>

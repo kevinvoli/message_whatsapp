@@ -854,29 +854,31 @@ export class OrderCallSyncService {
   async getDiagnostics(): Promise<{
     callStatusDistribution: Array<{ status: string; count: number }>;
     deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
+    retrySteps: { total: number; withStatus: number; withDuration: number; withAttribution: number; withoutSuccess: number };
     activeBatchPosteIds: string[];
     obligationServiceWired: boolean;
     featureFlagEnabled: boolean;
     dbAvailable: boolean;
     eligibleForRetry: number;
   }> {
-    const [callStatusDistribution, deviceStats, activeBatchPosteIds, ffEnabled, eligibleForRetry] =
+    const [callStatusDistribution, deviceStats, activeBatchPosteIds, ffEnabled, retrySteps] =
       await Promise.all([
         this.callEventService.getStatusDistribution(),
         this.callEventService.getDeviceStats(),
         this.obligationService ? this.obligationService.getActivePosteIds() : Promise.resolve([]),
         this.obligationService ? this.obligationService.isEnabled() : Promise.resolve(false),
-        this.callEventService.countEligibleForRetry(ORDER_CALL_TYPE_OUTGOING, ORDER_CALL_MIN_DURATION_SEC),
+        this.callEventService.countEligibleForRetrySteps(ORDER_CALL_TYPE_OUTGOING, ORDER_CALL_MIN_DURATION_SEC),
       ]);
 
     return {
       callStatusDistribution,
       deviceStats,
+      retrySteps,
       activeBatchPosteIds,
       obligationServiceWired: this.obligationService !== null && this.obligationService !== undefined,
       featureFlagEnabled: ffEnabled,
       dbAvailable: this.dbAvailable,
-      eligibleForRetry,
+      eligibleForRetry: retrySteps.withoutSuccess,
     };
   }
 

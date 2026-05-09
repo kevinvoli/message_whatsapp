@@ -93,22 +93,49 @@ export class CallEventService {
     return { withDeviceId, withoutDeviceId, withPoste };
   }
 
+  /** Breakdown step-by-step de pourquoi findEligibleForRetry retourne 0. */
+  async countEligibleForRetrySteps(callStatus: string, minDuration: number): Promise<{
+    total: number;
+    withStatus: number;
+    withDuration: number;
+    withAttribution: number;
+    withoutSuccess: number;
+  }> {
+    const [total, withStatus, withDuration, withAttribution, withoutSuccess] = await Promise.all([
+      this.callEventRepo.count(),
+      this.callEventRepo.count({ where: { call_status: callStatus } }),
+      this.callEventRepo
+        .createQueryBuilder('e')
+        .where('e.call_status = :status', { status: callStatus })
+        .andWhere('e.duration_seconds >= :minDuration', { minDuration })
+        .getCount(),
+      this.callEventRepo
+        .createQueryBuilder('e')
+        .where('e.call_status = :status', { status: callStatus })
+        .andWhere('e.duration_seconds >= :minDuration', { minDuration })
+        .andWhere('(e.commercial_id IS NOT NULL OR e.device_id IS NOT NULL)')
+        .getCount(),
+      this.callEventRepo
+        .createQueryBuilder('e')
+        .where('e.call_status = :status', { status: callStatus })
+        .andWhere('e.duration_seconds >= :minDuration', { minDuration })
+        .andWhere('(e.commercial_id IS NOT NULL OR e.device_id IS NOT NULL)')
+        .andWhere(
+          `NOT EXISTS (
+            SELECT 1 FROM integration_sync_log l
+            WHERE l.entity_type = 'call_validation'
+              AND l.entity_id = e.external_id
+              AND l.status = 'success'
+          )`,
+        )
+        .getCount(),
+    ]);
+    return { total, withStatus, withDuration, withAttribution, withoutSuccess };
+  }
+
   /** Nombre d'appels éligibles au retry (call_status + durée + attribution). */
   async countEligibleForRetry(callStatus: string, minDuration: number): Promise<number> {
-    return this.callEventRepo
-      .createQueryBuilder('e')
-      .where('e.call_status = :status', { status: callStatus })
-      .andWhere('e.duration_seconds >= :minDuration', { minDuration })
-      .andWhere('(e.commercial_id IS NOT NULL OR e.device_id IS NOT NULL)')
-      .andWhere(
-        `NOT EXISTS (
-          SELECT 1 FROM integration_sync_log l
-          WHERE l.entity_type = 'call_validation'
-            AND l.entity_id = e.external_id
-            AND l.status = 'success'
-        )`,
-      )
-      .getCount();
+    return this.countEligibleForRetrySteps(callStatus, minDuration).then(r => r.withoutSuccess);
   }
 
   /** Distribution des valeurs de call_status (diagnostic admin). */
