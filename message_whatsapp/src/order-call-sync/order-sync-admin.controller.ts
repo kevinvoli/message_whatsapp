@@ -92,6 +92,12 @@ export class OrderSyncAdminController {
     return this.callSync.initAllBatches();
   }
 
+  @Post('purge-stuck-pending')
+  @ApiOperation({ summary: 'Supprime les entrées pending en doublon dans integration_sync_log (one-shot post-déploiement) (admin)' })
+  async purgeStuckPending() {
+    return this.callSync.purgeStuckPending();
+  }
+
   @Get('diagnostics')
   @ApiOperation({ summary: 'Diagnostic : distribution call_status, batches actifs, feature flag (admin)' })
   async getDiagnostics() {

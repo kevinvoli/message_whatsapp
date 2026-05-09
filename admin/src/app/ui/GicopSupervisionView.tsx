@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardList, Database, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ClipboardList, Database, Loader2, RefreshCw, RotateCcw, Trash2, Play, Wrench, XCircle } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -66,6 +66,9 @@ export default function GicopSupervisionView() {
   const [retrying, setRetrying]           = useState<Record<string, boolean>>({});
   const [retryResults, setRetryResults]   = useState<Record<string, 'ok' | 'error'>>({});
 
+  const [syncAction, setSyncAction]       = useState<Record<string, 'idle' | 'running' | 'ok' | 'error'>>({});
+  const [syncActionMsg, setSyncActionMsg] = useState<Record<string, string>>({});
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -84,6 +87,22 @@ export default function GicopSupervisionView() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const runSyncAction = async (key: string, path: string, method = 'POST') => {
+    setSyncAction((p) => ({ ...p, [key]: 'running' }));
+    setSyncActionMsg((p) => ({ ...p, [key]: '' }));
+    try {
+      const res = await fetch(`${API_URL}${path}`, { method, credentials: 'include' });
+      const data = res.ok ? await res.json().catch(() => null) as Record<string, unknown> | null : null;
+      const msg  = data ? Object.entries(data).map(([k, v]) => `${k}: ${String(v)}`).join(' · ') : '';
+      setSyncAction((p) => ({ ...p, [key]: res.ok ? 'ok' : 'error' }));
+      setSyncActionMsg((p) => ({ ...p, [key]: msg || (res.ok ? 'OK' : `Erreur ${res.status}`) }));
+      if (res.ok) void load();
+    } catch {
+      setSyncAction((p) => ({ ...p, [key]: 'error' }));
+      setSyncActionMsg((p) => ({ ...p, [key]: 'Erreur réseau' }));
+    }
+  };
 
   const handleRetry = async (chatId: string) => {
     setRetrying((prev) => ({ ...prev, [chatId]: true }));
@@ -376,6 +395,42 @@ export default function GicopSupervisionView() {
                   <span className={`text-sm font-semibold ${status === 'failed' ? 'text-red-600' : status === 'pending' ? 'text-orange-600' : 'text-green-600'}`}>
                     {count}
                   </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions de maintenance */}
+          {syncStatus && (
+            <div className="mt-5 border-t border-gray-100 pt-5 space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Actions maintenance</p>
+
+              {([
+                { key: 'purge',   label: 'Purger pending en doublon',  icon: <Trash2 className="w-3.5 h-3.5" />, path: '/admin/order-sync/purge-stuck-pending',  desc: 'Supprime les entrées pending dupliquées dans le journal sync' },
+                { key: 'batches', label: 'Initialiser les batches',     icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/init-batches',           desc: 'Crée les batches d\'obligations pour les postes sans batch actif' },
+                { key: 'retry',   label: 'Retry obligations',           icon: <Play   className="w-3.5 h-3.5" />, path: '/admin/order-sync/retry-obligations',      desc: 'Relance le matching pour les appels outgoing non encore validés' },
+              ] as const).map(({ key, label, icon, path, desc }) => (
+                <div key={key} className="flex items-center gap-3">
+                  <button
+                    onClick={() => void runSyncAction(key, path)}
+                    disabled={syncAction[key] === 'running'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {syncAction[key] === 'running'
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : icon
+                    }
+                    {label}
+                  </button>
+                  <span className="text-xs text-gray-400 truncate">{desc}</span>
+                  {syncAction[key] === 'ok' && (
+                    <span className="ml-auto text-xs text-green-600 whitespace-nowrap flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> {syncActionMsg[key]}
+                    </span>
+                  )}
+                  {syncAction[key] === 'error' && (
+                    <span className="ml-auto text-xs text-red-600 whitespace-nowrap">{syncActionMsg[key]}</span>
+                  )}
                 </div>
               ))}
             </div>

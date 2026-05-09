@@ -83,6 +83,45 @@ export class IntegrationSyncLogService {
     return count > 0;
   }
 
+  /**
+   * Vérifie si une entrée existe pour cette entité, quel que soit son statut.
+   * Utilisé pour éviter de créer des doublons lors de re-fetch dans la fenêtre de lookback.
+   */
+  async existsAnyForEntity(entityType: SyncEntityType, entityId: string): Promise<boolean> {
+    const count = await this.repo.count({ where: { entityType, entityId } });
+    return count > 0;
+  }
+
+  /**
+   * Supprime les entrées pending en doublon : garde la plus récente par entity_id,
+   * supprime toutes les autres pending pour le même entity_type + entity_id.
+   * Retourne le nombre de lignes supprimées.
+   */
+  async purgeStuckPending(entityType: SyncEntityType): Promise<number> {
+    const result = await this.repo
+      .createQueryBuilder()
+      .delete()
+      .where(
+        `status = 'pending'
+         AND entity_type = :entityType
+         AND id NOT IN (
+           SELECT keep_id FROM (
+             SELECT MAX(id) AS keep_id
+             FROM integration_sync_log
+             WHERE status = 'pending' AND entity_type = :entityType
+             GROUP BY entity_id
+           ) AS t
+         )`,
+        { entityType },
+      )
+      .execute();
+    const deleted = result.affected ?? 0;
+    if (deleted > 0) {
+      this.logger.log(`purgeStuckPending(${entityType}): ${deleted} doublons supprimés`);
+    }
+    return deleted;
+  }
+
   /** Purge les entrées success de plus de N jours. */
   async purgeOldSuccess(days = 30): Promise<number> {
     const cutoff = new Date();

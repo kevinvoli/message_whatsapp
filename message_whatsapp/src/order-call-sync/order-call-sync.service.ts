@@ -209,23 +209,24 @@ export class OrderCallSyncService {
         }
       }
 
+      if (!this.isEligibleForObligation(call)) continue;
+
       let logId: string | null = null;
       try {
-        const alreadyDone = await this.syncLog.existsForEntity('call_validation', call.id);
-        if (alreadyDone) continue;
+        // existsAnyForEntity couvre pending+success+failed pour éviter les doublons de log
+        const alreadyProcessed = await this.syncLog.existsAnyForEntity('call_validation', call.id);
+        if (alreadyProcessed) continue;
 
         newCalls++;
         const log = await this.processCall(call);
         logId = log.id;
 
-        if (this.isEligibleForObligation(call)) {
-          const result = await this.matchObligation(call);
-          if (result?.matched) {
-            obligationsMatched++;
-            await this.syncLog.markSuccess(logId);
-          } else if (result && !result.matched) {
-            await this.syncLog.markFailed(logId, result.reason ?? 'unknown', true);
-          }
+        const result = await this.matchObligation(call);
+        if (result?.matched) {
+          obligationsMatched++;
+          await this.syncLog.markSuccess(logId);
+        } else if (result && !result.matched) {
+          await this.syncLog.markFailed(logId, result.reason ?? 'unknown', true);
         }
       } catch (err) {
         errors++;
@@ -819,6 +820,15 @@ export class OrderCallSyncService {
     if (!item) return null;
     item.resolvedAt = new Date();
     return this.unresolvedRepo.save(item);
+  }
+
+  /**
+   * Supprime les entrées pending en doublon dans integration_sync_log pour call_validation.
+   * À appeler une fois après déploiement pour nettoyer les ~13 000 doublons accumulés.
+   */
+  async purgeStuckPending(): Promise<{ deleted: number }> {
+    const deleted = await this.syncLog.purgeStuckPending('call_validation');
+    return { deleted };
   }
 
   /** Initialise les batches manquants pour tous les postes (idempotent). */
