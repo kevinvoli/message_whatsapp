@@ -393,12 +393,13 @@ export class OrderCallSyncService {
     }
 
     return this.obligationService.tryMatchCallToTask({
-      callEventId:     call.id,
-      durationSeconds: call.duration,
+      callEventId:      call.id,
+      durationSeconds:  this.normalizeDuration(call.duration),
       resolvedCategory,
-      commercialPhone: call.localNumber ?? undefined,
-      clientPhone:     call.remoteNumber,
-      posteId:         devicePosteId,
+      commercialPhone:  call.localNumber ?? undefined,
+      clientPhone:      call.remoteNumber,
+      posteId:          devicePosteId,
+      skipDurationCheck: true,
     });
   }
 
