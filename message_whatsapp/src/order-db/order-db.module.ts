@@ -44,13 +44,14 @@ const orderDbProvider: Provider = {
       synchronize:       false,   // JAMAIS de migration sur DB2
       migrationsRun:     false,   // JAMAIS de migration sur DB2
       logging:           false,
-      connectTimeout:    10_000,
+      connectTimeout:    parseInt(process.env['ORDER_DB_CONNECT_TIMEOUT_MS'] ?? '10000', 10),
       extra: {
         connectionLimit:    5,
         waitForConnections: true,
         queueLimit:         50,
         enableKeepAlive:    true,
         keepAliveInitialDelay: 30_000,
+        connectTimeout: parseInt(process.env['ORDER_DB_CONNECT_TIMEOUT_MS'] ?? '10000', 10),
       },
     });
 

@@ -78,12 +78,13 @@ function buildService(orderDb: ReturnType<typeof makeOrderDb> | null) {
 describe('OrderCallSyncService — resolveClientCategory()', () => {
   it('CAS-01 : id_client présent + dateLivree IS NOT NULL → COMMANDE_AVEC_LIVRAISON', async () => {
     const orderDb = makeOrderDb({
+      userResult:  { id: 42 },  // user trouvé via phone
       orderResult: { id: 42, dateLivree: new Date('2026-01-15'), trueCancel: 0 },
       statusResult: null, // pas de retour
     });
     const svc = buildService(orderDb);
 
-    const category = await (svc as any).resolveClientCategory(42, '0700000001');
+    const category = await (svc as any).resolveClientCategory('0700000001');
 
     expect(category).toBe(CallTaskCategory.COMMANDE_AVEC_LIVRAISON);
   });
@@ -95,16 +96,16 @@ describe('OrderCallSyncService — resolveClientCategory()', () => {
     });
     const svc = buildService(orderDb);
 
-    const category = await (svc as any).resolveClientCategory(null, '0600000099');
+    const category = await (svc as any).resolveClientCategory('0600000099');
 
     expect(category).toBe(CallTaskCategory.COMMANDE_ANNULEE);
   });
 
   it('CAS-03 : id_client présent, aucune commande trouvée → JAMAIS_COMMANDE', async () => {
-    const orderDb = makeOrderDb({ orderResult: null });
+    const orderDb = makeOrderDb({ userResult: { id: 7 }, orderResult: null });
     const svc = buildService(orderDb);
 
-    const category = await (svc as any).resolveClientCategory(7, '0700000007');
+    const category = await (svc as any).resolveClientCategory('0700000007');
 
     expect(category).toBe(CallTaskCategory.JAMAIS_COMMANDE);
   });
@@ -113,19 +114,20 @@ describe('OrderCallSyncService — resolveClientCategory()', () => {
     const orderDb = makeOrderDb({ userResult: null });
     const svc = buildService(orderDb);
 
-    const category = await (svc as any).resolveClientCategory(null, '0000000000');
+    const category = await (svc as any).resolveClientCategory('0000000000');
 
     expect(category).toBe(CallTaskCategory.JAMAIS_COMMANDE);
   });
 
   it('CAS-05 : dateLivree définie mais dernier statut = retour (etat 99) → COMMANDE_ANNULEE', async () => {
     const orderDb = makeOrderDb({
+      userResult:   { id: 55 },  // user trouvé via phone
       orderResult:  { id: 55, dateLivree: new Date('2026-03-10'), trueCancel: 0 },
       statusResult: { etat: 99 }, // retour commande
     });
     const svc = buildService(orderDb);
 
-    const category = await (svc as any).resolveClientCategory(55, '0700000055');
+    const category = await (svc as any).resolveClientCategory('0700000055');
 
     expect(category).toBe(CallTaskCategory.COMMANDE_ANNULEE);
   });

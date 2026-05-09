@@ -95,6 +95,12 @@ export class OrderDossierMirrorWriteService {
    * Idempotent : un double appel ne crée pas de doublon.
    */
   async upsertDossier(payload: DossierMirrorPayload): Promise<void> {
+    if (!this.dbAvailable) {
+      this.logger.warn('[DossierMirror] DB2 indisponible — upsert ignoré', {
+        chatId: payload.messagingChatId,
+      });
+      return; // skip propre, pas de throw
+    }
     if (!this.orderDb) {
       throw new Error('DB2 non disponible — ORDER_DB_HOST non configuré ou connexion échouée');
     }

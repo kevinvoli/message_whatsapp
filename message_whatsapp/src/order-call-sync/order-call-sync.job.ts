@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, Optional } from '@nestjs/co
 import { Cron } from '@nestjs/schedule';
 import { OrderCallSyncService } from './order-call-sync.service';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
+import { IntegrationSyncLogService } from 'src/integration-sync/integration-sync-log.service';
 
 @Injectable()
 export class OrderCallSyncJob implements OnApplicationBootstrap {
@@ -11,6 +12,7 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
   constructor(
     private readonly syncService: OrderCallSyncService,
     @Optional() private readonly lockService: DistributedLockService,
+    private readonly syncLog: IntegrationSyncLogService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -51,7 +53,29 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     await this._runRetry();
   }
 
-  private async _runRetry(): Promise<void> {
+  /** N6 — Nettoyage des mappings orphelins (contact/commercial supprimés), dimanche à 3h. */
+  @Cron('0 3 * * 0')
+  async cleanOrphans(): Promise<void> {
+    try {
+      const result = await this.syncService.cleanOrphanMappings();
+      this.logger.log(`[Cron] cleanOrphans: ${result.clients} clients, ${result.commercials} commerciaux`);
+    } catch (err) {
+      this.logger.error(`Erreur cleanOrphans: ${(err as Error).message}`);
+    }
+  }
+
+  /** N9 — Purge des entrées sync_log success de plus de 30j, dimanche à 4h. */
+  @Cron('0 4 * * 0')
+  async purgeOldSyncLogs(): Promise<void> {
+    try {
+      const deleted = await this.syncLog.purgeOldSuccess(30);
+      this.logger.log(`[SyncLog] Purge : ${deleted} entrées success supprimées (> 30j)`);
+    } catch (err) {
+      this.logger.error(`Erreur purgeOldSyncLogs: ${(err as Error).message}`);
+    }
+  }
+
+    private async _runRetry(): Promise<void> {
     try {
       await this.syncService.retryUnmatchedObligations();
     } catch (err) {

@@ -56,14 +56,17 @@ function makeOrderDb(calls: ReturnType<typeof makeCall>[]) {
 
   // QB générique pour les repos secondaires (users, commandes) — retourne null/vide
   const genericQb = {
-    where:    jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    orderBy:  jest.fn().mockReturnThis(),
-    select:   jest.fn().mockReturnThis(),
-    limit:    jest.fn().mockReturnThis(),
-    take:     jest.fn().mockReturnThis(),
-    getOne:   jest.fn().mockResolvedValue(null),
-    getMany:  jest.fn().mockResolvedValue([]),
+    where:       jest.fn().mockReturnThis(),
+    andWhere:    jest.fn().mockReturnThis(),
+    orderBy:     jest.fn().mockReturnThis(),
+    select:      jest.fn().mockReturnThis(),
+    addSelect:   jest.fn().mockReturnThis(),  // N13 — QueryBuilder device counts
+    groupBy:     jest.fn().mockReturnThis(),
+    limit:       jest.fn().mockReturnThis(),
+    take:        jest.fn().mockReturnThis(),
+    getOne:      jest.fn().mockResolvedValue(null),
+    getMany:     jest.fn().mockResolvedValue([]),
+    getRawMany:  jest.fn().mockResolvedValue([]),  // N13 — QueryBuilder typé
   };
 
   let callRepoUsed = false;
@@ -115,12 +118,20 @@ function buildService(
   const syncLog          = makeSyncLog();
   const commercialRepo   = { find: jest.fn().mockResolvedValue([]) } as any;
   const mappingRepo      = { findBy: jest.fn().mockResolvedValue([]) } as any;
-  const callEventService = { ingestFromDb2: jest.fn().mockResolvedValue(undefined) } as any;
+  const callEventService = {
+    ingestFromDb2:                  jest.fn().mockResolvedValue(undefined),
+    getExternalIdsWithoutDeviceId:  jest.fn().mockResolvedValue([]),    // backfill
+    applyDeviceIdBatch:             jest.fn().mockResolvedValue(0),
+    count:                          jest.fn().mockResolvedValue(0),
+    findEligibleForRetry:           jest.fn().mockResolvedValue([]),
+  } as any;
 
   const callDeviceRepo = {
+    find:    jest.fn().mockResolvedValue([]),  // N13 — pré-résolution device→commercial
     findOne: jest.fn().mockResolvedValue(null),
     save:    jest.fn().mockResolvedValue({}),
     create:  jest.fn().mockImplementation((x: unknown) => x),
+    update:  jest.fn().mockResolvedValue({ affected: 0 }),
   } as any;
 
   const contactRepo     = { find: jest.fn().mockResolvedValue([]) } as any;

@@ -56,4 +56,10 @@ export class OrderSyncAdminController {
   async retryObligations() {
     return this.callSync.retryUnmatchedObligations();
   }
+  @Post('clean-orphans')
+  @ApiOperation({ summary: 'Supprime les mappings orphelins (contact/commercial supprimés de DB1) (admin)' })
+  async cleanOrphans() {
+    return this.callSync.cleanOrphanMappings();
+  }
+
 }

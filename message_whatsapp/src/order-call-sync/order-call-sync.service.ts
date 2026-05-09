@@ -28,14 +28,19 @@ import {
 import { CallDevice } from 'src/call-device/entities/call-device.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
+import { normalizePhone } from 'src/shared/utils/normalize-phone';
 
 const CURSOR_SCOPE            = 'global';
-const BATCH_SIZE              = 200;
 const CURSOR_LOOKBACK_MINUTES = 2;
 
 @Injectable()
 export class OrderCallSyncService {
   private readonly logger = new Logger(OrderCallSyncService.name);
+
+  private readonly batchSize: number = parseInt(
+    process.env['ORDER_CALL_SYNC_BATCH_SIZE'] ?? '200',
+    10,
+  );
 
   constructor(
     @Inject(ORDER_DB_DATA_SOURCE)
@@ -91,7 +96,7 @@ export class OrderCallSyncService {
       .where('c.call_timestamp >= :lookbackSince', { lookbackSince })
       .orderBy('c.call_timestamp', 'ASC')
       .addOrderBy('c.id', 'ASC')
-      .take(BATCH_SIZE);
+      .take(this.batchSize);
 
     // Backfill device_id pour les call_event historiques (avant la migration)
     await this.backfillNullDeviceIds().catch((err: Error) =>
@@ -120,7 +125,7 @@ export class OrderCallSyncService {
     const commercialByPhone = new Map(
       allCommercialsDb1
         .filter((c) => c.phone)
-        .map((c) => [c.phone!.replace(/\D/g, ''), c.id]),
+        .map((c) => [normalizePhone(c.phone), c.id]),
     );
 
     // Pré-résolution 2 : device_id → commercial connecté au poste (fallback)
@@ -146,7 +151,7 @@ export class OrderCallSyncService {
     );
 
     for (const call of calls) {
-      const normalizedLocal = call.localNumber?.replace(/\D/g, '') ?? '';
+      const normalizedLocal = normalizePhone(call.localNumber);
       const commercialIdDb1 =
         (normalizedLocal ? commercialByPhone.get(normalizedLocal) : undefined)
         ?? commercialByDevice.get(call.deviceId)
@@ -276,12 +281,15 @@ export class OrderCallSyncService {
   private async recalculateDeviceCounts(): Promise<void> {
     if (!this.orderDb) return;
 
-    const rows = await this.orderDb.query(
-      `SELECT device_id AS deviceId, COUNT(*) AS cnt
-       FROM call_logs
-       WHERE device_id IS NOT NULL AND device_id != ''
-       GROUP BY device_id`,
-    ) as Array<{ deviceId: string; cnt: string }>;
+    const rows = await this.orderDb
+      .getRepository(OrderCallLog)
+      .createQueryBuilder('c')
+      .select('c.deviceId', 'deviceId')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('c.deviceId IS NOT NULL')
+      .andWhere("c.deviceId != ''")
+      .groupBy('c.deviceId')
+      .getRawMany<{ deviceId: string; cnt: string }>();
 
     this.logger.log(`recalculateDeviceCounts: ${rows.length} device(s) trouvé(s) dans DB2 call_logs`);
 
@@ -352,7 +360,7 @@ export class OrderCallSyncService {
     let clientIdDb2: number | null = null;
 
     if (remoteNumber) {
-      const normalized = remoteNumber.replace(/\D/g, '');
+      const normalized = normalizePhone(remoteNumber);
       const user = await userRepo
         .createQueryBuilder('u')
         .where('u.type = :type', { type: GIOCOP_USER_TYPE_CLIENT })
@@ -538,7 +546,7 @@ export class OrderCallSyncService {
 
     const db2ByPhone = new Map<string, number>();
     for (const u of db2Users) {
-      if (u.phone) db2ByPhone.set(u.phone.replace(/\D/g, ''), u.id);
+      if (u.phone) db2ByPhone.set(normalizePhone(u.phone), u.id);
     }
 
     const existingMappings = await this.mappingRepo.find();
@@ -550,11 +558,17 @@ export class OrderCallSyncService {
       try {
         if (!commercial.phone) { skipped++; continue; }
 
-        const db2Id = db2ByPhone.get(commercial.phone.replace(/\D/g, ''));
+        const db2Id = db2ByPhone.get(normalizePhone(commercial.phone));
         if (db2Id == null) { skipped++; continue; }
 
         const existing = mappingByCommercialId.get(commercial.id);
         if (existing) {
+          if (existing.external_id !== db2Id) {
+            // N11 — Changement d'external_id : warn car peut indiquer un problème de données
+            this.logger.warn(
+              `[CommercialMapping] Changement external_id détecté commercial=${commercial.id} ${existing.external_id}→${db2Id}`,
+            );
+          }
           if (existing.external_id !== db2Id || existing.commercial_name !== commercial.name) {
             existing.external_id = db2Id;
             existing.commercial_name = commercial.name;
@@ -603,7 +617,7 @@ export class OrderCallSyncService {
 
     const contactByPhone = new Map<string, string>();
     for (const c of contactsDb1) {
-      if (c.phone) contactByPhone.set(c.phone.replace(/\D/g, ''), c.id);
+      if (c.phone) contactByPhone.set(normalizePhone(c.phone), c.id);
     }
 
     if (contactByPhone.size === 0) {
@@ -634,7 +648,7 @@ export class OrderCallSyncService {
         let matchedPhone: string | undefined;
 
         for (const p of phones) {
-          const normalized = p.replace(/\D/g, '');
+          const normalized = normalizePhone(p);
           const cId = contactByPhone.get(normalized);
           if (cId) { contactId = cId; matchedPhone = normalized; break; }
         }
@@ -674,7 +688,28 @@ export class OrderCallSyncService {
     return { synced, skipped, errors };
   }
 
-  async getStatus(): Promise<{
+  /**
+   * N6 — Supprime les mappings orphelins (contact/commercial supprimés de DB1).
+   */
+  async cleanOrphanMappings(): Promise<{ clients: number; commercials: number }> {
+    const clients = await this.clientMappingRepo
+      .createQueryBuilder()
+      .delete()
+      .where('contact_id NOT IN (SELECT id FROM contact)')
+      .execute();
+
+    const commercials = await this.mappingRepo
+      .createQueryBuilder()
+      .delete()
+      .where('commercial_id NOT IN (SELECT id FROM whatsapp_commercial)')
+      .execute();
+
+    const result = { clients: clients.affected ?? 0, commercials: commercials.affected ?? 0 };
+    this.logger.log(`cleanOrphanMappings: ${result.clients} clients, ${result.commercials} commerciaux supprimés`);
+    return result;
+  }
+
+    async getStatus(): Promise<{
     dbAvailable: boolean;
     lastSyncAt: Date | null;
     processedCount: number;

@@ -78,9 +78,18 @@ describe('OrderDossierMirrorWriteService', () => {
 
   describe('upsertDossier', () => {
 
-    it('lève une erreur si DB2 non disponible (orderDb=null)', async () => {
+    it('skippe proprement (warn + return) si DB2 indisponible (dbAvailable=false)', async () => {
+      // N3 — Guard ORDER_DB_AVAILABLE : skip propre au lieu de throw
       const syncLog = makeSyncLog();
       const svc = buildService(null, false, syncLog);
+      await expect(svc.upsertDossier(makePayload())).resolves.toBeUndefined();
+      expect(syncLog.createPending).not.toHaveBeenCalled();
+    });
+
+    it('lève une erreur si DB2 techniquement absent (dbAvailable=true mais orderDb=null)', async () => {
+      // Guard technique : dbAvailable=true mais orderDb=null (état incohérent)
+      const syncLog = makeSyncLog();
+      const svc = buildService(null, true, syncLog);
       await expect(svc.upsertDossier(makePayload())).rejects.toThrow('DB2 non disponible');
       expect(syncLog.createPending).not.toHaveBeenCalled();
     });

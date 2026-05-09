@@ -17,6 +17,7 @@ import { Contact, ClientCategory } from 'src/contact/entities/contact.entity';
 import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { normalizePhone } from 'src/shared/utils/normalize-phone';
 
 const REQUIRED_PER_CATEGORY = 5;
 const MIN_CALL_DURATION_SECONDS = 90;
@@ -256,11 +257,21 @@ export class CallObligationService {
    * last_poste_message_at doit être ≥ last_client_message_at.
    */
   async checkAndRecordQuality(posteId: string, activeConvs: WhatsappChat[]): Promise<boolean> {
-    const passed = activeConvs.every((c) => {
-      if (!c.last_client_message_at) return true;
+    // N8 — Seuil configurable (défaut 80%) au lieu d'all-or-nothing
+    const thresholdStr = await this.systemConfig.get('CALL_QUALITY_THRESHOLD_PCT');
+    const threshold = thresholdStr ? parseInt(thresholdStr, 10) : 80;
+
+    const okCount = activeConvs.filter((c) => {
+      if (!c.last_client_message_at) return true;  // pas de message client = OK
       if (!c.last_poste_message_at) return false;
       return c.last_poste_message_at >= c.last_client_message_at;
-    });
+    }).length;
+
+    const pct = activeConvs.length > 0
+      ? Math.round((okCount / activeConvs.length) * 100)
+      : 100;
+
+    const passed = pct >= threshold;
 
     const batch = await this.getActiveBatch(posteId);
     if (batch) {
@@ -268,7 +279,9 @@ export class CallObligationService {
       await this.batchRepo.save(batch);
     }
 
-    this.logger.log(`${passed ? 'CALL_OBLIGATION_QUALITY_PASSED' : 'CALL_OBLIGATION_QUALITY_FAILED'} posteId=${posteId} blockSize=${activeConvs.length}`);
+    this.logger.log(
+      `${passed ? 'CALL_OBLIGATION_QUALITY_PASSED' : 'CALL_OBLIGATION_QUALITY_FAILED'} posteId=${posteId} score=${okCount}/${activeConvs.length} (${pct}% >= ${threshold}%)`,
+    );
     return passed;
   }
 
@@ -400,7 +413,7 @@ export class CallObligationService {
   }
 
   private async resolveContactCategory(clientPhone: string): Promise<CallTaskCategory | null> {
-    const normalized = clientPhone.replace(/\D/g, '');
+    const normalized = normalizePhone(clientPhone);
     const contact = await this.contactRepo.findOne({
       where: { phone: normalized },
       select: ['client_category'],
@@ -410,7 +423,7 @@ export class CallObligationService {
   }
 
   private async resolvePosteByCommercialPhone(phone: string): Promise<string | null> {
-    const normalized = phone.replace(/\D/g, '');
+    const normalized = normalizePhone(phone);
     const commercial = await this.commercialRepo.findOne({
       where: { phone: normalized },
       relations: { poste: true },
