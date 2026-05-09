@@ -92,6 +92,12 @@ export class OrderSyncAdminController {
     return this.callSync.initAllBatches();
   }
 
+  @Post('normalize-call-status')
+  @ApiOperation({ summary: 'Normalise call_event.call_status en minuscules (OUTGOING → outgoing) (admin)' })
+  async normalizeCallStatus() {
+    return this.callSync.normalizeCallStatus();
+  }
+
   @Post('purge-stuck-pending')
   @ApiOperation({ summary: 'Supprime les entrées pending en doublon dans integration_sync_log (one-shot post-déploiement) (admin)' })
   async purgeStuckPending() {

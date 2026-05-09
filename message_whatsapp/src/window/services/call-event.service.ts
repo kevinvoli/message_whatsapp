@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { CallEvent } from '../entities/call-event.entity';
 
 @Injectable()
@@ -66,6 +66,49 @@ export class CallEventService {
       .orderBy('e.event_at', 'DESC')
       .take(opts.limit ?? 100)
       .getMany();
+  }
+
+  /** Normalise call_status en minuscules. Retourne le nombre de lignes modifiées. */
+  async normalizeCallStatusToLower(): Promise<number> {
+    const result = await this.callEventRepo
+      .createQueryBuilder()
+      .update(CallEvent)
+      .set({ call_status: () => 'LOWER(call_status)' })
+      .where('call_status != LOWER(call_status)')
+      .execute();
+    return result.affected ?? 0;
+  }
+
+  /** Stats sur la présence du device_id dans call_event (diagnostic). */
+  async getDeviceStats(): Promise<{ withDeviceId: number; withoutDeviceId: number; withPoste: number }> {
+    const [withDeviceId, withoutDeviceId, withPoste] = await Promise.all([
+      this.callEventRepo.count({ where: { device_id: Not(IsNull()) } }),
+      this.callEventRepo.count({ where: { device_id: IsNull() } }),
+      // appels dont le device est associé à un poste dans call_device
+      this.callEventRepo
+        .createQueryBuilder('e')
+        .innerJoin('call_device', 'cd', 'cd.device_id = e.device_id AND cd.poste_id IS NOT NULL')
+        .getCount(),
+    ]);
+    return { withDeviceId, withoutDeviceId, withPoste };
+  }
+
+  /** Nombre d'appels éligibles au retry (call_status + durée + attribution). */
+  async countEligibleForRetry(callStatus: string, minDuration: number): Promise<number> {
+    return this.callEventRepo
+      .createQueryBuilder('e')
+      .where('e.call_status = :status', { status: callStatus })
+      .andWhere('e.duration_seconds >= :minDuration', { minDuration })
+      .andWhere('(e.commercial_id IS NOT NULL OR e.device_id IS NOT NULL)')
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM integration_sync_log l
+          WHERE l.entity_type = 'call_validation'
+            AND l.entity_id = e.external_id
+            AND l.status = 'success'
+        )`,
+      )
+      .getCount();
   }
 
   /** Distribution des valeurs de call_status (diagnostic admin). */

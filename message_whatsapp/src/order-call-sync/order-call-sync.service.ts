@@ -823,6 +823,16 @@ export class OrderCallSyncService {
   }
 
   /**
+   * Normalise call_event.call_status en minuscules (corrige les valeurs 'OUTGOING' → 'outgoing').
+   * À appeler une fois si la migration automatique n'a pas tourné.
+   */
+  async normalizeCallStatus(): Promise<{ updated: number }> {
+    const result = await this.callEventService.normalizeCallStatusToLower();
+    this.logger.log(`normalizeCallStatus: ${result} lignes mises à jour`);
+    return { updated: result };
+  }
+
+  /**
    * Supprime les entrées pending en doublon dans integration_sync_log pour call_validation.
    * À appeler une fois après déploiement pour nettoyer les ~13 000 doublons accumulés.
    */
@@ -839,25 +849,34 @@ export class OrderCallSyncService {
 
   /**
    * Diagnostic : retourne la distribution des call_status dans call_event,
-   * les postes avec/sans batch actif et l'état du feature flag.
+   * les postes avec/sans batch actif, le feature flag, et les stats device_id.
    */
   async getDiagnostics(): Promise<{
     callStatusDistribution: Array<{ status: string; count: number }>;
+    deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
     activeBatchPosteIds: string[];
     obligationServiceWired: boolean;
+    featureFlagEnabled: boolean;
     dbAvailable: boolean;
+    eligibleForRetry: number;
   }> {
-    const callStatusDistribution = await this.callEventService.getStatusDistribution();
-
-    const activeBatchPosteIds = this.obligationService
-      ? await this.obligationService.getActivePosteIds()
-      : [];
+    const [callStatusDistribution, deviceStats, activeBatchPosteIds, ffEnabled, eligibleForRetry] =
+      await Promise.all([
+        this.callEventService.getStatusDistribution(),
+        this.callEventService.getDeviceStats(),
+        this.obligationService ? this.obligationService.getActivePosteIds() : Promise.resolve([]),
+        this.obligationService ? this.obligationService.isEnabled() : Promise.resolve(false),
+        this.callEventService.countEligibleForRetry(ORDER_CALL_TYPE_OUTGOING, ORDER_CALL_MIN_DURATION_SEC),
+      ]);
 
     return {
       callStatusDistribution,
+      deviceStats,
       activeBatchPosteIds,
       obligationServiceWired: this.obligationService !== null && this.obligationService !== undefined,
+      featureFlagEnabled: ffEnabled,
       dbAvailable: this.dbAvailable,
+      eligibleForRetry,
     };
   }
 

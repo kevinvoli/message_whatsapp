@@ -34,6 +34,16 @@ interface SyncStatus {
   syncLog: Record<string, number>;
 }
 
+interface SyncDiagnostics {
+  callStatusDistribution: Array<{ status: string; count: number }>;
+  deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
+  activeBatchPosteIds: string[];
+  obligationServiceWired: boolean;
+  featureFlagEnabled: boolean;
+  dbAvailable: boolean;
+  eligibleForRetry: number;
+}
+
 interface FailedReport {
   chatId: string;
   clientName: string | null;
@@ -68,6 +78,8 @@ export default function GicopSupervisionView() {
 
   const [syncAction, setSyncAction]       = useState<Record<string, 'idle' | 'running' | 'ok' | 'error'>>({});
   const [syncActionMsg, setSyncActionMsg] = useState<Record<string, string>>({});
+  const [diagnostics, setDiagnostics]    = useState<SyncDiagnostics | null>(null);
+  const [diagLoading, setDiagLoading]    = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +100,15 @@ export default function GicopSupervisionView() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const loadDiagnostics = async () => {
+    setDiagLoading(true);
+    try {
+      const d = await fetchJson<SyncDiagnostics>(`${API_URL}/admin/order-sync/diagnostics`);
+      setDiagnostics(d);
+    } catch { /* silencieux */ }
+    finally { setDiagLoading(false); }
+  };
+
   const runSyncAction = async (key: string, path: string, method = 'POST') => {
     setSyncAction((p) => ({ ...p, [key]: 'running' }));
     setSyncActionMsg((p) => ({ ...p, [key]: '' }));
@@ -97,7 +118,7 @@ export default function GicopSupervisionView() {
       const msg  = data ? Object.entries(data).map(([k, v]) => `${k}: ${String(v)}`).join(' · ') : '';
       setSyncAction((p) => ({ ...p, [key]: res.ok ? 'ok' : 'error' }));
       setSyncActionMsg((p) => ({ ...p, [key]: msg || (res.ok ? 'OK' : `Erreur ${res.status}`) }));
-      if (res.ok) void load();
+      if (res.ok) { void load(); void loadDiagnostics(); }
     } catch {
       setSyncAction((p) => ({ ...p, [key]: 'error' }));
       setSyncActionMsg((p) => ({ ...p, [key]: 'Erreur réseau' }));
@@ -400,21 +421,125 @@ export default function GicopSupervisionView() {
             </div>
           )}
 
+          {/* Diagnostics */}
+          {syncStatus && (
+            <div className="mt-5 border-t border-gray-100 pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Diagnostics</p>
+                <button
+                  onClick={() => void loadDiagnostics()}
+                  disabled={diagLoading}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                >
+                  {diagLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  Charger
+                </button>
+              </div>
+
+              {diagnostics && (
+                <div className="space-y-2 text-xs">
+                  {/* call_status distribution */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="font-semibold text-gray-600 mb-2">Distribution call_status</p>
+                    {diagnostics.callStatusDistribution.length === 0
+                      ? <p className="text-gray-400">Aucun appel dans call_event</p>
+                      : diagnostics.callStatusDistribution.map(({ status, count }) => (
+                          <div key={status} className="flex justify-between py-0.5">
+                            <span className={`font-mono ${status === 'outgoing' ? 'text-green-700' : status.toUpperCase() === 'OUTGOING' ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                              {status}
+                            </span>
+                            <span className="font-semibold text-gray-700">{count}</span>
+                          </div>
+                        ))
+                    }
+                    {diagnostics.callStatusDistribution.some(({ status }) => status !== status.toLowerCase()) && (
+                      <p className="mt-2 text-red-600 font-semibold">⚠ Des valeurs en majuscules sont présentes — cliquer sur "Normaliser call_status" ci-dessous</p>
+                    )}
+                  </div>
+
+                  {/* Device stats */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="font-semibold text-gray-600 mb-2">Appels dans call_event</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Avec device_id</span>
+                        <span className="font-semibold text-gray-700">{diagnostics.deviceStats.withDeviceId}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Sans device_id</span>
+                        <span className={diagnostics.deviceStats.withoutDeviceId > 0 ? 'text-orange-600 font-semibold' : 'text-gray-700 font-semibold'}>
+                          {diagnostics.deviceStats.withoutDeviceId}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Device → poste associé</span>
+                        <span className={diagnostics.deviceStats.withPoste > 0 ? 'text-green-700 font-semibold' : 'text-red-600 font-semibold'}>
+                          {diagnostics.deviceStats.withPoste}
+                        </span>
+                      </div>
+                      {diagnostics.deviceStats.withPoste === 0 && (
+                        <p className="text-red-600 font-semibold mt-1">⚠ Aucun device n&apos;est associé à un poste — associer dans la gestion des devices</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Batches + service + feature flag */}
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Feature flag obligations</span>
+                      <span className={diagnostics.featureFlagEnabled ? 'text-green-700 font-semibold' : 'text-red-600 font-semibold'}>
+                        {diagnostics.featureFlagEnabled ? 'Activé' : 'DÉSACTIVÉ'}
+                      </span>
+                    </div>
+                    {!diagnostics.featureFlagEnabled && (
+                      <p className="text-red-600 font-semibold">⚠ FF_CALL_OBLIGATIONS_ENABLED doit être &quot;true&quot; dans system_config</p>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Service obligations câblé</span>
+                      <span className={diagnostics.obligationServiceWired ? 'text-green-700 font-semibold' : 'text-red-600 font-semibold'}>
+                        {diagnostics.obligationServiceWired ? 'Oui' : 'Non'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Batches actifs (postes)</span>
+                      <span className={diagnostics.activeBatchPosteIds.length > 0 ? 'text-green-700 font-semibold' : 'text-orange-600 font-semibold'}>
+                        {diagnostics.activeBatchPosteIds.length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Éligibles au retry</span>
+                      <span className={diagnostics.eligibleForRetry > 0 ? 'text-blue-600 font-semibold' : 'text-gray-500 font-semibold'}>
+                        {diagnostics.eligibleForRetry}
+                      </span>
+                    </div>
+                    {diagnostics.activeBatchPosteIds.length === 0 && (
+                      <p className="text-orange-600 font-semibold">⚠ Aucun batch actif — cliquer sur &quot;Initialiser les batches&quot;</p>
+                    )}
+                    {diagnostics.eligibleForRetry === 0 && diagnostics.callStatusDistribution.some(d => d.status !== d.status.toLowerCase()) && (
+                      <p className="text-red-600 font-semibold">⚠ Normaliser call_status d&apos;abord (étape 1)</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Actions de maintenance */}
           {syncStatus && (
             <div className="mt-5 border-t border-gray-100 pt-5 space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Actions maintenance</p>
 
               {([
-                { key: 'purge',   label: 'Purger pending en doublon',  icon: <Trash2 className="w-3.5 h-3.5" />, path: '/admin/order-sync/purge-stuck-pending',  desc: 'Supprime les entrées pending dupliquées dans le journal sync' },
-                { key: 'batches', label: 'Initialiser les batches',     icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/init-batches',           desc: 'Crée les batches d\'obligations pour les postes sans batch actif' },
-                { key: 'retry',   label: 'Retry obligations',           icon: <Play   className="w-3.5 h-3.5" />, path: '/admin/order-sync/retry-obligations',      desc: 'Relance le matching pour les appels outgoing non encore validés' },
+                { key: 'normalize', label: 'Normaliser call_status',    icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/normalize-call-status', desc: 'Convertit OUTGOING → outgoing dans call_event (étape 1)' },
+                { key: 'purge',     label: 'Purger pending en doublon',  icon: <Trash2 className="w-3.5 h-3.5" />, path: '/admin/order-sync/purge-stuck-pending',   desc: 'Supprime les entrées pending dupliquées dans le journal sync (étape 2)' },
+                { key: 'batches',   label: 'Initialiser les batches',    icon: <Play   className="w-3.5 h-3.5" />, path: '/admin/order-sync/init-batches',           desc: 'Crée les batches pour les postes sans batch actif (étape 3)' },
+                { key: 'retry',     label: 'Retry obligations',          icon: <RotateCcw className="w-3.5 h-3.5" />, path: '/admin/order-sync/retry-obligations',   desc: 'Relance le matching pour les appels outgoing éligibles (étape 4)' },
               ] as const).map(({ key, label, icon, path, desc }) => (
-                <div key={key} className="flex items-center gap-3">
+                <div key={key} className="flex items-start gap-3">
                   <button
                     onClick={() => void runSyncAction(key, path)}
                     disabled={syncAction[key] === 'running'}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition-colors whitespace-nowrap flex-shrink-0"
                   >
                     {syncAction[key] === 'running'
                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -422,15 +547,17 @@ export default function GicopSupervisionView() {
                     }
                     {label}
                   </button>
-                  <span className="text-xs text-gray-400 truncate">{desc}</span>
-                  {syncAction[key] === 'ok' && (
-                    <span className="ml-auto text-xs text-green-600 whitespace-nowrap flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> {syncActionMsg[key]}
-                    </span>
-                  )}
-                  {syncAction[key] === 'error' && (
-                    <span className="ml-auto text-xs text-red-600 whitespace-nowrap">{syncActionMsg[key]}</span>
-                  )}
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs text-gray-400">{desc}</span>
+                    {syncAction[key] === 'ok' && (
+                      <span className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
+                        <CheckCircle className="w-3 h-3 flex-shrink-0" /> {syncActionMsg[key]}
+                      </span>
+                    )}
+                    {syncAction[key] === 'error' && (
+                      <span className="text-xs text-red-600 mt-0.5">{syncActionMsg[key]}</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
