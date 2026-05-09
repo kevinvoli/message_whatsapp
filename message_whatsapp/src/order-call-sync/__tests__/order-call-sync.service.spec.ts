@@ -94,10 +94,11 @@ function makeCursorRepo(cursor: ReturnType<typeof makeCursor>) {
 
 function makeSyncLog() {
   return {
-    createPending:   jest.fn().mockResolvedValue({ id: 'log-1' }),
-    markSuccess:     jest.fn().mockResolvedValue({}),
-    markFailed:      jest.fn().mockResolvedValue({}),
-    existsForEntity: jest.fn().mockResolvedValue(false),
+    createPending:      jest.fn().mockResolvedValue({ id: 'log-1' }),
+    markSuccess:        jest.fn().mockResolvedValue({}),
+    markFailed:         jest.fn().mockResolvedValue({}),
+    existsForEntity:    jest.fn().mockResolvedValue(false),
+    existsAnyForEntity: jest.fn().mockResolvedValue(false),
   } as any;
 }
 
@@ -232,6 +233,257 @@ describe('OrderCallSyncService — curseur avec fenêtre de tolérance (OBL-009)
     const result = await svc.syncNewCalls();
     expect(result.processed).toBe(0);
     expect(cursorRepo.update).not.toHaveBeenCalled();
+  });
+});
+
+// ─── T3 : isEligibleForObligation — cas device_id ────────────────────────────
+
+describe('isEligibleForObligation — cas device_id', () => {
+  it('outgoing + localNumber présent + deviceId absent → éligible', async () => {
+    const call = makeCall({
+      callType:    ORDER_CALL_TYPE_OUTGOING,
+      localNumber: '0700000001',
+      deviceId:    null,
+    });
+    const obligationService = makeObligationService(true);
+    const { svc } = buildService([call], makeCursor(), obligationService);
+
+    await svc.syncNewCalls();
+
+    expect(obligationService.tryMatchCallToTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('outgoing + localNumber null + deviceId présent → éligible (cas nouveau)', async () => {
+    const call = makeCall({
+      callType:    ORDER_CALL_TYPE_OUTGOING,
+      localNumber: null,
+      deviceId:    'device-abc',
+    });
+    const obligationService = makeObligationService(true);
+    const { svc } = buildService([call], makeCursor(), obligationService);
+
+    await svc.syncNewCalls();
+
+    expect(obligationService.tryMatchCallToTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('outgoing + localNumber null + deviceId null → non éligible', async () => {
+    const call = makeCall({
+      callType:    ORDER_CALL_TYPE_OUTGOING,
+      localNumber: null,
+      deviceId:    null,
+    });
+    const obligationService = makeObligationService(true);
+    const { svc } = buildService([call], makeCursor(), obligationService);
+
+    await svc.syncNewCalls();
+
+    expect(obligationService.tryMatchCallToTask).not.toHaveBeenCalled();
+  });
+
+  it('missed + deviceId présent → non éligible', async () => {
+    const call = makeCall({
+      callType:    'missed',
+      localNumber: null,
+      deviceId:    'device-abc',
+    });
+    const obligationService = makeObligationService(true);
+    const { svc } = buildService([call], makeCursor(), obligationService);
+
+    await svc.syncNewCalls();
+
+    expect(obligationService.tryMatchCallToTask).not.toHaveBeenCalled();
+  });
+});
+
+// ─── T3 : normalizeDuration ───────────────────────────────────────────────────
+
+describe('normalizeDuration', () => {
+  it('duration = 0 → retourne 0', () => {
+    const { svc } = buildService([], makeCursor());
+    expect((svc as any).normalizeDuration(0)).toBe(0);
+  });
+
+  it('duration = 120 (secondes, <= 86400) → retourne 120 inchangé', () => {
+    const { svc } = buildService([], makeCursor());
+    expect((svc as any).normalizeDuration(120)).toBe(120);
+  });
+
+  it('duration = 120000 (ms, > 86400) → retourne 120 (divisé par 1000)', () => {
+    const { svc } = buildService([], makeCursor());
+    expect((svc as any).normalizeDuration(120_000)).toBe(120);
+  });
+
+  it('duration = 3600 (1h en secondes, <= 86400) → retourne 3600 inchangé', () => {
+    const { svc } = buildService([], makeCursor());
+    expect((svc as any).normalizeDuration(3600)).toBe(3600);
+  });
+});
+
+// ─── T4 : retryUnmatchedObligations — via device_id ──────────────────────────
+
+function makeCallEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    id:               'evt-uuid-1',
+    external_id:      'call-ext-1',
+    commercial_phone: '0700000001',
+    client_phone:     '0700000002',
+    call_status:      ORDER_CALL_TYPE_OUTGOING,
+    duration_seconds: 120,
+    commercial_id:    null,
+    device_id:        null,
+    event_at:         new Date('2026-04-28T10:00:00Z'),
+    created_at:       new Date(),
+    ...overrides,
+  };
+}
+
+function buildServiceForRetry(opts: {
+  candidates: ReturnType<typeof makeCallEvent>[];
+  deviceFindOneResult: { posteId: string } | null;
+  commercialFindOneResult?: { poste?: { id: string } } | null;
+  obligationMatched?: boolean;
+  obligationReason?: string;
+  syncLogExistsAny?: boolean;
+}) {
+  const orderDb    = makeOrderDb([]);
+  const cursorRepo = makeCursorRepo(makeCursor());
+
+  const syncLog = {
+    createPending:    jest.fn().mockResolvedValue({ id: 'log-retry-1' }),
+    markSuccess:      jest.fn().mockResolvedValue({}),
+    markFailed:       jest.fn().mockResolvedValue({}),
+    existsForEntity:  jest.fn().mockResolvedValue(false),
+    existsAnyForEntity: jest.fn().mockResolvedValue(opts.syncLogExistsAny ?? false),
+  } as any;
+
+  const obligationResult = opts.obligationMatched
+    ? { matched: true }
+    : { matched: false, reason: opts.obligationReason ?? 'poste_introuvable' };
+
+  const obligationService = {
+    isEnabled:          jest.fn().mockResolvedValue(true),
+    tryMatchCallToTask: jest.fn().mockResolvedValue(obligationResult),
+  } as any;
+
+  const commercialRepo = {
+    find:    jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(opts.commercialFindOneResult ?? null),
+  } as any;
+
+  const mappingRepo     = { findBy: jest.fn().mockResolvedValue([]) } as any;
+
+  const callEventService = {
+    ingestFromDb2:                 jest.fn().mockResolvedValue(undefined),
+    getExternalIdsWithoutDeviceId: jest.fn().mockResolvedValue([]),
+    applyDeviceIdBatch:            jest.fn().mockResolvedValue(0),
+    count:                         jest.fn().mockResolvedValue(0),
+    findEligibleForRetry:          jest.fn().mockResolvedValue(opts.candidates),
+  } as any;
+
+  const callDeviceRepo = {
+    find:    jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(opts.deviceFindOneResult),
+    save:    jest.fn().mockResolvedValue({}),
+    create:  jest.fn().mockImplementation((x: unknown) => x),
+    update:  jest.fn().mockResolvedValue({ affected: 0 }),
+  } as any;
+
+  const contactRepo       = { find: jest.fn().mockResolvedValue([]) } as any;
+  const clientMappingRepo = {
+    find:   jest.fn().mockResolvedValue([]),
+    save:   jest.fn().mockResolvedValue({}),
+    create: jest.fn().mockImplementation((x: unknown) => x),
+  } as any;
+  const unresolvedRepo = {
+    createQueryBuilder: jest.fn().mockReturnValue({
+      insert:   jest.fn().mockReturnThis(),
+      into:     jest.fn().mockReturnThis(),
+      values:   jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute:  jest.fn().mockResolvedValue({}),
+    }),
+    find:    jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
+    save:    jest.fn().mockResolvedValue({}),
+  } as any;
+
+  const svc = new OrderCallSyncService(
+    orderDb as any,
+    true,
+    cursorRepo,
+    commercialRepo,
+    mappingRepo,
+    callDeviceRepo,
+    syncLog,
+    obligationService,
+    callEventService,
+    contactRepo,
+    clientMappingRepo,
+    unresolvedRepo,
+  );
+
+  return { svc, syncLog, obligationService, callDeviceRepo, callEventService };
+}
+
+describe('retryUnmatchedObligations — via device_id', () => {
+  it('call_event avec device_id associé à un poste avec batch actif → retried: 1, matched: 1', async () => {
+    const candidate = makeCallEvent({ device_id: 'device-xyz', commercial_id: null });
+    const { svc } = buildServiceForRetry({
+      candidates:          [candidate],
+      deviceFindOneResult: { posteId: 'poste-1' },
+      obligationMatched:   true,
+    });
+
+    const result = await svc.retryUnmatchedObligations();
+
+    expect(result.retried).toBe(1);
+    expect(result.matched).toBe(1);
+  });
+
+  it('call_event avec device_id sans poste dans call_device → retried: 0 (call ignoré)', async () => {
+    const candidate = makeCallEvent({ device_id: 'device-orphan', commercial_id: null });
+    const { svc } = buildServiceForRetry({
+      candidates:          [candidate],
+      deviceFindOneResult: null, // device inconnu dans call_device
+      obligationMatched:   false,
+    });
+
+    const result = await svc.retryUnmatchedObligations();
+
+    expect(result.retried).toBe(0);
+    expect(result.matched).toBe(0);
+  });
+
+  it('call_event sans device_id ET sans commercial_id → retried: 0 (filtré par findEligibleForRetry)', async () => {
+    // findEligibleForRetry filtre déjà côté DB — ici on simule un retour vide
+    const { svc } = buildServiceForRetry({
+      candidates:          [], // filtré avant même d'arriver ici
+      deviceFindOneResult: null,
+      obligationMatched:   false,
+    });
+
+    const result = await svc.retryUnmatchedObligations();
+
+    expect(result.retried).toBe(0);
+    expect(result.matched).toBe(0);
+  });
+
+  it('call_event déjà en succès dans integration_sync_log → non retryé (idempotence)', async () => {
+    // findEligibleForRetry exclut déjà les succès via NOT EXISTS — retour vide
+    const { svc, callEventService } = buildServiceForRetry({
+      candidates:          [],
+      deviceFindOneResult: { posteId: 'poste-1' },
+      obligationMatched:   true,
+      syncLogExistsAny:    true,
+    });
+
+    const result = await svc.retryUnmatchedObligations();
+
+    // findEligibleForRetry a été appelé mais a retourné 0 candidats (déjà en succès côté DB)
+    expect(callEventService.findEligibleForRetry).toHaveBeenCalledTimes(1);
+    expect(result.retried).toBe(0);
+    expect(result.matched).toBe(0);
   });
 });
 

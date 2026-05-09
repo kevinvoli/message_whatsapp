@@ -43,6 +43,7 @@ interface SyncDiagnostics {
   featureFlagEnabled: boolean;
   dbAvailable: boolean;
   eligibleForRetry: number;
+  db2Stats: { outgoingTotal: number; withoutLocalNumber: number; withDeviceId: number } | null;
 }
 
 interface FailedReport {
@@ -484,6 +485,34 @@ export default function GicopSupervisionView() {
                     </div>
                   </div>
 
+                  {/* DB2 — appels sortants */}
+                  {diagnostics.db2Stats && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="font-semibold text-gray-600 mb-2">DB2 — appels sortants</p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Total outgoing</span>
+                          <span className="font-semibold text-gray-700">{diagnostics.db2Stats.outgoingTotal}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Sans local_number</span>
+                          <span className={diagnostics.db2Stats.withoutLocalNumber > 0 ? 'text-orange-600 font-semibold' : 'text-gray-700 font-semibold'}>
+                            {diagnostics.db2Stats.withoutLocalNumber}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Avec device_id</span>
+                          <span className={diagnostics.db2Stats.withDeviceId > 0 ? 'text-green-700 font-semibold' : 'text-red-600 font-semibold'}>
+                            {diagnostics.db2Stats.withDeviceId}
+                          </span>
+                        </div>
+                        {diagnostics.db2Stats.withoutLocalNumber > 0 && diagnostics.db2Stats.withDeviceId === 0 && (
+                          <p className="text-red-600 font-semibold mt-1">&#9888; Appels sans local_number ET sans device_id — impossibles à attribuer</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Batches + service + feature flag */}
                   <div className="bg-gray-50 rounded-lg p-3 space-y-1">
                     <div className="flex justify-between">
@@ -546,6 +575,7 @@ export default function GicopSupervisionView() {
 
               {([
                 { key: 'normalize', label: 'Normaliser call_status',    icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/normalize-call-status', desc: 'Convertit OUTGOING → outgoing dans call_event (étape 1)' },
+                { key: 'durations', label: 'Corriger les durées',       icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/backfill-durations',    desc: 'Relit DB2 et corrige les duration_seconds = 0 dans call_event (étape 1b)' },
                 { key: 'purge',     label: 'Purger pending en doublon',  icon: <Trash2 className="w-3.5 h-3.5" />, path: '/admin/order-sync/purge-stuck-pending',   desc: 'Supprime les entrées pending dupliquées dans le journal sync (étape 2)' },
                 { key: 'batches',   label: 'Initialiser les batches',    icon: <Play   className="w-3.5 h-3.5" />, path: '/admin/order-sync/init-batches',           desc: 'Crée les batches pour les postes sans batch actif (étape 3)' },
                 { key: 'retry',     label: 'Retry obligations',          icon: <RotateCcw className="w-3.5 h-3.5" />, path: '/admin/order-sync/retry-obligations',   desc: 'Relance le matching pour les appels outgoing éligibles (étape 4)' },

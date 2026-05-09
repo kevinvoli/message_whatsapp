@@ -98,6 +98,12 @@ export class OrderSyncAdminController {
     return this.callSync.normalizeCallStatus();
   }
 
+  @Post('backfill-durations')
+  @ApiOperation({ summary: 'Corrige les duration_seconds = 0 dans call_event depuis DB2 (admin)' })
+  async backfillDurations() {
+    return this.callSync.backfillDurations();
+  }
+
   @Post('purge-stuck-pending')
   @ApiOperation({ summary: 'Supprime les entrées pending en doublon dans integration_sync_log (one-shot post-déploiement) (admin)' })
   async purgeStuckPending() {

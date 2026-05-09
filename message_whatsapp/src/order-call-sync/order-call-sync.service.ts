@@ -161,16 +161,22 @@ export class OrderCallSyncService {
         ?? commercialByDevice.get(call.deviceId)
         ?? null;
 
+      const attributionSource =
+        (normalizedLocal && commercialByPhone.has(normalizedLocal)) ? 'phone' :
+        (call.deviceId && commercialByDevice.has(call.deviceId))    ? 'device_poste' :
+        null;
+
       // D2 - passer deviceId dans ingestFromDb2
       await this.callEventService.ingestFromDb2({
-        externalId:      String(call.id),
-        commercialPhone: call.localNumber ?? '',
-        commercialId:    commercialIdDb1 ?? null,
-        clientPhone:     call.remoteNumber,
-        callStatus:      call.callType.toLowerCase(),
-        durationSeconds: call.duration,
-        eventAt:         call.callTimestamp,
-        deviceId:        call.deviceId ?? null,
+        externalId:        String(call.id),
+        commercialPhone:   call.localNumber ?? '',
+        commercialId:      commercialIdDb1 ?? null,
+        clientPhone:       call.remoteNumber,
+        callStatus:        call.callType.toLowerCase(),
+        durationSeconds:   this.normalizeDuration(call.duration),
+        eventAt:           call.callTimestamp,
+        deviceId:          call.deviceId ?? null,
+        attributionSource,
       });
 
       // D4 - Auto-decouverte device : UPSERT silencieux sur call_device
@@ -351,8 +357,21 @@ export class OrderCallSyncService {
     return this.syncLog.createPending('call_validation', call.id, 'call_logs');
   }
 
+  /**
+   * Normalise la durée DB2 en secondes.
+   * DB2 peut stocker en millisecondes (valeurs > 86 400 000 = plus de 24h en ms).
+   * Seuil : si duration > 86400 on considère que c'est des ms → diviser par 1000.
+   */
+  private normalizeDuration(raw: number): number {
+    if (!raw) return 0;
+    return raw > 86_400 ? Math.round(raw / 1000) : raw;
+  }
+
   private isEligibleForObligation(call: OrderCallLog): boolean {
-    return call.callType.toLowerCase() === ORDER_CALL_TYPE_OUTGOING && Boolean(call.localNumber);
+    return (
+      call.callType.toLowerCase() === ORDER_CALL_TYPE_OUTGOING &&
+      (Boolean(call.localNumber) || Boolean(call.deviceId))
+    );
   }
 
   private async matchObligation(
@@ -823,6 +842,33 @@ export class OrderCallSyncService {
   }
 
   /**
+   * Backfill des durées dans call_event depuis DB2.
+   * Corrige les lignes dont duration_seconds = 0 mais pour lesquelles DB2 a une durée > 0.
+   * Applique aussi la normalisation ms→s si nécessaire.
+   */
+  async backfillDurations(): Promise<{ updated: number; checked: number }> {
+    if (!this.dbAvailable || !this.orderDb) return { updated: 0, checked: 0 };
+
+    const zeroDurationIds = await this.callEventService.getExternalIdsWithZeroDuration(500);
+    if (zeroDurationIds.length === 0) return { updated: 0, checked: 0 };
+
+    const callRepo = this.orderDb.getRepository(OrderCallLog);
+    const db2Calls = await callRepo.findBy({ id: In(zeroDurationIds) });
+
+    let updated = 0;
+    for (const c of db2Calls) {
+      const normalized = this.normalizeDuration(c.duration);
+      if (normalized > 0) {
+        await this.callEventService.updateDuration(String(c.id), normalized);
+        updated++;
+      }
+    }
+
+    this.logger.log(`backfillDurations: ${updated}/${db2Calls.length} lignes corrigées`);
+    return { updated, checked: zeroDurationIds.length };
+  }
+
+  /**
    * Normalise call_event.call_status en minuscules (corrige les valeurs 'OUTGOING' → 'outgoing').
    * À appeler une fois si la migration automatique n'a pas tourné.
    */
@@ -851,6 +897,39 @@ export class OrderCallSyncService {
    * Diagnostic : retourne la distribution des call_status dans call_event,
    * les postes avec/sans batch actif, le feature flag, et les stats device_id.
    */
+  /** Stats sur les appels sortants dans DB2 (pour diagnostic admin). */
+  private async getDb2Stats(): Promise<{
+    outgoingTotal: number;
+    withoutLocalNumber: number;
+    withDeviceId: number;
+  } | null> {
+    if (!this.dbAvailable || !this.orderDb) return null;
+
+    try {
+      const callRepo = this.orderDb.getRepository(OrderCallLog);
+      const [outgoingTotal, withoutLocalNumber, withDeviceId] = await Promise.all([
+        callRepo
+          .createQueryBuilder('c')
+          .where("UPPER(c.callType) = 'OUTGOING'")
+          .getCount(),
+        callRepo
+          .createQueryBuilder('c')
+          .where("UPPER(c.callType) = 'OUTGOING'")
+          .andWhere('(c.localNumber IS NULL OR c.localNumber = :empty)', { empty: '' })
+          .getCount(),
+        callRepo
+          .createQueryBuilder('c')
+          .where("UPPER(c.callType) = 'OUTGOING'")
+          .andWhere('c.deviceId IS NOT NULL')
+          .andWhere("c.deviceId != ''")
+          .getCount(),
+      ]);
+      return { outgoingTotal, withoutLocalNumber, withDeviceId };
+    } catch {
+      return null;
+    }
+  }
+
   async getDiagnostics(): Promise<{
     callStatusDistribution: Array<{ status: string; count: number }>;
     deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
@@ -860,14 +939,16 @@ export class OrderCallSyncService {
     featureFlagEnabled: boolean;
     dbAvailable: boolean;
     eligibleForRetry: number;
+    db2Stats: { outgoingTotal: number; withoutLocalNumber: number; withDeviceId: number } | null;
   }> {
-    const [callStatusDistribution, deviceStats, activeBatchPosteIds, ffEnabled, retrySteps] =
+    const [callStatusDistribution, deviceStats, activeBatchPosteIds, ffEnabled, retrySteps, db2Stats] =
       await Promise.all([
         this.callEventService.getStatusDistribution(),
         this.callEventService.getDeviceStats(),
         this.obligationService ? this.obligationService.getActivePosteIds() : Promise.resolve([]),
         this.obligationService ? this.obligationService.isEnabled() : Promise.resolve(false),
         this.callEventService.countEligibleForRetrySteps(ORDER_CALL_TYPE_OUTGOING, ORDER_CALL_MIN_DURATION_SEC),
+        this.getDb2Stats(),
       ]);
 
     return {
@@ -879,6 +960,7 @@ export class OrderCallSyncService {
       featureFlagEnabled: ffEnabled,
       dbAvailable: this.dbAvailable,
       eligibleForRetry: retrySteps.withoutSuccess,
+      db2Stats,
     };
   }
 

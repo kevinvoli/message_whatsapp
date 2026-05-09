@@ -68,6 +68,22 @@ export class CallEventService {
       .getMany();
   }
 
+  /** Retourne les external_id dont duration_seconds = 0 (pour backfill depuis DB2). */
+  async getExternalIdsWithZeroDuration(limit = 500): Promise<string[]> {
+    const rows = await this.callEventRepo
+      .createQueryBuilder('e')
+      .select('e.external_id')
+      .where('e.duration_seconds = 0')
+      .take(limit)
+      .getMany();
+    return rows.map((r) => r.external_id);
+  }
+
+  /** Met à jour duration_seconds pour un external_id donné. */
+  async updateDuration(externalId: string, durationSeconds: number): Promise<void> {
+    await this.callEventRepo.update({ external_id: externalId }, { duration_seconds: durationSeconds });
+  }
+
   /** Normalise call_status en minuscules. Retourne le nombre de lignes modifiées. */
   async normalizeCallStatusToLower(): Promise<number> {
     const result = await this.callEventRepo
@@ -163,28 +179,30 @@ export class CallEventService {
    * INSERT IGNORE via orIgnore() — idempotent sur l'index UNIQUE external_id.
    */
   async ingestFromDb2(params: {
-    externalId:      string;
-    commercialPhone: string;
-    commercialId:    string | null;
-    clientPhone:     string;
-    callStatus:      string;
-    durationSeconds: number;
-    eventAt:         Date;
-    deviceId?:       string | null;
+    externalId:        string;
+    commercialPhone:   string;
+    commercialId:      string | null;
+    clientPhone:       string;
+    callStatus:        string;
+    durationSeconds:   number;
+    eventAt:           Date;
+    deviceId?:         string | null;
+    attributionSource?: string | null;
   }): Promise<void> {
     await this.callEventRepo
       .createQueryBuilder()
       .insert()
       .into(CallEvent)
       .values({
-        external_id:      params.externalId,
-        commercial_phone: params.commercialPhone,
-        commercial_id:    params.commercialId,
-        client_phone:     params.clientPhone,
-        call_status:      params.callStatus,
-        duration_seconds: params.durationSeconds,
-        event_at:         params.eventAt,
-        device_id:        params.deviceId ?? null,
+        external_id:        params.externalId,
+        commercial_phone:   params.commercialPhone,
+        commercial_id:      params.commercialId,
+        attribution_source: params.attributionSource ?? null,
+        client_phone:       params.clientPhone,
+        call_status:        params.callStatus,
+        duration_seconds:   params.durationSeconds,
+        event_at:           params.eventAt,
+        device_id:          params.deviceId ?? null,
       })
       .orIgnore()
       .execute();
