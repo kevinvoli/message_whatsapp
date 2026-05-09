@@ -956,23 +956,35 @@ export class OrderCallSyncService {
 
   async getDiagnostics(): Promise<{
     callStatusDistribution: Array<{ status: string; count: number }>;
-    deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
-    retrySteps: { total: number; withStatus: number; withDuration: number; withAttribution: number; withoutSuccess: number };
+    deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number } | null;
+    retrySteps: { total: number; withStatus: number; withDuration: number; withAttribution: number; withoutSuccess: number } | null;
     activeBatchPosteIds: string[];
     obligationServiceWired: boolean;
     featureFlagEnabled: boolean;
     dbAvailable: boolean;
     eligibleForRetry: number;
     db2Stats: { outgoingTotal: number; withoutLocalNumber: number; withDeviceId: number } | null;
+    errors: Record<string, string>;
   }> {
+    const errors: Record<string, string> = {};
+
+    const safe = async <T>(key: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+      try { return await fn(); }
+      catch (err) {
+        errors[key] = (err as Error).message;
+        this.logger.error(`getDiagnostics[${key}]: ${(err as Error).message}`);
+        return fallback;
+      }
+    };
+
     const [callStatusDistribution, deviceStats, activeBatchPosteIds, ffEnabled, retrySteps, db2Stats] =
       await Promise.all([
-        this.callEventService.getStatusDistribution(),
-        this.callEventService.getDeviceStats(),
-        this.obligationService ? this.obligationService.getActivePosteIds() : Promise.resolve([]),
-        this.obligationService ? this.obligationService.isEnabled() : Promise.resolve(false),
-        this.callEventService.countEligibleForRetrySteps(ORDER_CALL_TYPE_OUTGOING, ORDER_CALL_MIN_DURATION_SEC),
-        this.getDb2Stats(),
+        safe('callStatusDistribution', () => this.callEventService.getStatusDistribution(), []),
+        safe('deviceStats',            () => this.callEventService.getDeviceStats(),         null),
+        safe('activeBatchPosteIds',    () => this.obligationService ? this.obligationService.getActivePosteIds() : Promise.resolve([]), []),
+        safe('featureFlagEnabled',     () => this.obligationService ? this.obligationService.isEnabled()         : Promise.resolve(false), false),
+        safe('retrySteps',             () => this.callEventService.countEligibleForRetrySteps(ORDER_CALL_TYPE_OUTGOING, 0), null),
+        safe('db2Stats',               () => this.getDb2Stats(), null),
       ]);
 
     return {
@@ -983,8 +995,9 @@ export class OrderCallSyncService {
       obligationServiceWired: this.obligationService !== null && this.obligationService !== undefined,
       featureFlagEnabled: ffEnabled,
       dbAvailable: this.dbAvailable,
-      eligibleForRetry: retrySteps.withoutSuccess,
+      eligibleForRetry: retrySteps?.withoutSuccess ?? 0,
       db2Stats,
+      errors,
     };
   }
 

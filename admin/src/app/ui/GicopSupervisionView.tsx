@@ -36,14 +36,15 @@ interface SyncStatus {
 
 interface SyncDiagnostics {
   callStatusDistribution: Array<{ status: string; count: number }>;
-  deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number };
-  retrySteps: { total: number; withStatus: number; withDuration: number; withAttribution: number; withoutSuccess: number };
+  deviceStats: { withDeviceId: number; withoutDeviceId: number; withPoste: number } | null;
+  retrySteps: { total: number; withStatus: number; withDuration: number; withAttribution: number; withoutSuccess: number } | null;
   activeBatchPosteIds: string[];
   obligationServiceWired: boolean;
   featureFlagEnabled: boolean;
   dbAvailable: boolean;
   eligibleForRetry: number;
   db2Stats: { outgoingTotal: number; withoutLocalNumber: number; withDeviceId: number } | null;
+  errors?: Record<string, string>;
 }
 
 interface FailedReport {
@@ -460,6 +461,7 @@ export default function GicopSupervisionView() {
                   </div>
 
                   {/* Device stats */}
+                  {diagnostics.deviceStats && (
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="font-semibold text-gray-600 mb-2">Appels dans call_event</p>
                     <div className="space-y-1">
@@ -484,6 +486,7 @@ export default function GicopSupervisionView() {
                       )}
                     </div>
                   </div>
+                  )}
 
                   {/* DB2 — appels sortants */}
                   {diagnostics.db2Stats && (
@@ -542,12 +545,13 @@ export default function GicopSupervisionView() {
                   </div>
 
                   {/* Breakdown retry */}
+                  {diagnostics.retrySteps && (
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="font-semibold text-gray-600 mb-2">Entonnoir retry (filtre par filtre)</p>
                     {([
                       { label: 'Total call_event',                      value: diagnostics.retrySteps.total,           ok: diagnostics.retrySteps.total > 0 },
                       { label: '→ call_status = outgoing',              value: diagnostics.retrySteps.withStatus,      ok: diagnostics.retrySteps.withStatus > 0 },
-                      { label: '→ duration_seconds ≥ 90s',              value: diagnostics.retrySteps.withDuration,    ok: diagnostics.retrySteps.withDuration > 0 },
+                      { label: '→ duration_seconds ≥ 0s',               value: diagnostics.retrySteps.withDuration,    ok: diagnostics.retrySteps.withDuration > 0 },
                       { label: '→ commercial_id ou device_id non nul', value: diagnostics.retrySteps.withAttribution, ok: diagnostics.retrySteps.withAttribution > 0 },
                       { label: '→ pas encore en succès (éligibles)',    value: diagnostics.retrySteps.withoutSuccess,  ok: diagnostics.retrySteps.withoutSuccess > 0 },
                     ] as const).map(({ label, value, ok }) => (
@@ -556,13 +560,20 @@ export default function GicopSupervisionView() {
                         <span className={`font-semibold ${ok ? 'text-green-700' : 'text-red-600'}`}>{value}</span>
                       </div>
                     ))}
-                    {diagnostics.retrySteps.withDuration === 0 && diagnostics.retrySteps.withStatus > 0 && (
-                      <p className="text-red-600 font-semibold mt-2">⚠ Tous les appels outgoing ont une durée &lt; 90s — vérifier le champ &quot;duration&quot; dans DB2</p>
-                    )}
-                    {diagnostics.retrySteps.withAttribution === 0 && diagnostics.retrySteps.withDuration > 0 && (
-                      <p className="text-red-600 font-semibold mt-2">⚠ commercial_id et device_id sont NULL pour tous les appels — les appels ne sont pas attribués</p>
+                    {diagnostics.retrySteps.withAttribution === 0 && diagnostics.retrySteps.withStatus > 0 && (
+                      <p className="text-red-600 font-semibold mt-2">⚠ commercial_id et device_id sont NULL pour tous les appels — backfill device_id requis</p>
                     )}
                   </div>
+                  )}
+                  {/* Erreurs diagnostic */}
+                  {diagnostics.errors && Object.keys(diagnostics.errors).length > 0 && (
+                  <div className="bg-red-50 rounded-lg p-3">
+                    <p className="font-semibold text-red-600 mb-1">Erreurs lors du diagnostic</p>
+                    {Object.entries(diagnostics.errors).map(([k, v]) => (
+                      <p key={k} className="text-xs text-red-600"><span className="font-mono">{k}</span>: {v}</p>
+                    ))}
+                  </div>
+                  )}
                 </div>
               )}
             </div>
