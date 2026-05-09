@@ -466,7 +466,7 @@ export class OrderCallSyncService {
 
     const candidates = await this.callEventService.findEligibleForRetry({
       callStatus:         ORDER_CALL_TYPE_OUTGOING,
-      minDurationSeconds: ORDER_CALL_MIN_DURATION_SEC,
+      minDurationSeconds: 0,
       limit:              100,
     });
 
@@ -501,11 +501,12 @@ export class OrderCallSyncService {
 
       try {
         const result = await this.obligationService.tryMatchCallToTask({
-          callEventId:     event.external_id,
-          durationSeconds: event.duration_seconds,
-          clientPhone:     event.client_phone,
-          commercialPhone: event.commercial_phone,
+          callEventId:      event.external_id,
+          durationSeconds:  event.duration_seconds,
+          clientPhone:      event.client_phone,
+          commercialPhone:  event.commercial_phone,
           posteId,
+          skipDurationCheck: true,
         });
 
         if (result.matched) {

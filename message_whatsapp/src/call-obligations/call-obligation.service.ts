@@ -163,14 +163,16 @@ export class CallObligationService {
     clientPhone?: string;
     commercialPhone?: string;
     posteId?: string | null;
+    /** Si true, bypass le filtre durée minimale (ex: appels historiques avec duration=0 en DB2). */
+    skipDurationCheck?: boolean;
   }): Promise<{ matched: boolean; taskId?: string; reason?: string }> {
 
     if (!await this.isEnabled()) {
       return { matched: false, reason: 'feature_disabled' };
     }
 
-    // 1. Vérifier la durée minimale
-    if (!params.durationSeconds || params.durationSeconds < MIN_CALL_DURATION_SECONDS) {
+    // 1. Vérifier la durée minimale (sauf bypass explicite pour les appels historiques)
+    if (!params.skipDurationCheck && (!params.durationSeconds || params.durationSeconds < MIN_CALL_DURATION_SECONDS)) {
       this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} reason=duree_insuffisante duration=${params.durationSeconds ?? 0}s`);
       return { matched: false, reason: 'duree_insuffisante' };
     }
