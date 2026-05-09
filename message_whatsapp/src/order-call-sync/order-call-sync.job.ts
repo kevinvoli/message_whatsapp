@@ -19,6 +19,12 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     this._run('bootstrap').catch((err) =>
       this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
     );
+    // Synchronise les catégories clients dès le démarrage (pas d'attente du cron 2h)
+    setImmediate(() =>
+      this._runSyncClientCategories().catch((err) =>
+        this.logger.error(`Erreur syncClientCategories au démarrage: ${(err as Error).message}`),
+      ),
+    );
   }
 
   /** Sync DB2 → DB1 toutes les 30 secondes : mapping commerciaux puis appels. */

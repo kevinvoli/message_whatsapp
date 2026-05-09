@@ -750,38 +750,30 @@ export class OrderCallSyncService {
       return { updated: 0, skipped: 0, errors: 0 };
     }
 
-    const mappings = await this.clientMappingRepo.find({
-      select: ['contact_id', 'phone_normalized'],
+    // Itère TOUS les contacts DB1 non supprimés qui ont un numéro de téléphone.
+    // Ne dépend pas de client_identity_mapping pour ne rater aucun contact.
+    const contacts = await this.contactRepo.find({
+      where:  { deletedAt: IsNull() },
+      select: ['id', 'phone', 'client_category'],
     });
 
     let updated = 0;
     let skipped = 0;
     let errors  = 0;
 
-    for (const mapping of mappings) {
+    for (const contact of contacts) {
       try {
-        const phone = mapping.phone_normalized;
+        const phone = normalizePhone(contact.phone);
         if (!phone) {
           skipped++;
           continue;
         }
 
-        // Résolution catégorie via DB2
+        // Résolution catégorie depuis DB2 via téléphone
         const callCategory = await this.resolveClientCategory(phone);
 
-        // Conversion CallTaskCategory → ClientCategory (valeurs string identiques)
+        // CallTaskCategory et ClientCategory ont les mêmes valeurs string
         const newCategory = callCategory as unknown as ClientCategory;
-
-        // Chargement du contact DB1
-        const contact = await this.contactRepo.findOne({
-          where:  { id: mapping.contact_id },
-          select: ['id', 'client_category'],
-        });
-
-        if (!contact) {
-          skipped++;
-          continue;
-        }
 
         if (contact.client_category === newCategory) {
           skipped++;
@@ -796,7 +788,7 @@ export class OrderCallSyncService {
       } catch (err) {
         errors++;
         this.logger.error(
-          `N4 syncClientCategories contact_id=${mapping.contact_id}: ${(err as Error).message}`,
+          `syncClientCategories contact_id=${contact.id}: ${(err as Error).message}`,
         );
       }
     }
