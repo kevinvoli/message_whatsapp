@@ -8,6 +8,14 @@ function makeCronConfigService() {
   } as any;
 }
 
+// ─── Mock NotificationService ─────────────────────────────────────────────────
+
+function makeNotificationService() {
+  return {
+    create: jest.fn().mockResolvedValue({}),
+  } as any;
+}
+
 // ─── Mock CallObligationService ────────────────────────────────────────────────
 
 function makeObligationService(posteIds: string[] = [], qualityResults: boolean[] = [], enabled = true) {
@@ -16,6 +24,7 @@ function makeObligationService(posteIds: string[] = [], qualityResults: boolean[
     isEnabled:         jest.fn().mockResolvedValue(enabled),
     getActivePosteIds: jest.fn().mockResolvedValue(posteIds),
     runQualityCheck:   jest.fn().mockImplementation(async () => qualityResults[runCallIdx++] ?? true),
+    getStuckBatches:   jest.fn().mockResolvedValue([]),
   } as any;
 }
 
@@ -25,7 +34,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('enregistre le handler au démarrage du module', () => {
     const cronConfigSvc = makeCronConfigService();
-    const job = new ObligationQualityCheckJob(cronConfigSvc, makeObligationService());
+    const job = new ObligationQualityCheckJob(cronConfigSvc, makeObligationService(), makeNotificationService());
     job.onModuleInit();
     expect(cronConfigSvc.registerHandler).toHaveBeenCalledWith(
       'obligation-quality-check',
@@ -35,7 +44,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('retourne early si aucun batch actif', async () => {
     const obligationSvc = makeObligationService([]);
-    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc);
+    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService());
 
     const msg = await job.run();
     expect(msg).toBe('Aucun batch actif — rien à vérifier');
@@ -44,7 +53,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('lance runQualityCheck pour chaque poste actif', async () => {
     const obligationSvc = makeObligationService(['poste-1', 'poste-2'], [true, false]);
-    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc);
+    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService());
 
     const msg = await job.run();
     expect(obligationSvc.runQualityCheck).toHaveBeenCalledTimes(2);
@@ -56,7 +65,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('tous les postes passent la qualité', async () => {
     const obligationSvc = makeObligationService(['poste-1', 'poste-2', 'poste-3'], [true, true, true]);
-    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc);
+    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService());
 
     const msg = await job.run();
     expect(msg).toContain('3 poste(s) OK');

@@ -26,9 +26,10 @@ import {
   ORDER_COMMAND_STATUS_ETAT_RETOUR,
 } from 'src/order-read/entities/order-command-status.entity';
 import { CallDevice } from 'src/call-device/entities/call-device.entity';
-import { Contact } from 'src/contact/entities/contact.entity';
+import { ClientCategory, Contact } from 'src/contact/entities/contact.entity';
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
+import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
 
 const CURSOR_SCOPE            = 'global';
 const CURSOR_LOOKBACK_MINUTES = 2;
@@ -73,6 +74,9 @@ export class OrderCallSyncService {
 
     @InjectRepository(ClientIdentityMapping)
     private readonly clientMappingRepo: Repository<ClientIdentityMapping>,
+
+    @InjectRepository(CallEventUnresolved)
+    private readonly unresolvedRepo: Repository<CallEventUnresolved>,
   ) {}
 
   async syncNewCalls(): Promise<{ processed: number; obligations: number; errors: number }> {
@@ -175,6 +179,33 @@ export class OrderCallSyncService {
           await this.upsertCallDevice(call.deviceId, call.callTimestamp);
         } catch {
           // silencieux - ne bloque pas la sync
+        }
+      }
+
+      // N5 — Appel non résolu : ni commercial trouvé par téléphone ni par device_id → file d'attente
+      if (commercialIdDb1 === null) {
+        try {
+          await this.unresolvedRepo
+            .createQueryBuilder()
+            .insert()
+            .into(CallEventUnresolved)
+            .values({
+              externalId:   String(call.id),
+              localNumber:  call.localNumber ?? null,
+              remoteNumber: call.remoteNumber ?? null,
+              deviceId:     call.deviceId ?? null,
+              callType:     call.callType ?? null,
+              durationSec:  call.duration ?? null,
+              eventAt:      call.callTimestamp,
+              reason:       'commercial_not_found',
+              resolvedAt:   null,
+            })
+            .orIgnore()
+            .execute();
+        } catch (insertErr) {
+          this.logger.warn(
+            `N5 insert call_event_unresolved ${call.id}: ${(insertErr as Error).message}`,
+          );
         }
       }
 
@@ -709,7 +740,96 @@ export class OrderCallSyncService {
     return result;
   }
 
-    async getStatus(): Promise<{
+  /**
+   * N4 — Synchronise Contact.client_category depuis DB2 (source de vérité).
+   * Parcourt toutes les lignes de client_identity_mapping, résout la catégorie
+   * via resolveClientCategory() et met à jour le Contact DB1 si nécessaire.
+   */
+  async syncClientCategories(): Promise<{ updated: number; skipped: number; errors: number }> {
+    if (!this.dbAvailable || !this.orderDb) {
+      return { updated: 0, skipped: 0, errors: 0 };
+    }
+
+    const mappings = await this.clientMappingRepo.find({
+      select: ['contact_id', 'phone_normalized'],
+    });
+
+    let updated = 0;
+    let skipped = 0;
+    let errors  = 0;
+
+    for (const mapping of mappings) {
+      try {
+        const phone = mapping.phone_normalized;
+        if (!phone) {
+          skipped++;
+          continue;
+        }
+
+        // Résolution catégorie via DB2
+        const callCategory = await this.resolveClientCategory(phone);
+
+        // Conversion CallTaskCategory → ClientCategory (valeurs string identiques)
+        const newCategory = callCategory as unknown as ClientCategory;
+
+        // Chargement du contact DB1
+        const contact = await this.contactRepo.findOne({
+          where:  { id: mapping.contact_id },
+          select: ['id', 'client_category'],
+        });
+
+        if (!contact) {
+          skipped++;
+          continue;
+        }
+
+        if (contact.client_category === newCategory) {
+          skipped++;
+          continue;
+        }
+
+        await this.contactRepo.update(
+          { id: contact.id },
+          { client_category: newCategory },
+        );
+        updated++;
+      } catch (err) {
+        errors++;
+        this.logger.error(
+          `N4 syncClientCategories contact_id=${mapping.contact_id}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `[SyncCategories] ${updated} mis à jour, ${skipped} skippés, ${errors} erreurs`,
+    );
+    return { updated, skipped, errors };
+  }
+
+  /**
+   * N5 — Retourne les appels non résolus (commercial introuvable), non encore retentés.
+   */
+  async getUnresolved(limit = 50): Promise<CallEventUnresolved[]> {
+    return this.unresolvedRepo.find({
+      where:  { resolvedAt: IsNull() },
+      order:  { eventAt: 'DESC' },
+      take:   limit,
+    });
+  }
+
+  /**
+   * N5 — Marque un appel non résolu comme retryé (resolved_at = now).
+   * Retourne l'entité mise à jour ou null si introuvable.
+   */
+  async markUnresolvedRetried(id: string): Promise<CallEventUnresolved | null> {
+    const item = await this.unresolvedRepo.findOne({ where: { id } });
+    if (!item) return null;
+    item.resolvedAt = new Date();
+    return this.unresolvedRepo.save(item);
+  }
+
+  async getStatus(): Promise<{
     dbAvailable: boolean;
     lastSyncAt: Date | null;
     processedCount: number;

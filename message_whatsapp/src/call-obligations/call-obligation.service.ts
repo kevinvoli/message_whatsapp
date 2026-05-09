@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { IsNull, LessThan, Not, Repository } from 'typeorm';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { v4 as uuidv4 } from 'uuid';
 import { SystemConfigService } from 'src/system-config/system-config.service';
@@ -333,6 +333,24 @@ export class CallObligationService {
       select: ['posteId'],
     });
     return [...new Set(batches.map((b) => b.posteId))];
+  }
+
+  // ── Batches bloqués (alerting N10) ──────────────────────────────────────
+
+  /**
+   * Retourne les batches PENDING avec qualityCheckPassed=false créés depuis plus de `olderThanDays` jours.
+   * Utilisé par ObligationQualityCheckJob pour alerter les managers.
+   */
+  async getStuckBatches(olderThanDays: number): Promise<CommercialObligationBatch[]> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - olderThanDays);
+    return this.batchRepo.find({
+      where: {
+        status: BatchStatus.PENDING,
+        qualityCheckPassed: false,
+        createdAt: LessThan(cutoff),
+      },
+    });
   }
 
   // ── Initialisation batch pour tous les postes ────────────────────────────

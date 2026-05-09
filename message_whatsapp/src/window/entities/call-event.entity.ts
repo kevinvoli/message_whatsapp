@@ -11,6 +11,7 @@ export enum CallStatus {
 
 @Entity({ name: 'call_event' })
 @Index('UQ_call_event_external_id', ['external_id'], { unique: true })
+@Index('IDX_call_event_device_ts', ['device_id', 'client_phone', 'event_at'])
 export class CallEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;

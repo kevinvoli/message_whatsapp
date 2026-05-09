@@ -13,6 +13,7 @@ import { CommercialIdentityMapping } from 'src/integration/entities/commercial-i
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { CallDeviceModule } from 'src/call-device/call-device.module';
+import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CallDeviceModule } from 'src/call-device/call-device.module';
       CommercialIdentityMapping,
       ClientIdentityMapping,
       Contact,
+      CallEventUnresolved,
     ]),
     CallDeviceModule,
     IntegrationSyncModule,

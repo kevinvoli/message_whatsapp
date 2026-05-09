@@ -53,6 +53,20 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     await this._runRetry();
   }
 
+  /** N4 — Synchronisation client_category depuis DB2, tous les jours à 2h. */
+  @Cron('0 2 * * *')
+  async syncClientCategories(): Promise<void> {
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock(
+        'cron:sync-client-categories', 3_600_000,
+        () => this._runSyncClientCategories(),
+      );
+      if (!acquired) this.logger.debug('LOCK_SKIPPED cron:sync-client-categories');
+      return;
+    }
+    await this._runSyncClientCategories();
+  }
+
   /** N6 — Nettoyage des mappings orphelins (contact/commercial supprimés), dimanche à 3h. */
   @Cron('0 3 * * 0')
   async cleanOrphans(): Promise<void> {
@@ -75,7 +89,18 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     }
   }
 
-    private async _runRetry(): Promise<void> {
+  private async _runSyncClientCategories(): Promise<void> {
+    try {
+      const result = await this.syncService.syncClientCategories();
+      this.logger.log(
+        `[SyncCategories] ${result.updated} mis à jour, ${result.skipped} skippés, ${result.errors} erreurs`,
+      );
+    } catch (err) {
+      this.logger.error(`Erreur syncClientCategories: ${(err as Error).message}`);
+    }
+  }
+
+  private async _runRetry(): Promise<void> {
     try {
       await this.syncService.retryUnmatchedObligations();
     } catch (err) {

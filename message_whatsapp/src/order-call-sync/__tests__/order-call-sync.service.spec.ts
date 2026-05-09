@@ -136,6 +136,18 @@ function buildService(
 
   const contactRepo     = { find: jest.fn().mockResolvedValue([]) } as any;
   const clientMappingRepo = { find: jest.fn().mockResolvedValue([]), save: jest.fn().mockResolvedValue({}), create: jest.fn().mockImplementation((x: unknown) => x) } as any;
+  const unresolvedRepo  = {
+    createQueryBuilder: jest.fn().mockReturnValue({
+      insert: jest.fn().mockReturnThis(),
+      into:   jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({}),
+    }),
+    find:    jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
+    save:    jest.fn().mockResolvedValue({}),
+  } as any;
 
   const svc = new OrderCallSyncService(
     orderDb as any,
@@ -149,6 +161,7 @@ function buildService(
     callEventService,
     contactRepo,
     clientMappingRepo,
+    unresolvedRepo,
   );
 
   return { svc, orderDb, cursorRepo, syncLog };
@@ -208,7 +221,7 @@ describe('OrderCallSyncService — curseur avec fenêtre de tolérance (OBL-009)
       null, false,
       {} as any, {} as any, {} as any, {} as any,
       {} as any, undefined as any, {} as any,
-      {} as any, {} as any,
+      {} as any, {} as any, {} as any,
     );
     const result = await svc.syncNewCalls();
     expect(result).toEqual({ processed: 0, obligations: 0, errors: 0 });

@@ -12,6 +12,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { RedisModule } from 'src/redis/redis.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RedisModule } from 'src/redis/redis.module';
     JorbsModule,
     SystemConfigModule,
     RedisModule,
+    NotificationModule,
   ],
   controllers: [CallObligationController],
   providers: [CallObligationService, ObligationQualityCheckJob],

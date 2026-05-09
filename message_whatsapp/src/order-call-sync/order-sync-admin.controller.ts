@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { OrderCallSyncService } from './order-call-sync.service';
@@ -60,6 +60,31 @@ export class OrderSyncAdminController {
   @ApiOperation({ summary: 'Supprime les mappings orphelins (contact/commercial supprimés de DB1) (admin)' })
   async cleanOrphans() {
     return this.callSync.cleanOrphanMappings();
+  }
+
+  @Post('sync-client-categories')
+  @ApiOperation({ summary: 'Synchronise Contact.client_category depuis DB2 (source de vérité) (admin)' })
+  async syncClientCategories() {
+    return this.callSync.syncClientCategories();
+  }
+
+  @Get('unresolved')
+  @ApiOperation({ summary: 'Liste les 50 derniers appels non résolus (commercial introuvable) (admin)' })
+  async getUnresolved() {
+    return this.callSync.getUnresolved(50);
+  }
+
+  @Post('unresolved/:id/retry')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Marque un appel non résolu comme traité et relance la sync (admin)' })
+  async retryUnresolved(@Param('id') id: string) {
+    const item = await this.callSync.markUnresolvedRetried(id);
+    if (!item) {
+      throw new NotFoundException(`Appel non résolu introuvable : ${id}`);
+    }
+    // Relance une sync complète pour tenter de résoudre l'appel
+    const syncResult = await this.callSync.syncNewCalls();
+    return { unresolved: item, sync: syncResult };
   }
 
 }
