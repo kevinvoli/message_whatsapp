@@ -574,11 +574,12 @@ export default function GicopSupervisionView() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Actions maintenance</p>
 
               {([
-                { key: 'normalize', label: 'Normaliser call_status',    icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/normalize-call-status', desc: 'Convertit OUTGOING → outgoing dans call_event (étape 1)' },
-                { key: 'durations', label: 'Corriger les durées',       icon: <Wrench className="w-3.5 h-3.5" />, path: '/admin/order-sync/backfill-durations',    desc: 'Relit DB2 et corrige les duration_seconds = 0 dans call_event (étape 1b)' },
-                { key: 'purge',     label: 'Purger pending en doublon',  icon: <Trash2 className="w-3.5 h-3.5" />, path: '/admin/order-sync/purge-stuck-pending',   desc: 'Supprime les entrées pending dupliquées dans le journal sync (étape 2)' },
-                { key: 'batches',   label: 'Initialiser les batches',    icon: <Play   className="w-3.5 h-3.5" />, path: '/admin/order-sync/init-batches',           desc: 'Crée les batches pour les postes sans batch actif (étape 3)' },
-                { key: 'retry',     label: 'Retry obligations',          icon: <RotateCcw className="w-3.5 h-3.5" />, path: '/admin/order-sync/retry-obligations',   desc: 'Relance le matching pour les appels outgoing éligibles (étape 4)' },
+                { key: 'normalize',  label: 'Normaliser call_status',     icon: <Wrench    className="w-3.5 h-3.5" />, path: '/admin/order-sync/normalize-call-status', desc: 'Convertit OUTGOING → outgoing dans call_event (étape 1)' },
+                { key: 'durations',  label: 'Corriger les durées',        icon: <Wrench    className="w-3.5 h-3.5" />, path: '/admin/order-sync/backfill-durations',    desc: 'Relit DB2 et corrige les duration_seconds = 0 dans call_event (étape 1b)' },
+                { key: 'deviceids',  label: 'Backfill device_id',         icon: <Wrench    className="w-3.5 h-3.5" />, path: '/admin/order-sync/backfill-device-ids',   desc: 'Récupère device_id manquant depuis DB2 pour les appels historiques (étape 1c)' },
+                { key: 'purge',      label: 'Purger pending en doublon',  icon: <Trash2    className="w-3.5 h-3.5" />, path: '/admin/order-sync/purge-stuck-pending',   desc: 'Supprime les entrées pending dupliquées dans le journal sync (étape 2)' },
+                { key: 'batches',    label: 'Initialiser les batches',    icon: <Play      className="w-3.5 h-3.5" />, path: '/admin/order-sync/init-batches',           desc: 'Crée les batches pour les postes sans batch actif (étape 3)' },
+                { key: 'retry',      label: 'Retry obligations',          icon: <RotateCcw className="w-3.5 h-3.5" />, path: '/admin/order-sync/retry-obligations',      desc: 'Relance le matching pour les appels outgoing éligibles (étape 4)' },
               ] as const).map(({ key, label, icon, path, desc }) => (
                 <div key={key} className="flex items-start gap-3">
                   <button

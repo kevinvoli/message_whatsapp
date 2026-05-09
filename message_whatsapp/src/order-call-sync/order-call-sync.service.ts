@@ -870,6 +870,28 @@ export class OrderCallSyncService {
   }
 
   /**
+   * Backfille device_id pour les lignes call_event sans attribution (ingérées avant la migration).
+   * Lit DB2, résout device_id via OrderCallLog.deviceId, et met à jour call_event.
+   */
+  async backfillDeviceIds(): Promise<{ updated: number; checked: number }> {
+    if (!this.dbAvailable || !this.orderDb) return { updated: 0, checked: 0 };
+
+    const noDeviceIds = await this.callEventService.getExternalIdsWithoutDeviceId(500);
+    if (noDeviceIds.length === 0) return { updated: 0, checked: 0 };
+
+    const callRepo = this.orderDb.getRepository(OrderCallLog);
+    const db2Calls = await callRepo.findBy({ id: In(noDeviceIds) });
+
+    const updates = db2Calls
+      .filter((c) => c.deviceId && c.deviceId.trim() !== '')
+      .map((c) => ({ externalId: String(c.id), deviceId: c.deviceId }));
+
+    const updated = await this.callEventService.applyDeviceIdBatch(updates);
+    this.logger.log(`backfillDeviceIds: ${updated}/${noDeviceIds.length} lignes mises à jour`);
+    return { updated, checked: noDeviceIds.length };
+  }
+
+  /**
    * Normalise call_event.call_status en minuscules (corrige les valeurs 'OUTGOING' → 'outgoing').
    * À appeler une fois si la migration automatique n'a pas tourné.
    */

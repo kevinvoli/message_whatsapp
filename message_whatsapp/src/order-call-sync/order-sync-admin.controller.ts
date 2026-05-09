@@ -104,6 +104,12 @@ export class OrderSyncAdminController {
     return this.callSync.backfillDurations();
   }
 
+  @Post('backfill-device-ids')
+  @ApiOperation({ summary: 'Backfille device_id manquant dans call_event depuis DB2 (appels historiques sans attribution) (admin)' })
+  async backfillDeviceIds() {
+    return this.callSync.backfillDeviceIds();
+  }
+
   @Post('purge-stuck-pending')
   @ApiOperation({ summary: 'Supprime les entrées pending en doublon dans integration_sync_log (one-shot post-déploiement) (admin)' })
   async purgeStuckPending() {
