@@ -167,7 +167,7 @@ export class OrderCallSyncService {
         commercialPhone: call.localNumber ?? '',
         commercialId:    commercialIdDb1 ?? null,
         clientPhone:     call.remoteNumber,
-        callStatus:      call.callType,
+        callStatus:      call.callType.toLowerCase(),
         durationSeconds: call.duration,
         eventAt:         call.callTimestamp,
         deviceId:        call.deviceId ?? null,
@@ -351,7 +351,7 @@ export class OrderCallSyncService {
   }
 
   private isEligibleForObligation(call: OrderCallLog): boolean {
-    return call.callType === ORDER_CALL_TYPE_OUTGOING && Boolean(call.localNumber);
+    return call.callType.toLowerCase() === ORDER_CALL_TYPE_OUTGOING && Boolean(call.localNumber);
   }
 
   private async matchObligation(
@@ -819,6 +819,36 @@ export class OrderCallSyncService {
     if (!item) return null;
     item.resolvedAt = new Date();
     return this.unresolvedRepo.save(item);
+  }
+
+  /** Initialise les batches manquants pour tous les postes (idempotent). */
+  async initAllBatches(): Promise<{ created: number; alreadyActive: number } | null> {
+    if (!this.obligationService) return null;
+    return this.obligationService.initAllBatches();
+  }
+
+  /**
+   * Diagnostic : retourne la distribution des call_status dans call_event,
+   * les postes avec/sans batch actif et l'état du feature flag.
+   */
+  async getDiagnostics(): Promise<{
+    callStatusDistribution: Array<{ status: string; count: number }>;
+    activeBatchPosteIds: string[];
+    obligationServiceWired: boolean;
+    dbAvailable: boolean;
+  }> {
+    const callStatusDistribution = await this.callEventService.getStatusDistribution();
+
+    const activeBatchPosteIds = this.obligationService
+      ? await this.obligationService.getActivePosteIds()
+      : [];
+
+    return {
+      callStatusDistribution,
+      activeBatchPosteIds,
+      obligationServiceWired: this.obligationService !== null && this.obligationService !== undefined,
+      dbAvailable: this.dbAvailable,
+    };
   }
 
   async getStatus(): Promise<{

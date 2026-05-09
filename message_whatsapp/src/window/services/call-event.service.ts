@@ -68,6 +68,17 @@ export class CallEventService {
       .getMany();
   }
 
+  /** Distribution des valeurs de call_status (diagnostic admin). */
+  async getStatusDistribution(): Promise<Array<{ status: string; count: number }>> {
+    const rows = await this.callEventRepo
+      .createQueryBuilder('e')
+      .select('e.call_status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('e.call_status')
+      .getRawMany<{ status: string; count: string }>();
+    return rows.map((r) => ({ status: r.status, count: Number(r.count) }));
+  }
+
   /** Historique des appels (admin). */
   async findAll(limit = 50, offset = 0): Promise<[CallEvent[], number]> {
     return this.callEventRepo.findAndCount({

@@ -82,9 +82,20 @@ export class OrderSyncAdminController {
     if (!item) {
       throw new NotFoundException(`Appel non résolu introuvable : ${id}`);
     }
-    // Relance une sync complète pour tenter de résoudre l'appel
     const syncResult = await this.callSync.syncNewCalls();
     return { unresolved: item, sync: syncResult };
+  }
+
+  @Post('init-batches')
+  @ApiOperation({ summary: 'Initialise les batches obligations pour tous les postes (idempotent) (admin)' })
+  async initBatches() {
+    return this.callSync.initAllBatches();
+  }
+
+  @Get('diagnostics')
+  @ApiOperation({ summary: 'Diagnostic : distribution call_status, batches actifs, feature flag (admin)' })
+  async getDiagnostics() {
+    return this.callSync.getDiagnostics();
   }
 
 }

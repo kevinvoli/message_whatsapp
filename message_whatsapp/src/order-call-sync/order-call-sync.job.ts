@@ -19,10 +19,14 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     this._run('bootstrap').catch((err) =>
       this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
     );
-    // Synchronise les catégories clients dès le démarrage (pas d'attente du cron 2h)
     setImmediate(() =>
       this._runSyncClientCategories().catch((err) =>
         this.logger.error(`Erreur syncClientCategories au démarrage: ${(err as Error).message}`),
+      ),
+    );
+    setImmediate(() =>
+      this._runInitBatches().catch((err) =>
+        this.logger.error(`Erreur initAllBatches au démarrage: ${(err as Error).message}`),
       ),
     );
   }
@@ -92,6 +96,17 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
       this.logger.log(`[SyncLog] Purge : ${deleted} entrées success supprimées (> 30j)`);
     } catch (err) {
       this.logger.error(`Erreur purgeOldSyncLogs: ${(err as Error).message}`);
+    }
+  }
+
+  private async _runInitBatches(): Promise<void> {
+    try {
+      const result = await this.syncService.initAllBatches();
+      if (result) {
+        this.logger.log(`[Bootstrap] initAllBatches: ${result.created} créés, ${result.alreadyActive} déjà actifs`);
+      }
+    } catch (err) {
+      this.logger.error(`Erreur initAllBatches: ${(err as Error).message}`);
     }
   }
 
