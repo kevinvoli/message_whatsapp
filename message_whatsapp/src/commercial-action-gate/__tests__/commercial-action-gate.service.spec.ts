@@ -40,10 +40,6 @@ function makeCallObligationService(readyForRotation = true) {
   } as any;
 }
 
-function makeAttendanceService(status = 'working') {
-  return { getCurrentStatus: jest.fn().mockResolvedValue(status) } as any;
-}
-
 function makeFollowUpRepo(overdueCount = 0) {
   const qb = makeQbCount(overdueCount);
   return { createQueryBuilder: jest.fn().mockReturnValue(qb) } as any;
@@ -56,7 +52,6 @@ function buildService({
   overdueFollowUps = 0,
   priority = 0,
   callObligationReady = true,
-  attendanceStatus = 'working',
 }: {
   missedCalls?: number;
   unanswered?: number;
@@ -64,7 +59,6 @@ function buildService({
   overdueFollowUps?: number;
   priority?: number;
   callObligationReady?: boolean;
-  attendanceStatus?: string;
 } = {}) {
   const messageRepo = { createQueryBuilder: jest.fn().mockReturnValue(makeQbCount(missedCalls)) } as any;
   const chatRepo    = {
@@ -83,7 +77,6 @@ function buildService({
     reportRepo,
     followUpRepo,
     makeCallObligationService(callObligationReady),
-    makeAttendanceService(attendanceStatus),
   );
 
   return service;
@@ -122,19 +115,6 @@ describe('CommercialActionGateService', () => {
       expect(result.warnings.some((w) => w.code === 'OVERDUE_FOLLOWUPS')).toBe(true);
     });
 
-    it('retourne warn si présence en pause', async () => {
-      const service = buildService({ attendanceStatus: 'on_break' });
-      const result = await service.evaluate('commercial-1');
-      expect(result.status).toBe('warn');
-      expect(result.warnings.some((w) => w.code === 'ON_BREAK')).toBe(true);
-    });
-
-    it('retourne block si non pointé', async () => {
-      const service = buildService({ attendanceStatus: 'not_clocked_in' });
-      const result = await service.evaluate('commercial-1');
-      expect(result.status).toBe('block');
-      expect(result.blockers.some((b) => b.code === 'NOT_CLOCKED_IN')).toBe(true);
-    });
   });
 
   describe('countOverdueFollowUps — fix bug EN_RETARD', () => {

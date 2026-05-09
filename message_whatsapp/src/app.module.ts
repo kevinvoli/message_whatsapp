@@ -83,7 +83,6 @@ import { CommercialActionGateModule } from './commercial-action-gate/commercial-
 import { IntegrationOutboxModule } from './integration-outbox/integration-outbox.module';
 import { ActionQueueModule } from './action-queue/action-queue.module';
 import { WorkScheduleModule } from './work-schedule/work-schedule.module';
-import { WorkAttendanceModule } from './work-attendance/work-attendance.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
 import { QueueModule } from './queue/queue.module';
@@ -256,7 +255,6 @@ import { BullBoardSetupModule } from './queue/bull-board.module';
     ActionQueueModule,
     // E07 — Temps de travail et planning
     WorkScheduleModule,
-    WorkAttendanceModule,
     // E09 — Plaintes clients
     ComplaintsModule,
     // Sprint 3 — Paramètres plateforme (relances automatiques)

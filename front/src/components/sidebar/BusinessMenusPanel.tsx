@@ -5,7 +5,6 @@ import { AlertCircle, Bell, Briefcase, ChevronDown, Loader2, RefreshCw } from 'l
 import { formatDate } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
 import WorkSchedulePanel from './WorkSchedulePanel';
-import AttendancePanel from './AttendancePanel';
 import CreateFollowUpModal from '@/components/chat/CreateFollowUpModal';
 import { FollowUpType } from '@/types/chat';
 
@@ -22,7 +21,7 @@ interface BizContact {
   last_message_date?: string | null;
 }
 
-type Tab = 'prospects' | 'annulee' | 'anciennes' | 'planning' | 'pointage';
+type Tab = 'prospects' | 'annulee' | 'anciennes' | 'planning';
 
 type BizTab = 'prospects' | 'annulee' | 'anciennes';
 
@@ -165,24 +164,12 @@ export default function BusinessMenusPanel() {
         >
           Planning
         </button>
-        <button
-          onClick={() => setTab('pointage')}
-          className={`flex-1 text-[11px] font-medium py-2 border-b-2 transition-colors ${
-            tab === 'pointage'
-              ? 'border-green-600 text-green-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Pointage
-        </button>
       </div>
 
       {/* Contenu */}
       <div className="flex-1 overflow-y-auto">
         {tab === 'planning' ? (
           <WorkSchedulePanel />
-        ) : tab === 'pointage' ? (
-          <AttendancePanel />
         ) : (
           <>
             {loading[tab as BizTab] && (
