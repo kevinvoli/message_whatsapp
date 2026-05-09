@@ -103,7 +103,7 @@ export class CallEventService {
       // appels dont le device est associé à un poste dans call_device
       this.callEventRepo
         .createQueryBuilder('e')
-        .innerJoin('call_device', 'cd', 'cd.device_id = e.device_id AND cd.poste_id IS NOT NULL')
+        .innerJoin('call_device', 'cd', 'CONVERT(cd.device_id USING utf8mb4) COLLATE utf8mb4_unicode_ci = e.device_id AND cd.poste_id IS NOT NULL')
         .getCount(),
     ]);
     return { withDeviceId, withoutDeviceId, withPoste };
