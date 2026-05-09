@@ -10,6 +10,8 @@ import { WindowModule } from 'src/window/window.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CommercialIdentityMapping } from 'src/integration/entities/commercial-identity-mapping.entity';
+import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
 import { CallDeviceModule } from 'src/call-device/call-device.module';
 
 @Module({
@@ -18,6 +20,8 @@ import { CallDeviceModule } from 'src/call-device/call-device.module';
       OrderCallSyncCursor,
       WhatsappCommercial,
       CommercialIdentityMapping,
+      ClientIdentityMapping,
+      Contact,
     ]),
     CallDeviceModule,
     IntegrationSyncModule,

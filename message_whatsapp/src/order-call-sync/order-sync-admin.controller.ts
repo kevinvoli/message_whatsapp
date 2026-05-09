@@ -39,6 +39,12 @@ export class OrderSyncAdminController {
     return this.callSync.syncCommercialMapping();
   }
 
+  @Post('sync-client-mapping')
+  @ApiOperation({ summary: 'Synchronise client_identity_mapping (Contact DB1 ↔ GicopUser DB2) (admin)' })
+  async syncClientMapping() {
+    return this.callSync.syncClientMapping();
+  }
+
   @Post('sync-calls')
   @ApiOperation({ summary: 'Déclenche manuellement la synchronisation des appels DB2 (admin)' })
   async syncCalls() {

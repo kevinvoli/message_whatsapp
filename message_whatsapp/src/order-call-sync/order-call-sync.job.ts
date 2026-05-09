@@ -64,6 +64,7 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     try {
       this.logger.log(`Sync DB2 démarrée (source: ${triggeredBy})`);
       await this.syncService.syncCommercialMapping();
+      await this.syncService.syncClientMapping();
       const result = await this.syncService.syncNewCalls();
       this.logger.log(
         `Sync DB2 terminée (source: ${triggeredBy}) — ${result.processed} appels, ${result.obligations} obligations, ${result.errors} erreurs`,

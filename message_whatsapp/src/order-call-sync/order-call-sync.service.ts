@@ -26,6 +26,8 @@ import {
   ORDER_COMMAND_STATUS_ETAT_RETOUR,
 } from 'src/order-read/entities/order-command-status.entity';
 import { CallDevice } from 'src/call-device/entities/call-device.entity';
+import { Contact } from 'src/contact/entities/contact.entity';
+import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
 
 const CURSOR_SCOPE            = 'global';
 const BATCH_SIZE              = 200;
@@ -60,6 +62,12 @@ export class OrderCallSyncService {
     private readonly obligationService: CallObligationService,
 
     private readonly callEventService: CallEventService,
+
+    @InjectRepository(Contact)
+    private readonly contactRepo: Repository<Contact>,
+
+    @InjectRepository(ClientIdentityMapping)
+    private readonly clientMappingRepo: Repository<ClientIdentityMapping>,
   ) {}
 
   async syncNewCalls(): Promise<{ processed: number; obligations: number; errors: number }> {
@@ -573,6 +581,95 @@ export class OrderCallSyncService {
 
     this.logger.log(
       `Sync commercial_identity_mapping - ${synced} sync, ${skipped} ignores, ${errors} erreurs`,
+    );
+    return { synced, skipped, errors };
+  }
+
+  /**
+   * Synchronise client_identity_mapping : mappe chaque Contact DB1 (via téléphone)
+   * vers son id entier dans GicopUser DB2.
+   * Pont de résolution : Contact.phone ↔ GicopUser.phone (ou phone2).
+   */
+  async syncClientMapping(): Promise<{ synced: number; skipped: number; errors: number }> {
+    if (!this.dbAvailable || !this.orderDb) {
+      return { synced: 0, skipped: 0, errors: 0 };
+    }
+
+    // Contacts DB1 avec téléphone (non supprimés)
+    const contactsDb1 = await this.contactRepo.find({
+      where:  { deletedAt: IsNull() },
+      select: ['id', 'phone'],
+    });
+
+    const contactByPhone = new Map<string, string>();
+    for (const c of contactsDb1) {
+      if (c.phone) contactByPhone.set(c.phone.replace(/\D/g, ''), c.id);
+    }
+
+    if (contactByPhone.size === 0) {
+      return { synced: 0, skipped: 0, errors: 0 };
+    }
+
+    // Clients DB2 avec téléphone
+    const userRepo = this.orderDb.getRepository(GicopUser);
+    const db2Clients = await userRepo
+      .createQueryBuilder('u')
+      .where('u.type = :type', { type: GIOCOP_USER_TYPE_CLIENT })
+      .andWhere('u.valid = 1')
+      .andWhere('(u.phone IS NOT NULL OR u.phone2 IS NOT NULL)')
+      .select(['u.id', 'u.phone', 'u.phone2'])
+      .getMany();
+
+    const existingMappings = await this.clientMappingRepo.find({
+      select: ['contact_id', 'external_id', 'phone_normalized'],
+    });
+    const mappingByContactId = new Map(existingMappings.map((m) => [m.contact_id, m]));
+
+    let synced = 0, skipped = 0, errors = 0;
+
+    for (const client of db2Clients) {
+      try {
+        const phones = [client.phone, client.phone2].filter(Boolean) as string[];
+        let contactId: string | undefined;
+        let matchedPhone: string | undefined;
+
+        for (const p of phones) {
+          const normalized = p.replace(/\D/g, '');
+          const cId = contactByPhone.get(normalized);
+          if (cId) { contactId = cId; matchedPhone = normalized; break; }
+        }
+
+        if (!contactId || !matchedPhone) { skipped++; continue; }
+
+        const existing = mappingByContactId.get(contactId);
+        if (existing) {
+          if (existing.external_id !== client.id || existing.phone_normalized !== matchedPhone) {
+            existing.external_id     = client.id;
+            existing.phone_normalized = matchedPhone;
+            await this.clientMappingRepo.save(existing);
+            synced++;
+          } else {
+            skipped++;
+          }
+        } else {
+          const created = await this.clientMappingRepo.save(
+            this.clientMappingRepo.create({
+              contact_id:       contactId,
+              external_id:      client.id,
+              phone_normalized: matchedPhone,
+            }),
+          );
+          mappingByContactId.set(contactId, created);
+          synced++;
+        }
+      } catch (err) {
+        errors++;
+        this.logger.error(`Erreur mapping client DB2 id=${client.id}: ${(err as Error).message}`);
+      }
+    }
+
+    this.logger.log(
+      `Sync client_identity_mapping — ${synced} sync, ${skipped} ignorés, ${errors} erreurs`,
     );
     return { synced, skipped, errors };
   }
