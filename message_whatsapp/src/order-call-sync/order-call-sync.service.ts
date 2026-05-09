@@ -497,6 +497,11 @@ export class OrderCallSyncService {
 
       if (!posteId) continue; // Attribution impossible — sera retenté au prochain cycle
 
+      // Résolution catégorie depuis DB2 (même logique que le flux temps réel)
+      const resolvedCategory = event.client_phone
+        ? await this.resolveClientCategory(event.client_phone).catch(() => null)
+        : null;
+
       retried++;
       const log = await this.syncLog.createPending('call_validation', event.external_id, 'call_event');
 
@@ -507,6 +512,7 @@ export class OrderCallSyncService {
           clientPhone:      event.client_phone,
           commercialPhone:  event.commercial_phone,
           posteId,
+          resolvedCategory,
           skipDurationCheck: true,
         });
 
