@@ -1,5 +1,5 @@
-/**
- * TICKET-08-A — Façade Zustand unifiée.
+﻿/**
+ * TICKET-08-A â€” FaÃ§ade Zustand unifiÃ©e.
  *
  * `useChatStore` compose les trois slices :
  *   - SocketSessionSlice  (modules/realtime/store/socket-session.store.ts)
@@ -15,19 +15,22 @@ import { createMessageSlice, MessageSlice } from '@/modules/chat/store/message.s
 import { createConversationSlice, ConversationSlice } from '@/modules/conversations/store/conversation.store';
 import type { TargetProgress } from '@/lib/targetsApi';
 
-// ─── Type obligation status ───────────────────────────────────────────────────
+// â”€â”€â”€ Type obligation status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type CategoryProgress = { done: number; required: number };
 export type ObligationStatus = {
   batchNumber:        number;
+  status:             string;
   annulee:            CategoryProgress;
   livree:             CategoryProgress;
   sansCommande:       CategoryProgress;
   qualityCheckPassed: boolean;
   readyForRotation:   boolean;
+  reportsRequired:    number;
+  reportsSubmitted:   number;
 };
 
-// ─── Type unifié ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Type unifiÃ© â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type ChatState = SocketSessionSlice &
   MessageSlice &
@@ -39,7 +42,7 @@ export type ChatState = SocketSessionSlice &
     reset: () => void;
   };
 
-// ─── État initial (pour reset) ────────────────────────────────────────────────
+// â”€â”€â”€ Ã‰tat initial (pour reset) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const initialState = {
   socket: null,
@@ -67,7 +70,7 @@ const initialState = {
   targetProgress: null,
 };
 
-// ─── Store composé ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Store composÃ© â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const useChatStore = create<ChatState>()((...a) => ({
   ...createSocketSessionSlice(...a),

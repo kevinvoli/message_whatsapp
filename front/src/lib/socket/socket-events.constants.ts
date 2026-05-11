@@ -1,15 +1,15 @@
-// front/src/lib/socket/socket-events.constants.ts
-// Noms d'événements Socket.IO — miroir du fichier backend.
+﻿// front/src/lib/socket/socket-events.constants.ts
+// Noms d'Ã©vÃ©nements Socket.IO â€” miroir du fichier backend.
 // Fichier source (backend) : message_whatsapp/src/realtime/events/socket-events.constants.ts
-// Ces deux fichiers DOIVENT rester identiques — vérification obligatoire à la PR.
+// Ces deux fichiers DOIVENT rester identiques â€” vÃ©rification obligatoire Ã  la PR.
 
-// ─── Canaux (noms d'événements socket.io) ───────────────────────────────────
+// â”€â”€â”€ Canaux (noms d'Ã©vÃ©nements socket.io) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const SOCKET_CHANNEL_CHAT    = 'chat:event' as const;
 export const SOCKET_CHANNEL_CONTACT = 'contact:event' as const;
 export const SOCKET_CHANNEL_QUEUE   = 'queue:updated' as const;
 
-// ─── Client → Serveur (emit) ────────────────────────────────────────────────
+// â”€â”€â”€ Client â†’ Serveur (emit) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const SOCKET_CLIENT_EVENTS = {
   CONVERSATIONS_GET:    'conversations:get',
@@ -26,7 +26,7 @@ export const SOCKET_CLIENT_EVENTS = {
 
 export type SocketClientEvent = typeof SOCKET_CLIENT_EVENTS[keyof typeof SOCKET_CLIENT_EVENTS];
 
-// ─── Serveur → Client : types sur chat:event ────────────────────────────────
+// â”€â”€â”€ Serveur â†’ Client : types sur chat:event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const CHAT_EVENT_TYPES = {
   CONVERSATION_LIST:          'CONVERSATION_LIST',
@@ -46,11 +46,13 @@ export const CHAT_EVENT_TYPES = {
   TYPING_STOP:                'TYPING_STOP',
   // Relances
   FOLLOW_UP_REMINDER:         'FOLLOW_UP_REMINDER',
+  // Obligations GICOP
+  OBLIGATION_UPDATED:         'OBLIGATION_UPDATED',
 } as const;
 
 export type ChatEventType = typeof CHAT_EVENT_TYPES[keyof typeof CHAT_EVENT_TYPES];
 
-// ─── Codes d'erreur MESSAGE_SEND_ERROR ──────────────────────────────────────
+// â”€â”€â”€ Codes d'erreur MESSAGE_SEND_ERROR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const MESSAGE_SEND_ERROR_CODES = {
   CONVERSATION_CLOSED:       'CONVERSATION_CLOSED',
@@ -64,7 +66,7 @@ export const MESSAGE_SEND_ERROR_CODES = {
 
 export type MessageSendErrorCode = typeof MESSAGE_SEND_ERROR_CODES[keyof typeof MESSAGE_SEND_ERROR_CODES];
 
-// ─── Serveur → Client : types sur contact:event ─────────────────────────────
+// â”€â”€â”€ Serveur â†’ Client : types sur contact:event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const CONTACT_EVENT_TYPES = {
   CONTACT_LIST:                'CONTACT_LIST',

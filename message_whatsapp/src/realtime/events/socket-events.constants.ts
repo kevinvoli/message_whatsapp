@@ -1,20 +1,20 @@
-// src/realtime/events/socket-events.constants.ts
-// Noms d'événements Socket.IO — source de vérité côté backend.
+﻿// src/realtime/events/socket-events.constants.ts
+// Noms d'evenements Socket.IO — source de verite cote backend.
 // Le fichier miroir se trouve dans : front/src/lib/socket/socket-events.constants.ts
-// Ces deux fichiers DOIVENT rester identiques — vérification obligatoire à la PR.
+// Ces deux fichiers DOIVENT rester identiques — verification obligatoire a la PR.
 
-// ─── Canaux (noms d'événements socket.io) ───────────────────────────────────
+// ─── Canaux (noms d'evenements socket.io) ───────────────────────────────────
 
-/** Événement bidirectionnel : chat, messages, conversations */
+/** Evenement bidirectionnel : chat, messages, conversations */
 export const SOCKET_CHANNEL_CHAT = 'chat:event' as const;
 
-/** Événement server → client : contacts, call logs */
+/** Evenement server -> client : contacts, call logs */
 export const SOCKET_CHANNEL_CONTACT = 'contact:event' as const;
 
-/** Événement server → client : mise à jour file d'attente */
+/** Evenement server -> client : mise a jour file d'attente */
 export const SOCKET_CHANNEL_QUEUE = 'queue:updated' as const;
 
-// ─── Client → Serveur (subscribe) ───────────────────────────────────────────
+// ─── Client -> Serveur (subscribe) ───────────────────────────────────────────
 
 export const SOCKET_CLIENT_EVENTS = {
   CONVERSATIONS_GET:    'conversations:get',
@@ -31,7 +31,7 @@ export const SOCKET_CLIENT_EVENTS = {
 
 export type SocketClientEvent = typeof SOCKET_CLIENT_EVENTS[keyof typeof SOCKET_CLIENT_EVENTS];
 
-// ─── Serveur → Client : types sur chat:event ────────────────────────────────
+// ─── Serveur -> Client : types sur chat:event ────────────────────────────────
 
 export const CHAT_EVENT_TYPES = {
   // Conversations
@@ -48,12 +48,14 @@ export const CHAT_EVENT_TYPES = {
   MESSAGE_ADD:                'MESSAGE_ADD',
   MESSAGE_STATUS_UPDATE:      'MESSAGE_STATUS_UPDATE',
   MESSAGE_SEND_ERROR:         'MESSAGE_SEND_ERROR',
-  // Temps réel
+  // Temps reel
   RATE_LIMITED:               'RATE_LIMITED',
   TYPING_START:               'TYPING_START',
   TYPING_STOP:                'TYPING_STOP',
   // Relances
   FOLLOW_UP_REMINDER:         'FOLLOW_UP_REMINDER',
+  // Obligations GICOP
+  OBLIGATION_UPDATED:         'OBLIGATION_UPDATED',
 } as const;
 
 export type ChatEventType = typeof CHAT_EVENT_TYPES[keyof typeof CHAT_EVENT_TYPES];
@@ -72,7 +74,7 @@ export const MESSAGE_SEND_ERROR_CODES = {
 
 export type MessageSendErrorCode = typeof MESSAGE_SEND_ERROR_CODES[keyof typeof MESSAGE_SEND_ERROR_CODES];
 
-// ─── Serveur → Client : types sur contact:event ─────────────────────────────
+// ─── Serveur -> Client : types sur contact:event ─────────────────────────────
 
 export const CONTACT_EVENT_TYPES = {
   CONTACT_LIST:               'CONTACT_LIST',

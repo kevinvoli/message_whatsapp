@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CommercialObligationBatch } from './entities/commercial-obligation-batch.entity';
 import { CallTask } from './entities/call-task.entity';
@@ -13,6 +13,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     SystemConfigModule,
     RedisModule,
     NotificationModule,
+    forwardRef(() => ConversationReportModule),
   ],
   controllers: [CallObligationController],
   providers: [CallObligationService, ObligationQualityCheckJob],

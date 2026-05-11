@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+﻿import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Not, Repository } from 'typeorm';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
@@ -18,16 +18,17 @@ import { WhatsappChat, WindowStatus } from 'src/whatsapp_chat/entities/whatsapp_
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ConversationReportService } from 'src/gicop-report/conversation-report.service';
 
 const REQUIRED_PER_CATEGORY = 5;
 const MIN_CALL_DURATION_SECONDS = 90;
 
-/** Map ClientCategory → CallTaskCategory */
+/** Map ClientCategory -> CallTaskCategory */
 const CATEGORY_MAP: Partial<Record<ClientCategory, CallTaskCategory>> = {
   [ClientCategory.COMMANDE_ANNULEE]:        CallTaskCategory.COMMANDE_ANNULEE,
   [ClientCategory.COMMANDE_AVEC_LIVRAISON]: CallTaskCategory.COMMANDE_AVEC_LIVRAISON,
   [ClientCategory.JAMAIS_COMMANDE]:         CallTaskCategory.JAMAIS_COMMANDE,
-  // COMMANDE_SANS_LIVRAISON → même bucket que JAMAIS_COMMANDE (venu sans commande livrée)
   [ClientCategory.COMMANDE_SANS_LIVRAISON]: CallTaskCategory.JAMAIS_COMMANDE,
 };
 
@@ -40,6 +41,8 @@ export interface ObligationStatus {
   sansCommande: { done: number; required: number };
   qualityCheckPassed: boolean;
   readyForRotation: boolean;
+  reportsRequired: number;
+  reportsSubmitted: number;
 }
 
 @Injectable()
@@ -69,19 +72,19 @@ export class CallObligationService {
 
     @Optional()
     private readonly lockService: DistributedLockService | null = null,
-  ) {}
 
-  // ── Feature flag ─────────────────────────────────────────────────────────
+    @Optional()
+    private readonly conversationReportService: ConversationReportService | null = null,
+
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async isEnabled(): Promise<boolean> {
     const val = await this.systemConfig.get('FF_CALL_OBLIGATIONS_ENABLED');
     return val === 'true';
   }
 
-  // ── Gestion du batch actif ──────────────────────────────────────────────
-
   async getOrCreateActiveBatch(posteId: string): Promise<CommercialObligationBatch> {
-    // OBL-010 — Lock distribué pour éviter deux créations simultanées sur le même poste
     const doCreate = async (): Promise<CommercialObligationBatch> => {
       const existing = await this.batchRepo.findOne({
         where: { posteId, status: BatchStatus.PENDING },
@@ -123,18 +126,17 @@ export class CallObligationService {
       ];
 
       await this.taskRepo.save(tasks as CallTask[]);
-      this.logger.log(`CALL_OBLIGATION_BATCH_CREATED posteId=${posteId} batchId=${batch.id} batchNumber=${batchNumber} tasks=15`);
+      this.logger.log('CALL_OBLIGATION_BATCH_CREATED posteId=' + posteId + ' batchId=' + batch.id + ' batchNumber=' + batchNumber + ' tasks=15');
       return batch;
     };
 
     if (this.lockService) {
       const { acquired, result } = await this.lockService.tryWithLock(
-        `call-obligation-batch:${posteId}`,
+        'call-obligation-batch:' + posteId,
         10_000,
         doCreate,
       );
       if (acquired && result) return result;
-      // Lock non acquis → un autre processus crée le batch : on relit
       return (await this.batchRepo.findOne({ where: { posteId, status: BatchStatus.PENDING } }))
         ?? (await doCreate());
     }
@@ -143,27 +145,21 @@ export class CallObligationService {
   }
 
   async getActiveBatch(posteId: string): Promise<CommercialObligationBatch | null> {
-    return this.batchRepo.findOne({ where: { posteId, status: BatchStatus.PENDING } });
+    const pending = await this.batchRepo.findOne({ where: { posteId, status: BatchStatus.PENDING } });
+    if (pending) return pending;
+    return this.batchRepo.findOne({
+      where: { posteId, status: BatchStatus.COMPLETE },
+      order: { batchNumber: 'DESC' },
+    });
   }
 
-  // ── Correspondance appel → tâche ────────────────────────────────────────
-
-  /**
-   * Tente de valider une tâche d'appel à partir d'un événement GICOP.
-   * Conditions :
-   *   - durée ≥ 90 secondes
-   *   - le contact a une catégorie mappée à une tâche ouverte
-   *   - il reste une tâche PENDING de cette catégorie dans le batch actif
-   */
   async tryMatchCallToTask(params: {
     callEventId: string;
     durationSeconds: number | null;
-    /** Catégorie résolue en amont via DB2 commandes (bypasse la résolution DB1). */
     resolvedCategory?: CallTaskCategory | null;
     clientPhone?: string;
     commercialPhone?: string;
     posteId?: string | null;
-    /** Si true, bypass le filtre durée minimale (ex: appels historiques avec duration=0 en DB2). */
     skipDurationCheck?: boolean;
   }): Promise<{ matched: boolean; taskId?: string; reason?: string }> {
 
@@ -171,59 +167,50 @@ export class CallObligationService {
       return { matched: false, reason: 'feature_disabled' };
     }
 
-    // 1. Vérifier la durée minimale (sauf bypass explicite pour les appels historiques)
     if (!params.skipDurationCheck && (!params.durationSeconds || params.durationSeconds < MIN_CALL_DURATION_SECONDS)) {
-      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} reason=duree_insuffisante duration=${params.durationSeconds ?? 0}s`);
+      this.logger.log('CALL_OBLIGATION_REJECTED callEventId=' + params.callEventId + ' reason=duree_insuffisante duration=' + (params.durationSeconds ?? 0) + 's');
       return { matched: false, reason: 'duree_insuffisante' };
     }
 
-    // 2. Résoudre le poste via téléphone commercial ou device-poste mapping
     let posteId = params.posteId ?? null;
     if (!posteId && params.commercialPhone) {
       posteId = await this.resolvePosteByCommercialPhone(params.commercialPhone);
     }
     if (!posteId) {
-      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} reason=poste_introuvable`);
+      this.logger.log('CALL_OBLIGATION_REJECTED callEventId=' + params.callEventId + ' reason=poste_introuvable');
       return { matched: false, reason: 'poste_introuvable' };
     }
 
-    // 3. Trouver la catégorie du contact
-    // Priorité : catégorie résolue en amont (DB2 commandes) > téléphone DB1
     let taskCategory: CallTaskCategory | null = params.resolvedCategory ?? null;
     if (!taskCategory && params.clientPhone) {
       taskCategory = await this.resolveContactCategory(params.clientPhone);
     }
-    // Client non identifié → bucket JAMAIS_COMMANDE par défaut
     if (!taskCategory) {
       taskCategory = CallTaskCategory.JAMAIS_COMMANDE;
     }
 
-    // 4. Trouver le batch actif
-    const batch = await this.getActiveBatch(posteId);
+    const batch = await this.batchRepo.findOne({ where: { posteId, status: BatchStatus.PENDING } });
     if (!batch) {
-      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} posteId=${posteId} reason=aucun_batch_actif`);
+      this.logger.log('CALL_OBLIGATION_REJECTED callEventId=' + params.callEventId + ' posteId=' + posteId + ' reason=aucun_batch_actif');
       return { matched: false, reason: 'aucun_batch_actif' };
     }
 
-    // 4b. OBL-008 — Idempotence : vérifier que cet appel n'a pas déjà validé une tâche
     const alreadyUsed = await this.taskRepo.findOne({
       where: { batchId: batch.id, callEventId: params.callEventId },
     });
     if (alreadyUsed) {
-      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} posteId=${posteId} batchId=${batch.id} reason=appel_deja_traite`);
+      this.logger.log('CALL_OBLIGATION_REJECTED callEventId=' + params.callEventId + ' posteId=' + posteId + ' batchId=' + batch.id + ' reason=appel_deja_traite');
       return { matched: false, reason: 'appel_deja_traite' };
     }
 
-    // 5. Trouver une tâche PENDING de cette catégorie
     const task = await this.taskRepo.findOne({
       where: { batchId: batch.id, category: taskCategory, status: CallTaskStatus.PENDING },
     });
     if (!task) {
-      this.logger.log(`CALL_OBLIGATION_REJECTED callEventId=${params.callEventId} posteId=${posteId} batchId=${batch.id} reason=quota_categorie_atteint category=${taskCategory}`);
+      this.logger.log('CALL_OBLIGATION_REJECTED callEventId=' + params.callEventId + ' posteId=' + posteId + ' batchId=' + batch.id + ' reason=quota_categorie_atteint category=' + taskCategory);
       return { matched: false, reason: 'quota_categorie_atteint' };
     }
 
-    // 6. Valider la tâche
     task.status = CallTaskStatus.DONE;
     task.clientPhone = params.clientPhone ?? null;
     task.callEventId = params.callEventId;
@@ -231,11 +218,9 @@ export class CallObligationService {
     task.completedAt = new Date();
     await this.taskRepo.save(task);
 
-    // 7. Mettre à jour le compteur du batch
     const counterField = this.batchCounterField(taskCategory);
     batch[counterField] = (batch[counterField] as number) + 1;
 
-    // 8. Vérifier si le batch est complet
     const callsComplete =
       batch.annuleeDone >= REQUIRED_PER_CATEGORY &&
       batch.livreeDone >= REQUIRED_PER_CATEGORY &&
@@ -244,27 +229,23 @@ export class CallObligationService {
     if (callsComplete) {
       batch.status = BatchStatus.COMPLETE;
       batch.completedAt = new Date();
-      this.logger.log(`CALL_OBLIGATION_BATCH_CALLS_COMPLETE posteId=${posteId} batchId=${batch.id} batchNumber=${batch.batchNumber}`);
+      this.logger.log('CALL_OBLIGATION_BATCH_CALLS_COMPLETE posteId=' + posteId + ' batchId=' + batch.id + ' batchNumber=' + batch.batchNumber);
     }
     await this.batchRepo.save(batch);
 
-    this.logger.log(`CALL_OBLIGATION_MATCHED callEventId=${params.callEventId} posteId=${posteId} batchId=${batch.id} batchNumber=${batch.batchNumber} category=${taskCategory} durationSeconds=${params.durationSeconds}`);
+    const obligationStatus = await this.getStatus(posteId);
+    this.eventEmitter.emit('call_obligation.matched', { posteId, obligationStatus });
+
+    this.logger.log('CALL_OBLIGATION_MATCHED callEventId=' + params.callEventId + ' posteId=' + posteId + ' batchId=' + batch.id + ' batchNumber=' + batch.batchNumber + ' category=' + taskCategory + ' durationSeconds=' + params.durationSeconds);
     return { matched: true, taskId: task.id };
   }
 
-  // ── Contrôle qualité messages ────────────────────────────────────────────
-
-  /**
-   * Vérifie que le commercial a le dernier message sur chaque conversation active.
-   * last_poste_message_at doit être ≥ last_client_message_at.
-   */
   async checkAndRecordQuality(posteId: string, activeConvs: WhatsappChat[]): Promise<boolean> {
-    // N8 — Seuil configurable (défaut 80%) au lieu d'all-or-nothing
     const thresholdStr = await this.systemConfig.get('CALL_QUALITY_THRESHOLD_PCT');
     const threshold = thresholdStr ? parseInt(thresholdStr, 10) : 80;
 
     const okCount = activeConvs.filter((c) => {
-      if (!c.last_client_message_at) return true;  // pas de message client = OK
+      if (!c.last_client_message_at) return true;
       if (!c.last_poste_message_at) return false;
       return c.last_poste_message_at >= c.last_client_message_at;
     }).length;
@@ -282,21 +263,35 @@ export class CallObligationService {
     }
 
     this.logger.log(
-      `${passed ? 'CALL_OBLIGATION_QUALITY_PASSED' : 'CALL_OBLIGATION_QUALITY_FAILED'} posteId=${posteId} score=${okCount}/${activeConvs.length} (${pct}% >= ${threshold}%)`,
+      (passed ? 'CALL_OBLIGATION_QUALITY_PASSED' : 'CALL_OBLIGATION_QUALITY_FAILED') + ' posteId=' + posteId + ' score=' + okCount + '/' + activeConvs.length + ' (' + pct + '% >= ' + threshold + '%)',
     );
     return passed;
   }
-
-  // ── Statut et rotation ───────────────────────────────────────────────────
 
   async getStatus(posteId: string): Promise<ObligationStatus | null> {
     const batch = await this.getActiveBatch(posteId);
     if (!batch) return null;
 
-    const readyForRotation = this.isBatchReady(batch);
-    if (readyForRotation) {
-      this.logger.log(`CALL_OBLIGATION_READY_FOR_ROTATION posteId=${posteId} batchId=${batch.id} batchNumber=${batch.batchNumber}`);
+    const readyForRotation = await this.isPosteReadyForRotation(posteId);
+
+    let reportsRequired = 0;
+    let reportsSubmitted = 0;
+
+    if (batch.status === BatchStatus.COMPLETE && this.conversationReportService) {
+      const activeConvs = await this.getActiveBlockConversations(posteId);
+      reportsRequired = activeConvs.length;
+      if (activeConvs.length > 0) {
+        const submittedMap = await this.conversationReportService.getSubmittedMapBulk(
+          activeConvs.map(c => c.chat_id),
+        );
+        reportsSubmitted = activeConvs.filter(c => submittedMap.get(c.chat_id) === true).length;
+      }
     }
+
+    if (readyForRotation) {
+      this.logger.log('CALL_OBLIGATION_READY_FOR_ROTATION posteId=' + posteId + ' batchId=' + batch.id + ' batchNumber=' + batch.batchNumber);
+    }
+
     return {
       batchId: batch.id,
       batchNumber: batch.batchNumber,
@@ -306,10 +301,10 @@ export class CallObligationService {
       sansCommande: { done: batch.sansCommandeDone,  required: REQUIRED_PER_CATEGORY },
       qualityCheckPassed: batch.qualityCheckPassed,
       readyForRotation,
+      reportsRequired,
+      reportsSubmitted,
     };
   }
-
-  // ── Détail tâches par poste ──────────────────────────────────────────────
 
   async getTasksByPoste(posteId: string): Promise<{
     batchId: string | null;
@@ -326,8 +321,6 @@ export class CallObligationService {
     return { batchId: batch.id, batchNumber: batch.batchNumber, tasks };
   }
 
-  // ── Postes avec batch actif ──────────────────────────────────────────────
-
   async getActivePosteIds(): Promise<string[]> {
     if (!await this.isEnabled()) return [];
     const batches = await this.batchRepo.find({
@@ -337,12 +330,6 @@ export class CallObligationService {
     return [...new Set(batches.map((b) => b.posteId))];
   }
 
-  // ── Batches bloqués (alerting N10) ──────────────────────────────────────
-
-  /**
-   * Retourne les batches PENDING avec qualityCheckPassed=false créés depuis plus de `olderThanDays` jours.
-   * Utilisé par ObligationQualityCheckJob pour alerter les managers.
-   */
   async getStuckBatches(olderThanDays: number): Promise<CommercialObligationBatch[]> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - olderThanDays);
@@ -355,8 +342,6 @@ export class CallObligationService {
     });
   }
 
-  // ── Initialisation batch pour tous les postes ────────────────────────────
-
   async initAllBatches(): Promise<{ created: number; alreadyActive: number }> {
     const postes = await this.posteRepo.find({ select: ['id'] });
     let created = 0;
@@ -367,17 +352,10 @@ export class CallObligationService {
       await this.getOrCreateActiveBatch(poste.id);
       created++;
     }
-    this.logger.log(`initAllBatches — créés: ${created}, déjà actifs: ${alreadyActive}`);
+    this.logger.log('initAllBatches — créés: ' + created + ', déjà actifs: ' + alreadyActive);
     return { created, alreadyActive };
   }
 
-  // ── Bloc actif ───────────────────────────────────────────────────────────
-
-  /**
-   * OBL-001 — Retourne uniquement les conversations du bloc actif courant.
-   * Seules les conversations window_status=ACTIVE (premier bloc) comptent pour
-   * le contrôle qualité — les conversations LOCKED sont hors scope.
-   */
   async getActiveBlockConversations(posteId: string): Promise<WhatsappChat[]> {
     return this.chatRepo.find({
       where: {
@@ -385,17 +363,11 @@ export class CallObligationService {
         window_status: WindowStatus.ACTIVE,
         window_slot:   Not(IsNull()),
       },
-      select: ['id', 'last_client_message_at', 'last_poste_message_at'],
+      select: ['id', 'chat_id', 'last_client_message_at', 'last_poste_message_at'],
       order:  { window_slot: 'ASC' },
     });
   }
 
-  // ── Contrôle qualité à la demande ────────────────────────────────────────
-
-  /**
-   * OBL-002 — Contrôle qualité limité au bloc actif (10 conversations ACTIVE).
-   * N'évalue plus toutes les conversations actives du poste.
-   */
   async runQualityCheck(posteId: string): Promise<boolean> {
     const blockConvs = await this.getActiveBlockConversations(posteId);
     return this.checkAndRecordQuality(posteId, blockConvs);
@@ -407,11 +379,19 @@ export class CallObligationService {
 
   async isPosteReadyForRotation(posteId: string): Promise<boolean> {
     const batch = await this.getActiveBatch(posteId);
-    if (!batch) return true; // Pas de batch actif → pas de blocage
-    return this.isBatchReady(batch);
+    if (!batch) return true;
+    if (!this.isBatchReady(batch)) return false;
+    if (batch.status === BatchStatus.COMPLETE) {
+      const activeConvs = await this.getActiveBlockConversations(posteId);
+      if (activeConvs.length === 0) return true;
+      if (!this.conversationReportService) return true;
+      const submittedMap = await this.conversationReportService.getSubmittedMapBulk(
+        activeConvs.map(c => c.chat_id),
+      );
+      return activeConvs.every(c => submittedMap.get(c.chat_id) === true);
+    }
+    return true;
   }
-
-  // ── Helpers privés ────────────────────────────────────────────────────────
 
   private isBatchReady(batch: CommercialObligationBatch): boolean {
     return (

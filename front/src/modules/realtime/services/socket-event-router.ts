@@ -1,11 +1,11 @@
-/**
- * TICKET-08-C — Routeur d'événements Socket.IO.
+﻿/**
+ * TICKET-08-C â€” Routeur d'Ã©vÃ©nements Socket.IO.
  *
- * Exporte des handlers purs qui reçoivent un événement socket et
+ * Exporte des handlers purs qui reÃ§oivent un Ã©vÃ©nement socket et
  * le dispatch vers le bon store. Chaque handler est une fonction
- * indépendante, testable sans instancier de socket.
+ * indÃ©pendante, testable sans instancier de socket.
  *
- * Ajouter un nouvel événement = ajouter une ligne dans le switch
+ * Ajouter un nouvel Ã©vÃ©nement = ajouter une ligne dans le switch
  * du handler correspondant, ou exporter un nouveau handler.
  */
 
@@ -17,7 +17,7 @@ import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
 import { logger } from '@/lib/logger';
 
-// ─── Handler : événements conversation / message ──────────────────────────────
+// â”€â”€â”€ Handler : Ã©vÃ©nements conversation / message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function handleChatEvent(
   data: { type: string; payload: any },
@@ -53,9 +53,9 @@ export function handleChatEvent(
           const senderName = conv?.clientName || message.from_name || 'Client';
           const body = message.text
             ? message.text.length > 80
-              ? message.text.slice(0, 80) + '…'
+              ? message.text.slice(0, 80) + 'â€¦'
               : message.text
-            : '📎 Média reçu';
+            : 'ðŸ“Ž MÃ©dia reÃ§u';
           const notif = new Notification(senderName, {
             body,
             icon: '/favicon.ico',
@@ -118,7 +118,7 @@ export function handleChatEvent(
         chatState.setConversations(convArray, hasMore, nextCursor);
       }
 
-      // Mise à jour de la progression du bloc si incluse dans le payload
+      // Mise Ã  jour de la progression du bloc si incluse dans le payload
       if (isNewFormat && raw.blockProgress) {
         chatState.setBlockProgress(raw.blockProgress as { submitted: number; total: number });
       }
@@ -138,21 +138,21 @@ export function handleChatEvent(
     case 'WINDOW_ROTATED': {
       const { releasedChatIds } = data.payload as { releasedChatIds: string[]; promotedChatIds: string[] };
 
-      // Rotation réussie : effacer le blocage éventuel
+      // Rotation rÃ©ussie : effacer le blocage Ã©ventuel
       chatState.setRotationBlocked(null);
 
-      // Phase 1 : marquer les conversations libérées pour l'animation de sortie
+      // Phase 1 : marquer les conversations libÃ©rÃ©es pour l'animation de sortie
       chatState.setReleasingChatIds(releasedChatIds);
       chatState.setWindowRotating(true);
 
-      // Phase 2 (après animation slide-up) : recharger la fenêtre complète
+      // Phase 2 (aprÃ¨s animation slide-up) : recharger la fenÃªtre complÃ¨te
       setTimeout(() => {
         chatState.setReleasingChatIds([]);
         chatState.setWindowRotating(false);
         chatState.loadConversations(chatState.currentSearch || undefined);
       }, 500);
 
-      logger.debug('WINDOW_ROTATED reçu', { releasedCount: releasedChatIds.length });
+      logger.debug('WINDOW_ROTATED reÃ§u', { releasedCount: releasedChatIds.length });
       break;
     }
 
@@ -167,18 +167,18 @@ export function handleChatEvent(
       if (obligations) {
         chatState.setObligationStatus(obligations);
       }
-      // Rechargement immédiat de la barre d'obligations
+      // Rechargement immÃ©diat de la barre d'obligations
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('obligations:reload'));
       }
-      logger.warn('WINDOW_ROTATION_BLOCKED reçu', { reason, progress });
+      logger.warn('WINDOW_ROTATION_BLOCKED reÃ§u', { reason, progress });
       break;
     }
 
     case 'TARGET_PROGRESS_UPDATE': {
       const progress = data.payload as import('@/lib/targetsApi').TargetProgress[];
       chatState.setTargetProgress(progress);
-      logger.debug('TARGET_PROGRESS_UPDATE reçu', { count: progress.length });
+      logger.debug('TARGET_PROGRESS_UPDATE reÃ§u', { count: progress.length });
       break;
     }
 
@@ -233,7 +233,7 @@ export function handleChatEvent(
       break;
     }
 
-    // Rappel relance à échéance
+    // Rappel relance Ã  Ã©chÃ©ance
     case 'FOLLOW_UP_REMINDER': {
       const reminder = data.payload as {
         commercial_id: string;
@@ -246,8 +246,8 @@ export function handleChatEvent(
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('followup:reminder', { detail: reminder }));
         if (document.hidden && Notification.permission === 'granted') {
-          const notif = new Notification('Relance à échéance', {
-            body: `Une relance (${reminder.type}) est arrivée à échéance`,
+          const notif = new Notification('Relance Ã  Ã©chÃ©ance', {
+            body: `Une relance (${reminder.type}) est arrivÃ©e Ã  Ã©chÃ©ance`,
             icon: '/favicon.ico',
             tag: `followup-${reminder.follow_up_id}`,
           });
@@ -259,21 +259,21 @@ export function handleChatEvent(
       break;
     }
 
-    // Rapport GICOP soumis — mise à jour du badge en temps réel
+    // Rapport GICOP soumis â€” mise Ã  jour du badge en temps rÃ©el
     case 'REPORT_SUBMITTED': {
       const { chat_id, report_submission_status } = data.payload as {
         chat_id: string;
         report_submission_status: 'sent' | 'failed' | 'pending';
       };
       chatState.patchConversation(chat_id, { report_submission_status });
-      // Rechargement immédiat de la barre d'obligations après soumission
+      // Rechargement immÃ©diat de la barre d'obligations aprÃ¨s soumission
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('obligations:reload'));
       }
       break;
     }
 
-    // Clôture bloquée (rapport de conversation incomplet)
+    // ClÃ´ture bloquÃ©e (rapport de conversation incomplet)
     case 'CONVERSATION_CLOSE_BLOCKED': {
       const blockedPayload = data.payload as { chat_id?: string; reason?: string };
       if (typeof window !== 'undefined') {
@@ -285,12 +285,21 @@ export function handleChatEvent(
       break;
     }
 
+
+    // Mise a jour temps reel des obligations appels GICOP
+    case 'OBLIGATION_UPDATED': {
+      const obligationStatus = data.payload as import('@/store/chatStore').ObligationStatus | null;
+      chatState.setObligationStatus(obligationStatus);
+      logger.debug('OBLIGATION_UPDATED recu', { status: obligationStatus?.status });
+      break;
+    }
+
     default:
       logger.warn('Unhandled chat event type', { type: data.type });
   }
 }
 
-// ─── Handler : événements contact ─────────────────────────────────────────────
+// â”€â”€â”€ Handler : Ã©vÃ©nements contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function handleContactEvent(data: { type: string; payload: any }): void {
   const contactState = useContactStore.getState();
@@ -345,13 +354,13 @@ export function handleContactEvent(data: { type: string; payload: any }): void {
   }
 }
 
-// ─── Handler : erreurs socket ─────────────────────────────────────────────────
+// â”€â”€â”€ Handler : erreurs socket â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function handleSocketError(error: { message: string; details?: string }): void {
   logger.error('Socket error received', { message: error.message, details: error.details });
 }
 
-// ─── Handler : queue ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Handler : queue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function handleQueueUpdated(data: {
   timestamp: string;
@@ -361,7 +370,7 @@ export function handleQueueUpdated(data: {
   logger.debug('Queue updated', { reason: data.reason, size: data.data?.length });
 }
 
-// ─── Utilitaire interne ───────────────────────────────────────────────────────
+// â”€â”€â”€ Utilitaire interne â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function upsertConversationPatch(chatId: string, patch: Partial<Conversation>): void {
   const state = useChatStore.getState();

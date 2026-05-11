@@ -1,10 +1,10 @@
-import { CallObligationService } from '../call-obligation.service';
+﻿import { CallObligationService } from '../call-obligation.service';
 import { CommercialObligationBatch, BatchStatus } from '../entities/commercial-obligation-batch.entity';
 import { CallTask, CallTaskCategory, CallTaskStatus } from '../entities/call-task.entity';
 import { Contact, ClientCategory } from 'src/contact/entities/contact.entity';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 
-// ─── Factories ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Factories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeBatch(overrides: Partial<CommercialObligationBatch> = {}): CommercialObligationBatch {
   return Object.assign(new CommercialObligationBatch(), {
@@ -57,7 +57,7 @@ function makeChat(overrides: Partial<WhatsappChat> = {}): WhatsappChat {
   });
 }
 
-// ─── Mock Repos ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Mock Repos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeBatchRepo(batch: CommercialObligationBatch | null = null) {
   return {
@@ -114,6 +114,8 @@ function buildService(
       key === 'CALL_QUALITY_THRESHOLD_PCT' ? '80' : 'true',
     ),
   } as any,
+  conversationReportService = null,
+  eventEmitter = { emit: jest.fn() } as any,
 ): CallObligationService {
   return new CallObligationService(
     batchRepo,
@@ -123,10 +125,13 @@ function buildService(
     chatRepo,
     posteRepo,
     systemConfig,
+    null,
+    conversationReportService,
+    eventEmitter,
   );
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('CallObligationService', () => {
 
@@ -141,7 +146,7 @@ describe('CallObligationService', () => {
       expect(batchRepo.save).not.toHaveBeenCalled();
     });
 
-    it('crée un nouveau batch avec 15 tâches si aucun n\'existe', async () => {
+    it('crÃ©e un nouveau batch avec 15 tÃ¢ches si aucun n\'existe', async () => {
       const batchRepo = makeBatchRepo(null);
       batchRepo.findOne = jest.fn().mockResolvedValue(null);
       const createdBatch = makeBatch({ id: 'batch-new', batchNumber: 1 });
@@ -154,7 +159,7 @@ describe('CallObligationService', () => {
       const result = await svc.getOrCreateActiveBatch('poste-1');
 
       expect(result.id).toBe('batch-new');
-      // 15 tâches sauvegardées (5 × 3 catégories)
+      // 15 tÃ¢ches sauvegardÃ©es (5 Ã— 3 catÃ©gories)
       expect(taskRepo.save).toHaveBeenCalledTimes(1);
       const savedTasks = taskRepo.save.mock.calls[0][0] as CallTask[];
       expect(savedTasks).toHaveLength(15);
@@ -164,12 +169,12 @@ describe('CallObligationService', () => {
       expect(categories.filter((c) => c === CallTaskCategory.JAMAIS_COMMANDE)).toHaveLength(5);
     });
 
-    it('incrémente batchNumber depuis le dernier batch', async () => {
+    it('incrÃ©mente batchNumber depuis le dernier batch', async () => {
       const batchRepo = makeBatchRepo(null);
       let callCount = 0;
       batchRepo.findOne = jest.fn().mockImplementation(async () => {
-        // 1er appel : pas de batch PENDING → null
-        // 2ème appel : batch le plus récent avec batchNumber=3
+        // 1er appel : pas de batch PENDING â†’ null
+        // 2Ã¨me appel : batch le plus rÃ©cent avec batchNumber=3
         callCount++;
         if (callCount === 1) return null;
         return makeBatch({ batchNumber: 3 });
@@ -188,7 +193,7 @@ describe('CallObligationService', () => {
   });
 
   describe('tryMatchCallToTask', () => {
-    it('refuse si durée < 90s', async () => {
+    it('refuse si durÃ©e < 90s', async () => {
       const svc = buildService();
       const result = await svc.tryMatchCallToTask({
         clientPhone: '0700000001',
@@ -213,13 +218,13 @@ describe('CallObligationService', () => {
       expect(result.reason).toBe('poste_introuvable');
     });
 
-    it('client inconnu → fallback JAMAIS_COMMANDE → valide si batch et tâche dispos', async () => {
-      // OBL-011 : un contact non identifié est catégorisé JAMAIS_COMMANDE par défaut.
+    it('client inconnu â†’ fallback JAMAIS_COMMANDE â†’ valide si batch et tÃ¢che dispos', async () => {
+      // OBL-011 : un contact non identifiÃ© est catÃ©gorisÃ© JAMAIS_COMMANDE par dÃ©faut.
       const contactRepo  = makeContactRepo(null);
       const batchRepo    = makeBatchRepo(makeBatch());
       const task         = makeTask({ category: CallTaskCategory.JAMAIS_COMMANDE });
       const taskRepo     = makeTaskRepo(task);
-      // 1er findOne (idempotence) → null ; 2e (PENDING lookup) → task
+      // 1er findOne (idempotence) â†’ null ; 2e (PENDING lookup) â†’ task
       taskRepo.findOne = jest.fn()
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(task);
@@ -235,10 +240,10 @@ describe('CallObligationService', () => {
       expect(result.matched).toBe(true);
     });
 
-    it('client inconnu → fallback JAMAIS_COMMANDE → quota atteint → refusé avec raison quota', async () => {
+    it('client inconnu â†’ fallback JAMAIS_COMMANDE â†’ quota atteint â†’ refusÃ© avec raison quota', async () => {
       const contactRepo = makeContactRepo(null);
       const batchRepo   = makeBatchRepo(makeBatch());
-      const taskRepo    = makeTaskRepo(null); // aucune tâche PENDING
+      const taskRepo    = makeTaskRepo(null); // aucune tÃ¢che PENDING
 
       const svc = buildService(batchRepo, taskRepo, contactRepo);
       const result = await svc.tryMatchCallToTask({
@@ -267,9 +272,9 @@ describe('CallObligationService', () => {
       expect(result.reason).toBe('aucun_batch_actif');
     });
 
-    it('refuse si quota catégorie atteint (aucune tâche PENDING)', async () => {
+    it('refuse si quota catÃ©gorie atteint (aucune tÃ¢che PENDING)', async () => {
       const batchRepo = makeBatchRepo(makeBatch());
-      const taskRepo = makeTaskRepo(null); // pas de tâche PENDING
+      const taskRepo = makeTaskRepo(null); // pas de tÃ¢che PENDING
       const contactRepo = makeContactRepo(makeContact());
       const svc = buildService(batchRepo, taskRepo, contactRepo);
 
@@ -284,12 +289,12 @@ describe('CallObligationService', () => {
       expect(result.reason).toContain('quota_');
     });
 
-    it('valide la tâche et met à jour le batch', async () => {
+    it('valide la tÃ¢che et met Ã  jour le batch', async () => {
       const batch = makeBatch({ annuleeDone: 0 });
       const task = makeTask({ category: CallTaskCategory.COMMANDE_ANNULEE });
       const batchRepo = makeBatchRepo(batch);
       const taskRepo = makeTaskRepo(task);
-      // 1er findOne (idempotence) → null ; 2e (PENDING task) → task
+      // 1er findOne (idempotence) â†’ null ; 2e (PENDING task) â†’ task
       taskRepo.findOne = jest.fn()
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(task);
@@ -318,7 +323,7 @@ describe('CallObligationService', () => {
       const contact = makeContact({ client_category: ClientCategory.JAMAIS_COMMANDE });
       const batchRepo = makeBatchRepo(batch);
       const taskRepo = makeTaskRepo(task);
-      // 1er findOne (idempotence) → null ; 2e (PENDING task) → task
+      // 1er findOne (idempotence) â†’ null ; 2e (PENDING task) â†’ task
       taskRepo.findOne = jest.fn()
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(task);
@@ -350,7 +355,7 @@ describe('CallObligationService', () => {
       expect(batch.qualityCheckPassed).toBe(true);
     });
 
-    it('échoue si un commercial n\'a pas répondu au dernier message client', async () => {
+    it('Ã©choue si un commercial n\'a pas rÃ©pondu au dernier message client', async () => {
       const batch = makeBatch();
       const batchRepo = makeBatchRepo(batch);
       const svc = buildService(batchRepo);
@@ -374,7 +379,7 @@ describe('CallObligationService', () => {
       expect(result).toBe(true);
     });
 
-    it('échoue si last_poste_message_at < last_client_message_at', async () => {
+    it('Ã©choue si last_poste_message_at < last_client_message_at', async () => {
       const batch = makeBatch();
       const batchRepo = makeBatchRepo(batch);
       const svc = buildService(batchRepo);
@@ -400,7 +405,7 @@ describe('CallObligationService', () => {
       expect(await svc.getStatus('poste-1')).toBeNull();
     });
 
-    it('retourne le statut structuré du batch', async () => {
+    it('retourne le statut structurÃ© du batch', async () => {
       const batch = makeBatch({ annuleeDone: 3, livreeDone: 5, sansCommandeDone: 2, qualityCheckPassed: false });
       const svc = buildService(makeBatchRepo(batch));
       const status = await svc.getStatus('poste-1');
@@ -412,7 +417,7 @@ describe('CallObligationService', () => {
       expect(status!.readyForRotation).toBe(false);
     });
 
-    it('readyForRotation = true quand tout est à 5 et qualité passée', async () => {
+    it('readyForRotation = true quand tout est Ã  5 et qualitÃ© passÃ©e', async () => {
       const batch = makeBatch({
         annuleeDone: 5,
         livreeDone: 5,
@@ -426,7 +431,7 @@ describe('CallObligationService', () => {
   });
 
   describe('getActivePosteIds', () => {
-    it('déduplique les posteIds depuis plusieurs batchs', async () => {
+    it('dÃ©duplique les posteIds depuis plusieurs batchs', async () => {
       const batchRepo = makeBatchRepo();
       batchRepo.find = jest.fn().mockResolvedValue([
         makeBatch({ posteId: 'poste-1' }),
@@ -449,7 +454,7 @@ describe('CallObligationService', () => {
   });
 
   describe('initAllBatches', () => {
-    it('crée des batchs pour les postes sans batch actif', async () => {
+    it('crÃ©e des batchs pour les postes sans batch actif', async () => {
       const batchRepo = makeBatchRepo(null); // getActiveBatch retourne null
       const createdBatch = makeBatch();
       batchRepo.create = jest.fn().mockReturnValue(createdBatch);
@@ -464,7 +469,7 @@ describe('CallObligationService', () => {
       expect(result.alreadyActive).toBe(0);
     });
 
-    it('ignore les postes ayant déjà un batch actif', async () => {
+    it('ignore les postes ayant dÃ©jÃ  un batch actif', async () => {
       const batch = makeBatch();
       const batchRepo = makeBatchRepo(batch); // getActiveBatch retourne toujours le batch
       const posteRepo = makePosteRepo(['poste-1', 'poste-2']);
@@ -488,27 +493,27 @@ describe('CallObligationService', () => {
       expect(await svc.isPosteReadyForRotation('poste-1')).toBe(false);
     });
 
-    it('retourne false si qualité non passée', async () => {
+    it('retourne false si qualitÃ© non passÃ©e', async () => {
       const batch = makeBatch({ annuleeDone: 5, livreeDone: 5, sansCommandeDone: 5, qualityCheckPassed: false });
       const svc = buildService(makeBatchRepo(batch));
       expect(await svc.isPosteReadyForRotation('poste-1')).toBe(false);
     });
   });
 
-  // ── OBL-023 : idempotence callEventId ────────────────────────────────────
+  // â”€â”€ OBL-023 : idempotence callEventId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  describe('tryMatchCallToTask — idempotence callEventId (OBL-008)', () => {
-    it('refuse un appel dont le callEventId a déjà validé une tâche', async () => {
+  describe('tryMatchCallToTask â€” idempotence callEventId (OBL-008)', () => {
+    it('refuse un appel dont le callEventId a dÃ©jÃ  validÃ© une tÃ¢che', async () => {
       const batch   = makeBatch();
       const contact = makeContact();
-      // La tâche déjà traitée avec ce callEventId
+      // La tÃ¢che dÃ©jÃ  traitÃ©e avec ce callEventId
       const doneTask = makeTask({ status: CallTaskStatus.DONE, callEventId: 'evt-deja-vu' });
 
       const batchRepo   = makeBatchRepo(batch);
       const taskRepo    = makeTaskRepo(doneTask);
-      // findOne retourne la tâche existante pour l'idempotence check
+      // findOne retourne la tÃ¢che existante pour l'idempotence check
       taskRepo.findOne = jest.fn()
-        .mockResolvedValueOnce(doneTask)   // vérification idempotence → trouvée
+        .mockResolvedValueOnce(doneTask)   // vÃ©rification idempotence â†’ trouvÃ©e
         .mockResolvedValue(makeTask());    // jamais atteint
 
       const contactRepo = makeContactRepo(contact);
@@ -532,10 +537,10 @@ describe('CallObligationService', () => {
 
       const batchRepo   = makeBatchRepo(batch);
       const taskRepo    = makeTaskRepo(task);
-      // Première findOne (idempotence) → null ; deuxième (PENDING task) → task
+      // PremiÃ¨re findOne (idempotence) â†’ null ; deuxiÃ¨me (PENDING task) â†’ task
       taskRepo.findOne = jest.fn()
-        .mockResolvedValueOnce(null)  // pas encore utilisé
-        .mockResolvedValueOnce(task); // tâche PENDING disponible
+        .mockResolvedValueOnce(null)  // pas encore utilisÃ©
+        .mockResolvedValueOnce(task); // tÃ¢che PENDING disponible
 
       const contactRepo = makeContactRepo(contact);
       const svc = buildService(batchRepo, taskRepo, contactRepo);
@@ -551,14 +556,14 @@ describe('CallObligationService', () => {
     });
   });
 
-  // ── OBL-021 : contrôle qualité limité au bloc actif ────────────────────────
+  // â”€â”€ OBL-021 : contrÃ´le qualitÃ© limitÃ© au bloc actif â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  describe('runQualityCheck — bloc actif uniquement (OBL-001 + OBL-002)', () => {
+  describe('runQualityCheck â€” bloc actif uniquement (OBL-001 + OBL-002)', () => {
     function makeActiveChatRepo(chats: WhatsappChat[]) {
       return { find: jest.fn().mockResolvedValue(chats) } as any;
     }
 
-    it('passe si toutes les conversations du bloc actif ont une réponse commerciale', async () => {
+    it('passe si toutes les conversations du bloc actif ont une rÃ©ponse commerciale', async () => {
       const t = new Date('2026-04-28T10:00:00Z');
       const chats = [
         makeChat({ window_status: 'active' as any, window_slot: 1, last_client_message_at: t, last_poste_message_at: new Date(t.getTime() + 60_000) }),
@@ -570,13 +575,13 @@ describe('CallObligationService', () => {
       const svc = buildService(batchRepo, undefined, undefined, undefined, chatRepo);
 
       const result = await svc.runQualityCheck('poste-1');
-      // chatRepo.find appelé avec window_status=ACTIVE (le service appelle getActiveBlockConversations)
+      // chatRepo.find appelÃ© avec window_status=ACTIVE (le service appelle getActiveBlockConversations)
       expect(chatRepo.find).toHaveBeenCalledTimes(1);
       expect(result).toBe(true);
       expect(batch.qualityCheckPassed).toBe(true);
     });
 
-    it('échoue si une conversation du bloc actif a un message client sans réponse', async () => {
+    it('Ã©choue si une conversation du bloc actif a un message client sans rÃ©ponse', async () => {
       const clientAt = new Date('2026-04-28T10:00:00Z');
       const chats = [
         makeChat({ window_status: 'active' as any, window_slot: 1, last_client_message_at: clientAt, last_poste_message_at: null }),
@@ -601,13 +606,13 @@ describe('CallObligationService', () => {
       expect(result).toBe(true);
     });
 
-    it('une conversation LOCKED hors bloc ne fait pas échouer le contrôle', async () => {
-      // chatRepo ne retourne que les ACTIVE — le LOCKED n'est pas dans la liste
+    it('une conversation LOCKED hors bloc ne fait pas Ã©chouer le contrÃ´le', async () => {
+      // chatRepo ne retourne que les ACTIVE â€” le LOCKED n'est pas dans la liste
       const activeAt = new Date('2026-04-28T09:00:00Z');
       const chats = [
         makeChat({ window_status: 'active' as any, window_slot: 1, last_client_message_at: activeAt, last_poste_message_at: new Date(activeAt.getTime() + 3600_000) }),
       ];
-      // Le LOCKED aurait last_poste_message_at=null — mais il n'est pas dans la liste
+      // Le LOCKED aurait last_poste_message_at=null â€” mais il n'est pas dans la liste
       const batch = makeBatch();
       const chatRepo = makeActiveChatRepo(chats);
       const batchRepo = makeBatchRepo(batch);

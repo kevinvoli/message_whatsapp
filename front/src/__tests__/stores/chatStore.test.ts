@@ -28,11 +28,14 @@ function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
 
 const baseObligation: ObligationStatus = {
   batchNumber: 1,
+  status: 'pending',
   annulee: { done: 0, required: 0 },
   livree: { done: 0, required: 0 },
   sansCommande: { done: 0, required: 0 },
   qualityCheckPassed: false,
   readyForRotation: false,
+  reportsRequired: 0,
+  reportsSubmitted: 0,
 };
 
 describe('useChatStore', () => {
@@ -40,7 +43,7 @@ describe('useChatStore', () => {
     useChatStore.getState().reset();
   });
 
-  it('a un état initial cohérent', () => {
+  it('a un Ã©tat initial cohÃ©rent', () => {
     const state = useChatStore.getState();
     expect(state.conversations).toEqual([]);
     expect(state.selectedConversation).toBeNull();
@@ -96,7 +99,7 @@ describe('useChatStore', () => {
     expect(useChatStore.getState().rotationBlocked).toBeNull();
   });
 
-  it('addConversation ajoute une nouvelle conversation en tête', () => {
+  it('addConversation ajoute une nouvelle conversation en tÃªte', () => {
     const a = makeConversation({ chat_id: 'a' });
     const b = makeConversation({ chat_id: 'b' });
     useChatStore.getState().addConversation(a);
@@ -105,7 +108,7 @@ describe('useChatStore', () => {
     expect(list.map((c) => c.chat_id)).toEqual(['b', 'a']);
   });
 
-  it('addConversation déduplique sur chat_id', () => {
+  it('addConversation dÃ©duplique sur chat_id', () => {
     const a = makeConversation({ chat_id: 'a', clientName: 'First' });
     const aBis = makeConversation({ chat_id: 'a', clientName: 'Second' });
     useChatStore.getState().addConversation(a);
@@ -157,7 +160,7 @@ describe('useChatStore', () => {
     expect(useChatStore.getState().conversations[0].contact_summary?.id).toBe('c1');
   });
 
-  it('reset remet l\'état initial', () => {
+  it('reset remet l\'Ã©tat initial', () => {
     useChatStore.getState().setObligationStatus(baseObligation);
     useChatStore.getState().setTotalUnread(99);
     useChatStore.getState().reset();

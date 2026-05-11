@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+﻿import { forwardRef, Module } from '@nestjs/common';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
@@ -49,6 +49,7 @@ import { WindowModule } from 'src/window/window.module';
 import { WindowPublisher } from 'src/realtime/publishers/window.publisher';
 import { FollowUpPublisher } from 'src/realtime/publishers/follow-up.publisher';
 import { TargetPublisher } from 'src/realtime/publishers/target.publisher';
+import { ObligationPublisher } from 'src/realtime/publishers/obligation.publisher';
 import { TargetsModule } from 'src/targets/targets.module';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
 import { ConversationReportModule } from 'src/gicop-report/conversation-report.module';
@@ -126,6 +127,7 @@ import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
     WindowPublisher,
     FollowUpPublisher,
     TargetPublisher,
+    ObligationPublisher,
     AgentConnectionService,
     ChannelProviderRegistry,
     ResolveTenantUseCase,

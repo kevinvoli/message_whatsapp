@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from 'react';
-import { Phone, CheckCircle, AlertCircle } from 'lucide-react';
+import { Phone, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { useChatStore, type ObligationStatus } from '@/store/chatStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -15,30 +15,29 @@ const LABELS: Record<keyof Pick<ObligationStatus, 'annulee' | 'livree' | 'sansCo
 export default function ObligationProgressBar() {
   const [status, setStatus] = useState<ObligationStatus | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const storeStatus = useChatStore((s) => s.obligationStatus);
   const setObligationStatus = useChatStore((s) => s.setObligationStatus);
+
+  useEffect(() => {
+    if (storeStatus) setStatus(storeStatus);
+  }, [storeStatus]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/call-obligations/mine`, { credentials: 'include' });
+        const res = await fetch(API_URL + '/call-obligations/mine', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json() as ObligationStatus;
           setStatus(data);
-          setObligationStatus(data); // partage avec le store
+          setObligationStatus(data);
         }
       } catch { /* silencieux */ }
     };
     void load();
     const id = setInterval(() => void load(), 60_000);
-
-    // Rechargement immédiat sur événements socket pertinents
     const handleReload = () => void load();
     window.addEventListener('obligations:reload', handleReload);
-
-    return () => {
-      clearInterval(id);
-      window.removeEventListener('obligations:reload', handleReload);
-    };
+    return () => { clearInterval(id); window.removeEventListener('obligations:reload', handleReload); };
   }, [setObligationStatus]);
 
   if (!status) return null;
@@ -48,7 +47,12 @@ export default function ObligationProgressBar() {
   const totalRequired = categories.reduce((s, k) => s + status[k].required, 0);
   const allCallsDone = totalDone >= totalRequired;
 
-  if (status.readyForRotation) return null; // tout bon, pas besoin d'afficher
+  if (status.readyForRotation) return null;
+
+  const reportsRequired = status.reportsRequired ?? 0;
+  const reportsSubmitted = status.reportsSubmitted ?? 0;
+  const showReports = allCallsDone && reportsRequired > 0;
+  const allReportsDone = reportsSubmitted >= reportsRequired;
 
   return (
     <div className="border-b border-orange-100 bg-orange-50 flex-shrink-0">
@@ -59,7 +63,7 @@ export default function ObligationProgressBar() {
         <div className="flex items-center gap-1.5">
           <Phone className="w-3.5 h-3.5 text-orange-600" />
           <span className="text-xs font-semibold text-orange-700">
-            Obligations appels — Batch #{status.batchNumber}
+            Obligations appels
           </span>
         </div>
         <span className={`text-xs font-bold ${allCallsDone ? 'text-green-600' : 'text-orange-600'}`}>
@@ -77,7 +81,7 @@ export default function ObligationProgressBar() {
             />
           </div>
 
-          {/* Détail par catégorie */}
+          {/* Detail par categorie */}
           <div className="grid grid-cols-3 gap-1.5">
             {categories.map((key) => {
               const { done, required } = status[key];
@@ -99,7 +103,7 @@ export default function ObligationProgressBar() {
             })}
           </div>
 
-          {/* Contrôle qualité */}
+          {/* Controle qualite */}
           <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg ${status.qualityCheckPassed ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
             {status.qualityCheckPassed
               ? <CheckCircle className="w-3 h-3 flex-shrink-0" />
@@ -107,11 +111,24 @@ export default function ObligationProgressBar() {
             }
             <span>
               {status.qualityCheckPassed
-                ? 'Qualité messages bloc actif : OK'
-                : 'Qualité messages : répondez aux clients du bloc actif'
+                ? 'Qualite messages bloc actif : OK'
+                : 'Qualite messages : repondez aux clients du bloc actif'
               }
             </span>
           </div>
+
+          {/* Section rapports GICOP */}
+          {showReports && (
+            <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg border ${allReportsDone ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+              {allReportsDone
+                ? <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                : <FileText className="w-3 h-3 flex-shrink-0" />
+              }
+              <span>
+                Rapports GICOP : {reportsSubmitted}/{reportsRequired} soumis
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
