@@ -1,9 +1,10 @@
 import { Client, ClientSummary, ClientDossier, OutcomeStats, ConversationResult } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
-export async function getClients(limit = 50, offset = 0, search?: string): Promise<{ data: Client[]; total: number }> {
+export async function getClients(limit = 50, offset = 0, search?: string, contactSource?: string): Promise<{ data: Client[]; total: number }> {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (search?.trim()) params.set('search', search.trim());
+    if (contactSource) params.set('contact_source', contactSource);
     const response = await fetch(`${API_BASE_URL}/contact?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
@@ -43,6 +44,7 @@ export interface SearchClientsParams {
     search?: string;
     portfolio_owner_id?: string;
     source?: string;
+    contact_source?: string;
     category?: string;
     limit?: number;
     offset?: number;
@@ -55,6 +57,7 @@ export async function searchClientsAdmin(
     if (params.search?.trim()) p.set('search', params.search.trim());
     if (params.portfolio_owner_id) p.set('portfolio_owner_id', params.portfolio_owner_id);
     if (params.source) p.set('source', params.source);
+    if (params.contact_source) p.set('contact_source', params.contact_source);
     if (params.category) p.set('category', params.category);
     p.set('limit', String(params.limit ?? 50));
     p.set('offset', String(params.offset ?? 0));

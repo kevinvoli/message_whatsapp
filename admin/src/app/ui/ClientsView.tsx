@@ -54,15 +54,17 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [portfolioSearch, setPortfolioSearch] = useState('');
   const [filterCommercialId, setFilterCommercialId] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterSource, setFilterSource] = useState('');
   const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
   const [assigningClient, setAssigningClient] = useState<ClientSummary | null>(null);
   const [assignTarget, setAssignTarget] = useState('');
   const portfolioOffset = useRef(0);
+  const [filterSourceAnnuaire, setFilterSourceAnnuaire] = useState('');
 
-  const loadPage = useCallback(async (l: number, o: number, s?: string) => {
+  const loadPage = useCallback(async (l: number, o: number, s?: string, cs?: string) => {
     setLoading(true);
     try {
-      const result = await getClients(l, o, s);
+      const result = await getClients(l, o, s, cs);
       setClients(result.data);
       setTotal(result.total);
     } finally {
@@ -70,7 +72,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
     }
   }, []);
 
-  useEffect(() => { void loadPage(limit, offset, searchQuery); }, [loadPage, limit, offset, searchQuery]);
+  useEffect(() => { void loadPage(limit, offset, searchQuery, filterSourceAnnuaire || undefined); }, [loadPage, limit, offset, searchQuery, filterSourceAnnuaire]);
 
   const loadPortfolio = useCallback(async () => {
     setPortfolioLoading(true);
@@ -79,6 +81,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
         search: portfolioSearch || undefined,
         portfolio_owner_id: filterCommercialId || undefined,
         category: filterCategory || undefined,
+        contact_source: filterSource || undefined,
         limit: 50,
         offset: portfolioOffset.current,
       });
@@ -87,7 +90,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
     } finally {
       setPortfolioLoading(false);
     }
-  }, [portfolioSearch, filterCommercialId]);
+  }, [portfolioSearch, filterCommercialId, filterCategory, filterSource]);
 
   useEffect(() => {
     if (activeTab === 'portefeuille') {
@@ -246,6 +249,15 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
               <option value="commande_avec_livraison">Livré</option>
               <option value="commande_annulee">Annulé</option>
             </select>
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Toutes origines</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="erp_import">ERP importé</option>
+            </select>
           </div>
 
           {/* Portfolio table */}
@@ -268,7 +280,14 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
                   <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Aucun client trouvé</td></tr>
                 ) : portfolio.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      <span className="flex items-center gap-1.5">
+                        {c.name}
+                        {c.contact_source === 'erp_import' && (
+                          <span className="text-[10px] px-1 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-600 font-medium">ERP</span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{c.phone}</td>
                     <td className="px-4 py-3">
                       <CategoryBadge category={(c as ClientSummary & { client_category?: ClientCategory }).client_category} />
@@ -365,7 +384,16 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
               </button>
             )}
           </div>
-          <button type="button" onClick={() => void loadPage(limit, offset, searchQuery)}
+          <select
+            value={filterSourceAnnuaire}
+            onChange={(e) => setFilterSourceAnnuaire(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <option value="">Toutes origines</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="erp_import">ERP importé</option>
+          </select>
+          <button type="button" onClick={() => void loadPage(limit, offset, searchQuery, filterSourceAnnuaire || undefined)}
             title="Rafraîchir" aria-label="Rafraîchir"
             className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800">
             <RefreshCw className="w-4 h-4" />
@@ -385,7 +413,17 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
           emptyMessage="Aucun client trouvé."
           getRowKey={(client) => client.id}
           columns={[
-            { header: 'Nom', render: (c) => <span className="font-medium text-gray-900">{c.name}</span> },
+            {
+              header: 'Nom',
+              render: (c) => (
+                <span className="flex items-center gap-1.5 font-medium text-gray-900">
+                  {c.name}
+                  {c.contact_source === 'erp_import' && (
+                    <span className="text-[10px] px-1 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-600 font-medium">ERP</span>
+                  )}
+                </span>
+              ),
+            },
             { header: 'Téléphone', render: (c) => <span className="text-gray-700">{c.phone}</span> },
             { header: 'Catégorie', render: (c) => <CategoryBadge category={c.client_category} /> },
             {

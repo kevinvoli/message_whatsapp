@@ -365,6 +365,7 @@ export class ClientDossierService {
     client_category?: string,
     limit = 50,
     offset = 0,
+    contactSource?: string,
   ): Promise<{ data: Contact[]; total: number }> {
     const qb = this.contactRepo
       .createQueryBuilder('c')
@@ -379,6 +380,9 @@ export class ClientDossierService {
     }
     if (client_category) {
       qb.andWhere('c.client_category = :client_category', { client_category });
+    }
+    if (contactSource === 'whatsapp' || contactSource === 'erp_import') {
+      qb.andWhere('c.contactSource = :contactSource', { contactSource });
     }
 
     const [data, total] = await qb

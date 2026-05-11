@@ -347,6 +347,7 @@ export type Client = {
   // Champs ERP
   client_category?: ClientCategory | null;
   order_client_id?: number | null;
+  contact_source?: 'whatsapp' | 'erp_import' | null;
   referral_code?: string | null;
   referral_count?: number | null;
   referral_commission?: number | null;
@@ -1128,6 +1129,7 @@ export interface ClientSummary {
   name: string;
   phone: string;
   source?: string | null;
+  contact_source?: 'whatsapp' | 'erp_import' | null;
   client_category?: string | null;
   portfolio_owner_id?: string | null;
   portfolio_owner_name?: string | null;

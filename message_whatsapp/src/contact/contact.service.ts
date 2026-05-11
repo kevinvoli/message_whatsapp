@@ -82,15 +82,30 @@ export class ContactService {
     });
   }
 
-  async findAll(limit = 50, offset = 0, search?: string): Promise<{ data: unknown[]; total: number }> {
+  async findAll(
+    limit = 50,
+    offset = 0,
+    search?: string,
+    contactSource?: string,
+  ): Promise<{ data: unknown[]; total: number }> {
     const qb = this.repo.createQueryBuilder('contact');
 
+    let hasWhere = false;
     if (search?.trim()) {
       const term = `%${search.trim()}%`;
       qb.where(
-        'contact.name LIKE :term OR contact.phone LIKE :term OR contact.chat_id LIKE :term',
+        '(contact.name LIKE :term OR contact.phone LIKE :term OR contact.chat_id LIKE :term)',
         { term },
       );
+      hasWhere = true;
+    }
+
+    if (contactSource === 'whatsapp' || contactSource === 'erp_import') {
+      if (hasWhere) {
+        qb.andWhere('contact.contactSource = :contactSource', { contactSource });
+      } else {
+        qb.where('contact.contactSource = :contactSource', { contactSource });
+      }
     }
 
     const [contacts, total] = await qb
