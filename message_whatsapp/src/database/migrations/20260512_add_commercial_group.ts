@@ -21,10 +21,8 @@ export class AddCommercialGroup1747094400002 implements MigrationInterface {
     if (!hasGroupId) {
       await qr.query(`
         ALTER TABLE whatsapp_commercial
-          ADD COLUMN group_id CHAR(36) NULL DEFAULT NULL,
-          ADD INDEX  IDX_commercial_group_id (group_id),
-          ADD CONSTRAINT FK_commercial_group_id
-            FOREIGN KEY (group_id) REFERENCES commercial_group(id) ON DELETE SET NULL
+          ADD COLUMN group_id VARCHAR(36) NULL DEFAULT NULL,
+          ADD INDEX  IDX_commercial_group_id (group_id)
       `);
     }
   }
@@ -32,7 +30,6 @@ export class AddCommercialGroup1747094400002 implements MigrationInterface {
   async down(qr: QueryRunner): Promise<void> {
     const hasGroupId = await qr.hasColumn('whatsapp_commercial', 'group_id');
     if (hasGroupId) {
-      await qr.query(`ALTER TABLE whatsapp_commercial DROP FOREIGN KEY FK_commercial_group_id`);
       await qr.query(`ALTER TABLE whatsapp_commercial DROP INDEX IDX_commercial_group_id`);
       await qr.query(`ALTER TABLE whatsapp_commercial DROP COLUMN group_id`);
     }

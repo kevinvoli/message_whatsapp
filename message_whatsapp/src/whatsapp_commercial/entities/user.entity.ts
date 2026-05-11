@@ -84,10 +84,10 @@ export class WhatsappCommercial {
   @Column({ name: 'working_today_since', type: 'timestamp', nullable: true, default: null })
   workingTodaySince: Date | null;
 
-  @Column({ name: 'group_id', type: 'char', length: 36, nullable: true, default: null })
+  @Column({ name: 'group_id', type: 'varchar', length: 36, nullable: true, default: null })
   groupId: string | null;
 
-  @ManyToOne(() => CommercialGroup, (g) => g.commercials, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => CommercialGroup, (g) => g.commercials, { nullable: true })
   @JoinColumn({ name: 'group_id' })
   group?: CommercialGroup;
 
