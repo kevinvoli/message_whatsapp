@@ -18,7 +18,6 @@ import {
   createGroup,
   updateGroup,
   deleteGroup,
-  getGroup,
   addMember,
   removeMember,
 } from '../lib/api/commercial-groups.api';
@@ -124,26 +123,13 @@ interface GroupDetailPanelProps {
 }
 
 function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelProps) {
-  const [detail, setDetail]         = useState<CommercialGroup | null>(null);
-  const [loadingDetail, setLoad]    = useState(false);
   const [selectedAdd, setSelectedAdd] = useState('');
-  const [adding, setAdding]         = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [adding, setAdding]           = useState(false);
+  const [removingId, setRemovingId]   = useState<string | null>(null);
 
-  const loadDetail = useCallback(async () => {
-    setLoad(true);
-    try {
-      const g = await getGroup(group.id);
-      setDetail(g);
-    } catch { /* silencieux */ }
-    finally { setLoad(false); }
-  }, [group.id]);
-
-  useEffect(() => { void loadDetail(); }, [loadDetail]);
-
-  const members = detail?.commercials ?? [];
-  const memberIds = new Set(members.map((m) => m.id));
-  const available = allPresence.filter((p) => p.groupId === null && !memberIds.has(p.id));
+  // Les membres sont dérivés directement depuis allPresence (déjà chargé dans le parent)
+  const members   = allPresence.filter((p) => p.groupId === group.id);
+  const available = allPresence.filter((p) => p.groupId === null);
 
   const handleAdd = async () => {
     if (!selectedAdd) return;
@@ -151,7 +137,6 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
     try {
       await addMember(group.id, selectedAdd);
       setSelectedAdd('');
-      await loadDetail();
       onRefresh();
     } catch { /* silencieux */ }
     finally { setAdding(false); }
@@ -161,19 +146,10 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
     setRemovingId(commercialId);
     try {
       await removeMember(group.id, commercialId);
-      await loadDetail();
       onRefresh();
     } catch { /* silencieux */ }
     finally { setRemovingId(null); }
   };
-
-  if (loadingDetail) {
-    return (
-      <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
-        <Loader2 className="w-4 h-4 animate-spin" /> Chargement…
-      </div>
-    );
-  }
 
   return (
     <div className="mt-4 border-t border-gray-100 pt-4 space-y-4">
