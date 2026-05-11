@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Not, Repository } from 'typeorm';
 import { ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
   GicopUser,
@@ -129,9 +129,57 @@ export class ErpClientSyncService {
       }
     }
 
+    // Second pass (OE-5.2) : contacts DB1 avec order_client_id mais absents du batch DB2 courant.
+    // Ces contacts ont changé de situation (ex : commandes supprimées/invalidées) → recalculer
+    // leur catégorie pour éviter des données obsolètes en DB1.
+    const refreshed = await this.refreshStaleCategories(
+      new Set(db2Clients.map((c) => c.id)),
+    );
+
     this.logger.log(
-      `syncErpClients terminé — ${created} contacts créés, ${updated} mis à jour, ${errors} erreurs`,
+      `syncErpClients terminé — ${created} créés, ${updated} mis à jour, ${refreshed} recatégorisés, ${errors} erreurs`,
     );
     return { created, updated, errors };
+  }
+
+  /**
+   * Recatégorise les contacts DB1 dont le order_client_id ne figure plus dans le
+   * batch DB2 courant (client sans commande valide désormais).
+   */
+  private async refreshStaleCategories(processedIds: Set<number>): Promise<number> {
+    let refreshed = 0;
+    try {
+      // Charge tous les contacts DB1 ayant un order_client_id
+      const linkedContacts = await this.contactRepo.find({
+        where:  { order_client_id: Not(IsNull()) },
+        select: ['id', 'order_client_id', 'client_category'],
+      });
+
+      // Ne retenir que ceux absents du batch courant (situation changée)
+      const stale = linkedContacts.filter(
+        (c) => c.order_client_id != null && !processedIds.has(c.order_client_id),
+      );
+
+      if (stale.length === 0) return 0;
+
+      this.logger.log(`syncErpClients: ${stale.length} contacts à recatégoriser (absents du batch DB2)`);
+
+      for (const contact of stale) {
+        try {
+          const fresh = await this.orderCallSyncService.resolveCategoryByClientId(
+            contact.order_client_id!,
+            this.orderDb!,
+          );
+          const freshCategory = fresh as unknown as ClientCategory;
+          if (freshCategory !== contact.client_category) {
+            await this.contactRepo.update(contact.id, { client_category: freshCategory });
+            refreshed++;
+          }
+        } catch { /* non bloquant */ }
+      }
+    } catch (err) {
+      this.logger.warn(`refreshStaleCategories erreur: ${(err as Error).message}`);
+    }
+    return refreshed;
   }
 }

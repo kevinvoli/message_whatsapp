@@ -454,6 +454,23 @@ export class OrderCallSyncService {
     return raw > 86_400 ? Math.round(raw / 1000) : raw;
   }
 
+  /** Log CALL_MATCHED_ERP_ONLY quand le client validant l'obligation n'a pas de compte WhatsApp. */
+  private async logIfErpOnly(phone: string, callEventId: string | number): Promise<void> {
+    try {
+      const normalized = normalizePhone(phone);
+      if (!normalized) return;
+      const contact = await this.contactRepo.findOne({
+        where:  { phone: normalized },
+        select: ['id', 'contactSource'],
+      });
+      if (!contact || contact.contactSource === ContactSource.ErpImport) {
+        this.logger.log(
+          `CALL_MATCHED_ERP_ONLY callEventId=${callEventId} phone=${normalized}`,
+        );
+      }
+    } catch { /* non bloquant */ }
+  }
+
   private isEligibleForObligation(call: OrderCallLog): boolean {
     return (
       call.callType.toLowerCase() === ORDER_CALL_TYPE_OUTGOING &&
@@ -502,7 +519,7 @@ export class OrderCallSyncService {
       }
     }
 
-    return this.obligationService.tryMatchCallToTask({
+    const result = await this.obligationService.tryMatchCallToTask({
       callEventId:      call.id,
       durationSeconds:  this.normalizeDuration(call.duration),
       resolvedCategory,
@@ -511,6 +528,12 @@ export class OrderCallSyncService {
       posteId:          devicePosteId,
       skipDurationCheck: true,
     });
+
+    if (result.matched && call.remoteNumber) {
+      await this.logIfErpOnly(call.remoteNumber, call.id);
+    }
+
+    return result;
   }
 
   /**
@@ -690,6 +713,9 @@ export class OrderCallSyncService {
         if (result.matched) {
           matched++;
           await this.syncLog.markSuccess(log.id);
+          if (event.client_phone) {
+            await this.logIfErpOnly(event.client_phone, event.external_id);
+          }
         } else {
           await this.syncLog.markFailed(log.id, result.reason ?? 'unknown', true);
         }
