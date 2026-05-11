@@ -461,6 +461,29 @@ export class OrderCallSyncService {
   ): Promise<{ matched: boolean; reason?: string } | null> {
     if (!this.obligationService) return null;
 
+    // Circuit breaker : si DB2 indisponible, ne pas matcher avec une catégorie incorrecte.
+    // L'appel est déjà dans call_event (DB1) — retryUnmatchedObligations() le reprendra
+    // automatiquement toutes les 5 min quand DB2 reviendra.
+    if (!this.orderDb) {
+      try {
+        await this.unresolvedRepo.upsert(
+          {
+            externalId:  String(call.id),
+            localNumber: call.localNumber ?? null,
+            remoteNumber: call.remoteNumber ?? null,
+            deviceId:    call.deviceId ?? null,
+            callType:    call.callType ?? null,
+            durationSec: this.normalizeDuration(call.duration),
+            eventAt:     call.callTimestamp,
+            reason:      'db2_unavailable',
+            resolvedAt:  null,
+          },
+          { conflictPaths: ['externalId'], skipUpdateIfNoValuesChanged: true },
+        );
+      } catch { /* non bloquant */ }
+      return { matched: false, reason: 'db2_unavailable' };
+    }
+
     const resolvedCategory = await this.resolveClientCategory(call.remoteNumber);
 
     // D7 - Fallback device->poste : si device_id connu et associe a un poste dans call_device
