@@ -386,10 +386,8 @@ export class OrderCallSyncService {
     callTimestamp: Date,
     scheduleCache: Map<string, string[]>,
   ): Promise<string | null> {
-    const working = pool.filter((c) => c.isWorkingToday);
-    const step1 = working.length > 0 ? working : pool;
-    if (step1.length === 1) return step1[0].id;
-
+    // Étape 1 : groupe planifié à l'heure de l'appel (priorité principale)
+    // Un commercial dont le groupe a un planning actif à ce moment est le destinataire naturel.
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayOfWeek = days[callTimestamp.getDay()];
     const hh = String(callTimestamp.getHours()).padStart(2, '0');
@@ -401,16 +399,23 @@ export class OrderCallSyncService {
     }
     const activeGroupIds = scheduleCache.get(cacheKey)!;
 
-    const bySchedule = step1.filter((c) => c.groupId && activeGroupIds.includes(c.groupId));
-    const step2 = bySchedule.length > 0 ? bySchedule : step1;
+    const bySchedule = pool.filter((c) => c.groupId && activeGroupIds.includes(c.groupId));
+    const step1 = bySchedule.length > 0 ? bySchedule : pool;
+    if (step1.length === 1) return step1[0].id;
+
+    // Étape 2 : is_working_today (parmi les commerciaux du groupe planifié)
+    const working = step1.filter((c) => c.isWorkingToday);
+    const step2 = working.length > 0 ? working : step1;
     if (step2.length === 1) return step2[0].id;
 
+    // Étape 3 : tiebreaker local_number → commercial.phone
     if (localNumber) {
       const norm = normalizePhone(localNumber);
       const byPhone = step2.find((c) => c.phone && normalizePhone(c.phone) === norm);
       if (byPhone) return byPhone.id;
     }
 
+    // Étape 4 : dernier connecté
     const sorted = [...step2].sort(
       (a, b) => (b.lastConnectionAt?.getTime() ?? 0) - (a.lastConnectionAt?.getTime() ?? 0),
     );
