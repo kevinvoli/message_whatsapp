@@ -4,11 +4,12 @@ import { WorkSchedule } from './entities/work-schedule.entity';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleController } from './work-schedule.controller';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { DailyResetJob } from './jobs/daily-reset.job';
 
 @Module({
   imports: [TypeOrmModule.forFeature([WorkSchedule, WhatsappCommercial])],
   controllers: [WorkScheduleController],
-  providers: [WorkScheduleService],
+  providers: [WorkScheduleService, DailyResetJob],
   exports: [WorkScheduleService],
 })
 export class WorkScheduleModule {}

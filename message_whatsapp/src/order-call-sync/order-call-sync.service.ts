@@ -31,6 +31,7 @@ import { CallStatus, ClientCategory, Contact, ContactSource } from 'src/contact/
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
+import { WorkScheduleService } from 'src/work-schedule/work-schedule.service';
 
 const CURSOR_SCOPE            = 'global';
 const CURSOR_LOOKBACK_MINUTES = 2;
@@ -81,6 +82,8 @@ export class OrderCallSyncService {
 
     @InjectRepository(CallLog)
     private readonly callLogRepo: Repository<CallLog>,
+
+    private readonly workScheduleService: WorkScheduleService,
   ) {}
 
   async syncNewCalls(): Promise<{ processed: number; obligations: number; errors: number }> {
@@ -148,32 +151,53 @@ export class OrderCallSyncService {
       ? await this.commercialRepo.find({
           where: { poste: { id: In(posteIds) }, deletedAt: IsNull() },
           relations: ['poste'],
-          select: { id: true, poste: { id: true } },
+          select: { id: true, phone: true, lastConnectionAt: true, isWorkingToday: true, groupId: true, poste: { id: true } },
         })
       : [];
-    const commercialByPosteId = new Map(
-      commercialsAtPoste.filter((c) => c.poste?.id).map((c) => [c.poste!.id, c.id]),
-    );
-    const commercialByDevice = new Map(
-      allDevices
-        .filter((d) => d.posteId && commercialByPosteId.has(d.posteId))
-        .map((d) => [d.deviceId, commercialByPosteId.get(d.posteId!)!]),
-    );
+
+    // Phase 1 : Map<posteId, WhatsappCommercial[]> — supporte plusieurs commerciaux par poste
+    const poolByPosteId = new Map<string, WhatsappCommercial[]>();
+    for (const c of commercialsAtPoste.filter((c) => c.poste?.id)) {
+      const list = poolByPosteId.get(c.poste!.id) ?? [];
+      list.push(c);
+      poolByPosteId.set(c.poste!.id, list);
+    }
+
+    const workingTodayIds = new Set<string>();
+    const scheduleCache = new Map<string, string[]>();
 
     for (const call of calls) {
       const normalizedLocal = normalizePhone(call.localNumber);
-      // Priorité : device → poste → commercial (plus précis que le numéro de téléphone,
-      // car localNumber peut être un numéro partagé ou de trunk qui matcherait toujours
-      // le même commercial).
-      const commercialIdDb1 =
-        commercialByDevice.get(call.deviceId)
-        ?? (normalizedLocal ? commercialByPhone.get(normalizedLocal) : undefined)
-        ?? null;
 
-      const attributionSource =
-        (call.deviceId && commercialByDevice.has(call.deviceId))    ? 'device_poste' :
-        (normalizedLocal && commercialByPhone.has(normalizedLocal)) ? 'phone' :
-        null;
+      let commercialIdDb1: string | null = null;
+      let attributionSource: string | null = null;
+
+      if (call.deviceId) {
+        const device = allDevices.find((d) => d.deviceId === call.deviceId);
+        if (device?.posteId) {
+          const pool = poolByPosteId.get(device.posteId) ?? [];
+          if (pool.length > 0) {
+            commercialIdDb1 = await this.resolveCommercialForDevice(
+              pool, call.localNumber, call.callTimestamp, scheduleCache,
+            );
+            if (commercialIdDb1) attributionSource = 'device_poste';
+          }
+        }
+      }
+
+      if (!commercialIdDb1 && normalizedLocal) {
+        commercialIdDb1 = commercialByPhone.get(normalizedLocal) ?? null;
+        if (commercialIdDb1) attributionSource = 'phone';
+      }
+
+      // Phase 2 — Auto-marquer is_working_today si commercial trouvé
+      if (commercialIdDb1 && !workingTodayIds.has(commercialIdDb1)) {
+        await this.commercialRepo.update(commercialIdDb1, {
+          isWorkingToday: true,
+          workingTodaySince: new Date(),
+        });
+        workingTodayIds.add(commercialIdDb1);
+      }
 
       // D2 - passer deviceId dans ingestFromDb2
       await this.callEventService.ingestFromDb2({
@@ -350,6 +374,47 @@ export class OrderCallSyncService {
     );
 
     return { processed: newCalls, obligations: obligationsMatched, errors };
+  }
+
+  /**
+   * Phase 4 — Cascade de sélection dans un pool de commerciaux pour un device donné.
+   * Étape 1 : is_working_today ; Étape 2 : planning de groupe ; Étape 3 : tiebreaker local_number ; Étape 4 : dernier connecté.
+   */
+  private async resolveCommercialForDevice(
+    pool: WhatsappCommercial[],
+    localNumber: string | null,
+    callTimestamp: Date,
+    scheduleCache: Map<string, string[]>,
+  ): Promise<string | null> {
+    const working = pool.filter((c) => c.isWorkingToday);
+    const step1 = working.length > 0 ? working : pool;
+    if (step1.length === 1) return step1[0].id;
+
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = days[callTimestamp.getDay()];
+    const hh = String(callTimestamp.getHours()).padStart(2, '0');
+    const mm = String(callTimestamp.getMinutes()).padStart(2, '0');
+    const cacheKey = `${dayOfWeek}|${hh}:${mm}`;
+
+    if (!scheduleCache.has(cacheKey)) {
+      scheduleCache.set(cacheKey, await this.workScheduleService.getActiveGroupIds(callTimestamp));
+    }
+    const activeGroupIds = scheduleCache.get(cacheKey)!;
+
+    const bySchedule = step1.filter((c) => c.groupId && activeGroupIds.includes(c.groupId));
+    const step2 = bySchedule.length > 0 ? bySchedule : step1;
+    if (step2.length === 1) return step2[0].id;
+
+    if (localNumber) {
+      const norm = normalizePhone(localNumber);
+      const byPhone = step2.find((c) => c.phone && normalizePhone(c.phone) === norm);
+      if (byPhone) return byPhone.id;
+    }
+
+    const sorted = [...step2].sort(
+      (a, b) => (b.lastConnectionAt?.getTime() ?? 0) - (a.lastConnectionAt?.getTime() ?? 0),
+    );
+    return sorted[0]?.id ?? null;
   }
 
   /** D4 — Insère ou met à jour first_seen/last_seen pour ce device_id. */

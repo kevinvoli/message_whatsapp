@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { WorkSchedule, DayOfWeek } from './entities/work-schedule.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { v4 as uuidv4 } from 'uuid';
@@ -97,6 +97,32 @@ export class WorkScheduleService {
     const all = await this.findForCommercial(commercialId);
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as DayOfWeek;
     return all.find((d) => d.dayOfWeek === today) ?? null;
+  }
+
+  /**
+   * Retourne les groupId dont le planning est actif à l'instant donné.
+   * Utilisé par OrderCallSyncService pour affiner l'attribution dans un pool multi-commerciaux.
+   */
+  async getActiveGroupIds(at: Date): Promise<string[]> {
+    const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = days[at.getDay()];
+    const hhmm = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+
+    const schedules = await this.repo.find({
+      where: {
+        groupId:   Not(IsNull()),
+        dayOfWeek,
+        isActive:  true,
+      },
+    });
+
+    return schedules
+      .filter((s) => {
+        if (s.startTime > hhmm || s.endTime <= hhmm) return false;
+        const breaks = (s.breakSlots as Array<{ start: string; end: string }> | null) ?? [];
+        return !breaks.some((b) => b.start <= hhmm && b.end > hhmm);
+      })
+      .map((s) => s.groupId!);
   }
 
   async create(dto: CreateScheduleDto): Promise<WorkSchedule> {

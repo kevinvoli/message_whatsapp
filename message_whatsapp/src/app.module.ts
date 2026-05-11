@@ -88,6 +88,7 @@ import { PlatformSettingsModule } from './platform-settings/platform-settings.mo
 import { QueueModule } from './queue/queue.module';
 import { BullBoardSetupModule } from './queue/bull-board.module';
 import { ErpClientSyncModule } from './erp-client-sync/erp-client-sync.module';
+import { CommercialGroupModule } from './commercial-group/commercial-group.module';
 
 @Module({
   imports: [
@@ -264,6 +265,8 @@ import { ErpClientSyncModule } from './erp-client-sync/erp-client-sync.module';
     QueueModule,
     // Sprint 6+ — Sync nocturne clients ERP → Contact DB1
     ErpClientSyncModule,
+    // Groupes de commerciaux (pool d'attribution appels)
+    CommercialGroupModule,
     // Bull Board UI — activé seulement si BULL_BOARD_ENABLED=true
     ...(process.env.BULL_BOARD_ENABLED === 'true' ? [BullBoardSetupModule] : []),
   ],

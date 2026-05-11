@@ -496,4 +496,12 @@ export class WhatsappCommercialService {
       passwordResetExpires: expires,
     });
   }
+
+  async setWorkingToday(id: string, working: boolean): Promise<WhatsappCommercial> {
+    await this.whatsappCommercialRepository.update(id, {
+      isWorkingToday: working,
+      workingTodaySince: working ? new Date() : null,
+    });
+    return this.whatsappCommercialRepository.findOneOrFail({ where: { id } });
+  }
 }

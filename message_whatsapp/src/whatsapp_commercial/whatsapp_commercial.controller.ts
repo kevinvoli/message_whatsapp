@@ -60,4 +60,12 @@ export class WhatsappCommercialController {
   async remove(@Param('id') id: string) {
     return await this.whatsappCommercialService.remove(id);
   }
+
+  @Patch(':id/working-today')
+  async setWorkingToday(
+    @Param('id') id: string,
+    @Body() body: { working: boolean },
+  ) {
+    return this.whatsappCommercialService.setWorkingToday(id, body.working);
+  }
 }

@@ -1,4 +1,5 @@
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { CommercialGroup } from 'src/commercial-group/entities/commercial-group.entity';
 import {
   Entity,
   Column,
@@ -76,6 +77,19 @@ export class WhatsappCommercial {
 
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
+
+  @Column({ name: 'is_working_today', type: 'boolean', default: false })
+  isWorkingToday: boolean;
+
+  @Column({ name: 'working_today_since', type: 'timestamp', nullable: true, default: null })
+  workingTodaySince: Date | null;
+
+  @Column({ name: 'group_id', type: 'char', length: 36, nullable: true, default: null })
+  groupId: string | null;
+
+  @ManyToOne(() => CommercialGroup, (g) => g.commercials, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'group_id' })
+  group?: CommercialGroup;
 
   @Column('varchar', {
     name: 'salt',
