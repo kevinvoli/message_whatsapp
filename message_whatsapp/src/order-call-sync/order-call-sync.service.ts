@@ -606,9 +606,10 @@ export class OrderCallSyncService {
             phone:           normalized,
             name:            normalized,
             contactSource:   ContactSource.ErpImport,
-            order_client_id: clientIdDb2,
-            client_category: resolvedCategory as unknown as ClientCategory,
-            call_status:     CallStatus.À_APPeler,
+            order_client_id:    clientIdDb2,
+            client_category:    resolvedCategory as unknown as ClientCategory,
+            call_status:        CallStatus.À_APPeler,
+            conversion_status:  'client',
           }),
         );
       }

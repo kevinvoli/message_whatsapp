@@ -109,12 +109,13 @@ export class ErpClientSyncService {
             // Création contact ERP-only (pas de chat_id, pas de conversation)
             await this.contactRepo.save(
               this.contactRepo.create({
-                phone:           normalized,
-                name:            fullName,
-                contactSource:   ContactSource.ErpImport,
-                order_client_id: client.id,
-                client_category: clientCategory,
-                call_status:     CallStatus.À_APPeler,
+                phone:              normalized,
+                name:               fullName,
+                contactSource:      ContactSource.ErpImport,
+                order_client_id:    client.id,
+                client_category:    clientCategory,
+                call_status:        CallStatus.À_APPeler,
+                conversion_status:  'client', // déjà client ERP — pas un "nouveau" contact
               }),
             );
             created++;

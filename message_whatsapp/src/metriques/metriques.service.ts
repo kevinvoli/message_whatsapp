@@ -292,12 +292,13 @@ export class MetriquesService {
       .createQueryBuilder('contact')
       .select('COUNT(*)', 'total')
       .addSelect(
-        'SUM(CASE WHEN contact.createdAt >= :dateStart AND contact.createdAt <= :dateEnd THEN 1 ELSE 0 END)',
+        // Exclure les contacts importés de l'ERP (erp_import) — ils ne sont pas de "nouveaux" contacts WA
+        'SUM(CASE WHEN contact.createdAt >= :dateStart AND contact.createdAt <= :dateEnd AND (contact.contactSource IS NULL OR contact.contactSource != :erpSource) THEN 1 ELSE 0 END)',
         'nouveaux',
       )
       .addSelect('SUM(CASE WHEN contact.is_active = 1 THEN 1 ELSE 0 END)', 'actifs')
       .where('contact.deletedAt IS NULL')
-      .setParameters({ dateStart, dateEnd })
+      .setParameters({ dateStart, dateEnd, erpSource: 'erp_import' })
       .getRawOne();
 
     return {
