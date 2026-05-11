@@ -48,6 +48,14 @@ import OutboxSyncView from '@/app/ui/OutboxSyncView';
 import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
 import PresenceView from '@/app/ui/PresenceView';
 import CommercialGroupsView from '@/app/ui/CommercialGroupsView';
+// ── Vues fusionnées avec onglets ──────────────────────────────────────────────
+import PlanningTabsView from '@/app/ui/PlanningTabsView';
+import DispatchTabsView from '@/app/ui/DispatchTabsView';
+import SupervisionTabsView from '@/app/ui/SupervisionTabsView';
+import ClientsCrmTabsView from '@/app/ui/ClientsCrmTabsView';
+import RelancesTabsView from '@/app/ui/RelancesTabsView';
+import DiffusionsTabsView from '@/app/ui/DiffusionsTabsView';
+import SecuriteAccesTabsView from '@/app/ui/SecuriteAccesTabsView';
 import ComplaintsView from '@/app/modules/dispatch/components/ComplaintsView';
 import LoginLogsView from '@/app/ui/LoginLogsView';
 import RelanceConfigView from '@/app/ui/RelanceConfigView';
@@ -120,7 +128,7 @@ export default function AdminDashboard() {
             case 'queue':
                 return <QueueView onRefresh={() => {}} />;
             case 'dispatch':
-                return <DispatchView onRefresh={() => {}} />;
+                return <DispatchTabsView />;
             case 'crons':
                 return <CronConfigView />;
             case 'alert-config':
@@ -128,7 +136,7 @@ export default function AdminDashboard() {
             case 'observabilite':
                 return <ObservabiliteView />;
             case 'system-health':
-                return <SystemHealthView />;
+                return <SupervisionTabsView />;
             case 'integration':
                 return <IntegrationView />;
             case 'ranking':
@@ -153,7 +161,7 @@ export default function AdminDashboard() {
             case 'messages':
                 return <MessagesView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
             case 'clients':
-                return <ClientsView onRefresh={() => {}} />;
+                return <ClientsCrmTabsView />;
             case 'rapports':
                 return <RapportsView />;
             case 'notifications':
@@ -190,7 +198,7 @@ export default function AdminDashboard() {
             case 'contexts':
                 return <ContextsView />;
             case 'follow-ups':
-                return <FollowUpsView />;
+                return <RelancesTabsView />;
             case 'crm':
                 return <CrmView />;
             case 'sla-rules':
@@ -198,11 +206,11 @@ export default function AdminDashboard() {
             case 'audit-logs':
                 return <AuditView />;
             case 'roles':
-                return <RolesView />;
+                return <SecuriteAccesTabsView />;
             case 'outbound-webhooks':
                 return <WebhooksView />;
             case 'broadcasts':
-                return <BroadcastsView />;
+                return <DiffusionsTabsView />;
             case 'templates':
                 return <TemplatesView />;
             case 'targets':
@@ -220,7 +228,7 @@ export default function AdminDashboard() {
             case 'outbox-sync':
                 return <OutboxSyncView />;
             case 'work-schedule':
-                return <WorkScheduleAdminView />;
+                return <PlanningTabsView />;
             case 'presence':
                 return <PresenceView />;
             case 'commercial-groups':

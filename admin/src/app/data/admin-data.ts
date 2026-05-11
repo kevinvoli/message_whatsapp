@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, LogIn, Settings, UserCheck, Users2 } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, Route, Activity, ShieldCheck, LayoutDashboard, Timer, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Lock, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2 } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -14,44 +14,36 @@ export const navigationGroups: NavigationGroup[] = [
     icon: MessageSquare,
     items: [
       { id: 'conversations', name: 'Conversations', icon: MessageSquare, badge: null },
-      { id: 'messages', name: 'Messages', icon: MessageCircle, badge: null },
-      { id: 'queue', name: "File d'attente", icon: ListOrdered, badge: null },
-      { id: 'dispatch', name: 'Dispatch', icon: Route, badge: null },
-      { id: 'capacity', name: 'Capacite conversations', icon: Gauge, badge: null },
-      { id: 'contexts', name: 'Contextes', icon: Layers, badge: null },
+      { id: 'messages',      name: 'Messages',      icon: MessageCircle, badge: null },
+      { id: 'dispatch',      name: 'Dispatch',      icon: Route,         badge: null },
     ],
   },
   {
     label: 'Equipe & Planning',
     icon: Users,
     items: [
-      { id: 'commerciaux', name: 'Commerciaux', icon: Users, badge: null },
-      { id: 'commercial-groups', name: 'Groupes commerciaux', icon: Users2, badge: null },
-      { id: 'postes', name: 'Postes', icon: Network, badge: null },
-      { id: 'work-schedule', name: 'Plannings de travail', icon: CalendarDays, badge: null },
-      { id: 'presence', name: 'Presence du jour', icon: UserCheck, badge: null },
-      { id: 'sessions', name: 'Heures de travail', icon: Clock, badge: null },
+      { id: 'commerciaux',       name: 'Commerciaux',        icon: Users,        badge: null },
+      { id: 'commercial-groups', name: 'Groupes commerciaux', icon: Users2,       badge: null },
+      { id: 'postes',            name: 'Postes',             icon: Network,      badge: null },
+      { id: 'work-schedule',     name: 'Planning',           icon: CalendarDays, badge: null },
     ],
   },
   {
     label: 'CRM & Relances',
     icon: Briefcase,
     items: [
-      { id: 'clients', name: 'Clients', icon: Briefcase, badge: null },
-      { id: 'crm', name: 'Champs CRM', icon: Database, badge: null },
-      { id: 'follow-ups', name: 'Relances', icon: PhoneCall, badge: null },
-      { id: 'relance-config', name: 'Configuration relances', icon: Settings, badge: null },
-      { id: 'targets', name: 'Objectifs', icon: Target, badge: null },
+      { id: 'clients',    name: 'Clients & CRM', icon: Briefcase, badge: null },
+      { id: 'follow-ups', name: 'Relances',       icon: PhoneCall, badge: null },
+      { id: 'targets',    name: 'Objectifs',      icon: Target,    badge: null },
     ],
   },
   {
     label: 'Automatisation & Diffusion',
     icon: Bot,
     items: [
-      { id: 'flowbot', name: 'Automatisations', icon: Bot, badge: null },
-      { id: 'broadcasts', name: 'Diffusions', icon: Send, badge: null },
-      { id: 'templates', name: 'Templates WhatsApp', icon: FileCode2, badge: null },
-      { id: 'crons', name: 'Taches planifiees', icon: Timer, badge: null },
+      { id: 'flowbot',    name: 'Automatisations',  icon: Bot,   badge: null },
+      { id: 'broadcasts', name: 'Diffusions',        icon: Send,  badge: null },
+      { id: 'crons',      name: 'Taches planifiees', icon: Timer, badge: null },
     ],
   },
   {
@@ -68,24 +60,18 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'Supervision & Alertes',
     icon: Activity,
     items: [
-      { id: 'system-health', name: 'Sante serveur', icon: Server, badge: null },
-      { id: 'observabilite', name: 'Observabilite', icon: Activity, badge: 'SLO' },
-      { id: 'notifications', name: 'Notifications', icon: Bell, badge: null },
-      { id: 'alert-config', name: 'Alertes systeme', icon: Bell, badge: null },
-      { id: 'go_no_go', name: 'GO/NO-GO', icon: ShieldCheck, badge: 'OPS' },
+      { id: 'system-health', name: 'Supervision', icon: Activity, badge: null },
     ],
   },
   {
     label: 'Administration & Securite',
     icon: Shield,
     items: [
-      { id: 'roles', name: 'Roles & permissions', icon: ShieldCheck, badge: null },
-      { id: 'ip-access', name: "Restrictions d'acces", icon: Lock, badge: null },
-      { id: 'login-logs', name: 'Journal connexions', icon: LogIn, badge: null },
-      { id: 'audit-logs', name: "Journal d'audit", icon: ClipboardList, badge: null },
-      { id: 'sla-rules', name: 'Regles SLA', icon: Shield, badge: null },
-      { id: 'ia-governance', name: 'Gouvernance IA', icon: Sparkles, badge: null },
-      { id: 'settings', name: 'Parametres', icon: Settings, badge: null },
+      { id: 'roles',         name: "Securite & Acces", icon: Lock,          badge: null },
+      { id: 'audit-logs',    name: "Journal d'audit",  icon: ClipboardList, badge: null },
+      { id: 'sla-rules',     name: 'Regles SLA',       icon: Shield,        badge: null },
+      { id: 'ia-governance', name: 'Gouvernance IA',   icon: Sparkles,      badge: null },
+      { id: 'settings',      name: 'Parametres',       icon: Settings,      badge: null },
     ],
   },
   {

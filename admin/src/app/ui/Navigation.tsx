@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { NavigationGroup, ViewMode, WhatsappMessage } from '@/app/lib/definitions';
 import { useRouter } from 'next/navigation';
 import { logoutAdmin } from '@/app/lib/api/auth.api';
@@ -168,19 +168,6 @@ export default function Navigation({ sidebarOpen, setSidebarOpen, viewMode, setV
                         </div>
                     )}
                 </div>
-                {sidebarOpen && (
-                    <button
-                        onClick={() => setViewMode('settings')}
-                        className={`w-full mt-3 flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
-                            viewMode === 'settings'
-                                ? 'bg-blue-700 text-white'
-                                : 'text-blue-200 hover:bg-blue-700'
-                        }`}
-                    >
-                        <Settings className="w-4 h-4" />
-                        Parametres
-                    </button>
-                )}
                 <button
                     onClick={handleLogout}
                     className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-900 rounded-lg transition-colors"
