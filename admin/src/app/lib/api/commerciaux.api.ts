@@ -1,4 +1,4 @@
-import { Commercial } from '../definitions';
+import { Commercial, CommercialPresenceItem } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 export async function getCommerciaux(): Promise<Commercial[]> {
@@ -40,4 +40,21 @@ export async function deleteCommercial(id: string): Promise<{ message: string }>
         credentials: 'include',
     });
     return handleResponse<{ message: string }>(response);
+}
+
+export async function getPresence(): Promise<CommercialPresenceItem[]> {
+    const response = await fetch(`${API_BASE_URL}/users/presence`, {
+        credentials: 'include',
+    });
+    return handleResponse<CommercialPresenceItem[]>(response);
+}
+
+export async function setWorkingToday(id: string, working: boolean): Promise<CommercialPresenceItem> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/working-today`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ working }),
+    });
+    return handleResponse<CommercialPresenceItem>(response);
 }

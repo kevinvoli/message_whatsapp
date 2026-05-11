@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, LogIn, Settings } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Bot, Layers, Database, Send, FileCode2, Shield, ClipboardList, Webhook, PhoneCall, Target, Clock, Lock, Gauge, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, LogIn, Settings, UserCheck, Users2 } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -125,6 +125,8 @@ export const navigationGroups: NavigationGroup[] = [
     icon: CalendarDays,
     items: [
       { id: 'work-schedule', name: 'Plannings de travail', icon: CalendarDays, badge: null },
+      { id: 'presence', name: 'Présence du jour', icon: UserCheck, badge: null },
+      { id: 'commercial-groups', name: 'Groupes commerciaux', icon: Users2, badge: null },
     ],
   },
 ];

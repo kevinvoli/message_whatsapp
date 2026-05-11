@@ -79,7 +79,9 @@ export type ViewMode =
   // Sprint 3 — Config relances auto
   | 'relance-config'
   // Device-Poste mapping
-  | 'call-devices';
+  | 'call-devices'
+  | 'presence'
+  | 'commercial-groups';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -272,6 +274,26 @@ export type ProduitsPopulaires = {
   ventes: number;
   ca: number;
 };
+
+export interface CommercialPresenceItem {
+  id: string;
+  name: string;
+  phone: string | null;
+  isWorkingToday: boolean;
+  workingTodaySince: string | null;
+  groupId: string | null;
+  poste: { id: string; name: string; code: string } | null;
+}
+
+export interface CommercialGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  commercials?: CommercialPresenceItem[];
+}
 
 export type Poste = {
   id: string;

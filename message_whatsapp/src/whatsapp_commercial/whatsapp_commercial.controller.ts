@@ -37,6 +37,11 @@ export class WhatsappCommercialController {
     return await this.whatsappCommercialService.getCommercialsDashboard();
   }
 
+  @Get('presence')
+  async getPresence() {
+    return this.whatsappCommercialService.getPresence();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     this.logger.debug(`Get user ${id}`);

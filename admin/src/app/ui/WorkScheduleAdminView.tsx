@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { CalendarDays, Coffee, Edit2, Loader2, Plus, Trash2, X } from 'lucide-react';
+import { CalendarDays, Coffee, Edit2, Loader2, Plus, Trash2, X, Users } from 'lucide-react';
 import {
   getAllSchedules,
   createSchedule,
@@ -13,7 +13,8 @@ import {
   BreakSlot,
 } from '../lib/api/work-schedule.api';
 import { getCommerciaux } from '../lib/api/commerciaux.api';
-import { Commercial } from '../lib/definitions';
+import { getGroups } from '../lib/api/commercial-groups.api';
+import { Commercial, CommercialGroup } from '../lib/definitions';
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
   monday:    'Lundi',
@@ -57,11 +58,12 @@ interface ScheduleFormModalProps {
   initial:      FormState | null;
   editId:       string | null;
   commerciaux:  Commercial[];
+  availableGroups: CommercialGroup[];
   onClose:      () => void;
   onSaved:      () => void;
 }
 
-function ScheduleFormModal({ initial, editId, commerciaux, onClose, onSaved }: ScheduleFormModalProps) {
+function ScheduleFormModal({ initial, editId, commerciaux, availableGroups, onClose, onSaved }: ScheduleFormModalProps) {
   const [form, setForm]   = useState<FormState>(initial ?? defaultForm());
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState<string | null>(null);
@@ -160,25 +162,30 @@ function ScheduleFormModal({ initial, editId, commerciaux, onClose, onSaved }: S
               </select>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">ID Groupe (posteId)</label>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Groupe</label>
+              {availableGroups.length > 0 ? (
+                <select
+                  value={form.groupId}
+                  onChange={(e) => {
+                    const selected = availableGroups.find((g) => g.id === e.target.value);
+                    set({ groupId: e.target.value, groupName: selected?.name ?? '' });
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  <option value="">-- Sélectionner un groupe --</option>
+                  {availableGroups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              ) : (
                 <input
                   value={form.groupId}
                   onChange={(e) => set({ groupId: e.target.value })}
-                  placeholder="uuid du poste"
+                  placeholder="uuid du groupe"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Nom groupe</label>
-                <input
-                  value={form.groupName}
-                  onChange={(e) => set({ groupName: e.target.value })}
-                  placeholder="ex: Equipe A"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
+              )}
             </div>
           )}
 
@@ -285,33 +292,145 @@ function ScheduleFormModal({ initial, editId, commerciaux, onClose, onSaved }: S
   );
 }
 
+// ─── Table de plannings ────────────────────────────────────────────────────
+
+interface ScheduleTableProps {
+  schedules:    WorkSchedule[];
+  commercialMap: Map<string, string>;
+  onEdit:       (s: WorkSchedule) => void;
+  onDelete:     (id: string) => void;
+  deletingId:   string | null;
+}
+
+function ScheduleTable({ schedules, commercialMap, onEdit, onDelete, deletingId }: ScheduleTableProps) {
+  if (schedules.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Aucun planning configuré.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cible</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Jour</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Horaires</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pauses</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
+            <th className="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {schedules.map((s) => (
+            <tr key={s.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                {s.commercialId ? (
+                  <div>
+                    <p className="font-medium text-gray-900">{commercialMap.get(s.commercialId) ?? s.commercialId}</p>
+                    <p className="text-xs text-gray-400">Commercial individuel</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium text-gray-900">{s.groupName ?? s.groupId}</p>
+                    <p className="text-xs text-gray-400">Groupe</p>
+                  </div>
+                )}
+              </td>
+              <td className="px-4 py-3 font-medium text-gray-700">{DAY_LABELS[s.dayOfWeek]}</td>
+              <td className="px-4 py-3 text-gray-700">{s.startTime} – {s.endTime}</td>
+              <td className="px-4 py-3">
+                {s.breakSlots && s.breakSlots.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {s.breakSlots.map((b, i) => (
+                      <div key={i} className="flex items-center gap-1 text-xs text-gray-500">
+                        <Coffee className="w-3 h-3 text-amber-500" />
+                        {b.start} – {b.end}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400">—</span>
+                )}
+              </td>
+              <td className="px-4 py-3">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  s.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {s.isActive ? 'Actif' : 'Inactif'}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    onClick={() => onEdit(s)}
+                    className="p-1.5 text-gray-400 hover:text-indigo-600 rounded hover:bg-indigo-50"
+                    aria-label="Modifier ce créneau"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => void onDelete(s.id)}
+                    disabled={deletingId === s.id}
+                    className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+                    aria-label="Supprimer ce créneau"
+                  >
+                    {deletingId === s.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Vue principale ─────────────────────────────────────────────────────────
+
+type TabId = 'individual' | 'group';
 
 export default function WorkScheduleAdminView() {
   const [schedules, setSchedules]     = useState<WorkSchedule[]>([]);
   const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<CommercialGroup[]>([]);
   const [loading, setLoading]         = useState(false);
   const [showModal, setShowModal]     = useState(false);
   const [editItem, setEditItem]       = useState<WorkSchedule | null>(null);
   const [deletingId, setDeletingId]   = useState<string | null>(null);
+  const [activeTab, setActiveTab]     = useState<TabId>('individual');
+  const [presetGroupId, setPresetGroupId] = useState<string | null>(null);
 
   const commercialMap = new Map(commerciaux.map((c) => [c.id, c.name]));
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, c] = await Promise.all([getAllSchedules(), getCommerciaux()]);
+      const [s, c, g] = await Promise.all([getAllSchedules(), getCommerciaux(), getGroups()]);
       setSchedules(s);
       setCommerciaux(c);
+      setAvailableGroups(g.filter((gr) => gr.isActive));
     } catch { /* silencieux */ }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
-  const openCreate = () => { setEditItem(null); setShowModal(true); };
-  const openEdit   = (s: WorkSchedule) => { setEditItem(s); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setEditItem(null); };
+  const openCreate = (groupId?: string) => {
+    setEditItem(null);
+    setPresetGroupId(groupId ?? null);
+    setShowModal(true);
+  };
+  const openEdit   = (s: WorkSchedule) => { setPresetGroupId(null); setEditItem(s); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setEditItem(null); setPresetGroupId(null); };
   const onSaved    = () => { closeModal(); void load(); };
 
   const handleDelete = async (id: string) => {
@@ -335,121 +454,119 @@ export default function WorkScheduleAdminView() {
     isActive:     s.isActive,
   });
 
+  const buildPresetInitial = (groupId: string): FormState => {
+    const group = availableGroups.find((g) => g.id === groupId);
+    return {
+      ...defaultForm(),
+      type:      'group',
+      groupId:   groupId,
+      groupName: group?.name ?? '',
+    };
+  };
+
+  const individualSchedules = schedules.filter((s) => s.commercialId !== null);
+  const groupSchedules      = schedules.filter((s) => s.groupId !== null);
+
+  const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
+    { id: 'individual', label: 'Plannings individuels / postes', icon: CalendarDays },
+    { id: 'group',      label: 'Plannings par groupe',           icon: Users },
+  ];
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header + Onglets */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <CalendarDays className="w-6 h-6 text-indigo-600" />
           <h2 className="text-xl font-bold text-gray-900">Temps de travail</h2>
         </div>
-        <button
-            onClick={openCreate}
+        {activeTab === 'individual' && (
+          <button
+            onClick={() => openCreate()}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
           >
             <Plus className="w-4 h-4" /> Nouveau créneau
           </button>
+        )}
       </div>
 
-      {/* Table plannings */}
-      {loading ? (
+      {/* Onglets */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading && schedules.length === 0 ? (
         <div className="flex items-center justify-center h-32 text-gray-400">
           <Loader2 className="w-6 h-6 animate-spin mr-2" /> Chargement…
         </div>
-      ) : schedules.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>Aucun planning configuré.</p>
-        </div>
+      ) : activeTab === 'individual' ? (
+        <ScheduleTable
+          schedules={individualSchedules}
+          commercialMap={commercialMap}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          deletingId={deletingId}
+        />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cible</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Jour</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Horaires</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pauses</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {schedules.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    {s.commercialId ? (
-                      <div>
-                        <p className="font-medium text-gray-900">{commercialMap.get(s.commercialId) ?? s.commercialId}</p>
-                        <p className="text-xs text-gray-400">Commercial individuel</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="font-medium text-gray-900">{s.groupName ?? s.groupId}</p>
-                        <p className="text-xs text-gray-400">Groupe / Poste</p>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-700">{DAY_LABELS[s.dayOfWeek]}</td>
-                  <td className="px-4 py-3 text-gray-700">
-                    {s.startTime} – {s.endTime}
-                  </td>
-                  <td className="px-4 py-3">
-                    {s.breakSlots && s.breakSlots.length > 0 ? (
-                      <div className="space-y-0.5">
-                        {s.breakSlots.map((b, i) => (
-                          <div key={i} className="flex items-center gap-1 text-xs text-gray-500">
-                            <Coffee className="w-3 h-3 text-amber-500" />
-                            {b.start} – {b.end}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      s.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {s.isActive ? 'Actif' : 'Inactif'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => openEdit(s)}
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 rounded hover:bg-indigo-50"
-                        title="Modifier"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => void handleDelete(s.id)}
-                        disabled={deletingId === s.id}
-                        className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
-                        title="Supprimer"
-                      >
-                        {deletingId === s.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
+        <div className="space-y-6">
+          {availableGroups.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Aucun groupe actif. Créez un groupe depuis la vue Groupes commerciaux.</p>
+            </div>
+          ) : (
+            availableGroups.map((group) => {
+              const groupSched = groupSchedules.filter((s) => s.groupId === group.id);
+              return (
+                <div key={group.id} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-indigo-500" />
+                      <span className="font-semibold text-gray-800">{group.name}</span>
+                      <span className="text-xs text-gray-400">{groupSched.length} créneau{groupSched.length > 1 ? 'x' : ''}</span>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <button
+                      onClick={() => openCreate(group.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Ajouter un créneau
+                    </button>
+                  </div>
+                  <ScheduleTable
+                    schedules={groupSched}
+                    commercialMap={commercialMap}
+                    onEdit={openEdit}
+                    onDelete={handleDelete}
+                    deletingId={deletingId}
+                  />
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
       {showModal && (
         <ScheduleFormModal
-          initial={editItem ? buildInitial(editItem) : null}
+          initial={editItem ? buildInitial(editItem) : presetGroupId ? buildPresetInitial(presetGroupId) : null}
           editId={editItem?.id ?? null}
           commerciaux={commerciaux}
+          availableGroups={availableGroups}
           onClose={closeModal}
           onSaved={onSaved}
         />

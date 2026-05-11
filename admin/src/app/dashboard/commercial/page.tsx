@@ -46,6 +46,8 @@ import AiGovernanceView from '@/app/ui/AiGovernanceView';
 import GicopSupervisionView from '@/app/ui/GicopSupervisionView';
 import OutboxSyncView from '@/app/ui/OutboxSyncView';
 import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
+import PresenceView from '@/app/ui/PresenceView';
+import CommercialGroupsView from '@/app/ui/CommercialGroupsView';
 import ComplaintsView from '@/app/modules/dispatch/components/ComplaintsView';
 import LoginLogsView from '@/app/ui/LoginLogsView';
 import RelanceConfigView from '@/app/ui/RelanceConfigView';
@@ -219,6 +221,10 @@ export default function AdminDashboard() {
                 return <OutboxSyncView />;
             case 'work-schedule':
                 return <WorkScheduleAdminView />;
+            case 'presence':
+                return <PresenceView />;
+            case 'commercial-groups':
+                return <CommercialGroupsView />;
             case 'complaints':
                 return <ComplaintsView />;
             case 'login-logs':

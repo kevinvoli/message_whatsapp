@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
@@ -24,6 +24,7 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommercialDashboardDto } from './dto/commercial-Dashboard.dto';
+import { CommercialPresenceDto } from './dto/commercial-presence.dto';
 
 @Injectable()
 export class WhatsappCommercialService {
@@ -503,5 +504,23 @@ export class WhatsappCommercialService {
       workingTodaySince: working ? new Date() : null,
     });
     return this.whatsappCommercialRepository.findOneOrFail({ where: { id } });
+  }
+
+  async getPresence(): Promise<CommercialPresenceDto[]> {
+    const users = await this.whatsappCommercialRepository.find({
+      where: { deletedAt: IsNull() },
+      relations: ['poste'],
+      order: { name: 'ASC' },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      phone: u.phone ?? null,
+      isWorkingToday: u.isWorkingToday ?? false,
+      workingTodaySince: u.workingTodaySince ?? null,
+      groupId: u.groupId ?? null,
+      poste: u.poste ? { id: u.poste.id, name: u.poste.name, code: u.poste.code } : null,
+    }));
   }
 }
