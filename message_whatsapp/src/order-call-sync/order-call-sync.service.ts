@@ -136,21 +136,23 @@ export class OrderCallSyncService {
         .map((c) => [normalizePhone(c.phone), c.id]),
     );
 
-    // Pré-résolution 2 : device_id → commercial connecté au poste (fallback)
+    // Pré-résolution 2 : device_id → commercial assigné au poste (priorité haute)
+    // On ne filtre PAS sur isConnected — un commercial peut avoir passé l'appel sans être
+    // actuellement connecté à la messagerie. Ce qui compte c'est l'assignation poste↔device.
     const allDevices = await this.callDeviceRepo.find({
       where: { posteId: Not(IsNull()) },
       select: ['deviceId', 'posteId'],
     });
     const posteIds = [...new Set(allDevices.map((d) => d.posteId!))];
-    const connectedAtPoste = posteIds.length > 0
+    const commercialsAtPoste = posteIds.length > 0
       ? await this.commercialRepo.find({
-          where: { poste: { id: In(posteIds) }, isConnected: true, deletedAt: IsNull() },
+          where: { poste: { id: In(posteIds) }, deletedAt: IsNull() },
           relations: ['poste'],
           select: { id: true, poste: { id: true } },
         })
       : [];
     const commercialByPosteId = new Map(
-      connectedAtPoste.filter((c) => c.poste?.id).map((c) => [c.poste!.id, c.id]),
+      commercialsAtPoste.filter((c) => c.poste?.id).map((c) => [c.poste!.id, c.id]),
     );
     const commercialByDevice = new Map(
       allDevices
@@ -160,14 +162,17 @@ export class OrderCallSyncService {
 
     for (const call of calls) {
       const normalizedLocal = normalizePhone(call.localNumber);
+      // Priorité : device → poste → commercial (plus précis que le numéro de téléphone,
+      // car localNumber peut être un numéro partagé ou de trunk qui matcherait toujours
+      // le même commercial).
       const commercialIdDb1 =
-        (normalizedLocal ? commercialByPhone.get(normalizedLocal) : undefined)
-        ?? commercialByDevice.get(call.deviceId)
+        commercialByDevice.get(call.deviceId)
+        ?? (normalizedLocal ? commercialByPhone.get(normalizedLocal) : undefined)
         ?? null;
 
       const attributionSource =
-        (normalizedLocal && commercialByPhone.has(normalizedLocal)) ? 'phone' :
         (call.deviceId && commercialByDevice.has(call.deviceId))    ? 'device_poste' :
+        (normalizedLocal && commercialByPhone.has(normalizedLocal)) ? 'phone' :
         null;
 
       // D2 - passer deviceId dans ingestFromDb2
