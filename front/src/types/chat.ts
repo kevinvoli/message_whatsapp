@@ -279,7 +279,8 @@ export type CallOutcome = "répondu" | "messagerie" | "pas_de_réponse" | "occup
 /** Entrée d'historique d'appel (ticket F-01) */
 export interface CallLog {
   id: string;
-  contact_id: string;
+  contact_id: string | null;
+  client_phone?: string | null;
   commercial_id: string;
   commercial_name: string;
   called_at: Date;
@@ -293,7 +294,8 @@ export interface CallLog {
 
 export const transformToCallLog = (raw: Record<string, any>): CallLog => ({
   id: raw.id,
-  contact_id: raw.contact_id,
+  contact_id: raw.contact_id ?? null,
+  client_phone: raw.client_phone ?? null,
   commercial_id: raw.commercial_id,
   commercial_name: raw.commercial_name ?? '',
   called_at: new Date(raw.called_at),

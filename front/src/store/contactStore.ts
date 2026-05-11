@@ -102,12 +102,13 @@ export const useContactStore = create<ContactState>((set, get) => ({
   },
 
   addCallLog: (log) => {
+    if (!log.contact_id) return;
     set((state) => {
-      const existing = state.callLogs[log.contact_id] ?? [];
+      const existing = state.callLogs[log.contact_id!] ?? [];
       return {
         callLogs: {
           ...state.callLogs,
-          [log.contact_id]: [log, ...existing],
+          [log.contact_id!]: [log, ...existing],
         },
       };
     });

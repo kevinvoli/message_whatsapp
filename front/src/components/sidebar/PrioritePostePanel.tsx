@@ -14,7 +14,8 @@ const PRIORITY_CRITICAL_THRESHOLD = 3;
 
 interface MissedCall {
   id: string;
-  contact_id: string;
+  contact_id: string | null;
+  client_phone?: string | null;
   commercial_id: string;
   called_at: string;
   outcome?: string | null;
@@ -142,7 +143,7 @@ export default function PrioritePostePanel() {
               {missedCalls.map((call) => (
                 <div key={call.id} className="flex items-center justify-between px-3 py-1.5 gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-mono text-gray-700 truncate">{call.contact_id.slice(-8)}</p>
+                    <p className="text-xs font-mono text-gray-700 truncate">{call.client_phone ?? call.contact_id?.slice(-8) ?? '—'}</p>
                     <p className="text-[10px] text-gray-400">{formatDate(call.called_at)}</p>
                   </div>
                   <button
