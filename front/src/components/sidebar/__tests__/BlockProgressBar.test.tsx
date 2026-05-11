@@ -9,9 +9,9 @@ vi.mock('@/store/chatStore', () => ({
 import { useChatStore } from '@/store/chatStore';
 
 const mockStore = (blockProgress: { submitted: number; total: number } | null, windowRotating = false) => {
-  vi.mocked(useChatStore).mockImplementation((selector: (s: unknown) => unknown) => {
+  vi.mocked(useChatStore).mockImplementation(selector => {
     const state = { blockProgress, windowRotating };
-    return selector(state);
+    return selector(state as never);
   });
 };
 

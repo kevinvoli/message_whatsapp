@@ -44,19 +44,19 @@ vi.mock('@/store/contactStore', () => ({
 }));
 
 vi.mock('@/lib/mappers/message.mapper', () => ({
-  transformToMessage: vi.fn((p: unknown) => ({ id: 'msg-1', chat_id: 'chat-1', from_me: false, text: 'hello', ...p })),
+  transformToMessage: vi.fn((p: Record<string, unknown>) => ({ id: 'msg-1', chat_id: 'chat-1', from_me: false, text: 'hello', ...p })),
 }));
 
 vi.mock('@/lib/mappers/conversation.mapper', () => ({
-  transformToConversation: vi.fn((p: unknown) => ({ chat_id: 'chat-1', clientName: 'Client', ...p })),
+  transformToConversation: vi.fn((p: Record<string, unknown>) => ({ chat_id: 'chat-1', clientName: 'Client', ...p })),
 }));
 
 vi.mock('@/types/chat', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/types/chat')>();
   return {
     ...actual,
-    transformToContact: vi.fn((p: unknown) => ({ id: 'contact-1', ...p })),
-    transformToCallLog: vi.fn((p: unknown) => ({ id: 'log-1', ...p })),
+    transformToContact: vi.fn((p: Record<string, unknown>) => ({ id: 'contact-1', ...p })),
+    transformToCallLog: vi.fn((p: Record<string, unknown>) => ({ id: 'log-1', ...p })),
   };
 });
 

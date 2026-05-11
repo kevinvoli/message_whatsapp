@@ -74,8 +74,8 @@ describe('ConversationFilters', () => {
 
   it('affiche "Charge par poste" si plusieurs postes distincts', () => {
     const convs = [
-      makeConv({ chat_id: 'c1', poste_id: 'p1', poste: { name: 'Poste A' } }),
-      makeConv({ chat_id: 'c2', poste_id: 'p2', poste: { name: 'Poste B' } }),
+      makeConv({ chat_id: 'c1', poste_id: 'p1', poste: { id: 'p1', name: 'Poste A', code: 'A', isActive: true } }),
+      makeConv({ chat_id: 'c2', poste_id: 'p2', poste: { id: 'p2', name: 'Poste B', code: 'B', isActive: true } }),
     ];
     render(<ConversationFilters {...defaultProps} conversations={convs} />);
     expect(screen.getByText('Charge par poste')).toBeInTheDocument();
@@ -83,8 +83,8 @@ describe('ConversationFilters', () => {
 
   it('affiche le détail par poste au clic sur "Charge par poste"', () => {
     const convs = [
-      makeConv({ chat_id: 'c1', poste_id: 'p1', poste: { name: 'Poste A' }, status: 'actif' }),
-      makeConv({ chat_id: 'c2', poste_id: 'p2', poste: { name: 'Poste B' } }),
+      makeConv({ chat_id: 'c1', poste_id: 'p1', poste: { id: 'p1', name: 'Poste A', code: 'A', isActive: true }, status: 'actif' }),
+      makeConv({ chat_id: 'c2', poste_id: 'p2', poste: { id: 'p2', name: 'Poste B', code: 'B', isActive: true } }),
     ];
     render(<ConversationFilters {...defaultProps} conversations={convs} />);
     fireEvent.click(screen.getByText('Charge par poste'));

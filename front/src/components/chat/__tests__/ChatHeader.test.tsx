@@ -193,7 +193,7 @@ describe('ChatHeader', () => {
   });
 
   it('affiche le SLA countdown si first_response_deadline_at présent', () => {
-    const future = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const future = new Date(Date.now() + 10 * 60 * 1000);
     const conv = makeConv({ first_response_deadline_at: future });
     render(<ChatHeader {...defaultProps} currentConv={conv} />);
     expect(screen.getByText(/m \d{2}s/)).toBeInTheDocument();
@@ -201,7 +201,7 @@ describe('ChatHeader', () => {
 
   it('affiche "SLA depasse" si deadline passée', async () => {
     vi.useFakeTimers();
-    const past = new Date(Date.now() - 1000).toISOString();
+    const past = new Date(Date.now() - 1000);
     const conv = makeConv({ first_response_deadline_at: past });
     render(<ChatHeader {...defaultProps} currentConv={conv} />);
     await waitFor(() => {

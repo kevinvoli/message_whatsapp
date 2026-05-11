@@ -14,8 +14,8 @@ vi.mock('@/lib/dateUtils', () => ({
 import { useChatStore } from '@/store/chatStore';
 
 const mockDefaultStore = () => {
-  vi.mocked(useChatStore).mockImplementation((selector: (s: unknown) => unknown) =>
-    selector({ affinityChats: new Set(), obligationStatus: null, blockProgress: { submitted: 0, total: 0 } }),
+  vi.mocked(useChatStore).mockImplementation(selector =>
+    selector({ affinityChats: new Set(), obligationStatus: null, blockProgress: { submitted: 0, total: 0 } } as never),
   );
 };
 
@@ -107,8 +107,8 @@ describe('ConversationItem', () => {
   });
 
   it('affiche badge "Fidèle" si contact en affinité', () => {
-    vi.mocked(useChatStore).mockImplementation((selector: (s: unknown) => unknown) =>
-      selector({ affinityChats: new Set(['33612345678@s.whatsapp.net']), obligationStatus: null, blockProgress: { submitted: 0, total: 0 } }),
+    vi.mocked(useChatStore).mockImplementation(selector =>
+      selector({ affinityChats: new Set(['33612345678@s.whatsapp.net']), obligationStatus: null, blockProgress: { submitted: 0, total: 0 } } as never),
     );
     render(<ConversationItem {...defaultProps} />);
     expect(screen.getByText('Fidèle')).toBeInTheDocument();

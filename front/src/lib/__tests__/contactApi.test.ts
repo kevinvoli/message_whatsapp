@@ -123,17 +123,17 @@ describe('setCrmFields', () => {
 describe('updateContactCallStatus', () => {
   it('appelle PATCH /contact/:id/call-status', async () => {
     mockAxiosPatch.mockResolvedValue({ data: { ok: true } });
-    await updateContactCallStatus('c-1', 'answered', 'Bon contact', 'interested', 120);
+    await updateContactCallStatus('c-1', 'appelé', 'Bon contact', 'interested', 120);
     expect(mockAxiosPatch).toHaveBeenCalledWith(
       expect.stringContaining('/contact/c-1/call-status'),
-      expect.objectContaining({ call_status: 'answered', duration_sec: 120 }),
+      expect.objectContaining({ call_status: 'appelé', duration_sec: 120 }),
       expect.any(Object),
     );
   });
 
   it('retourne les données de la réponse', async () => {
     mockAxiosPatch.mockResolvedValue({ data: { updated: true } });
-    const result = await updateContactCallStatus('c-1', 'missed');
+    const result = await updateContactCallStatus('c-1', 'non_joignable');
     expect(result).toEqual({ updated: true });
   });
 });

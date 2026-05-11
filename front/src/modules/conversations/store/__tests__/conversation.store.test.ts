@@ -21,7 +21,7 @@ vi.mock('@/modules/conversations/services/conversation-merge.service', () => ({
 
 vi.mock('@/lib/actionGateApi', () => ({
   getAffinityChats: vi.fn().mockResolvedValue([]),
-}), { virtual: true });
+}));
 
 import { useChatStore } from '@/store/chatStore';
 import type { Conversation } from '@/types/chat';

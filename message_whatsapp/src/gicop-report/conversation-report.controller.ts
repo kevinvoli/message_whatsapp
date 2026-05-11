@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AdminGuard } from 'src/auth/admin.guard';
 import { ConversationReportService, UpsertReportDto } from './conversation-report.service';
 import { ReportSubmissionService } from './report-submission.service';
 
@@ -70,12 +71,14 @@ export class ConversationReportController {
   }
 
   @Get('admin/failed-submissions')
+  @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Liste des rapports en échec de soumission (admin)' })
   failedSubmissions() {
     return this.submissionService.getFailedReports();
   }
 
   @Post('admin/:chatId/retry')
+  @UseGuards(AdminGuard)
   @HttpCode(200)
   @ApiOperation({ summary: 'Relance la soumission d\'un rapport en échec (admin)' })
   retrySubmission(@Param('chatId') chatId: string) {

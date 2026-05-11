@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -188,21 +187,6 @@ export class ReportSubmissionService {
     if (!report) throw new NotFoundException(`Rapport introuvable pour la conversation ${chatId}`);
     if (!report.commercialId) throw new BadRequestException('Aucun commercial associé au rapport — relance impossible');
     return this.submitReport(chatId, report.commercialId);
-  }
-
-  /** Fallback legacy : retry des rapports en échec avant l'introduction de l'outbox. */
-  @Cron('0 * * * *')
-  async autoRetryFailedReports(): Promise<void> {
-    const failed = await this.getFailedReports(20);
-    if (failed.length === 0) return;
-    this.logger.log(`Legacy auto-retry: ${failed.length} rapport(s) en échec`);
-    for (const r of failed) {
-      try {
-        await this.retryReport(r.chatId);
-      } catch (err) {
-        this.logger.warn(`Legacy auto-retry échoué chat=${r.chatId}: ${(err as Error).message}`);
-      }
-    }
   }
 
   async getFailedReports(limit = 50): Promise<Array<{
