@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { CallLog, CallOutcome } from 'src/call-log/entities/call_log.entity';
-import { CallStatus } from 'src/contact/entities/contact.entity';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
@@ -28,7 +27,7 @@ import {
   ORDER_COMMAND_STATUS_ETAT_RETOUR,
 } from 'src/order-read/entities/order-command-status.entity';
 import { CallDevice } from 'src/call-device/entities/call-device.entity';
-import { ClientCategory, Contact } from 'src/contact/entities/contact.entity';
+import { CallStatus, ClientCategory, Contact, ContactSource } from 'src/contact/entities/contact.entity';
 import { ClientIdentityMapping } from 'src/integration/entities/client-identity-mapping.entity';
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
@@ -486,10 +485,63 @@ export class OrderCallSyncService {
     });
   }
 
+  /**
+   * Résout la catégorie client à partir de son ID DB2.
+   * Méthode publique pour pouvoir être appelée depuis ErpClientSyncService.
+   *
+   * Règles métier (validées 2026-05-11) :
+   * 1. LIVRÉ    = au moins UNE livraison historique (dateLivree non nulle et non annulée)
+   * 2. ANNULÉ   = aucune livraison ET dernière commande annulée (trueCancel ou statut retour)
+   * 3. SANS CMD = jamais commandé OU commande en cours non encore livrée
+   */
+  async resolveCategoryByClientId(
+    clientIdDb2: number,
+    orderDb: DataSource,
+  ): Promise<CallTaskCategory> {
+    const cmdRepo = orderDb.getRepository(OrderCommand);
+
+    const orders = await cmdRepo
+      .createQueryBuilder('c')
+      .where('c.idClient = :clientIdDb2', { clientIdDb2 })
+      .andWhere('c.valid = 1')
+      .select(['c.id', 'c.trueCancel', 'c.dateLivree', 'c.dateEnreg'])
+      .getMany();
+
+    if (orders.length === 0) return CallTaskCategory.JAMAIS_COMMANDE;
+
+    // Priorité absolue : au moins une livraison réelle (non annulée)
+    const hasAnyDelivery = orders.some(o => o.dateLivree != null && o.trueCancel !== 1);
+    if (hasAnyDelivery) return CallTaskCategory.COMMANDE_AVEC_LIVRAISON;
+
+    // Pas de livraison — regarder uniquement la dernière commande pour l'annulation
+    const lastOrder = [...orders].sort(
+      (a, b) => (b.dateEnreg ? new Date(b.dateEnreg).getTime() : 0)
+              - (a.dateEnreg ? new Date(a.dateEnreg).getTime() : 0),
+    )[0];
+
+    if (lastOrder.trueCancel === 1) return CallTaskCategory.COMMANDE_ANNULEE;
+
+    const statusRepo = orderDb.getRepository(OrderCommandStatus);
+    const lastStatus = await statusRepo
+      .createQueryBuilder('s')
+      .where('s.idCommande = :orderId', { orderId: lastOrder.id })
+      .andWhere('s.valid = 1')
+      .orderBy('s.dateEnreg', 'DESC')
+      .limit(1)
+      .select(['s.etat'])
+      .getOne();
+
+    if (lastStatus && ORDER_COMMAND_STATUS_ETAT_RETOUR.includes(lastStatus.etat)) {
+      return CallTaskCategory.COMMANDE_ANNULEE;
+    }
+
+    // Commande en cours (non livrée, non annulée) = sans commande (règle métier)
+    return CallTaskCategory.JAMAIS_COMMANDE;
+  }
+
   private async resolveClientCategory(remoteNumber: string): Promise<CallTaskCategory> {
     if (!this.orderDb) return CallTaskCategory.JAMAIS_COMMANDE;
 
-    const cmdRepo  = this.orderDb.getRepository(OrderCommand);
     const userRepo = this.orderDb.getRepository(GicopUser);
 
     let clientIdDb2: number | null = null;
@@ -509,34 +561,41 @@ export class OrderCallSyncService {
 
     if (clientIdDb2 == null) return CallTaskCategory.JAMAIS_COMMANDE;
 
-    const order = await cmdRepo
-      .createQueryBuilder('c')
-      .where('c.idClient = :clientIdDb2', { clientIdDb2 })
-      .andWhere('c.valid = 1')
-      .orderBy('c.dateEnreg', 'DESC')
-      .limit(1)
-      .getOne();
+    const resolvedCategory = await this.resolveCategoryByClientId(clientIdDb2, this.orderDb);
 
-    if (!order) return CallTaskCategory.JAMAIS_COMMANDE;
-    if (order.trueCancel === 1) return CallTaskCategory.COMMANDE_ANNULEE;
-
-    const statusRepo = this.orderDb.getRepository(OrderCommandStatus);
-    const latestStatus = await statusRepo
-      .createQueryBuilder('s')
-      .where('s.idCommande = :orderId', { orderId: order.id })
-      .andWhere('s.valid = 1')
-      .orderBy('s.dateEnreg', 'DESC')
-      .limit(1)
-      .select(['s.etat'])
-      .getOne();
-
-    if (latestStatus && ORDER_COMMAND_STATUS_ETAT_RETOUR.includes(latestStatus.etat)) {
-      return CallTaskCategory.COMMANDE_ANNULEE;
+    // Upsert contact DB1 avec la catégorie résolue depuis DB2
+    try {
+      const normalized = normalizePhone(remoteNumber);
+      const existing = await this.contactRepo.findOne({
+        where:  { phone: normalized },
+        select: ['id', 'contactSource'],
+      });
+      if (existing) {
+        // Met à jour catégorie et order_client_id, préserve contactSource existant
+        await this.contactRepo.update(existing.id, {
+          client_category: resolvedCategory as unknown as ClientCategory,
+          order_client_id: clientIdDb2,
+        });
+      } else {
+        // Crée un nouveau contact ERP-only (sans chat_id, pas de conversation)
+        await this.contactRepo.save(
+          this.contactRepo.create({
+            phone:           normalized,
+            name:            normalized,
+            contactSource:   ContactSource.ErpImport,
+            order_client_id: clientIdDb2,
+            client_category: resolvedCategory as unknown as ClientCategory,
+            call_status:     CallStatus.À_APPeler,
+          }),
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Upsert contact ERP échoué pour ${remoteNumber}: ${(err as Error).message}`,
+      );
     }
 
-    if (order.dateLivree != null) return CallTaskCategory.COMMANDE_AVEC_LIVRAISON;
-
-    return CallTaskCategory.JAMAIS_COMMANDE;
+    return resolvedCategory;
   }
 
   /**

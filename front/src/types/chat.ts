@@ -10,6 +10,8 @@ export type ConversationStatus =
   | "converti"
   | "fermé";
 
+export type ContactSource = 'whatsapp' | 'erp_import';
+
 export type ConversationResult =
   | 'commande_confirmee'
   | 'commande_a_saisir'
@@ -355,6 +357,9 @@ export interface Contact {
   referral_code?: string | null;
   referral_count?: number | null;
   referral_commission?: number | null;
+
+  // Origine du contact
+  contact_source?: ContactSource;
 }
 
 export interface Conversation {
@@ -699,6 +704,8 @@ interface RawContactData {
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
   deletedAt?: string | number | Date | null;
+
+  contact_source?: ContactSource;
 }
 
 // ==============================================
@@ -1029,6 +1036,8 @@ export const transformToContact = (raw: RawContactData): Contact => {
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt),
     deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : undefined,
+
+    contact_source: raw.contact_source,
   };
 };
 

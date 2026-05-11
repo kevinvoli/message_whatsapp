@@ -87,6 +87,7 @@ import { ComplaintsModule } from './complaints/complaints.module';
 import { PlatformSettingsModule } from './platform-settings/platform-settings.module';
 import { QueueModule } from './queue/queue.module';
 import { BullBoardSetupModule } from './queue/bull-board.module';
+import { ErpClientSyncModule } from './erp-client-sync/erp-client-sync.module';
 
 @Module({
   imports: [
@@ -261,6 +262,8 @@ import { BullBoardSetupModule } from './queue/bull-board.module';
     PlatformSettingsModule,
     // Sprint 3 Redis — BullMQ (shutdown gracieux + DLQ + admin)
     QueueModule,
+    // Sprint 6+ — Sync nocturne clients ERP → Contact DB1
+    ErpClientSyncModule,
     // Bull Board UI — activé seulement si BULL_BOARD_ENABLED=true
     ...(process.env.BULL_BOARD_ENABLED === 'true' ? [BullBoardSetupModule] : []),
   ],

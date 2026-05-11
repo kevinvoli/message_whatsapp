@@ -29,6 +29,11 @@ export enum ClientCategory {
   COMMANDE_ANNULEE = 'commande_annulee',
 }
 
+export enum ContactSource {
+  Whatsapp  = 'whatsapp',
+  ErpImport = 'erp_import',
+}
+
 
 @Entity()
 // phone : hot path — appelé sur chaque message entrant (findOrCreate)
@@ -113,6 +118,14 @@ export class Contact {
   is_active: boolean;
 
   // ─── P7 — Portefeuille et enrichissement client ──────────────────────────────
+  @Column({
+    name: 'contact_source',
+    type: 'enum',
+    enum: ContactSource,
+    default: ContactSource.Whatsapp,
+  })
+  contactSource: ContactSource;
+
   @Column({ name: 'portfolio_owner_id', type: 'char', length: 36, nullable: true, default: null })
   portfolio_owner_id?: string | null;
 

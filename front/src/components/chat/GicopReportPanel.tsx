@@ -48,6 +48,7 @@ interface ContactInfo {
   phone: string;
   call_count: number;
   conversion_status?: string;
+  contact_source?: 'whatsapp' | 'erp_import';
 }
 
 const PRODUCT_CATEGORIES = [
@@ -302,7 +303,14 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
       {/* Résumé contact */}
       {contact && (
         <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100 text-xs text-blue-800">
-          <p className="font-semibold">{contact.name}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-semibold">{contact.name}</p>
+            {contact.contact_source === 'erp_import' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 flex-shrink-0">
+                Client ERP
+              </span>
+            )}
+          </div>
           <p className="text-blue-600">{contact.phone} · {contact.call_count} appel{contact.call_count !== 1 ? 's' : ''}</p>
           {contact.conversion_status && <p className="capitalize text-blue-500">{contact.conversion_status}</p>}
         </div>
