@@ -27,9 +27,13 @@ export class CallLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** FK vers Contact (sans relation TypeORM pour éviter les chargements involontaires) */
-  @Column({ name: 'contact_id', type: 'varchar', length: 36 })
-  contact_id: string;
+  /** FK vers Contact (null si le numéro appelé n'existe pas comme contact WhatsApp) */
+  @Column({ name: 'contact_id', type: 'varchar', length: 36, nullable: true, default: null })
+  contact_id: string | null;
+
+  /** Numéro de téléphone du client appelé (dénormalisé pour les cas sans contact) */
+  @Column({ name: 'client_phone', type: 'varchar', length: 50, nullable: true, default: null })
+  client_phone: string | null;
 
   /** ID du commercial (sub du JWT) */
   @Column({ name: 'commercial_id', type: 'varchar', length: 36 })

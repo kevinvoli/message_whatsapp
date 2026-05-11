@@ -240,7 +240,8 @@ export class OrderCallSyncService {
 
             await this.callLogRepo.save(
               this.callLogRepo.create({
-                contact_id:           clientContact?.id ?? '',
+                contact_id:           clientContact?.id ?? null,
+                client_phone:         normalizePhone(call.remoteNumber ?? ''),
                 commercial_id:        commercialIdDb1,
                 commercial_name:      commercial?.name ?? 'Commercial inconnu',
                 called_at:            call.callTimestamp,
