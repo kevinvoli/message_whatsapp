@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { CallLog, CallOutcome } from 'src/call-log/entities/call_log.entity';
+import { CallStatus } from 'src/contact/entities/contact.entity';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
@@ -77,6 +79,9 @@ export class OrderCallSyncService {
 
     @InjectRepository(CallEventUnresolved)
     private readonly unresolvedRepo: Repository<CallEventUnresolved>,
+
+    @InjectRepository(CallLog)
+    private readonly callLogRepo: Repository<CallLog>,
   ) {}
 
   async syncNewCalls(): Promise<{ processed: number; obligations: number; errors: number }> {
@@ -178,6 +183,83 @@ export class OrderCallSyncService {
         deviceId:          call.deviceId ?? null,
         attributionSource,
       });
+
+      // B — Créer un call_log automatique depuis cet appel (idempotent via callEventExternalId)
+      if (commercialIdDb1 !== null) {
+        try {
+          const alreadyLogged = await this.callLogRepo.findOne({
+            where: { callEventExternalId: String(call.id) },
+            select: ['id'],
+          });
+          if (!alreadyLogged) {
+            // Résoudre contact_id via numéro client (peut être null si pas de contact WhatsApp)
+            const clientContact = call.remoteNumber
+              ? await this.contactRepo.findOne({
+                  where: { phone: normalizePhone(call.remoteNumber) },
+                  select: ['id'],
+                })
+              : null;
+
+            // Résoudre commercial_name
+            const commercial = await this.commercialRepo.findOne({
+              where: { id: commercialIdDb1 },
+              select: ['id', 'name'],
+            });
+
+            // Mapper call_status + outcome
+            const callType     = call.callType.toLowerCase();
+            const durationSec  = this.normalizeDuration(call.duration);
+            let mappedStatus: CallStatus;
+            let mappedOutcome: CallOutcome | null = null;
+
+            if (callType === 'answered') {
+              mappedStatus  = CallStatus.Appelé;
+              mappedOutcome = CallOutcome.Répondu;
+            } else if (callType === 'outgoing') {
+              if (durationSec > 0) {
+                mappedStatus  = CallStatus.Appelé;
+                mappedOutcome = CallOutcome.Répondu;
+              } else {
+                mappedStatus  = CallStatus.Non_Joignable;
+                mappedOutcome = CallOutcome.PasDeRéponse;
+              }
+            } else if (callType === 'no_answer' || callType === 'missed') {
+              mappedStatus  = CallStatus.Non_Joignable;
+              mappedOutcome = CallOutcome.PasDeRéponse;
+            } else if (callType === 'busy') {
+              mappedStatus  = CallStatus.Non_Joignable;
+              mappedOutcome = CallOutcome.Occupé;
+            } else if (callType === 'voicemail') {
+              mappedStatus  = CallStatus.Rappeler;
+              mappedOutcome = CallOutcome.Messagerie;
+            } else {
+              // rejected, failed, ou inconnu
+              mappedStatus  = CallStatus.Non_Joignable;
+              mappedOutcome = CallOutcome.PasDeRéponse;
+            }
+
+            await this.callLogRepo.save(
+              this.callLogRepo.create({
+                contact_id:           clientContact?.id ?? '',
+                commercial_id:        commercialIdDb1,
+                commercial_name:      commercial?.name ?? 'Commercial inconnu',
+                called_at:            call.callTimestamp,
+                call_status:          mappedStatus,
+                outcome:              mappedOutcome,
+                duration_sec:         durationSec,
+                notes:                null,
+                treated:              false,
+                callEventExternalId:  String(call.id),
+              }),
+            );
+            this.logger.debug(`call_log créé pour appel DB2 id=${call.id}`);
+          }
+        } catch (callLogErr) {
+          this.logger.warn(
+            `Impossible de créer call_log pour appel ${call.id}: ${(callLogErr as Error).message}`,
+          );
+        }
+      }
 
       // D4 - Auto-decouverte device : UPSERT silencieux sur call_device
       if (call.deviceId) {

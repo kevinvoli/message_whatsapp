@@ -150,6 +150,12 @@ function buildService(
     save:    jest.fn().mockResolvedValue({}),
   } as any;
 
+  const callLogRepo = {
+    findOne: jest.fn().mockResolvedValue(null),
+    save:    jest.fn().mockResolvedValue({}),
+    create:  jest.fn().mockImplementation((x: unknown) => x),
+  } as any;
+
   const svc = new OrderCallSyncService(
     orderDb as any,
     true,
@@ -163,6 +169,7 @@ function buildService(
     contactRepo,
     clientMappingRepo,
     unresolvedRepo,
+    callLogRepo,
   );
 
   return { svc, orderDb, cursorRepo, syncLog };
@@ -223,6 +230,7 @@ describe('OrderCallSyncService — curseur avec fenêtre de tolérance (OBL-009)
       {} as any, {} as any, {} as any, {} as any,
       {} as any, undefined as any, {} as any,
       {} as any, {} as any, {} as any,
+      {} as any,
     );
     const result = await svc.syncNewCalls();
     expect(result).toEqual({ processed: 0, obligations: 0, errors: 0 });
@@ -408,6 +416,12 @@ function buildServiceForRetry(opts: {
     save:    jest.fn().mockResolvedValue({}),
   } as any;
 
+  const callLogRepoRetry = {
+    findOne: jest.fn().mockResolvedValue(null),
+    save:    jest.fn().mockResolvedValue({}),
+    create:  jest.fn().mockImplementation((x: unknown) => x),
+  } as any;
+
   const svc = new OrderCallSyncService(
     orderDb as any,
     true,
@@ -421,6 +435,7 @@ function buildServiceForRetry(opts: {
     contactRepo,
     clientMappingRepo,
     unresolvedRepo,
+    callLogRepoRetry,
   );
 
   return { svc, syncLog, obligationService, callDeviceRepo, callEventService };

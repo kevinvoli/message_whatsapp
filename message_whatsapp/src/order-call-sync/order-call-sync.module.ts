@@ -14,6 +14,7 @@ import { ClientIdentityMapping } from 'src/integration/entities/client-identity-
 import { Contact } from 'src/contact/entities/contact.entity';
 import { CallDeviceModule } from 'src/call-device/call-device.module';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
+import { CallLog } from 'src/call-log/entities/call_log.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
       ClientIdentityMapping,
       Contact,
       CallEventUnresolved,
+      CallLog,
     ]),
     CallDeviceModule,
     IntegrationSyncModule,

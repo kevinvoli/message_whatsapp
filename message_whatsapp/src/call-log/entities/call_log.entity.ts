@@ -54,6 +54,11 @@ export class CallLog {
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes?: string | null;
 
+  /** Lien vers l'appel source dans call_event (idempotence automatique) */
+  @Index('UQ_call_log_call_event_id', { unique: true })
+  @Column({ name: 'call_event_external_id', type: 'varchar', length: 100, nullable: true, default: null })
+  callEventExternalId: string | null;
+
   @Column({ name: 'treated', type: 'tinyint', width: 1, default: 0 })
   treated: boolean;
 

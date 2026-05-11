@@ -71,6 +71,7 @@ function buildService(orderDb: ReturnType<typeof makeOrderDb> | null) {
     null as any, // contactRepo
     null as any, // clientMappingRepo
     null as any, // unresolvedRepo
+    null as any, // callLogRepo — non utilisé par resolveClientCategory
   );
 }
 

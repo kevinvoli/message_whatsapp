@@ -76,7 +76,36 @@ export class ClientDossierService {
       }),
     ]);
 
-    return { dossier, contact, phones, callLogs };
+    // Pré-remplissage fullName depuis contact.name (sans écriture en base)
+    if (dossier) {
+      if (!dossier.fullName?.trim() && contact.name?.trim()) {
+        // Retourner une copie avec fullName pré-rempli — pas de save()
+        return { dossier: { ...dossier, fullName: contact.name }, contact, phones, callLogs };
+      }
+      return { dossier, contact, phones, callLogs };
+    }
+
+    // Dossier inexistant : retourner un objet partiel pour que le frontend ait toujours un fullName
+    const emptyDossier: ClientDossier = {
+      id:                 '',
+      contactId:          contact.id,
+      commercialId:       null,
+      fullName:           contact.name?.trim() || null,
+      ville:              null,
+      commune:            null,
+      quartier:           null,
+      otherPhones:        null,
+      productCategory:    null,
+      clientNeed:         null,
+      interestScore:      null,
+      isMaleNotInterested: false,
+      followUpAt:         null,
+      nextAction:         null,
+      notes:              null,
+      createdAt:          new Date(),
+      updatedAt:          new Date(),
+    };
+    return { dossier: emptyDossier, contact, phones, callLogs };
   }
 
   /** Upsert du dossier structuré par chatId */
