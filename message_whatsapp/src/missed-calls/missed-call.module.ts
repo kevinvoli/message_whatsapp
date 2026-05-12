@@ -2,15 +2,23 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MissedCallEvent } from './entities/missed-call-event.entity';
 import { MissedCallHandlerService } from './missed-call-handler.service';
+import { MissedCallSlaJob } from './missed-call-sla.job';
+import { MissedCallService } from './missed-call.service';
+import { MissedCallController } from './missed-call.controller';
 import { ActionQueueModule } from 'src/action-queue/action-queue.module';
 import { CommercialActionTask } from 'src/action-queue/entities/commercial-action-task.entity';
+import { NotificationModule } from 'src/notification/notification.module';
+import { JorbsModule } from 'src/jorbs/jorbs.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MissedCallEvent, CommercialActionTask]),
     ActionQueueModule,
+    NotificationModule,
+    JorbsModule,
   ],
-  providers: [MissedCallHandlerService],
-  exports: [MissedCallHandlerService, TypeOrmModule],
+  controllers: [MissedCallController],
+  providers: [MissedCallHandlerService, MissedCallSlaJob, MissedCallService],
+  exports: [MissedCallHandlerService, MissedCallService, TypeOrmModule],
 })
 export class MissedCallModule {}

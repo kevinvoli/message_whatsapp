@@ -109,6 +109,19 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: null,
     maxSteps: null,
   },
+  'missed-call-sla': {
+    label: 'Appels en absence — SLA et fermeture auto',
+    description:
+      'Vérifie toutes les 5 min les appels en absence dont le SLA est dépassé (escalade superviseur) et ferme automatiquement ceux de plus de 24h sans action.',
+    enabled: true,
+    scheduleType: 'interval',
+    intervalMinutes: 5,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
