@@ -53,23 +53,30 @@ function makePosteRepo() {
 
 function makeCommercialRepo() {
   const qb: any = {
-    innerJoin:  jest.fn().mockReturnThis(),
-    select:     jest.fn().mockReturnThis(),
-    addSelect:  jest.fn().mockReturnThis(),
-    where:      jest.fn().mockReturnThis(),
-    orderBy:    jest.fn().mockReturnThis(),
-    getRawMany: jest.fn().mockResolvedValue([]),
+    innerJoin:   jest.fn().mockReturnThis(),
+    leftJoin:    jest.fn().mockReturnThis(),
+    select:      jest.fn().mockReturnThis(),
+    addSelect:   jest.fn().mockReturnThis(),
+    where:       jest.fn().mockReturnThis(),
+    orderBy:     jest.fn().mockReturnThis(),
+    addOrderBy:  jest.fn().mockReturnThis(),
+    getRawMany:  jest.fn().mockResolvedValue([]),
   };
   return { createQueryBuilder: jest.fn().mockReturnValue(qb), _qb: qb } as any;
 }
 
+function makeWorkScheduleRepo() {
+  return {} as any;
+}
+
 function buildService(
-  callTaskRepo    = makeCallTaskRepo(),
-  batchRepo       = makeBatchRepo(),
-  posteRepo       = makePosteRepo(),
-  commercialRepo  = makeCommercialRepo(),
+  callTaskRepo      = makeCallTaskRepo(),
+  batchRepo         = makeBatchRepo(),
+  posteRepo         = makePosteRepo(),
+  commercialRepo    = makeCommercialRepo(),
+  workScheduleRepo  = makeWorkScheduleRepo(),
 ) {
-  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo, commercialRepo);
+  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo, commercialRepo, workScheduleRepo);
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { CallTask, CallTaskCategory, CallTaskStatus } from './entities/call-task
 import { CommercialObligationBatch } from './entities/commercial-obligation-batch.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WorkSchedule } from 'src/work-schedule/entities/work-schedule.entity';
 
 export interface CallTaskMetrics {
   totalToday: number;
@@ -53,6 +54,9 @@ export class CallTaskAdminService {
 
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+
+    @InjectRepository(WorkSchedule)
+    private readonly workScheduleRepo: Repository<WorkSchedule>,
   ) {}
 
   async getMetrics(category: CallTaskCategory): Promise<CallTaskMetrics> {
@@ -169,14 +173,33 @@ export class CallTaskAdminService {
   private async resolveCommercialNamesByPoste(posteIds: string[]): Promise<Map<string, string>> {
     if (posteIds.length === 0) return new Map();
 
-    // Priorise le commercial qui travaille aujourd'hui pour ce poste
+    // Jour courant pour correspondre au planning
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const today = days[new Date().getDay()];
+
+    // Priorité : 1) planifié aujourd'hui (individuel ou groupe/poste) 2) isWorkingToday
     const rows = await this.commercialRepo
       .createQueryBuilder('c')
       .innerJoin('c.poste', 'p')
+      .leftJoin(
+        WorkSchedule,
+        'ws_ind',
+        'ws_ind.commercialId = c.id AND ws_ind.dayOfWeek = :today AND ws_ind.isActive = true',
+        { today },
+      )
+      .leftJoin(
+        WorkSchedule,
+        'ws_grp',
+        'ws_grp.groupId = p.id AND ws_grp.dayOfWeek = :today AND ws_grp.isActive = true',
+      )
       .select('c.name', 'commercialName')
       .addSelect('p.id', 'posteId')
       .where('p.id IN (:...posteIds)', { posteIds })
-      .orderBy('c.isWorkingToday', 'DESC')
+      .orderBy(
+        'CASE WHEN ws_ind.id IS NOT NULL OR ws_grp.id IS NOT NULL THEN 1 ELSE 0 END',
+        'DESC',
+      )
+      .addOrderBy('c.isWorkingToday', 'DESC')
       .getRawMany<{ commercialName: string; posteId: string }>();
 
     const map = new Map<string, string>();

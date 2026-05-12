@@ -4,6 +4,7 @@ import { In, IsNull, Not, Repository } from 'typeorm';
 import { MissedCallEvent, MissedCallEventStatus } from './entities/missed-call-event.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WorkSchedule } from 'src/work-schedule/entities/work-schedule.entity';
 
 export interface MissedCallMetrics {
   totalToday: number;
@@ -50,6 +51,9 @@ export class MissedCallService {
 
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+
+    @InjectRepository(WorkSchedule)
+    private readonly workScheduleRepo: Repository<WorkSchedule>,
   ) {}
 
   async getMetrics(): Promise<MissedCallMetrics> {
@@ -137,25 +141,41 @@ export class MissedCallService {
     const posteIds      = [...new Set(events.map((e) => e.posteId).filter((id): id is string => !!id))];
     const commercialIds = [...new Set(events.map((e) => e.commercialId).filter((id): id is string => !!id))];
 
-    const posteNameMap      = await this.resolvePosteNames(posteIds);
-    const commercialNameMap = await this.resolveCommercialNames(commercialIds);
+    // Postes dont l'appel n'a pas de commercialId → résoudre via planning
+    const posteIdsWithoutCommercial = [
+      ...new Set(
+        events
+          .filter((e) => !e.commercialId && e.posteId)
+          .map((e) => e.posteId as string),
+      ),
+    ];
 
-    const items: MissedCallRow[] = events.map((m) => ({
-      id:                   m.id,
-      source:               m.source,
-      clientPhone:          m.clientPhone,
-      clientName:           m.clientName,
-      posteId:              m.posteId,
-      posteName:            m.posteId ? (posteNameMap.get(m.posteId) ?? null) : null,
-      commercialId:         m.commercialId,
-      commercialName:       m.commercialId ? (commercialNameMap.get(m.commercialId) ?? null) : null,
-      status:               m.status,
-      occurredAt:           m.occurredAt.toISOString(),
-      slaBreachedAt:        m.slaBreachedAt?.toISOString() ?? null,
-      callbackDoneAt:       m.callbackDoneAt?.toISOString() ?? null,
-      handlingDelaySeconds: m.handlingDelaySeconds,
-      callbackTaskId:       m.callbackTaskId,
-    }));
+    const posteNameMap           = await this.resolvePosteNames(posteIds);
+    const commercialNameMap      = await this.resolveCommercialNames(commercialIds);
+    const posteCommercialMap     = await this.resolveCommercialNamesByPoste(posteIdsWithoutCommercial);
+
+    const items: MissedCallRow[] = events.map((m) => {
+      const commercialName = m.commercialId
+        ? (commercialNameMap.get(m.commercialId) ?? null)
+        : (m.posteId ? (posteCommercialMap.get(m.posteId) ?? null) : null);
+
+      return {
+        id:                   m.id,
+        source:               m.source,
+        clientPhone:          m.clientPhone,
+        clientName:           m.clientName,
+        posteId:              m.posteId,
+        posteName:            m.posteId ? (posteNameMap.get(m.posteId) ?? null) : null,
+        commercialId:         m.commercialId,
+        commercialName,
+        status:               m.status,
+        occurredAt:           m.occurredAt.toISOString(),
+        slaBreachedAt:        m.slaBreachedAt?.toISOString() ?? null,
+        callbackDoneAt:       m.callbackDoneAt?.toISOString() ?? null,
+        handlingDelaySeconds: m.handlingDelaySeconds,
+        callbackTaskId:       m.callbackTaskId,
+      };
+    });
 
     return { items, total };
   }
@@ -176,5 +196,44 @@ export class MissedCallService {
     if (ids.length === 0) return new Map();
     const commercials = await this.commercialRepo.find({ where: { id: In(ids) }, select: ['id', 'name'] });
     return new Map(commercials.map((c) => [c.id, c.name]));
+  }
+
+  private async resolveCommercialNamesByPoste(posteIds: string[]): Promise<Map<string, string>> {
+    if (posteIds.length === 0) return new Map();
+
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const today = days[new Date().getDay()];
+
+    const rows = await this.commercialRepo
+      .createQueryBuilder('c')
+      .innerJoin('c.poste', 'p')
+      .leftJoin(
+        WorkSchedule,
+        'ws_ind',
+        'ws_ind.commercialId = c.id AND ws_ind.dayOfWeek = :today AND ws_ind.isActive = true',
+        { today },
+      )
+      .leftJoin(
+        WorkSchedule,
+        'ws_grp',
+        'ws_grp.groupId = p.id AND ws_grp.dayOfWeek = :today AND ws_grp.isActive = true',
+      )
+      .select('c.name', 'commercialName')
+      .addSelect('p.id', 'posteId')
+      .where('p.id IN (:...posteIds)', { posteIds })
+      .orderBy(
+        'CASE WHEN ws_ind.id IS NOT NULL OR ws_grp.id IS NOT NULL THEN 1 ELSE 0 END',
+        'DESC',
+      )
+      .addOrderBy('c.isWorkingToday', 'DESC')
+      .getRawMany<{ commercialName: string; posteId: string }>();
+
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (!map.has(row.posteId)) {
+        map.set(row.posteId, row.commercialName);
+      }
+    }
+    return map;
   }
 }
