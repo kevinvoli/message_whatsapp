@@ -62,21 +62,20 @@ function makeCommercialRepo() {
     addOrderBy:  jest.fn().mockReturnThis(),
     getRawMany:  jest.fn().mockResolvedValue([]),
   };
-  return { createQueryBuilder: jest.fn().mockReturnValue(qb), _qb: qb } as any;
-}
-
-function makeWorkScheduleRepo() {
-  return {} as any;
+  return {
+    createQueryBuilder: jest.fn().mockReturnValue(qb),
+    manager: { query: jest.fn().mockResolvedValue([]) },
+    _qb: qb,
+  } as any;
 }
 
 function buildService(
-  callTaskRepo      = makeCallTaskRepo(),
-  batchRepo         = makeBatchRepo(),
-  posteRepo         = makePosteRepo(),
-  commercialRepo    = makeCommercialRepo(),
-  workScheduleRepo  = makeWorkScheduleRepo(),
+  callTaskRepo   = makeCallTaskRepo(),
+  batchRepo      = makeBatchRepo(),
+  posteRepo      = makePosteRepo(),
+  commercialRepo = makeCommercialRepo(),
 ) {
-  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo, commercialRepo, workScheduleRepo);
+  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo, commercialRepo);
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────

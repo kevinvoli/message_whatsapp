@@ -4,7 +4,6 @@ import { In, IsNull, Not, Repository } from 'typeorm';
 import { MissedCallEvent, MissedCallEventStatus } from './entities/missed-call-event.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { WorkSchedule } from 'src/work-schedule/entities/work-schedule.entity';
 
 export interface MissedCallMetrics {
   totalToday: number;
@@ -51,9 +50,6 @@ export class MissedCallService {
 
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
-
-    @InjectRepository(WorkSchedule)
-    private readonly workScheduleRepo: Repository<WorkSchedule>,
   ) {}
 
   async getMetrics(): Promise<MissedCallMetrics> {
@@ -203,30 +199,32 @@ export class MissedCallService {
 
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const today = days[new Date().getDay()];
+    const inClause = posteIds.map(() => '?').join(', ');
 
-    const rows = await this.commercialRepo
-      .createQueryBuilder('c')
-      .innerJoin('c.poste', 'p')
-      .leftJoin(
-        WorkSchedule,
-        'ws_ind',
-        'ws_ind.commercialId = c.id AND ws_ind.dayOfWeek = :today AND ws_ind.isActive = true',
-        { today },
-      )
-      .leftJoin(
-        WorkSchedule,
-        'ws_grp',
-        'ws_grp.groupId = p.id AND ws_grp.dayOfWeek = :today AND ws_grp.isActive = true',
-      )
-      .select('c.name', 'commercialName')
-      .addSelect('p.id', 'posteId')
-      .where('p.id IN (:...posteIds)', { posteIds })
-      .orderBy(
-        'CASE WHEN ws_ind.id IS NOT NULL OR ws_grp.id IS NOT NULL THEN 1 ELSE 0 END',
-        'DESC',
-      )
-      .addOrderBy('c.isWorkingToday', 'DESC')
-      .getRawMany<{ commercialName: string; posteId: string }>();
+    // Groupe (poste) prime sur individuel, puis is_working_today
+    const rows: Array<{ commercialName: string; posteId: string }> =
+      await this.commercialRepo.manager.query(
+        `SELECT c.name AS commercialName, p.id AS posteId
+         FROM whatsapp_commercial c
+         INNER JOIN whatsapp_poste p ON p.id = c.poste_id
+         LEFT JOIN work_schedule ws_grp
+           ON ws_grp.group_id = p.id
+           AND ws_grp.day_of_week = ?
+           AND ws_grp.is_active = 1
+         LEFT JOIN work_schedule ws_ind
+           ON ws_ind.commercial_id = c.id
+           AND ws_ind.day_of_week = ?
+           AND ws_ind.is_active = 1
+         WHERE p.id IN (${inClause})
+         ORDER BY
+           CASE
+             WHEN ws_grp.id IS NOT NULL THEN 2
+             WHEN ws_ind.id IS NOT NULL THEN 1
+             ELSE 0
+           END DESC,
+           c.is_working_today DESC`,
+        [today, today, ...posteIds],
+      );
 
     const map = new Map<string, string>();
     for (const row of rows) {

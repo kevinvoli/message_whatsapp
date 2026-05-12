@@ -15,14 +15,12 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { WorkSchedule } from 'src/work-schedule/entities/work-schedule.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       MissedCallEvent, CommercialActionTask, CallEvent,
       WhatsappCommercial, WhatsappPoste, WhatsappMessage, WhatsappChat,
-      WorkSchedule,
     ]),
     ActionQueueModule,
     NotificationModule,
