@@ -82,7 +82,9 @@ export type ViewMode =
   | 'call-devices'
   | 'presence'
   | 'commercial-groups'
-  // Appels en absence
+  // Menu Appels unifié (en absence + GICOP)
+  | 'appels'
+  // Appels en absence (rétro-compatibilité)
   | 'missed-calls';
 
 // ─── Context types ────────────────────────────────────────────────────────────

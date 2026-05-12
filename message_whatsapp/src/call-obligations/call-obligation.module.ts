@@ -4,6 +4,8 @@ import { CommercialObligationBatch } from './entities/commercial-obligation-batc
 import { CallTask } from './entities/call-task.entity';
 import { CallObligationService } from './call-obligation.service';
 import { CallObligationController } from './call-obligation.controller';
+import { CallTaskAdminService } from './call-task-admin.service';
+import { CallTaskAdminController } from './call-task-admin.controller';
 import { ObligationQualityCheckJob } from './obligation-quality-check.job';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
@@ -31,8 +33,8 @@ import { ConversationReportModule } from 'src/gicop-report/conversation-report.m
     NotificationModule,
     forwardRef(() => ConversationReportModule),
   ],
-  controllers: [CallObligationController],
-  providers: [CallObligationService, ObligationQualityCheckJob],
+  controllers: [CallObligationController, CallTaskAdminController],
+  providers: [CallObligationService, CallTaskAdminService, ObligationQualityCheckJob],
   exports: [CallObligationService],
 })
 export class CallObligationModule {}
