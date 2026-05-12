@@ -126,6 +126,7 @@ export default function CallTasksTab({ category }: CallTasksTabProps) {
                         <tr>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Client</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Poste</th>
+                            <th className="px-4 py-3 text-left font-medium text-gray-500">Commercial</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Batch</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Statut</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Durée</th>
@@ -134,16 +135,19 @@ export default function CallTasksTab({ category }: CallTasksTabProps) {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {loading ? (
-                            <tr><td colSpan={6} className="py-12 text-center text-gray-400"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />Chargement...</td></tr>
+                            <tr><td colSpan={7} className="py-12 text-center text-gray-400"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />Chargement...</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan={6} className="py-12 text-center text-gray-400">Aucun appel pour cette catégorie</td></tr>
+                            <tr><td colSpan={7} className="py-12 text-center text-gray-400">Aucun appel pour cette catégorie</td></tr>
                         ) : items.map((row) => (
                             <tr key={row.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-medium text-gray-900">
                                     {row.clientPhone ?? <span className="text-gray-400">—</span>}
                                 </td>
-                                <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                                <td className="px-4 py-3 text-gray-700 text-sm">
                                     {row.posteName ?? (row.posteId ? row.posteId.slice(0, 8) + '...' : '—')}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700 text-sm">
+                                    {row.commercialName ?? '—'}
                                 </td>
                                 <td className="px-4 py-3 text-gray-500 text-xs">
                                     #{row.batchNumber}

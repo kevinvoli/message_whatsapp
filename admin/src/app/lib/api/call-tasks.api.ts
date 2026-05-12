@@ -22,6 +22,7 @@ export interface CallTaskRow {
     createdAt: string;
     posteId: string;
     posteName: string | null;
+    commercialName: string | null;
     batchNumber: number;
 }
 

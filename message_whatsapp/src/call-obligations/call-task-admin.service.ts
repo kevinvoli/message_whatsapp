@@ -4,6 +4,7 @@ import { Between, In, Repository } from 'typeorm';
 import { CallTask, CallTaskCategory, CallTaskStatus } from './entities/call-task.entity';
 import { CommercialObligationBatch } from './entities/commercial-obligation-batch.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 export interface CallTaskMetrics {
   totalToday: number;
@@ -24,6 +25,7 @@ export interface CallTaskRow {
   createdAt: Date;
   posteId: string;
   posteName: string | null;
+  commercialName: string | null;
   batchNumber: number;
 }
 
@@ -48,6 +50,9 @@ export class CallTaskAdminService {
 
     @InjectRepository(WhatsappPoste)
     private readonly posteRepo: Repository<WhatsappPoste>,
+
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
   ) {}
 
   async getMetrics(category: CallTaskCategory): Promise<CallTaskMetrics> {
@@ -86,7 +91,6 @@ export class CallTaskAdminService {
       .limit(5)
       .getRawMany<{ posteId: string; count: string }>();
 
-    // Résolution des noms de postes
     const posteIds = overdueRaw.map((r) => r.posteId).filter(Boolean);
     const posteNameMap = await this.resolvePosteNames(posteIds);
 
@@ -140,16 +144,47 @@ export class CallTaskAdminService {
       .orderBy('ct.createdAt', 'DESC')
       .offset((params.page - 1) * params.limit)
       .limit(params.limit)
-      .getRawMany<CallTaskRow>();
+      .getRawMany<Omit<CallTaskRow, 'commercialName'>>();
 
-    return { items: raw, total };
+    // Résolution des noms de commerciaux par poste (batch)
+    const posteIds = [...new Set(raw.map((r) => r.posteId).filter(Boolean))];
+    const commercialNameMap = await this.resolveCommercialNamesByPoste(posteIds);
+
+    const items: CallTaskRow[] = raw.map((r) => ({
+      ...r,
+      commercialName: commercialNameMap.get(r.posteId) ?? null,
+    }));
+
+    return { items, total };
   }
 
-  // ── Helper privé ─────────────────────────────────────────────────────────
+  // ── Helpers privés ───────────────────────────────────────────────────────
 
   private async resolvePosteNames(ids: string[]): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
     const postes = await this.posteRepo.find({ where: { id: In(ids) }, select: ['id', 'name'] });
     return new Map(postes.map((p) => [p.id, p.name]));
+  }
+
+  private async resolveCommercialNamesByPoste(posteIds: string[]): Promise<Map<string, string>> {
+    if (posteIds.length === 0) return new Map();
+
+    // Priorise le commercial qui travaille aujourd'hui pour ce poste
+    const rows = await this.commercialRepo
+      .createQueryBuilder('c')
+      .innerJoin('c.poste', 'p')
+      .select('c.name', 'commercialName')
+      .addSelect('p.id', 'posteId')
+      .where('p.id IN (:...posteIds)', { posteIds })
+      .orderBy('c.isWorkingToday', 'DESC')
+      .getRawMany<{ commercialName: string; posteId: string }>();
+
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (!map.has(row.posteId)) {
+        map.set(row.posteId, row.commercialName);
+      }
+    }
+    return map;
   }
 }

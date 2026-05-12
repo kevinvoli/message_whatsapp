@@ -51,12 +51,25 @@ function makePosteRepo() {
   return { find: jest.fn().mockResolvedValue([]) } as any;
 }
 
+function makeCommercialRepo() {
+  const qb: any = {
+    innerJoin:  jest.fn().mockReturnThis(),
+    select:     jest.fn().mockReturnThis(),
+    addSelect:  jest.fn().mockReturnThis(),
+    where:      jest.fn().mockReturnThis(),
+    orderBy:    jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
+  };
+  return { createQueryBuilder: jest.fn().mockReturnValue(qb), _qb: qb } as any;
+}
+
 function buildService(
-  callTaskRepo = makeCallTaskRepo(),
-  batchRepo    = makeBatchRepo(),
-  posteRepo    = makePosteRepo(),
+  callTaskRepo    = makeCallTaskRepo(),
+  batchRepo       = makeBatchRepo(),
+  posteRepo       = makePosteRepo(),
+  commercialRepo  = makeCommercialRepo(),
 ) {
-  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo);
+  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo, commercialRepo);
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
