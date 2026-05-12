@@ -47,13 +47,23 @@ function makeEventEmitter() {
   return { emit: jest.fn() } as any;
 }
 
+function makeCallEventRepo() {
+  return { find: jest.fn().mockResolvedValue([]) } as any;
+}
+
+function makeCommercialRepo() {
+  return { find: jest.fn().mockResolvedValue([]) } as any;
+}
+
 function buildService(
-  missedRepo = makeMissedCallRepo(),
-  taskRepo   = makeActionTaskRepo(),
-  actionSvc  = makeActionQueueService(),
-  emitter    = makeEventEmitter(),
+  missedRepo    = makeMissedCallRepo(),
+  taskRepo      = makeActionTaskRepo(),
+  actionSvc     = makeActionQueueService(),
+  emitter       = makeEventEmitter(),
+  callEventRepo = makeCallEventRepo(),
+  commercialRepo = makeCommercialRepo(),
 ): MissedCallHandlerService {
-  return new MissedCallHandlerService(missedRepo, taskRepo, actionSvc, emitter);
+  return new MissedCallHandlerService(missedRepo, taskRepo, callEventRepo, commercialRepo, actionSvc, emitter);
 }
 
 describe('MissedCallHandlerService', () => {

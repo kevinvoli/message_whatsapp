@@ -6,6 +6,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { MissedCallEvent } from './entities/missed-call-event.entity';
 import { CommercialActionTask } from 'src/action-queue/entities/commercial-action-task.entity';
+import { CallEvent, CallStatus } from 'src/window/entities/call-event.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { ActionQueueService } from 'src/action-queue/action-queue.service';
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
 import {
@@ -45,6 +47,12 @@ export class MissedCallHandlerService {
 
     @InjectRepository(CommercialActionTask)
     private readonly actionTaskRepo: Repository<CommercialActionTask>,
+
+    @InjectRepository(CallEvent)
+    private readonly callEventRepo: Repository<CallEvent>,
+
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
 
     private readonly actionQueueService: ActionQueueService,
 
@@ -208,5 +216,76 @@ export class MissedCallHandlerService {
     });
 
     return true;
+  }
+
+  // ── Backfill historique call_event → missed_call_event ───────────────────
+
+  async backfillFromCallEvents(): Promise<{ processed: number; skipped: number; created: number }> {
+    const callEvents = await this.callEventRepo.find({
+      where: { call_status: CallStatus.NO_ANSWER },
+      order: { event_at: 'ASC' },
+    });
+
+    if (callEvents.length === 0) {
+      return { processed: 0, skipped: 0, created: 0 };
+    }
+
+    // Pré-charger les externalIds déjà présents pour éviter les doublons
+    const externalIds = callEvents.map((e) => e.external_id);
+    const existing = await this.missedCallRepo.find({
+      where: { externalId: In(externalIds) },
+      select: ['externalId'],
+    });
+    const existingSet = new Set(existing.map((e) => e.externalId));
+
+    // Résoudre poste_id en batch via commercial_id
+    const commercialIds = [
+      ...new Set(callEvents.map((e) => e.commercial_id).filter((id): id is string => !!id)),
+    ];
+    const commercialPosteMap = new Map<string, string | null>();
+    if (commercialIds.length > 0) {
+      const commercials = await this.commercialRepo.find({
+        where: { id: In(commercialIds) },
+        relations: ['poste'],
+      });
+      for (const c of commercials) {
+        commercialPosteMap.set(c.id, c.poste?.id ?? null);
+      }
+    }
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const ce of callEvents) {
+      if (existingSet.has(ce.external_id)) {
+        skipped++;
+        continue;
+      }
+
+      const posteId = ce.commercial_id ? (commercialPosteMap.get(ce.commercial_id) ?? null) : null;
+
+      try {
+        await this.handle({
+          source:       'db2',
+          externalId:   ce.external_id,
+          clientPhone:  ce.client_phone,
+          posteId,
+          commercialId: ce.commercial_id ?? null,
+          deviceId:     ce.device_id ?? null,
+          occurredAt:   ce.event_at,
+          clientName:   null,
+        });
+        created++;
+      } catch (err) {
+        this.logger.error(
+          `BACKFILL_ERROR external_id=${ce.external_id}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `BACKFILL_COMPLETE total=${callEvents.length} created=${created} skipped=${skipped}`,
+    );
+    return { processed: callEvents.length, skipped, created };
   }
 }

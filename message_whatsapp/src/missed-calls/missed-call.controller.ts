@@ -1,12 +1,16 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { MissedCallService } from './missed-call.service';
+import { MissedCallHandlerService } from './missed-call-handler.service';
 import { MissedCallEventStatus } from './entities/missed-call-event.entity';
 
 @Controller('admin/missed-calls')
 @UseGuards(AdminGuard)
 export class MissedCallController {
-  constructor(private readonly missedCallService: MissedCallService) {}
+  constructor(
+    private readonly missedCallService: MissedCallService,
+    private readonly missedCallHandlerService: MissedCallHandlerService,
+  ) {}
 
   /**
    * GET /admin/missed-calls/metrics
@@ -50,5 +54,14 @@ export class MissedCallController {
   async closeManually(@Param('id') id: string) {
     await this.missedCallService.closeManually(id);
     return { ok: true };
+  }
+
+  /**
+   * POST /admin/missed-calls/backfill
+   * Importe les call_event historiques (call_status='no_answer') vers missed_call_event
+   */
+  @Post('backfill')
+  async backfill() {
+    return this.missedCallHandlerService.backfillFromCallEvents();
   }
 }
