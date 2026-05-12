@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -42,8 +42,18 @@ export interface OutgoingCallParams {
 }
 
 @Injectable()
-export class MissedCallHandlerService {
+export class MissedCallHandlerService implements OnModuleInit {
   private readonly logger = new Logger(MissedCallHandlerService.name);
+
+  // Exécuté une fois au démarrage — fire-and-forget, ne bloque pas l'app
+  onModuleInit(): void {
+    Promise.all([
+      this.backfillFromWhatsappMessages(),
+      this.backfillFromCallEvents(),
+    ]).catch((err: Error) =>
+      this.logger.error(`BACKFILL_STARTUP_ERROR: ${err.message}`),
+    );
+  }
 
   constructor(
     @InjectRepository(MissedCallEvent)
