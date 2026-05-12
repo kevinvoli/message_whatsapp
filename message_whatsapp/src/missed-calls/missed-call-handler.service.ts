@@ -8,12 +8,16 @@ import { MissedCallEvent } from './entities/missed-call-event.entity';
 import { CommercialActionTask } from 'src/action-queue/entities/commercial-action-task.entity';
 import { CallEvent, CallStatus } from 'src/window/entities/call-event.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappMessage, MessageDirection } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { ActionQueueService } from 'src/action-queue/action-queue.service';
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
 import {
   INBOUND_MESSAGE_PROCESSED_EVENT,
   InboundMessageProcessedEvent,
 } from 'src/ingress/events/inbound-message-processed.event';
+
+const CALL_MSG_TYPES = ['call', 'voice_call', 'video_call', 'missed_call'];
 
 const MISSED_CALL_SLA_MINUTES = 30;
 
@@ -53,6 +57,12 @@ export class MissedCallHandlerService {
 
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+
+    @InjectRepository(WhatsappMessage)
+    private readonly messageRepo: Repository<WhatsappMessage>,
+
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepo: Repository<WhatsappChat>,
 
     private readonly actionQueueService: ActionQueueService,
 
@@ -216,6 +226,102 @@ export class MissedCallHandlerService {
     });
 
     return true;
+  }
+
+  // ── Backfill messages WhatsApp → missed_call_event ──────────────────────
+
+  async backfillFromWhatsappMessages(): Promise<{ processed: number; skipped: number; created: number }> {
+    type MsgRow = {
+      msgId: string;
+      externalId: string | null;
+      messageId: string | null;
+      clientPhone: string;
+      clientName: string;
+      posteId: string | null;
+      occurredAt: Date;
+      unreadCount: number;
+      contactClient: string;
+    };
+
+    const rows = await this.messageRepo
+      .createQueryBuilder('m')
+      .innerJoin('m.chat', 'c')
+      .select('m.id', 'msgId')
+      .addSelect('m.external_id', 'externalId')
+      .addSelect('m.message_id', 'messageId')
+      .addSelect('m.from', 'clientPhone')
+      .addSelect('m.from_name', 'clientName')
+      .addSelect('m.poste_id', 'posteId')
+      .addSelect('m.timestamp', 'occurredAt')
+      .addSelect('c.unread_count', 'unreadCount')
+      .addSelect('c.contact_client', 'contactClient')
+      .where('m.type IN (:...types)', { types: CALL_MSG_TYPES })
+      .andWhere('m.direction = :dir', { dir: MessageDirection.IN })
+      .andWhere('m.deletedAt IS NULL')
+      .andWhere('c.deletedAt IS NULL')
+      .orderBy('m.timestamp', 'ASC')
+      .getRawMany<MsgRow>();
+
+    if (rows.length === 0) return { processed: 0, skipped: 0, created: 0 };
+
+    // Pré-charger les externalIds déjà présents
+    const extIdOf = (r: MsgRow) => r.externalId ?? r.messageId ?? r.msgId;
+    const externalIds = rows.map(extIdOf);
+    const existing = await this.missedCallRepo.find({
+      where: { externalId: In(externalIds) },
+      select: ['externalId'],
+    });
+    const existingSet = new Set(existing.map((e) => e.externalId));
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const row of rows) {
+      const extId = extIdOf(row);
+      if (existingSet.has(extId)) { skipped++; continue; }
+
+      const clientPhone = normalizePhone(row.clientPhone || row.contactClient) || row.clientPhone || row.contactClient;
+      const occurredAt  = row.occurredAt instanceof Date ? row.occurredAt : new Date(row.occurredAt);
+
+      try {
+        if (row.unreadCount > 0) {
+          // Conversation encore non traitée — créer événement + tâche normalement
+          await this.handle({
+            source:       'whatsapp',
+            externalId:   extId,
+            clientPhone,
+            posteId:      row.posteId ?? null,
+            commercialId: null,
+            occurredAt,
+            clientName:   row.clientName || null,
+          });
+        } else {
+          // Commercial a déjà répondu — enregistrer en fermé, pas de tâche
+          const missed = this.missedCallRepo.create({
+            id:           uuidv4(),
+            source:       'whatsapp',
+            externalId:   extId,
+            occurredAt,
+            clientPhone,
+            clientName:   row.clientName || null,
+            posteId:      row.posteId ?? null,
+            commercialId: null,
+            status:       'closed',
+          });
+          await this.missedCallRepo.save(missed);
+        }
+        created++;
+      } catch (err) {
+        this.logger.error(
+          `BACKFILL_WA_ERROR externalId=${extId}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `BACKFILL_WHATSAPP_COMPLETE total=${rows.length} created=${created} skipped=${skipped}`,
+    );
+    return { processed: rows.length, skipped, created };
   }
 
   // ── Backfill historique call_event → missed_call_event ───────────────────

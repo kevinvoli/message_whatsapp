@@ -58,10 +58,21 @@ export class MissedCallController {
 
   /**
    * POST /admin/missed-calls/backfill
-   * Importe les call_event historiques (call_status='no_answer') vers missed_call_event
+   * Importe les call_event historiques DB2 (call_status='no_answer') vers missed_call_event
    */
   @Post('backfill')
   async backfill() {
     return this.missedCallHandlerService.backfillFromCallEvents();
+  }
+
+  /**
+   * POST /admin/missed-calls/backfill-whatsapp
+   * Importe les messages WhatsApp historiques (type missed_call) vers missed_call_event
+   * — actifs (unread_count > 0) créés avec tâche de rappel
+   * — traités (unread_count = 0) créés comme fermés
+   */
+  @Post('backfill-whatsapp')
+  async backfillWhatsapp() {
+    return this.missedCallHandlerService.backfillFromWhatsappMessages();
   }
 }
