@@ -35,6 +35,11 @@ export class CallLog {
   @Column({ name: 'client_phone', type: 'varchar', length: 50, nullable: true, default: null })
   client_phone: string | null;
 
+  /** Poste du commercial au moment de l'appel (dénormalisé) */
+  @Index('IDX_call_log_poste_id')
+  @Column({ name: 'poste_id', type: 'varchar', length: 36, nullable: true, default: null })
+  poste_id: string | null;
+
   /** ID du commercial (sub du JWT) */
   @Column({ name: 'commercial_id', type: 'varchar', length: 36 })
   commercial_id: string;

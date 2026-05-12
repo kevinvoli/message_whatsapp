@@ -159,10 +159,10 @@ export class ContactService {
     contact.call_count = (contact.call_count ?? 0) + 1;
     const savedContact = await this.repo.save(contact);
 
-    // Lookup du nom du commercial pour dénormalisation
+    // Lookup du nom et du poste du commercial pour dénormalisation
     const commercial = await this.commercialRepo.findOne({
       where: { id: commercial_id },
-      select: ['name'],
+      relations: ['poste'],
     });
     const commercial_name = commercial?.name ?? 'Inconnu';
 
@@ -170,6 +170,7 @@ export class ContactService {
       contact_id: id,
       commercial_id,
       commercial_name,
+      poste_id: commercial?.poste?.id ?? null,
       call_status: dto.call_status,
       notes: dto.call_notes,
       outcome: dto.outcome as any,

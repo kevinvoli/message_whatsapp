@@ -38,4 +38,8 @@ export class CreateCallLogDto {
   @IsDate()
   @Type(() => Date)
   called_at?: Date;
+
+  @IsOptional()
+  @IsString()
+  poste_id?: string | null;
 }

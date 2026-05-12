@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { MissedCallEvent, MissedCallEventStatus } from './entities/missed-call-event.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
@@ -137,23 +137,32 @@ export class MissedCallService {
     const posteIds      = [...new Set(events.map((e) => e.posteId).filter((id): id is string => !!id))];
     const commercialIds = [...new Set(events.map((e) => e.commercialId).filter((id): id is string => !!id))];
 
-    // Postes dont l'appel n'a pas de commercialId → résoudre via planning
-    const posteIdsWithoutCommercial = [
+    const posteNameMap      = await this.resolvePosteNames(posteIds);
+    const commercialNameMap = await this.resolveCommercialNames(commercialIds);
+
+    // Pour les absences rappelées sans commercialId direct : résoudre via call_log
+    const callbackEventIds = [
       ...new Set(
         events
-          .filter((e) => !e.commercialId && e.posteId)
-          .map((e) => e.posteId as string),
+          .filter((e) => !e.commercialId && e.callbackCallEventId)
+          .map((e) => e.callbackCallEventId as string),
       ),
     ];
-
-    const posteNameMap           = await this.resolvePosteNames(posteIds);
-    const commercialNameMap      = await this.resolveCommercialNames(commercialIds);
-    const posteCommercialMap     = await this.resolveCommercialNamesByPoste(posteIdsWithoutCommercial);
+    let callbackCommercialMap = new Map<string, string>(); // callbackCallEventId → commercialName
+    if (callbackEventIds.length > 0) {
+      const callLogs = await this.commercialRepo.manager.query(
+        `SELECT call_event_external_id, commercial_name FROM call_log WHERE call_event_external_id IN (${callbackEventIds.map(() => '?').join(', ')})`,
+        callbackEventIds,
+      );
+      for (const cl of callLogs as Array<{ call_event_external_id: string; commercial_name: string }>) {
+        callbackCommercialMap.set(cl.call_event_external_id, cl.commercial_name);
+      }
+    }
 
     const items: MissedCallRow[] = events.map((m) => {
       const commercialName = m.commercialId
         ? (commercialNameMap.get(m.commercialId) ?? null)
-        : (m.posteId ? (posteCommercialMap.get(m.posteId) ?? null) : null);
+        : (m.callbackCallEventId ? (callbackCommercialMap.get(m.callbackCallEventId) ?? null) : null);
 
       return {
         id:                   m.id,
@@ -194,44 +203,5 @@ export class MissedCallService {
     return new Map(commercials.map((c) => [c.id, c.name]));
   }
 
-  private async resolveCommercialNamesByPoste(posteIds: string[]): Promise<Map<string, string>> {
-    if (posteIds.length === 0) return new Map();
-
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const today = days[new Date().getDay()];
-    const inClause = posteIds.map(() => '?').join(', ');
-
-    // Groupe (poste) prime sur individuel, puis is_working_today
-    const rows: Array<{ commercialName: string; posteId: string }> =
-      await this.commercialRepo.manager.query(
-        `SELECT c.name AS commercialName, p.id AS posteId
-         FROM whatsapp_commercial c
-         INNER JOIN whatsapp_poste p ON p.id = c.poste_id
-         LEFT JOIN work_schedule ws_grp
-           ON ws_grp.group_id = p.id
-           AND ws_grp.day_of_week = ?
-           AND ws_grp.is_active = 1
-         LEFT JOIN work_schedule ws_ind
-           ON ws_ind.commercial_id = c.id
-           AND ws_ind.day_of_week = ?
-           AND ws_ind.is_active = 1
-         WHERE p.id IN (${inClause})
-         ORDER BY
-           CASE
-             WHEN ws_grp.id IS NOT NULL THEN 2
-             WHEN ws_ind.id IS NOT NULL THEN 1
-             ELSE 0
-           END DESC,
-           c.is_working_today DESC`,
-        [today, today, ...posteIds],
-      );
-
-    const map = new Map<string, string>();
-    for (const row of rows) {
-      if (!map.has(row.posteId)) {
-        map.set(row.posteId, row.commercialName);
-      }
-    }
-    return map;
-  }
 }
+

@@ -4,7 +4,7 @@ import { Between, In, Repository } from 'typeorm';
 import { CallTask, CallTaskCategory, CallTaskStatus } from './entities/call-task.entity';
 import { CommercialObligationBatch } from './entities/commercial-obligation-batch.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
-import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { CallLog } from 'src/call-log/entities/call_log.entity';
 
 export interface CallTaskMetrics {
   totalToday: number;
@@ -50,9 +50,6 @@ export class CallTaskAdminService {
 
     @InjectRepository(WhatsappPoste)
     private readonly posteRepo: Repository<WhatsappPoste>,
-
-    @InjectRepository(WhatsappCommercial)
-    private readonly commercialRepo: Repository<WhatsappCommercial>,
   ) {}
 
   async getMetrics(category: CallTaskCategory): Promise<CallTaskMetrics> {
@@ -112,6 +109,7 @@ export class CallTaskAdminService {
       .createQueryBuilder('ct')
       .leftJoin(CommercialObligationBatch, 'batch', 'batch.id = ct.batchId')
       .leftJoin(WhatsappPoste, 'poste', 'poste.id = ct.posteId')
+      .leftJoin(CallLog, 'cl', 'cl.call_event_external_id = ct.callEventId')
       .where('ct.category = :category', { category: params.category });
 
     if (params.status) {
@@ -141,18 +139,16 @@ export class CallTaskAdminService {
       .addSelect('ct.posteId', 'posteId')
       .addSelect('poste.name', 'posteName')
       .addSelect('COALESCE(batch.batchNumber, 0)', 'batchNumber')
+      .addSelect('cl.commercial_name', 'commercialName')
+      .addSelect('cl.commercial_id', 'commercialId')
       .orderBy('ct.createdAt', 'DESC')
       .offset((params.page - 1) * params.limit)
       .limit(params.limit)
-      .getRawMany<Omit<CallTaskRow, 'commercialName'>>();
-
-    // Résolution des noms de commerciaux par poste (batch)
-    const posteIds = [...new Set(raw.map((r) => r.posteId).filter(Boolean))];
-    const commercialNameMap = await this.resolveCommercialNamesByPoste(posteIds);
+      .getRawMany<CallTaskRow & { commercialId: string | null }>();
 
     const items: CallTaskRow[] = raw.map((r) => ({
       ...r,
-      commercialName: commercialNameMap.get(r.posteId) ?? null,
+      commercialName: r.commercialName ?? null,
     }));
 
     return { items, total };
@@ -166,44 +162,5 @@ export class CallTaskAdminService {
     return new Map(postes.map((p) => [p.id, p.name]));
   }
 
-  private async resolveCommercialNamesByPoste(posteIds: string[]): Promise<Map<string, string>> {
-    if (posteIds.length === 0) return new Map();
-
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const today = days[new Date().getDay()];
-    const inClause = posteIds.map(() => '?').join(', ');
-
-    // Groupe (poste) prime sur individuel, puis is_working_today
-    const rows: Array<{ commercialName: string; posteId: string }> =
-      await this.commercialRepo.manager.query(
-        `SELECT c.name AS commercialName, p.id AS posteId
-         FROM whatsapp_commercial c
-         INNER JOIN whatsapp_poste p ON p.id = c.poste_id
-         LEFT JOIN work_schedule ws_grp
-           ON ws_grp.group_id = p.id
-           AND ws_grp.day_of_week = ?
-           AND ws_grp.is_active = 1
-         LEFT JOIN work_schedule ws_ind
-           ON ws_ind.commercial_id = c.id
-           AND ws_ind.day_of_week = ?
-           AND ws_ind.is_active = 1
-         WHERE p.id IN (${inClause})
-         ORDER BY
-           CASE
-             WHEN ws_grp.id IS NOT NULL THEN 2
-             WHEN ws_ind.id IS NOT NULL THEN 1
-             ELSE 0
-           END DESC,
-           c.is_working_today DESC`,
-        [today, today, ...posteIds],
-      );
-
-    const map = new Map<string, string>();
-    for (const row of rows) {
-      if (!map.has(row.posteId)) {
-        map.set(row.posteId, row.commercialName);
-      }
-    }
-    return map;
-  }
 }
+
