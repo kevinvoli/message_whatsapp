@@ -8,7 +8,7 @@ export interface CallTaskMetrics {
     totalPending: number;
     totalDone: number;
     avgDurationSeconds: number | null;
-    topPostesOverdue: Array<{ posteId: string; count: number }>;
+    topPostesOverdue: Array<{ posteId: string; posteName: string | null; count: number }>;
 }
 
 export interface CallTaskRow {
@@ -21,6 +21,7 @@ export interface CallTaskRow {
     completedAt: string | null;
     createdAt: string;
     posteId: string;
+    posteName: string | null;
     batchNumber: number;
 }
 

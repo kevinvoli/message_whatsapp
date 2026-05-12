@@ -12,10 +12,11 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { CallEvent } from 'src/window/entities/call-event.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MissedCallEvent, CommercialActionTask, CallEvent, WhatsappCommercial]),
+    TypeOrmModule.forFeature([MissedCallEvent, CommercialActionTask, CallEvent, WhatsappCommercial, WhatsappPoste]),
     ActionQueueModule,
     NotificationModule,
     JorbsModule,

@@ -100,7 +100,7 @@ export default function CallTasksTab({ category }: CallTasksTabProps) {
                     <ul className="space-y-1">
                         {metrics.topPostesOverdue.map((p) => (
                             <li key={p.posteId} className="flex justify-between text-sm">
-                                <span className="text-gray-700 truncate">Poste {p.posteId.slice(0, 8)}...</span>
+                                <span className="text-gray-700 truncate">{p.posteName ?? p.posteId.slice(0, 8) + '...'}</span>
                                 <span className="font-medium text-orange-600">{p.count} en attente</span>
                             </li>
                         ))}
@@ -143,7 +143,7 @@ export default function CallTasksTab({ category }: CallTasksTabProps) {
                                     {row.clientPhone ?? <span className="text-gray-400">—</span>}
                                 </td>
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                                    {row.posteId ? row.posteId.slice(0, 8) + '...' : '—'}
+                                    {row.posteName ?? (row.posteId ? row.posteId.slice(0, 8) + '...' : '—')}
                                 </td>
                                 <td className="px-4 py-3 text-gray-500 text-xs">
                                     #{row.batchNumber}

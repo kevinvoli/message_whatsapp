@@ -11,7 +11,7 @@ export interface MissedCallMetrics {
     totalClosed: number;
     slaComplianceRate: number;
     avgHandlingDelaySeconds: number | null;
-    topPostesOverdue: Array<{ posteId: string; count: number }>;
+    topPostesOverdue: Array<{ posteId: string; posteName: string | null; count: number }>;
 }
 
 export interface MissedCallRow {
@@ -20,7 +20,9 @@ export interface MissedCallRow {
     clientPhone: string;
     clientName: string | null;
     posteId: string | null;
+    posteName: string | null;
     commercialId: string | null;
+    commercialName: string | null;
     status: MissedCallStatus;
     occurredAt: string;
     slaBreachedAt: string | null;

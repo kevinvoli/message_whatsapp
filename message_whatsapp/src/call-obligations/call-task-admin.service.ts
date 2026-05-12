@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, LessThan, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { CallTask, CallTaskCategory, CallTaskStatus } from './entities/call-task.entity';
 import { CommercialObligationBatch } from './entities/commercial-obligation-batch.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 export interface CallTaskMetrics {
   totalToday: number;
   totalPending: number;
   totalDone: number;
   avgDurationSeconds: number | null;
-  topPostesOverdue: Array<{ posteId: string; count: number }>;
+  topPostesOverdue: Array<{ posteId: string; posteName: string | null; count: number }>;
 }
 
 export interface CallTaskRow {
@@ -22,6 +23,7 @@ export interface CallTaskRow {
   completedAt: Date | null;
   createdAt: Date;
   posteId: string;
+  posteName: string | null;
   batchNumber: number;
 }
 
@@ -43,6 +45,9 @@ export class CallTaskAdminService {
 
     @InjectRepository(CommercialObligationBatch)
     private readonly batchRepo: Repository<CommercialObligationBatch>,
+
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepo: Repository<WhatsappPoste>,
   ) {}
 
   async getMetrics(category: CallTaskCategory): Promise<CallTaskMetrics> {
@@ -81,14 +86,19 @@ export class CallTaskAdminService {
       .limit(5)
       .getRawMany<{ posteId: string; count: string }>();
 
+    // Résolution des noms de postes
+    const posteIds = overdueRaw.map((r) => r.posteId).filter(Boolean);
+    const posteNameMap = await this.resolvePosteNames(posteIds);
+
     return {
       totalToday,
       totalPending,
       totalDone,
       avgDurationSeconds,
       topPostesOverdue: overdueRaw.map((r) => ({
-        posteId: r.posteId,
-        count: parseInt(r.count, 10),
+        posteId:   r.posteId,
+        posteName: posteNameMap.get(r.posteId) ?? null,
+        count:     parseInt(r.count, 10),
       })),
     };
   }
@@ -97,6 +107,7 @@ export class CallTaskAdminService {
     const qb = this.callTaskRepo
       .createQueryBuilder('ct')
       .leftJoin(CommercialObligationBatch, 'batch', 'batch.id = ct.batchId')
+      .leftJoin(WhatsappPoste, 'poste', 'poste.id = ct.posteId')
       .where('ct.category = :category', { category: params.category });
 
     if (params.status) {
@@ -124,6 +135,7 @@ export class CallTaskAdminService {
       .addSelect('ct.completedAt', 'completedAt')
       .addSelect('ct.createdAt', 'createdAt')
       .addSelect('ct.posteId', 'posteId')
+      .addSelect('poste.name', 'posteName')
       .addSelect('COALESCE(batch.batchNumber, 0)', 'batchNumber')
       .orderBy('ct.createdAt', 'DESC')
       .offset((params.page - 1) * params.limit)
@@ -131,5 +143,13 @@ export class CallTaskAdminService {
       .getRawMany<CallTaskRow>();
 
     return { items: raw, total };
+  }
+
+  // ── Helper privé ─────────────────────────────────────────────────────────
+
+  private async resolvePosteNames(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const postes = await this.posteRepo.find({ where: { id: In(ids) }, select: ['id', 'name'] });
+    return new Map(postes.map((p) => [p.id, p.name]));
   }
 }

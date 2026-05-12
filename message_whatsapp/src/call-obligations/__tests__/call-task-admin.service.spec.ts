@@ -47,8 +47,16 @@ function makeBatchRepo() {
   return {} as any;
 }
 
-function buildService(callTaskRepo = makeCallTaskRepo(), batchRepo = makeBatchRepo()) {
-  return new CallTaskAdminService(callTaskRepo, batchRepo);
+function makePosteRepo() {
+  return { find: jest.fn().mockResolvedValue([]) } as any;
+}
+
+function buildService(
+  callTaskRepo = makeCallTaskRepo(),
+  batchRepo    = makeBatchRepo(),
+  posteRepo    = makePosteRepo(),
+) {
+  return new CallTaskAdminService(callTaskRepo, batchRepo, posteRepo);
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -77,8 +85,8 @@ describe('CallTaskAdminService', () => {
       expect(m.totalDone).toBe(12);
       expect(m.avgDurationSeconds).toBe(186);  // Math.round(185.5)
       expect(m.topPostesOverdue).toEqual([
-        { posteId: 'poste-1', count: 4 },
-        { posteId: 'poste-2', count: 2 },
+        { posteId: 'poste-1', posteName: null, count: 4 },
+        { posteId: 'poste-2', posteName: null, count: 2 },
       ]);
     });
 

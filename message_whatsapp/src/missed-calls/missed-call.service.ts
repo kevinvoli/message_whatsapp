@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { MissedCallEvent, MissedCallEventStatus } from './entities/missed-call-event.entity';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 export interface MissedCallMetrics {
   totalToday: number;
@@ -10,9 +12,9 @@ export interface MissedCallMetrics {
   totalEscalated: number;
   totalCalledBack: number;
   totalClosed: number;
-  slaComplianceRate: number; // 0–100
+  slaComplianceRate: number;
   avgHandlingDelaySeconds: number | null;
-  topPostesOverdue: Array<{ posteId: string; count: number }>;
+  topPostesOverdue: Array<{ posteId: string; posteName: string | null; count: number }>;
 }
 
 export interface MissedCallRow {
@@ -21,7 +23,9 @@ export interface MissedCallRow {
   clientPhone: string;
   clientName: string | null;
   posteId: string | null;
+  posteName: string | null;
   commercialId: string | null;
+  commercialName: string | null;
   status: MissedCallEventStatus;
   occurredAt: string;
   slaBreachedAt: string | null;
@@ -40,6 +44,12 @@ export class MissedCallService {
   constructor(
     @InjectRepository(MissedCallEvent)
     private readonly repo: Repository<MissedCallEvent>,
+
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepo: Repository<WhatsappPoste>,
+
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
   ) {}
 
   async getMetrics(): Promise<MissedCallMetrics> {
@@ -59,29 +69,33 @@ export class MissedCallService {
     const calledBack = all.filter((m) => m.status === 'called_back').length;
     const closed     = all.filter((m) => m.status === 'closed').length;
 
-    // SLA compliance: called_back without slaBreachedAt / total resolved
-    const resolved   = all.filter((m) => m.status === 'called_back' || m.status === 'closed');
-    const inSla      = resolved.filter((m) => m.status === 'called_back' && !m.slaBreachedAt);
-    const slaRate    = resolved.length > 0 ? Math.round((inSla.length / resolved.length) * 100) : 100;
+    const resolved = all.filter((m) => m.status === 'called_back' || m.status === 'closed');
+    const inSla    = resolved.filter((m) => m.status === 'called_back' && !m.slaBreachedAt);
+    const slaRate  = resolved.length > 0 ? Math.round((inSla.length / resolved.length) * 100) : 100;
 
-    // Average handling delay (only called_back with a value)
-    const withDelay  = all.filter((m) => m.handlingDelaySeconds !== null && m.status === 'called_back');
-    const avgDelay   = withDelay.length > 0
+    const withDelay = all.filter((m) => m.handlingDelaySeconds !== null && m.status === 'called_back');
+    const avgDelay  = withDelay.length > 0
       ? Math.round(withDelay.reduce((sum, m) => sum + (m.handlingDelaySeconds ?? 0), 0) / withDelay.length)
       : null;
 
-    // Top postes overdue (escalated + still assigned past dueAt)
-    const overdue    = all.filter((m) => m.status === 'escalated' || (m.status === 'assigned' && m.slaBreachedAt));
-    const posteMap   = new Map<string, number>();
+    const overdue  = all.filter((m) => m.status === 'escalated' || (m.status === 'assigned' && m.slaBreachedAt));
+    const posteMap = new Map<string, number>();
     for (const m of overdue) {
-      if (m.posteId) {
-        posteMap.set(m.posteId, (posteMap.get(m.posteId) ?? 0) + 1);
-      }
+      if (m.posteId) posteMap.set(m.posteId, (posteMap.get(m.posteId) ?? 0) + 1);
     }
-    const topPostes = Array.from(posteMap.entries())
+    const topRaw = Array.from(posteMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([posteId, count]) => ({ posteId, count }));
+      .slice(0, 5);
+
+    // Résolution des noms de postes
+    const posteIds = topRaw.map(([id]) => id);
+    const posteNameMap = await this.resolvePosteNames(posteIds);
+
+    const topPostesOverdue = topRaw.map(([posteId, count]) => ({
+      posteId,
+      posteName: posteNameMap.get(posteId) ?? null,
+      count,
+    }));
 
     return {
       totalToday:           todayEvents.length,
@@ -92,7 +106,7 @@ export class MissedCallService {
       totalClosed:          closed,
       slaComplianceRate:    slaRate,
       avgHandlingDelaySeconds: avgDelay,
-      topPostesOverdue:     topPostes,
+      topPostesOverdue,
     };
   }
 
@@ -115,10 +129,16 @@ export class MissedCallService {
     if (dateFrom)     qb.andWhere('mc.occurredAt >= :dateFrom', { dateFrom: new Date(dateFrom) });
     if (dateTo)       qb.andWhere('mc.occurredAt <= :dateTo',   { dateTo:   new Date(dateTo) });
 
-    const skip = (page - 1) * limit;
-    qb.skip(skip).take(limit);
+    qb.skip((page - 1) * limit).take(limit);
 
     const [events, total] = await qb.getManyAndCount();
+
+    // Résolution des noms en batch
+    const posteIds      = [...new Set(events.map((e) => e.posteId).filter((id): id is string => !!id))];
+    const commercialIds = [...new Set(events.map((e) => e.commercialId).filter((id): id is string => !!id))];
+
+    const posteNameMap      = await this.resolvePosteNames(posteIds);
+    const commercialNameMap = await this.resolveCommercialNames(commercialIds);
 
     const items: MissedCallRow[] = events.map((m) => ({
       id:                   m.id,
@@ -126,7 +146,9 @@ export class MissedCallService {
       clientPhone:          m.clientPhone,
       clientName:           m.clientName,
       posteId:              m.posteId,
+      posteName:            m.posteId ? (posteNameMap.get(m.posteId) ?? null) : null,
       commercialId:         m.commercialId,
+      commercialName:       m.commercialId ? (commercialNameMap.get(m.commercialId) ?? null) : null,
       status:               m.status,
       occurredAt:           m.occurredAt.toISOString(),
       slaBreachedAt:        m.slaBreachedAt?.toISOString() ?? null,
@@ -140,5 +162,19 @@ export class MissedCallService {
 
   async closeManually(id: string): Promise<void> {
     await this.repo.update(id, { status: 'closed' });
+  }
+
+  // ── Helpers privés ───────────────────────────────────────────────────────
+
+  private async resolvePosteNames(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const postes = await this.posteRepo.find({ where: { id: In(ids) }, select: ['id', 'name'] });
+    return new Map(postes.map((p) => [p.id, p.name]));
+  }
+
+  private async resolveCommercialNames(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const commercials = await this.commercialRepo.find({ where: { id: In(ids) }, select: ['id', 'name'] });
+    return new Map(commercials.map((c) => [c.id, c.name]));
   }
 }

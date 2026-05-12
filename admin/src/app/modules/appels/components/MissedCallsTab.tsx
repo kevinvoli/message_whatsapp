@@ -118,7 +118,7 @@ export default function MissedCallsTab() {
                             <ul className="space-y-1">
                                 {metrics.topPostesOverdue.map((p) => (
                                     <li key={p.posteId} className="flex justify-between text-sm">
-                                        <span className="text-gray-700 truncate">Poste {p.posteId.slice(0, 8)}...</span>
+                                        <span className="text-gray-700 truncate">{p.posteName ?? p.posteId.slice(0, 8) + '...'}</span>
                                         <span className="font-medium text-red-600">{p.count} appel(s)</span>
                                     </li>
                                 ))}
@@ -147,6 +147,7 @@ export default function MissedCallsTab() {
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Client</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Heure appel</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Poste</th>
+                            <th className="px-4 py-3 text-left font-medium text-gray-500">Commercial</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Statut</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">Délai</th>
                             <th className="px-4 py-3 text-left font-medium text-gray-500">SLA</th>
@@ -155,9 +156,9 @@ export default function MissedCallsTab() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {loading ? (
-                            <tr><td colSpan={7} className="py-12 text-center text-gray-400"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />Chargement...</td></tr>
+                            <tr><td colSpan={8} className="py-12 text-center text-gray-400"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />Chargement...</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan={7} className="py-12 text-center text-gray-400">Aucun appel en absence</td></tr>
+                            <tr><td colSpan={8} className="py-12 text-center text-gray-400">Aucun appel en absence</td></tr>
                         ) : items.map((row) => (
                             <tr key={row.id} className={`hover:bg-gray-50 ${row.status === 'escalated' ? 'bg-red-50' : ''}`}>
                                 <td className="px-4 py-3">
@@ -165,7 +166,8 @@ export default function MissedCallsTab() {
                                     {row.clientName && <div className="text-xs text-gray-500">{row.clientPhone}</div>}
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">{formatDate(row.occurredAt)} {formatTime(row.occurredAt)}</td>
-                                <td className="px-4 py-3 text-gray-500 font-mono text-xs">{row.posteId ? row.posteId.slice(0, 8) + '...' : '—'}</td>
+                                <td className="px-4 py-3 text-gray-700 text-sm">{row.posteName ?? (row.posteId ? row.posteId.slice(0, 8) + '...' : '—')}</td>
+                                <td className="px-4 py-3 text-gray-700 text-sm">{row.commercialName ?? (row.commercialId ? row.commercialId.slice(0, 8) + '...' : '—')}</td>
                                 <td className="px-4 py-3"><span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status]}`}>{STATUS_LABELS[row.status]}</span></td>
                                 <td className="px-4 py-3 text-gray-600">{formatDelay(row.handlingDelaySeconds)}</td>
                                 <td className="px-4 py-3">
