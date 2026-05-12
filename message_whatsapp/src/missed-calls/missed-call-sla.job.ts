@@ -2,13 +2,14 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, In, LessThan, Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MissedCallEvent } from './entities/missed-call-event.entity';
 import { CommercialActionTask } from 'src/action-queue/entities/commercial-action-task.entity';
 
-const DEFAULT_SLA_MINUTES = 30;
-const DEFAULT_AUTO_CLOSE_HOURS = 24;
+const FALLBACK_SLA_MINUTES = 30;
+const FALLBACK_AUTO_CLOSE_HOURS = 24;
 
 @Injectable()
 export class MissedCallSlaJob implements OnModuleInit {
@@ -24,6 +25,7 @@ export class MissedCallSlaJob implements OnModuleInit {
     private readonly cronConfigService: CronConfigService,
     private readonly notificationService: NotificationService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly systemConfig: SystemConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -34,11 +36,18 @@ export class MissedCallSlaJob implements OnModuleInit {
     let escalated = 0;
     let closed = 0;
 
+    const [slaMinutesStr, autoCloseHoursStr] = await Promise.all([
+      this.systemConfig.get('MISSED_CALL_SLA_MINUTES'),
+      this.systemConfig.get('MISSED_CALL_AUTO_CLOSE_HOURS'),
+    ]);
+    const slaMinutes      = parseInt(slaMinutesStr      ?? String(FALLBACK_SLA_MINUTES),      10) || FALLBACK_SLA_MINUTES;
+    const autoCloseHours  = parseInt(autoCloseHoursStr  ?? String(FALLBACK_AUTO_CLOSE_HOURS), 10) || FALLBACK_AUTO_CLOSE_HOURS;
+
     // US3.1 + US3.2 : SLA breach detection and escalation
-    escalated = await this.checkSlaBreaches();
+    escalated = await this.checkSlaBreaches(slaMinutes);
 
     // US3.3 : Auto-close after 24h without action
-    closed = await this.autoCloseOldEvents();
+    closed = await this.autoCloseOldEvents(autoCloseHours);
 
     const msg = `MissedCallSlaJob — ${escalated} escalade(s), ${closed} fermeture(s) auto`;
     this.logger.log(msg);
@@ -47,7 +56,7 @@ export class MissedCallSlaJob implements OnModuleInit {
 
   // US3.1 : Find assigned events whose task dueAt has passed
 
-  private async checkSlaBreaches(): Promise<number> {
+  private async checkSlaBreaches(slaMinutes: number = FALLBACK_SLA_MINUTES): Promise<number> {
     const overdue = await this.missedCallRepo.find({
       where: {
         status: 'assigned',
@@ -69,7 +78,7 @@ export class MissedCallSlaJob implements OnModuleInit {
         const isBreach =
           (task && task.dueAt && task.dueAt < now && task.status === 'pending') ||
           (!task &&
-            mc.occurredAt < new Date(now.getTime() - DEFAULT_SLA_MINUTES * 60_000));
+            mc.occurredAt < new Date(now.getTime() - slaMinutes * 60_000));
 
         if (!isBreach) continue;
 
@@ -129,9 +138,9 @@ export class MissedCallSlaJob implements OnModuleInit {
 
   // US3.3 : Auto-close events pending/assigned/escalated for > 24h
 
-  private async autoCloseOldEvents(): Promise<number> {
+  private async autoCloseOldEvents(autoCloseHours: number = FALLBACK_AUTO_CLOSE_HOURS): Promise<number> {
     const cutoff = new Date(
-      Date.now() - DEFAULT_AUTO_CLOSE_HOURS * 60 * 60_000,
+      Date.now() - autoCloseHours * 60 * 60_000,
     );
 
     const stale = await this.missedCallRepo.find({
@@ -157,7 +166,7 @@ export class MissedCallSlaJob implements OnModuleInit {
         }
 
         this.logger.log(
-          `MISSED_CALL_AUTO_CLOSED id=${mc.id} phone=${mc.clientPhone} reason=no_action_${DEFAULT_AUTO_CLOSE_HOURS}h`,
+          `MISSED_CALL_AUTO_CLOSED id=${mc.id} phone=${mc.clientPhone} reason=no_action_${autoCloseHours}h`,
         );
         count++;
       } catch (err) {

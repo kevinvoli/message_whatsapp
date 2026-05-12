@@ -9,6 +9,7 @@ import { ActionQueueModule } from 'src/action-queue/action-queue.module';
 import { CommercialActionTask } from 'src/action-queue/entities/commercial-action-task.entity';
 import { NotificationModule } from 'src/notification/notification.module';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
+import { SystemConfigModule } from 'src/system-config/system-config.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
     ActionQueueModule,
     NotificationModule,
     JorbsModule,
+    SystemConfigModule,
   ],
   controllers: [MissedCallController],
   providers: [MissedCallHandlerService, MissedCallSlaJob, MissedCallService],

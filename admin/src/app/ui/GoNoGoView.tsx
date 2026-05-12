@@ -18,6 +18,7 @@ const GICOP_CRON_RULES: { key: string; recetteEnabled: boolean; label: string; r
   { key: 'orphan-checker',           recetteEnabled: true,  label: 'Rattrapage orphelins',    reason: 'Actif — filet de sécurité conversations sans poste' },
   { key: 'webhook-purge',            recetteEnabled: true,  label: 'Purge webhook',           reason: 'Actif — maintenance courante' },
   { key: 'obligation-quality-check', recetteEnabled: true,  label: 'Qualité messages GICOP', reason: 'Actif — contrôle qualité périodique des messages commerciaux' },
+  { key: 'missed-call-sla',           recetteEnabled: true,  label: 'Appels en absence — SLA & fermeture auto', reason: 'Actif — escalade si SLA dépassé, fermeture automatique après 24h sans action' },
 ];
 
 const GICOP_FLAG_RULES: { key: string; expectedValue: string; label: string; reason: string }[] = [

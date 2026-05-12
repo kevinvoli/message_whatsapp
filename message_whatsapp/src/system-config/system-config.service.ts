@@ -125,6 +125,22 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
     description: 'true / false — autorise le nœud AI_REPLY dans les FlowBots',
   },
 
+
+  // ─── Appels en absence ────────────────────────────────────────────────────────
+  {
+    key: 'MISSED_CALL_SLA_MINUTES',
+    label: 'SLA appels en absence (minutes)',
+    category: 'missed_calls',
+    description: 'Délai maximum (minutes) avant escalade. Défaut : 30.',
+    defaultValue: '30',
+  },
+  {
+    key: 'MISSED_CALL_AUTO_CLOSE_HOURS',
+    label: 'Fermeture auto appels en absence (heures)',
+    category: 'missed_calls',
+    description: 'Délai (heures) avant fermeture automatique sans action. Défaut : 24.',
+    defaultValue: '24',
+  },
 ];
 
 
