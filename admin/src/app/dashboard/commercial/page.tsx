@@ -48,6 +48,7 @@ import OutboxSyncView from '@/app/ui/OutboxSyncView';
 import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
 import PresenceView from '@/app/ui/PresenceView';
 import CommercialGroupsView from '@/app/ui/CommercialGroupsView';
+import MissedCallsView from '@/app/ui/MissedCallsView';
 // ── Vues fusionnées avec onglets ──────────────────────────────────────────────
 import PlanningTabsView from '@/app/ui/PlanningTabsView';
 import DispatchTabsView from '@/app/ui/DispatchTabsView';
@@ -233,6 +234,8 @@ export default function AdminDashboard() {
                 return <PresenceView />;
             case 'commercial-groups':
                 return <CommercialGroupsView />;
+            case 'missed-calls':
+                return <MissedCallsView />;
             case 'complaints':
                 return <ComplaintsView />;
             case 'login-logs':

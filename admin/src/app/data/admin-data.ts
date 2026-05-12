@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, Route, Activity, ShieldCheck, LayoutDashboard, Timer, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Lock, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2 } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, Route, Activity, ShieldCheck, LayoutDashboard, Timer, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Lock, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2, PhoneOff } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -82,6 +82,7 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'integration', name: 'Integration ERP', icon: Link2, badge: null },
       { id: 'outbound-webhooks', name: 'Webhooks sortants', icon: Webhook, badge: null },
       { id: 'gicop-supervision', name: 'Supervision GICOP', icon: Stethoscope, badge: 'P0' },
+      { id: 'missed-calls', name: 'Appels en absence', icon: PhoneOff, badge: null },
       { id: 'outbox-sync', name: 'Sync DB2', icon: Database, badge: null },
       { id: 'complaints', name: 'Plaintes clients', icon: AlertCircle, badge: null },
     ],

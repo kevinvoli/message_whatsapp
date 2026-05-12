@@ -81,7 +81,9 @@ export type ViewMode =
   // Device-Poste mapping
   | 'call-devices'
   | 'presence'
-  | 'commercial-groups';
+  | 'commercial-groups'
+  // Appels en absence
+  | 'missed-calls';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
