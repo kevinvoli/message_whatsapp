@@ -63,9 +63,15 @@ export class WindowRotationService {
       return;
     }
 
-    // S'assurer qu'un batch d'obligations est actif pour ce poste
+    // S'assurer qu'un batch d'obligations est actif pour ce poste.
+    // On vérifie d'abord si un batch existe déjà (PENDING ou COMPLETE) pour ne pas
+    // en créer un nouveau et remettre à zéro les appels d'un batch COMPLETE dont
+    // la rotation n'a pas encore eu lieu (reconnexion alors que 5/5/5 sont faits).
     if (await this.obligationService?.isEnabled()) {
-      await this.obligationService.getOrCreateActiveBatch(posteId);
+      const existingBatch = await this.obligationService.getActiveBatch(posteId);
+      if (!existingBatch) {
+        await this.obligationService.getOrCreateActiveBatch(posteId);
+      }
     }
     const { quotaActive, quotaTotal } = await this.capacityService.getQuotas();
 
