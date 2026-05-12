@@ -8,7 +8,6 @@ import { useChatStore } from '@/store/chatStore';
 import styles from './ConversationList.module.css';
 
 const ROTATION_BLOCKED_LABELS: Record<string, string> = {
-  quality_check_failed:        'Répondez au dernier message de chaque conversation avant la rotation.',
   call_obligations_incomplete: 'Complétez vos obligations d\'appels pour débloquer la rotation.',
 };
 

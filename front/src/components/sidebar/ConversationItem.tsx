@@ -307,12 +307,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               </div>
             )}
 
-            {obligationStatus && !obligationStatus.qualityCheckPassed && (
-              <div className="flex items-center gap-1.5 text-yellow-300">
-                <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                <span>Répondez aux clients du bloc actif (10 conversations)</span>
-              </div>
-            )}
 
             <div className="absolute left-4 bottom-0 translate-y-full w-0 h-0
                             border-x-4 border-x-transparent border-t-4 border-t-gray-900" />

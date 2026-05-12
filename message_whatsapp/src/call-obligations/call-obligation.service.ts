@@ -336,7 +336,6 @@ export class CallObligationService {
     return this.batchRepo.find({
       where: {
         status: BatchStatus.PENDING,
-        qualityCheckPassed: false,
         createdAt: LessThan(cutoff),
       },
     });
@@ -397,8 +396,7 @@ export class CallObligationService {
     return (
       batch.annuleeDone >= REQUIRED_PER_CATEGORY &&
       batch.livreeDone >= REQUIRED_PER_CATEGORY &&
-      batch.sansCommandeDone >= REQUIRED_PER_CATEGORY &&
-      batch.qualityCheckPassed
+      batch.sansCommandeDone >= REQUIRED_PER_CATEGORY
     );
   }
 
