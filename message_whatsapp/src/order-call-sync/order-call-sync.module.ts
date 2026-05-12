@@ -16,6 +16,7 @@ import { CallDeviceModule } from 'src/call-device/call-device.module';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { WorkScheduleModule } from 'src/work-schedule/work-schedule.module';
+import { MissedCallModule } from 'src/missed-calls/missed-call.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { WorkScheduleModule } from 'src/work-schedule/work-schedule.module';
     WindowModule,
     RedisModule,
     WorkScheduleModule,
+    MissedCallModule,
   ],
   controllers: [OrderSyncAdminController],
   providers: [OrderCallSyncService, OrderCallSyncJob],

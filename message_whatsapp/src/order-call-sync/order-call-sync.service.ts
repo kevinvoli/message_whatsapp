@@ -32,6 +32,7 @@ import { ClientIdentityMapping } from 'src/integration/entities/client-identity-
 import { normalizePhone } from 'src/shared/utils/normalize-phone';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
 import { WorkScheduleService } from 'src/work-schedule/work-schedule.service';
+import { MissedCallHandlerService } from 'src/missed-calls/missed-call-handler.service';
 
 const CURSOR_SCOPE            = 'global';
 const CURSOR_LOOKBACK_MINUTES = 2;
@@ -84,6 +85,9 @@ export class OrderCallSyncService {
     private readonly callLogRepo: Repository<CallLog>,
 
     private readonly workScheduleService: WorkScheduleService,
+
+    @Optional()
+    private readonly missedCallHandlerService: MissedCallHandlerService | null = null,
   ) {}
 
   async syncNewCalls(): Promise<{ processed: number; obligations: number; errors: number }> {
@@ -326,6 +330,24 @@ export class OrderCallSyncService {
         }
       }
 
+      // Appel en absence (missed) : créer tâche de rappel via MissedCallHandlerService
+      if (call.callType.toLowerCase() === ORDER_CALL_TYPE_MISSED && this.missedCallHandlerService) {
+        const resolvedPosteId = call.deviceId
+          ? (allDevices.find((d) => d.deviceId === call.deviceId)?.posteId ?? null)
+          : null;
+        this.missedCallHandlerService.handle({
+          source:       'db2',
+          externalId:   String(call.id),
+          clientPhone:  call.remoteNumber ?? '',
+          posteId:      resolvedPosteId,
+          commercialId: commercialIdDb1,
+          deviceId:     call.deviceId ?? null,
+          occurredAt:   call.callTimestamp,
+        }).catch((err: Error) =>
+          this.logger.warn(`missedCallHandler.handle failed for call ${call.id}: ${err.message}`),
+        );
+      }
+
       if (!this.isEligibleForObligation(call)) continue;
 
       let logId: string | null = null;
@@ -337,6 +359,35 @@ export class OrderCallSyncService {
         newCalls++;
         const log = await this.processCall(call);
         logId = log.id;
+
+        // Vérifier si cet appel sortant est un rappel d'appel en absence
+        // Si oui, skip le matching GICOP (règle métier : rappel != obligation GICOP)
+        let isMissedCallCallback = false;
+        if (this.missedCallHandlerService) {
+          try {
+            const resolvedPosteId = call.deviceId
+              ? (allDevices.find((d) => d.deviceId === call.deviceId)?.posteId ?? null)
+              : null;
+            if (resolvedPosteId) {
+              isMissedCallCallback = await this.missedCallHandlerService.onOutgoingCallDetected({
+                callEventExternalId: String(call.id),
+                posteId:             resolvedPosteId,
+                commercialId:        commercialIdDb1 ?? '',
+                clientPhone:         normalizePhone(call.remoteNumber ?? ''),
+                occurredAt:          call.callTimestamp,
+                durationSeconds:     this.normalizeDuration(call.duration),
+              });
+            }
+          } catch (err) {
+            this.logger.warn(`onOutgoingCallDetected failed for call ${call.id}: ${(err as Error).message}`);
+          }
+        }
+
+        if (isMissedCallCallback) {
+          this.logger.log(`MISSED_CALL_CALLBACK call.id=${call.id} — skip matching obligation GICOP`);
+          await this.syncLog.markSuccess(logId!);
+          continue;
+        }
 
         const result = await this.matchObligation(call);
         if (result?.matched) {
