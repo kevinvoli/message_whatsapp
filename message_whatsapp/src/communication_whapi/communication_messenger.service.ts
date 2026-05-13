@@ -27,7 +27,7 @@ export class CommunicationMessengerService {
     try {
       const response = await axios.get<{ access_token?: string }>(
         `https://graph.facebook.com/${this.META_API_VERSION}/${pageId}`,
-        { params: { fields: 'access_token', access_token: userToken } },
+        { params: { fields: 'access_token', access_token: userToken }, timeout: 5_000 },
       );
       const pat = response.data?.access_token;
       if (pat) {
@@ -210,6 +210,7 @@ export class CommunicationMessengerService {
           Authorization: `Bearer ${effectiveToken}`,
           'Content-Type': 'application/json',
         },
+        timeout: 15_000,
       })
       .catch((err: AxiosError<{ error?: { message?: string; code?: number; type?: string; error_subcode?: number; fbtrace_id?: string } }>) => {
         const apiErr = err.response?.data?.error;
@@ -275,6 +276,7 @@ export class CommunicationMessengerService {
         Authorization: `Bearer ${effectiveToken}`,
         ...form.getHeaders(),
       },
+      timeout: 30_000,
     });
 
     const attachmentId: string = uploadResponse.data?.attachment_id;
@@ -302,6 +304,7 @@ export class CommunicationMessengerService {
         Authorization: `Bearer ${effectiveToken}`,
         'Content-Type': 'application/json',
       },
+      timeout: 15_000,
     });
 
     const messageId: string = sendResponse.data?.message_id;
