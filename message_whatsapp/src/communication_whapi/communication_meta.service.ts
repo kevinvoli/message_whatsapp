@@ -301,6 +301,7 @@ export class CommunicationMetaService {
       const url = `https://graph.facebook.com/${this.META_API_VERSION}/${mediaId}${query}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 10_000,
       });
       return response.data?.url ?? null;
     } catch (error) {
@@ -352,6 +353,7 @@ export class CommunicationMetaService {
       const response = await axios.get(mediaUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
         responseType: 'arraybuffer',
+        timeout: 15_000,
       });
 
       const buffer = Buffer.from(response.data);

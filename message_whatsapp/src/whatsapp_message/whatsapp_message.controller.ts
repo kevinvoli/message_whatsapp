@@ -396,7 +396,6 @@ export class WhatsappMessageController {
         channel.channel_id,
       );
 
-
       if (refreshedUrl) {
         if (media && refreshedUrl !== media.url) {
           await this.mediaRepository.update(media.id, { url: refreshedUrl });
@@ -406,17 +405,9 @@ export class WhatsappMessageController {
           refreshedUrl,
           channel.token,
         );
-
       }
-    }
-
-    // Final fallback: resolve URL then download (handles transient Meta API issues)
-    if (!downloaded) {
-      downloaded = await this.metaService.downloadMedia(
-        providerMediaId,
-        channel.token,
-        channel.channel_id,
-      );
+      // getMediaUrl a retourné null : le media ID n'existe plus côté Meta,
+      // inutile d'appeler downloadMedia qui rappellerait getMediaUrl une seconde fois.
     }
 
 
