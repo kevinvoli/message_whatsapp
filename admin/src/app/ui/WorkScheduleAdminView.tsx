@@ -402,7 +402,9 @@ export default function WorkScheduleAdminView() {
   const [schedules, setSchedules]     = useState<WorkSchedule[]>([]);
   const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
   const [availableGroups, setAvailableGroups] = useState<CommercialGroup[]>([]);
-  const [loading, setLoading]         = useState(false);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [loadingCommerciaux, setLoadingCommerciaux] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   const [showModal, setShowModal]     = useState(false);
   const [editItem, setEditItem]       = useState<WorkSchedule | null>(null);
   const [deletingId, setDeletingId]   = useState<string | null>(null);
@@ -411,18 +413,28 @@ export default function WorkScheduleAdminView() {
 
   const commercialMap = new Map(commerciaux.map((c) => [c.id, c.name]));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [s, c, g] = await Promise.all([getAllSchedules(), getCommerciaux(), getGroups()]);
-      setSchedules(s);
-      setCommerciaux(c);
-      setAvailableGroups(g.filter((gr) => gr.isActive));
-    } catch { /* silencieux */ }
-    finally { setLoading(false); }
+  const load = useCallback(() => {
+    setLoadingSchedules(true);
+    setLoadingCommerciaux(true);
+    setLoadingGroups(true);
+
+    getAllSchedules()
+      .then((s) => setSchedules(s))
+      .catch(() => { /* silencieux */ })
+      .finally(() => setLoadingSchedules(false));
+
+    getCommerciaux()
+      .then((c) => setCommerciaux(c))
+      .catch(() => { /* silencieux */ })
+      .finally(() => setLoadingCommerciaux(false));
+
+    getGroups()
+      .then((g) => setAvailableGroups(g.filter((gr) => gr.isActive)))
+      .catch(() => { /* silencieux */ })
+      .finally(() => setLoadingGroups(false));
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const openCreate = (groupId?: string) => {
     setEditItem(null);
@@ -431,7 +443,7 @@ export default function WorkScheduleAdminView() {
   };
   const openEdit   = (s: WorkSchedule) => { setPresetGroupId(null); setEditItem(s); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditItem(null); setPresetGroupId(null); };
-  const onSaved    = () => { closeModal(); void load(); };
+  const onSaved    = () => { closeModal(); load(); };
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
@@ -479,14 +491,19 @@ export default function WorkScheduleAdminView() {
           <CalendarDays className="w-6 h-6 text-indigo-600" />
           <h2 className="text-xl font-bold text-gray-900">Temps de travail</h2>
         </div>
-        {activeTab === 'individual' && (
-          <button
-            onClick={() => openCreate()}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> Nouveau créneau
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {(loadingCommerciaux || loadingGroups) && (
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+          )}
+          {activeTab === 'individual' && (
+            <button
+              onClick={() => openCreate()}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" /> Nouveau créneau
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Onglets */}
@@ -510,7 +527,7 @@ export default function WorkScheduleAdminView() {
         })}
       </div>
 
-      {loading && schedules.length === 0 ? (
+      {loadingSchedules && schedules.length === 0 ? (
         <div className="flex items-center justify-center h-32 text-gray-400">
           <Loader2 className="w-6 h-6 animate-spin mr-2" /> Chargement…
         </div>
