@@ -2,12 +2,16 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SlaRule, SlaMetric, SlaSeverity } from './entities/sla-rule.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 import {
   IsString,
   IsNumber,
@@ -81,7 +85,34 @@ export class SlaService {
 
     @InjectRepository(WhatsappMessage)
     private readonly messageRepo: Repository<WhatsappMessage>,
+
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
+
+  // ─── Cache helpers ────────────────────────────────────────────────────────
+
+  async getActiveRules(tenantId: string): Promise<SlaRule[]> {
+    const cacheKey = `sla:rules:${tenantId}`;
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) return JSON.parse(cached) as SlaRule[];
+      } catch { /* fallback DB */ }
+    }
+    const rules = await this.ruleRepo.find({
+      where: { tenant_id: tenantId, is_active: true },
+      order: { metric: 'ASC' },
+    });
+    if (this.redis) {
+      try { await this.redis.setex(cacheKey, 300, JSON.stringify(rules)); } catch { /* ok */ }
+    }
+    return rules;
+  }
+
+  async invalidateSlaCache(tenantId: string): Promise<void> {
+    if (!this.redis) return;
+    try { await this.redis.del(`sla:rules:${tenantId}`); } catch { /* ok */ }
+  }
 
   // ─── CRUD Règles ──────────────────────────────────────────────────────────
 
@@ -94,7 +125,9 @@ export class SlaService {
         `Une règle SLA pour la métrique "${dto.metric}" existe déjà pour ce tenant`,
       );
     }
-    return this.ruleRepo.save(this.ruleRepo.create(dto));
+    const rule = await this.ruleRepo.save(this.ruleRepo.create(dto));
+    await this.invalidateSlaCache(dto.tenant_id);
+    return rule;
   }
 
   async findAllRules(tenantId: string): Promise<SlaRule[]> {
@@ -108,13 +141,16 @@ export class SlaService {
     const rule = await this.ruleRepo.findOne({ where: { id, tenant_id: tenantId } });
     if (!rule) throw new NotFoundException(`Règle SLA ${id} introuvable`);
     Object.assign(rule, dto);
-    return this.ruleRepo.save(rule);
+    const saved = await this.ruleRepo.save(rule);
+    await this.invalidateSlaCache(tenantId);
+    return saved;
   }
 
   async removeRule(id: string, tenantId: string): Promise<void> {
     const rule = await this.ruleRepo.findOne({ where: { id, tenant_id: tenantId } });
     if (!rule) throw new NotFoundException(`Règle SLA ${id} introuvable`);
     await this.ruleRepo.delete(rule.id);
+    await this.invalidateSlaCache(tenantId);
   }
 
   // ─── Évaluation SLA ───────────────────────────────────────────────────────

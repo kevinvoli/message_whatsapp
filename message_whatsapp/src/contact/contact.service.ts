@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, Optional } from '@nestjs/common';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactCallDto } from './dto/update-contact-call.dto';
@@ -10,6 +10,8 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 @Injectable()
 export class ContactService {
@@ -20,6 +22,7 @@ export class ContactService {
     private readonly commercialRepo: Repository<WhatsappCommercial>,
     private readonly callLogService: CallLogService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
   
 
@@ -130,6 +133,26 @@ export class ContactService {
       .getMany();
   }
 
+  async findById(contactId: string): Promise<Contact | null> {
+    const cacheKey = `contact:${contactId}`;
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) return JSON.parse(cached) as Contact;
+      } catch { /* fallback */ }
+    }
+    const contact = await this.repo.findOne({ where: { id: contactId } });
+    if (contact && this.redis) {
+      try { await this.redis.setex(cacheKey, 300, JSON.stringify(contact)); } catch { /* ok */ }
+    }
+    return contact;
+  }
+
+  async invalidateContact(contactId: string): Promise<void> {
+    if (!this.redis) return;
+    try { await this.redis.del(`contact:${contactId}`); } catch { /* ok */ }
+  }
+
   async findOne(id: string) {
     const contact = await this.repo.findOne({
       where: { id },
@@ -144,7 +167,9 @@ export class ContactService {
   async update(id: string, dto: UpdateContactDto) {
     const contact = await this.findOne(id);
     Object.assign(contact, dto);
-    return this.repo.save(contact);
+    const saved = await this.repo.save(contact);
+    await this.invalidateContact(id);
+    return saved;
   }
 
   async updateCallStatus(

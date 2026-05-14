@@ -8,8 +8,9 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'commercial_session' })
-@Index('IDX_session_commercial_id', ['commercial_id'])
-@Index('IDX_session_connected_at', ['connected_at'])
+@Index('IDX_session_commercial_id',       ['commercial_id'])
+@Index('IDX_session_connected_at',        ['connected_at'])
+@Index('IDX_sess_commercial_connected',   ['commercial_id', 'connected_at'])
 export class CommercialSession {
   @PrimaryGeneratedColumn('uuid')
   id: string;

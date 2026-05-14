@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Not, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
 import { ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
 import {
   GicopUser,
@@ -71,60 +71,62 @@ export class ErpClientSyncService {
     for (let i = 0; i < db2Clients.length; i += CHUNK_SIZE) {
       const chunk = db2Clients.slice(i, i + CHUNK_SIZE);
 
+      const phonePairs: Array<{ client: (typeof chunk)[0]; normalized: string }> = [];
       for (const client of chunk) {
-        // Utiliser phone principal, sinon phone2
         const rawPhone = client.phone ?? client.phone2;
         if (!rawPhone) continue;
-
         const normalized = normalizePhone(rawPhone);
         if (!normalized) continue;
+        phonePairs.push({ client, normalized });
+      }
+      if (phonePairs.length === 0) continue;
+
+      const normalizedPhones = phonePairs.map((p) => p.normalized);
+      const existingContacts = await this.contactRepo.find({
+        where: { phone: In(normalizedPhones) },
+        select: ['id', 'phone', 'contactSource', 'client_category', 'order_client_id'],
+      });
+      const existingByPhone = new Map(existingContacts.map((c) => [c.phone, c]));
+
+      const categoryResults = await Promise.allSettled(
+        phonePairs.map(({ client }) =>
+          this.orderCallSyncService.resolveCategoryByClientId(client.id, this.orderDb!),
+        ),
+      );
+
+      for (let j = 0; j < phonePairs.length; j++) {
+        const { client, normalized } = phonePairs[j];
+        const catResult = categoryResults[j];
+        if (catResult.status === 'rejected') { errors++; continue; }
+
+        const clientCategory = catResult.value as unknown as ClientCategory;
+        const existing = existingByPhone.get(normalized);
 
         try {
-          // Résoudre la catégorie via la méthode extraite de OrderCallSyncService
-          const resolvedCategory: CallTaskCategory =
-            await this.orderCallSyncService.resolveCategoryByClientId(client.id, this.orderDb!);
-
-          const clientCategory = resolvedCategory as unknown as ClientCategory;
-
-          // Construire le nom complet depuis nom + prenoms DB2
-          const fullName = [client.prenoms, client.nom]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || normalized;
-
-          // Upsert contact DB1
-          const existing = await this.contactRepo.findOne({
-            where:  { phone: normalized },
-            select: ['id', 'contactSource'],
-          });
-
           if (existing) {
-            // Mise à jour catégorie et order_client_id — ne pas écraser contactSource
             await this.contactRepo.update(existing.id, {
               client_category: clientCategory,
               order_client_id: client.id,
             });
             updated++;
           } else {
-            // Création contact ERP-only (pas de chat_id, pas de conversation)
+            const fullName = [client.prenoms, client.nom].filter(Boolean).join(' ').trim() || normalized;
             await this.contactRepo.save(
               this.contactRepo.create({
-                phone:              normalized,
-                name:               fullName,
-                contactSource:      ContactSource.ErpImport,
-                order_client_id:    client.id,
-                client_category:    clientCategory,
-                call_status:        CallStatus.À_APPeler,
-                conversion_status:  'client', // déjà client ERP — pas un "nouveau" contact
+                phone:             normalized,
+                name:              fullName,
+                contactSource:     ContactSource.ErpImport,
+                order_client_id:   client.id,
+                client_category:   clientCategory,
+                call_status:       CallStatus.À_APPeler,
+                conversion_status: 'client',
               }),
             );
             created++;
           }
         } catch (err) {
           errors++;
-          this.logger.warn(
-            `syncErpClients erreur client DB2 id=${client.id}: ${(err as Error).message}`,
-          );
+          this.logger.warn(`syncErpClients erreur client DB2 id=${client.id}: ${(err as Error).message}`);
         }
       }
     }

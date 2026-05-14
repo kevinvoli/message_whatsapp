@@ -23,6 +23,8 @@ export enum CallOutcome {
 @Index('IDX_call_log_commercial_id', ['commercial_id'])
 // tri chronologique
 @Index('IDX_call_log_called_at',     ['called_at'])
+// tableau de bord commercial : filtre commercial + tri temporel
+@Index('IDX_call_log_commercial_createdat', ['commercial_id', 'createdAt'])
 export class CallLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;

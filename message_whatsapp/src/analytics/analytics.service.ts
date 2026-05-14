@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -7,6 +7,8 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { FollowUp } from 'src/follow-up/entities/follow_up.entity';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 export interface AnalyticsSummaryDto {
   totalConversations: number;
@@ -80,6 +82,8 @@ export class AnalyticsService {
 
     @InjectRepository(FollowUp)
     private readonly followUpRepo: Repository<FollowUp>,
+
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
 
   private dateRange(from?: string, to?: string): { dateStart: Date; dateEnd: Date } {
@@ -92,7 +96,22 @@ export class AnalyticsService {
 
   // ─── Summary KPIs ─────────────────────────────────────────────────────────
 
-  async getSummary(
+  async getSummary(tenantId: string, from?: string, to?: string): Promise<AnalyticsSummaryDto> {
+    const cacheKey = `analytics:summary:${tenantId}:${from ?? ''}:${to ?? ''}`;
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) return JSON.parse(cached) as AnalyticsSummaryDto;
+      } catch { /* fallback */ }
+    }
+    const result = await this.computeSummary(tenantId, from, to);
+    if (this.redis) {
+      try { await this.redis.setex(cacheKey, 60, JSON.stringify(result)); } catch { /* ok */ }
+    }
+    return result;
+  }
+
+  private async computeSummary(
     tenantId: string,
     from?: string,
     to?: string,
@@ -339,7 +358,22 @@ export class AnalyticsService {
 
   // ─── Ranking commercial (4.7) ─────────────────────────────────────────────
 
-  async getCommercialRanking(
+  async getCommercialRanking(from?: string, to?: string): Promise<CommercialRankingDto[]> {
+    const cacheKey = `analytics:ranking:${from ?? 'default'}:${to ?? 'default'}`;
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) return JSON.parse(cached) as CommercialRankingDto[];
+      } catch { /* fallback */ }
+    }
+    const result = await this.computeCommercialRanking(from, to);
+    if (this.redis) {
+      try { await this.redis.setex(cacheKey, 120, JSON.stringify(result)); } catch { /* ok */ }
+    }
+    return result;
+  }
+
+  private async computeCommercialRanking(
     from?: string,
     to?: string,
   ): Promise<CommercialRankingDto[]> {

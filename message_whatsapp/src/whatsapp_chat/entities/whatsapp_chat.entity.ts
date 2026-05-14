@@ -52,6 +52,8 @@ export enum ConversationResult {
 @Index('IDX_chat_poste_time',            ['poste_id', 'createdAt', 'deletedAt'])
 // Index hot-path : liste des conversations d'un poste triées par activité récente
 @Index('IDX_chat_poste_activity',        ['poste_id', 'last_activity_at'])
+// Index pour les agrégations par résultat de conversation (objectifs/ranking)
+@Index('IDX_chat_conversation_result',   ['conversation_result', 'deletedAt'])
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

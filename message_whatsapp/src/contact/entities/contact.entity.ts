@@ -42,6 +42,8 @@ export enum ContactSource {
 @Index('IDX_contact_chat_id',           ['chat_id'])
 // filtre temporel + soft-delete
 @Index('IDX_contact_created_deleted',   ['createdAt', 'deletedAt'])
+// lookup ERP sync par identifiant client DB2
+@Index('IDX_contact_order_client_id',   ['order_client_id'])
 export class Contact {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

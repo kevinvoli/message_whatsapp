@@ -3,8 +3,10 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Update
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
 @Entity('work_schedule')
-@Index('IDX_ws_commercial_id', ['commercialId'])
-@Index('IDX_ws_group_id',      ['groupId'])
+@Index('IDX_ws_commercial_id',     ['commercialId'])
+@Index('IDX_ws_group_id',          ['groupId'])
+@Index('IDX_ws_commercial_active', ['commercialId', 'isActive'])
+@Index('IDX_ws_group_active_day',  ['groupId', 'dayOfWeek', 'isActive'])
 export class WorkSchedule {
   @PrimaryGeneratedColumn('uuid')
   id: string;

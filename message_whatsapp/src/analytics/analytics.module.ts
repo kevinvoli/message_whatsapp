@@ -8,6 +8,7 @@ import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { FollowUp } from 'src/follow-up/entities/follow_up.entity';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AnalyticsController } from './analytics.controller';
       CallLog,
       FollowUp,
     ]),
+    RedisModule,
   ],
   providers: [AnalyticsService],
   controllers: [AnalyticsController],

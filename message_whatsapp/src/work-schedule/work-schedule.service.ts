@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { WorkSchedule, DayOfWeek } from './entities/work-schedule.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { v4 as uuidv4 } from 'uuid';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.module';
 
 const DAY_ORDER: DayOfWeek[] = [
   'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
@@ -37,6 +39,7 @@ export class WorkScheduleService {
     private readonly repo: Repository<WorkSchedule>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
 
   async findAll(): Promise<WorkSchedule[]> {
@@ -57,24 +60,38 @@ export class WorkScheduleService {
     });
   }
 
-  /** Effective schedule for a commercial: individual overrides group (poste). */
+  /** Effective schedule for a commercial: individual overrides group (poste). Cache Redis TTL 300s. */
   async findForCommercial(commercialId: string): Promise<WorkScheduleDay[]> {
+    const cacheKey = `schedule:commercial:${commercialId}`;
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) return JSON.parse(cached) as WorkScheduleDay[];
+      } catch { /* fallback DB */ }
+    }
+    const result = await this.computeForCommercial(commercialId);
+    if (this.redis) {
+      try { await this.redis.setex(cacheKey, 300, JSON.stringify(result)); } catch { /* ok */ }
+    }
+    return result;
+  }
+
+  private async computeForCommercial(commercialId: string): Promise<WorkScheduleDay[]> {
     const commercial = await this.commercialRepo.findOne({
       where: { id: commercialId },
       relations: ['poste'],
     });
     const posteId = commercial?.poste?.id ?? null;
 
-    const individual: WorkSchedule[] = await this.repo.find({ where: { commercialId, isActive: true } });
-    const group: WorkSchedule[]       = posteId
-      ? await this.repo.find({ where: { groupId: posteId, isActive: true } })
-      : [];
+    const [individual, group] = await Promise.all([
+      this.repo.find({ where: { commercialId, isActive: true } }),
+      posteId ? this.repo.find({ where: { groupId: posteId, isActive: true } }) : Promise.resolve([]),
+    ]);
 
     const individualByDay = new Map<DayOfWeek, WorkSchedule>(individual.map((s) => [s.dayOfWeek, s]));
-    const groupByDay       = new Map<DayOfWeek, WorkSchedule>(group.map((s) => [s.dayOfWeek, s]));
+    const groupByDay = new Map<DayOfWeek, WorkSchedule>(group.map((s) => [s.dayOfWeek, s]));
 
     const result: WorkScheduleDay[] = [];
-
     for (const day of DAY_ORDER) {
       const s: WorkSchedule | undefined = individualByDay.get(day) ?? groupByDay.get(day);
       if (!s) continue;
@@ -88,8 +105,19 @@ export class WorkScheduleService {
         scheduleId: s.id,
       });
     }
-
     return result;
+  }
+
+  private async invalidateScheduleCache(commercialId?: string | null, groupId?: string | null): Promise<void> {
+    if (!this.redis) return;
+    try {
+      if (groupId) {
+        const keys = await this.redis.keys('schedule:commercial:*');
+        if (keys.length > 0) await this.redis.del(...keys);
+      } else if (commercialId) {
+        await this.redis.del(`schedule:commercial:${commercialId}`);
+      }
+    } catch { /* ok */ }
   }
 
   /** Today's effective schedule entry for a commercial. */
@@ -153,10 +181,16 @@ export class WorkScheduleService {
     if (dto.groupName   !== undefined) existing.groupName  = dto.groupName ?? null;
     if (dto.commercialId !== undefined) existing.commercialId = dto.commercialId ?? null;
 
-    return this.repo.save(existing);
+    const saved = await this.repo.save(existing);
+    await this.invalidateScheduleCache(saved.commercialId, saved.groupId);
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
+    const existing = await this.repo.findOne({ where: { id } });
+    if (existing) {
+      await this.invalidateScheduleCache(existing.commercialId, existing.groupId);
+    }
     await this.repo.delete(id);
   }
 }

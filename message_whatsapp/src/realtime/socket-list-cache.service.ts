@@ -6,7 +6,7 @@ import { REDIS_CLIENT } from 'src/redis/redis.module';
 @Injectable()
 export class SocketListCacheService {
   private readonly logger = new Logger(SocketListCacheService.name);
-  private static readonly MAX_CONVERSATIONS_TTL = 3;
+  private static readonly MAX_CONVERSATIONS_TTL = 15;
 
   constructor(
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
@@ -19,7 +19,7 @@ export class SocketListCacheService {
   ): Promise<T> {
     if (!this.redis) return loader();
 
-    const ttl = 2;
+    const ttl = 15;
     if (ttl > SocketListCacheService.MAX_CONVERSATIONS_TTL) {
       this.logger.warn(
         `TTL conversations ${ttl} dépasse MAX_CONVERSATIONS_TTL=${SocketListCacheService.MAX_CONVERSATIONS_TTL} — forcé à MAX`,
@@ -36,7 +36,7 @@ export class SocketListCacheService {
     if (raw !== null) return JSON.parse(raw) as T;
 
     const value = await loader();
-    await this.redis.setex(key, 2, JSON.stringify(value));
+    await this.redis.setex(key, 15, JSON.stringify(value));
     return value;
   }
 

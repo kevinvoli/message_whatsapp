@@ -11,13 +11,16 @@ import { FollowUp } from '../follow-up/entities/follow_up.entity';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { SystemConfigModule } from '../system-config/system-config.module';
 import { ConversationReport } from '../gicop-report/entities/conversation-report.entity';
+import { RedisModule } from '../redis/redis.module';
+import { TargetsCacheInvalidatorListener } from './targets-cache-invalidator.listener';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([CommercialTarget, CommercialDailyPerformance, WhatsappMessage, CallLog, FollowUp, WhatsappCommercial, ConversationReport]),
     SystemConfigModule,
+    RedisModule,
   ],
-  providers: [TargetsService, CommercialDailySnapshotService],
+  providers: [TargetsService, CommercialDailySnapshotService, TargetsCacheInvalidatorListener],
   controllers: [TargetsController],
   exports: [TargetsService, CommercialDailySnapshotService],
 })

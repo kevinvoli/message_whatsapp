@@ -29,6 +29,7 @@ export enum FollowUpStatus {
 @Index('IDX_follow_up_commercial_id', ['commercial_id'])
 @Index('IDX_follow_up_scheduled_at', ['scheduled_at'])
 @Index('IDX_follow_up_status', ['status'])
+@Index('IDX_follow_up_commercial_status_completed', ['commercial_id', 'status', 'completed_at'])
 export class FollowUp {
   @PrimaryGeneratedColumn('uuid')
   id: string;

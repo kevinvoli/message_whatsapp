@@ -42,30 +42,32 @@ export class IntegrationOutboxService {
 
   /**
    * Réclame un lot d'entrées à traiter (pending ou failed-and-due).
-   * Les marque 'processing' atomiquement.
+   * Les marque 'processing' atomiquement via transaction pessimiste (SELECT ... FOR UPDATE).
    */
   async claimBatch(limit = 20): Promise<IntegrationOutbox[]> {
     const now = new Date();
+    return this.repo.manager.transaction(async (manager) => {
+      const entries = await manager
+        .createQueryBuilder(IntegrationOutbox, 'o')
+        .setLock('pessimistic_write')
+        .where('o.status = :pending', { pending: 'pending' })
+        .orWhere(
+          '(o.status = :failed AND (o.nextRetryAt IS NULL OR o.nextRetryAt <= :now))',
+          { failed: 'failed', now },
+        )
+        .orderBy('o.createdAt', 'ASC')
+        .take(limit)
+        .getMany();
 
-    const entries = await this.repo
-      .createQueryBuilder('o')
-      .where('o.status = :pending', { pending: 'pending' })
-      .orWhere('(o.status = :failed AND (o.nextRetryAt IS NULL OR o.nextRetryAt <= :now))', {
-        failed: 'failed',
-        now,
-      })
-      .orderBy('o.createdAt', 'ASC')
-      .take(limit)
-      .getMany();
+      if (entries.length === 0) return [];
 
-    if (entries.length === 0) return [];
-
-    await this.repo.update(
-      { id: In(entries.map((e) => e.id)) },
-      { status: 'processing' },
-    );
-
-    return entries;
+      await manager.update(
+        IntegrationOutbox,
+        { id: In(entries.map((e) => e.id)) },
+        { status: 'processing' },
+      );
+      return entries;
+    });
   }
 
   async markSuccess(id: string): Promise<void> {
