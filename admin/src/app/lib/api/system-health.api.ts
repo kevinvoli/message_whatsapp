@@ -12,7 +12,15 @@ export interface SystemHealth {
     heapTotalMb: number;
     rssMb: number;
     externalMb: number;
+    arrayBuffersMb: number;
     heapUsedPct: number;
+    rssRamPct: number;
+    system: {
+      totalRamMb: number;
+      freeRamMb: number;
+      usedRamMb: number;
+      ramUsedPct: number;
+    };
   };
   services: {
     database: 'ok' | 'error';

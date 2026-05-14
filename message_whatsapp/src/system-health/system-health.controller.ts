@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
+import * as os from 'os';
 
 function bytesToMb(bytes: number) {
   return Math.round(bytes / 1024 / 1024);
@@ -31,6 +32,9 @@ export class SystemHealthController {
   @Get('health')
   async getHealth() {
     const mem = process.memoryUsage();
+    const totalRamBytes = os.totalmem();
+    const freeRamBytes  = os.freemem();
+    const usedRamBytes  = totalRamBytes - freeRamBytes;
 
     let dbStatus: 'ok' | 'error' = 'ok';
     try {
@@ -114,11 +118,19 @@ export class SystemHealthController {
       platform: process.platform,
       pid: process.pid,
       memory: {
-        heapUsedMb: bytesToMb(mem.heapUsed),
-        heapTotalMb: bytesToMb(mem.heapTotal),
-        rssMb: bytesToMb(mem.rss),
-        externalMb: bytesToMb(mem.external),
-        heapUsedPct: Math.round((mem.heapUsed / mem.heapTotal) * 100),
+        heapUsedMb:    bytesToMb(mem.heapUsed),
+        heapTotalMb:   bytesToMb(mem.heapTotal),
+        rssMb:         bytesToMb(mem.rss),
+        externalMb:    bytesToMb(mem.external),
+        arrayBuffersMb: bytesToMb(mem.arrayBuffers ?? 0),
+        heapUsedPct:   Math.round((mem.heapUsed / mem.heapTotal) * 100),
+        rssRamPct:     Math.round((mem.rss / totalRamBytes) * 100),
+        system: {
+          totalRamMb:  bytesToMb(totalRamBytes),
+          freeRamMb:   bytesToMb(freeRamBytes),
+          usedRamMb:   bytesToMb(usedRamBytes),
+          ramUsedPct:  Math.round((usedRamBytes / totalRamBytes) * 100),
+        },
       },
       services: {
         database: dbStatus,

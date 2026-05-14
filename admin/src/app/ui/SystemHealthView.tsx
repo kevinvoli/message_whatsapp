@@ -121,21 +121,57 @@ export default function SystemHealthView() {
           {/* Mémoire */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
             <h3 className="font-medium text-gray-800">Mémoire</h3>
-            <MemoryBar pct={health.memory.heapUsedPct} label={`Heap JS (${health.memory.heapUsedMb} Mo / ${health.memory.heapTotalMb} Mo)`} />
-            <div className="grid grid-cols-3 gap-3 pt-2">
+
+            {/* RAM système globale */}
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">RAM système</p>
+              <MemoryBar
+                pct={health.memory.system.ramUsedPct}
+                label={`Utilisée (${health.memory.system.usedRamMb} Mo / ${health.memory.system.totalRamMb} Mo) — ${health.memory.system.freeRamMb} Mo libre`}
+              />
+            </div>
+
+            {/* RSS du processus NestJS dans la RAM */}
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Processus NestJS (RSS)</p>
+              <MemoryBar
+                pct={health.memory.rssRamPct}
+                label={`${health.memory.rssMb} Mo RSS — ${health.memory.rssRamPct}% de la RAM totale`}
+              />
+            </div>
+
+            {/* Détail heap V8 */}
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Heap JavaScript (V8)</p>
+              <MemoryBar
+                pct={health.memory.heapUsedPct}
+                label={`${health.memory.heapUsedMb} Mo / ${health.memory.heapTotalMb} Mo alloués`}
+              />
+            </div>
+
+            {/* Décomposition mémoire processus */}
+            <div className="grid grid-cols-4 gap-3 pt-1">
               <div className="text-center bg-gray-50 rounded-lg py-3">
-                <p className="text-lg font-semibold text-gray-800">{health.memory.rssMb} Mo</p>
-                <p className="text-xs text-gray-500">RSS</p>
+                <p className="text-base font-semibold text-gray-800">{health.memory.rssMb} Mo</p>
+                <p className="text-xs text-gray-500">RSS total</p>
               </div>
               <div className="text-center bg-gray-50 rounded-lg py-3">
-                <p className="text-lg font-semibold text-gray-800">{health.memory.externalMb} Mo</p>
-                <p className="text-xs text-gray-500">Externe</p>
-              </div>
-              <div className="text-center bg-gray-50 rounded-lg py-3">
-                <p className="text-lg font-semibold text-gray-800">{health.memory.heapUsedPct}%</p>
+                <p className="text-base font-semibold text-gray-800">{health.memory.heapUsedMb} Mo</p>
                 <p className="text-xs text-gray-500">Heap utilisé</p>
               </div>
+              <div className="text-center bg-gray-50 rounded-lg py-3">
+                <p className="text-base font-semibold text-gray-800">{health.memory.externalMb} Mo</p>
+                <p className="text-xs text-gray-500">Externe (C++)</p>
+              </div>
+              <div className="text-center bg-gray-50 rounded-lg py-3">
+                <p className="text-base font-semibold text-gray-800">{health.memory.arrayBuffersMb} Mo</p>
+                <p className="text-xs text-gray-500">ArrayBuffers</p>
+              </div>
             </div>
+
+            <p className="text-xs text-gray-400">
+              Le RSS inclut heap, stack, code natif et buffers. La RAM système est celle de l'hôte (ou du conteneur Docker si cgroup v2).
+            </p>
           </div>
 
           {/* Infos serveur */}
