@@ -49,6 +49,7 @@ export class CommercialDailySnapshotService {
         );
       }
       this.logger.log(`Snapshot ${date} : ${entries.length} commercial(aux) enregistré(s)`);
+      await this.targetsService.invalidateRankingCache();
     } catch (err) {
       this.logger.error(`Erreur snapshot commercial ${date}: ${(err as Error).message}`);
     }
