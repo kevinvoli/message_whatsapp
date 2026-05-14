@@ -59,9 +59,10 @@ export class ConversationReportController {
   @ApiOperation({ summary: 'Soumet le rapport vers la plateforme de gestion des commandes' })
   submit(
     @Param('chatId') chatId: string,
+    @Body() dto: UpsertReportDto,
     @Request() req: { user: JwtUser },
   ) {
-    return this.submissionService.submitReport(chatId, req.user.userId);
+    return this.submissionService.submitReport(chatId, req.user.userId, dto);
   }
 
   @Get(':chatId/submission-status')

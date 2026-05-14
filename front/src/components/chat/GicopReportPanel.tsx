@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Bell, CheckCircle, ChevronDown, ChevronUp, ClipboardList, Loader2, Phone, Plus, Save, Send, Star, Trash2, X } from 'lucide-react';
+import { Bell, CheckCircle, ChevronDown, ChevronUp, ClipboardList, Loader2, Phone, Plus, Send, Star, Trash2, X } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import CreateFollowUpModal from './CreateFollowUpModal';
 
@@ -116,9 +116,6 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
   const [contact, setContact]   = useState<ContactInfo | null>(null);
   const [phones, setPhones]     = useState<PhoneEntry[]>([]);
   const [callLogs, setCallLogs] = useState<CallLogEntry[]>([]);
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
-  const [dirty, setDirty]       = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
   const [newPhone, setNewPhone]       = useState('');
@@ -144,15 +141,13 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
 
   useEffect(() => {
     loadSubmissionStatus();
-    setSaved(false);
-    setDirty(false);
     fetch(`${API_URL}/clients/by-chat/${chatId}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { dossier: Dossier | null; contact: ContactInfo | null; phones: PhoneEntry[]; callLogs: CallLogEntry[] } | null) => {
         if (!data) return;
         setDossier(data.dossier ? toDossier(data.dossier) : EMPTY_DOSSIER);
         setContact(data.contact ?? null);
-        setPhones(data.phones ?? []);
+        setPhones((data.phones ?? []).filter((p: PhoneEntry) => !p.isPrimary));
         setCallLogs(data.callLogs ?? []);
         if (data.dossier?.productCategory && !PRODUCT_CATEGORIES.includes(data.dossier.productCategory)) {
           setCustomCategory(data.dossier.productCategory);
@@ -161,14 +156,16 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
       .catch(() => {});
   }, [chatId, loadSubmissionStatus]);
 
-  // ── Soumission rapport vers la plateforme commandes ──────────────────────
+  // ── Soumission directe — aucune sauvegarde préalable ──────────────────────
 
   const handleSubmitReport = async () => {
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/gicop-report/${chatId}/submit`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify(toReportDto(dossier)),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { message?: string };
@@ -176,9 +173,7 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         setSubmissionError(err.message ?? `Erreur HTTP ${res.status}`);
         return;
       }
-      const data = await res.json() as { status: SubmissionStatus; error: string | null };
-      setSubmissionStatus(data.status);
-      setSubmissionError(data.error ?? null);
+      onClose();
     } catch {
       setSubmissionStatus('failed');
       setSubmissionError('Erreur réseau');
@@ -187,43 +182,10 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
     }
   };
 
-  // ── Sauvegarde explicite ─────────────────────────────────────────────────
-
-  const handleSave = async () => {
-    setSaving(true);
-    setSaved(false);
-    try {
-      const [res] = await Promise.all([
-        fetch(`${API_URL}/clients/by-chat/${chatId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(toDossier(dossier)),
-        }),
-        // Alimente aussi ConversationReport pour que submitReport() trouve les données complètes.
-        // fullName (ClientDossier) est envoyé en tant que clientName (ConversationReport).
-        fetch(`${API_URL}/gicop-report/${chatId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(toReportDto(dossier)),
-        }),
-      ]);
-      if (res.ok) {
-        const updated = await res.json() as { dossier: unknown };
-        if (updated.dossier) setDossier(toDossier(updated.dossier));
-        setSaved(true);
-        setDirty(false);
-      }
-    } finally { setSaving(false); }
-  };
-
   // ── Mise à jour état local uniquement ────────────────────────────────────
 
   const set = <K extends keyof Dossier>(key: K, val: Dossier[K]) => {
     setDossier((prev) => ({ ...prev, [key]: val }));
-    setDirty(true);
-    setSaved(false);
   };
 
   // ── Téléphones (sauvegarde immédiate car actions atomiques) ───────────────
@@ -516,8 +478,8 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         </div>
       </div>
 
-      {/* Footer — bouton enregistrer explicite */}
-      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-2">
+      {/* Footer */}
+      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-start gap-2">
         <button
           onClick={() => setShowFollowUpModal(true)}
           className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 border border-green-200 bg-green-50 rounded-lg hover:bg-green-100 transition-colors flex-shrink-0"
@@ -525,17 +487,6 @@ export default function GicopReportPanel({ chatId, onClose }: Props) {
         >
           <Bell className="w-3.5 h-3.5" />
           Relance
-        </button>
-        <span className="text-xs text-gray-400 flex-1 text-center truncate">
-          {saved && !dirty ? '✓ Enregistré' : dirty ? 'Non sauvegardé' : ''}
-        </span>
-        <button
-          onClick={() => void handleSave()}
-          disabled={saving || !dirty}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-        >
-          <Save className="w-3.5 h-3.5" />
-          {saving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
 
