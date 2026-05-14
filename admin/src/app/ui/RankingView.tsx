@@ -41,9 +41,8 @@ export default function RankingView() {
     setLoading(true);
     setError(null);
     try {
-      const [data, formula] = await Promise.all([getRanking(period), getRankingFormula()]);
+      const data = await getRanking(period);
       setEntries(data);
-      setWeights(formula);
     } catch {
       setError('Impossible de charger le classement.');
     } finally {
@@ -52,6 +51,11 @@ export default function RankingView() {
   }, [period]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Formule chargée une seule fois, indépendamment du classement
+  useEffect(() => {
+    getRankingFormula().then(setWeights).catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-6">

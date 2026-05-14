@@ -25,7 +25,8 @@ export default function IntegrationView() {
   const [tab, setTab] = useState<Tab>('clients');
   const [clientMappings, setClientMappings] = useState<ClientMapping[]>([]);
   const [commercialMappings, setCommercialMappings] = useState<CommercialMapping[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingMappings, setLoadingMappings] = useState(true);
+  const [loadingSyncStatus, setLoadingSyncStatus] = useState(true);
   const [syncStatus, setSyncStatus] = useState<OrderSyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<SyncCallsResult | null>(null);
@@ -42,13 +43,17 @@ export default function IntegrationView() {
   const [commercialSaving, setCommercialSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([getClientMappings(), getCommercialMappings(), getOrderSyncStatus()])
-      .then(([c, co, status]) => {
-        setClientMappings(c);
-        setCommercialMappings(co);
-        setSyncStatus(status);
-      })
-      .finally(() => setLoading(false));
+    // Mappings — rapides, affichés dès que disponibles
+    Promise.all([getClientMappings(), getCommercialMappings()])
+      .then(([c, co]) => { setClientMappings(c); setCommercialMappings(co); })
+      .catch(() => {})
+      .finally(() => setLoadingMappings(false));
+
+    // Statut sync DB2 — peut être lent (vérifie la connexion DB2), chargé indépendamment
+    getOrderSyncStatus()
+      .then(setSyncStatus)
+      .catch(() => {})
+      .finally(() => setLoadingSyncStatus(false));
   }, []);
 
   const saveClient = async () => {
@@ -107,7 +112,6 @@ export default function IntegrationView() {
     }
   };
 
-  if (loading) return <div className="p-6 text-gray-500">Chargement…</div>;
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
@@ -134,7 +138,9 @@ export default function IntegrationView() {
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-900">Synchronisation appels DB2</span>
-            {syncStatus && (
+            {loadingSyncStatus ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+            ) : syncStatus ? (
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 syncStatus.db2.dbAvailable
                   ? 'bg-green-100 text-green-700'
@@ -142,11 +148,11 @@ export default function IntegrationView() {
               }`}>
                 {syncStatus.db2.dbAvailable ? 'Connecté' : 'Déconnecté'}
               </span>
-            )}
+            ) : null}
           </div>
           <button
             onClick={() => void handleSyncCalls()}
-            disabled={syncing || !syncStatus?.db2.dbAvailable}
+            disabled={syncing || loadingSyncStatus || !syncStatus?.db2.dbAvailable}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {syncing
@@ -183,7 +189,7 @@ export default function IntegrationView() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex items-center border-b border-gray-200 gap-2">
         {(['clients', 'commercials', 'appareils'] as Tab[]).map((t) => (
           <button
             key={t}
@@ -197,6 +203,7 @@ export default function IntegrationView() {
             {t === 'clients' ? `Clients (${clientMappings.length})` : t === 'commercials' ? `Commerciaux (${commercialMappings.length})` : 'Appareils'}
           </button>
         ))}
+        {loadingMappings && <Loader2 className="w-4 h-4 animate-spin text-gray-400 ml-2" />}
       </div>
 
       {tab === 'clients' && (

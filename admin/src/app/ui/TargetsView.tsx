@@ -56,13 +56,13 @@ export default function TargetsView() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([getCommerciaux(), getTargets(), getProgressAll()])
-      .then(([c, t, p]) => {
-        setCommerciaux(c);
-        setTargets(t);
-        setProgress(p);
-      })
+    // Données principales — conditionnent l'affichage du contenu
+    Promise.all([getTargets(), getProgressAll()])
+      .then(([t, p]) => { setTargets(t); setProgress(p); })
       .finally(() => setLoading(false));
+
+    // Commerciaux — uniquement nécessaires pour le modal, chargés indépendamment
+    getCommerciaux().then(setCommerciaux).catch(() => {});
   }, []);
 
   const openCreate = () => {
