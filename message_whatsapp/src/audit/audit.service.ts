@@ -15,6 +15,7 @@ export interface LogAuditDto {
   meta?: Record<string, unknown>;
 }
 
+
 export interface AuditQueryDto {
   tenant_id?: string;
   actor_id?: string;
