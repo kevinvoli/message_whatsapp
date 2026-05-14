@@ -194,6 +194,9 @@ jobs:
             docker tag ghcr.io/${{ github.repository }}/front:latest ghcr.io/${{ github.repository }}/front:previous 2>/dev/null || true
             docker tag ghcr.io/${{ github.repository }}/admin:latest ghcr.io/${{ github.repository }}/admin:previous 2>/dev/null || true
 
+            # ── Authentification GHCR ─────────────────────────────────────────
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
             # ── Pull les nouvelles images ──────────────────────────────────────
             docker compose pull
 
