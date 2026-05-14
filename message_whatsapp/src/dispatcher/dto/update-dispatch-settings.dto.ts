@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdateDispatchSettingsDto {
   @IsOptional()
@@ -14,4 +14,8 @@ export class UpdateDispatchSettingsDto {
   @IsOptional()
   @IsString()
   offline_reinject_cron?: string;
+
+  @IsOptional()
+  @IsIn(['LEAST_LOADED', 'ROUND_ROBIN'])
+  dispatch_mode?: 'LEAST_LOADED' | 'ROUND_ROBIN';
 }

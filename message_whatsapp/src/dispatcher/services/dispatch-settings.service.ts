@@ -9,6 +9,7 @@ const DEFAULTS = {
   no_reply_reinject_interval_minutes: 5,
   read_only_check_interval_minutes: 10,
   offline_reinject_cron: '0 9 * * *',
+  dispatch_mode: 'LEAST_LOADED' as const,
 };
 
 @Injectable()

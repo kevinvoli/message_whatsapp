@@ -19,6 +19,7 @@ import {
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
+import { DispatchSettingsService } from './dispatch-settings.service';
 
 const DEFAULT_QUOTA_ACTIVE = 10;
 
@@ -53,6 +54,9 @@ export class QueueService implements OnModuleInit {
 
     @Optional()
     private readonly socketListCacheService: SocketListCacheService,
+
+    @Optional()
+    private readonly dispatchSettingsService: DispatchSettingsService,
   ) {}
 
   private async withDistributedLock<T>(resource: string, ttl: number, fn: () => Promise<T>): Promise<T> {
@@ -225,8 +229,24 @@ export class QueueService implements OnModuleInit {
 
       const candidates = allPositions.filter((qp) => qp.poste && !dedicatedSet.has(qp.poste_id));
 
-      // ─── ÉTAPE 1 : stratégie normale via queue_positions ─────────────────────
+      // ─── Lire le mode de dispatch configuré ──────────────────────────────────
+      const dispatchSettings = await this.dispatchSettingsService?.getSettings();
+      const dispatchMode = dispatchSettings?.dispatch_mode ?? 'LEAST_LOADED';
+
+      // ─── ÉTAPE 1 : stratégie via queue_positions ──────────────────────────────
       if (candidates.length > 0) {
+
+        // ── 1a : ROUND_ROBIN — rotation stricte, sans comptage de charge ─────────
+        if (dispatchMode === 'ROUND_ROBIN') {
+          const candidate = candidates[0];
+          this.logger.debug(
+            `ROUND_ROBIN → poste ${candidate.poste.name} (${candidate.poste_id})`,
+          );
+          await this.moveToEndInternal(candidate.poste_id);
+          return candidate.poste;
+        }
+
+        // ── 1b : LEAST_LOADED — poste avec le moins de conversations actives ─────
         const quotaRaw = this.systemConfig
           ? await this.systemConfig.get('CAPACITY_QUOTA_ACTIVE')
           : null;
@@ -273,7 +293,7 @@ export class QueueService implements OnModuleInit {
         }
 
         this.logger.debug(
-          `Poste selectionne: ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs (quota=${quotaActive})`,
+          `LEAST_LOADED → poste ${best.poste.name} (${best.poste.id}) avec ${bestCount} chats actifs (quota=${quotaActive})`,
         );
         await this.moveToEndInternal(best.poste_id);
         return best.poste;
@@ -319,6 +339,13 @@ export class QueueService implements OnModuleInit {
         fallbackCountMap.set(row.poste_id, parseInt(row.count, 10));
       }
 
+      if (dispatchMode === 'ROUND_ROBIN') {
+        this.logger.warn(
+          `Fallback BDD ROUND_ROBIN → poste ${allPostes[0].name} (${allPostes[0].id})`,
+        );
+        return allPostes[0];
+      }
+
       let bestFallback = allPostes[0];
       let bestFallbackCount = fallbackCountMap.get(bestFallback.id) ?? 0;
 
@@ -331,7 +358,7 @@ export class QueueService implements OnModuleInit {
       }
 
       this.logger.warn(
-        `Fallback BDD → poste ${bestFallback.name} (${bestFallback.id}) avec ${bestFallbackCount} chats actifs`,
+        `Fallback BDD LEAST_LOADED → poste ${bestFallback.name} (${bestFallback.id}) avec ${bestFallbackCount} chats actifs`,
       );
       return bestFallback;
       }),

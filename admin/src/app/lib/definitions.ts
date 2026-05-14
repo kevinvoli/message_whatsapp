@@ -488,6 +488,7 @@ export type DispatchSettings = {
   no_reply_reinject_interval_minutes: number;
   read_only_check_interval_minutes: number;
   offline_reinject_cron: string;
+  dispatch_mode: 'LEAST_LOADED' | 'ROUND_ROBIN';
 };
 
 

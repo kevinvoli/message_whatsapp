@@ -33,6 +33,14 @@ export class DispatchSettings {
   })
   offline_reinject_cron: string;
 
+  @Column({
+    name: 'dispatch_mode',
+    type: 'varchar',
+    length: 20,
+    default: 'LEAST_LOADED',
+  })
+  dispatch_mode: 'LEAST_LOADED' | 'ROUND_ROBIN';
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

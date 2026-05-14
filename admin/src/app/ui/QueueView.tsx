@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { QueuePosition, Poste } from "@/app/lib/definitions";
 import { getPostes } from "@/app/lib/api/postes.api";
-import { blockPosteFromQueue, getQueue, resetQueue, unblockPosteFromQueue } from "@/app/lib/api/dispatch.api";
+import { blockPosteFromQueue, getDispatchSettings, getQueue, resetQueue, unblockPosteFromQueue, updateDispatchSettings } from "@/app/lib/api/dispatch.api";
 import { logger } from "@/app/lib/logger";
 import { useToast } from "@/app/ui/ToastProvider";
 import { useRealtimePolling } from "@/app/hooks/useRealtimePolling";
@@ -57,6 +57,8 @@ const QueueView = ({ onRefresh }: { onRefresh?: () => void }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [lastReason, setLastReason] = useState<string | null>(null);
+  const [dispatchMode, setDispatchMode] = useState<'LEAST_LOADED' | 'ROUND_ROBIN'>('LEAST_LOADED');
+  const [savingMode, setSavingMode] = useState(false);
   const { addToast } = useToast();
 
   const refreshQueueFromRest = async () => {
@@ -89,6 +91,25 @@ const QueueView = ({ onRefresh }: { onRefresh?: () => void }) => {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    getDispatchSettings()
+      .then((s) => setDispatchMode(s.dispatch_mode ?? 'LEAST_LOADED'))
+      .catch(() => {});
+  }, []);
+
+  const handleModeChange = async (mode: 'LEAST_LOADED' | 'ROUND_ROBIN') => {
+    setSavingMode(true);
+    try {
+      await updateDispatchSettings({ dispatch_mode: mode });
+      setDispatchMode(mode);
+      addToast({ type: 'success', message: 'Mode de dispatch mis à jour' });
+    } catch {
+      addToast({ type: 'error', message: 'Erreur lors de la sauvegarde du mode' });
+    } finally {
+      setSavingMode(false);
+    }
+  };
 
   const pollCallback = useCallback(async () => {
     try {
@@ -236,6 +257,50 @@ const QueueView = ({ onRefresh }: { onRefresh?: () => void }) => {
           {lastReason && (
             <span className="text-xs text-gray-500">Source: {lastReason}</span>
           )}
+        </div>
+      </div>
+
+      {/* Mode de dispatch */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-800">Mode de dispatch</h3>
+          {savingMode && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {([
+            {
+              value: 'LEAST_LOADED' as const,
+              label: 'Charge minimale',
+              description: 'Le poste avec le moins de conversations actives reçoit le message en priorité.',
+            },
+            {
+              value: 'ROUND_ROBIN' as const,
+              label: 'Rotation stricte',
+              description: 'Chaque poste reçoit à son tour, quelle que soit sa charge actuelle.',
+            },
+          ]).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => void handleModeChange(opt.value)}
+              disabled={savingMode}
+              className={`text-left p-4 rounded-lg border-2 transition-colors disabled:opacity-60 ${
+                dispatchMode === opt.value
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-gray-900">{opt.label}</span>
+                {dispatchMode === opt.value && (
+                  <span className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded-full">
+                    Actif
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">{opt.description}</p>
+            </button>
+          ))}
         </div>
       </div>
 
