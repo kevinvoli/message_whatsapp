@@ -1,4 +1,4 @@
-import { Column, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryColumn, UpdateDateColumn, CreateDateColumn } from 'typeorm';
 
 /**
  * Table miroir côté DB2 : résumé complet du dossier client vu par la messagerie.
@@ -102,8 +102,8 @@ export class MessagingClientDossierMirror {
   @Column({ name: 'sync_error', type: 'text', nullable: true })
   syncError: string | null;
 
-  @Column({ name: 'submitted_at', type: 'datetime', nullable: true })
-  submittedAt: Date | null;
+  @CreateDateColumn({ name: 'submitted_at' })
+  submittedAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;

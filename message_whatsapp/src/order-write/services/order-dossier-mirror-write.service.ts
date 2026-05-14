@@ -144,7 +144,6 @@ export class OrderDossierMirrorWriteService {
         closedAt:           payload.closedAt ?? null,
         syncStatus:         'synced',
         syncError:          null,
-        submittedAt:        new Date(),
       };
 
       await this.orderDb
