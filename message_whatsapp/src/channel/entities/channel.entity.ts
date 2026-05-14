@@ -130,6 +130,15 @@ export class WhapiChannel {
   @Column({ name: 'no_close', type: 'boolean', default: false })
   no_close: boolean;
 
+  /**
+   * Nombre max de messages sortants avant que la conversation passe en lecture seule.
+   * null = utiliser la valeur globale (MAX_MESSAGES_BEFORE_READONLY dans SystemConfig).
+   * 0    = désactivé pour ce canal.
+   * N    = passer en read_only après N messages.
+   */
+  @Column({ name: 'max_messages_before_readonly', type: 'int', nullable: true, default: null })
+  maxMessagesBeforeReadonly: number | null;
+
   @ManyToOne(() => WhatsappPoste, (poste) => poste.channels, {
     nullable: true,
     onDelete: 'SET NULL',

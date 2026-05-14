@@ -11,6 +11,7 @@ import { PlatformSettingsService } from 'src/platform-settings/platform-settings
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
+import { ChannelService } from 'src/channel/channel.service';
 
 export const FOLLOW_UP_REMINDER_EVENT = 'follow_up.reminder';
 
@@ -38,6 +39,7 @@ export class FollowUpReminderService {
     private readonly eventEmitter: EventEmitter2,
     private readonly platformSettings: PlatformSettingsService,
     private readonly outboundRouter: OutboundRouterService,
+    private readonly channelService: ChannelService,
     @Optional() private readonly lockService: DistributedLockService,
   ) {}
 
@@ -164,6 +166,24 @@ export class FollowUpReminderService {
       });
 
       this.logger.log(`Template ${mapping.templateName} envoyé au client pour relance ${followUp.id}`);
+
+      // Incrémenter le compteur de messages sortants et vérifier la limite read_only.
+      if (followUp.conversation_id) {
+        await this.chatRepo.update(
+          { id: followUp.conversation_id },
+          { outboundMessageCount: () => 'outbound_message_count + 1' },
+        );
+        const updatedChat = await this.chatRepo.findOne({
+          where: { id: followUp.conversation_id },
+          select: ['chat_id', 'outboundMessageCount', 'channel_id'],
+        });
+        if (updatedChat) {
+          const limit = await this.channelService.getEffectiveMessageLimit(updatedChat.channel_id ?? '');
+          if (limit > 0 && (updatedChat.outboundMessageCount ?? 0) >= limit) {
+            await this.chatRepo.update({ id: followUp.conversation_id }, { read_only: true });
+          }
+        }
+      }
     } catch (err) {
       this.logger.warn(`trySendTemplate: échec envoi template pour relance ${followUp.id} — ${(err as Error).message}`);
     }

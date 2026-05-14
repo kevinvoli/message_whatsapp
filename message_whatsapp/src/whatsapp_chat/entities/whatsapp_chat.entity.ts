@@ -252,6 +252,10 @@ export class WhatsappChat {
   @Column({ name: 'customer_window_expires_at', type: 'datetime', nullable: true })
   customerWindowExpiresAt: Date | null;
 
+  /** Nombre de messages sortants (commerciaux + auto) depuis la dernière réponse client. */
+  @Column({ name: 'outbound_message_count', type: 'int', default: 0 })
+  outboundMessageCount: number;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

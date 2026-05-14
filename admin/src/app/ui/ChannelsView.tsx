@@ -475,6 +475,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [assigningPosteId, setAssigningPosteId] = useState<string>('');
   const [assignNoReadOnly, setAssignNoReadOnly] = useState(false);
   const [assignNoClose, setAssignNoClose] = useState(false);
+  const [assignMaxMessages, setAssignMaxMessages] = useState<number | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
 
   const openAssignModal = async (channel: Channel) => {
@@ -482,6 +483,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setAssigningPosteId(channel.poste_id ?? '');
     setAssignNoReadOnly(channel.no_read_only ?? false);
     setAssignNoClose(channel.no_close ?? false);
+    setAssignMaxMessages(channel.max_messages_before_readonly ?? null);
     setPostesLoading(true);
     try {
       const data = await getPostes();
@@ -499,9 +501,9 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     try {
       const [assigned, flagsUpdated] = await Promise.all([
         assignChannelToPoste(assignModal.channel.channel_id, assigningPosteId || null),
-        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose }),
+        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose, max_messages_before_readonly: assignMaxMessages }),
       ]);
-      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close };
+      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close, max_messages_before_readonly: flagsUpdated.max_messages_before_readonly };
       setItems((prev) => prev.map((c) => (c.id === merged.id ? merged : c)));
       addToast({ type: 'success', message: 'Paramètres du canal enregistrés.' });
       setAssignModal(null);
@@ -721,6 +723,11 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                   {channel.no_close && (
                     <span title="Jamais fermée" className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">FC</span>
                   )}
+                  {channel.max_messages_before_readonly !== null && channel.max_messages_before_readonly !== undefined && (
+                    <span title={`Limite : ${channel.max_messages_before_readonly} message(s) avant lecture seule`} className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                      {channel.max_messages_before_readonly}msg
+                    </span>
+                  )}
                   <button
                     onClick={() => void openAssignModal(channel)}
                     className="rounded p-1 text-indigo-500 hover:bg-indigo-50"
@@ -864,6 +871,25 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                   <span className="block text-xs text-gray-400 mt-0.5">La conversation ne peut pas être fermée manuellement ni par le cron d&apos;inactivité.</span>
                 </span>
               </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Messages max avant lecture seule
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={assignMaxMessages ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setAssignMaxMessages(v === '' ? null : parseInt(v, 10));
+                  }}
+                  placeholder="0 = désactivé (utilise la config globale si vide)"
+                  className="w-full rounded border px-3 py-2 text-sm text-gray-700 shadow focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Laissez vide pour utiliser la valeur globale. 0 = jamais en lecture seule.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">

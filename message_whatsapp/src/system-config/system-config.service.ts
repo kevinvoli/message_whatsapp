@@ -32,6 +32,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'SERVER_PUBLIC_HOST', label: 'URL publique du serveur', category: 'general', description: 'Utilisée pour les liens médias Meta (ex: https://your-domain.com)' },
   { key: 'APP_URL', label: 'URL de l\'application', category: 'general', description: 'Utilisée pour enregistrer le webhook Telegram' },
   { key: 'CORS_ORIGINS', label: 'Origines CORS autorisées', category: 'general', description: 'Liste séparée par des virgules, sans espaces' },
+  { key: 'MAX_MESSAGES_BEFORE_READONLY', label: 'Messages max avant lecture seule', category: 'general', description: 'Nombre de messages sortants (commerciaux + auto) avant passage en lecture seule. 0 = désactivé.', defaultValue: '0' },
 
   // ─── WhatsApp / Whapi ───────────────────────────────────────────────────────
   { key: 'WHAPI_URL', label: 'URL API Whapi', category: 'whapi' },

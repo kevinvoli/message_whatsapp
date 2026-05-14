@@ -6,6 +6,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
@@ -18,6 +19,7 @@ import { AppLogger } from 'src/logging/app-logger.service';
 import { ChannelProviderRegistry } from './domain/channel-provider.registry';
 import { ResolveTenantUseCase } from './application/resolve-tenant.use-case';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
+import type { SystemConfigService } from 'src/system-config/system-config.service';
 
 /**
  * TICKET-05-C-CLEANUP — `ChannelService` ne contient plus de délégations pures.
@@ -35,6 +37,8 @@ import { REDIS_CLIENT } from 'src/redis/redis.module';
  */
 @Injectable()
 export class ChannelService implements OnModuleInit {
+  private systemConfigService: SystemConfigService | null = null;
+
   constructor(
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
@@ -44,7 +48,15 @@ export class ChannelService implements OnModuleInit {
     private readonly providerRegistry: ChannelProviderRegistry,
     private readonly resolveTenantUseCase: ResolveTenantUseCase,
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private getSystemConfigService(): SystemConfigService {
+    if (!this.systemConfigService) {
+      this.systemConfigService = this.moduleRef.get<SystemConfigService>('SystemConfigService', { strict: false });
+    }
+    return this.systemConfigService!;
+  }
 
   private async cachedGet<T>(key: string, ttl: number, loader: () => Promise<T>): Promise<T> {
     if (this.redis) {
@@ -180,6 +192,26 @@ export class ChannelService implements OnModuleInit {
       select: ['channel_id', 'no_close', 'poste_id'],
     });
     return !!ch?.no_close || !!ch?.poste_id;
+  }
+
+  /**
+   * Retourne la limite effective de messages avant read_only pour ce canal.
+   * Priorité : surcharge canal → config globale → 0 (désactivé).
+   *
+   * 0 = désactivé (pas de passage automatique en read_only basé sur ce compteur).
+   * N = passer en read_only après N messages sortants.
+   */
+  async getEffectiveMessageLimit(channelId: string): Promise<number> {
+    if (!channelId) return 0;
+    const ch = await this.channelRepository.findOne({
+      where: { channel_id: channelId },
+      select: ['channel_id', 'maxMessagesBeforeReadonly'],
+    });
+    if (ch?.maxMessagesBeforeReadonly !== null && ch?.maxMessagesBeforeReadonly !== undefined) {
+      return ch.maxMessagesBeforeReadonly;
+    }
+    const global = await this.getSystemConfigService().get('MAX_MESSAGES_BEFORE_READONLY');
+    return global ? parseInt(global, 10) || 0 : 0;
   }
 
   async findAll() {

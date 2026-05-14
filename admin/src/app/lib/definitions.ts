@@ -345,6 +345,7 @@ export type Channel = {
   poste?: Poste | null;
   no_read_only?: boolean;
   no_close?: boolean;
+  max_messages_before_readonly?: number | null;
 };
 
 

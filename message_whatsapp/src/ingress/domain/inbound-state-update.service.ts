@@ -55,10 +55,12 @@ export class InboundStateUpdateService {
       );
     } else {
       // ── Fallback legacy — comportement avant CTX (migration progressive) ────
+      // Le client répond : on remet le compteur de messages sortants à 0.
       await this.chatService.update(conversation.chat_id, {
         read_only: false,
         last_client_message_at: clientMessageAt,
         customerWindowExpiresAt: windowExpires,
+        outboundMessageCount: 0,
       });
     }
 

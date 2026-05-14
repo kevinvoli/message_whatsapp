@@ -309,6 +309,13 @@ export class WhatsappMessageService {
       this.logger.log(
         `OUTBOUND_PERSISTED trace=${traceId} db_message_id=${mes.id}`,
       );
+      // Calcul de la limite effective et du nouveau compteur de messages sortants
+      const limit = await this.channelService.getEffectiveMessageLimit(data.channel_id ?? '');
+      const newCount = (chat.outboundMessageCount ?? 0) + 1;
+      // Passe en read_only si : limite > 0, compteur atteint la limite, et canal non dédié.
+      // Canal dédié (channel.poste_id != null) → jamais en read_only (comportement préservé).
+      const shouldBeReadOnly = limit > 0 && newCount >= limit && !channel.poste_id;
+
       await this.chatRepository.update(
         { chat_id: chat.chat_id },
         {
@@ -319,11 +326,12 @@ export class WhatsappMessageService {
           // N'actualise last_poste_message_at que pour les vrais agents humains.
           // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
           ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),
-          // Le commercial vient de répondre → lecture seule jusqu'à la prochaine réponse client
-          // Exception : canal dédié → jamais en lecture seule
-          ...(data.poste_id && !channel.poste_id ? { read_only: true } : {}),
+          // Passage en lecture seule basé sur la limite configurable de messages sortants.
+          // 0 = désactivé ; N = passe en read_only après N messages (canal dédié exclu).
+          ...(shouldBeReadOnly ? { read_only: true } : {}),
           // Le commercial a pris en charge la conv prioritaire → retirer le flag
           ...(data.poste_id ? { is_priority: false } : {}),
+          outboundMessageCount: newCount,
           last_activity_at: new Date(),
         },
       );

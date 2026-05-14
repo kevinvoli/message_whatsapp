@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateChannelDto {
   @IsString()
@@ -64,4 +64,10 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   no_close?: boolean;
+
+  /** Limite messages avant lecture seule pour ce canal (null = global, 0 = désactivé) */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  max_messages_before_readonly?: number | null;
 }
