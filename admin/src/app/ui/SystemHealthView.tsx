@@ -124,10 +124,17 @@ export default function SystemHealthView() {
 
             {/* RAM système globale */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">RAM système</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                RAM {health.memory.system.isContainerized ? 'conteneur Docker' : 'système'}
+                {health.memory.system.isContainerized && health.memory.system.hostTotalRamMb && (
+                  <span className="ml-2 font-normal normal-case text-gray-400">
+                    (hôte : {health.memory.system.hostTotalRamMb} Mo)
+                  </span>
+                )}
+              </p>
               <MemoryBar
                 pct={health.memory.system.ramUsedPct}
-                label={`Utilisée (${health.memory.system.usedRamMb} Mo / ${health.memory.system.totalRamMb} Mo) — ${health.memory.system.freeRamMb} Mo libre`}
+                label={`Utilisée (${health.memory.system.usedRamMb} Mo / ${health.memory.system.totalRamMb} Mo) — ${health.memory.system.availableRamMb} Mo disponible`}
               />
             </div>
 
@@ -142,7 +149,14 @@ export default function SystemHealthView() {
 
             {/* Détail heap V8 */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Heap JavaScript (V8)</p>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Heap JavaScript (V8)</p>
+                {health.memory.heapWarning && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded-full">
+                    Pression mémoire — GC fréquent possible
+                  </span>
+                )}
+              </div>
               <MemoryBar
                 pct={health.memory.heapUsedPct}
                 label={`${health.memory.heapUsedMb} Mo / ${health.memory.heapTotalMb} Mo alloués`}
@@ -170,7 +184,7 @@ export default function SystemHealthView() {
             </div>
 
             <p className="text-xs text-gray-400">
-              Le RSS inclut heap, stack, code natif et buffers. La RAM système est celle de l'hôte (ou du conteneur Docker si cgroup v2).
+              RSS = heap + stack + code JIT + buffers natifs. &quot;Disponible&quot; = mémoire réellement libre + cache OS reclaimable (via <code>/proc/meminfo</code> sur Linux). En Docker, la limite du conteneur est lue depuis les cgroups.
             </p>
           </div>
 

@@ -15,11 +15,14 @@ export interface SystemHealth {
     arrayBuffersMb: number;
     heapUsedPct: number;
     rssRamPct: number;
+    heapWarning: boolean;
     system: {
       totalRamMb: number;
-      freeRamMb: number;
+      availableRamMb: number;
       usedRamMb: number;
       ramUsedPct: number;
+      isContainerized: boolean;
+      hostTotalRamMb?: number;
     };
   };
   services: {

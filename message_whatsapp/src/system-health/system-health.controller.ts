@@ -5,9 +5,39 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
 import * as os from 'os';
+import * as fs from 'fs';
 
 function bytesToMb(bytes: number) {
   return Math.round(bytes / 1024 / 1024);
+}
+
+/** MemAvailable depuis /proc/meminfo (Linux) — inclut le cache OS reclaimable. */
+function readLinuxMemAvailable(): number | null {
+  try {
+    const content = fs.readFileSync('/proc/meminfo', 'utf8');
+    const match = content.match(/^MemAvailable:\s+(\d+)\s+kB/m);
+    return match ? parseInt(match[1], 10) * 1024 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Limite mémoire du conteneur Docker (cgroup v2 puis v1).
+ * Retourne null si hors conteneur ou si la limite = illimitée.
+ */
+function readContainerMemLimit(): number | null {
+  // cgroup v2
+  try {
+    const raw = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim();
+    if (raw !== 'max') return parseInt(raw, 10);
+  } catch { /* pas cgroup v2 */ }
+  // cgroup v1
+  try {
+    const raw = parseInt(fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8').trim(), 10);
+    if (raw < 9 * 1024 * 1024 * 1024 * 1024) return raw; // < 9 Tio = vraie limite
+  } catch { /* pas cgroup v1 */ }
+  return null;
 }
 
 function parseRedisInfo(raw: string): Record<string, string> {
@@ -32,9 +62,20 @@ export class SystemHealthController {
   @Get('health')
   async getHealth() {
     const mem = process.memoryUsage();
-    const totalRamBytes = os.totalmem();
-    const freeRamBytes  = os.freemem();
-    const usedRamBytes  = totalRamBytes - freeRamBytes;
+
+    // Mémoire système
+    const hostTotalBytes     = os.totalmem();
+    const hostFreeBytes      = os.freemem();
+    const containerLimitBytes = readContainerMemLimit();
+    const memAvailableBytes  = readLinuxMemAvailable(); // inclut cache OS reclaimable
+
+    // totalRamBytes = limite conteneur si disponible, sinon RAM hôte
+    const totalRamBytes = containerLimitBytes ?? hostTotalBytes;
+    // availableBytes = MemAvailable si /proc/meminfo lisible, sinon os.freemem()
+    const availableRamBytes = memAvailableBytes ?? hostFreeBytes;
+    const usedRamBytes = totalRamBytes - availableRamBytes;
+
+    const isContainerized = containerLimitBytes !== null;
 
     let dbStatus: 'ok' | 'error' = 'ok';
     try {
@@ -118,18 +159,22 @@ export class SystemHealthController {
       platform: process.platform,
       pid: process.pid,
       memory: {
-        heapUsedMb:    bytesToMb(mem.heapUsed),
-        heapTotalMb:   bytesToMb(mem.heapTotal),
-        rssMb:         bytesToMb(mem.rss),
-        externalMb:    bytesToMb(mem.external),
+        heapUsedMb:     bytesToMb(mem.heapUsed),
+        heapTotalMb:    bytesToMb(mem.heapTotal),
+        rssMb:          bytesToMb(mem.rss),
+        externalMb:     bytesToMb(mem.external),
         arrayBuffersMb: bytesToMb(mem.arrayBuffers ?? 0),
-        heapUsedPct:   Math.round((mem.heapUsed / mem.heapTotal) * 100),
-        rssRamPct:     Math.round((mem.rss / totalRamBytes) * 100),
+        heapUsedPct:    Math.round((mem.heapUsed / mem.heapTotal) * 100),
+        rssRamPct:      Math.round((mem.rss / totalRamBytes) * 100),
+        heapWarning:    mem.heapUsed / mem.heapTotal > 0.80,
         system: {
-          totalRamMb:  bytesToMb(totalRamBytes),
-          freeRamMb:   bytesToMb(freeRamBytes),
-          usedRamMb:   bytesToMb(usedRamBytes),
-          ramUsedPct:  Math.round((usedRamBytes / totalRamBytes) * 100),
+          totalRamMb:      bytesToMb(totalRamBytes),
+          availableRamMb:  bytesToMb(availableRamBytes),
+          usedRamMb:       bytesToMb(usedRamBytes),
+          ramUsedPct:      Math.round((usedRamBytes / totalRamBytes) * 100),
+          isContainerized,
+          // hostTotalRamMb exposé uniquement si dans un conteneur (contexte utile)
+          ...(isContainerized && { hostTotalRamMb: bytesToMb(hostTotalBytes) }),
         },
       },
       services: {
