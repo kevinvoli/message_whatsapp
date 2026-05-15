@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
         destination: `${API_URL}/campaign/t/:code`,
       },
     ];
+    
   },
 };
 

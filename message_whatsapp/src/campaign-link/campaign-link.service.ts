@@ -8,7 +8,6 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CreateCampaignLinkDto } from './dto/create-campaign-link.dto';
 import { UpdateCampaignLinkDto } from './dto/update-campaign-link.dto';
-import { SystemConfigService } from 'src/system-config/system-config.service';
 
 @Injectable()
 export class CampaignLinkService {
@@ -23,7 +22,6 @@ export class CampaignLinkService {
     private readonly channelRepository: Repository<WhapiChannel>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
-    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -49,17 +47,15 @@ export class CampaignLinkService {
     throw new Error('Impossible de générer un short code unique après 5 tentatives');
   }
 
-  private async buildUrls(
+  private buildUrls(
     phone: string,
     message: string,
     code: string,
-  ): Promise<{ directUrl: string; trackedUrl: string }> {
+  ): { directUrl: string; trackedUrl: string } {
     const digits = phone.replace(/\D/g, '');
     const directUrl = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-    const domain =
-      (await this.systemConfigService.get('APP_DOMAIN')) ||
-      process.env.APP_URL ||
-      '';
+    // APP_DOMAIN est patchée dans process.env par SystemConfigService.patchProcessEnv() au démarrage
+    const domain = process.env.APP_DOMAIN || process.env.APP_URL || '';
     const trackedUrl = `${domain}/campaign/t/${code}`;
     return { directUrl, trackedUrl };
   }
@@ -133,7 +129,7 @@ export class CampaignLinkService {
     }
 
     const shortCode = await this.generateShortCode();
-    const { directUrl, trackedUrl } = await this.buildUrls(phone, dto.predefined_message, shortCode);
+    const { directUrl, trackedUrl } = this.buildUrls(phone, dto.predefined_message, shortCode);
 
     const link = this.linkRepository.create({
       name: dto.name,
@@ -189,7 +185,7 @@ export class CampaignLinkService {
       const channel = link.channel ?? (await this.channelRepository.findOne({ where: { channel_id: link.channelId } }));
       const phone = channel ? await this.resolvePhone(channel) : null;
       if (phone) {
-        const { directUrl, trackedUrl } = await this.buildUrls(phone, link.predefinedMessage, link.shortCode);
+        const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
         link.directUrl = directUrl;
         link.trackedUrl = trackedUrl;
       }
@@ -210,7 +206,7 @@ export class CampaignLinkService {
       const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
       const phone = channel ? await this.resolvePhone(channel) : null;
       if (!phone) continue;
-      const { directUrl, trackedUrl } = await this.buildUrls(phone, link.predefinedMessage, link.shortCode);
+      const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
       if (link.directUrl !== directUrl || link.trackedUrl !== trackedUrl) {
         await this.linkRepository.update(link.id, { directUrl, trackedUrl });
         repaired++;
