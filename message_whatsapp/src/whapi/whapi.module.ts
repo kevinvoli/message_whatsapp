@@ -59,6 +59,7 @@ import { ProviderAdapterRegistry } from 'src/webhooks/adapters/provider-adapter.
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     NotificationModule,
     SystemAlertModule,
     WhatsappTemplateModule,
+    CampaignLinkModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
