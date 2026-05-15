@@ -97,15 +97,26 @@ export class CallObligationService {
       });
 
       const batchNumber = (lastBatch?.batchNumber ?? 0) + 1;
-
-      const batch = await this.batchRepo.save(
-        this.batchRepo.create({
-          id: uuidv4(),
-          posteId,
-          batchNumber,
-          status: BatchStatus.PENDING,
-        }),
-      );
+      // FIX-C2: Protection race condition — catch ER_DUP_ENTRY si deux processus créent simultanément
+      let batch: CommercialObligationBatch;
+      try {
+        batch = await this.batchRepo.save(
+          this.batchRepo.create({
+            id: uuidv4(),
+            posteId,
+            batchNumber,
+            status: BatchStatus.PENDING,
+          }),
+        );
+      } catch (insertErr: any) {
+        if (insertErr?.code === 'ER_DUP_ENTRY') {
+          // Un autre processus a cree le batch en meme temps
+          this.logger.warn('FIX-C2: ER_DUP_ENTRY batch posteId=' + posteId + ' — recuperation batch existant');
+          const found = await this.batchRepo.findOne({ where: { posteId, status: BatchStatus.PENDING } });
+          if (found) return found;
+        }
+        throw insertErr;
+      }
 
       const tasks: Partial<CallTask>[] = [
         ...Array(REQUIRED_PER_CATEGORY).fill(null).map(() => ({
@@ -211,13 +222,24 @@ export class CallObligationService {
       return { matched: false, reason: 'quota_categorie_atteint' };
     }
 
+    // FIX-M2: Protection race condition — deux appels simultanés peuvent valider la meme tâche
+    // L'index UNIQUE UQ_call_task_call_event_id garantit qu'un callEventId est utilisé une seule fois
     task.status = CallTaskStatus.DONE;
     task.clientPhone = params.clientPhone ?? null;
     task.callEventId = params.callEventId;
     task.durationSeconds = params.durationSeconds;
     task.completedAt = new Date();
-    await this.taskRepo.save(task);
-
+    try {
+      await this.taskRepo.save(task);
+    } catch (saveErr: any) {
+      if (saveErr?.code === 'ER_DUP_ENTRY') {
+        this.logger.warn(
+          'FIX-M2: ER_DUP_ENTRY tryMatchCallToTask callEventId=' + params.callEventId + ' — appel deja utilise dans une autre tache',
+        );
+        return { matched: false, reason: 'appel_deja_traite' };
+      }
+      throw saveErr;
+    }
     const counterField = this.batchCounterField(taskCategory);
     batch[counterField] = (batch[counterField] as number) + 1;
 

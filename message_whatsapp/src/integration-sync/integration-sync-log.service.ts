@@ -134,4 +134,24 @@ export class IntegrationSyncLogService {
     if (count > 0) this.logger.log(`Purge sync log: ${count} entrée(s) supprimée(s)`);
     return count;
   }
+
+  /**
+   * FIX-M7: Débloque les entrées pending > 1h (processus crashé).
+   * Passe leur statut a failed pour libérer le pipeline de retry.
+   * Appelé par purgeOldSyncLogs() dans le cron hebdomadaire.
+   */
+  async unblockStuckPending(maxAgeMinutes = 60): Promise<number> {
+    const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    const result = await this.repo
+      .createQueryBuilder()
+      .update(IntegrationSyncLog)
+      .set({ status: 'failed', lastError: 'auto-unblocked: stuck pending > ' + maxAgeMinutes + 'min' })
+      .where('status = :status AND created_at < :cutoff', { status: 'pending', cutoff })
+      .execute();
+    const unblocked = result.affected ?? 0;
+    if (unblocked > 0) {
+      this.logger.warn('FIX-M7 Deblocage ' + unblocked + ' integration_sync_log pending bloques > ' + maxAgeMinutes + 'min');
+    }
+    return unblocked;
+  }
 }

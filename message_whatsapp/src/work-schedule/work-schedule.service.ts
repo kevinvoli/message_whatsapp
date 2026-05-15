@@ -132,9 +132,18 @@ export class WorkScheduleService {
    * Utilisé par OrderCallSyncService pour affiner l'attribution dans un pool multi-commerciaux.
    */
   async getActiveGroupIds(at: Date): Promise<string[]> {
-    const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayOfWeek = days[at.getDay()];
-    const hhmm = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+    // FIX-H3: Utiliser le fuseau horaire de l'application (APP_TIMEZONE, defaut Africa/Abidjan)
+    const tz = process.env['APP_TIMEZONE'] ?? 'Africa/Abidjan';
+    const dayOfWeekStr = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', timeZone: tz })
+      .format(at).toLowerCase();
+    // Mapping fr -> DayOfWeek anglais
+    const dayFrToEn: Record<string, DayOfWeek> = {
+      'lundi': 'monday', 'mardi': 'tuesday', 'mercredi': 'wednesday',
+      'jeudi': 'thursday', 'vendredi': 'friday', 'samedi': 'saturday', 'dimanche': 'sunday',
+    };
+    const dayOfWeek: DayOfWeek = dayFrToEn[dayOfWeekStr] ?? (new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(at).toLowerCase() as DayOfWeek);
+    const hhmmParts = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(at).split(':');
+    const hhmm = hhmmParts[0].padStart(2, '0') + ':' + hhmmParts[1].padStart(2, '0');
 
     const schedules = await this.repo.find({
       where: {

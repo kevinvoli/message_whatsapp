@@ -1,32 +1,26 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { CallObligationService } from './call-obligation.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { CommercialObligationBatch } from './entities/commercial-obligation-batch.entity';
 
 /**
  * S6-004 — Contrôle qualité messages GICOP (périodique).
- * Vérifie, pour chaque poste avec un batch actif, que le commercial
- * a répondu au dernier message de chaque conversation active.
- * Résultat persisté dans CommercialObligationBatch.qualityCheckPassed.
- *
- * N10 — Alerting escalade : après le contrôle qualité, détecte les batches
- * bloqués depuis > 3 jours et émet une notification WARNING.
- * Anti-doublon en mémoire : un batch ne déclenche qu'une alerte par tranche de 24h.
+ * N10 — Alerting escalade : batches bloqués depuis > 3 jours.
+ * FIX-H6: Anti-doublon persisté en DB (last_alert_at) — résistant aux redémarrages.
  */
 @Injectable()
 export class ObligationQualityCheckJob implements OnModuleInit {
   private readonly logger = new Logger(ObligationQualityCheckJob.name);
 
-  /**
-   * Map batchId → timestamp de la dernière alerte émise.
-   * Réinitialisée au redémarrage du process (suffisant : le job tourne toutes les heures max).
-   */
-  private readonly lastAlertAt = new Map<string, number>();
-
   constructor(
     private readonly cronConfigService: CronConfigService,
     private readonly obligationService: CallObligationService,
     private readonly notificationService: NotificationService,
+    @InjectRepository(CommercialObligationBatch)
+    private readonly batchRepo: Repository<CommercialObligationBatch>,
   ) {}
 
   onModuleInit(): void {
@@ -36,7 +30,7 @@ export class ObligationQualityCheckJob implements OnModuleInit {
   }
 
   async run(): Promise<string> {
-    if (!await this.obligationService.isEnabled()) return 'Obligations d\'appels désactivées — vérification ignorée';
+    if (!await this.obligationService.isEnabled()) return "Obligations d'appels désactivées — vérification ignorée";
     const posteIds = await this.obligationService.getActivePosteIds();
     if (posteIds.length === 0) return 'Aucun batch actif — rien à vérifier';
 
@@ -47,7 +41,7 @@ export class ObligationQualityCheckJob implements OnModuleInit {
       if (ok) passed++; else failed++;
     }
 
-    const msg = `Contrôle qualité GICOP — ${passed} poste(s) OK, ${failed} poste(s) KO`;
+    const msg = 'Contrôle qualité GICOP — ' + passed + ' poste(s) OK, ' + failed + ' poste(s) KO';
     this.logger.log(msg);
 
     // N10 — Alerting batches bloqués depuis > 3 jours
@@ -60,14 +54,14 @@ export class ObligationQualityCheckJob implements OnModuleInit {
     const stuckBatches = await this.obligationService.getStuckBatches(3);
     if (stuckBatches.length === 0) return;
 
-    const now = Date.now();
-    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     for (const batch of stuckBatches) {
-      const lastAlert = this.lastAlertAt.get(batch.id);
-      if (lastAlert !== undefined && now - lastAlert < twentyFourHoursMs) {
+      // FIX-H6: Vérifier la dernière alerte en DB (résistant aux redémarrages)
+      const lastAlert = batch.lastAlertAt;
+      if (lastAlert && lastAlert > oneDayAgo) {
         this.logger.debug(
-          `STUCK_BATCH_ALERT_SKIPPED batchId=${batch.id} posteId=${batch.posteId} — alerte déjà émise il y a moins de 24h`,
+          'STUCK_BATCH_ALERT_SKIPPED batchId=' + batch.id + ' — alerte envoyee il y a moins de 24h (persiste en DB)',
         );
         continue;
       }
@@ -75,12 +69,13 @@ export class ObligationQualityCheckJob implements OnModuleInit {
       await this.notificationService.create(
         'alert',
         'Batch obligations bloqué',
-        `Poste ${batch.posteId} — Batch #${batch.batchNumber} bloqué depuis > 3j (qualité KO). Vérifier les conversations actives.`,
+        'Poste ' + batch.posteId + ' — Batch #' + batch.batchNumber + ' bloqué depuis > 3j (qualité KO). Vérifier les conversations actives.',
       );
 
-      this.lastAlertAt.set(batch.id, now);
+      // FIX-H6: Persister la date d'alerte en DB
+      await this.batchRepo.update(batch.id, { lastAlertAt: new Date() });
       this.logger.warn(
-        `STUCK_BATCH_ALERT_SENT batchId=${batch.id} posteId=${batch.posteId} batchNumber=${batch.batchNumber}`,
+        'STUCK_BATCH_ALERT_SENT batchId=' + batch.id + ' posteId=' + batch.posteId + ' batchNumber=' + batch.batchNumber,
       );
     }
   }

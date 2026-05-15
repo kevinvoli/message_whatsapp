@@ -28,13 +28,20 @@ function makeObligationService(posteIds: string[] = [], qualityResults: boolean[
   } as any;
 }
 
+// ─── Mock BatchRepo ──────────────────────────────────────────────────────────
+
+function makeBatchRepo() {
+  return {
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
+  } as any;
+}
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ObligationQualityCheckJob', () => {
 
   it('enregistre le handler au démarrage du module', () => {
     const cronConfigSvc = makeCronConfigService();
-    const job = new ObligationQualityCheckJob(cronConfigSvc, makeObligationService(), makeNotificationService());
+    const job = new ObligationQualityCheckJob(cronConfigSvc, makeObligationService(), makeNotificationService(), makeBatchRepo());
     job.onModuleInit();
     expect(cronConfigSvc.registerHandler).toHaveBeenCalledWith(
       'obligation-quality-check',
@@ -44,7 +51,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('retourne early si aucun batch actif', async () => {
     const obligationSvc = makeObligationService([]);
-    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService());
+    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService(), makeBatchRepo());
 
     const msg = await job.run();
     expect(msg).toBe('Aucun batch actif — rien à vérifier');
@@ -53,7 +60,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('lance runQualityCheck pour chaque poste actif', async () => {
     const obligationSvc = makeObligationService(['poste-1', 'poste-2'], [true, false]);
-    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService());
+    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService(), makeBatchRepo());
 
     const msg = await job.run();
     expect(obligationSvc.runQualityCheck).toHaveBeenCalledTimes(2);
@@ -65,7 +72,7 @@ describe('ObligationQualityCheckJob', () => {
 
   it('tous les postes passent la qualité', async () => {
     const obligationSvc = makeObligationService(['poste-1', 'poste-2', 'poste-3'], [true, true, true]);
-    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService());
+    const job = new ObligationQualityCheckJob(makeCronConfigService(), obligationSvc, makeNotificationService(), makeBatchRepo());
 
     const msg = await job.run();
     expect(msg).toContain('3 poste(s) OK');

@@ -150,12 +150,15 @@ export class MissedCallService {
     ];
     let callbackCommercialMap = new Map<string, string>(); // callbackCallEventId → commercialName
     if (callbackEventIds.length > 0) {
-      const callLogs = await this.commercialRepo.manager.query(
-        `SELECT call_event_external_id, commercial_name FROM call_log WHERE call_event_external_id IN (${callbackEventIds.map(() => '?').join(', ')})`,
-        callbackEventIds,
-      );
-      for (const cl of callLogs as Array<{ call_event_external_id: string; commercial_name: string }>) {
-        callbackCommercialMap.set(cl.call_event_external_id, cl.commercial_name);
+      // FIX-M8: Remplacement de la requête SQL brute par QueryBuilder
+      const callLogs = await this.commercialRepo.manager
+        .getRepository('call_log')
+        .createQueryBuilder('cl')
+        .select(['cl.callEventExternalId', 'cl.commercialName'])
+        .where('cl.callEventExternalId IN (:...ids)', { ids: callbackEventIds })
+        .getRawMany<{ cl_call_event_external_id: string; cl_commercial_name: string }>();
+      for (const cl of callLogs) {
+        callbackCommercialMap.set(cl.cl_call_event_external_id, cl.cl_commercial_name);
       }
     }
 

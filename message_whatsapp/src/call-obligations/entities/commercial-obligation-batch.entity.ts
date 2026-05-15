@@ -47,4 +47,8 @@ export class CommercialObligationBatch {
 
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true, default: null })
   completedAt: Date | null;
+
+  /** FIX-H6: Timestamp de la dernière alerte anti-doublon persistée en DB. */
+  @Column({ name: 'last_alert_at', type: 'timestamp', nullable: true, default: null })
+  lastAlertAt: Date | null;
 }

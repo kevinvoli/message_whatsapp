@@ -19,10 +19,13 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     this._run('bootstrap').catch((err) =>
       this.logger.error(`Erreur sync appels au démarrage: ${(err as Error).message}`),
     );
-    setImmediate(() =>
+    // FIX-H7: Delai 5 min avant syncClientCategories au bootstrap
+    // Evite d'ecraser des categories manuelles avec des donnees DB2 potentiellement en retard
+    setTimeout(() =>
       this._runSyncClientCategories().catch((err) =>
-        this.logger.error(`Erreur syncClientCategories au démarrage: ${(err as Error).message}`),
+        this.logger.error('Erreur syncClientCategories au démarrage: ' + (err as Error).message),
       ),
+    5 * 60 * 1000, // 5 minutes
     );
     setImmediate(() =>
       this._runInitBatches().catch((err) =>
@@ -63,6 +66,25 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
     await this._runRetry();
   }
 
+  /** FIX-C4 — Retry automatique call_event_unresolved toutes les 15 minutes. */
+  @Cron('0 */15 * * * *')
+  async retryUnresolved(): Promise<void> {
+    if (this.running) return;
+    if (this.lockService) {
+      const { acquired } = await this.lockService.tryWithLock(
+        'cron:retry-unresolved', 14_000 * 60,
+        () => this.syncService.retryUnresolvedCalls(),
+      );
+      if (!acquired) this.logger.debug('LOCK_SKIPPED cron:retry-unresolved');
+      return;
+    }
+    try {
+      await this.syncService.retryUnresolvedCalls();
+    } catch (e) {
+      this.logger.error('retryUnresolved echoue', e);
+    }
+  }
+
   /** N4 — Synchronisation client_category depuis DB2, tous les jours à 2h. */
   @Cron('0 2 * * *')
   async syncClientCategories(): Promise<void> {
@@ -78,6 +100,17 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
   }
 
   /** N6 — Nettoyage des mappings orphelins (contact/commercial supprimés), dimanche à 3h. */
+  /** FIX-H4 — Remet is_working_today a false sur tous les commerciaux a minuit. */
+  @Cron('0 0 0 * * *')
+  async resetWorkingToday(): Promise<void> {
+    try {
+      const result = await this.syncService.resetAllWorkingToday();
+      this.logger.log('[Cron] resetWorkingToday: ' + result.affected + ' commerciaux remis a false');
+    } catch (err) {
+      this.logger.error('Erreur resetWorkingToday: ' + (err as Error).message);
+    }
+  }
+
   @Cron('0 3 * * 0')
   async cleanOrphans(): Promise<void> {
     try {
@@ -93,9 +126,26 @@ export class OrderCallSyncJob implements OnApplicationBootstrap {
   async purgeOldSyncLogs(): Promise<void> {
     try {
       const deleted = await this.syncLog.purgeOldSuccess(30);
-      this.logger.log(`[SyncLog] Purge : ${deleted} entrées success supprimées (> 30j)`);
+      this.logger.log('[SyncLog] Purge : ' + deleted + ' entrées success supprimées (> 30j)');
+
+      // FIX-M7: Débloquer les pending > 1h (processus crashé)
+      const unblocked = await this.syncLog.unblockStuckPending(60);
+      if (unblocked > 0) {
+        this.logger.warn('[SyncLog] FIX-M7: ' + unblocked + ' entrées pending bloquées > 1h débloquées vers failed');
+      }
     } catch (err) {
-      this.logger.error(`Erreur purgeOldSyncLogs: ${(err as Error).message}`);
+      this.logger.error('Erreur purgeOldSyncLogs: ' + (err as Error).message);
+    }
+  }
+
+  /** FIX-H2 — Purge call_event_unresolved non-outgoing, dimanche a 5h. */
+  @Cron('0 5 * * 0')
+  async cleanNonOutgoingUnresolved(): Promise<void> {
+    try {
+      const result = await this.syncService.purgeNonOutgoingUnresolved();
+      this.logger.log('[Cron] cleanNonOutgoingUnresolved: ' + result.deleted + ' lignes supprimees');
+    } catch (err) {
+      this.logger.error('Erreur cleanNonOutgoingUnresolved: ' + (err as Error).message);
     }
   }
 

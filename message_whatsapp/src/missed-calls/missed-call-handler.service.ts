@@ -335,73 +335,78 @@ export class MissedCallHandlerService implements OnModuleInit {
   }
 
   // ── Backfill historique call_event → missed_call_event ───────────────────
-
+  // FIX-M6: Backfill avec pagination pour éviter les problèmes d'OOM
   async backfillFromCallEvents(): Promise<{ processed: number; skipped: number; created: number }> {
-    const callEvents = await this.callEventRepo.find({
-      where: { call_status: CallStatus.NO_ANSWER },
-      order: { event_at: 'ASC' },
-    });
+    const BACKFILL_PAGE_SIZE = 200;
+    let offset = 0;
+    let totalProcessed = 0;
+    let totalCreated = 0;
+    let totalSkipped = 0;
 
-    if (callEvents.length === 0) {
-      return { processed: 0, skipped: 0, created: 0 };
-    }
-
-    // Pré-charger les externalIds déjà présents pour éviter les doublons
-    const externalIds = callEvents.map((e) => e.external_id);
-    const existing = await this.missedCallRepo.find({
-      where: { externalId: In(externalIds) },
-      select: ['externalId'],
-    });
-    const existingSet = new Set(existing.map((e) => e.externalId));
-
-    // Résoudre poste_id en batch via commercial_id
-    const commercialIds = [
-      ...new Set(callEvents.map((e) => e.commercial_id).filter((id): id is string => !!id)),
-    ];
-    const commercialPosteMap = new Map<string, string | null>();
-    if (commercialIds.length > 0) {
-      const commercials = await this.commercialRepo.find({
-        where: { id: In(commercialIds) },
-        relations: ['poste'],
+    while (true) {
+      const callEvents = await this.callEventRepo.find({
+        where: { call_status: CallStatus.NO_ANSWER },
+        order: { event_at: 'ASC' },
+        skip: offset,
+        take: BACKFILL_PAGE_SIZE,
       });
-      for (const c of commercials) {
-        commercialPosteMap.set(c.id, c.poste?.id ?? null);
-      }
-    }
 
-    let created = 0;
-    let skipped = 0;
+      if (callEvents.length === 0) break;
 
-    for (const ce of callEvents) {
-      if (existingSet.has(ce.external_id)) {
-        skipped++;
-        continue;
-      }
+      // Pré-charger les externalIds déjà présents pour éviter les doublons
+      const externalIds = callEvents.map((e) => e.external_id);
+      const existing = await this.missedCallRepo.find({
+        where: { externalId: In(externalIds) },
+        select: ['externalId'],
+      });
+      const existingSet = new Set(existing.map((e) => e.externalId));
 
-      const posteId = ce.commercial_id ? (commercialPosteMap.get(ce.commercial_id) ?? null) : null;
-
-      try {
-        await this.handle({
-          source:       'db2',
-          externalId:   ce.external_id,
-          clientPhone:  ce.client_phone,
-          posteId,
-          commercialId: ce.commercial_id ?? null,
-          deviceId:     ce.device_id ?? null,
-          occurredAt:   ce.event_at,
-          clientName:   null,
+      // Résoudre poste_id en batch via commercial_id
+      const commercialIds = [
+        ...new Set(callEvents.map((e) => e.commercial_id).filter((id): id is string => !!id)),
+      ];
+      const commercialPosteMap = new Map<string, string | null>();
+      if (commercialIds.length > 0) {
+        const commercials = await this.commercialRepo.find({
+          where: { id: In(commercialIds) },
+          relations: ['poste'],
         });
-        created++;
-      } catch (err) {
-        this.logger.error(
-          `BACKFILL_ERROR external_id=${ce.external_id}: ${(err as Error).message}`,
-        );
+        for (const c of commercials) {
+          commercialPosteMap.set(c.id, c.poste?.id ?? null);
+        }
       }
+
+      for (const ce of callEvents) {
+        if (existingSet.has(ce.external_id)) {
+          totalSkipped++;
+          continue;
+        }
+        const posteId = ce.commercial_id ? (commercialPosteMap.get(ce.commercial_id) ?? null) : null;
+        try {
+          await this.handle({
+            source:       'db2',
+            externalId:   ce.external_id,
+            clientPhone:  ce.client_phone,
+            posteId,
+            commercialId: ce.commercial_id ?? null,
+            deviceId:     ce.device_id ?? null,
+            occurredAt:   ce.event_at,
+            clientName:   null,
+          });
+          totalCreated++;
+        } catch (err) {
+          this.logger.error(
+            'BACKFILL_ERROR external_id=' + ce.external_id + ': ' + (err as Error).message,
+          );
+        }
+      }
+
+      totalProcessed += callEvents.length;
+      offset += callEvents.length;
+      if (callEvents.length < BACKFILL_PAGE_SIZE) break; // Derniere page
     }
 
-    this.logger.log(
-      `BACKFILL_COMPLETE total=${callEvents.length} created=${created} skipped=${skipped}`,
-    );
-    return { processed: callEvents.length, skipped, created };
+    this.logger.log('BACKFILL_COMPLETE total=' + totalProcessed + ' created=' + totalCreated + ' skipped=' + totalSkipped);
+    return { processed: totalProcessed, skipped: totalSkipped, created: totalCreated };
   }
 }

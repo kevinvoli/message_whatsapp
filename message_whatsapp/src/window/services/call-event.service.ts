@@ -207,16 +207,29 @@ export class CallEventService {
       .orIgnore()
       .execute();
 
-    // Backfill commercial_id sur les lignes déjà présentes mais sans attribution
+    // FIX-C3: Backfill + log si commercial_id change (reassignation poste possible)
     if (params.commercialId) {
-      await this.callEventRepo
-        .createQueryBuilder()
-        .update(CallEvent)
-        .set({ commercial_id: params.commercialId })
-        .where('external_id = :eid AND commercial_id IS NULL', { eid: params.externalId })
-        .execute();
+      // Lire l'entree existante pour detecter un changement d'attribution
+      const existingEvent = await this.callEventRepo.findOne({
+        where: { external_id: params.externalId },
+        select: ['commercial_id'],
+      });
+      if (existingEvent && existingEvent.commercial_id && existingEvent.commercial_id !== params.commercialId) {
+        this.logger.warn(
+          'FIX-C3 Attribution changee externalId=' + params.externalId +
+          ' ancien=' + existingEvent.commercial_id + ' nouveau=' + params.commercialId +
+          ' — verifier reassignation poste.',
+        );
+      }
+      if (!existingEvent || !existingEvent.commercial_id) {
+        await this.callEventRepo
+          .createQueryBuilder()
+          .update(CallEvent)
+          .set({ commercial_id: params.commercialId })
+          .where('external_id = :eid AND commercial_id IS NULL', { eid: params.externalId })
+          .execute();
+      }
     }
-
     // Backfill device_id sur les lignes insérées avant la migration (device_id = NULL)
     if (params.deviceId) {
       await this.callEventRepo
@@ -226,5 +239,15 @@ export class CallEventService {
         .where('external_id = :eid AND device_id IS NULL', { eid: params.externalId })
         .execute();
     }
+  }
+
+  /**
+   * FIX-C4: Backfille commercial_id et attribution_source apres resolution par retryUnresolvedCalls().
+   */
+  async backfillCommercialId(externalId: string, commercialId: string): Promise<void> {
+    await this.callEventRepo.update(
+      { external_id: externalId },
+      { commercial_id: commercialId, attribution_source: 'retry' },
+    );
   }
 }

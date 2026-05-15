@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+﻿import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { CallLog, CallOutcome } from 'src/call-log/entities/call_log.entity';
@@ -35,14 +35,14 @@ import { WorkScheduleService } from 'src/work-schedule/work-schedule.service';
 import { MissedCallHandlerService } from 'src/missed-calls/missed-call-handler.service';
 
 const CURSOR_SCOPE            = 'global';
-const CURSOR_LOOKBACK_MINUTES = 2;
+const CURSOR_LOOKBACK_MINUTES_DEFAULT = 10; // FIX-C1: délai insertion DB2 peut dépasser 2 min
 
 @Injectable()
 export class OrderCallSyncService {
   private readonly logger = new Logger(OrderCallSyncService.name);
 
   private readonly batchSize: number = parseInt(
-    process.env['ORDER_CALL_SYNC_BATCH_SIZE'] ?? '200',
+    process.env['ORDER_CALL_SYNC_BATCH_SIZE'] ?? '100', // FIX-C3: fenetre stale reduite (etait 200)
     10,
   );
 
@@ -102,7 +102,7 @@ export class OrderCallSyncService {
     const since           = cursor.lastCallTimestamp ?? new Date(0);
     const lookbackMinutes = Math.max(
       0,
-      Number(process.env['ORDER_CALL_SYNC_LOOKBACK_MINUTES'] ?? String(CURSOR_LOOKBACK_MINUTES)),
+      Number(process.env['ORDER_CALL_SYNC_LOOKBACK_MINUTES'] ?? String(CURSOR_LOOKBACK_MINUTES_DEFAULT)),
     );
     const lookbackSince = new Date(since.getTime() - lookbackMinutes * 60_000);
 
@@ -232,12 +232,13 @@ export class OrderCallSyncService {
                 })
               : null;
 
-            // Résoudre commercial_name
+            // FIX-H5: Charger le poste pour renseigner poste_id dans call_log
             const commercial = await this.commercialRepo.findOne({
               where: { id: commercialIdDb1 },
-              select: ['id', 'name'],
+              relations: ['poste'],
+              select: { id: true, name: true, poste: { id: true } },
             });
-
+            const resolvedPosteId: string | null = commercial?.poste?.id ?? null;
             // Mapper call_status + outcome
             const callType     = call.callType.toLowerCase();
             const durationSec  = this.normalizeDuration(call.duration);
@@ -282,6 +283,7 @@ export class OrderCallSyncService {
                 duration_sec:         durationSec,
                 notes:                null,
                 treated:              false,
+                poste_id:             resolvedPosteId,          // FIX-H5
                 callEventExternalId:  String(call.id),
               }),
             );
@@ -405,6 +407,17 @@ export class OrderCallSyncService {
       }
     }
 
+    // FIX-C1: Si batch plein => possible troncature, ne pas avancer le curseur
+    if (calls.length >= this.batchSize) {
+      this.logger.warn(
+        'Sync DB2 : batch plein (' + this.batchSize + ' appels) — possible troncature. Curseur NON avance, prochain cycle relira depuis le meme point.',
+      );
+      await this.recalculateDeviceCounts().catch((err: Error) =>
+        this.logger.warn('recalculateDeviceCounts: ' + err.message),
+      );
+      return { processed: newCalls, obligations: obligationsMatched, errors };
+    }
+
     const last = calls[calls.length - 1];
     await Promise.all([
       this.cursorRepo.update(
@@ -466,10 +479,19 @@ export class OrderCallSyncService {
       if (byPhone) return byPhone.id;
     }
 
-    // Étape 4 : dernier connecté
-    const sorted = [...step2].sort(
-      (a, b) => (b.lastConnectionAt?.getTime() ?? 0) - (a.lastConnectionAt?.getTime() ?? 0),
-    );
+    // FIX-H1: Tiebreaker déterministe — tri alphabétique sur UUID si lastConnectionAt identique
+    const sorted = [...step2].sort((a, b) => {
+      const diff =
+        (b.lastConnectionAt?.getTime() ?? 0) - (a.lastConnectionAt?.getTime() ?? 0);
+      if (diff !== 0) return diff;
+      // Tiebreaker deterministe : tri alphabetique sur l'UUID
+      return a.id.localeCompare(b.id);
+    });
+    if (sorted.length > 1) {
+      this.logger.debug(
+        'FIX-H1 tiebreaker: ' + sorted.length + ' candidats pour device, resolu: ' + sorted[0].id,
+      );
+    }
     return sorted[0]?.id ?? null;
   }
 
@@ -564,15 +586,24 @@ export class OrderCallSyncService {
   private async processCall(call: OrderCallLog): Promise<{ id: string }> {
     return this.syncLog.createPending('call_validation', call.id, 'call_logs');
   }
-
   /**
-   * Normalise la durée DB2 en secondes.
-   * DB2 peut stocker en millisecondes (valeurs > 86 400 000 = plus de 24h en ms).
-   * Seuil : si duration > 86400 on considère que c'est des ms → diviser par 1000.
+   * FIX-C5: Normalise la duree DB2 en secondes avec seuil robuste.
+   * Si raw > ORDER_CALL_DURATION_MS_THRESHOLD_SEC (defaut 7200), interprete comme ms.
+   * Couvre: appels <= 2h stockes en s, et toutes durees en ms <= 2h*1000.
    */
   private normalizeDuration(raw: number): number {
     if (!raw) return 0;
-    return raw > 86_400 ? Math.round(raw / 1000) : raw;
+    if (raw < 0) return 0;
+    const threshold = parseInt(
+      process.env['ORDER_CALL_DURATION_MS_THRESHOLD_SEC'] ?? '7200',
+      10,
+    );
+    if (raw > threshold) {
+      const asSec = Math.round(raw / 1000);
+      this.logger.debug('normalizeDuration: ' + raw + ' -> ms -> ' + asSec + 's');
+      return asSec;
+    }
+    return raw;
   }
 
   /** Log CALL_MATCHED_ERP_ONLY quand le client validant l'obligation n'a pas de compte WhatsApp. */
@@ -720,10 +751,15 @@ export class OrderCallSyncService {
 
     if (remoteNumber) {
       const normalized = normalizePhone(remoteNumber);
+      const raw = remoteNumber; // FIX-M3: chercher aussi avec le numero brut non normalise
       const user = await userRepo
         .createQueryBuilder('u')
         .where('u.type = :type', { type: GIOCOP_USER_TYPE_CLIENT })
-        .andWhere('(u.phone = :phone OR u.phone2 = :phone)', { phone: normalized })
+        .andWhere(
+          // Recherche sur numero normalise ET numero brut (DB2 peut avoir formats differents)
+          '(u.phone = :norm OR u.phone2 = :norm OR u.phone = :raw OR u.phone2 = :raw)',
+          { norm: normalized, raw },
+        )
         .andWhere('u.valid = 1')
         .select(['u.id'])
         .getOne();
@@ -735,13 +771,29 @@ export class OrderCallSyncService {
 
     const resolvedCategory = await this.resolveCategoryByClientId(clientIdDb2, this.orderDb);
 
-    // Upsert contact DB1 avec la catégorie résolue depuis DB2
+    // FIX-M1: Upsert contact DB1 cohérent — chercher sur phone ET phone2 du client DB2
     try {
       const normalized = normalizePhone(remoteNumber);
+      // Récupérer phone2 du client DB2 pour éviter un contact en double
+      let phone2Normalized: string | null = null;
+      if (clientIdDb2) {
+        const gicopUser = await userRepo.findOne({ where: { id: clientIdDb2 }, select: ['phone2'] });
+        phone2Normalized = gicopUser?.phone2 ? normalizePhone(gicopUser.phone2) : null;
+      }
+
+      // Chercher un contact existant sur phone principal ET phone alternatif
+      const whereConditions: any[] = [{ phone: normalized }];
+      if (phone2Normalized && phone2Normalized !== normalized) {
+        whereConditions.push({ phone: phone2Normalized });
+      }
       const existing = await this.contactRepo.findOne({
-        where:  { phone: normalized },
-        select: ['id', 'contactSource'],
+        where: whereConditions,
+        select: ['id', 'phone', 'contactSource'],
       });
+
+      // Utiliser le numéro canonique (toujours phone principal DB2, pas phone2)
+      const contactPhone = existing?.phone ?? normalized;
+
       if (existing) {
         // Met à jour catégorie et order_client_id, préserve contactSource existant
         await this.contactRepo.update(existing.id, {
@@ -749,12 +801,12 @@ export class OrderCallSyncService {
           order_client_id: clientIdDb2,
         });
       } else {
-        // Crée un nouveau contact ERP-only (sans chat_id, pas de conversation)
+        // Crée un nouveau contact ERP-only avec le numéro principal (pas phone2)
         await this.contactRepo.save(
           this.contactRepo.create({
-            phone:           normalized,
-            name:            normalized,
-            contactSource:   ContactSource.ErpImport,
+            phone:              contactPhone,
+            name:               contactPhone,
+            contactSource:      ContactSource.ErpImport,
             order_client_id:    clientIdDb2,
             client_category:    resolvedCategory as unknown as ClientCategory,
             call_status:        CallStatus.À_APPeler,
@@ -764,7 +816,7 @@ export class OrderCallSyncService {
       }
     } catch (err) {
       this.logger.warn(
-        `Upsert contact ERP échoué pour ${remoteNumber}: ${(err as Error).message}`,
+        'Upsert contact ERP échoué pour ' + remoteNumber + ': ' + (err as Error).message,
       );
     }
 
@@ -1157,6 +1209,95 @@ export class OrderCallSyncService {
   }
 
   /**
+   * FIX-C4: Retry automatique des appels non resolus (commercial_not_found).
+   * Retraite les entrees de call_event_unresolved dont resolved_at IS NULL.
+   * Appele par un cron toutes les 15 minutes dans OrderCallSyncJob.
+   */
+  async retryUnresolvedCalls(limit = 50): Promise<{ retried: number; resolved: number }> {
+    const unresolved = await this.unresolvedRepo.find({
+      where: { resolvedAt: IsNull() },
+      order: { createdAt: 'ASC' },
+      take: limit,
+    });
+
+    if (!unresolved.length) return { retried: 0, resolved: 0 };
+
+    this.logger.log('retryUnresolvedCalls: ' + unresolved.length + ' appels a retenter');
+
+    // Recalculer les maps de resolution
+    const allCommercialsDb1 = await this.commercialRepo.find({
+      where: { deletedAt: IsNull() },
+      select: ['id', 'phone'],
+    });
+    const commercialByPhone = new Map(
+      allCommercialsDb1
+        .filter((c) => c.phone)
+        .map((c) => [normalizePhone(c.phone), c.id]),
+    );
+
+    const allDevices = await this.callDeviceRepo.find({
+      where: { posteId: Not(IsNull()) },
+      select: ['deviceId', 'posteId'],
+    });
+    const posteIds = [...new Set(allDevices.map((d) => d.posteId!))];
+    const commercialsAtPoste = posteIds.length > 0
+      ? await this.commercialRepo.find({
+          where: { poste: { id: In(posteIds) }, deletedAt: IsNull() },
+          relations: ['poste'],
+          select: { id: true, phone: true, lastConnectionAt: true, isWorkingToday: true, groupId: true, poste: { id: true } },
+        })
+      : [];
+    const poolByPosteId = new Map<string, WhatsappCommercial[]>();
+    for (const c of commercialsAtPoste.filter((c) => c.poste?.id)) {
+      const list = poolByPosteId.get(c.poste!.id) ?? [];
+      list.push(c);
+      poolByPosteId.set(c.poste!.id, list);
+    }
+    const scheduleCache = new Map<string, string[]>();
+
+    let retried = 0;
+    let resolved = 0;
+
+    for (const entry of unresolved) {
+      retried++;
+      let commercialId: string | null = null;
+
+      // Resolution par device_id -> poste -> commercial
+      if (entry.deviceId) {
+        const device = allDevices.find((d) => d.deviceId === entry.deviceId);
+        if (device?.posteId) {
+          const pool = poolByPosteId.get(device.posteId) ?? [];
+          if (pool.length > 0) {
+            commercialId = await this.resolveCommercialForDevice(
+              pool, entry.localNumber, new Date(), scheduleCache,
+            );
+          }
+        }
+      }
+
+      // Fallback: local_number -> commercial.phone
+      if (!commercialId && entry.localNumber) {
+        const norm = normalizePhone(entry.localNumber);
+        commercialId = commercialByPhone.get(norm) ?? null;
+      }
+
+      if (!commercialId) continue; // toujours non resolu
+
+      // Marquer comme resolu
+      await this.unresolvedRepo.update(entry.id, { resolvedAt: new Date() });
+
+      // Backfill commercial_id dans call_event
+      await this.callEventService.backfillCommercialId(entry.externalId, commercialId);
+
+      this.logger.log('retryUnresolvedCalls: resolu externalId=' + entry.externalId + ' commercial=' + commercialId);
+      resolved++;
+    }
+
+    this.logger.log('retryUnresolvedCalls: ' + retried + ' tentes, ' + resolved + ' resolus');
+    return { retried, resolved };
+  }
+
+  /**
    * N5 — Marque un appel non résolu comme retryé (resolved_at = now).
    * Retourne l'entité mise à jour ou null si introuvable.
    */
@@ -1232,6 +1373,23 @@ export class OrderCallSyncService {
    */
   async purgeStuckPending(): Promise<{ deleted: number }> {
     const deleted = await this.syncLog.purgeStuckPending('call_validation');
+    return { deleted };
+  }
+
+  /**
+   * FIX-H2: Supprime les entrées call_event_unresolved non-outgoing non resolues.
+   * Seuls les appels outgoing peuvent valider une obligation GICOP.
+   * Appelée par un cron hebdomadaire (dimanche 5h).
+   */
+  async purgeNonOutgoingUnresolved(): Promise<{ deleted: number }> {
+    const result = await this.unresolvedRepo.delete({
+      callType: Not('outgoing'),
+      resolvedAt: IsNull(),
+    });
+    const deleted = result.affected ?? 0;
+    if (deleted > 0) {
+      this.logger.log('FIX-H2 Purge call_event_unresolved non-outgoing : ' + deleted + ' lignes supprimees');
+    }
     return { deleted };
   }
 
@@ -1323,6 +1481,18 @@ export class OrderCallSyncService {
       db2Stats,
       errors,
     };
+  }
+
+  /**
+   * FIX-H4: Remet isWorkingToday a false pour tous les commerciaux.
+   * Appele par un cron quotidien a minuit dans OrderCallSyncJob.
+   */
+  async resetAllWorkingToday(): Promise<{ affected: number }> {
+    const result = await this.commercialRepo.update(
+      { isWorkingToday: true },
+      { isWorkingToday: false },
+    );
+    return { affected: result.affected ?? 0 };
   }
 
   async getStatus(): Promise<{
