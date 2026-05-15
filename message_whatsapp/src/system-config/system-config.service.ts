@@ -33,6 +33,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'APP_URL', label: 'URL de l\'application', category: 'general', description: 'Utilisée pour enregistrer le webhook Telegram' },
   { key: 'CORS_ORIGINS', label: 'Origines CORS autorisées', category: 'general', description: 'Liste séparée par des virgules, sans espaces' },
   { key: 'MAX_MESSAGES_BEFORE_READONLY', label: 'Messages max avant lecture seule', category: 'general', description: 'Nombre de messages sortants (commerciaux + auto) avant passage en lecture seule. 0 = désactivé.', defaultValue: '0' },
+  { key: 'APP_TIMEZONE', label: 'Fuseau horaire de l\'application', category: 'general', description: 'Fuseau horaire utilisé pour les plannings de groupes commerciaux (ex: Africa/Abidjan, Africa/Douala).', defaultValue: 'Africa/Abidjan' },
 
   // ─── WhatsApp / Whapi ───────────────────────────────────────────────────────
   { key: 'WHAPI_URL', label: 'URL API Whapi', category: 'whapi' },
@@ -59,7 +60,29 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },
   { key: 'INTEGRATION_SECRET', label: 'Secret partagé ERP / GICOP', category: 'integration', description: 'Header x-integration-secret (entrant) + signature HMAC-SHA256 (sortant) + POST /webhooks/gicop', isSecret: true },
   { key: 'GICOP_WEBHOOK_VERIFY_TOKEN', label: 'Token vérification webhook GICOP', category: 'integration', description: 'Token pour le GET /webhooks/gicop?hub.verify_token=... (si vide, utilise INTEGRATION_SECRET)', isSecret: true },
-  { key: 'ORDER_CALL_SYNC_LOOKBACK_MINUTES', label: 'Fenêtre de tolérance sync appels (min)', category: 'integration', description: 'Minutes de recul pour rattraper les appels DB2 insérés tardivement (défaut : 10)', defaultValue: '10' },
+
+  // ─── Appels DB2 ──────────────────────────────────────────────────────────────
+  {
+    key: 'ORDER_CALL_SYNC_LOOKBACK_MINUTES',
+    label: 'Fenêtre de relecture DB2 (minutes)',
+    category: 'calls',
+    description: 'Nombre de minutes relues à chaque cycle de synchronisation pour rattraper les appels insérés en retard dans DB2.',
+    defaultValue: '10',
+  },
+  {
+    key: 'ORDER_CALL_SYNC_BATCH_SIZE',
+    label: 'Taille du batch de sync appels',
+    category: 'calls',
+    description: 'Nombre maximum d\'appels traités par cycle de synchronisation DB2.',
+    defaultValue: '100',
+  },
+  {
+    key: 'ORDER_CALL_DURATION_MS_THRESHOLD_SEC',
+    label: 'Seuil normalisation durée appel (secondes)',
+    category: 'calls',
+    description: 'Au-delà de cette valeur (en secondes), la durée brute DB2 est interprétée comme des millisecondes et convertie.',
+    defaultValue: '7200',
+  },
 
   // ─── Formule de classement des commerciaux ────────────────────────────────────
   {
@@ -204,6 +227,24 @@ export class SystemConfigService implements OnApplicationBootstrap {
       }
     }
     this.logger.log(`SystemConfig: ${patched} variables patchées dans process.env`);
+  }
+
+  async getString(key: string, defaultValue: string): Promise<string> {
+    const val = await this.get(key);
+    return val !== null && val !== '' ? val : defaultValue;
+  }
+
+  async getNumber(key: string, defaultValue: number): Promise<number> {
+    const val = await this.get(key);
+    if (val === null || val === '') return defaultValue;
+    const parsed = Number(val);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+
+  async getBoolean(key: string, defaultValue: boolean): Promise<boolean> {
+    const val = await this.get(key);
+    if (val === null || val === '') return defaultValue;
+    return val === 'true' || val === '1';
   }
 
   async getAll(): Promise<SystemConfig[]> {

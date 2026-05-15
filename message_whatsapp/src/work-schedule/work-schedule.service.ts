@@ -6,6 +6,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { v4 as uuidv4 } from 'uuid';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
 const DAY_ORDER: DayOfWeek[] = [
   'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
@@ -40,6 +41,7 @@ export class WorkScheduleService {
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
+    private readonly systemConfigService: SystemConfigService,
   ) {}
 
   async findAll(): Promise<WorkSchedule[]> {
@@ -133,7 +135,7 @@ export class WorkScheduleService {
    */
   async getActiveGroupIds(at: Date): Promise<string[]> {
     // FIX-H3: Utiliser le fuseau horaire de l'application (APP_TIMEZONE, defaut Africa/Abidjan)
-    const tz = process.env['APP_TIMEZONE'] ?? 'Africa/Abidjan';
+    const tz = await this.systemConfigService.getString('APP_TIMEZONE', 'Africa/Abidjan');
     const dayOfWeekStr = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', timeZone: tz })
       .format(at).toLowerCase();
     // Mapping fr -> DayOfWeek anglais

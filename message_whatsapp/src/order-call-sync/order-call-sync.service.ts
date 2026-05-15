@@ -33,18 +33,13 @@ import { normalizePhone } from 'src/shared/utils/normalize-phone';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
 import { WorkScheduleService } from 'src/work-schedule/work-schedule.service';
 import { MissedCallHandlerService } from 'src/missed-calls/missed-call-handler.service';
+import { SystemConfigService } from 'src/system-config/system-config.service';
 
-const CURSOR_SCOPE            = 'global';
-const CURSOR_LOOKBACK_MINUTES_DEFAULT = 10; // FIX-C1: délai insertion DB2 peut dépasser 2 min
+const CURSOR_SCOPE = 'global';
 
 @Injectable()
 export class OrderCallSyncService {
   private readonly logger = new Logger(OrderCallSyncService.name);
-
-  private readonly batchSize: number = parseInt(
-    process.env['ORDER_CALL_SYNC_BATCH_SIZE'] ?? '100', // FIX-C3: fenetre stale reduite (etait 200)
-    10,
-  );
 
   constructor(
     @Inject(ORDER_DB_DATA_SOURCE)
@@ -86,6 +81,8 @@ export class OrderCallSyncService {
 
     private readonly workScheduleService: WorkScheduleService,
 
+    private readonly systemConfigService: SystemConfigService,
+
     @Optional()
     private readonly missedCallHandlerService: MissedCallHandlerService | null = null,
   ) {}
@@ -96,14 +93,16 @@ export class OrderCallSyncService {
       return { processed: 0, obligations: 0, errors: 0 };
     }
 
+    const [batchSize, lookbackMinutesRaw] = await Promise.all([
+      this.systemConfigService.getNumber('ORDER_CALL_SYNC_BATCH_SIZE', 100),
+      this.systemConfigService.getNumber('ORDER_CALL_SYNC_LOOKBACK_MINUTES', 10),
+    ]);
+    const lookbackMinutes = Math.max(0, lookbackMinutesRaw);
+
     const cursor = await this.getOrCreateCursor();
     const callRepo = this.orderDb.getRepository(OrderCallLog);
 
-    const since           = cursor.lastCallTimestamp ?? new Date(0);
-    const lookbackMinutes = Math.max(
-      0,
-      Number(process.env['ORDER_CALL_SYNC_LOOKBACK_MINUTES'] ?? String(CURSOR_LOOKBACK_MINUTES_DEFAULT)),
-    );
+    const since         = cursor.lastCallTimestamp ?? new Date(0);
     const lookbackSince = new Date(since.getTime() - lookbackMinutes * 60_000);
 
     const qb = callRepo
@@ -111,7 +110,7 @@ export class OrderCallSyncService {
       .where('c.call_timestamp >= :lookbackSince', { lookbackSince })
       .orderBy('c.call_timestamp', 'ASC')
       .addOrderBy('c.id', 'ASC')
-      .take(this.batchSize);
+      .take(batchSize);
 
     // Backfill device_id pour les call_event historiques (avant la migration)
     await this.backfillNullDeviceIds().catch((err: Error) =>
@@ -210,7 +209,7 @@ export class OrderCallSyncService {
         commercialId:      commercialIdDb1 ?? null,
         clientPhone:       call.remoteNumber,
         callStatus:        call.callType.toLowerCase(),
-        durationSeconds:   this.normalizeDuration(call.duration),
+        durationSeconds:   await this.normalizeDuration(call.duration),
         eventAt:           call.callTimestamp,
         deviceId:          call.deviceId ?? null,
         attributionSource,
@@ -241,7 +240,7 @@ export class OrderCallSyncService {
             const resolvedPosteId: string | null = commercial?.poste?.id ?? null;
             // Mapper call_status + outcome
             const callType     = call.callType.toLowerCase();
-            const durationSec  = this.normalizeDuration(call.duration);
+            const durationSec  = await this.normalizeDuration(call.duration);
             let mappedStatus: CallStatus;
             let mappedOutcome: CallOutcome | null = null;
 
@@ -377,7 +376,7 @@ export class OrderCallSyncService {
                 commercialId:        commercialIdDb1 ?? '',
                 clientPhone:         normalizePhone(call.remoteNumber ?? ''),
                 occurredAt:          call.callTimestamp,
-                durationSeconds:     this.normalizeDuration(call.duration),
+                durationSeconds:     await this.normalizeDuration(call.duration),
               });
             }
           } catch (err) {
@@ -408,9 +407,9 @@ export class OrderCallSyncService {
     }
 
     // FIX-C1: Si batch plein => possible troncature, ne pas avancer le curseur
-    if (calls.length >= this.batchSize) {
+    if (calls.length >= batchSize) {
       this.logger.warn(
-        'Sync DB2 : batch plein (' + this.batchSize + ' appels) — possible troncature. Curseur NON avance, prochain cycle relira depuis le meme point.',
+        'Sync DB2 : batch plein (' + batchSize + ' appels) — possible troncature. Curseur NON avance, prochain cycle relira depuis le meme point.',
       );
       await this.recalculateDeviceCounts().catch((err: Error) =>
         this.logger.warn('recalculateDeviceCounts: ' + err.message),
@@ -591,13 +590,10 @@ export class OrderCallSyncService {
    * Si raw > ORDER_CALL_DURATION_MS_THRESHOLD_SEC (defaut 7200), interprete comme ms.
    * Couvre: appels <= 2h stockes en s, et toutes durees en ms <= 2h*1000.
    */
-  private normalizeDuration(raw: number): number {
+  private async normalizeDuration(raw: number): Promise<number> {
     if (!raw) return 0;
     if (raw < 0) return 0;
-    const threshold = parseInt(
-      process.env['ORDER_CALL_DURATION_MS_THRESHOLD_SEC'] ?? '7200',
-      10,
-    );
+    const threshold = await this.systemConfigService.getNumber('ORDER_CALL_DURATION_MS_THRESHOLD_SEC', 7200);
     if (raw > threshold) {
       const asSec = Math.round(raw / 1000);
       this.logger.debug('normalizeDuration: ' + raw + ' -> ms -> ' + asSec + 's');
@@ -647,7 +643,7 @@ export class OrderCallSyncService {
             remoteNumber: call.remoteNumber ?? null,
             deviceId:    call.deviceId ?? null,
             callType:    call.callType ?? null,
-            durationSec: this.normalizeDuration(call.duration),
+            durationSec: await this.normalizeDuration(call.duration),
             eventAt:     call.callTimestamp,
             reason:      'db2_unavailable',
             resolvedAt:  null,
@@ -673,7 +669,7 @@ export class OrderCallSyncService {
 
     const result = await this.obligationService.tryMatchCallToTask({
       callEventId:      call.id,
-      durationSeconds:  this.normalizeDuration(call.duration),
+      durationSeconds:  await this.normalizeDuration(call.duration),
       resolvedCategory,
       commercialPhone:  call.localNumber ?? undefined,
       clientPhone:      call.remoteNumber,
@@ -1324,7 +1320,7 @@ export class OrderCallSyncService {
 
     let updated = 0;
     for (const c of db2Calls) {
-      const normalized = this.normalizeDuration(c.duration);
+      const normalized = await this.normalizeDuration(c.duration);
       if (normalized > 0) {
         await this.callEventService.updateDuration(String(c.id), normalized);
         updated++;
