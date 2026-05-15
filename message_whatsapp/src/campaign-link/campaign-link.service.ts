@@ -54,7 +54,7 @@ export class CampaignLinkService {
   ): { directUrl: string; trackedUrl: string } {
     const digits = phone.replace(/\D/g, '');
     const directUrl = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-    const trackedUrl = `${process.env.APP_URL ?? ''}/api/campaign/t/${code}`;
+    const trackedUrl = `${process.env.APP_URL ?? ''}/campaign/t/${code}`;
     return { directUrl, trackedUrl };
   }
 
@@ -195,6 +195,22 @@ export class CampaignLinkService {
   async remove(id: string): Promise<void> {
     const link = await this.findOne(id);
     await this.linkRepository.remove(link);
+  }
+
+  async repairTrackedUrls(): Promise<{ repaired: number }> {
+    const links = await this.linkRepository.find();
+    let repaired = 0;
+    for (const link of links) {
+      const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+      const phone = channel ? await this.resolvePhone(channel) : null;
+      if (!phone) continue;
+      const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
+      if (link.directUrl !== directUrl || link.trackedUrl !== trackedUrl) {
+        await this.linkRepository.update(link.id, { directUrl, trackedUrl });
+        repaired++;
+      }
+    }
+    return { repaired };
   }
 
   // ─── Tracking ────────────────────────────────────────────────────────────────

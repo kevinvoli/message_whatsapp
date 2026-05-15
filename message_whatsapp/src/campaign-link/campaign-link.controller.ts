@@ -51,6 +51,11 @@ export class CampaignLinkController {
     await this.service.remove(id);
   }
 
+  @Post('repair-urls')
+  repairUrls() {
+    return this.service.repairTrackedUrls();
+  }
+
   @Get(':id/analytics')
   async getStats(
     @Param('id') id: string,
