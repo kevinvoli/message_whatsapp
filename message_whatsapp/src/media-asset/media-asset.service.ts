@@ -44,6 +44,11 @@ export class MediaAssetService {
     return `${domain}/${filePath}`;
   }
 
+  buildPreviewUrl(id: string): string {
+    const domain = (process.env.APP_DOMAIN || process.env.APP_URL || '').replace(/\/$/, '');
+    return `${domain}/media/preview/${id}`;
+  }
+
   private hydrateUrl(asset: MediaAsset): MediaAsset {
     asset.publicUrl = this.buildPublicUrl(asset.filePath);
     return asset;

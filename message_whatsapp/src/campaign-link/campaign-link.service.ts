@@ -116,7 +116,7 @@ export class CampaignLinkService {
 
   private stripMediaUrl(message: string): string {
     return message
-      .replace(/\n?https?:\/\/\S+\/uploads\/media-assets\/\S+/g, '')
+      .replace(/\n?https?:\/\/\S+\/(?:uploads\/media-assets\/\S+|media\/preview\/[\w-]+)/g, '')
       .trim();
   }
   // --- CRUD ---
@@ -222,9 +222,9 @@ export class CampaignLinkService {
     if (link.mediaAssetId && link.mediaAssetId !== assetId) {
       await this.mediaAssetService.decrementUsage(link.mediaAssetId);
     }
+    const previewUrl = this.mediaAssetService.buildPreviewUrl(asset.id);
     const baseMessage = this.stripMediaUrl(link.predefinedMessage);
-    const newMessage = `${baseMessage}
-${asset.publicUrl}`.trim();
+    const newMessage = `${baseMessage}\n${previewUrl}`.trim();
     await this.linkRepository.update(linkId, { mediaAssetId: assetId, predefinedMessage: newMessage });
     if (!link.mediaAssetId || link.mediaAssetId !== assetId) {
       await this.mediaAssetService.incrementUsage(assetId);
@@ -261,8 +261,9 @@ ${asset.publicUrl}`.trim();
       if (!link.mediaAssetId) continue;
       try {
         const asset = await this.mediaAssetService.findOne(link.mediaAssetId);
+        const previewUrl = this.mediaAssetService.buildPreviewUrl(asset.id);
         const baseMessage = this.stripMediaUrl(link.predefinedMessage);
-        const newMessage = `${baseMessage}\n${asset.publicUrl}`.trim();
+        const newMessage = `${baseMessage}\n${previewUrl}`.trim();
         const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
         const phone = channel ? await this.resolvePhone(channel) : null;
         const updates: Partial<CampaignLink> = { predefinedMessage: newMessage };

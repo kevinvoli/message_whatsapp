@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -17,10 +18,55 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
+import { Response } from 'express';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { MediaAssetService } from './media-asset.service';
 import { CreateMediaAssetDto } from './dto/create-media-asset.dto';
 import { UpdateMediaAssetDto } from './dto/update-media-asset.dto';
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+@Controller('media')
+export class MediaPreviewController {
+  constructor(private readonly service: MediaAssetService) {}
+
+  @Get('preview/:id')
+  async preview(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const asset = await this.service.findOne(id);
+      const imageUrl = asset.mediaType === 'image' ? asset.publicUrl : '';
+      const title = escapeHtml(asset.name);
+      const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title}</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${title}">
+  <meta property="og:url" content="${escapeHtml(asset.publicUrl)}">
+  ${imageUrl ? `<meta property="og:image" content="${escapeHtml(imageUrl)}">
+  <meta property="og:image:type" content="${escapeHtml(asset.mimeType)}">` : ''}
+  <meta http-equiv="refresh" content="0;url=${escapeHtml(asset.publicUrl)}">
+</head>
+<body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh">
+  ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" style="max-width:100%;max-height:100vh;object-fit:contain" alt="${title}">` : `<p style="color:#fff;font-family:sans-serif">${title}</p>`}
+</body>
+</html>`;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.send(html);
+    } catch {
+      return res.status(404).send('Not found');
+    }
+  }
+}
 
 const ALLOWED_MIMETYPES = [
   'image/jpeg',
