@@ -52,9 +52,20 @@ export class CampaignLinkService {
     message: string,
     code: string,
   ): { directUrl: string; trackedUrl: string } {
-    const directUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    const digits = phone.replace(/\D/g, '');
+    const directUrl = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
     const trackedUrl = `${process.env.APP_URL ?? ''}/api/campaign/t/${code}`;
     return { directUrl, trackedUrl };
+  }
+
+  private resolvePhone(channel: WhapiChannel): string | null {
+    if (channel.phone_number) {
+      return channel.phone_number;
+    }
+    if (channel.provider === 'whapi' && channel.channel_id) {
+      return channel.channel_id.split('@')[0];
+    }
+    return null;
   }
 
   private detectDevice(userAgent: string | null): string | null {
@@ -80,12 +91,9 @@ export class CampaignLinkService {
       throw new NotFoundException(`Canal introuvable : ${dto.channel_id}`);
     }
 
-    let phone = channel.phone_number ?? null;
-    if (!phone && channel.channel_id) {
-      phone = channel.channel_id.split('@')[0];
-    }
+    const phone = this.resolvePhone(channel);
     if (!phone) {
-      throw new NotFoundException(`Numéro de téléphone introuvable pour le canal ${dto.channel_id}`);
+      throw new NotFoundException(`Numéro de téléphone introuvable pour le canal ${dto.channel_id}. Renseignez le champ "Numéro de téléphone" dans la configuration du canal.`);
     }
 
     const shortCode = await this.generateShortCode();
@@ -143,10 +151,7 @@ export class CampaignLinkService {
 
     if (messageChanged || channelChanged) {
       const channel = link.channel ?? (await this.channelRepository.findOne({ where: { channel_id: link.channelId } }));
-      let phone = channel?.phone_number ?? null;
-      if (!phone && channel?.channel_id) {
-        phone = channel.channel_id.split('@')[0];
-      }
+      const phone = channel ? this.resolvePhone(channel) : null;
       if (phone) {
         const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
         link.directUrl = directUrl;
