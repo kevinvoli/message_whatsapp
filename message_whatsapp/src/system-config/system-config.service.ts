@@ -27,6 +27,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'WS_PORT', label: 'Port WebSocket', category: 'general' },
   { key: 'SERVER_PUBLIC_HOST', label: 'URL publique du serveur', category: 'general', description: 'Utilisée pour les liens médias Meta (ex: https://your-domain.com)' },
   { key: 'APP_URL', label: 'URL de l\'application', category: 'general', description: 'Utilisée pour enregistrer le webhook Telegram' },
+  { key: 'APP_DOMAIN', label: 'Domaine de l\'API', category: 'general', description: 'URL de base pour les liens de suivi campagne (ex: https://api.gicop.ci)' },
   { key: 'CORS_ORIGINS', label: 'Origines CORS autorisées', category: 'general', description: 'Liste séparée par des virgules, sans espaces' },
 
   // ─── WhatsApp / Whapi ───────────────────────────────────────────────────────
