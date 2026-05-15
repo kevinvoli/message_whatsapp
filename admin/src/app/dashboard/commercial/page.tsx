@@ -39,6 +39,7 @@ import GoNoGoView from '@/app/ui/GoNoGoView';
 import NotificationsView from '@/app/ui/NotificationsView';
 import SettingsView from '@/app/ui/SettingsView';
 import CampaignLinksView from '@/app/ui/CampaignLinksView';
+import MediathequeView from '@/app/ui/MediathequeView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -133,6 +134,8 @@ export default function AdminDashboard() {
                 return <AnalyticsView />;
             case 'campaign-links':
                 return <CampaignLinksView />;
+            case 'mediatheque':
+                return <MediathequeView />;
             case 'messages':
                 return <MessagesView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
             case 'clients':

@@ -11,6 +11,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { CampaignLinkClick } from './campaign-link-click.entity';
+import { MediaAsset } from 'src/media-asset/entities/media-asset.entity';
 
 @Entity({ name: 'campaign_link' })
 @Index('UQ_campaign_link_short_code', ['shortCode'], { unique: true })
@@ -48,6 +49,13 @@ export class CampaignLink {
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
+
+  @Column({ name: 'media_asset_id', type: 'varchar', length: 36, nullable: true })
+  mediaAssetId: string | null;
+
+  @ManyToOne(() => MediaAsset, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'media_asset_id' })
+  mediaAsset: MediaAsset | null;
 
   @OneToMany(() => CampaignLinkClick, (click) => click.campaignLink)
   clicks: CampaignLinkClick[];

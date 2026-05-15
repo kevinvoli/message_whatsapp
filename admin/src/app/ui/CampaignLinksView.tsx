@@ -16,6 +16,12 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  Image,
+  Film,
+  Music,
+  FileText,
+  Paperclip,
+  X,
 } from 'lucide-react';
 import {
   ComposedChart,
@@ -37,8 +43,12 @@ import {
   getCampaignLinkStats,
   getCampaignLinkClicks,
   getChannels,
+  attachMediaAssetToLink,
+  detachMediaAssetFromLink,
+  uploadMediaDirectToLink,
 } from '@/app/lib/api';
-import { CampaignLink, CampaignLinkClick, CampaignLinkStats, Channel } from '@/app/lib/definitions';
+import { CampaignLink, CampaignLinkClick, CampaignLinkStats, Channel, MediaAsset } from '@/app/lib/definitions';
+import MediaPickerModal from '@/app/ui/MediaPickerModal';
 import { Spinner } from '@/app/ui/Spinner';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate, formatDateShort, formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
@@ -132,6 +142,9 @@ function CampaignLinkForm({ channels, initial, loading, onSave, onCancel }: Link
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [savedLink, setSavedLink] = useState<CampaignLink | null>(null);
   const [copying, setCopying] = useState<'direct' | 'tracked' | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<MediaAsset | null>(initial?.media_asset ?? null);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [mediaLinkId, setMediaLinkId] = useState<string | null>(initial?.id ?? null);
   const { addToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,7 +156,18 @@ function CampaignLinkForm({ channels, initial, loading, onSave, onCancel }: Link
       predefined_message: message.trim(),
       is_active: isActive,
     });
-    if (result) setSavedLink(result);
+    if (result) {
+      setSavedLink(result);
+      setMediaLinkId(result.id);
+      // Attacher le media si selectionne
+      if (selectedMedia && !initial?.media_asset_id) {
+        try {
+          await attachMediaAssetToLink(result.id, selectedMedia.id);
+        } catch (e: any) {
+          addToast({ type: 'error', message: e.message ?? 'Erreur attachement media' });
+        }
+      }
+    }
   };
 
   const copy = async (text: string, type: 'direct' | 'tracked') => {
@@ -235,6 +259,71 @@ function CampaignLinkForm({ channels, initial, loading, onSave, onCancel }: Link
         <span className="text-sm text-gray-700">Lien actif</span>
       </div>
 
+      {/* Section media */}
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+          <Paperclip className="w-4 h-4" /> Media associe (optionnel)
+        </p>
+        {selectedMedia ? (
+          <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+              {selectedMedia.mediaType === 'image' ? (
+                <img src={selectedMedia.publicUrl} alt={selectedMedia.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-gray-400">
+                  {selectedMedia.mediaType === 'video' && <Film className="w-8 h-8" />}
+                  {selectedMedia.mediaType === 'audio' && <Music className="w-8 h-8" />}
+                  {selectedMedia.mediaType === 'document' && <FileText className="w-8 h-8" />}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{selectedMedia.name}</p>
+              <p className="text-xs text-gray-500">{selectedMedia.mediaType} · {(selectedMedia.fileSize / 1024).toFixed(0)} Ko</p>
+              {selectedMedia.category && <p className="text-xs text-gray-400">{selectedMedia.category}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                if (mediaLinkId) {
+                  try {
+                    await detachMediaAssetFromLink(mediaLinkId);
+                  } catch {}
+                }
+                setSelectedMedia(null);
+              }}
+              className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMediaPicker(true)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+            >
+              <Image className="w-4 h-4" /> Choisir dans la mediathèque
+            </button>
+            <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition-colors cursor-pointer">
+              <Paperclip className="w-4 h-4" /> Upload rapide
+              <input type="file" className="hidden" onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !mediaLinkId) return;
+                try {
+                  const updated = await uploadMediaDirectToLink(mediaLinkId, file);
+                  if (updated.media_asset) setSelectedMedia(updated.media_asset);
+                  addToast({ type: 'success', message: 'Media uploade et attache' });
+                } catch (err: any) {
+                  addToast({ type: 'error', message: err.message ?? 'Erreur upload' });
+                }
+              }} />
+            </label>
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-end gap-2 pt-2">
         <button
           type="button"
@@ -309,6 +398,24 @@ function CampaignLinkForm({ channels, initial, loading, onSave, onCancel }: Link
             </div>
           </div>
         </div>
+      )}
+      {showMediaPicker && (
+        <MediaPickerModal
+          open={showMediaPicker}
+          onClose={() => setShowMediaPicker(false)}
+          onSelect={async (asset) => {
+            setShowMediaPicker(false);
+            setSelectedMedia(asset);
+            if (mediaLinkId) {
+              try {
+                await attachMediaAssetToLink(mediaLinkId, asset.id);
+                addToast({ type: 'success', message: 'Media attache' });
+              } catch (e: any) {
+                addToast({ type: 'error', message: e.message ?? 'Erreur attachement' });
+              }
+            }
+          }}
+        />
       )}
     </form>
   );
@@ -468,6 +575,7 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Nom</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Canal</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Message</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Media</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Clics</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversions</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
@@ -484,6 +592,19 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
                     </td>
                     <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">
                       {link.predefinedMessage ? truncate(link.predefinedMessage, 50) : <span className="italic text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {link.media_asset ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+                          {link.media_asset.mediaType === 'image' && <Image className="w-3.5 h-3.5" />}
+                          {link.media_asset.mediaType === 'video' && <Film className="w-3.5 h-3.5" />}
+                          {link.media_asset.mediaType === 'audio' && <Music className="w-3.5 h-3.5" />}
+                          {link.media_asset.mediaType === 'document' && <FileText className="w-3.5 h-3.5" />}
+                          <span className="truncate max-w-[80px]" title={link.media_asset.name}>{link.media_asset.name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-gray-800">
                       {link.clickCount}
@@ -549,7 +670,7 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
                   {/* Ligne expandable — URLs */}
                   {expandedId === link.id && (
                     <tr className="bg-blue-50 border-t-0">
-                      <td colSpan={7} className="px-4 py-3">
+                      <td colSpan={8} className="px-4 py-3">
                         <div className="space-y-2">
 
                           {/* URL de suivi */}

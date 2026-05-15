@@ -12,8 +12,14 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { randomUUID } from 'crypto';
+import * as path from 'path';
 import { Response, Request } from 'express';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { CampaignLinkService } from './campaign-link.service';
@@ -59,7 +65,7 @@ export class CampaignLinkController {
   @Get('debug/config')
   debugConfig() {
     return {
-      APP_URL: process.env.APP_URL ?? '(non défini)',
+      APP_URL: process.env.APP_URL ?? '(non defini)',
       trackedUrlSample: `${process.env.APP_URL ?? ''}/campaign/t/EXAMPLE`,
       isAbsolute: (process.env.APP_URL ?? '').startsWith('http'),
     };
@@ -84,6 +90,37 @@ export class CampaignLinkController {
     const pageNum = page ? parseInt(page, 10) : 1;
     return this.service.getClickHistory(id, pageNum);
   }
+
+  @Post(':id/media-asset/:assetId')
+  attachAsset(@Param('id') id: string, @Param('assetId') assetId: string) {
+    return this.service.attachAsset(id, assetId);
+  }
+
+  @Delete(':id/media-asset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async detachAsset(@Param('id') id: string): Promise<void> {
+    await this.service.detachAsset(id);
+  }
+
+  @Post(':id/media-upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/media-assets',
+        filename: (_req, file, cb) => {
+          const ext = path.extname(file.originalname);
+          cb(null, `${randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 16 * 1024 * 1024 },
+    }),
+  )
+  async uploadMediaToLink(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.uploadAndAttachMedia(id, file);
+  }
 }
 
 @Controller('campaign')
@@ -101,7 +138,6 @@ export class CampaignTrackingController {
       (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ??
       req.ip ??
       '0.0.0.0';
-
     const directUrl = await this.service.track(code, rawIp, userAgent ?? null);
     res.redirect(302, directUrl);
   }

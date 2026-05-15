@@ -39,6 +39,7 @@ import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { SystemAlertModule } from './system-alert/system-alert.module';
 import { CampaignLinkModule } from './campaign-link/campaign-link.module';
+import { MediaAssetModule } from './media-asset/media-asset.module';
 
 @Module({
   imports: [
@@ -116,6 +117,7 @@ import { CampaignLinkModule } from './campaign-link/campaign-link.module';
     SystemConfigModule,
     SystemAlertModule,
     CampaignLinkModule,
+    MediaAssetModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

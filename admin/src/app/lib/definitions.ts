@@ -41,6 +41,7 @@ export type ViewMode =
   | 'notifications'
   | 'alert-config'
   | 'campaign-links'
+  | 'mediatheque'
   | 'settings';
 
 export type NavigationItem = {
@@ -710,6 +711,30 @@ export const SEUILS_ALERTES = {
   TEMPS_REPONSE_MAX_MINUTES: 15,
 } as const;
 
+
+// ============================================
+// MEDIA ASSET (Mediathèque)
+// ============================================
+
+export type MediaAssetType = 'image' | 'video' | 'audio' | 'document';
+
+export type MediaAsset = {
+  id: string;
+  name: string;
+  originalName: string;
+  publicUrl: string;
+  filePath: string;
+  mimeType: string;
+  mediaType: MediaAssetType;
+  fileSize: number;
+  category: string | null;
+  tags: string[] | null;
+  colorLabel: string | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // ============================================
 // CAMPAIGN LINKS
 // ============================================
@@ -726,6 +751,8 @@ export type CampaignLink = {
   clickCount: number;
   conversionCount: number;
   isActive: boolean;
+  media_asset_id: string | null;
+  media_asset: MediaAsset | null;
   createdAt: string;
   updatedAt: string;
 };
