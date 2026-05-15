@@ -547,7 +547,7 @@ export class DispatcherService {
     const chats = await this.chatRepository.find({
       where: {
         poste_id: poste_id,
-        status: WhatsappChatStatus.ACTIF,
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
         unread_count: MoreThan(0),
       },
     });
@@ -591,18 +591,23 @@ export class DispatcherService {
           (SELECT c.poste_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
       )`;
 
-      // ── 2. Convs non lues sur postes offline/bloqués (hors queue) ───────────
+      // Déclaré tôt : nécessaire pour la requête unavailableCountRows (NOT IN) et step 3.
+      const posteIds = queuedPostes.map((p) => p.id);
+
+      // ── 2. Convs non lues sur postes hors queue (offline temporaire OU désactivé) ──
       // Détectés EN PREMIER pour ne pas être bloqués par le guard queuedPostes.length < 2.
-      // Ces postes ne figurent pas dans queuedPostes → invisibles sans ce bloc.
+      // Avant : filtre is_queue_enabled = false → ratait les postes is_active = false (offline
+      // temporaire, purged from queue) dont les convs EN_ATTENTE/FERME restaient assignées.
+      // Fix : on capture toutes les convs sur postes absents de la queue courante (NOT IN).
       const unavailableCountRows = await this.chatRepository
         .createQueryBuilder('chat')
-        .innerJoin('chat.poste', 'poste')
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
         .where('chat.unread_count > 0')
         .andWhere('chat.last_client_message_at < :threshold', { threshold })
         .andWhere('chat.deletedAt IS NULL')
-        .andWhere('poste.is_queue_enabled = false')
+        .andWhere('chat.poste_id IS NOT NULL')
+        .andWhere('chat.poste_id NOT IN (:...posteIds)', { posteIds })
         .andWhere(dedicatedExclusion)
         .groupBy('chat.poste_id')
         .getRawMany<{ poste_id: string; cnt: string }>();
@@ -620,8 +625,6 @@ export class DispatcherService {
       if (queuedPostes.length < 2 && unavailablePostes.length === 0) {
         return `File d'attente insuffisante — ${queuedPostes.length} poste(s) disponible(s)`;
       }
-
-      const posteIds = queuedPostes.map((p) => p.id);
 
       // ── 3. Nombre de convs éligibles — postes de la queue ───────────────────
       const countRows = await this.chatRepository
