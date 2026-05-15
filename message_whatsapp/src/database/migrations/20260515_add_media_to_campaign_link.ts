@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMediaToCampaignLink20260515 implements MigrationInterface {
-  name = 'AddMediaToCampaignLink20260515';
+export class AddMediaToCampaignLink1778803200002 implements MigrationInterface {
+  name = 'AddMediaToCampaignLink1778803200002';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

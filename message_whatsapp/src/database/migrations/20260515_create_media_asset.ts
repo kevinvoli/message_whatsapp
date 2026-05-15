@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateMediaAsset20260515 implements MigrationInterface {
-  name = 'CreateMediaAsset20260515';
+export class CreateMediaAsset1778803200001 implements MigrationInterface {
+  name = 'CreateMediaAsset1778803200001';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
