@@ -9,6 +9,7 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { CronConfig } from 'src/jorbs/entities/cron-config.entity';
 import { WhatsappMessageModule } from '../whatsapp_message/whatsapp_message.module';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
@@ -56,6 +57,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
       WhatsappMedia,
     ]),
     forwardRef(() => WhatsappMessageModule),
+    CampaignLinkModule,
     LoggingModule,
     CallLogModule,
     JorbsModule,
