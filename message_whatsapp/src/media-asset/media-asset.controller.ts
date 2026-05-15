@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -37,9 +38,20 @@ export class MediaPreviewController {
   constructor(private readonly service: MediaAssetService) {}
 
   @Get('preview/:id')
-  async preview(@Param('id') id: string, @Res() res: Response) {
+  async preview(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @Headers('accept') accept: string,
+  ) {
     try {
       const asset = await this.service.findOne(id);
+
+      // Requête d'un <img src="..."> : Accept commence par image/ → redirect 302 vers le fichier réel
+      if (accept && accept.trim().startsWith('image/')) {
+        return res.redirect(302, asset.publicUrl);
+      }
+
+      // Requête browser / crawler WhatsApp : servir la page HTML avec og:image
       const imageUrl = asset.mediaType === 'image' ? asset.publicUrl : '';
       const title = escapeHtml(asset.name);
       const html = `<!DOCTYPE html>
