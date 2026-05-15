@@ -55,6 +55,7 @@ export function mapConversation(
     contact_client: locked ? null : chat.contact_client,
     first_response_deadline_at: locked ? null : chat.first_response_deadline_at,
     validation_state: locked ? null : (validationState ?? null),
+    chat_pic: locked ? null : (chat.chat_pic || null),
   };
 }
 

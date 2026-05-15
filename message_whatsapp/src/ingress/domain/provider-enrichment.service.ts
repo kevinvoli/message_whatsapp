@@ -10,6 +10,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { UnifiedMessage } from 'src/webhooks/normalization/unified-message';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class ProviderEnrichmentService {
   constructor(
     private readonly channelService: ChannelService,
     private readonly messengerService: CommunicationMessengerService,
+    private readonly whapiService: CommunicationWhapiService,
   ) {}
 
   /**
@@ -33,7 +35,41 @@ export class ProviderEnrichmentService {
     }
   }
 
+  /**
+   * Résout l'URL de la photo de profil de l'expéditeur selon le provider.
+   * Ne propage jamais d'erreur — retourne null si indisponible.
+   */
+  async resolveProfilePicture(message: UnifiedMessage): Promise<string | null> {
+    try {
+      if (message.provider === 'messenger' && message.from && message.channelId) {
+        return await this.resolveMessengerPicture(message.from, message.channelId);
+      }
+      if (message.provider === 'whapi' && message.from && message.channelId) {
+        return await this.resolveWhapiPicture(message.from, message.channelId);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   // ─── Privé ────────────────────────────────────────────────────────────────
+
+  private async resolveMessengerPicture(psid: string, channelId: string): Promise<string | null> {
+    const channel =
+      (await this.channelService.findByChannelId(channelId)) ??
+      (await this.channelService.findChannelByExternalId('messenger', channelId));
+    if (!channel?.token) return null;
+    return await this.messengerService.getUserProfilePicture(psid, channel.token, channel.external_id ?? undefined);
+  }
+
+  private async resolveWhapiPicture(phone: string, channelId: string): Promise<string | null> {
+    const channel = await this.channelService.findByChannelId(channelId);
+    if (!channel?.token) return null;
+    const cleanPhone = phone.split('@')[0];
+    const { thumbUrl } = await this.whapiService.getContactPicture(cleanPhone, channel.token);
+    return thumbUrl ?? null;
+  }
 
   private async resolveMessengerFromName(
     psid: string,

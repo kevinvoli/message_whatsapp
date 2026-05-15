@@ -38,9 +38,20 @@ export class InboundStateUpdateService {
     conversation: WhatsappChat,
     savedMessage: WhatsappMessage,
     chatContext?: ChatContext,
+    resolvedPictureUrl?: string | null,
   ): Promise<void> {
     const clientMessageAt = savedMessage.timestamp ?? new Date();
     const windowExpires = new Date(clientMessageAt.getTime() + 24 * 60 * 60 * 1000);
+
+    // ── Photo de profil : mise à jour sur WhatsappChat (indépendante du path CTX/legacy) ──
+    if (resolvedPictureUrl && !conversation.chat_pic) {
+      await this.chatService.update(conversation.chat_id, {
+        chat_pic: resolvedPictureUrl,
+        chat_pic_full: resolvedPictureUrl,
+        chatPicRefreshedAt: new Date(),
+      });
+      conversation.chat_pic = resolvedPictureUrl;
+    }
 
     if (chatContext) {
       // ── Chemin isolé (CTX-C3) — met à jour uniquement ce contexte ──────────

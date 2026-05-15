@@ -12,6 +12,8 @@ export class CommunicationMessengerService {
   private readonly nameCache = new Map<string, { name: string; expiresAt: number }>();
   /** Cache PAT dérivés : évite de rappeler /{pageId}?fields=access_token à chaque message */
   private readonly patCache = new Map<string, { token: string; expiresAt: number }>();
+  /** Cache photo de profil Messenger : 1h (succès), 10 min (erreur) */
+  private readonly pictureCache = new Map<string, { url: string | null; expiresAt: number }>();
 
   constructor(private readonly logger: AppLogger) {}
 
@@ -167,6 +169,37 @@ export class CommunicationMessengerService {
       return user?.name?.trim() ?? null;
     } catch {
       // Silencieux : on passe à la méthode 2
+      return null;
+    }
+  }
+
+  /**
+   * Récupère la photo de profil d'un utilisateur Messenger via son PSID.
+   * Résultat mis en cache 1h (succès) ou 10 min (erreur).
+   * Ne propage jamais d'erreur — retourne null si indisponible.
+   */
+  async getUserProfilePicture(
+    psid: string,
+    accessToken: string,
+    pageId?: string,
+  ): Promise<string | null> {
+    const cached = this.pictureCache.get(psid);
+    if (cached && cached.expiresAt > Date.now()) return cached.url;
+
+    const effectiveToken = pageId
+      ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+      : accessToken;
+
+    try {
+      const response = await axios.get<{ profile_pic?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
+        { params: { fields: 'profile_pic', access_token: effectiveToken }, timeout: 5_000 },
+      );
+      const url = response.data?.profile_pic ?? null;
+      this.pictureCache.set(psid, { url, expiresAt: Date.now() + 60 * 60_000 });
+      return url;
+    } catch {
+      this.pictureCache.set(psid, { url: null, expiresAt: Date.now() + 10 * 60_000 });
       return null;
     }
   }

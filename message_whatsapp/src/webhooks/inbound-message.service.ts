@@ -163,6 +163,12 @@ export class InboundMessageService {
     const conversation = assignResult.chat;
     const chatContext = assignResult.chatContext;
 
+    // ── Étape 2b : résolution photo de profil (uniquement si non encore résolue) ──
+    let resolvedPicUrl: string | null = null;
+    if (!conversation.chat_pic) {
+      resolvedPicUrl = await this.providerEnrichment.resolveProfilePicture(message);
+    }
+
     // ── Étape 4 : persistance du message ──────────────────────────────────────
     const persistResult = await this.messagePersistence.persist(message, conversation, correlationId);
     if (!persistResult.ok) return; // canal inconnu — HTTP 200 pour stopper les retries provider
@@ -174,7 +180,7 @@ export class InboundMessageService {
     await this.mediaPersistence.persistAll(medias, persistResult.message, conversation, message);
 
     // ── Étape 6 : mise à jour état conversation ───────────────────────────────
-    await this.stateUpdate.apply(conversation, persistResult.message, chatContext ?? undefined);
+    await this.stateUpdate.apply(conversation, persistResult.message, chatContext ?? undefined, resolvedPicUrl);
 
     // ── Étape 7 : notification frontend via WebSocket ────────────────────────
     await this.messageGateway.notifyNewMessage(persistResult.message, conversation, persistResult.message);

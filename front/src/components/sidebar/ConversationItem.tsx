@@ -1,5 +1,6 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, Star, Phone, AlertCircle, Send } from 'lucide-react';
+import { Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Clock, Lock, Star, Phone, AlertCircle, Send } from 'lucide-react';
+import { ContactAvatar } from '../ui/ContactAvatar';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
@@ -89,13 +90,6 @@ interface ConversationItemProps {
   onToggleCheck?: (chatId: string) => void;
 }
 
-const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
-  whatsapp:  { bg: 'bg-green-100',  text: 'text-green-600'  },
-  messenger: { bg: 'bg-blue-100',   text: 'text-blue-600'   },
-  instagram: { bg: 'bg-purple-100', text: 'text-purple-600' },
-  telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
-};
-
 const SLA_WARNING_MS = 30 * 60 * 1000; // 30 minutes
 
 function hasSlaWarning(conv: Conversation): boolean {
@@ -113,7 +107,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 }) => {
 
   const provider = getProviderFromChatId(conversation.chat_id);
-  const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
   const slaAlert = hasSlaWarning(conversation);
   const windowStatus = conversation.window_status;
   const isLocked = windowStatus === 'locked' || (windowStatus == null && conversation.is_locked === true);
@@ -171,8 +164,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             />
           </div>
         ) : (
-        <div className={`w-12 h-12 ${avatarColor.bg} rounded-full flex items-center justify-center flex-shrink-0 relative`}>
-          <User className={`w-6 h-6 ${avatarColor.text}`} />
+        <div className="relative flex-shrink-0">
+          <ContactAvatar
+            src={conversation.chat_pic}
+            name={conversation.clientName}
+            provider={provider}
+            size="lg"
+          />
           {conversation.priority === 'haute' && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
               <span className="text-white text-xs">!</span>

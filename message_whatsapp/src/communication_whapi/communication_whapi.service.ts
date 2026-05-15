@@ -25,6 +25,7 @@ export class CommunicationWhapiService {
   private readonly maxRetries = Number(
     process.env.WHAPI_OUTBOUND_MAX_RETRIES ?? 2,
   );
+  private readonly pictureCache = new Map<string, { url: string | null; thumbUrl: string | null; expiresAt: number }>();
 
   constructor(
     @InjectRepository(WhapiChannel)
@@ -392,6 +393,35 @@ export class CommunicationWhapiService {
         CommunicationWhapiService.name,
       );
       return null;
+    }
+  }
+
+  /**
+   * Récupère la photo de profil d'un contact WhatsApp via l'API Whapi.
+   * Résultat mis en cache 1h (succès) ou 10 min (échec) pour borner les appels API.
+   * Ne propage jamais d'erreur — retourne null si indisponible.
+   */
+  async getContactPicture(
+    phone: string,
+    token: string,
+  ): Promise<{ url: string | null; thumbUrl: string | null }> {
+    const cached = this.pictureCache.get(phone);
+    if (cached && cached.expiresAt > Date.now()) {
+      return { url: cached.url, thumbUrl: cached.thumbUrl };
+    }
+
+    try {
+      const response = await axios.get<{ picture?: string | null; picture_thumb?: string | null }>(
+        `https://gate.whapi.cloud/contacts/${phone}`,
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 5_000 },
+      );
+      const url = response.data?.picture ?? null;
+      const thumbUrl = response.data?.picture_thumb ?? null;
+      this.pictureCache.set(phone, { url, thumbUrl, expiresAt: Date.now() + 60 * 60_000 });
+      return { url, thumbUrl };
+    } catch {
+      this.pictureCache.set(phone, { url: null, thumbUrl: null, expiresAt: Date.now() + 10 * 60_000 });
+      return { url: null, thumbUrl: null };
     }
   }
 

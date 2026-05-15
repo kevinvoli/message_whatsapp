@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers, Bell } from 'lucide-react';
+import { MessageCircle, Clock, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers, Bell } from 'lucide-react';
+import { ContactAvatar } from '../ui/ContactAvatar';
 import {
   Conversation,
   ConversationStatus,
@@ -14,13 +15,6 @@ import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu'
 import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
-
-const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
-  whatsapp:  { bg: 'bg-green-100',  text: 'text-green-600'  },
-  messenger: { bg: 'bg-blue-100',   text: 'text-blue-600'   },
-  instagram: { bg: 'bg-purple-100', text: 'text-purple-600' },
-  telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
-};
 
 interface ChatHeaderProps {
     currentConv: Conversation;
@@ -109,7 +103,6 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
         selectContactByChatId(currentConv.chat_id);
         onOpenContact?.();
     }
-    const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
     const handleConversationStatusChange = (
       _conversationId: string,
@@ -127,9 +120,12 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
         <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 ${avatarColor.bg} rounded-full flex items-center justify-center`}>
-                        <User className={`w-6 h-6 ${avatarColor.text}`} />
-                    </div>
+                    <ContactAvatar
+                        src={currentConv.chat_pic}
+                        name={currentConv.clientName}
+                        provider={getProviderFromChatId(currentConv.chat_id)}
+                        size="md"
+                    />
                     <div>
                         <button onClick={handleOpenContact} className="font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left transition-colors">
                             {currentConv?.clientName}

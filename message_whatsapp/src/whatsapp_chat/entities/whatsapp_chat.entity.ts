@@ -145,23 +145,14 @@ export class WhatsappChat {
   @Column({ name: 'type', type: 'varchar', length: 100, nullable: false })
   type: string; // private | group | newsletter
 
-  @Column({
-    name: 'chat_pic',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
-    default: 'default.png',
-  })
-  chat_pic: string;
+  @Column({ name: 'chat_pic', type: 'text', nullable: true, default: null })
+  chat_pic: string | null;
 
-  @Column({
-    name: 'chat_pic_full',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
-    default: 'default.png',
-  })
-  chat_pic_full: string;
+  @Column({ name: 'chat_pic_full', type: 'text', nullable: true, default: null })
+  chat_pic_full: string | null;
+
+  @Column({ name: 'chat_pic_refreshed_at', type: 'datetime', nullable: true, default: null })
+  chatPicRefreshedAt: Date | null;
 
   @Column({ name: 'is_pinned', type: 'boolean', default: false })
   is_pinned: boolean;

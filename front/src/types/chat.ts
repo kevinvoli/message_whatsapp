@@ -432,6 +432,10 @@ export interface Conversation {
   /** Date d'expiration de la fenêtre 24h côté Meta (ISO string) */
   customerWindowExpiresAt?: string | null;
 
+  /** Photo de profil WhatsApp/Messenger du contact */
+  chat_pic?: string | null;
+  chat_pic_full?: string | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -942,6 +946,8 @@ export const transformToConversation = (
 
     channel_provider: raw.channel_provider ?? raw.channel?.provider ?? null,
     customerWindowExpiresAt: raw.customer_window_expires_at ?? null,
+    chat_pic: (raw as any).chat_pic ?? null,
+    chat_pic_full: (raw as any).chat_pic_full ?? null,
 
     window_slot: raw.window_slot ?? null,
     window_status: (raw.window_status ?? null) as Conversation['window_status'],

@@ -63,4 +63,6 @@ export interface UnifiedMessage {
   raw: unknown;
   /** Identifiant de corrélation généré à l'entrée du webhook HTTP — permet de relier tous les logs du pipeline à la même requête entrante. */
   correlationId?: string;
+  /** URL de la photo de profil de l'expéditeur, résolue lors de l'enrichissement. */
+  fromProfilePicUrl?: string;
 }
