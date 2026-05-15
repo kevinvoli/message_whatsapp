@@ -328,6 +328,7 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editLink, setEditLink] = useState<CampaignLink | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -475,84 +476,133 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {links.map((link) => (
-                <tr key={link.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{link.name}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {link.channel?.label || link.channelId}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">
-                    {link.predefinedMessage ? truncate(link.predefinedMessage, 50) : <span className="italic text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-800">
-                    {link.clickCount}
-                    {!link.trackedUrl.startsWith('http') && (
-                      <span className="ml-1 text-red-400" title="APP_URL non configuré — URL de suivi invalide">⚠</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="font-mono text-gray-800">{link.conversionCount}</span>
-                    {link.clickCount > 0 && (
-                      <span className="ml-1.5 text-xs text-gray-400">({conversionRate(link)})</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {link.isActive ? (
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                        Actif
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
-                        Inactif
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => onSelectLink(link.id)}
-                        className="rounded p-1.5 text-indigo-600 hover:bg-indigo-50"
-                        title="Voir les analytics"
-                        aria-label="Voir les analytics"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => void handleCopyTracked(link.trackedUrl)}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-100"
-                        title="Copier l'URL de suivi"
-                        aria-label="Copier l'URL de suivi"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                      {link.trackedUrl.startsWith('http') && (
-                        <button
-                          onClick={() => window.open(link.trackedUrl, '_blank')}
-                          className="rounded p-1.5 text-blue-500 hover:bg-blue-50"
-                          title="Tester le suivi (clic enregistré)"
-                          aria-label="Tester l'URL de suivi"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
+                <React.Fragment key={link.id}>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900">{link.name}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {link.channel?.label || link.channelId}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">
+                      {link.predefinedMessage ? truncate(link.predefinedMessage, 50) : <span className="italic text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-gray-800">
+                      {link.clickCount}
+                      {!link.trackedUrl.startsWith('http') && (
+                        <span className="ml-1 text-red-400" title="APP_URL non configuré — URL de suivi invalide">⚠</span>
                       )}
-                      <button
-                        onClick={() => openEdit(link)}
-                        className="rounded p-1.5 text-blue-600 hover:bg-blue-50"
-                        title="Modifier"
-                        aria-label="Modifier le lien"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => void handleDelete(link.id)}
-                        className="rounded p-1.5 text-red-600 hover:bg-red-50"
-                        title="Supprimer"
-                        aria-label="Supprimer le lien"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="font-mono text-gray-800">{link.conversionCount}</span>
+                      {link.clickCount > 0 && (
+                        <span className="ml-1.5 text-xs text-gray-400">({conversionRate(link)})</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {link.isActive ? (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                          Actif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+                          Inactif
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setExpandedId((prev) => (prev === link.id ? null : link.id))}
+                          className={`rounded p-1.5 hover:bg-gray-100 transition-colors ${expandedId === link.id ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}
+                          title="Voir / copier les URLs"
+                          aria-label="Afficher les URLs"
+                        >
+                          <Link2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onSelectLink(link.id)}
+                          className="rounded p-1.5 text-indigo-600 hover:bg-indigo-50"
+                          title="Voir les analytics"
+                          aria-label="Voir les analytics"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(link)}
+                          className="rounded p-1.5 text-blue-600 hover:bg-blue-50"
+                          title="Modifier"
+                          aria-label="Modifier le lien"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleDelete(link.id)}
+                          className="rounded p-1.5 text-red-600 hover:bg-red-50"
+                          title="Supprimer"
+                          aria-label="Supprimer le lien"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* Ligne expandable — URLs */}
+                  {expandedId === link.id && (
+                    <tr className="bg-blue-50 border-t-0">
+                      <td colSpan={7} className="px-4 py-3">
+                        <div className="space-y-2">
+
+                          {/* URL de suivi */}
+                          <div className="flex items-center gap-2">
+                            <span className="w-28 flex-shrink-0 text-xs font-semibold text-blue-700">URL de suivi</span>
+                            <code className="flex-1 truncate rounded bg-white border border-blue-200 px-2 py-1 text-xs text-gray-700">
+                              {link.trackedUrl || '—'}
+                            </code>
+                            <button
+                              onClick={() => void handleCopyTracked(link.trackedUrl)}
+                              className="flex-shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-100"
+                              title="Copier l'URL de suivi"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            {link.trackedUrl.startsWith('http') && (
+                              <button
+                                onClick={() => window.open(link.trackedUrl, '_blank')}
+                                className="flex-shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-100"
+                                title="Tester (enregistre un clic)"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {!link.trackedUrl.startsWith('http') && (
+                              <span className="text-xs text-red-500">⚠ APP_URL non défini</span>
+                            )}
+                          </div>
+
+                          {/* URL directe */}
+                          <div className="flex items-center gap-2">
+                            <span className="w-28 flex-shrink-0 text-xs text-gray-500">URL directe</span>
+                            <code className="flex-1 truncate rounded bg-white border border-gray-200 px-2 py-1 text-xs text-gray-500">
+                              {link.directUrl || '—'}
+                            </code>
+                            <button
+                              onClick={() => {
+                                void navigator.clipboard.writeText(link.directUrl).then(() =>
+                                  addToast({ type: 'success', message: 'URL directe copiée.' })
+                                );
+                              }}
+                              className="flex-shrink-0 rounded p-1.5 text-gray-400 hover:bg-gray-100"
+                              title="Copier l'URL directe (sans suivi)"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
