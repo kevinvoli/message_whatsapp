@@ -32,6 +32,15 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+function parseMediaPreview(text: string): { previewUrl: string | null; cleanText: string } {
+  const match = /https?:\/\/\S+\/media\/preview\/[a-zA-Z0-9-]+/.exec(text);
+  if (!match) return { previewUrl: null, cleanText: text };
+  return {
+    previewUrl: match[0],
+    cleanText: text.replace(match[0], '').trim(),
+  };
+}
+
 function formatDuration(seconds?: number): string {
   if (!seconds || seconds <= 0) return '';
   const m = Math.floor(seconds / 60);
@@ -95,6 +104,10 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
   const hasLocationMedia = msg.medias?.some((m) => m.type === 'location' || m.type === 'live_location') ?? false;
   // Ne pas afficher le texte fallback si le message a un média location (évite "[Localisation]" en doublon)
   const messageText = msg.text && msg.text.trim().length > 0 && !hasLocationMedia ? msg.text : null;
+  const { previewUrl: inlinePreviewUrl, cleanText: inlineCleanText } = messageText
+    ? parseMediaPreview(messageText)
+    : { previewUrl: null, cleanText: '' };
+  const displayText = inlinePreviewUrl ? (inlineCleanText || null) : messageText;
   const isFromMe = msg.from_me;
   const messageTimestamp = msg.timestamp ? new Date(msg.timestamp) : null;
   const messageId = msg.id || `msg-fallback-${index}`;
@@ -283,8 +296,22 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             );
           })}
 
-          {/* Text */}
-          {messageText && <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>}
+          {/* Image inline si l'URL campagne /media/preview/:id est présente dans le texte */}
+          {inlinePreviewUrl && (
+            <MediaBubble fromMe={isFromMe}>
+              <a href={inlinePreviewUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <img
+                  src={inlinePreviewUrl}
+                  alt="Média campagne"
+                  className="max-w-full max-h-80 object-cover cursor-pointer"
+                  loading="lazy"
+                />
+              </a>
+            </MediaBubble>
+          )}
+
+          {/* Text (URL retirée si image affichée) */}
+          {displayText && <p className="text-sm whitespace-pre-wrap break-words">{displayText}</p>}
 
           {/* Fallback for empty messages */}
           {!messageText && !hasMedia && (
