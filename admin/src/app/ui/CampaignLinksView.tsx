@@ -414,13 +414,23 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
           <Link2 className="w-5 h-5" />
           Liens de campagne
         </h2>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <PlusCircle className="w-4 h-4" />
-          Nouveau lien
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void load()}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            title="Rafraîchir les compteurs"
+          >
+            <ArrowLeft className="w-4 h-4 rotate-[135deg]" />
+            Rafraîchir
+          </button>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Nouveau lien
+          </button>
+        </div>
       </div>
 
       {/* Formulaire (modal inline) */}
@@ -473,7 +483,12 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
                   <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">
                     {link.predefinedMessage ? truncate(link.predefinedMessage, 50) : <span className="italic text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-gray-800">{link.clickCount}</td>
+                  <td className="px-4 py-3 text-right font-mono text-gray-800">
+                    {link.clickCount}
+                    {!link.trackedUrl.startsWith('http') && (
+                      <span className="ml-1 text-red-400" title="APP_URL non configuré — URL de suivi invalide">⚠</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <span className="font-mono text-gray-800">{link.conversionCount}</span>
                     {link.clickCount > 0 && (
@@ -509,6 +524,16 @@ function CampaignLinksList({ onSelectLink }: CampaignLinksListProps) {
                       >
                         <Copy className="w-4 h-4" />
                       </button>
+                      {link.trackedUrl.startsWith('http') && (
+                        <button
+                          onClick={() => window.open(link.trackedUrl, '_blank')}
+                          className="rounded p-1.5 text-blue-500 hover:bg-blue-50"
+                          title="Tester le suivi (clic enregistré)"
+                          aria-label="Tester l'URL de suivi"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => openEdit(link)}
                         className="rounded p-1.5 text-blue-600 hover:bg-blue-50"

@@ -56,6 +56,15 @@ export class CampaignLinkController {
     return this.service.repairTrackedUrls();
   }
 
+  @Get('debug/config')
+  debugConfig() {
+    return {
+      APP_URL: process.env.APP_URL ?? '(non défini)',
+      trackedUrlSample: `${process.env.APP_URL ?? ''}/campaign/t/EXAMPLE`,
+      isAbsolute: (process.env.APP_URL ?? '').startsWith('http'),
+    };
+  }
+
   @Get(':id/analytics')
   async getStats(
     @Param('id') id: string,
