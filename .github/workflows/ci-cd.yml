@@ -25,6 +25,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch production ref for paths-filter
+        run: git fetch origin production --no-tags
+
       - uses: dorny/paths-filter@v3
         id: filter
         with:

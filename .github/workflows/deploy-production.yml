@@ -31,6 +31,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch master ref for paths-filter
+        run: git fetch origin master --no-tags
+
       - uses: dorny/paths-filter@v3
         id: filter
         with:
