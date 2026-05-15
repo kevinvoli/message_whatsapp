@@ -62,6 +62,11 @@ export class CampaignLinkController {
     return this.service.repairTrackedUrls();
   }
 
+  @Post('repair-media-urls')
+  repairMediaUrls() {
+    return this.service.repairMediaUrls();
+  }
+
   @Get('debug/config')
   debugConfig() {
     return {

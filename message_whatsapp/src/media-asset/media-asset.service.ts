@@ -39,6 +39,16 @@ export class MediaAssetService {
     return 'document';
   }
 
+  private buildPublicUrl(filePath: string): string {
+    const domain = (process.env.APP_DOMAIN || process.env.APP_URL || '').replace(/\/$/, '');
+    return `${domain}/${filePath}`;
+  }
+
+  private hydrateUrl(asset: MediaAsset): MediaAsset {
+    asset.publicUrl = this.buildPublicUrl(asset.filePath);
+    return asset;
+  }
+
   async findAll(
     filters: MediaAssetFilters,
   ): Promise<{ items: MediaAsset[]; total: number; pages: number }> {
@@ -97,7 +107,7 @@ export class MediaAssetService {
 
     const [items, total] = await qb.getManyAndCount();
     return {
-      items,
+      items: items.map((a) => this.hydrateUrl(a)),
       total,
       pages: Math.ceil(total / limitNum),
     };
@@ -108,7 +118,7 @@ export class MediaAssetService {
     if (!asset) {
       throw new NotFoundException(`MediaAsset introuvable : ${id}`);
     }
-    return asset;
+    return this.hydrateUrl(asset);
   }
 
   async upload(

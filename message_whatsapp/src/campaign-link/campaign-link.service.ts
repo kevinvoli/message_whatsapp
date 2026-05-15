@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, IsNull, Repository } from 'typeorm';
+import { Between, IsNull, Not, Repository } from 'typeorm';
 import { CampaignLink } from './entities/campaign-link.entity';
 import { CampaignLinkClick } from './entities/campaign-link-click.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
@@ -250,6 +250,34 @@ ${asset.publicUrl}`.trim();
       const { directUrl, trackedUrl } = this.buildUrls(phone, cleanMessage, link.shortCode);
       await this.linkRepository.update(linkId, { directUrl, trackedUrl });
     }
+  }
+
+  async repairMediaUrls(): Promise<{ repaired: number }> {
+    const links = await this.linkRepository.find({
+      where: { mediaAssetId: Not(IsNull()) },
+    });
+    let repaired = 0;
+    for (const link of links) {
+      if (!link.mediaAssetId) continue;
+      try {
+        const asset = await this.mediaAssetService.findOne(link.mediaAssetId);
+        const baseMessage = this.stripMediaUrl(link.predefinedMessage);
+        const newMessage = `${baseMessage}\n${asset.publicUrl}`.trim();
+        const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+        const phone = channel ? await this.resolvePhone(channel) : null;
+        const updates: Partial<CampaignLink> = { predefinedMessage: newMessage };
+        if (phone) {
+          const { directUrl, trackedUrl } = this.buildUrls(phone, newMessage, link.shortCode);
+          updates.directUrl = directUrl;
+          updates.trackedUrl = trackedUrl;
+        }
+        await this.linkRepository.update(link.id, updates);
+        repaired++;
+      } catch {
+        // skip links with broken assets
+      }
+    }
+    return { repaired };
   }
 
   async uploadAndAttachMedia(linkId: string, file: Express.Multer.File): Promise<CampaignLink> {
