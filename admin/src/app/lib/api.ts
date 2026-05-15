@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1155,4 +1155,78 @@ export async function sendTestAlert(): Promise<{ results: AlertSendResult[]; mes
         credentials: 'include',
     });
     return handleResponse<{ results: AlertSendResult[]; message: string }>(response);
+}
+
+// ─── Campaign Links ───────────────────────────────────────────────────────────
+
+export async function getCampaignLinks(): Promise<CampaignLink[]> {
+    const response = await fetch(`${API_BASE_URL}/campaign-links`, {
+        method: 'GET', credentials: 'include',
+    });
+    return handleResponse<CampaignLink[]>(response);
+}
+
+export async function getCampaignLink(id: string): Promise<CampaignLink> {
+    const response = await fetch(`${API_BASE_URL}/campaign-links/${id}`, {
+        method: 'GET', credentials: 'include',
+    });
+    return handleResponse<CampaignLink>(response);
+}
+
+export async function createCampaignLink(data: {
+    name: string;
+    channel_id: string;
+    predefined_message: string;
+    is_active?: boolean;
+}): Promise<CampaignLink> {
+    const response = await fetch(`${API_BASE_URL}/campaign-links`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse<CampaignLink>(response);
+}
+
+export async function updateCampaignLink(id: string, data: {
+    name?: string;
+    channel_id?: string;
+    predefined_message?: string;
+    is_active?: boolean;
+}): Promise<CampaignLink> {
+    const response = await fetch(`${API_BASE_URL}/campaign-links/${id}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse<CampaignLink>(response);
+}
+
+export async function deleteCampaignLink(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/campaign-links/${id}`, {
+        method: 'DELETE', credentials: 'include',
+    });
+    if (!response.ok && response.status !== 204) {
+        return handleResponse<void>(response);
+    }
+}
+
+export async function getCampaignLinkStats(
+    id: string, from?: string, to?: string,
+): Promise<CampaignLinkStats> {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const response = await fetch(`${API_BASE_URL}/campaign-links/${id}/analytics?${params}`, {
+        method: 'GET', credentials: 'include',
+    });
+    return handleResponse<CampaignLinkStats>(response);
+}
+
+export async function getCampaignLinkClicks(
+    id: string, page = 1,
+): Promise<CampaignLinkClick[]> {
+    const response = await fetch(`${API_BASE_URL}/campaign-links/${id}/clicks?page=${page}`, {
+        method: 'GET', credentials: 'include',
+    });
+    return handleResponse<CampaignLinkClick[]>(response);
 }

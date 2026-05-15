@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip } from 'lucide-react';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip, Link2 } from 'lucide-react';
 import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getPostes, getChatStatsByCommercial, patchChat, getChannels } from '@/app/lib/api';
 import { Spinner } from './Spinner';
 import { Channel, CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
@@ -634,6 +634,12 @@ export default function ConversationsView({
                                             Verrouiller
                                             <Lock className="w-3 h-3" />
                                         </button>
+                                    )}
+                                    {selectedChat.campaign_link_id && (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+                                            <Link2 className="w-3 h-3" />
+                                            Via campagne
+                                        </span>
                                     )}
                                     {selectedChat.is_archived && (
                                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">

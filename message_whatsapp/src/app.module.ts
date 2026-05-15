@@ -38,6 +38,7 @@ import { LoggingModule } from './logging/logging.module';
 import { NotificationModule } from './notification/notification.module';
 import { SystemConfigModule } from './system-config/system-config.module';
 import { SystemAlertModule } from './system-alert/system-alert.module';
+import { CampaignLinkModule } from './campaign-link/campaign-link.module';
 
 @Module({
   imports: [
@@ -114,6 +115,7 @@ import { SystemAlertModule } from './system-alert/system-alert.module';
     NotificationModule,
     SystemConfigModule,
     SystemAlertModule,
+    CampaignLinkModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

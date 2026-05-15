@@ -40,6 +40,7 @@ export type ViewMode =
   | 'go_no_go'
   | 'notifications'
   | 'alert-config'
+  | 'campaign-links'
   | 'settings';
 
 export type NavigationItem = {
@@ -132,6 +133,7 @@ export type Channel = {
   no_read_only?: boolean;
   no_close?: boolean;
   readOnlyAfterMessages?: number | null;
+  phone_number?: string | null;
 };
 
 // ============================================
@@ -315,6 +317,7 @@ export type WhatsappChat = {
   last_activity_at: string;
   createdAt: string;
   updatedAt: string;
+  campaign_link_id?: string | null;
   last_message?: WhatsappMessage | null;
   channel?: Channel;
   contact?: Client;
@@ -706,6 +709,47 @@ export const SEUILS_ALERTES = {
   TAUX_ASSIGNATION_MIN: 70,
   TEMPS_REPONSE_MAX_MINUTES: 15,
 } as const;
+
+// ============================================
+// CAMPAIGN LINKS
+// ============================================
+
+export type CampaignLink = {
+  id: string;
+  name: string;
+  channelId: string;
+  channel?: { id: string; label?: string | null; channel_id: string; phone_number?: string | null } | null;
+  predefinedMessage: string;
+  shortCode: string;
+  directUrl: string;
+  trackedUrl: string;
+  clickCount: number;
+  conversionCount: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CampaignLinkClick = {
+  id: string;
+  campaignLinkId: string;
+  clickedAt: string;
+  ipHash: string | null;
+  userAgent: string | null;
+  deviceType: 'mobile' | 'desktop' | 'tablet' | 'other' | null;
+  converted: boolean;
+  convertedAt: string | null;
+  chatId: string | null;
+};
+
+export type CampaignLinkStats = {
+  total_clicks: number;
+  total_conversions: number;
+  conversion_rate: number;
+  unique_clicks: number;
+  clicks_by_day: { date: string; clicks: number; conversions: number }[];
+  clicks_by_device: { device_type: string; count: number }[];
+};
 
 export const COULEURS_STATUT = {
   actif: 'green',

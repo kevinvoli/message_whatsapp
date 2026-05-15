@@ -345,6 +345,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [formProvider, setFormProvider] = useState<ProviderType>('whapi');
   const [formLabel, setFormLabel] = useState('');
+  const [formPhoneNumber, setFormPhoneNumber] = useState('');
   const [formChannelId, setFormChannelId] = useState('');
   const [formExternalId, setFormExternalId] = useState('');
   const [formToken, setFormToken] = useState('');
@@ -354,11 +355,12 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [formVerifyToken, setFormVerifyToken] = useState('');
   const [formPermanentToken, setFormPermanentToken] = useState(false);
 
-  const buildPayload = (): ChannelCreateInput => {
-    const base: ChannelCreateInput = {
+  const buildPayload = (): ChannelCreateInput & { phone_number?: string } => {
+    const base: ChannelCreateInput & { phone_number?: string } = {
       token: formToken.trim(),
       label: formLabel.trim() || undefined,
       provider: formProvider,
+      phone_number: formPhoneNumber.trim() || undefined,
     };
     const metaCredentials = {
       meta_app_id: formMetaAppId.trim() || undefined,
@@ -389,6 +391,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
 
   const resetFormState = () => {
     setFormLabel('');
+    setFormPhoneNumber('');
     setFormChannelId('');
     setFormExternalId('');
     setFormToken('');
@@ -410,6 +413,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setCurrentChannel(channel);
     setFormProvider(channel.provider ?? 'whapi');
     setFormLabel(channel.label ?? '');
+    setFormPhoneNumber(channel.phone_number ?? '');
     setFormChannelId(channel.channel_id ?? '');
     setFormExternalId(channel.external_id ?? '');
     setFormToken(channel.token);
@@ -524,6 +528,22 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
           value={formLabel}
           onChange={(e) => setFormLabel(e.target.value)}
         />
+      </div>
+      <div className="mb-4">
+        <label htmlFor={`${idPrefix}-phone-number`} className={labelClass}>
+          Numéro de téléphone <span className="font-normal text-gray-400">(optionnel)</span>
+        </label>
+        <input
+          type="text"
+          id={`${idPrefix}-phone-number`}
+          className={inputClass}
+          placeholder="2250101234567"
+          value={formPhoneNumber}
+          onChange={(e) => setFormPhoneNumber(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Format international sans + ni espaces. Pour Whapi, déduit automatiquement du channel_id si vide.
+        </p>
       </div>
       <div className="mb-4">
         <label htmlFor={`${idPrefix}-provider`} className={labelClass}>

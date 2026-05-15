@@ -136,6 +136,9 @@ export class WhapiChannel {
   @Column({ name: 'no_close', type: 'boolean', default: false })
   no_close: boolean;
 
+  @Column({ name: 'phone_number', type: 'varchar', length: 32, nullable: true, default: null })
+  phone_number: string | null;
+
   @ManyToOne(() => WhatsappPoste, (poste) => poste.channels, {
     nullable: true,
     onDelete: 'SET NULL',

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -24,6 +24,7 @@ import {
   WhatsappMediaType,
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -48,6 +49,8 @@ export class WhatsappMessageService {
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly templateService: WhatsappTemplateService,
+    @Inject(forwardRef(() => CampaignLinkService))
+    private readonly campaignLinkService: CampaignLinkService,
   ) {}
 
   private resolveIncomingText(message: WhapiMessage): string {
@@ -1163,6 +1166,13 @@ export class WhatsappMessageService {
 
       await this.chatRepository.save(chat);
 
+      if (!message.from_me) {
+        const text = this.resolveIncomingText(message);
+        if (text) {
+          void this.campaignLinkService.tryAttribute(text, message.chat_id).catch(() => undefined);
+        }
+      }
+
       try {
         const messagesss = await this.messageRepository.save(
           this.messageRepository.create({
@@ -1307,6 +1317,13 @@ export class WhatsappMessageService {
             })
           : Promise.resolve(null),
       ]);
+
+      if (message.direction === 'in') {
+        const text = this.resolveIncomingTextUnified(message);
+        if (text) {
+          void this.campaignLinkService.tryAttribute(text, message.chatId).catch(() => undefined);
+        }
+      }
 
       const buildMessageEntity = (chatRef: WhatsappChat) =>
         this.messageRepository.create({

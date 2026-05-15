@@ -295,6 +295,9 @@ export class WhatsappChat {
   @Column({ name: 'on_assign_auto_sent', type: 'boolean', default: false })
   on_assign_auto_sent: boolean;
 
+  @Column({ name: 'campaign_link_id', type: 'char', length: 36, nullable: true, default: null })
+  campaignLinkId: string | null;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

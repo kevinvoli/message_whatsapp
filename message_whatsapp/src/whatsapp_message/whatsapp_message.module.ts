@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
@@ -75,6 +76,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     NotificationModule,
     SystemAlertModule,
     WhatsappTemplateModule,
+    forwardRef(() => CampaignLinkModule),
   ],
   controllers: [WhatsappMessageController],
   providers: [
