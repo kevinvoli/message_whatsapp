@@ -58,14 +58,44 @@ export class CampaignLinkService {
     return { directUrl, trackedUrl };
   }
 
-  private resolvePhone(channel: WhapiChannel): string | null {
+  private async resolvePhone(channel: WhapiChannel): Promise<string | null> {
     if (channel.phone_number) {
       return channel.phone_number;
     }
     if (channel.provider === 'whapi' && channel.channel_id) {
       return channel.channel_id.split('@')[0];
     }
+    if (
+      channel.provider &&
+      ['meta', 'messenger', 'instagram'].includes(channel.provider) &&
+      channel.channel_id &&
+      channel.token
+    ) {
+      const phone = await this.fetchMetaPhoneNumber(channel.channel_id, channel.token);
+      if (phone) {
+        await this.channelRepository.update(channel.id, { phone_number: phone });
+        channel.phone_number = phone;
+        return phone;
+      }
+    }
     return null;
+  }
+
+  private async fetchMetaPhoneNumber(phoneNumberId: string, token: string): Promise<string | null> {
+    try {
+      const url = `https://graph.facebook.com/v18.0/${phoneNumberId}?fields=display_phone_number&access_token=${encodeURIComponent(token)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        this.logger.warn(`Meta API error ${res.status} pour phone_number_id=${phoneNumberId}`);
+        return null;
+      }
+      const data = (await res.json()) as { display_phone_number?: string };
+      if (!data.display_phone_number) return null;
+      return data.display_phone_number.replace(/\D/g, '');
+    } catch (err: unknown) {
+      this.logger.warn(`Impossible de récupérer le numéro Meta : ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
   }
 
   private detectDevice(userAgent: string | null): string | null {
@@ -91,7 +121,7 @@ export class CampaignLinkService {
       throw new NotFoundException(`Canal introuvable : ${dto.channel_id}`);
     }
 
-    const phone = this.resolvePhone(channel);
+    const phone = await this.resolvePhone(channel);
     if (!phone) {
       throw new NotFoundException(`Numéro de téléphone introuvable pour le canal ${dto.channel_id}. Renseignez le champ "Numéro de téléphone" dans la configuration du canal.`);
     }
@@ -151,7 +181,7 @@ export class CampaignLinkService {
 
     if (messageChanged || channelChanged) {
       const channel = link.channel ?? (await this.channelRepository.findOne({ where: { channel_id: link.channelId } }));
-      const phone = channel ? this.resolvePhone(channel) : null;
+      const phone = channel ? await this.resolvePhone(channel) : null;
       if (phone) {
         const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
         link.directUrl = directUrl;

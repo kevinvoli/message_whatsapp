@@ -65,6 +65,11 @@ export class CreateChannelDto {
   @IsBoolean()
   no_close?: boolean;
 
+  /** Numéro de téléphone réel du canal (requis pour les liens campagne Meta) */
+  @IsOptional()
+  @IsString()
+  phone_number?: string | null;
+
   /** Nombre de messages commerciaux autorisés avant lecture seule (NULL = suivre global, 0 = désactivé, N = N messages) */
   @IsOptional()
   @IsInt()
