@@ -257,47 +257,56 @@ function CampaignLinkForm({ channels, initial, loading, onSave, onCancel }: Link
         <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
           <p className="text-sm font-semibold text-green-800">URLs générées</p>
 
+          {/* URL de suivi — c'est CETTE URL qu'on met dans les pubs */}
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-xs text-gray-500 mb-0.5">URL directe</p>
-              <p className="truncate text-xs font-mono text-gray-700">{savedLink.directUrl}</p>
+              <p className="text-xs font-semibold text-blue-700 mb-0.5">URL de suivi ← mettre dans les pubs</p>
+              <p className="truncate text-xs font-mono text-gray-700">{savedLink.trackedUrl}</p>
+              {!savedLink.trackedUrl.startsWith('http') && (
+                <p className="text-xs text-red-500 mt-0.5">⚠ URL relative — configurer APP_URL sur le serveur</p>
+              )}
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => void copy(savedLink.trackedUrl, 'tracked')}
+                className="rounded p-1.5 text-gray-500 hover:bg-green-100"
+                title="Copier l'URL de suivi"
+                aria-label="Copier l'URL de suivi"
+              >
+                <Copy className={`w-3.5 h-3.5 ${copying === 'tracked' ? 'text-green-600' : ''}`} />
+              </button>
+              {savedLink.trackedUrl.startsWith('http') && (
+                <button
+                  type="button"
+                  onClick={() => window.open(savedLink.trackedUrl, '_blank')}
+                  className="rounded p-1.5 text-blue-600 hover:bg-blue-50"
+                  title="Tester le suivi (ouvre WhatsApp ET enregistre un clic)"
+                  aria-label="Tester l'URL de suivi"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* URL directe — pour tester WhatsApp sans tracking */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-400 mb-0.5">URL directe (sans suivi)</p>
+              <p className="truncate text-xs font-mono text-gray-500">{savedLink.directUrl}</p>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => void copy(savedLink.directUrl, 'direct')}
-                className="rounded p-1.5 text-gray-500 hover:bg-green-100"
-                title="Copier"
+                className="rounded p-1.5 text-gray-400 hover:bg-green-100"
+                title="Copier l'URL directe"
                 aria-label="Copier l'URL directe"
               >
                 <Copy className={`w-3.5 h-3.5 ${copying === 'direct' ? 'text-green-600' : ''}`} />
               </button>
-              <button
-                type="button"
-                onClick={() => window.open(savedLink.directUrl, '_blank')}
-                className="rounded p-1.5 text-gray-500 hover:bg-green-100"
-                title="Tester"
-                aria-label="Tester l'URL directe"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500 mb-0.5">URL de suivi</p>
-              <p className="truncate text-xs font-mono text-gray-700">{savedLink.trackedUrl}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void copy(savedLink.trackedUrl, 'tracked')}
-              className="rounded p-1.5 text-gray-500 hover:bg-green-100 flex-shrink-0"
-              title="Copier"
-              aria-label="Copier l'URL de suivi"
-            >
-              <Copy className={`w-3.5 h-3.5 ${copying === 'tracked' ? 'text-green-600' : ''}`} />
-            </button>
           </div>
         </div>
       )}

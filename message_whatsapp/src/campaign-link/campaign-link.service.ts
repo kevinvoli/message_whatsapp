@@ -216,10 +216,15 @@ export class CampaignLinkService {
   // ─── Tracking ────────────────────────────────────────────────────────────────
 
   async track(shortCode: string, rawIp: string, userAgent: string | null): Promise<string> {
+    this.logger.log(`[TRACK] Clic reçu — shortCode=${shortCode} ip=${rawIp}`);
+
     const link = await this.linkRepository.findOne({ where: { shortCode } });
     if (!link || !link.isActive) {
+      this.logger.warn(`[TRACK] Lien introuvable ou inactif : ${shortCode}`);
       throw new NotFoundException(`Lien campagne introuvable ou inactif : ${shortCode}`);
     }
+
+    this.logger.log(`[TRACK] Lien trouvé — id=${link.id} clickCount_avant=${link.clickCount}`);
 
     const ipHash = createHash('sha256')
       .update(rawIp + (process.env.IP_SALT ?? ''))
@@ -237,17 +242,23 @@ export class CampaignLinkService {
           converted: false,
         });
         await this.clickRepository.save(click);
+        this.logger.log(`[TRACK] Click enregistré en base — id=${click.id}`);
       })
       .catch((err: Error) => {
-        this.logger.error(`Erreur lors de la sauvegarde du click : ${err.message}`);
+        this.logger.error(`[TRACK] Erreur sauvegarde click : ${err.message}`);
       });
 
-    await this.linkRepository
-      .createQueryBuilder()
-      .update(CampaignLink)
-      .set({ clickCount: () => 'click_count + 1' })
-      .where('id = :id', { id: link.id })
-      .execute();
+    try {
+      const result = await this.linkRepository
+        .createQueryBuilder()
+        .update(CampaignLink)
+        .set({ clickCount: () => 'click_count + 1' })
+        .where('id = :id', { id: link.id })
+        .execute();
+      this.logger.log(`[TRACK] click_count incrémenté — affected=${result.affected}`);
+    } catch (err: unknown) {
+      this.logger.error(`[TRACK] Erreur incrément click_count : ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     return link.directUrl;
   }
