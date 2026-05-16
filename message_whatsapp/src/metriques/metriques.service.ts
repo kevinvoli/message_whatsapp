@@ -796,35 +796,17 @@ export class MetriquesService {
       this.logger.error(`[Q2-msg] channelId=${channelId}: ${(e as Error).message}`);
     }
 
-    // Q3 : stats par lien campagne
+    // Q3a : liste des liens du canal (sans sous-requêtes — fiable même si campaign_link_id absent)
     let links: ChannelLinkStatsDto[] = [];
     try {
       const linkRows: any[] = await em.query(
         `SELECT
           cl.id,
           cl.name,
-          cl.short_code        AS shortCode,
-          cl.is_active         AS isActive,
-          cl.click_count       AS clickCount,
-          cl.conversion_count  AS conversionCount,
-          (SELECT COUNT(*)
-             FROM whatsapp_chat c
-             WHERE c.campaign_link_id = cl.id
-               AND c.\`deletedAt\` IS NULL)                                   AS conversations_count,
-          (SELECT COUNT(*)
-             FROM whatsapp_message m
-             INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
-             WHERE c2.campaign_link_id = cl.id
-               AND c2.\`deletedAt\` IS NULL
-               AND m.\`deletedAt\`  IS NULL
-               AND m.direction   = 'IN')                                      AS messages_in,
-          (SELECT COUNT(*)
-             FROM whatsapp_message m
-             INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
-             WHERE c3.campaign_link_id = cl.id
-               AND c3.\`deletedAt\` IS NULL
-               AND m.\`deletedAt\`  IS NULL
-               AND m.direction   = 'OUT')                                     AS messages_out
+          cl.short_code       AS shortCode,
+          cl.is_active        AS isActive,
+          cl.click_count      AS clickCount,
+          cl.conversion_count AS conversionCount
          FROM campaign_link cl
          WHERE cl.channel_id = ?`,
         [channelId],
@@ -836,12 +818,57 @@ export class MetriquesService {
         isActive:            Boolean(Number(r.isActive ?? r.is_active)),
         clickCount:          parseInt(r.clickCount  ?? r.click_count)  || 0,
         conversionCount:     parseInt(r.conversionCount ?? r.conversion_count) || 0,
-        conversations_count: parseInt(r.conversations_count) || 0,
-        messages_in:         parseInt(r.messages_in)  || 0,
-        messages_out:        parseInt(r.messages_out) || 0,
+        conversations_count: 0,
+        messages_in:         0,
+        messages_out:        0,
       }));
     } catch (e) {
-      this.logger.error(`[Q3-links] channelId=${channelId}: ${(e as Error).message}`);
+      this.logger.error(`[Q3a-links-base] channelId=${channelId}: ${(e as Error).message}`);
+    }
+
+    // Q3b : comptes conversations + messages par lien (nécessite campaign_link_id sur whatsapp_chat)
+    if (links.length > 0) {
+      try {
+        const ids = links.map((l) => `'${l.id}'`).join(',');
+        const countRows: any[] = await em.query(
+          `SELECT
+            cl.id,
+            (SELECT COUNT(*)
+               FROM whatsapp_chat c
+               WHERE c.campaign_link_id = cl.id
+                 AND c.\`deletedAt\` IS NULL)                                 AS conversations_count,
+            (SELECT COUNT(*)
+               FROM whatsapp_message m
+               INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
+               WHERE c2.campaign_link_id = cl.id
+                 AND c2.\`deletedAt\` IS NULL
+                 AND m.\`deletedAt\`  IS NULL
+                 AND m.direction   = 'IN')                                    AS messages_in,
+            (SELECT COUNT(*)
+               FROM whatsapp_message m
+               INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
+               WHERE c3.campaign_link_id = cl.id
+                 AND c3.\`deletedAt\` IS NULL
+                 AND m.\`deletedAt\`  IS NULL
+                 AND m.direction   = 'OUT')                                   AS messages_out
+           FROM campaign_link cl
+           WHERE cl.id IN (${ids})`,
+        );
+        const countMap = new Map(countRows.map((r: any) => [r.id, r]));
+        links = links.map((l) => {
+          const c = countMap.get(l.id);
+          return c
+            ? {
+                ...l,
+                conversations_count: parseInt(c.conversations_count) || 0,
+                messages_in:         parseInt(c.messages_in)         || 0,
+                messages_out:        parseInt(c.messages_out)        || 0,
+              }
+            : l;
+        });
+      } catch (e) {
+        this.logger.warn(`[Q3b-links-counts] channelId=${channelId}: ${(e as Error).message} — counts set to 0`);
+      }
     }
 
     // Q4 : courbe temporelle messages/jour
