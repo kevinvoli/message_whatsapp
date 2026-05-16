@@ -731,113 +731,136 @@ export class MetriquesService {
     dateFrom?: string,
     dateTo?: string,
   ): Promise<ChannelDetailStatsDto> {
+    try {
+      return await this._getChannelDetailStatsInner(channelId, periode, dateFrom, dateTo);
+    } catch (err) {
+      this.logger.error('getChannelDetailStats failed', {
+        channelId,
+        periode,
+        dateFrom,
+        dateTo,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      throw err;
+    }
+  }
+
+  private async _getChannelDetailStatsInner(
+    channelId: string,
+    periode: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<ChannelDetailStatsDto> {
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
+    const em = this.campaignLinkRepository.manager;
 
-    // Requête 1 : conversations (statuts agrégés en une seule passe)
-    const convStats = await this.chatRepository
-      .createQueryBuilder('chat')
-      .select('COUNT(*)', 'total')
-      .addSelect("SUM(CASE WHEN chat.status = 'actif'      THEN 1 ELSE 0 END)", 'actif')
-      .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'attente')
-      .addSelect("SUM(CASE WHEN chat.status = 'fermé'      THEN 1 ELSE 0 END)", 'ferme')
-      .where('chat.channel_id = :channelId', { channelId })
-      .andWhere('chat.deletedAt IS NULL')
-      .andWhere('chat.createdAt >= :dateStart', { dateStart })
-      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
-      .getRawOne();
+    // Requête 1 : conversations par statut (raw SQL — colonnes DB: createdAt/deletedAt camelCase)
+    const [convRow]: any[] = await em.query(
+      `SELECT
+        COUNT(*)                                                               AS total,
+        SUM(CASE WHEN status = 'actif'      THEN 1 ELSE 0 END)               AS actif,
+        SUM(CASE WHEN status = 'en attente' THEN 1 ELSE 0 END)               AS attente,
+        SUM(CASE WHEN status = 'fermé'      THEN 1 ELSE 0 END)               AS ferme
+       FROM whatsapp_chat
+       WHERE channel_id  = ?
+         AND \`deletedAt\`  IS NULL
+         AND \`createdAt\` >= ?
+         AND \`createdAt\` <= ?`,
+      [channelId, dateStart, dateEnd],
+    );
 
-    // Requête 2 : messages (direction agrégée en une seule passe)
-    const msgStats = await this.messageRepository
-      .createQueryBuilder('message')
-      .select('COUNT(*)', 'total')
-      .addSelect('SUM(CASE WHEN message.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
-      .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
-      .where('message.channel_id = :channelId', { channelId })
-      .andWhere('message.deletedAt IS NULL')
-      .andWhere('message.createdAt >= :dateStart', { dateStart })
-      .andWhere('message.createdAt <= :dateEnd', { dateEnd })
-      .getRawOne();
+    // Requête 2 : messages par direction
+    const [msgRow]: any[] = await em.query(
+      `SELECT
+        COUNT(*)                                                               AS total,
+        SUM(CASE WHEN direction = 'IN'  THEN 1 ELSE 0 END)                   AS messages_in,
+        SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END)                   AS messages_out
+       FROM whatsapp_message
+       WHERE channel_id  = ?
+         AND \`deletedAt\`  IS NULL
+         AND \`createdAt\` >= ?
+         AND \`createdAt\` <= ?`,
+      [channelId, dateStart, dateEnd],
+    );
 
-    // Requête 3 : stats détaillées par lien campagne
-    // Sous-requêtes scalaires (même pattern que getStatutChannels) pour éviter les JOIN/GROUP BY complexes
-    const linkRows = await this.campaignLinkRepository
-      .createQueryBuilder('link')
-      .select('link.id',             'id')
-      .addSelect('link.name',        'name')
-      .addSelect('link.shortCode',   'shortCode')
-      .addSelect('link.isActive',    'isActive')
-      .addSelect('link.clickCount',  'clickCount')
-      .addSelect('link.conversionCount', 'conversionCount')
-      .addSelect(
-        `(SELECT COUNT(*) FROM whatsapp_chat c
-            WHERE c.campaign_link_id = link.id
-              AND c.deletedAt IS NULL)`,
-        'conversations_count',
-      )
-      .addSelect(
-        `(SELECT COUNT(*) FROM whatsapp_message m
-            INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
-            WHERE c2.campaign_link_id = link.id
-              AND c2.deletedAt IS NULL
-              AND m.deletedAt IS NULL
-              AND m.direction = 'IN')`,
-        'messages_in',
-      )
-      .addSelect(
-        `(SELECT COUNT(*) FROM whatsapp_message m
-            INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
-            WHERE c3.campaign_link_id = link.id
-              AND c3.deletedAt IS NULL
-              AND m.deletedAt IS NULL
-              AND m.direction = 'OUT')`,
-        'messages_out',
-      )
-      .where('link.channelId = :channelId', { channelId })
-      .getRawMany();
+    // Requête 3 : stats par lien campagne (conversations + messages via campaign_link_id)
+    const linkRows: any[] = await em.query(
+      `SELECT
+        cl.id,
+        cl.name,
+        cl.short_code        AS shortCode,
+        cl.is_active         AS isActive,
+        cl.click_count       AS clickCount,
+        cl.conversion_count  AS conversionCount,
+        (SELECT COUNT(*)
+           FROM whatsapp_chat c
+           WHERE c.campaign_link_id = cl.id
+             AND c.\`deletedAt\` IS NULL)                                     AS conversations_count,
+        (SELECT COUNT(*)
+           FROM whatsapp_message m
+           INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
+           WHERE c2.campaign_link_id = cl.id
+             AND c2.\`deletedAt\` IS NULL
+             AND m.\`deletedAt\`  IS NULL
+             AND m.direction   = 'IN')                                        AS messages_in,
+        (SELECT COUNT(*)
+           FROM whatsapp_message m
+           INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
+           WHERE c3.campaign_link_id = cl.id
+             AND c3.\`deletedAt\` IS NULL
+             AND m.\`deletedAt\`  IS NULL
+             AND m.direction   = 'OUT')                                       AS messages_out
+       FROM campaign_link cl
+       WHERE cl.channel_id = ?`,
+      [channelId],
+    );
 
-    const links: ChannelLinkStatsDto[] = linkRows.map((r) => ({
+    const links: ChannelLinkStatsDto[] = linkRows.map((r: any) => ({
       id:                  r.id,
       name:                r.name,
-      shortCode:           r.shortCode,
-      isActive:            Boolean(r.isActive),
-      clickCount:          parseInt(r.clickCount)      || 0,
-      conversionCount:     parseInt(r.conversionCount) || 0,
+      shortCode:           r.shortCode ?? r.short_code ?? '',
+      isActive:            Boolean(Number(r.isActive ?? r.is_active)),
+      clickCount:          parseInt(r.clickCount  ?? r.click_count)  || 0,
+      conversionCount:     parseInt(r.conversionCount ?? r.conversion_count) || 0,
       conversations_count: parseInt(r.conversations_count) || 0,
       messages_in:         parseInt(r.messages_in)  || 0,
       messages_out:        parseInt(r.messages_out) || 0,
     }));
 
-    // Requête 4 : messages par jour sur la période (courbe temporelle)
-    const temporalRows = await this.messageRepository
-      .createQueryBuilder('message')
-      .select('DATE(message.createdAt)', 'date')
-      .addSelect('SUM(CASE WHEN message.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
-      .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
-      .addSelect('COUNT(*)', 'total')
-      .where('message.channel_id = :channelId', { channelId })
-      .andWhere('message.deletedAt IS NULL')
-      .andWhere('message.createdAt >= :dateStart', { dateStart })
-      .andWhere('message.createdAt <= :dateEnd', { dateEnd })
-      .groupBy('DATE(message.createdAt)')
-      .orderBy('date', 'ASC')
-      .getRawMany();
+    // Requête 4 : courbe temporelle messages/jour
+    const temporalRows: any[] = await em.query(
+      `SELECT
+        DATE(\`createdAt\`)                                                    AS date,
+        SUM(CASE WHEN direction = 'IN'  THEN 1 ELSE 0 END)                   AS messages_in,
+        SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END)                   AS messages_out,
+        COUNT(*)                                                               AS total
+       FROM whatsapp_message
+       WHERE channel_id  = ?
+         AND \`deletedAt\`  IS NULL
+         AND \`createdAt\` >= ?
+         AND \`createdAt\` <= ?
+       GROUP BY DATE(\`createdAt\`)
+       ORDER BY date ASC`,
+      [channelId, dateStart, dateEnd],
+    );
 
-    const temporal: ChannelTemporalPointDto[] = temporalRows.map((row) => ({
-      date:         row.date,
-      messages_in:  parseInt(row.messages_in)  || 0,
-      messages_out: parseInt(row.messages_out) || 0,
-      total:        parseInt(row.total)        || 0,
+    const temporal: ChannelTemporalPointDto[] = temporalRows.map((r: any) => ({
+      date:         r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+      messages_in:  parseInt(r.messages_in)  || 0,
+      messages_out: parseInt(r.messages_out) || 0,
+      total:        parseInt(r.total)        || 0,
     }));
 
     return {
       channel_id:              channelId,
-      conversations_total:     parseInt(convStats?.total)   || 0,
-      conversations_actif:     parseInt(convStats?.actif)   || 0,
-      conversations_attente:   parseInt(convStats?.attente) || 0,
-      conversations_ferme:     parseInt(convStats?.ferme)   || 0,
-      messages_total:          parseInt(msgStats?.total)        || 0,
-      messages_in:             parseInt(msgStats?.messages_in)  || 0,
-      messages_out:            parseInt(msgStats?.messages_out) || 0,
+      conversations_total:     parseInt(convRow?.total)   || 0,
+      conversations_actif:     parseInt(convRow?.actif)   || 0,
+      conversations_attente:   parseInt(convRow?.attente) || 0,
+      conversations_ferme:     parseInt(convRow?.ferme)   || 0,
+      messages_total:          parseInt(msgRow?.total)        || 0,
+      messages_in:             parseInt(msgRow?.messages_in)  || 0,
+      messages_out:            parseInt(msgRow?.messages_out) || 0,
       links_count:             links.length,
       links_clicks_total:      links.reduce((s, l) => s + l.clickCount, 0),
       links_conversions_total: links.reduce((s, l) => s + l.conversionCount, 0),
