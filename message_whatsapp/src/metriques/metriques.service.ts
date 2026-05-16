@@ -755,102 +755,122 @@ export class MetriquesService {
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
     const em = this.campaignLinkRepository.manager;
 
-    // Requête 1 : conversations par statut (raw SQL — colonnes DB: createdAt/deletedAt camelCase)
-    const [convRow]: any[] = await em.query(
-      `SELECT
-        COUNT(*)                                                               AS total,
-        SUM(CASE WHEN status = 'actif'      THEN 1 ELSE 0 END)               AS actif,
-        SUM(CASE WHEN status = 'en attente' THEN 1 ELSE 0 END)               AS attente,
-        SUM(CASE WHEN status = 'fermé'      THEN 1 ELSE 0 END)               AS ferme
-       FROM whatsapp_chat
-       WHERE channel_id  = ?
-         AND \`deletedAt\`  IS NULL
-         AND \`createdAt\` >= ?
-         AND \`createdAt\` <= ?`,
-      [channelId, dateStart, dateEnd],
-    );
+    // Q1 : conversations par statut
+    let convRow: any = {};
+    try {
+      const rows: any[] = await em.query(
+        `SELECT
+          COUNT(*)                                                             AS total,
+          SUM(CASE WHEN status = 'actif'      THEN 1 ELSE 0 END)             AS actif,
+          SUM(CASE WHEN status = 'en attente' THEN 1 ELSE 0 END)             AS attente,
+          SUM(CASE WHEN status = 'fermé'      THEN 1 ELSE 0 END)             AS ferme
+         FROM whatsapp_chat
+         WHERE channel_id  = ?
+           AND \`deletedAt\`  IS NULL
+           AND \`createdAt\` >= ?
+           AND \`createdAt\` <= ?`,
+        [channelId, dateStart, dateEnd],
+      );
+      convRow = rows[0] ?? {};
+    } catch (e) {
+      this.logger.error(`[Q1-conv] channelId=${channelId}: ${(e as Error).message}`);
+    }
 
-    // Requête 2 : messages par direction
-    const [msgRow]: any[] = await em.query(
-      `SELECT
-        COUNT(*)                                                               AS total,
-        SUM(CASE WHEN direction = 'IN'  THEN 1 ELSE 0 END)                   AS messages_in,
-        SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END)                   AS messages_out
-       FROM whatsapp_message
-       WHERE channel_id  = ?
-         AND \`deletedAt\`  IS NULL
-         AND \`createdAt\` >= ?
-         AND \`createdAt\` <= ?`,
-      [channelId, dateStart, dateEnd],
-    );
+    // Q2 : messages par direction
+    let msgRow: any = {};
+    try {
+      const rows: any[] = await em.query(
+        `SELECT
+          COUNT(*)                                                             AS total,
+          SUM(CASE WHEN direction = 'IN'  THEN 1 ELSE 0 END)                 AS messages_in,
+          SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END)                 AS messages_out
+         FROM whatsapp_message
+         WHERE channel_id  = ?
+           AND \`deletedAt\`  IS NULL
+           AND \`createdAt\` >= ?
+           AND \`createdAt\` <= ?`,
+        [channelId, dateStart, dateEnd],
+      );
+      msgRow = rows[0] ?? {};
+    } catch (e) {
+      this.logger.error(`[Q2-msg] channelId=${channelId}: ${(e as Error).message}`);
+    }
 
-    // Requête 3 : stats par lien campagne (conversations + messages via campaign_link_id)
-    const linkRows: any[] = await em.query(
-      `SELECT
-        cl.id,
-        cl.name,
-        cl.short_code        AS shortCode,
-        cl.is_active         AS isActive,
-        cl.click_count       AS clickCount,
-        cl.conversion_count  AS conversionCount,
-        (SELECT COUNT(*)
-           FROM whatsapp_chat c
-           WHERE c.campaign_link_id = cl.id
-             AND c.\`deletedAt\` IS NULL)                                     AS conversations_count,
-        (SELECT COUNT(*)
-           FROM whatsapp_message m
-           INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
-           WHERE c2.campaign_link_id = cl.id
-             AND c2.\`deletedAt\` IS NULL
-             AND m.\`deletedAt\`  IS NULL
-             AND m.direction   = 'IN')                                        AS messages_in,
-        (SELECT COUNT(*)
-           FROM whatsapp_message m
-           INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
-           WHERE c3.campaign_link_id = cl.id
-             AND c3.\`deletedAt\` IS NULL
-             AND m.\`deletedAt\`  IS NULL
-             AND m.direction   = 'OUT')                                       AS messages_out
-       FROM campaign_link cl
-       WHERE cl.channel_id = ?`,
-      [channelId],
-    );
+    // Q3 : stats par lien campagne
+    let links: ChannelLinkStatsDto[] = [];
+    try {
+      const linkRows: any[] = await em.query(
+        `SELECT
+          cl.id,
+          cl.name,
+          cl.short_code        AS shortCode,
+          cl.is_active         AS isActive,
+          cl.click_count       AS clickCount,
+          cl.conversion_count  AS conversionCount,
+          (SELECT COUNT(*)
+             FROM whatsapp_chat c
+             WHERE c.campaign_link_id = cl.id
+               AND c.\`deletedAt\` IS NULL)                                   AS conversations_count,
+          (SELECT COUNT(*)
+             FROM whatsapp_message m
+             INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
+             WHERE c2.campaign_link_id = cl.id
+               AND c2.\`deletedAt\` IS NULL
+               AND m.\`deletedAt\`  IS NULL
+               AND m.direction   = 'IN')                                      AS messages_in,
+          (SELECT COUNT(*)
+             FROM whatsapp_message m
+             INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
+             WHERE c3.campaign_link_id = cl.id
+               AND c3.\`deletedAt\` IS NULL
+               AND m.\`deletedAt\`  IS NULL
+               AND m.direction   = 'OUT')                                     AS messages_out
+         FROM campaign_link cl
+         WHERE cl.channel_id = ?`,
+        [channelId],
+      );
+      links = linkRows.map((r: any) => ({
+        id:                  r.id,
+        name:                r.name,
+        shortCode:           r.shortCode ?? r.short_code ?? '',
+        isActive:            Boolean(Number(r.isActive ?? r.is_active)),
+        clickCount:          parseInt(r.clickCount  ?? r.click_count)  || 0,
+        conversionCount:     parseInt(r.conversionCount ?? r.conversion_count) || 0,
+        conversations_count: parseInt(r.conversations_count) || 0,
+        messages_in:         parseInt(r.messages_in)  || 0,
+        messages_out:        parseInt(r.messages_out) || 0,
+      }));
+    } catch (e) {
+      this.logger.error(`[Q3-links] channelId=${channelId}: ${(e as Error).message}`);
+    }
 
-    const links: ChannelLinkStatsDto[] = linkRows.map((r: any) => ({
-      id:                  r.id,
-      name:                r.name,
-      shortCode:           r.shortCode ?? r.short_code ?? '',
-      isActive:            Boolean(Number(r.isActive ?? r.is_active)),
-      clickCount:          parseInt(r.clickCount  ?? r.click_count)  || 0,
-      conversionCount:     parseInt(r.conversionCount ?? r.conversion_count) || 0,
-      conversations_count: parseInt(r.conversations_count) || 0,
-      messages_in:         parseInt(r.messages_in)  || 0,
-      messages_out:        parseInt(r.messages_out) || 0,
-    }));
-
-    // Requête 4 : courbe temporelle messages/jour
-    const temporalRows: any[] = await em.query(
-      `SELECT
-        DATE(\`createdAt\`)                                                    AS date,
-        SUM(CASE WHEN direction = 'IN'  THEN 1 ELSE 0 END)                   AS messages_in,
-        SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END)                   AS messages_out,
-        COUNT(*)                                                               AS total
-       FROM whatsapp_message
-       WHERE channel_id  = ?
-         AND \`deletedAt\`  IS NULL
-         AND \`createdAt\` >= ?
-         AND \`createdAt\` <= ?
-       GROUP BY DATE(\`createdAt\`)
-       ORDER BY date ASC`,
-      [channelId, dateStart, dateEnd],
-    );
-
-    const temporal: ChannelTemporalPointDto[] = temporalRows.map((r: any) => ({
-      date:         r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
-      messages_in:  parseInt(r.messages_in)  || 0,
-      messages_out: parseInt(r.messages_out) || 0,
-      total:        parseInt(r.total)        || 0,
-    }));
+    // Q4 : courbe temporelle messages/jour
+    let temporal: ChannelTemporalPointDto[] = [];
+    try {
+      const temporalRows: any[] = await em.query(
+        `SELECT
+          DATE(\`createdAt\`)                                                  AS date,
+          SUM(CASE WHEN direction = 'IN'  THEN 1 ELSE 0 END)                 AS messages_in,
+          SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END)                 AS messages_out,
+          COUNT(*)                                                             AS total
+         FROM whatsapp_message
+         WHERE channel_id  = ?
+           AND \`deletedAt\`  IS NULL
+           AND \`createdAt\` >= ?
+           AND \`createdAt\` <= ?
+         GROUP BY DATE(\`createdAt\`)
+         ORDER BY date ASC`,
+        [channelId, dateStart, dateEnd],
+      );
+      temporal = temporalRows.map((r: any) => ({
+        date:         r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+        messages_in:  parseInt(r.messages_in)  || 0,
+        messages_out: parseInt(r.messages_out) || 0,
+        total:        parseInt(r.total)        || 0,
+      }));
+    } catch (e) {
+      this.logger.error(`[Q4-temporal] channelId=${channelId}: ${(e as Error).message}`);
+    }
 
     return {
       channel_id:              channelId,
