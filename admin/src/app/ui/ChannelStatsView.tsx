@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   RefreshCw,
-  X,
   BarChart3,
   MessageCircle,
   Link2,
@@ -11,6 +10,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronRight,
+  Calendar,
+  Search,
 } from 'lucide-react';
 import {
   LineChart,
@@ -46,7 +47,9 @@ interface ChannelStatsViewProps {
   dateTo?: string;
 }
 
-// ─── Constantes couleurs providers ───────────────────────────────────────────
+type TabId = 'resume' | 'detail';
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const PROVIDER_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   whapi:     { bg: 'bg-green-100',  text: 'text-green-700',  label: 'Whapi' },
@@ -61,14 +64,9 @@ const PROVIDERS_FILTER = ['tous', 'whapi', 'meta', 'messenger', 'instagram', 'te
 // ─── Sous-composants ──────────────────────────────────────────────────────────
 
 function ProviderBadge({ provider }: { provider?: ProviderType | null }) {
-  if (!provider) {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-        Inconnu
-      </span>
-    );
-  }
-  const colors = PROVIDER_COLORS[provider] ?? { bg: 'bg-gray-100', text: 'text-gray-600', label: provider };
+  const colors = provider
+    ? (PROVIDER_COLORS[provider] ?? { bg: 'bg-gray-100', text: 'text-gray-600', label: provider })
+    : { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Inconnu' };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors.bg} ${colors.text}`}>
       {colors.label}
@@ -76,24 +74,31 @@ function ProviderBadge({ provider }: { provider?: ProviderType | null }) {
   );
 }
 
-interface KpiMiniCardProps {
+interface KpiCardProps {
   label: string;
   value: string | number;
-  sub?: string;
   icon: React.ReactNode;
   colorBg: string;
+  rows: { label: string; value: string | number; color?: string }[];
 }
 
-function KpiMiniCard({ label, value, sub, icon, colorBg }: KpiMiniCardProps) {
+function KpiCard({ label, value, icon, colorBg, rows }: KpiCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-start gap-3">
-      <div className={`p-2.5 rounded-lg ${colorBg} flex-shrink-0`}>
-        {icon}
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`p-2.5 rounded-lg ${colorBg} flex-shrink-0`}>{icon}</div>
+        <div>
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+        </div>
       </div>
-      <div>
-        <p className="text-xs text-gray-500 font-medium">{label}</p>
-        <p className="text-xl font-bold text-gray-900 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <div className="space-y-1.5 border-t border-gray-100 pt-3">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">{r.label}</span>
+            <span className={`font-semibold ${r.color ?? 'text-gray-800'}`}>{r.value}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -101,29 +106,41 @@ function KpiMiniCard({ label, value, sub, icon, colorBg }: KpiMiniCardProps) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function ChannelStatsView({ selectedPeriod, dateFrom, dateTo }: ChannelStatsViewProps) {
+export default function ChannelStatsView({ selectedPeriod }: ChannelStatsViewProps) {
+  // ── Onglets ────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<TabId>('resume');
+
+  // ── Données globales ───────────────────────────────────────────────────────
   const [channels, setChannels] = useState<StatutChannel[]>([]);
   const [channelDetails, setChannelDetails] = useState<Channel[]>([]);
   const [campaignLinks, setCampaignLinks] = useState<CampaignLink[]>([]);
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const [detailStats, setDetailStats] = useState<ChannelDetailStats | null>(null);
-  const [providerFilter, setProviderFilter] = useState<string>('tous');
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Filtre provider (onglet Résumé) ───────────────────────────────────────
+  const [providerFilter, setProviderFilter] = useState<string>('tous');
+
+  // ── Onglet Détail — sélection canal ───────────────────────────────────────
+  const [selectedChannelId, setSelectedChannelId] = useState<string>('');
+
+  // ── Onglet Détail — filtre date local ─────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const [detailDateFrom, setDetailDateFrom] = useState<string>('');
+  const [detailDateTo, setDetailDateTo] = useState<string>(today);
+
+  // ── Onglet Détail — stats ──────────────────────────────────────────────────
+  const [detailStats, setDetailStats] = useState<ChannelDetailStats | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  // ── Chargement liste ────────────────────────────────────────────────────────
+  // ── Chargement liste globale ───────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setSelectedChannelId(null);
-    setDetailStats(null);
-
     try {
       const [statChannels, allChannels, allLinks] = await Promise.all([
-        getStatutChannelsFiltered(selectedPeriod, dateFrom, dateTo),
+        getStatutChannelsFiltered(selectedPeriod),
         getChannels(),
         getCampaignLinks(),
       ]);
@@ -131,62 +148,78 @@ export default function ChannelStatsView({ selectedPeriod, dateFrom, dateTo }: C
       setChannelDetails(allChannels);
       setCampaignLinks(allLinks);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des données');
+      setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod, dateFrom, dateTo]);
+  }, [selectedPeriod]);
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
-  // ── Chargement détail d'un canal ────────────────────────────────────────────
+  // ── Chargement détail d'un canal ──────────────────────────────────────────
 
-  const fetchChannelDetail = useCallback(async (channelId: string) => {
+  const loadDetail = useCallback(async (channelId: string, dateFrom: string, dateTo: string) => {
+    if (!channelId) return;
     setDetailLoading(true);
     setDetailError(null);
     setDetailStats(null);
-    setSelectedChannelId(channelId);
-
     try {
-      const stats = await getChannelDetailStats(channelId, selectedPeriod, dateFrom, dateTo);
+      const stats = await getChannelDetailStats(
+        channelId,
+        'custom',
+        dateFrom || undefined,
+        dateTo || undefined,
+      );
       setDetailStats(stats);
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : 'Erreur lors du chargement du détail');
     } finally {
       setDetailLoading(false);
     }
-  }, [selectedPeriod, dateFrom, dateTo]);
+  }, []);
 
-  const closeDetail = () => {
-    setSelectedChannelId(null);
-    setDetailStats(null);
-    setDetailError(null);
+  // Recharge le détail quand canal ou dates changent (seulement si onglet actif)
+  useEffect(() => {
+    if (activeTab === 'detail' && selectedChannelId) {
+      void loadDetail(selectedChannelId, detailDateFrom, detailDateTo);
+    }
+  }, [activeTab, selectedChannelId, detailDateFrom, detailDateTo, loadDetail]);
+
+  // ── Action "Détail" depuis le tableau ─────────────────────────────────────
+
+  const openDetail = (channelId: string) => {
+    setSelectedChannelId(channelId);
+    setActiveTab('detail');
   };
 
-  // ── Enrichissement des données ──────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  const getChannelDetail = (channelId: string): Channel | undefined =>
+  const getChannelDetail = (channelId: string) =>
     channelDetails.find((c) => c.channel_id === channelId);
 
-  const getChannelLinks = (channelId: string): CampaignLink[] =>
+  const getChannelLinks = (channelId: string) =>
     campaignLinks.filter((l) => l.channelId === channelId || l.channel?.channel_id === channelId);
 
   const getChannelLabel = (stat: StatutChannel): string => {
     const detail = getChannelDetail(stat.channel_id);
-    return detail?.label ?? stat.label ?? stat.channel_id.slice(0, 14) + '…';
+    const raw = detail?.label ?? stat.label ?? stat.channel_id;
+    return raw.length > 20 ? raw.slice(0, 18) + '…' : raw;
   };
 
-  // ── Filtre provider ─────────────────────────────────────────────────────────
+  const getChannelLabelById = (channelId: string): string => {
+    const detail = getChannelDetail(channelId);
+    const raw = detail?.label ?? channelId;
+    return raw.length > 40 ? raw.slice(0, 38) + '…' : raw;
+  };
+
+  // ── Filtre provider ───────────────────────────────────────────────────────
 
   const filteredChannels = channels.filter((stat) => {
     if (providerFilter === 'tous') return true;
-    const detail = getChannelDetail(stat.channel_id);
-    return (detail?.provider ?? null) === providerFilter;
+    return (getChannelDetail(stat.channel_id)?.provider ?? null) === providerFilter;
   });
 
-  // ── Données graphique temporel ──────────────────────────────────────────────
+  // ── Données graphique ─────────────────────────────────────────────────────
 
   const chartData = (detailStats?.temporal ?? []).map((t) => ({
     date: formatDateShort(t.date),
@@ -195,28 +228,13 @@ export default function ChannelStatsView({ selectedPeriod, dateFrom, dateTo }: C
     Total: t.total,
   }));
 
-  // ── Liens du canal sélectionné ──────────────────────────────────────────────
-
   const selectedChannelLinks = selectedChannelId ? getChannelLinks(selectedChannelId) : [];
+  const selectedChannelDetail = selectedChannelId ? getChannelDetail(selectedChannelId) : undefined;
 
-  // ── Canal sélectionné (détail d'en-tête) ───────────────────────────────────
-
-  const selectedStatChannel = selectedChannelId
-    ? channels.find((c) => c.channel_id === selectedChannelId)
-    : null;
-
-  const selectedDetailChannel = selectedChannelId
-    ? getChannelDetail(selectedChannelId)
-    : null;
-
-  const selectedChannelLabel = selectedStatChannel
-    ? getChannelLabel(selectedStatChannel)
-    : selectedChannelId ?? '';
-
-  // ── Rendu ───────────────────────────────────────────────────────────────────
+  // ── Rendu ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -226,307 +244,396 @@ export default function ChannelStatsView({ selectedPeriod, dateFrom, dateTo }: C
         <button
           onClick={() => void loadData()}
           disabled={loading}
-          aria-label="Rafraîchir les données"
+          aria-label="Rafraîchir"
           className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
-      {/* Filtre provider */}
-      <div className="flex flex-wrap items-center gap-2">
-        {PROVIDERS_FILTER.map((p) => {
-          const colors = p !== 'tous' ? PROVIDER_COLORS[p] : null;
-          const isActive = providerFilter === p;
-          return (
-            <button
-              key={p}
-              onClick={() => setProviderFilter(p)}
-              aria-pressed={isActive}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                isActive
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : colors
-                    ? `${colors.bg} ${colors.text} border-transparent hover:opacity-80`
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {p === 'tous' ? 'Tous' : (PROVIDER_COLORS[p]?.label ?? p)}
-            </button>
-          );
-        })}
-        <span className="text-sm text-gray-400 ml-1">
-          {filteredChannels.length} canal{filteredChannels.length !== 1 ? 'x' : ''}
-        </span>
+      {/* Barre d'onglets */}
+      <div className="flex border-b border-gray-200">
+        {([
+          { id: 'resume' as TabId, label: 'Résumé global' },
+          { id: 'detail' as TabId, label: 'Détail canal' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+              activeTab === tab.id
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+            {tab.id === 'detail' && selectedChannelId && (
+              <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                {getChannelLabelById(selectedChannelId)}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Erreur globale */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
-          <Activity className="w-4 h-4 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* Spinner chargement initial */}
-      {loading && (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      )}
-
-      {/* Tableau résumé */}
-      {!loading && !error && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Canal</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Provider</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Conv. actives</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Messages</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Liens</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Clics</th>
-                  <th className="py-3 px-4" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filteredChannels.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">
-                      Aucun canal disponible pour ce filtre
-                    </td>
-                  </tr>
-                )}
-                {filteredChannels.map((stat) => {
-                  const detail = getChannelDetail(stat.channel_id);
-                  const links = getChannelLinks(stat.channel_id);
-                  const totalClics = links.reduce((acc, l) => acc + l.clickCount, 0);
-                  const isSelected = selectedChannelId === stat.channel_id;
-
-                  return (
-                    <tr
-                      key={stat.id}
-                      className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
-                    >
-                      <td className="py-3 px-4">
-                        <p className="font-medium text-gray-900 truncate max-w-[200px]">
-                          {getChannelLabel(stat)}
-                        </p>
-                        {detail?.phone_number && (
-                          <p className="text-xs text-gray-400 mt-0.5">{detail.phone_number}</p>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <ProviderBadge provider={detail?.provider} />
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="font-semibold text-gray-800">
-                          {stat.nb_chats_actifs.toLocaleString('fr-FR')}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="font-semibold text-gray-800">
-                          {stat.nb_messages.toLocaleString('fr-FR')}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right text-gray-600">
-                        {links.length}
-                      </td>
-                      <td className="py-3 px-4 text-right text-gray-600">
-                        {totalClics.toLocaleString('fr-FR')}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => void fetchChannelDetail(stat.channel_id)}
-                          aria-label={`Voir le détail du canal ${getChannelLabel(stat)}`}
-                          className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors ml-auto"
-                        >
-                          Détail
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* ── ONGLET RÉSUMÉ ──────────────────────────────────────────────────── */}
+      {activeTab === 'resume' && (
+        <div className="space-y-4">
+          {/* Filtres provider */}
+          <div className="flex flex-wrap items-center gap-2">
+            {PROVIDERS_FILTER.map((p) => {
+              const colors = p !== 'tous' ? PROVIDER_COLORS[p] : null;
+              const isActive = providerFilter === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setProviderFilter(p)}
+                  aria-pressed={isActive}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : colors
+                        ? `${colors.bg} ${colors.text} border-transparent hover:opacity-80`
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {p === 'tous' ? 'Tous' : (PROVIDER_COLORS[p]?.label ?? p)}
+                </button>
+              );
+            })}
+            <span className="text-sm text-gray-400 ml-1">
+              {filteredChannels.length} canal{filteredChannels.length !== 1 ? 'x' : ''}
+            </span>
           </div>
-        </div>
-      )}
 
-      {/* Panneau de détail */}
-      {selectedChannelId && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          {/* En-tête du panneau */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">{selectedChannelLabel}</h2>
-                {selectedDetailChannel?.provider && (
-                  <div className="mt-0.5">
-                    <ProviderBadge provider={selectedDetailChannel.provider} />
-                  </div>
-                )}
+          {/* Erreur */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {/* Spinner */}
+          {loading && (
+            <div className="flex justify-center py-16">
+              <Spinner />
+            </div>
+          )}
+
+          {/* Tableau */}
+          {!loading && !error && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      {['Canal', 'Provider', 'Conv. actives', 'Messages', 'Liens', 'Clics', ''].map((h, i) => (
+                        <th
+                          key={i}
+                          className={`py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide ${i > 1 ? 'text-right' : 'text-left'} ${i === 6 ? 'w-20' : ''}`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filteredChannels.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">
+                          Aucun canal pour ce filtre
+                        </td>
+                      </tr>
+                    )}
+                    {filteredChannels.map((stat) => {
+                      const detail = getChannelDetail(stat.channel_id);
+                      const links = getChannelLinks(stat.channel_id);
+                      const totalClics = links.reduce((acc, l) => acc + l.clickCount, 0);
+                      const isSelected = selectedChannelId === stat.channel_id;
+
+                      return (
+                        <tr
+                          key={stat.id}
+                          className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''}`}
+                        >
+                          <td className="py-3 px-4">
+                            <p className="font-medium text-gray-900">{getChannelLabel(stat)}</p>
+                            {detail?.phone_number && (
+                              <p className="text-xs text-gray-400 mt-0.5">{detail.phone_number}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <ProviderBadge provider={detail?.provider} />
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-gray-800">
+                            {stat.nb_chats_actifs.toLocaleString('fr-FR')}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-gray-800">
+                            {stat.nb_messages.toLocaleString('fr-FR')}
+                          </td>
+                          <td className="py-3 px-4 text-right text-gray-600">{links.length}</td>
+                          <td className="py-3 px-4 text-right text-gray-600">
+                            {totalClics.toLocaleString('fr-FR')}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => openDetail(stat.channel_id)}
+                              aria-label={`Voir détail de ${getChannelLabel(stat)}`}
+                              className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors ml-auto"
+                            >
+                              Détail
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <button
-              onClick={closeDetail}
-              aria-label="Fermer le panneau de détail"
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── ONGLET DÉTAIL ──────────────────────────────────────────────────── */}
+      {activeTab === 'detail' && (
+        <div className="space-y-5">
+          {/* Filtres canal + dates */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <Search className="w-4 h-4 text-gray-400" />
+              Sélection du canal et de la période
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Sélecteur de canal */}
+              <div className="sm:col-span-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Canal</label>
+                <select
+                  value={selectedChannelId}
+                  onChange={(e) => setSelectedChannelId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">— Sélectionner un canal —</option>
+                  {channelDetails.map((ch) => (
+                    <option key={ch.id} value={ch.channel_id}>
+                      {ch.label ?? ch.channel_id}
+                      {ch.phone_number ? ` (${ch.phone_number})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date début */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Du
+                </label>
+                <input
+                  type="date"
+                  value={detailDateFrom}
+                  max={detailDateTo || today}
+                  onChange={(e) => setDetailDateFrom(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Date fin */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Au
+                </label>
+                <input
+                  type="date"
+                  value={detailDateTo}
+                  min={detailDateFrom || undefined}
+                  max={today}
+                  onChange={(e) => setDetailDateTo(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Info canal sélectionné */}
+            {selectedChannelDetail && (
+              <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <ProviderBadge provider={selectedChannelDetail.provider} />
+                <span className="text-sm font-medium text-gray-700">
+                  {selectedChannelDetail.label ?? selectedChannelId}
+                </span>
+                {selectedChannelDetail.phone_number && (
+                  <span className="text-xs text-gray-400">{selectedChannelDetail.phone_number}</span>
+                )}
+                {selectedChannelDetail.is_business && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium">Business</span>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Spinner chargement détail */}
-            {detailLoading && (
-              <div className="flex justify-center py-10">
-                <Spinner />
+          {/* Aucun canal sélectionné */}
+          {!selectedChannelId && (
+            <div className="bg-white rounded-xl border border-dashed border-gray-300 py-20 flex flex-col items-center gap-3 text-gray-400">
+              <BarChart3 className="w-10 h-10 opacity-40" />
+              <p className="text-sm font-medium">Sélectionnez un canal pour afficher ses statistiques</p>
+              <p className="text-xs">Ou cliquez sur "Détail" dans l'onglet Résumé</p>
+            </div>
+          )}
+
+          {/* Spinner */}
+          {selectedChannelId && detailLoading && (
+            <div className="flex justify-center py-16">
+              <Spinner />
+            </div>
+          )}
+
+          {/* Erreur détail */}
+          {selectedChannelId && detailError && !detailLoading && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              {detailError}
+            </div>
+          )}
+
+          {/* Stats */}
+          {selectedChannelId && detailStats && !detailLoading && (
+            <div className="space-y-5">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <KpiCard
+                  label="Conversations"
+                  value={detailStats.conversations_total.toLocaleString('fr-FR')}
+                  icon={<MessageCircle className="w-5 h-5 text-teal-600" />}
+                  colorBg="bg-teal-100"
+                  rows={[
+                    { label: 'Actives', value: detailStats.conversations_actif.toLocaleString('fr-FR'), color: 'text-green-600' },
+                    { label: 'En attente', value: detailStats.conversations_attente.toLocaleString('fr-FR'), color: 'text-amber-600' },
+                    { label: 'Fermées', value: detailStats.conversations_ferme.toLocaleString('fr-FR'), color: 'text-gray-500' },
+                  ]}
+                />
+                <KpiCard
+                  label="Messages"
+                  value={detailStats.messages_total.toLocaleString('fr-FR')}
+                  icon={
+                    <span className="flex gap-0.5">
+                      <ArrowDownLeft className="w-4 h-4 text-green-600" />
+                      <ArrowUpRight className="w-4 h-4 text-blue-600" />
+                    </span>
+                  }
+                  colorBg="bg-blue-100"
+                  rows={[
+                    { label: 'Entrants (IN)', value: detailStats.messages_in.toLocaleString('fr-FR'), color: 'text-green-600' },
+                    { label: 'Sortants (OUT)', value: detailStats.messages_out.toLocaleString('fr-FR'), color: 'text-blue-600' },
+                  ]}
+                />
+                <KpiCard
+                  label="Liens campagne"
+                  value={detailStats.links_count}
+                  icon={<Link2 className="w-5 h-5 text-purple-600" />}
+                  colorBg="bg-purple-100"
+                  rows={[
+                    { label: 'Clics totaux', value: detailStats.links_clicks_total.toLocaleString('fr-FR'), color: 'text-purple-600' },
+                    { label: 'Conversions', value: detailStats.links_conversions_total.toLocaleString('fr-FR'), color: 'text-indigo-600' },
+                    {
+                      label: 'Taux de conv.',
+                      value: detailStats.links_clicks_total > 0
+                        ? `${Math.round((detailStats.links_conversions_total / detailStats.links_clicks_total) * 100)}%`
+                        : '—',
+                    },
+                  ]}
+                />
               </div>
-            )}
 
-            {/* Erreur détail */}
-            {detailError && !detailLoading && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
-                <Activity className="w-4 h-4 flex-shrink-0" />
-                {detailError}
-              </div>
-            )}
-
-            {/* KPI cards */}
-            {detailStats && !detailLoading && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Conversations */}
-                  <KpiMiniCard
-                    label="Conversations"
-                    value={detailStats.conversations_total.toLocaleString('fr-FR')}
-                    sub={`${detailStats.conversations_actif} actif · ${detailStats.conversations_attente} attente · ${detailStats.conversations_ferme} fermé`}
-                    icon={<MessageCircle className="w-4 h-4 text-teal-600" />}
-                    colorBg="bg-teal-100"
-                  />
-                  {/* Messages */}
-                  <KpiMiniCard
-                    label="Messages"
-                    value={detailStats.messages_total.toLocaleString('fr-FR')}
-                    sub={`${detailStats.messages_in} entrants · ${detailStats.messages_out} sortants`}
-                    icon={
-                      <span className="flex gap-0.5">
-                        <ArrowDownLeft className="w-3.5 h-3.5 text-green-600" />
-                        <ArrowUpRight className="w-3.5 h-3.5 text-blue-600" />
-                      </span>
-                    }
-                    colorBg="bg-blue-100"
-                  />
-                  {/* Liens */}
-                  <KpiMiniCard
-                    label="Liens campagne"
-                    value={detailStats.links_count}
-                    sub={`${detailStats.links_clicks_total.toLocaleString('fr-FR')} clics · ${detailStats.links_conversions_total.toLocaleString('fr-FR')} conv.`}
-                    icon={<Link2 className="w-4 h-4 text-purple-600" />}
-                    colorBg="bg-purple-100"
-                  />
-                </div>
-
-                {/* Graphique temporel */}
-                {chartData.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Évolution des messages</h3>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="Entrants"
-                          stroke="#22c55e"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="Sortants"
-                          stroke="#3b82f6"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="Total"
-                          stroke="#a855f7"
-                          strokeWidth={1.5}
-                          strokeDasharray="5 5"
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {chartData.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-4">
-                    Aucune donnée temporelle disponible pour cette période
+              {/* Graphique temporel */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Évolution des messages sur la période</h3>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="Entrants" stroke="#22c55e" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Sortants" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Total" stroke="#a855f7" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-gray-400 text-center py-8">
+                    Aucune donnée temporelle pour cette période
                   </p>
                 )}
+              </div>
 
-                {/* Tableau des liens du canal */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                    Liens campagne ({selectedChannelLinks.length})
+              {/* Tableau liens campagne */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-700">
+                    Liens campagne de ce canal
                   </h3>
-                  {selectedChannelLinks.length === 0 ? (
-                    <p className="text-sm text-gray-400">Aucun lien campagne pour ce canal</p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-lg border border-gray-100">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-100 bg-gray-50">
-                            <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nom</th>
-                            <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Clics</th>
-                            <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversions</th>
-                            <th className="text-center py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {selectedChannelLinks.map((link) => (
+                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                    {selectedChannelLinks.length} lien{selectedChannelLinks.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                {selectedChannelLinks.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">
+                    Aucun lien campagne associé à ce canal
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          {['Nom', 'Clics', 'Conversions', 'Taux conv.', 'Statut'].map((h, i) => (
+                            <th
+                              key={h}
+                              className={`py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide ${i === 0 ? 'text-left' : 'text-right'} ${i === 4 ? 'text-center' : ''}`}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {selectedChannelLinks.map((link) => {
+                          const taux = link.clickCount > 0
+                            ? Math.round((link.conversionCount / link.clickCount) * 100)
+                            : 0;
+                          return (
                             <tr key={link.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="py-2.5 px-4 font-medium text-gray-900 truncate max-w-[220px]">
+                              <td className="py-3 px-4 font-medium text-gray-900 max-w-[200px] truncate">
                                 {link.name}
                               </td>
-                              <td className="py-2.5 px-4 text-right text-gray-700">
+                              <td className="py-3 px-4 text-right text-gray-700">
                                 {link.clickCount.toLocaleString('fr-FR')}
                               </td>
-                              <td className="py-2.5 px-4 text-right text-gray-700">
+                              <td className="py-3 px-4 text-right text-gray-700">
                                 {link.conversionCount.toLocaleString('fr-FR')}
                               </td>
-                              <td className="py-2.5 px-4 text-center">
-                                <span
-                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                    link.isActive
-                                      ? 'bg-green-100 text-green-700'
-                                      : 'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
+                              <td className="py-3 px-4 text-right text-gray-600">
+                                {taux}%
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${link.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                                   {link.isActive ? 'Actif' : 'Inactif'}
                                 </span>
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
