@@ -28,6 +28,7 @@ import {
   Channel,
   CampaignLink,
   ChannelDetailStats,
+  ChannelLinkStats,
   ProviderType,
 } from '@/app/lib/definitions';
 import {
@@ -228,7 +229,6 @@ export default function ChannelStatsView({ selectedPeriod }: ChannelStatsViewPro
     Total: t.total,
   }));
 
-  const selectedChannelLinks = selectedChannelId ? getChannelLinks(selectedChannelId) : [];
   const selectedChannelDetail = selectedChannelId ? getChannelDetail(selectedChannelId) : undefined;
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
@@ -571,17 +571,17 @@ export default function ChannelStatsView({ selectedPeriod }: ChannelStatsViewPro
                 )}
               </div>
 
-              {/* Tableau liens campagne */}
+              {/* Tableau liens campagne enrichi */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-gray-700">
                     Liens campagne de ce canal
                   </h3>
                   <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
-                    {selectedChannelLinks.length} lien{selectedChannelLinks.length !== 1 ? 's' : ''}
+                    {detailStats.links.length} lien{detailStats.links.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-                {selectedChannelLinks.length === 0 ? (
+                {detailStats.links.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-8">
                     Aucun lien campagne associé à ce canal
                   </p>
@@ -590,27 +590,27 @@ export default function ChannelStatsView({ selectedPeriod }: ChannelStatsViewPro
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                          {['Nom', 'Clics', 'Conversions', 'Taux conv.', 'Statut'].map((h, i) => (
-                            <th
-                              key={h}
-                              className={`py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide ${i === 0 ? 'text-left' : 'text-right'} ${i === 4 ? 'text-center' : ''}`}
-                            >
-                              {h}
-                            </th>
-                          ))}
+                          <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Nom</th>
+                          <th className="py-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Clics</th>
+                          <th className="py-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversions</th>
+                          <th className="py-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Taux conv.</th>
+                          <th className="py-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversations</th>
+                          <th className="py-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Msg entrants</th>
+                          <th className="py-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Msg sortants</th>
+                          <th className="py-3 px-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {selectedChannelLinks.map((link) => {
+                        {detailStats.links.map((link: ChannelLinkStats) => {
                           const taux = link.clickCount > 0
                             ? Math.round((link.conversionCount / link.clickCount) * 100)
                             : 0;
                           return (
                             <tr key={link.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="py-3 px-4 font-medium text-gray-900 max-w-[200px] truncate">
+                              <td className="py-3 px-4 font-medium text-gray-900 max-w-[160px] truncate">
                                 {link.name}
                               </td>
-                              <td className="py-3 px-4 text-right text-gray-700">
+                              <td className="py-3 px-4 text-right font-semibold text-gray-800">
                                 {link.clickCount.toLocaleString('fr-FR')}
                               </td>
                               <td className="py-3 px-4 text-right text-gray-700">
@@ -618,6 +618,24 @@ export default function ChannelStatsView({ selectedPeriod }: ChannelStatsViewPro
                               </td>
                               <td className="py-3 px-4 text-right text-gray-600">
                                 {taux}%
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="inline-flex items-center gap-1 text-teal-700 font-semibold">
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  {link.conversations_count.toLocaleString('fr-FR')}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
+                                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                                  {link.messages_in.toLocaleString('fr-FR')}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
+                                  <ArrowUpRight className="w-3.5 h-3.5" />
+                                  {link.messages_out.toLocaleString('fr-FR')}
+                                </span>
                               </td>
                               <td className="py-3 px-4 text-center">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${link.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>

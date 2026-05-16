@@ -12,6 +12,7 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import {
   ChannelDetailStatsDto,
+  ChannelLinkStatsDto,
   ChannelTemporalPointDto,
   ChargePosteDto,
   MetriquesGlobalesDto,
@@ -757,14 +758,41 @@ export class MetriquesService {
       .andWhere('message.createdAt <= :dateEnd', { dateEnd })
       .getRawOne();
 
-    // Requête 3 : liens campagne (sans filtre de date — données cumulatives)
-    const linkStats = await this.campaignLinkRepository
+    // Requête 3 : stats détaillées par lien campagne
+    // JOIN sur whatsapp_chat (via campaign_link_id) puis sur whatsapp_message (via chat_id)
+    const linkRows = await this.campaignLinkRepository
       .createQueryBuilder('link')
-      .select('COUNT(*)', 'links_count')
-      .addSelect('SUM(link.clickCount)', 'clicks_total')
-      .addSelect('SUM(link.conversionCount)', 'conversions_total')
+      .select('link.id',             'id')
+      .addSelect('link.name',        'name')
+      .addSelect('link.shortCode',   'shortCode')
+      .addSelect('link.isActive',    'isActive')
+      .addSelect('link.clickCount',  'clickCount')
+      .addSelect('link.conversionCount', 'conversionCount')
+      .addSelect('COUNT(DISTINCT chat.id)',                                                            'conversations_count')
+      .addSelect('SUM(CASE WHEN msg.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
+      .addSelect('SUM(CASE WHEN msg.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
+      .leftJoin('whatsapp_chat',    'chat', 'chat.campaign_link_id = link.id AND chat.deletedAt IS NULL')
+      .leftJoin('whatsapp_message', 'msg',  'msg.chat_id = chat.chat_id   AND msg.deletedAt  IS NULL')
       .where('link.channelId = :channelId', { channelId })
-      .getRawOne();
+      .groupBy('link.id')
+      .addGroupBy('link.name')
+      .addGroupBy('link.shortCode')
+      .addGroupBy('link.isActive')
+      .addGroupBy('link.clickCount')
+      .addGroupBy('link.conversionCount')
+      .getRawMany();
+
+    const links: ChannelLinkStatsDto[] = linkRows.map((r) => ({
+      id:                  r.id,
+      name:                r.name,
+      shortCode:           r.shortCode,
+      isActive:            Boolean(r.isActive),
+      clickCount:          parseInt(r.clickCount)      || 0,
+      conversionCount:     parseInt(r.conversionCount) || 0,
+      conversations_count: parseInt(r.conversations_count) || 0,
+      messages_in:         parseInt(r.messages_in)  || 0,
+      messages_out:        parseInt(r.messages_out) || 0,
+    }));
 
     // Requête 4 : messages par jour sur la période (courbe temporelle)
     const temporalRows = await this.messageRepository
@@ -797,10 +825,11 @@ export class MetriquesService {
       messages_total:          parseInt(msgStats?.total)        || 0,
       messages_in:             parseInt(msgStats?.messages_in)  || 0,
       messages_out:            parseInt(msgStats?.messages_out) || 0,
-      links_count:             parseInt(linkStats?.links_count)      || 0,
-      links_clicks_total:      parseInt(linkStats?.clicks_total)     || 0,
-      links_conversions_total: parseInt(linkStats?.conversions_total) || 0,
+      links_count:             links.length,
+      links_clicks_total:      links.reduce((s, l) => s + l.clickCount, 0),
+      links_conversions_total: links.reduce((s, l) => s + l.conversionCount, 0),
       temporal,
+      links,
     };
   }
 

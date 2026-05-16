@@ -758,6 +758,18 @@ export type CampaignLink = {
   updatedAt: string;
 };
 
+export type ChannelLinkStats = {
+  id: string;
+  name: string;
+  shortCode: string;
+  isActive: boolean;
+  clickCount: number;
+  conversionCount: number;
+  conversations_count: number;
+  messages_in: number;
+  messages_out: number;
+};
+
 /**
  * Statistiques détaillées d'un canal sur une période
  */
@@ -774,6 +786,7 @@ export type ChannelDetailStats = {
   links_clicks_total: number;
   links_conversions_total: number;
   temporal: { date: string; messages_in: number; messages_out: number; total: number }[];
+  links: ChannelLinkStats[];
 };
 
 export type CampaignLinkClick = {

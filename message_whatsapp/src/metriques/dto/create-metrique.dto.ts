@@ -310,6 +310,47 @@ export class PerformanceTemporelleDto {
 }
 
 /**
+ * DTO pour les statistiques d'un lien campagne dans le contexte d'un channel
+ */
+export class ChannelLinkStatsDto {
+  @ApiProperty({ description: 'ID du lien' })
+  @IsString()
+  id: string;
+
+  @ApiProperty({ description: 'Nom du lien' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Code court' })
+  @IsString()
+  shortCode: string;
+
+  @ApiProperty({ description: 'Lien actif' })
+  @IsBoolean()
+  isActive: boolean;
+
+  @ApiProperty({ description: 'Nombre de clics' })
+  @IsNumber()
+  clickCount: number;
+
+  @ApiProperty({ description: 'Nombre de conversions' })
+  @IsNumber()
+  conversionCount: number;
+
+  @ApiProperty({ description: 'Conversations ouvertes via ce lien' })
+  @IsNumber()
+  conversations_count: number;
+
+  @ApiProperty({ description: 'Messages entrants dans ces conversations' })
+  @IsNumber()
+  messages_in: number;
+
+  @ApiProperty({ description: 'Messages sortants dans ces conversations' })
+  @IsNumber()
+  messages_out: number;
+}
+
+/**
  * DTO pour un point de données temporelles d'un channel
  */
 export class ChannelTemporalPointDto {
@@ -385,6 +426,11 @@ export class ChannelDetailStatsDto {
   @ApiProperty({ description: 'Messages par jour sur la période', type: [ChannelTemporalPointDto] })
   @IsArray()
   temporal: ChannelTemporalPointDto[];
+
+  // Liens détaillés
+  @ApiProperty({ description: 'Stats par lien campagne', type: [ChannelLinkStatsDto] })
+  @IsArray()
+  links: ChannelLinkStatsDto[];
 }
 
 /**
