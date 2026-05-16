@@ -759,7 +759,7 @@ export class MetriquesService {
       .getRawOne();
 
     // Requête 3 : stats détaillées par lien campagne
-    // JOIN sur whatsapp_chat (via campaign_link_id) puis sur whatsapp_message (via chat_id)
+    // Sous-requêtes scalaires (même pattern que getStatutChannels) pour éviter les JOIN/GROUP BY complexes
     const linkRows = await this.campaignLinkRepository
       .createQueryBuilder('link')
       .select('link.id',             'id')
@@ -768,18 +768,31 @@ export class MetriquesService {
       .addSelect('link.isActive',    'isActive')
       .addSelect('link.clickCount',  'clickCount')
       .addSelect('link.conversionCount', 'conversionCount')
-      .addSelect('COUNT(DISTINCT chat.id)',                                                            'conversations_count')
-      .addSelect('SUM(CASE WHEN msg.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
-      .addSelect('SUM(CASE WHEN msg.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
-      .leftJoin('whatsapp_chat',    'chat', 'chat.campaign_link_id = link.id AND chat.deletedAt IS NULL')
-      .leftJoin('whatsapp_message', 'msg',  'msg.chat_id = chat.chat_id   AND msg.deletedAt  IS NULL')
+      .addSelect(
+        `(SELECT COUNT(*) FROM whatsapp_chat c
+            WHERE c.campaign_link_id = link.id
+              AND c.deletedAt IS NULL)`,
+        'conversations_count',
+      )
+      .addSelect(
+        `(SELECT COUNT(*) FROM whatsapp_message m
+            INNER JOIN whatsapp_chat c2 ON c2.chat_id = m.chat_id
+            WHERE c2.campaign_link_id = link.id
+              AND c2.deletedAt IS NULL
+              AND m.deletedAt IS NULL
+              AND m.direction = 'IN')`,
+        'messages_in',
+      )
+      .addSelect(
+        `(SELECT COUNT(*) FROM whatsapp_message m
+            INNER JOIN whatsapp_chat c3 ON c3.chat_id = m.chat_id
+            WHERE c3.campaign_link_id = link.id
+              AND c3.deletedAt IS NULL
+              AND m.deletedAt IS NULL
+              AND m.direction = 'OUT')`,
+        'messages_out',
+      )
       .where('link.channelId = :channelId', { channelId })
-      .groupBy('link.id')
-      .addGroupBy('link.name')
-      .addGroupBy('link.shortCode')
-      .addGroupBy('link.isActive')
-      .addGroupBy('link.clickCount')
-      .addGroupBy('link.conversionCount')
       .getRawMany();
 
     const links: ChannelLinkStatsDto[] = linkRows.map((r) => ({
