@@ -12,6 +12,7 @@ import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { AnalyticsSnapshot } from './entities/analytics-snapshot.entity';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
+import { CampaignLink } from 'src/campaign-link/entities/campaign-link.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AnalyticsSnapshotService } from './analytics-snapshot.service';
       WhapiChannel,
       QueuePosition,
       AnalyticsSnapshot,
+      CampaignLink,
     ]),
     ConnectionLogModule,
   ],

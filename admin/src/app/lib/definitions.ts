@@ -42,7 +42,8 @@ export type ViewMode =
   | 'alert-config'
   | 'campaign-links'
   | 'mediatheque'
-  | 'settings';
+  | 'settings'
+  | 'channel-stats';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -755,6 +756,24 @@ export type CampaignLink = {
   media_asset: MediaAsset | null;
   createdAt: string;
   updatedAt: string;
+};
+
+/**
+ * Statistiques détaillées d'un canal sur une période
+ */
+export type ChannelDetailStats = {
+  channel_id: string;
+  conversations_total: number;
+  conversations_actif: number;
+  conversations_attente: number;
+  conversations_ferme: number;
+  messages_total: number;
+  messages_in: number;
+  messages_out: number;
+  links_count: number;
+  links_clicks_total: number;
+  links_conversions_total: number;
+  temporal: { date: string; messages_in: number; messages_out: number; total: number }[];
 };
 
 export type CampaignLinkClick = {

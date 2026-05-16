@@ -310,6 +310,84 @@ export class PerformanceTemporelleDto {
 }
 
 /**
+ * DTO pour un point de données temporelles d'un channel
+ */
+export class ChannelTemporalPointDto {
+  @ApiProperty({ description: 'Date (YYYY-MM-DD)' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Messages entrants' })
+  @IsNumber()
+  messages_in: number;
+
+  @ApiProperty({ description: 'Messages sortants' })
+  @IsNumber()
+  messages_out: number;
+
+  @ApiProperty({ description: 'Total messages' })
+  @IsNumber()
+  total: number;
+}
+
+/**
+ * DTO pour les statistiques détaillées d'un channel
+ */
+export class ChannelDetailStatsDto {
+  @ApiProperty({ description: 'ID externe du channel' })
+  @IsString()
+  channel_id: string;
+
+  // Conversations
+  @ApiProperty({ description: 'Total conversations' })
+  @IsNumber()
+  conversations_total: number;
+
+  @ApiProperty({ description: 'Conversations actives' })
+  @IsNumber()
+  conversations_actif: number;
+
+  @ApiProperty({ description: 'Conversations en attente' })
+  @IsNumber()
+  conversations_attente: number;
+
+  @ApiProperty({ description: 'Conversations fermées' })
+  @IsNumber()
+  conversations_ferme: number;
+
+  // Messages
+  @ApiProperty({ description: 'Total messages' })
+  @IsNumber()
+  messages_total: number;
+
+  @ApiProperty({ description: 'Messages entrants' })
+  @IsNumber()
+  messages_in: number;
+
+  @ApiProperty({ description: 'Messages sortants' })
+  @IsNumber()
+  messages_out: number;
+
+  // Liens campagne
+  @ApiProperty({ description: 'Nombre de liens campagne' })
+  @IsNumber()
+  links_count: number;
+
+  @ApiProperty({ description: 'Total clics sur les liens' })
+  @IsNumber()
+  links_clicks_total: number;
+
+  @ApiProperty({ description: 'Total conversions sur les liens' })
+  @IsNumber()
+  links_conversions_total: number;
+
+  // Temporel
+  @ApiProperty({ description: 'Messages par jour sur la période', type: [ChannelTemporalPointDto] })
+  @IsArray()
+  temporal: ChannelTemporalPointDto[];
+}
+
+/**
  * DTO pour les metriques de queue
  */
 export class QueueMetricsDto {

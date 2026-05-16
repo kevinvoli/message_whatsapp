@@ -40,6 +40,7 @@ import NotificationsView from '@/app/ui/NotificationsView';
 import SettingsView from '@/app/ui/SettingsView';
 import CampaignLinksView from '@/app/ui/CampaignLinksView';
 import MediathequeView from '@/app/ui/MediathequeView';
+import ChannelStatsView from '@/app/ui/ChannelStatsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -136,6 +137,8 @@ export default function AdminDashboard() {
                 return <CampaignLinksView />;
             case 'mediatheque':
                 return <MediathequeView />;
+            case 'channel-stats':
+                return <ChannelStatsView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} />;
             case 'messages':
                 return <MessagesView onRefresh={() => {}} selectedPeriod={selectedPeriod} />;
             case 'clients':

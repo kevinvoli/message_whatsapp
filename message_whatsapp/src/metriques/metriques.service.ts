@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { CampaignLink } from 'src/campaign-link/entities/campaign-link.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
@@ -10,6 +11,8 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import {
+  ChannelDetailStatsDto,
+  ChannelTemporalPointDto,
   ChargePosteDto,
   MetriquesGlobalesDto,
   PerformanceCommercialDto,
@@ -44,6 +47,10 @@ export class MetriquesService {
 
     @InjectRepository(QueuePosition)
     private queueRepository: Repository<QueuePosition>,
+
+    @InjectRepository(CampaignLink)
+    private campaignLinkRepository: Repository<CampaignLink>,
+
     private readonly connectionLogService: ConnectionLogService,
   ) {}
 
@@ -711,6 +718,90 @@ export class MetriquesService {
     }));
 
     return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public — Statistiques détaillées d'un channel
+  // ---------------------------------------------------------------------------
+
+  async getChannelDetailStats(
+    channelId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<ChannelDetailStatsDto> {
+    const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
+
+    // Requête 1 : conversations (statuts agrégés en une seule passe)
+    const convStats = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(*)', 'total')
+      .addSelect("SUM(CASE WHEN chat.status = 'actif'      THEN 1 ELSE 0 END)", 'actif')
+      .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'attente')
+      .addSelect("SUM(CASE WHEN chat.status = 'fermé'      THEN 1 ELSE 0 END)", 'ferme')
+      .where('chat.channel_id = :channelId', { channelId })
+      .andWhere('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd', { dateEnd })
+      .getRawOne();
+
+    // Requête 2 : messages (direction agrégée en une seule passe)
+    const msgStats = await this.messageRepository
+      .createQueryBuilder('message')
+      .select('COUNT(*)', 'total')
+      .addSelect('SUM(CASE WHEN message.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
+      .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
+      .where('message.channel_id = :channelId', { channelId })
+      .andWhere('message.deletedAt IS NULL')
+      .andWhere('message.createdAt >= :dateStart', { dateStart })
+      .andWhere('message.createdAt <= :dateEnd', { dateEnd })
+      .getRawOne();
+
+    // Requête 3 : liens campagne (sans filtre de date — données cumulatives)
+    const linkStats = await this.campaignLinkRepository
+      .createQueryBuilder('link')
+      .select('COUNT(*)', 'links_count')
+      .addSelect('SUM(link.clickCount)', 'clicks_total')
+      .addSelect('SUM(link.conversionCount)', 'conversions_total')
+      .where('link.channelId = :channelId', { channelId })
+      .getRawOne();
+
+    // Requête 4 : messages par jour sur la période (courbe temporelle)
+    const temporalRows = await this.messageRepository
+      .createQueryBuilder('message')
+      .select('DATE(message.createdAt)', 'date')
+      .addSelect('SUM(CASE WHEN message.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
+      .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
+      .addSelect('COUNT(*)', 'total')
+      .where('message.channel_id = :channelId', { channelId })
+      .andWhere('message.deletedAt IS NULL')
+      .andWhere('message.createdAt >= :dateStart', { dateStart })
+      .andWhere('message.createdAt <= :dateEnd', { dateEnd })
+      .groupBy('DATE(message.createdAt)')
+      .orderBy('date', 'ASC')
+      .getRawMany();
+
+    const temporal: ChannelTemporalPointDto[] = temporalRows.map((row) => ({
+      date:         row.date,
+      messages_in:  parseInt(row.messages_in)  || 0,
+      messages_out: parseInt(row.messages_out) || 0,
+      total:        parseInt(row.total)        || 0,
+    }));
+
+    return {
+      channel_id:              channelId,
+      conversations_total:     parseInt(convStats?.total)   || 0,
+      conversations_actif:     parseInt(convStats?.actif)   || 0,
+      conversations_attente:   parseInt(convStats?.attente) || 0,
+      conversations_ferme:     parseInt(convStats?.ferme)   || 0,
+      messages_total:          parseInt(msgStats?.total)        || 0,
+      messages_in:             parseInt(msgStats?.messages_in)  || 0,
+      messages_out:            parseInt(msgStats?.messages_out) || 0,
+      links_count:             parseInt(linkStats?.links_count)      || 0,
+      links_clicks_total:      parseInt(linkStats?.clicks_total)     || 0,
+      links_conversions_total: parseInt(linkStats?.conversions_total) || 0,
+      temporal,
+    };
   }
 
   // ---------------------------------------------------------------------------

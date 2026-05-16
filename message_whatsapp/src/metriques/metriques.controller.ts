@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import {
+  ChannelDetailStatsDto,
   MetriquesGlobalesDto,
   PerformanceCommercialDto,
   PerformanceTemporelleDto,
@@ -50,6 +51,17 @@ export class MetriquesController {
     return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo);
   }
 
+  @Get('channels/:channelId/stats')
+  @ApiOperation({ summary: 'Stats détaillées d\'un channel' })
+  async getChannelDetailStats(
+    @Param('channelId') channelId: string,
+    @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ): Promise<ChannelDetailStatsDto> {
+    return this.metriquesService.getChannelDetailStats(channelId, periode, dateFrom, dateTo);
+  }
+
   @Get('channels')
   @ApiOperation({ summary: 'Recupere le statut des channels' })
   @ApiResponse({
@@ -59,8 +71,10 @@ export class MetriquesController {
   })
   async getStatutChannels(
     @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ): Promise<StatutChannelDto[]> {
-    return this.metriquesService.getStatutChannels(periode);
+    return this.metriquesService.getStatutChannels(periode, dateFrom, dateTo);
   }
 
   @Get('performance-temporelle')

@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1317,4 +1317,36 @@ export async function uploadMediaDirectToLink(linkId: string, file: File): Promi
         method: 'POST', credentials: 'include', body: formData,
     });
     return handleResponse<CampaignLink>(response);
+}
+
+// ─── Stats canaux ─────────────────────────────────────────────────────────────
+
+export async function getStatutChannelsFiltered(
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<StatutChannel[]> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(`${API_BASE_URL}/api/metriques/channels?${params}`, {
+        credentials: 'include',
+    });
+    return handleResponse<StatutChannel[]>(response);
+}
+
+export async function getChannelDetailStats(
+    channelId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<ChannelDetailStats> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/api/metriques/channels/${encodeURIComponent(channelId)}/stats?${params}`,
+        { credentials: 'include' },
+    );
+    return handleResponse<ChannelDetailStats>(response);
 }
