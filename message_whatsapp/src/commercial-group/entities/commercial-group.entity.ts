@@ -24,6 +24,12 @@ export class CommercialGroup {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
+  @Column({ name: 'work_days_count', type: 'int', default: 2 })
+  workDaysCount: number;
+
+  @Column({ name: 'first_work_day', type: 'date', nullable: true, default: null })
+  firstWorkDay: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { WorkSchedule, DayOfWeek } from './entities/work-schedule.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { GroupScheduleDay } from 'src/commercial-group/entities/group-schedule-day.entity';
 import { v4 as uuidv4 } from 'uuid';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
@@ -40,6 +41,8 @@ export class WorkScheduleService {
     private readonly repo: Repository<WorkSchedule>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
+    @InjectRepository(GroupScheduleDay)
+    private readonly groupScheduleDayRepo: Repository<GroupScheduleDay>,
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
     private readonly systemConfigService: SystemConfigService,
   ) {}
@@ -155,13 +158,40 @@ export class WorkScheduleService {
       },
     });
 
-    return schedules
+    const existingGroupIds = schedules
       .filter((s) => {
         if (s.startTime > hhmm || s.endTime <= hhmm) return false;
         const breaks = (s.breakSlots as Array<{ start: string; end: string }> | null) ?? [];
         return !breaks.some((b) => b.start <= hhmm && b.end > hhmm);
       })
       .map((s) => s.groupId!);
+
+    // Filtrage par planning de rotation (group_schedule_day)
+    const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(at); // 'YYYY-MM-DD'
+
+    // Récupérer les groupes qui ont au moins une entrée dans group_schedule_day (ont un planning de rotation)
+    const allRotatingRaw = await this.groupScheduleDayRepo
+      .createQueryBuilder('d')
+      .select('DISTINCT d.group_id', 'groupId')
+      .getRawMany<{ groupId: string }>();
+    const hasSchedule = new Set(allRotatingRaw.map((r) => r.groupId));
+
+    if (hasSchedule.size === 0) {
+      // Aucun groupe n'a de planning de rotation -> rétrocompatibilité totale
+      return existingGroupIds;
+    }
+
+    // Récupérer les groupes en travail aujourd'hui
+    const workDayRows = await this.groupScheduleDayRepo.find({
+      where: { date: todayStr, isWorkDay: true },
+      select: ['groupId'],
+    });
+    const rotatingSet = new Set(workDayRows.map((r) => r.groupId));
+
+    // Garder un groupe si:
+    // - il n'a pas de planning de rotation (rétrocompat), OU
+    // - il a un planning de rotation ET est en jour de travail aujourd'hui
+    return existingGroupIds.filter((gid) => !hasSchedule.has(gid) || rotatingSet.has(gid));
   }
 
   async create(dto: CreateScheduleDto): Promise<WorkSchedule> {
