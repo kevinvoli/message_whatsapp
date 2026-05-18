@@ -1,19 +1,19 @@
 'use client';
 import React, { useState } from 'react';
-import WorkScheduleAdminView from '@/app/ui/WorkScheduleAdminView';
+import GroupsCalendarView from '@/app/ui/groups/GroupsCalendarView';
 import PresenceView from '@/app/ui/PresenceView';
 import SessionsView from '@/app/ui/SessionsView';
 
-type Tab = 'work-schedule' | 'presence' | 'sessions';
+type Tab = 'planning' | 'presence' | 'sessions';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'work-schedule', label: 'Plannings de travail' },
-  { id: 'presence',      label: 'Présence du jour'    },
-  { id: 'sessions',      label: 'Heures de travail'   },
+  { id: 'planning',  label: 'Plannings de travail' },
+  { id: 'presence',  label: 'Présence du jour'     },
+  { id: 'sessions',  label: 'Heures de travail'    },
 ];
 
 export default function PlanningTabsView() {
-  const [active, setActive] = useState<Tab>('work-schedule');
+  const [active, setActive] = useState<Tab>('planning');
 
   return (
     <div className="space-y-4">
@@ -22,9 +22,9 @@ export default function PlanningTabsView() {
           <button
             key={t.id}
             onClick={() => setActive(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               active === t.id
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-indigo-500 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -32,9 +32,9 @@ export default function PlanningTabsView() {
           </button>
         ))}
       </div>
-      {active === 'work-schedule' && <WorkScheduleAdminView />}
-      {active === 'presence'      && <PresenceView />}
-      {active === 'sessions'      && <SessionsView />}
+      {active === 'planning'  && <GroupsCalendarView />}
+      {active === 'presence'  && <PresenceView />}
+      {active === 'sessions'  && <SessionsView />}
     </div>
   );
 }
