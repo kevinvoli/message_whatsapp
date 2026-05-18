@@ -1060,9 +1060,10 @@ export class OrderCallSyncService {
       .getMany();
 
     const existingMappings = await this.clientMappingRepo.find({
-      select: ['contact_id', 'external_id', 'phone_normalized'],
+      select: ['id', 'contact_id', 'external_id', 'phone_normalized'],
     });
-    const mappingByContactId = new Map(existingMappings.map((m) => [m.contact_id, m]));
+    const mappingByContactId  = new Map(existingMappings.map((m) => [m.contact_id,  m]));
+    const mappingByExternalId = new Map(existingMappings.map((m) => [m.external_id, m]));
 
     let synced = 0, skipped = 0, errors = 0;
 
@@ -1080,17 +1081,32 @@ export class OrderCallSyncService {
 
         if (!contactId || !matchedPhone) { skipped++; continue; }
 
-        const existing = mappingByContactId.get(contactId);
-        if (existing) {
-          if (existing.external_id !== client.id || existing.phone_normalized !== matchedPhone) {
-            existing.external_id     = client.id;
-            existing.phone_normalized = matchedPhone;
-            await this.clientMappingRepo.save(existing);
+        const byContact  = mappingByContactId.get(contactId);
+        const byExternal = mappingByExternalId.get(client.id);
+
+        if (byContact) {
+          // Le contact est déjà mappé — mise à jour si external_id ou téléphone a changé
+          if (byContact.external_id !== client.id || byContact.phone_normalized !== matchedPhone) {
+            // Libérer l'ancien external_id des deux maps avant de modifier
+            mappingByExternalId.delete(byContact.external_id);
+            byContact.external_id      = client.id;
+            byContact.phone_normalized = matchedPhone;
+            await this.clientMappingRepo.save(byContact);
+            mappingByExternalId.set(client.id, byContact);
             synced++;
           } else {
             skipped++;
           }
+        } else if (byExternal) {
+          // external_id déjà en base pour un autre contact — réassigner
+          mappingByContactId.delete(byExternal.contact_id);
+          byExternal.contact_id      = contactId;
+          byExternal.phone_normalized = matchedPhone;
+          await this.clientMappingRepo.save(byExternal);
+          mappingByContactId.set(contactId, byExternal);
+          synced++;
         } else {
+          // Nouveau mapping
           const created = await this.clientMappingRepo.save(
             this.clientMappingRepo.create({
               contact_id:       contactId,
@@ -1099,6 +1115,7 @@ export class OrderCallSyncService {
             }),
           );
           mappingByContactId.set(contactId, created);
+          mappingByExternalId.set(client.id, created);
           synced++;
         }
       } catch (err) {
