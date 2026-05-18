@@ -604,18 +604,21 @@ export class WindowRotationService {
           ...submitted.map((c) => c.id),
         ]);
 
-        // Convs non-RELEASED + toutes les FERME (même RELEASED par l'ancien code sans rapport).
+        // Uniquement les conversations sans slot (jamais slottées ou libérées).
+        // Ne pas inclure les LOCKED/ACTIVE encore dans la fenêtre (window_slot IS NOT NULL)
+        // pour éviter que le take() soit épuisé par des conversations déjà exclues.
         const newCandidates = await this.chatRepo
           .createQueryBuilder('c')
           .where('c.poste_id = :posteId', { posteId })
           .andWhere('c.deletedAt IS NULL')
           .andWhere('c.is_priority = 0')
+          .andWhere('c.window_slot IS NULL')
           .andWhere('(c.window_status IS NULL OR c.window_status != :released OR c.status = :ferme)', {
             released: WindowStatus.RELEASED,
             ferme: WhatsappChatStatus.FERME,
           })
           .orderBy('c.last_activity_at', 'DESC')
-          .take(slotsAvailable + submitted.length)
+          .take(slotsAvailable + 10)
           .getMany();
 
         const unexcluded = newCandidates.filter((c) => !excludedIds.has(c.id));
@@ -712,18 +715,19 @@ export class WindowRotationService {
     const injectChatIds: string[] = [];
     if (slotsUsed < quotaTotal) {
       const existingIds = new Set(current.map((c) => c.id));
-      // Convs non-RELEASED + toutes les FERME (même RELEASED par l'ancien code sans rapport).
+      // Uniquement les conversations sans slot (jamais slottées ou libérées).
       const rawCandidates = await this.chatRepo
         .createQueryBuilder('c')
         .where('c.poste_id = :posteId', { posteId })
         .andWhere('c.deletedAt IS NULL')
         .andWhere('c.is_priority = 0')
+        .andWhere('c.window_slot IS NULL')
         .andWhere('(c.window_status IS NULL OR c.window_status != :released OR c.status = :ferme)', {
           released: WindowStatus.RELEASED,
           ferme: WhatsappChatStatus.FERME,
         })
         .orderBy('c.last_activity_at', 'DESC')
-        .take(slotsUsed + 5)
+        .take(quotaTotal - slotsUsed + 10)
         .getMany();
 
       const unexcluded = rawCandidates.filter((c) => !existingIds.has(c.id));
