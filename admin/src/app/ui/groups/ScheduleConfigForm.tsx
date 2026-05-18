@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, RotateCw, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, RotateCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { setGroupScheduleConfig, generateGroupSchedule } from '../../lib/api/commercial-groups.api';
 import { ScheduleConfigDto } from '../../lib/definitions';
 
@@ -20,122 +20,96 @@ export default function ScheduleConfigForm({
 }: ScheduleConfigFormProps) {
   const [workDaysCount, setWorkDaysCount] = useState<number>(initialWorkDaysCount ?? 2);
   const [firstWorkDay, setFirstWorkDay]   = useState<string>(initialFirstWorkDay ?? '');
-  const [loadingConfig, setLoadingConfig] = useState(false);
-  const [loadingGenerate, setLoadingGenerate] = useState(false);
-  const [successMessage, setSuccessMessage]   = useState<string | null>(null);
-  const [errorMessage, setErrorMessage]       = useState<string | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage]     = useState<string | null>(null);
 
-  const clearMessages = () => {
+  const handleGenerateAndSave = async () => {
     setSuccessMessage(null);
     setErrorMessage(null);
-  };
-
-  const handleSaveConfig = async () => {
-    clearMessages();
-    setLoadingConfig(true);
-    try {
-      const dto: ScheduleConfigDto = {
-        workDaysCount,
-        firstWorkDay,
-      };
-      await setGroupScheduleConfig(groupId, dto);
-      setSuccessMessage('Configuration enregistrée avec succès.');
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement.';
-      setErrorMessage(message);
-    } finally {
-      setLoadingConfig(false);
-    }
-  };
-
-  const handleGenerate = async () => {
-    clearMessages();
     if (!firstWorkDay) {
       setErrorMessage('Veuillez définir un premier jour de travail.');
       return;
     }
-    setLoadingGenerate(true);
+    setLoading(true);
     try {
+      const dto: ScheduleConfigDto = { workDaysCount, firstWorkDay };
+      await setGroupScheduleConfig(groupId, dto);
       const result = await generateGroupSchedule(groupId, 3);
-      setSuccessMessage(`Planning généré : ${result.daysGenerated} jours`);
+      setSuccessMessage(`Planning généré : ${result.daysGenerated} jours sur 3 mois`);
       onScheduleGenerated();
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur lors de la génération.';
       setErrorMessage(message);
     } finally {
-      setLoadingGenerate(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="mt-6 border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+    <div className="mt-6 border border-indigo-100 rounded-lg p-4 space-y-4 bg-indigo-50/40">
       <div className="flex items-center gap-2">
         <Calendar className="w-4 h-4 text-indigo-600" />
-        <p className="text-sm font-semibold text-gray-800">Emploi du temps</p>
+        <p className="text-sm font-semibold text-gray-800">Planning de rotation</p>
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
-          Rythme (jours consécutifs de travail)
-        </label>
-        <div className="flex items-center gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Jours de travail consécutifs
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={14}
+              value={workDaysCount}
+              onChange={(e) => setWorkDaysCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              aria-label="Nombre de jours de travail consécutifs"
+            />
+            <span className="text-xs text-gray-500">
+              j. travail / {workDaysCount} j. repos
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Premier jour de travail
+          </label>
           <input
-            type="number"
-            min={1}
-            max={30}
-            value={workDaysCount}
-            onChange={(e) => setWorkDaysCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            aria-label="Nombre de jours de travail consécutifs"
+            type="date"
+            value={firstWorkDay}
+            onChange={(e) => setFirstWorkDay(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            aria-label="Premier jour de travail"
           />
-          <span className="text-sm text-gray-500">jours de travail / repos</span>
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
-          Premier jour de travail
-        </label>
-        <input
-          type="date"
-          value={firstWorkDay}
-          onChange={(e) => setFirstWorkDay(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-          aria-label="Premier jour de travail"
-        />
-      </div>
+      <p className="text-xs text-gray-400">
+        Le groupe alternera{' '}
+        <span className="font-medium text-gray-600">
+          {workDaysCount} j. travail / {workDaysCount} j. repos
+        </span>{' '}
+        en continu, 7j/7.
+      </p>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <button
-          onClick={() => void handleSaveConfig()}
-          disabled={loadingConfig}
-          className="flex items-center gap-2 px-4 py-2 text-sm border border-indigo-200 text-indigo-700 bg-white rounded-lg hover:bg-indigo-50 disabled:opacity-50 font-medium"
-          aria-label="Enregistrer la configuration de planning"
-        >
-          {loadingConfig ? (
-            <RotateCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          Enregistrer la config
-        </button>
-
-        <button
-          onClick={() => void handleGenerate()}
-          disabled={loadingGenerate}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
-          aria-label="Générer le planning sur 3 mois"
-        >
-          {loadingGenerate ? (
-            <RotateCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <RotateCw className="w-4 h-4" />
-          )}
-          Generer 3 mois
-        </button>
-      </div>
+      <button
+        onClick={() => void handleGenerateAndSave()}
+        disabled={loading}
+        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium transition-colors"
+        aria-label="Enregistrer la configuration et générer le planning sur 3 mois"
+      >
+        {loading ? (
+          <RotateCw className="w-4 h-4 animate-spin" />
+        ) : (
+          <Calendar className="w-4 h-4" />
+        )}
+        {loading ? 'Génération en cours…' : 'Enregistrer et générer (3 mois)'}
+      </button>
 
       {successMessage && (
         <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
