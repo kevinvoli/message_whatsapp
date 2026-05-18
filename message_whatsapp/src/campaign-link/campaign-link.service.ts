@@ -356,6 +356,55 @@ export class CampaignLinkService {
     }
   }
 
+  async tryAttributeByTiming(chatId: string, channelId: string): Promise<void> {
+    if (!channelId) return;
+    const WINDOW_MS = 5 * 60 * 1000;
+    const since = new Date(Date.now() - WINDOW_MS);
+
+    // Cherche le clic le plus récent sur ce canal dans la fenêtre temporelle
+    const recentClick = await this.clickRepository
+      .createQueryBuilder('click')
+      .innerJoin('click.campaignLink', 'link')
+      .where('link.channelId = :channelId', { channelId })
+      .andWhere('click.clickedAt >= :since', { since })
+      .andWhere('click.converted = false')
+      .andWhere('click.chatId IS NULL')
+      .orderBy('click.clickedAt', 'DESC')
+      .getOne();
+
+    if (!recentClick) return;
+
+    // Associe le lien au chat (idempotent : seulement si non déjà attribué)
+    const chatUpdate = await this.chatRepository
+      .createQueryBuilder()
+      .update(WhatsappChat)
+      .set({ campaignLinkId: recentClick.campaignLinkId })
+      .where('chat_id = :chatId AND campaign_link_id IS NULL', { chatId })
+      .execute();
+
+    if (!chatUpdate.affected || chatUpdate.affected === 0) return;
+
+    // Marque le clic comme converti (AND converted = false pour être idempotent)
+    const clickUpdate = await this.clickRepository
+      .createQueryBuilder()
+      .update(CampaignLinkClick)
+      .set({ converted: true, convertedAt: () => 'NOW()', chatId })
+      .where('id = :id AND converted = false', { id: recentClick.id })
+      .execute();
+
+    if (!clickUpdate.affected || clickUpdate.affected === 0) return;
+
+    // Incrémente conversion_count (seulement si le clic vient d'être converti)
+    await this.linkRepository
+      .createQueryBuilder()
+      .update(CampaignLink)
+      .set({ conversionCount: () => 'conversion_count + 1' })
+      .where('id = :id', { id: recentClick.campaignLinkId })
+      .execute();
+
+    this.logger.log(`[CAMPAIGN_ATTR] chat=${chatId} → link=${recentClick.campaignLinkId} (timing correlation)`);
+  }
+
   // --- Analytics ---
 
   async getStats(linkId: string, from: Date, to: Date): Promise<{

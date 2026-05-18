@@ -27,6 +27,7 @@ import { WhatsappChatService } from 'src/whatsapp_chat/whatsapp_chat.service';
 import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestrator.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
+import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -55,6 +56,7 @@ export class InboundMessageService {
     private readonly autoMessageOrchestrator: AutoMessageOrchestrator,
     private readonly systemAlert: SystemAlertService,
     private readonly messengerService: CommunicationMessengerService,
+    private readonly campaignLinkService: CampaignLinkService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -199,6 +201,15 @@ export class InboundMessageService {
           // Fire-and-forget : le setTimeout interne est non-bloquant.
           if (!conversation.last_poste_message_at) {
             void this.autoMessageOrchestrator.handleClientMessage(conversation);
+          }
+
+          // Corrélation temporelle : associe la conversation au lien campagne si clic récent
+          if (message.channelId && !conversation.campaignLinkId) {
+            void this.campaignLinkService
+              .tryAttributeByTiming(conversation.chat_id, message.channelId)
+              .catch((err: Error) =>
+                this.logger.warn(`[CAMPAIGN_ATTR] ${message.chatId}: ${err.message}`),
+              );
           }
         });
       } catch (err) {
