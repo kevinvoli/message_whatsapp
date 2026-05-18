@@ -23,6 +23,9 @@ import {
 } from '../lib/api/commercial-groups.api';
 import { getPresence } from '../lib/api/commerciaux.api';
 import { CommercialGroup, CommercialPresenceItem } from '../lib/definitions';
+import ScheduleConfigForm from './groups/ScheduleConfigForm';
+import GroupScheduleCalendar from './groups/GroupScheduleCalendar';
+import GroupPresenceTable from './groups/GroupPresenceTable';
 
 // ─── Modal création / modification ──────────────────────────────────────────
 
@@ -231,6 +234,7 @@ export default function CommercialGroupsView() {
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [togglingId, setTogglingId]   = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<CommercialGroup | null>(null);
+  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -303,6 +307,7 @@ export default function CommercialGroupsView() {
         </div>
       ) : (
         <div className="space-y-3">
+          <GroupPresenceTable groups={groups} />
           {groups.map((group) => {
             const memberCount = presence.filter((p) => p.groupId === group.id).length;
             const isExpanded  = expandedId === group.id;
@@ -370,6 +375,16 @@ export default function CommercialGroupsView() {
                       group={group}
                       allPresence={presence}
                       onRefresh={load}
+                    />
+                    <ScheduleConfigForm
+                      groupId={group.id}
+                      initialWorkDaysCount={group.workDaysCount}
+                      initialFirstWorkDay={group.firstWorkDay}
+                      onScheduleGenerated={() => setScheduleRefreshKey((k) => k + 1)}
+                    />
+                    <GroupScheduleCalendar
+                      groupId={group.id}
+                      refreshKey={scheduleRefreshKey}
                     />
                   </div>
                 )}

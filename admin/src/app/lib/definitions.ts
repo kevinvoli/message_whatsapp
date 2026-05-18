@@ -294,9 +294,31 @@ export interface CommercialGroup {
   name: string;
   description: string | null;
   isActive: boolean;
+  workDaysCount?: number;
+  firstWorkDay?: string | null;
   createdAt: string;
   updatedAt: string;
   commercials?: CommercialPresenceItem[];
+}
+
+export interface GroupScheduleDayItem {
+  date: string;       // 'YYYY-MM-DD'
+  isWorkDay: boolean;
+  dayOfWeek: number;  // 0=dim, 1=lun, 2=mar, 3=mer, 4=jeu, 5=ven, 6=sam
+}
+
+export interface ScheduleConfigDto {
+  workDaysCount: number;
+  firstWorkDay: string; // 'YYYY-MM-DD'
+}
+
+export interface GenerateScheduleResult {
+  daysGenerated: number;
+}
+
+export interface GenerateAllResult {
+  groupId: string;
+  daysGenerated: number;
 }
 
 export type Poste = {
