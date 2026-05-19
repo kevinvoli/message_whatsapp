@@ -26,39 +26,11 @@ export class CommercialGroupController {
     return this.service.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateCommercialGroupDto) {
-    return this.service.update(id, body);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
-  }
+  // --- Routes statiques AVANT les routes paramétrées (:id) ---
 
   @Post('schedule/generate-all')
   generateAll() {
     return this.groupScheduleService.generateForAllGroups();
-  }
-
-  @Patch(':id/schedule-config')
-  setScheduleConfig(@Param('id') id: string, @Body() dto: ScheduleConfigDto) {
-    return this.service.setScheduleConfig(id, dto);
-  }
-
-  @Post(':id/schedule/generate')
-  generateSchedule(@Param('id') id: string, @Body() dto: GenerateScheduleDto) {
-    return this.service.generateSchedule(id, dto?.months).then(daysGenerated => ({ daysGenerated }));
-  }
-
-  @Get(':id/schedule')
-  getSchedule(@Param('id') id: string, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.service.getSchedule(id, from, to);
   }
 
   @Get('planning')
@@ -82,6 +54,38 @@ export class CommercialGroupController {
   @Delete('planning/:id')
   removePlanning(@Param('id') id: string) {
     return this.planningService.remove(id);
+  }
+
+  // --- Routes paramétrées ---
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: UpdateCommercialGroupDto) {
+    return this.service.update(id, body);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
+
+  @Patch(':id/schedule-config')
+  setScheduleConfig(@Param('id') id: string, @Body() dto: ScheduleConfigDto) {
+    return this.service.setScheduleConfig(id, dto);
+  }
+
+  @Post(':id/schedule/generate')
+  generateSchedule(@Param('id') id: string, @Body() dto: GenerateScheduleDto) {
+    return this.service.generateSchedule(id, dto?.months).then(daysGenerated => ({ daysGenerated }));
+  }
+
+  @Get(':id/schedule')
+  getSchedule(@Param('id') id: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.getSchedule(id, from, to);
   }
 
   @Post(':id/members')
