@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommercialPlanning } from 'src/commercial-group/entities/commercial-planning.entity';
+import { GroupScheduleDay } from 'src/commercial-group/entities/group-schedule-day.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Injectable()
@@ -13,6 +14,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService,
     @InjectRepository(CommercialPlanning)
     private readonly planningRepo: Repository<CommercialPlanning>,
+    @InjectRepository(GroupScheduleDay)
+    private readonly scheduleDayRepo: Repository<GroupScheduleDay>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
   ) {
@@ -40,25 +43,53 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const [commercial, planning] = await Promise.all([
       this.commercialRepo.findOne({
         where: { id: payload.sub },
-        select: ['id', 'isWorkingToday'],
+        select: ['id', 'groupId'],
       }),
       this.planningRepo.findOne({
         where: { commercialId: payload.sub, date: today },
       }),
     ]);
 
-    const effectivePosteId =
-      planning?.type === 'exceptional' && planning.overridePosteId
-        ? planning.overridePosteId
-        : payload.posteId;
+    // Absence déclarée → hors service, pas de remplacement
+    if (planning?.type === 'absence') {
+      return {
+        userId:         payload.sub,
+        email:          payload.email,
+        posteId:        payload.posteId,
+        isWorkingToday: false,
+        absentToday:    true,
+        isReplacing:    false,
+      };
+    }
+
+    // Jour exceptionnel (remplaçant) → en service sur le poste remplacé
+    if (planning?.type === 'exceptional') {
+      return {
+        userId:         payload.sub,
+        email:          payload.email,
+        posteId:        planning.overridePosteId ?? payload.posteId,
+        isWorkingToday: true,
+        absentToday:    false,
+        isReplacing:    !!planning.overridePosteId,
+      };
+    }
+
+    // Cas normal : calculer isWorkingToday depuis group_schedule_day en temps réel
+    let isWorkingToday = false;
+    if (commercial?.groupId) {
+      const scheduleDay = await this.scheduleDayRepo.findOne({
+        where: { groupId: commercial.groupId, date: today, isWorkDay: true },
+      });
+      isWorkingToday = !!scheduleDay;
+    }
 
     return {
       userId:         payload.sub,
       email:          payload.email,
-      posteId:        effectivePosteId,
-      isWorkingToday: commercial?.isWorkingToday ?? false,
-      absentToday:    planning?.type === 'absence',
-      isReplacing:    planning?.type === 'exceptional' && !!planning.overridePosteId,
+      posteId:        payload.posteId,
+      isWorkingToday,
+      absentToday:    false,
+      isReplacing:    false,
     };
   }
 }

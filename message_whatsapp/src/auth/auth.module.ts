@@ -13,6 +13,7 @@ import { LoginLog } from './entities/login-log.entity';
 import { LoginLogService } from './login-log.service';
 import { LoginLogController } from './login-log.controller';
 import { CommercialPlanning } from '../commercial-group/entities/commercial-planning.entity';
+import { GroupScheduleDay } from '../commercial-group/entities/group-schedule-day.entity';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { SystemConfigModule } from '../system-config/system-config.module';
 import { WorkingDayGuard } from './working-day.guard';
@@ -25,7 +26,7 @@ import { WorkingDayGuard } from './working-day.guard';
     PassportModule,
     ConfigModule,
     SystemConfigModule,
-    TypeOrmModule.forFeature([LoginLog, CommercialPlanning, WhatsappCommercial]),
+    TypeOrmModule.forFeature([LoginLog, CommercialPlanning, GroupScheduleDay, WhatsappCommercial]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
