@@ -84,6 +84,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     void bootstrapSession();
   }, []);
 
+  // Poll silencieux toutes les 5 min pour détecter les changements de statut en cours de journée
+  // (absence déclarée, remplacement, changement de groupe…)
+  useEffect(() => {
+    if (!apiBaseUrl) return;
+
+    const refreshProfile = async () => {
+      try {
+        const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
+          withCredentials: true,
+        });
+        setUser((prev) => {
+          if (!prev) return prev;
+          const fresh = normalizeUser(response.data);
+          const changed =
+            prev.isWorkingToday !== fresh.isWorkingToday ||
+            prev.absentToday   !== fresh.absentToday    ||
+            prev.isReplacing   !== fresh.isReplacing    ||
+            prev.posteId       !== fresh.posteId;
+          return changed ? fresh : prev;
+        });
+      } catch {
+        // silencieux — si la session expire, le prochain 401 sur une vraie requête gère la déconnexion
+      }
+    };
+
+    const id = setInterval(() => void refreshProfile(), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const login = async (email: string, password: string) => {
     if (!apiBaseUrl) {
       setError('NEXT_PUBLIC_API_URL is not configured');
