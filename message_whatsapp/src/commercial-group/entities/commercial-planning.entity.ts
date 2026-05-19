@@ -26,24 +26,24 @@ export class CommercialPlanning {
   @Column({ type: 'date' })
   date: string;
 
-  @Column({ name: 'linked_commercial_id', nullable: true, default: null })
+  @Column({ name: 'linked_commercial_id', type: 'varchar', length: 36, nullable: true, default: null })
   linkedCommercialId?: string | null;
 
   @ManyToOne(() => WhatsappCommercial, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'linked_commercial_id' })
   linkedCommercial?: WhatsappCommercial | null;
 
-  @Column({ name: 'override_poste_id', nullable: true, default: null })
+  @Column({ name: 'override_poste_id', type: 'varchar', length: 36, nullable: true, default: null })
   overridePosteId?: string | null;
 
   @ManyToOne(() => WhatsappPoste, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'override_poste_id' })
   overridePoste?: WhatsappPoste | null;
 
-  @Column({ nullable: true, default: null })
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   reason?: string | null;
 
-  @Column({ name: 'declared_by', nullable: true, default: null })
+  @Column({ name: 'declared_by', type: 'varchar', length: 100, nullable: true, default: null })
   declaredBy?: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
