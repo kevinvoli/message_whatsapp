@@ -91,12 +91,17 @@ export class ActionQueueService {
   async getMissedCallItems(posteId: string | null): Promise<ActionTaskItem[]> {
     if (!posteId) return [];
 
+    // Limite aux appels reçus dans les 72h : évite qu'un ancien appel manqué
+    // ressorte comme notification à cause de nouveaux messages sans rapport.
+    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+
     const chats = await this.chatRepo
       .createQueryBuilder('c')
       .innerJoin(
         'whatsapp_message', 'm',
-        `m.chat_id = c.chat_id AND m.direction = '${MessageDirection.IN}' AND m.type IN ('${CALL_MSG_TYPES.join("','")}') AND m.deletedAt IS NULL`,
+        `m.chat_id = c.chat_id AND m.direction = '${MessageDirection.IN}' AND m.type IN ('${CALL_MSG_TYPES.join("','")}') AND m.deletedAt IS NULL AND m.createdAt >= :missedCallCutoff`,
       )
+      .setParameter('missedCallCutoff', cutoff)
       .where('c.poste_id = :posteId', { posteId })
       .andWhere('c.unread_count > 0')
       .andWhere('c.deletedAt IS NULL')
