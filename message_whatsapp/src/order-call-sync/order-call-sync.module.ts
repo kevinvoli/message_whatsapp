@@ -16,6 +16,7 @@ import { CallDeviceModule } from 'src/call-device/call-device.module';
 import { CallEventUnresolved } from './entities/call-event-unresolved.entity';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { WorkScheduleModule } from 'src/work-schedule/work-schedule.module';
+import { CommercialPlanning } from 'src/commercial-group/entities/commercial-planning.entity';
 import { MissedCallModule } from 'src/missed-calls/missed-call.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 
@@ -29,6 +30,7 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
       Contact,
       CallEventUnresolved,
       CallLog,
+      CommercialPlanning,
     ]),
     CallDeviceModule,
     IntegrationSyncModule,

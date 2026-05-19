@@ -1,6 +1,7 @@
 ﻿import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { CommercialPlanning } from 'src/commercial-group/entities/commercial-planning.entity';
 import { CallLog, CallOutcome } from 'src/call-log/entities/call_log.entity';
 import { CallEventService } from 'src/window/services/call-event.service';
 import { ORDER_DB_AVAILABLE, ORDER_DB_DATA_SOURCE } from 'src/order-db/order-db.constants';
@@ -78,6 +79,9 @@ export class OrderCallSyncService {
 
     @InjectRepository(CallLog)
     private readonly callLogRepo: Repository<CallLog>,
+
+    @InjectRepository(CommercialPlanning)
+    private readonly planningRepo: Repository<CommercialPlanning>,
 
     private readonly workScheduleService: WorkScheduleService,
 
@@ -164,6 +168,29 @@ export class OrderCallSyncService {
       const list = poolByPosteId.get(c.poste!.id) ?? [];
       list.push(c);
       poolByPosteId.set(c.poste!.id, list);
+    }
+
+    // Enrichissement pool — remplaçants du jour (commercial_planning)
+    const todayStr = new Intl.DateTimeFormat('fr-CA', {
+      timeZone: process.env['TZ'] ?? 'Africa/Abidjan',
+    }).format(new Date());
+    const todayReplacements = await this.planningRepo.find({
+      where: { type: 'exceptional', date: todayStr },
+    });
+    for (const r of todayReplacements) {
+      if (!r.overridePosteId) continue;
+      const replacer = commercialsAtPoste.find((c) => c.id === r.commercialId)
+        ?? await this.commercialRepo.findOne({
+          where: { id: r.commercialId, deletedAt: IsNull() },
+          relations: ['poste'],
+          select: { id: true, phone: true, lastConnectionAt: true, isWorkingToday: true, groupId: true, poste: { id: true } },
+        });
+      if (!replacer) continue;
+      const pool = poolByPosteId.get(r.overridePosteId) ?? [];
+      if (!pool.find((c) => c.id === replacer.id)) {
+        pool.push(replacer);
+        poolByPosteId.set(r.overridePosteId, pool);
+      }
     }
 
     const workingTodayIds = new Set<string>();

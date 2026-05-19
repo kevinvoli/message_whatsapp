@@ -1250,3 +1250,22 @@ export interface FollowUpTemplateMappingDto {
   language_code: string;
 }
 
+// ============================================
+// PLANNING — Gestion des imprévus
+// ============================================
+
+export interface CommercialPlanningEntry {
+  id: string;
+  commercialId: string;
+  commercial: { id: string; name: string; phone?: string };
+  type: 'absence' | 'exceptional';
+  date: string;
+  linkedCommercialId?: string | null;
+  linkedCommercial?: { id: string; name: string } | null;
+  overridePosteId?: string | null;
+  overridePoste?: { id: string; name: string; code: string } | null;
+  reason?: string | null;
+  declaredBy?: string | null;
+  createdAt: string;
+}
+

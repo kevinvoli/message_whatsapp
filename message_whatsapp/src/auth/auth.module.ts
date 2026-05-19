@@ -12,6 +12,8 @@ import { GeoAccessModule } from '../geo-access/geo_access.module';
 import { LoginLog } from './entities/login-log.entity';
 import { LoginLogService } from './login-log.service';
 import { LoginLogController } from './login-log.controller';
+import { CommercialPlanning } from '../commercial-group/entities/commercial-planning.entity';
+import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 
 @Module({
   imports: [
@@ -20,7 +22,7 @@ import { LoginLogController } from './login-log.controller';
     GeoAccessModule,
     PassportModule,
     ConfigModule,
-    TypeOrmModule.forFeature([LoginLog]),
+    TypeOrmModule.forFeature([LoginLog, CommercialPlanning, WhatsappCommercial]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

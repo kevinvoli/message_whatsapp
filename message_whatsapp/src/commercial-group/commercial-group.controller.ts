@@ -4,6 +4,8 @@ import { AdminGuard } from 'src/auth/admin.guard';
 import { AddMemberDto, CreateCommercialGroupDto, UpdateCommercialGroupDto } from './dto/commercial-group.dto';
 import { GenerateScheduleDto, ScheduleConfigDto } from './dto/schedule-config.dto';
 import { GroupScheduleService } from './group-schedule.service';
+import { CommercialPlanningService } from './commercial-planning.service';
+import { CreateAbsenceDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
 
 @Controller('commercial-groups')
 @UseGuards(AdminGuard)
@@ -11,6 +13,7 @@ export class CommercialGroupController {
   constructor(
     private readonly service: CommercialGroupService,
     private readonly groupScheduleService: GroupScheduleService,
+    private readonly planningService: CommercialPlanningService,
   ) {}
 
   @Post()
@@ -56,6 +59,29 @@ export class CommercialGroupController {
   @Get(':id/schedule')
   getSchedule(@Param('id') id: string, @Query('from') from?: string, @Query('to') to?: string) {
     return this.service.getSchedule(id, from, to);
+  }
+
+  @Get('planning')
+  getPlanningByDate(@Query('date') date?: string) {
+    return this.planningService.findByDate(date ?? this.planningService.getTodayString());
+  }
+
+  @Post('planning')
+  createPlanning(@Body() body: CreateAbsenceDto | CreateExceptionalDto) {
+    if ((body as any).type === 'exceptional') {
+      return this.planningService.createExceptional(body as CreateExceptionalDto);
+    }
+    return this.planningService.createAbsence(body as CreateAbsenceDto);
+  }
+
+  @Post('planning/replacement')
+  createReplacement(@Body() body: CreateReplacementDto) {
+    return this.planningService.createReplacement(body);
+  }
+
+  @Delete('planning/:id')
+  removePlanning(@Param('id') id: string) {
+    return this.planningService.remove(id);
   }
 
   @Post(':id/members')

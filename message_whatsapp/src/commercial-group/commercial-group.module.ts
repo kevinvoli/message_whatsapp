@@ -7,14 +7,16 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { GroupScheduleDay } from './entities/group-schedule-day.entity';
 import { GroupScheduleService } from './group-schedule.service';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
+import { CommercialPlanning } from './entities/commercial-planning.entity';
+import { CommercialPlanningService } from './commercial-planning.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CommercialGroup, WhatsappCommercial, GroupScheduleDay]),
+    TypeOrmModule.forFeature([CommercialGroup, WhatsappCommercial, GroupScheduleDay, CommercialPlanning]),
     SystemConfigModule,
   ],
   controllers: [CommercialGroupController],
-  providers: [CommercialGroupService, GroupScheduleService],
-  exports: [CommercialGroupService, GroupScheduleService],
+  providers: [CommercialGroupService, GroupScheduleService, CommercialPlanningService],
+  exports: [CommercialGroupService, GroupScheduleService, CommercialPlanningService],
 })
 export class CommercialGroupModule {}

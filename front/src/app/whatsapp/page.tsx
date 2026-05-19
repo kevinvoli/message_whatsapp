@@ -30,11 +30,34 @@ const WhatsAppPage = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <ConversationSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
-      {viewMode === 'contacts'
-        ? <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />
-        : <ChatMainArea onOpenContact={() => setViewMode('contacts')} />}
+    <div className="flex flex-col h-screen">
+      {/* Bannière absent */}
+      {user && !user.isWorkingToday && user.absentToday && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-700 flex-shrink-0">
+          Vous êtes déclaré absent aujourd&apos;hui. Aucun appel ne vous sera attribué.
+        </div>
+      )}
+
+      {/* Bannière hors planning */}
+      {user && !user.isWorkingToday && !user.absentToday && (
+        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-sm text-gray-600 flex-shrink-0">
+          Vous n&apos;êtes pas en service aujourd&apos;hui. Aucun appel ne vous sera attribué.
+        </div>
+      )}
+
+      {/* Bannière remplaçant */}
+      {user && user.isWorkingToday && user.isReplacing && (
+        <div className="bg-purple-50 border-b border-purple-200 px-4 py-2 text-sm text-purple-700 flex-shrink-0">
+          Vous remplacez un collègue aujourd&apos;hui — vous gérez son poste et ses conversations.
+        </div>
+      )}
+
+      <div className="flex flex-1 min-h-0 bg-gray-100">
+        <ConversationSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
+        {viewMode === 'contacts'
+          ? <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />
+          : <ChatMainArea onOpenContact={() => setViewMode('contacts')} />}
+      </div>
     </div>
   );
 };

@@ -16,6 +16,9 @@ interface User {
   name: string;
   posteId?: string | null;
   poste_id: string;
+  isWorkingToday?: boolean;
+  absentToday?: boolean;
+  isReplacing?: boolean;
 }
 
 interface AuthContextType {

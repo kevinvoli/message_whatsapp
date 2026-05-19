@@ -1,5 +1,6 @@
 import {
   CommercialGroup,
+  CommercialPlanningEntry,
   ScheduleConfigDto,
   GenerateScheduleResult,
   GenerateAllResult,
@@ -112,4 +113,77 @@ export async function getGroupSchedule(
       credentials: 'include',
     }),
   );
+}
+
+// ─── Planning — Gestion des imprévus ────────────────────────────────────────
+
+export async function getPlanningByDate(date: string): Promise<CommercialPlanningEntry[]> {
+  return handleResponse<CommercialPlanningEntry[]>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning?date=${encodeURIComponent(date)}`, {
+      credentials: 'include',
+    }),
+  );
+}
+
+export async function createAbsence(data: {
+  commercialId: string;
+  date: string;
+  reason?: string;
+}): Promise<CommercialPlanningEntry> {
+  return handleResponse<CommercialPlanningEntry>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, type: 'absence' }),
+    }),
+  );
+}
+
+export async function createExceptional(data: {
+  commercialId: string;
+  date: string;
+  reason?: string;
+}): Promise<CommercialPlanningEntry> {
+  return handleResponse<CommercialPlanningEntry>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, type: 'exceptional' }),
+    }),
+  );
+}
+
+export async function createReplacement(data: {
+  replacedId: string;
+  replacerId: string;
+  date: string;
+  reason?: string;
+}): Promise<{ absence: CommercialPlanningEntry; exceptional: CommercialPlanningEntry }> {
+  return handleResponse<{ absence: CommercialPlanningEntry; exceptional: CommercialPlanningEntry }>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning/replacement`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  );
+}
+
+export async function deletePlanning(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/commercial-groups/planning/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!response.ok && response.status !== 204) {
+    let errorMessage: string;
+    try {
+      const errorData = await response.json() as { message?: string };
+      errorMessage = errorData.message ?? response.statusText;
+    } catch {
+      errorMessage = response.statusText;
+    }
+    throw new Error(errorMessage);
+  }
 }
