@@ -55,6 +55,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'FF_STICKY_ASSIGNMENT', label: 'Sticky assignment (affinité client→poste)', category: 'feature_flags', description: 'true / false — réaffecte un contact à son dernier poste si celui-ci est disponible' },
   { key: 'FF_GICOP_REPORT_REQUIRED', label: 'Rapport GICOP obligatoire à la clôture', category: 'feature_flags', description: 'true / false — bloque la clôture si le rapport GICOP est incomplet' },
   { key: 'FF_CALL_OBLIGATIONS_ENABLED', label: 'Obligations d\'appels GICOP', category: 'feature_flags', description: 'true / false — active les obligations d\'appels quotidiens (5 annulés + 5 livrés + 5 sans commande ≥ 90s) et bloque la rotation si incomplètes', defaultValue: 'false' },
+  { key: 'RESTRICT_LOGIN_TO_WORKING_DAYS', label: 'Bloquer connexion hors jour de travail', category: 'feature_flags', description: 'true / false — si activé, les commerciaux dont is_working_today=false ne peuvent pas se connecter (approche B blocage fort). Désactivé par défaut.', defaultValue: 'false' },
 
   // ─── Intégration ERP ─────────────────────────────────────────────────────────
   { key: 'INTEGRATION_ERP_URL', label: 'URL webhook sortant ERP', category: 'integration', description: 'Endpoint de votre ERP qui reçoit les événements de la plateforme' },

@@ -14,6 +14,8 @@ import { LoginLogService } from './login-log.service';
 import { LoginLogController } from './login-log.controller';
 import { CommercialPlanning } from '../commercial-group/entities/commercial-planning.entity';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
+import { SystemConfigModule } from '../system-config/system-config.module';
+import { WorkingDayGuard } from './working-day.guard';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity'
     GeoAccessModule,
     PassportModule,
     ConfigModule,
+    SystemConfigModule,
     TypeOrmModule.forFeature([LoginLog, CommercialPlanning, WhatsappCommercial]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -32,8 +35,8 @@ import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity'
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtStrategy, LoginLogService],
+  providers: [AuthService, JwtStrategy, LoginLogService, WorkingDayGuard],
   controllers: [AuthController, LoginLogController],
-  exports: [AuthService, LoginLogService],
+  exports: [AuthService, LoginLogService, WorkingDayGuard],
 })
 export class AuthModule {}
