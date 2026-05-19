@@ -3,13 +3,15 @@ import React, { useState } from 'react';
 import GroupsCalendarView from '@/app/ui/groups/GroupsCalendarView';
 import PresenceView from '@/app/ui/PresenceView';
 import SessionsView from '@/app/ui/SessionsView';
+import CommercialPlanningView from '@/app/ui/CommercialPlanningView';
 
-type Tab = 'planning' | 'presence' | 'sessions';
+type Tab = 'planning' | 'presence' | 'imprevus' | 'sessions';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'planning',  label: 'Plannings de travail' },
-  { id: 'presence',  label: 'Présence du jour'     },
-  { id: 'sessions',  label: 'Heures de travail'    },
+  { id: 'planning',  label: 'Plannings de travail'      },
+  { id: 'presence',  label: 'Présence du jour'          },
+  { id: 'imprevus',  label: 'Absences & remplacements'  },
+  { id: 'sessions',  label: 'Heures de travail'         },
 ];
 
 export default function PlanningTabsView() {
@@ -34,6 +36,7 @@ export default function PlanningTabsView() {
       </div>
       {active === 'planning'  && <GroupsCalendarView />}
       {active === 'presence'  && <PresenceView />}
+      {active === 'imprevus'  && <CommercialPlanningView />}
       {active === 'sessions'  && <SessionsView />}
     </div>
   );
