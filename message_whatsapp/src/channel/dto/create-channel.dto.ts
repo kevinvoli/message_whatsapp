@@ -25,16 +25,6 @@ export class CreateChannelDto {
   @IsString()
   label?: string;
 
-  /** App ID Meta (requis pour meta/messenger/instagram — échange token + signature webhooks) */
-  @IsOptional()
-  @IsString()
-  meta_app_id?: string;
-
-  /** App Secret Meta (requis pour meta/messenger/instagram — signature HMAC des webhooks) */
-  @IsOptional()
-  @IsString()
-  meta_app_secret?: string;
-
   /** Secret de webhook (Telegram uniquement — généré automatiquement si absent) */
   @IsOptional()
   @IsString()
@@ -55,7 +45,7 @@ export class CreateChannelDto {
   @IsBoolean()
   permanent_token?: boolean;
 
-  /** UUID de l'application Meta associée. Si fourni, remplace meta_app_id/meta_app_secret. */
+  /** UUID de l'application Meta associée (requis pour meta/messenger/instagram). */
   @IsOptional()
   @IsUUID()
   application_id?: string;

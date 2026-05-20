@@ -82,8 +82,8 @@ export class ChannelService implements OnModuleInit {
     try {
       const unsecured = await this.channelRepository.find({
         where: [
-          { provider: 'messenger', meta_app_secret: IsNull(), application_id: IsNull() },
-          { provider: 'meta', meta_app_secret: IsNull(), application_id: IsNull() },
+          { provider: 'messenger', application_id: IsNull() },
+          { provider: 'meta', application_id: IsNull() },
         ],
         select: ['channel_id', 'provider', 'external_id'],
       });

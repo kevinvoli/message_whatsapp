@@ -33,7 +33,7 @@ export class MetaTokenService {
 
     if (!appId || !appSecret) {
       throw new BadRequestException(
-        "meta_app_id et meta_app_secret sont requis sur le canal pour échanger un token Meta",
+        "appId et appSecret de l'application sont requis pour échanger un token Meta",
       );
     }
 

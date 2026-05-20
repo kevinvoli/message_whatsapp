@@ -45,20 +45,11 @@ export class MessengerChannelProviderService implements ChannelProviderStrategy,
     const externalId = dto.external_id?.trim() || channelId;
     const nowEpoch = Math.floor(Date.now() / 1000);
 
-    let effectiveAppId = dto.meta_app_id;
-    let effectiveAppSecret = dto.meta_app_secret;
-    let isPermanent = !!dto.permanent_token;
-    let messengerToken = dto.token.trim();
-
-    if (dto.application_id) {
-      const app = await this.applicationService.findOne(dto.application_id);
-      effectiveAppId = app.appId;
-      effectiveAppSecret = app.appSecret;
-      if (app.systemToken?.trim()) {
-        isPermanent = true;
-        messengerToken = app.systemToken.trim();
-      }
-    }
+    const app = await this.applicationService.findOne(dto.application_id);
+    const effectiveAppId = app.appId;
+    const effectiveAppSecret = app.appSecret;
+    let isPermanent = !!dto.permanent_token || !!app.systemToken?.trim();
+    let messengerToken = app.systemToken?.trim() || dto.token.trim();
 
     let messengerTokenExpiresAt: Date | null = isPermanent ? new Date('2099-12-31') : null;
 
@@ -106,8 +97,6 @@ export class MessengerChannelProviderService implements ChannelProviderStrategy,
       tokenExpiresAt: messengerTokenExpiresAt,
       channel_id: channelId,
       application_id: dto.application_id ?? null,
-      meta_app_id: dto.application_id ? null : (dto.meta_app_id ?? null),
-      meta_app_secret: dto.application_id ? null : (dto.meta_app_secret ?? null),
       verify_token: dto.verify_token ?? null,
       page_id: dto.page_id ?? null,
       uptime: 0,
@@ -182,12 +171,9 @@ export class MessengerChannelProviderService implements ChannelProviderStrategy,
         const app = await this.applicationService.findOne(applicationId);
         return { appId: app.appId, appSecret: app.appSecret };
       } catch {
-        // application introuvable → fallback champs directs
+        // application introuvable
       }
     }
-    return {
-      appId: dto.meta_app_id || channel.meta_app_id,
-      appSecret: dto.meta_app_secret || channel.meta_app_secret,
-    };
+    return { appId: null, appSecret: null };
   }
 }

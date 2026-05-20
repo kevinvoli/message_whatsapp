@@ -6,8 +6,6 @@ function makeChannel(overrides: Partial<WhapiChannel> = {}): WhapiChannel {
   return {
     id: 'chan-uuid',
     token: 'chan-token',
-    meta_app_id: null,
-    meta_app_secret: null,
     application: null,
     application_id: null,
     ...overrides,
@@ -25,16 +23,7 @@ function makeApp(overrides: Partial<MessagingApplication> = {}): MessagingApplic
 }
 
 describe('resolveChannelCredentials', () => {
-  it('canal sans application → retourne meta_app_id/meta_app_secret du canal', () => {
-    const channel = makeChannel({ meta_app_id: 'cid', meta_app_secret: 'csecret' });
-    const result = resolveChannelCredentials(channel);
-    expect(result.appId).toBe('cid');
-    expect(result.appSecret).toBe('csecret');
-    expect(result.accessToken).toBe('chan-token');
-    expect(result.isSystemToken).toBe(false);
-  });
-
-  it('canal sans application, meta_app_id null → retourne null pour appId/appSecret', () => {
+  it('canal sans application → retourne appId/appSecret null, token canal', () => {
     const result = resolveChannelCredentials(makeChannel());
     expect(result.appId).toBeNull();
     expect(result.appSecret).toBeNull();
@@ -66,10 +55,11 @@ describe('resolveChannelCredentials', () => {
     expect(result.isSystemToken).toBe(false);
   });
 
-  it('canal avec application_id mais relation non chargée → fallback canal sans erreur', () => {
+  it('canal avec application_id mais relation non chargée → retourne null credentials sans erreur', () => {
     const channel = makeChannel({ application_id: 'app-uuid', application: undefined });
     const result = resolveChannelCredentials(channel);
     expect(result.appId).toBeNull();
+    expect(result.appSecret).toBeNull();
     expect(result.accessToken).toBe('chan-token');
     expect(result.isSystemToken).toBe(false);
   });

@@ -596,7 +596,7 @@ export class WhapiController {
     const wabaId = entry?.id;
     const phoneNumberId = metaValue?.metadata?.phone_number_id;
 
-    // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
+    // Résoudre le canal et ses credentials d'application, puis valider la signature
     const channel = phoneNumberId
       ? await this.channelService.findByChannelIdForWebhook(phoneNumberId)
       : null;

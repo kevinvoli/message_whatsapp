@@ -14,7 +14,7 @@ type ChannelWithApplication = WhapiChannel & {
 
 /**
  * Résout les credentials effectifs d'un canal.
- * Priorité : application liée > champs directs du canal (rétrocompatibilité).
+ * Priorité : application liée > aucune (canal legacy sans application).
  */
 export function resolveChannelCredentials(
   channel: ChannelWithApplication,
@@ -32,8 +32,8 @@ export function resolveChannelCredentials(
   }
 
   return {
-    appId: channel.meta_app_id ?? null,
-    appSecret: channel.meta_app_secret ?? null,
+    appId: null,
+    appSecret: null,
     accessToken: channel.token,
     isSystemToken: false,
   };
