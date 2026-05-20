@@ -366,6 +366,7 @@ export class ClientDossierService {
     limit = 50,
     offset = 0,
     contactSource?: string,
+    callStatus?: string,
   ): Promise<{ data: Contact[]; total: number }> {
     const qb = this.contactRepo
       .createQueryBuilder('c')
@@ -383,6 +384,14 @@ export class ClientDossierService {
     }
     if (contactSource === 'whatsapp' || contactSource === 'erp_import') {
       qb.andWhere('c.contactSource = :contactSource', { contactSource });
+    }
+    if (callStatus) {
+      const statuses = callStatus.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length === 1) {
+        qb.andWhere('c.call_status = :callStatus', { callStatus: statuses[0] });
+      } else {
+        qb.andWhere('c.call_status IN (:...callStatuses)', { callStatuses: statuses });
+      }
     }
 
     const [data, total] = await qb

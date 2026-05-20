@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, BarChart2, Trophy, Briefcase, ListTodo } from 'lucide-react';
+import { User, Search, Wifi, WifiOff, LogOut, MessageSquare, Users, Bell, Trophy, Briefcase } from 'lucide-react';
 import { Commercial, Conversation, ViewMode } from '@/types/chat';
 import { getDueToday } from '@/lib/followUpApi';
 
@@ -139,20 +139,8 @@ export default function UserHeader({
                             <span className="text-[10px] mt-0.5 leading-none">Relances</span>
                         </button>
                     </div>
-                    {/* Ligne 2 : Objectifs · Rang · Métier */}
+                    {/* Ligne 2 : Rang · Métier */}
                     <div className="bg-green-700 bg-opacity-50 rounded-lg p-1 flex gap-1">
-                        <button
-                            onClick={() => handleViewChange('dashboard')}
-                            title="Tableau de bord"
-                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
-                                viewMode === 'dashboard' || viewMode === 'objectifs'
-                                    ? 'bg-white text-green-700 shadow-md font-medium'
-                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                            }`}
-                        >
-                            <BarChart2 className="w-4 h-4" />
-                            <span className="text-[10px] mt-0.5 leading-none">Dashboard</span>
-                        </button>
                         <button
                             onClick={() => handleViewChange('ranking')}
                             title="Classement"
@@ -176,18 +164,6 @@ export default function UserHeader({
                         >
                             <Briefcase className="w-4 h-4" />
                             <span className="text-[10px] mt-0.5 leading-none">Métier</span>
-                        </button>
-                        <button
-                            onClick={() => handleViewChange('action-queue')}
-                            title="Files d'action"
-                            className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-md transition-all ${
-                                viewMode === 'action-queue'
-                                    ? 'bg-white text-green-700 shadow-md font-medium'
-                                    : 'text-green-100 hover:bg-green-600 hover:bg-opacity-50'
-                            }`}
-                        >
-                            <ListTodo className="w-4 h-4" />
-                            <span className="text-[10px] mt-0.5 leading-none">Files</span>
                         </button>
                     </div>
                 </div>

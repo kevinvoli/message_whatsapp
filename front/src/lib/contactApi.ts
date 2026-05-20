@@ -69,6 +69,7 @@ export async function searchClients(params: {
   search?: string;
   my_portfolio?: boolean;
   client_category?: string;
+  call_status?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ data: ClientSummary[]; total: number }> {
@@ -77,6 +78,7 @@ export async function searchClients(params: {
   if (params.search)        query.set('search', params.search);
   if (params.my_portfolio)  query.set('my_portfolio', 'true');
   if (params.client_category) query.set('client_category', params.client_category);
+  if (params.call_status)   query.set('call_status', params.call_status);
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
   const r = await axios.get(`${apiBaseUrl}/clients?${query}`, { withCredentials: true });

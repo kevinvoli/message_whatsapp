@@ -4,16 +4,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { User, RefreshCw } from 'lucide-react';
 import { useContactStore } from '@/store/contactStore';
 import { searchClients, ClientSummary } from '@/lib/contactApi';
+import { CallStatus, getCallStatusColor, getCallStatusLabel } from '@/types/chat';
 
 interface ContactSidebarPanelProps {
   searchQuery: string;
 }
 
-type FilterKey = 'all' | 'my_portfolio';
+type FilterKey = 'called' | 'missed' | 'all';
 
 export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
   const { selectedContactDetail, selectContactByChatId } = useContactStore();
-  const [filter, setFilter] = useState<FilterKey>('all');
+  const [filter, setFilter] = useState<FilterKey>('called');
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,10 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
       const currentOffset = reset ? 0 : offset;
       const res = await searchClients({
         search: searchQuery.trim() || undefined,
-        my_portfolio: filter === 'my_portfolio',
+        my_portfolio: true,
+        call_status: filter === 'called' ? 'appelé,rappeler'
+                   : filter === 'missed' ? 'non_joignable'
+                   : undefined,
         limit: PAGE,
         offset: currentOffset,
       });
@@ -46,8 +50,9 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
   }, [searchQuery, filter]);
 
   const pills: { key: FilterKey; label: string }[] = [
-    { key: 'all',          label: 'Tous'        },
-    { key: 'my_portfolio', label: 'Mon portefeuille' },
+    { key: 'called', label: 'Appelés'  },
+    { key: 'missed', label: 'Absences' },
+    { key: 'all',    label: 'Tous'     },
   ];
 
   return (
@@ -73,6 +78,7 @@ export function ContactSidebarPanel({ searchQuery }: ContactSidebarPanelProps) {
           onClick={() => load(true)}
           className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 flex-shrink-0"
           title="Rafraîchir"
+          aria-label="Rafraîchir la liste"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -147,11 +153,26 @@ function ClientCard({ client, isSelected, onClick }: {
         </p>
         <p className="text-xs text-gray-400 truncate">{client.phone}</p>
       </div>
-      {client.next_follow_up && (
-        <span className="text-xs bg-orange-100 text-orange-600 rounded-full px-1.5 py-0.5 flex-shrink-0">
-          Relance
-        </span>
-      )}
+      <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+        {/* Catégorie client */}
+        {client.client_category && (
+          <span className="text-xs bg-blue-50 text-blue-700 rounded-full px-1.5 py-0.5 flex-shrink-0">
+            {client.client_category}
+          </span>
+        )}
+        {/* Statut d'appel */}
+        {client.call_status && (
+          <span className={`text-xs rounded-full px-1.5 py-0.5 flex-shrink-0 ${getCallStatusColor(client.call_status as CallStatus)}`}>
+            {getCallStatusLabel(client.call_status as CallStatus)}
+          </span>
+        )}
+        {/* Badge relance */}
+        {client.next_follow_up && (
+          <span className="text-xs bg-orange-100 text-orange-600 rounded-full px-1.5 py-0.5 flex-shrink-0">
+            Relance
+          </span>
+        )}
+      </div>
     </button>
   );
 }

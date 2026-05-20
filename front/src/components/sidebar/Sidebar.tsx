@@ -16,8 +16,6 @@ import { OutboundModal } from '@/components/conversation/OutboundModal';
 import BusinessMenusPanel from './BusinessMenusPanel';
 import PrioritePostePanel from './PrioritePostePanel';
 import ActionGateBanner from './ActionGateBanner';
-import ActionQueuePanel from './ActionQueuePanel';
-import DashboardPanel from './DashboardPanel';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -100,7 +98,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex-1">
               <ConversationFilters
                 conversations={allConversations ?? conversations}
-                totalUnread={totalUnread}
                 filterStatus={filterStatus}
                 setFilterStatus={setFilterStatus}
               />
@@ -129,10 +126,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         <RankingPositionWidget />
       ) : viewMode === 'menus-metier' ? (
         <BusinessMenusPanel />
-      ) : viewMode === 'action-queue' ? (
-        <ActionQueuePanel />
-      ) : viewMode === 'dashboard' ? (
-        <DashboardPanel />
       ) : (
         <FollowUpPanel onOpenConversation={handleOpenConversationById} />
       )}

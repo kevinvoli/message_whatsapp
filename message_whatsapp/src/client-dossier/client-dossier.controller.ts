@@ -32,6 +32,7 @@ export class ClientDossierController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('contact_source') contactSource?: string,
+    @Query('call_status') callStatus?: string,
   ) {
     const portfolio_owner_id = my_portfolio === 'true' ? req.user.userId : undefined;
     return this.service.searchClients(
@@ -41,6 +42,7 @@ export class ClientDossierController {
       limit ? Math.min(parseInt(limit, 10), 200) : 50,
       offset ? parseInt(offset, 10) : 0,
       contactSource,
+      callStatus,
     );
   }
 
@@ -112,6 +114,7 @@ export class ClientDossierController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('contact_source') contactSource?: string,
+    @Query('call_status') callStatus?: string,
   ) {
     return this.service.searchClients(
       search,
@@ -120,6 +123,7 @@ export class ClientDossierController {
       limit ? Math.min(parseInt(limit, 10), 200) : 50,
       offset ? parseInt(offset, 10) : 0,
       contactSource,
+      callStatus,
     );
   }
 

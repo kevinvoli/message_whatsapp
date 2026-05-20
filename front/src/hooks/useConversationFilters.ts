@@ -10,20 +10,15 @@ export function useConversationFilters(conversations: Conversation[]) {
 
   const filteredConversations = useMemo(() => {
     return conversations.filter((conv) => {
-      // En mode fenêtre glissante, les 10 conversations actives (non verrouillées) sont
-      // toujours visibles quel que soit le filtre. Elles disparaissent toutes ensemble
-      // lors de la rotation (window_slot → null), pas une par une à la soumission.
-      if (conv.window_slot != null && conv.is_locked !== true) {
-        return true;
-      }
-
       switch (filterStatus) {
-        case 'unread':  return conv.unreadCount > 0;
-        // "Nouveaux" = le commercial n'a jamais répondu (last_poste_message_at null).
-        case 'nouveau': return !conv.last_poste_message_at;
-        // "En attente" = agent hors-ligne, conversation attend la reconnexion
-        case 'attente': return conv.status === 'attente';
-        default:        return true;
+        case 'active':
+          return conv.window_slot != null && conv.is_locked !== true;
+        case 'rotation_calls':
+          return conv.window_slot != null
+            && conv.call_status != null
+            && conv.call_status !== 'à_appeler';
+        default: // 'all'
+          return true;
       }
     });
   }, [conversations, filterStatus]);
