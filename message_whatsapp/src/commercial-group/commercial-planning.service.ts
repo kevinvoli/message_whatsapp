@@ -4,7 +4,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, DataSource, Repository } from 'typeorm';
 import { CommercialPlanning } from './entities/commercial-planning.entity';
-import { CommercialPlanningAudit } from './entities/commercial-planning-audit.entity';
 import { GroupScheduleDay } from './entities/group-schedule-day.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { CreateAbsenceDto, CreateAbsenceRangeDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
@@ -14,8 +13,6 @@ export class CommercialPlanningService {
   constructor(
     @InjectRepository(CommercialPlanning)
     private readonly planningRepo: Repository<CommercialPlanning>,
-    @InjectRepository(CommercialPlanningAudit)
-    private readonly auditRepo: Repository<CommercialPlanningAudit>,
     @InjectRepository(GroupScheduleDay)
     private readonly scheduleDayRepo: Repository<GroupScheduleDay>,
     @InjectRepository(WhatsappCommercial)
@@ -27,17 +24,24 @@ export class CommercialPlanningService {
     action: 'created' | 'deleted',
     entry: Pick<CommercialPlanning, 'id' | 'commercialId' | 'type' | 'date' | 'reason' | 'declaredBy'>,
   ): Promise<void> {
-    const audit = this.auditRepo.create({
-      planningId:   action === 'created' ? entry.id : null,
-      action,
-      commercialId: entry.commercialId,
-      type:         entry.type,
-      date:         entry.date,
-      reason:       entry.reason ?? null,
-      declaredBy:   entry.declaredBy ?? null,
-      performedAt:  new Date(),
-    });
-    await this.auditRepo.save(audit);
+    try {
+      await this.dataSource.query(
+        `INSERT INTO commercial_planning_audit
+          (id, planning_id, action, commercial_id, type, date, reason, declared_by, performed_at)
+         VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          action === 'created' ? entry.id : null,
+          action,
+          entry.commercialId,
+          entry.type,
+          entry.date,
+          entry.reason ?? null,
+          entry.declaredBy ?? null,
+        ],
+      );
+    } catch {
+      // Silencieux : la table d'audit peut ne pas encore exister (migration en attente).
+    }
   }
 
   getTodayString(): string {
@@ -303,17 +307,28 @@ export class CommercialPlanningService {
     from?: string;
     to?: string;
     limit?: number;
-  }): Promise<CommercialPlanningAudit[]> {
-    const qb = this.auditRepo
-      .createQueryBuilder('a')
-      .orderBy('a.performedAt', 'DESC')
-      .take(filters.limit ?? 100);
+  }): Promise<Record<string, unknown>[]> {
+    try {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+      if (filters.commercialId) { conditions.push('commercial_id = ?'); params.push(filters.commercialId); }
+      if (filters.from) { conditions.push('date >= ?'); params.push(filters.from); }
+      if (filters.to)   { conditions.push('date <= ?'); params.push(filters.to); }
 
-    if (filters.commercialId) qb.andWhere('a.commercial_id = :cid', { cid: filters.commercialId });
-    if (filters.from) qb.andWhere('a.date >= :from', { from: filters.from });
-    if (filters.to)   qb.andWhere('a.date <= :to',   { to: filters.to });
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const limit = filters.limit ?? 100;
 
-    return qb.getMany();
+      return this.dataSource.query(
+        `SELECT id, planning_id AS planningId, action, commercial_id AS commercialId,
+                type, date, reason, declared_by AS declaredBy, performed_at AS performedAt
+         FROM commercial_planning_audit ${where}
+         ORDER BY performed_at DESC
+         LIMIT ${limit}`,
+        params,
+      ) as Promise<Record<string, unknown>[]>;
+    } catch {
+      return [];
+    }
   }
 
   async getAbsenceSummary(
