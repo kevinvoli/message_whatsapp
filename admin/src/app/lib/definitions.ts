@@ -1260,11 +1260,14 @@ export interface FollowUpTemplateMappingDto {
 // PLANNING — Gestion des imprévus
 // ============================================
 
+export type TimeSlot = 'full' | 'morning' | 'afternoon';
+
 export interface CommercialPlanningEntry {
   id: string;
   commercialId: string;
   commercial: { id: string; name: string; phone?: string };
   type: 'absence' | 'exceptional';
+  timeSlot: TimeSlot;
   date: string;
   linkedCommercialId?: string | null;
   linkedCommercial?: { id: string; name: string } | null;
@@ -1273,5 +1276,24 @@ export interface CommercialPlanningEntry {
   reason?: string | null;
   declaredBy?: string | null;
   createdAt: string;
+}
+
+export interface PlanningAuditEntry {
+  id: string;
+  planningId: string | null;
+  action: 'created' | 'deleted';
+  commercialId: string;
+  type: 'absence' | 'exceptional';
+  date: string;
+  reason: string | null;
+  declaredBy: string | null;
+  performedAt: string;
+}
+
+export interface AbsenceSummaryItem {
+  commercialId: string;
+  commercialName: string;
+  groupName: string | null;
+  totalDays: number;
 }
 

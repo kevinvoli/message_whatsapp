@@ -1,11 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CommercialGroupService } from './commercial-group.service';
 import { AdminGuard } from 'src/auth/admin.guard';
 import { AddMemberDto, CreateCommercialGroupDto, UpdateCommercialGroupDto } from './dto/commercial-group.dto';
 import { GenerateScheduleDto, ScheduleConfigDto } from './dto/schedule-config.dto';
 import { GroupScheduleService } from './group-schedule.service';
 import { CommercialPlanningService } from './commercial-planning.service';
-import { CreateAbsenceDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
+import { CreateAbsenceDto, CreateAbsenceRangeDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
 
 @Controller('commercial-groups')
 @UseGuards(AdminGuard)
@@ -54,6 +54,36 @@ export class CommercialGroupController {
   @Post('planning/replacement')
   createReplacement(@Body() body: CreateReplacementDto) {
     return this.planningService.createReplacement(body);
+  }
+
+  @Post('planning/absence-range')
+  createAbsenceRange(@Body() body: CreateAbsenceRangeDto) {
+    return this.planningService.createAbsenceRange(body);
+  }
+
+  @Get('planning/month/:year/:month')
+  getPlanningMonth(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+  ) {
+    return this.planningService.findByMonth(year, month);
+  }
+
+  @Get('planning/summary/:year/:month')
+  getAbsenceSummary(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+  ) {
+    return this.planningService.getAbsenceSummary(year, month);
+  }
+
+  @Get('planning/audit')
+  getAudit(
+    @Query('commercialId') commercialId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.planningService.getAudit({ commercialId, from, to });
   }
 
   @Delete('planning/:id')

@@ -8,15 +8,17 @@ import { GroupScheduleDay } from './entities/group-schedule-day.entity';
 import { GroupScheduleService } from './group-schedule.service';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { CommercialPlanning } from './entities/commercial-planning.entity';
+import { CommercialPlanningAudit } from './entities/commercial-planning-audit.entity';
 import { CommercialPlanningService } from './commercial-planning.service';
 import { CalendarRegenJob } from './jobs/calendar-regen.job';
+import { CommercialSelfPlanningController } from './commercial-self-planning.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CommercialGroup, WhatsappCommercial, GroupScheduleDay, CommercialPlanning]),
+    TypeOrmModule.forFeature([CommercialGroup, WhatsappCommercial, GroupScheduleDay, CommercialPlanning, CommercialPlanningAudit]),
     SystemConfigModule,
   ],
-  controllers: [CommercialGroupController],
+  controllers: [CommercialGroupController, CommercialSelfPlanningController],
   providers: [CommercialGroupService, GroupScheduleService, CommercialPlanningService, CalendarRegenJob],
   exports: [CommercialGroupService, GroupScheduleService, CommercialPlanningService],
 })

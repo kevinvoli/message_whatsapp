@@ -2,23 +2,43 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Between, DataSource, Repository } from 'typeorm';
 import { CommercialPlanning } from './entities/commercial-planning.entity';
+import { CommercialPlanningAudit } from './entities/commercial-planning-audit.entity';
 import { GroupScheduleDay } from './entities/group-schedule-day.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { CreateAbsenceDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
+import { CreateAbsenceDto, CreateAbsenceRangeDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
 
 @Injectable()
 export class CommercialPlanningService {
   constructor(
     @InjectRepository(CommercialPlanning)
     private readonly planningRepo: Repository<CommercialPlanning>,
+    @InjectRepository(CommercialPlanningAudit)
+    private readonly auditRepo: Repository<CommercialPlanningAudit>,
     @InjectRepository(GroupScheduleDay)
     private readonly scheduleDayRepo: Repository<GroupScheduleDay>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
     private readonly dataSource: DataSource,
   ) {}
+
+  private async writeAudit(
+    action: 'created' | 'deleted',
+    entry: Pick<CommercialPlanning, 'id' | 'commercialId' | 'type' | 'date' | 'reason' | 'declaredBy'>,
+  ): Promise<void> {
+    const audit = this.auditRepo.create({
+      planningId:   action === 'created' ? entry.id : null,
+      action,
+      commercialId: entry.commercialId,
+      type:         entry.type,
+      date:         entry.date,
+      reason:       entry.reason ?? null,
+      declaredBy:   entry.declaredBy ?? null,
+      performedAt:  new Date(),
+    });
+    await this.auditRepo.save(audit);
+  }
 
   getTodayString(): string {
     return new Intl.DateTimeFormat('fr-CA', {
@@ -99,15 +119,64 @@ export class CommercialPlanningService {
       date: dto.date,
       reason: dto.reason,
       declaredBy: dto.declaredBy,
+      timeSlot: dto.timeSlot ?? 'full',
     });
     const saved = await this.planningRepo.save(entry);
+    await this.writeAudit('created', saved);
 
-    // Effet immédiat si c'est pour aujourd'hui
     if (dto.date === this.getTodayString()) {
       await this.applyTodayEffect(dto.commercialId, 'force_absent');
     }
 
     return saved;
+  }
+
+  async createAbsenceRange(dto: CreateAbsenceRangeDto): Promise<{ created: number; skipped: number }> {
+    if (dto.dateStart > dto.dateEnd) {
+      throw new BadRequestException('dateStart doit être antérieure ou égale à dateEnd.');
+    }
+
+    const days = this.daysInRange(dto.dateStart, dto.dateEnd);
+    const today = this.getTodayString();
+    let created = 0;
+    let skipped = 0;
+
+    for (const date of days) {
+      const conflict = await this.planningRepo.findOne({
+        where: { commercialId: dto.commercialId, date },
+        select: ['id'],
+      });
+      if (conflict) { skipped++; continue; }
+
+      const entry = this.planningRepo.create({
+        commercialId: dto.commercialId,
+        type: 'absence',
+        date,
+        reason: dto.reason,
+        declaredBy: dto.declaredBy,
+        timeSlot: dto.timeSlot ?? 'full',
+      });
+      const saved = await this.planningRepo.save(entry);
+      await this.writeAudit('created', saved);
+      created++;
+
+      if (date === today) {
+        await this.applyTodayEffect(dto.commercialId, 'force_absent');
+      }
+    }
+
+    return { created, skipped };
+  }
+
+  private daysInRange(dateStart: string, dateEnd: string): string[] {
+    const days: string[] = [];
+    const cur = new Date(dateStart + 'T12:00:00Z');
+    const end = new Date(dateEnd + 'T12:00:00Z');
+    while (cur <= end) {
+      days.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return days;
   }
 
   async createExceptional(dto: CreateExceptionalDto): Promise<CommercialPlanning> {
@@ -171,7 +240,11 @@ export class CommercialPlanningService {
       return { absence, exceptional };
     });
 
-    // Effet immédiat si c'est pour aujourd'hui
+    await Promise.all([
+      this.writeAudit('created', result.absence),
+      this.writeAudit('created', result.exceptional),
+    ]);
+
     if (dto.date === this.getTodayString()) {
       await Promise.all([
         this.applyTodayEffect(dto.replacedId, 'force_absent'),
@@ -187,6 +260,17 @@ export class CommercialPlanningService {
       where: { date },
       relations: ['commercial', 'linkedCommercial', 'overridePoste'],
       order: { type: 'ASC', createdAt: 'ASC' },
+    });
+  }
+
+  async findByMonth(year: number, month: number): Promise<CommercialPlanning[]> {
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return this.planningRepo.find({
+      where: { date: Between(start, end) },
+      relations: ['commercial', 'linkedCommercial', 'overridePoste'],
+      order: { date: 'ASC', type: 'ASC' },
     });
   }
 
@@ -209,9 +293,51 @@ export class CommercialPlanningService {
     }
     await this.planningRepo.remove(entry);
 
-    // Restaurer isWorkingToday depuis le planning du groupe pour tous les commerciaux impactés
     if (isToday) {
       await Promise.all(affectedIds.map((cid) => this.applyTodayEffect(cid, 'restore')));
     }
+  }
+
+  async getAudit(filters: {
+    commercialId?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+  }): Promise<CommercialPlanningAudit[]> {
+    const qb = this.auditRepo
+      .createQueryBuilder('a')
+      .orderBy('a.performedAt', 'DESC')
+      .take(filters.limit ?? 100);
+
+    if (filters.commercialId) qb.andWhere('a.commercial_id = :cid', { cid: filters.commercialId });
+    if (filters.from) qb.andWhere('a.date >= :from', { from: filters.from });
+    if (filters.to)   qb.andWhere('a.date <= :to',   { to: filters.to });
+
+    return qb.getMany();
+  }
+
+  async getAbsenceSummary(
+    year: number,
+    month: number,
+  ): Promise<{ commercialId: string; commercialName: string; groupName: string | null; totalDays: number }[]> {
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const rows: { commercialId: string; commercialName: string; groupName: string | null; totalDays: number }[] =
+      await this.dataSource.query(
+        `SELECT cp.commercial_id AS commercialId,
+                c.name           AS commercialName,
+                g.name           AS groupName,
+                COUNT(*)         AS totalDays
+         FROM commercial_planning cp
+         JOIN whatsapp_commercial c ON c.id = cp.commercial_id
+         LEFT JOIN commercial_group g ON g.id = c.group_id
+         WHERE cp.type = 'absence' AND cp.date BETWEEN ? AND ?
+         GROUP BY cp.commercial_id, c.name, g.name
+         ORDER BY totalDays DESC`,
+        [start, end],
+      );
+    return rows.map((r) => ({ ...r, totalDays: Number(r.totalDays) }));
   }
 }

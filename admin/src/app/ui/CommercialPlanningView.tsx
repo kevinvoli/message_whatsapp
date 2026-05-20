@@ -8,11 +8,12 @@ import {
   getGroups,
   getPlanningByDate,
   createAbsence,
+  createAbsenceRange,
   createReplacement,
   deletePlanning,
   getCalendarHealth,
 } from '@/app/lib/api/commercial-groups.api';
-import { CommercialGroup, CommercialPresenceItem, CommercialPlanningEntry, CalendarHealthItem } from '@/app/lib/definitions';
+import { CommercialGroup, CommercialPresenceItem, CommercialPlanningEntry, CalendarHealthItem, TimeSlot } from '@/app/lib/definitions';
 
 function toDateString(d: Date): string {
   const y = d.getFullYear();
@@ -46,20 +47,31 @@ function getEffectivePoste(commercial: CommercialPresenceItem, planning: Commerc
 
 // ─── Formulaire absence inline ────────────────────────────────────────────────
 
+const TIME_SLOT_OPTIONS: { value: TimeSlot; label: string }[] = [
+  { value: 'full',      label: 'Journée entière' },
+  { value: 'morning',   label: 'Matin seulement' },
+  { value: 'afternoon', label: 'Après-midi seulement' },
+];
+
 function AbsenceForm({ commercial, date, onConfirm, onCancel }: {
   commercial: CommercialPresenceItem;
   date: string;
-  onConfirm: (reason: string) => Promise<void>;
+  onConfirm: (reason: string, dateEnd: string, timeSlot: TimeSlot) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason]     = useState('');
+  const [dateEnd, setDateEnd]   = useState(date);
+  const [timeSlot, setTimeSlot] = useState<TimeSlot>('full');
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+
+  const isRange = dateEnd > date;
 
   const handleSubmit = async () => {
+    if (dateEnd < date) { setError('La date de fin doit être ≥ à la date de début.'); return; }
     setSaving(true);
     setError(null);
-    try { await onConfirm(reason.trim()); }
+    try { await onConfirm(reason.trim(), dateEnd, timeSlot); }
     catch (err) { setError(err instanceof Error ? err.message : 'Erreur.'); }
     finally { setSaving(false); }
   };
@@ -67,20 +79,41 @@ function AbsenceForm({ commercial, date, onConfirm, onCancel }: {
   return (
     <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
       <p className="text-xs font-medium text-amber-800">
-        Déclarer {commercial.name} absent le {date}
+        Déclarer {commercial.name} absent
+        {isRange ? ` du ${date} au ${dateEnd}` : ` le ${date}`}
       </p>
-      <input
-        type="text"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        placeholder="Raison (optionnelle)"
-        className="w-full border border-amber-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
-      />
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1 min-w-[120px]">
+          <label className="block text-[10px] text-amber-700 mb-0.5">Date de fin</label>
+          <input
+            type="date" value={dateEnd} min={date}
+            onChange={(e) => setDateEnd(e.target.value)}
+            className="w-full border border-amber-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+          />
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <label className="block text-[10px] text-amber-700 mb-0.5">Créneau</label>
+          <select
+            value={timeSlot} onChange={(e) => setTimeSlot(e.target.value as TimeSlot)}
+            className="w-full border border-amber-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+          >
+            {TIME_SLOT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <label className="block text-[10px] text-amber-700 mb-0.5">Raison (optionnelle)</label>
+          <input
+            type="text" value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="ex : maladie, congé..."
+            className="w-full border border-amber-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+          />
+        </div>
+      </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button
-          onClick={() => void handleSubmit()}
-          disabled={saving}
+          onClick={() => void handleSubmit()} disabled={saving}
           className="px-3 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1"
         >
           {saving && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -206,8 +239,12 @@ function CommercialRow({ commercial, planning, groupName, date, onRefresh }: {
   const badge = getBadge(commercial, planning);
   const effectivePoste = getEffectivePoste(commercial, planning);
 
-  const handleDeclareAbsence = async (reason: string) => {
-    await createAbsence({ commercialId: commercial.id, date, reason: reason || undefined });
+  const handleDeclareAbsence = async (reason: string, dateEnd: string, timeSlot: TimeSlot) => {
+    if (dateEnd > date) {
+      await createAbsenceRange({ commercialId: commercial.id, dateStart: date, dateEnd, reason: reason || undefined, timeSlot });
+    } else {
+      await createAbsence({ commercialId: commercial.id, date, reason: reason || undefined });
+    }
     setShowAbsenceForm(false);
     onRefresh();
   };

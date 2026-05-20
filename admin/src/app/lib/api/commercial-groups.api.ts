@@ -1,11 +1,14 @@
 import {
   CommercialGroup,
   CommercialPlanningEntry,
+  PlanningAuditEntry,
+  AbsenceSummaryItem,
   ScheduleConfigDto,
   GenerateScheduleResult,
   GenerateAllResult,
   GroupScheduleDayItem,
   CalendarHealthItem,
+  TimeSlot,
 } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
@@ -169,6 +172,58 @@ export async function createReplacement(data: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  );
+}
+
+export async function createAbsenceRange(data: {
+  commercialId: string;
+  dateStart: string;
+  dateEnd: string;
+  reason?: string;
+  timeSlot?: TimeSlot;
+}): Promise<{ created: number; skipped: number }> {
+  return handleResponse<{ created: number; skipped: number }>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning/absence-range`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, type: 'absence' }),
+    }),
+  );
+}
+
+export async function getPlanningMonth(
+  year: number,
+  month: number,
+): Promise<CommercialPlanningEntry[]> {
+  return handleResponse<CommercialPlanningEntry[]>(
+    await fetch(
+      `${API_BASE_URL}/commercial-groups/planning/month/${year}/${month}`,
+      { credentials: 'include' },
+    ),
+  );
+}
+
+export async function getAbsenceSummary(year: number, month: number): Promise<AbsenceSummaryItem[]> {
+  return handleResponse<AbsenceSummaryItem[]>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning/summary/${year}/${month}`, {
+      credentials: 'include',
+    }),
+  );
+}
+
+export async function getPlanningAudit(params?: {
+  commercialId?: string;
+  from?: string;
+  to?: string;
+}): Promise<PlanningAuditEntry[]> {
+  const q = new URLSearchParams();
+  if (params?.commercialId) q.set('commercialId', params.commercialId);
+  if (params?.from) q.set('from', params.from);
+  if (params?.to) q.set('to', params.to);
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return handleResponse<PlanningAuditEntry[]>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning/audit${qs}`, { credentials: 'include' }),
   );
 }
 

@@ -23,6 +23,9 @@ export class CommercialPlanning {
   @Column({ type: 'enum', enum: ['absence', 'exceptional'] })
   type: 'absence' | 'exceptional';
 
+  @Column({ name: 'time_slot', type: 'enum', enum: ['full', 'morning', 'afternoon'], default: 'full' })
+  timeSlot: 'full' | 'morning' | 'afternoon';
+
   @Column({ type: 'date' })
   date: string;
 
