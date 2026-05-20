@@ -215,7 +215,7 @@ export class ChannelService implements OnModuleInit {
   }
 
   async findAll() {
-    return this.channelRepository.find({ relations: ['poste'] });
+    return this.channelRepository.find({ relations: ['poste', 'application'] });
   }
 
   async findOne(id: string) {

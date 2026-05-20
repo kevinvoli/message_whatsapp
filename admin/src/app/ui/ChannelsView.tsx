@@ -742,19 +742,31 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
               render: (channel) => <ProviderBadge provider={channel.provider} />,
             },
             {
+              header: 'Application',
+              render: (channel) => {
+                if (channel.application) {
+                  return (
+                    <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800" title={`App ID : ${channel.application.appId}`}>
+                      {channel.application.label}
+                    </span>
+                  );
+                }
+                if (channel.meta_app_id) {
+                  return (
+                    <span className="font-mono text-xs text-gray-400" title="Credentials directs (non lié à une application)">
+                      {channel.meta_app_id.substring(0, 8)}…
+                    </span>
+                  );
+                }
+                return <span className="text-xs text-gray-300 italic">—</span>;
+              },
+            },
+            {
               header: 'Identifiant',
               render: (channel) => {
                 const id = channel.external_id || channel.channel_id || '-';
                 return <span className="font-mono text-xs text-gray-700">{id}</span>;
               },
-            },
-            {
-              header: 'Token (Partiel)',
-              render: (channel) => (
-                <span className="text-gray-700">
-                  {channel.token ? `${channel.token.substring(0, 10)}...` : '-'}
-                </span>
-              ),
             },
             {
               header: 'Créé le',

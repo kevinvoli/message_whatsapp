@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Edit, PlusCircle, Trash2, RefreshCw, Info } from 'lucide-react';
+import { Edit, PlusCircle, Trash2, RefreshCw, Info, X, Globe } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
-import { MessagingApplication } from '@/app/lib/definitions';
+import { Channel, MessagingApplication } from '@/app/lib/definitions';
 import {
   createApplication,
   deleteApplication,
   getApplications,
+  getApplicationChannels,
   updateApplication,
 } from '@/app/lib/api/applications.api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
@@ -27,6 +28,12 @@ const PROVIDER_LABELS: Record<string, string> = {
   meta:      'WhatsApp (Meta)',
   messenger: 'Messenger',
   instagram: 'Instagram',
+};
+
+const PROVIDER_BADGE: Record<string, string> = {
+  meta:      'bg-emerald-100 text-emerald-800',
+  messenger: 'bg-blue-100 text-blue-800',
+  instagram: 'bg-purple-100 text-purple-800',
 };
 
 export default function ApplicationsView() {
@@ -54,6 +61,7 @@ export default function ApplicationsView() {
     void fetchData();
   }, [fetchData]);
 
+  // ── Formulaire ──────────────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentApp, setCurrentApp] = useState<MessagingApplication | null>(null);
@@ -63,6 +71,25 @@ export default function ApplicationsView() {
   const [formAppSecret, setFormAppSecret] = useState('');
   const [formSystemToken, setFormSystemToken] = useState('');
 
+  // ── Modal canaux liés ────────────────────────────────────────────────────────
+  const [channelsModal, setChannelsModal] = useState<{ app: MessagingApplication; channels: Channel[] } | null>(null);
+  const [channelsModalLoading, setChannelsModalLoading] = useState(false);
+
+  const openChannelsModal = async (app: MessagingApplication) => {
+    setChannelsModal({ app, channels: [] });
+    setChannelsModalLoading(true);
+    try {
+      const channels = await getApplicationChannels(app.id);
+      setChannelsModal({ app, channels });
+    } catch {
+      addToast({ type: 'error', message: 'Impossible de charger les canaux liés.' });
+      setChannelsModal(null);
+    } finally {
+      setChannelsModalLoading(false);
+    }
+  };
+
+  // ── Handlers CRUD ─────────────────────────────────────────────────────────
   const resetForm = () => {
     setFormLabel('');
     setFormProvider('meta');
@@ -71,11 +98,7 @@ export default function ApplicationsView() {
     setFormSystemToken('');
   };
 
-  const openAddModal = () => {
-    resetForm();
-    clearStatus();
-    setShowAddModal(true);
-  };
+  const openAddModal = () => { resetForm(); clearStatus(); setShowAddModal(true); };
 
   const openEditModal = (app: MessagingApplication) => {
     setCurrentApp(app);
@@ -188,7 +211,7 @@ export default function ApplicationsView() {
           type="password"
           id={`${idPrefix}-app-secret`}
           className={inputClass}
-          placeholder={isEdit ? '••••••••' : 'Clé secrète de l\'app Meta...'}
+          placeholder={isEdit ? '••••••••' : "Clé secrète de l'app Meta..."}
           value={formAppSecret}
           onChange={(e) => setFormAppSecret(e.target.value)}
           required={!isEdit}
@@ -196,7 +219,8 @@ export default function ApplicationsView() {
       </div>
       <div className="mb-4">
         <label htmlFor={`${idPrefix}-system-token`} className={labelClass}>
-          System User Token <span className="ml-1 font-normal text-gray-400 text-xs">(optionnel — token permanent Business Manager)</span>
+          System User Token
+          <span className="ml-1 font-normal text-gray-400 text-xs">(optionnel — token permanent Business Manager)</span>
         </label>
         <input
           type="password"
@@ -207,7 +231,7 @@ export default function ApplicationsView() {
           onChange={(e) => setFormSystemToken(e.target.value)}
         />
         <p className="mt-1 text-xs text-emerald-700 bg-emerald-50 rounded px-3 py-2">
-          Si renseigné, tous les canaux liés à cette application utiliseront ce token permanent (ne expire jamais).
+          Si renseigné, tous les canaux liés utiliseront ce token permanent (ne expire jamais).
         </p>
       </div>
     </>
@@ -243,7 +267,7 @@ export default function ApplicationsView() {
         <Info className="h-4 w-4 flex-shrink-0" />
         <span>
           Une application centralise les credentials Meta (App ID, App Secret, System User Token optionnel).
-          Lors de la création d&apos;un canal, vous pouvez sélectionner une application pour hériter de ses credentials.
+          Lors de la création d&apos;un canal, sélectionnez une application pour hériter de ses credentials automatiquement.
         </span>
       </div>
 
@@ -263,7 +287,7 @@ export default function ApplicationsView() {
             {
               header: 'Provider',
               render: (app) => (
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PROVIDER_BADGE[app.provider] ?? 'bg-gray-100 text-gray-700'}`}>
                   {PROVIDER_LABELS[app.provider] ?? app.provider}
                 </span>
               ),
@@ -276,11 +300,23 @@ export default function ApplicationsView() {
             },
             {
               header: 'Canaux liés',
-              render: (app) => (
-                <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                  {app.channelCount ?? 0} canal{(app.channelCount ?? 0) !== 1 ? 'x' : ''}
-                </span>
-              ),
+              render: (app) => {
+                const count = app.channelCount ?? 0;
+                if (count === 0) {
+                  return <span className="text-xs text-gray-400 italic">Aucun canal</span>;
+                }
+                return (
+                  <button
+                    type="button"
+                    onClick={() => void openChannelsModal(app)}
+                    className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800 hover:bg-violet-200 transition-colors"
+                    title="Voir les canaux liés"
+                  >
+                    <Globe className="h-3 w-3" />
+                    {count} canal{count !== 1 ? 'x' : ''}
+                  </button>
+                );
+              },
             },
             {
               header: 'Créé le',
@@ -314,6 +350,61 @@ export default function ApplicationsView() {
           ]}
         />
       </div>
+
+      {/* ── Modal canaux liés ─────────────────────────────────────────────── */}
+      {channelsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">
+                  Canaux liés à &laquo;{channelsModal.app.label}&raquo;
+                </h3>
+                <p className="mt-0.5 text-xs text-gray-500">App ID : {channelsModal.app.appId}</p>
+              </div>
+              <button
+                onClick={() => setChannelsModal(null)}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-96 overflow-y-auto px-6 py-4">
+              {channelsModalLoading ? (
+                <p className="py-6 text-center text-sm text-gray-400">Chargement…</p>
+              ) : channelsModal.channels.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-400">Aucun canal lié.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {channelsModal.channels.map((ch) => (
+                    <li key={ch.id} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {ch.label ?? <span className="italic text-gray-400">Sans nom</span>}
+                        </p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-500">
+                          {ch.external_id || ch.channel_id || ch.id}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PROVIDER_BADGE[ch.provider ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
+                        {PROVIDER_LABELS[ch.provider ?? ''] ?? ch.provider ?? '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="border-t border-gray-100 px-6 py-4 text-right">
+              <button
+                onClick={() => setChannelsModal(null)}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <EntityFormModal
         isOpen={showAddModal}
