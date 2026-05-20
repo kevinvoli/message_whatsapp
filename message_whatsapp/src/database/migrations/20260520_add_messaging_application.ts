@@ -5,6 +5,8 @@ export class AddMessagingApplication1779235200001 implements MigrationInterface 
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ─── messaging_applications ───────────────────────────────────────────────
+    // Note: DDL auto-commit en MySQL — ces étapes survivent à un ROLLBACK précédent.
+    // La table et la colonne peuvent donc déjà exister si une exécution précédente a échoué.
     if (!(await queryRunner.hasTable('messaging_applications'))) {
       await queryRunner.query(
         'CREATE TABLE `messaging_applications` (' +
@@ -28,31 +30,15 @@ export class AddMessagingApplication1779235200001 implements MigrationInterface 
       );
     }
 
-    // ─── FK whapi_channels → messaging_applications ───────────────────────────
-    const table = await queryRunner.getTable('whapi_channels');
-    const fkExists = table?.foreignKeys.some(
-      (fk) => fk.name === 'FK_whapi_channels_application_id',
-    );
-    if (!fkExists) {
-      await queryRunner.query(
-        'ALTER TABLE `whapi_channels` ADD CONSTRAINT `FK_whapi_channels_application_id` ' +
-          'FOREIGN KEY (`application_id`) REFERENCES `messaging_applications` (`id`) ' +
-          'ON DELETE SET NULL ON UPDATE CASCADE',
-      );
-    }
+    // Note: la FK est volontairement omise ici — un mismatch de collation MySQL
+    // entre whapi_channels (charset base de données) et messaging_applications
+    // provoque errno 150. L'intégrité est garantie au niveau applicatif
+    // (ApplicationService.remove() bloque la suppression si des canaux sont liés).
+    // La contrainte FK sera ajoutée dans une migration séparée après alignement
+    // des charsets en production.
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const table = await queryRunner.getTable('whapi_channels');
-    const fkExists = table?.foreignKeys.some(
-      (fk) => fk.name === 'FK_whapi_channels_application_id',
-    );
-    if (fkExists) {
-      await queryRunner.query(
-        'ALTER TABLE `whapi_channels` DROP FOREIGN KEY `FK_whapi_channels_application_id`',
-      );
-    }
-
     if (await queryRunner.hasColumn('whapi_channels', 'application_id')) {
       await queryRunner.query(
         'ALTER TABLE `whapi_channels` DROP COLUMN `application_id`',
