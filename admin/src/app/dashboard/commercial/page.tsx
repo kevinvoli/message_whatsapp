@@ -50,6 +50,7 @@ import PresenceView from '@/app/ui/PresenceView';
 import CommercialGroupsView from '@/app/ui/CommercialGroupsView';
 import MissedCallsView from '@/app/ui/MissedCallsView';
 import AppelsView from '@/app/modules/appels/components/AppelsView';
+import ApplicationsView from '@/app/ui/ApplicationsView';
 // ── Vues fusionnées avec onglets ──────────────────────────────────────────────
 import PlanningTabsView from '@/app/ui/PlanningTabsView';
 import DispatchTabsView from '@/app/ui/DispatchTabsView';
@@ -145,6 +146,8 @@ export default function AdminDashboard() {
                 return <RankingView />;
             case 'go_no_go':
                 return <GoNoGoView />;
+            case 'applications':
+                return <ApplicationsView />;
             case 'canaux':
                 return <ChannelsView />;
             case 'conversations':

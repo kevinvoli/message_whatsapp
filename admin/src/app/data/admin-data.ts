@@ -78,6 +78,7 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'Integrations & GICOP',
     icon: Link2,
     items: [
+      { id: 'applications', name: 'Applications Meta', icon: ShieldCheck, badge: null },
       { id: 'canaux', name: 'Canaux', icon: Globe, badge: null },
       { id: 'integration', name: 'Integration ERP', icon: Link2, badge: null },
       { id: 'outbound-webhooks', name: 'Webhooks sortants', icon: Webhook, badge: null },

@@ -3,9 +3,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Edit, PlusCircle, Trash2, RefreshCw, Info, Link, X } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
-import { Channel, Poste, ProviderType } from '@/app/lib/definitions';
+import { Channel, MessagingApplication, Poste, ProviderType } from '@/app/lib/definitions';
 import { assignChannelToPoste, createChannel, deleteChannel, getChannels, refreshChannelToken, updateChannel } from '@/app/lib/api/channels.api';
 import { getPostes } from '@/app/lib/api/postes.api';
+import { getApplications } from '@/app/lib/api/applications.api';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
@@ -27,6 +28,7 @@ type ChannelCreateInput = {
   meta_app_secret?: string;
   verify_token?: string;
   permanent_token?: boolean;
+  application_id?: string;
 };
 
 const PROVIDER_CONFIG: Record<ProviderType, { label: string; badgeClass: string }> = {
@@ -87,6 +89,7 @@ interface DynamicFieldsProps {
   metaAppSecret: string;
   verifyToken: string;
   idPrefix: string;
+  hideMetaCredentials?: boolean;
   onChannelId: (v: string) => void;
   onExternalId: (v: string) => void;
   onWabaId: (v: string) => void;
@@ -162,8 +165,9 @@ function VerifyTokenField({
   );
 }
 
-function DynamicFields({
+function DynamicFieldsWithApp({
   provider, channelId, externalId, wabaId, isBusiness, metaAppId, metaAppSecret, verifyToken, idPrefix,
+  hideMetaCredentials,
   onChannelId, onExternalId, onWabaId, onIsBusiness, onMetaAppId, onMetaAppSecret, onVerifyToken,
 }: DynamicFieldsProps) {
   const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
@@ -216,11 +220,15 @@ function DynamicFields({
             onChange={(e) => onExternalId(e.target.value)}
           />
         </div>
-        <MetaCredentialsFields
-          metaAppId={metaAppId} metaAppSecret={metaAppSecret}
-          idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
-        />
-        <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
+        {!hideMetaCredentials && (
+          <>
+            <MetaCredentialsFields
+              metaAppId={metaAppId} metaAppSecret={metaAppSecret}
+              idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
+            />
+            <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
+          </>
+        )}
         <div className="mb-4 flex items-center gap-2 rounded bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Le token sera échangé contre un token long-lived automatiquement.
@@ -261,11 +269,15 @@ function DynamicFields({
             required
           />
         </div>
-        <MetaCredentialsFields
-          metaAppId={metaAppId} metaAppSecret={metaAppSecret}
-          idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
-        />
-        <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
+        {!hideMetaCredentials && (
+          <>
+            <MetaCredentialsFields
+              metaAppId={metaAppId} metaAppSecret={metaAppSecret}
+              idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
+            />
+            <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
+          </>
+        )}
         <div className="mb-4 flex items-center gap-2 rounded bg-blue-50 px-3 py-2 text-xs text-blue-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Le token de page sera échangé contre un token long-lived automatiquement.
@@ -306,11 +318,15 @@ function DynamicFields({
             required
           />
         </div>
-        <MetaCredentialsFields
-          metaAppId={metaAppId} metaAppSecret={metaAppSecret}
-          idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
-        />
-        <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
+        {!hideMetaCredentials && (
+          <>
+            <MetaCredentialsFields
+              metaAppId={metaAppId} metaAppSecret={metaAppSecret}
+              idPrefix={idPrefix} onMetaAppId={onMetaAppId} onMetaAppSecret={onMetaAppSecret}
+            />
+            <VerifyTokenField verifyToken={verifyToken} idPrefix={idPrefix} onVerifyToken={onVerifyToken} />
+          </>
+        )}
         <div className="mb-4 flex items-center gap-2 rounded bg-orange-50 px-3 py-2 text-xs text-orange-700">
           <Info className="h-3 w-3 flex-shrink-0" />
           Instagram ne supporte pas l&apos;envoi d&apos;audio ni de documents. Le token sera échangé automatiquement.
@@ -373,6 +389,30 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [formMetaAppSecret, setFormMetaAppSecret] = useState('');
   const [formVerifyToken, setFormVerifyToken] = useState('');
   const [formPermanentToken, setFormPermanentToken] = useState(false);
+  const [formApplicationId, setFormApplicationId] = useState('');
+  const [applications, setApplications] = useState<MessagingApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+
+  const META_PROVIDERS: ProviderType[] = ['meta', 'messenger', 'instagram'];
+
+  const loadApplications = useCallback(async () => {
+    setApplicationsLoading(true);
+    try {
+      const data = await getApplications();
+      setApplications(data);
+    } catch {
+      // silently ignore — applications list is optional
+    } finally {
+      setApplicationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (META_PROVIDERS.includes(formProvider) && applications.length === 0 && !applicationsLoading) {
+      void loadApplications();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formProvider]);
 
   const buildPayload = (): ChannelCreateInput => {
     const base: ChannelCreateInput = {
@@ -380,7 +420,10 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       label: formLabel.trim() || undefined,
       provider: formProvider,
     };
-    const metaCredentials = {
+    if (formApplicationId) {
+      base.application_id = formApplicationId;
+    }
+    const metaCredentials = formApplicationId ? {} : {
       meta_app_id: formMetaAppId.trim() || undefined,
       meta_app_secret: formMetaAppSecret.trim() || undefined,
       verify_token: formVerifyToken.trim() || undefined,
@@ -419,6 +462,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormMetaAppSecret('');
     setFormVerifyToken('');
     setFormPermanentToken(false);
+    setFormApplicationId('');
   };
 
   const openAddModal = () => {
@@ -441,6 +485,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setFormMetaAppSecret(channel.meta_app_secret ?? '');
     setFormVerifyToken(channel.verify_token ?? '');
     setFormPermanentToken(isPermanentToken(channel.tokenExpiresAt));
+    setFormApplicationId(channel.application_id ?? '');
     clearStatus();
     setShowEditModal(true);
   };
@@ -565,7 +610,33 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
           <option value="telegram">Telegram</option>
         </select>
       </div>
-      <DynamicFields
+      {META_PROVIDERS.includes(formProvider) && (
+        <div className="mb-4">
+          <label htmlFor={`${idPrefix}-application`} className={labelClass}>
+            Application Meta <span className="ml-1 font-normal text-gray-400 text-xs">(optionnel — hérite des credentials de l&apos;application)</span>
+          </label>
+          <select
+            id={`${idPrefix}-application`}
+            className={inputClass}
+            value={formApplicationId}
+            onChange={(e) => setFormApplicationId(e.target.value)}
+            disabled={applicationsLoading}
+          >
+            <option value="">— Credentials directs (App ID / App Secret) —</option>
+            {applications.filter((a) => a.provider === formProvider || a.provider === 'meta').map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label} ({a.appId})
+              </option>
+            ))}
+          </select>
+          {formApplicationId && (
+            <p className="mt-1 text-xs text-emerald-700 bg-emerald-50 rounded px-3 py-2">
+              Les credentials seront hérités de l&apos;application sélectionnée. Les champs App ID / App Secret ci-dessous ne sont pas requis.
+            </p>
+          )}
+        </div>
+      )}
+      <DynamicFieldsWithApp
         provider={formProvider}
         channelId={formChannelId}
         externalId={formExternalId}
@@ -575,6 +646,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         metaAppSecret={formMetaAppSecret}
         verifyToken={formVerifyToken}
         idPrefix={idPrefix}
+        hideMetaCredentials={!!formApplicationId}
         onChannelId={setFormChannelId}
         onExternalId={setFormExternalId}
         onWabaId={setFormWabaId}

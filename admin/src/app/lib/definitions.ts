@@ -20,6 +20,18 @@ export type Commercial = {
   productivite: number;
 };
 
+// ─── Application Meta ────────────────────────────────────────────────────────
+
+export interface MessagingApplication {
+  id: string;
+  label: string;
+  provider: string;
+  appId: string;
+  channelCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ViewMode =
   | 'overview'
   | 'commerciaux'
@@ -85,7 +97,9 @@ export type ViewMode =
   // Menu Appels unifié (en absence + GICOP)
   | 'appels'
   // Appels en absence (rétro-compatibilité)
-  | 'missed-calls';
+  | 'missed-calls'
+  // Applications Meta
+  | 'applications';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -374,6 +388,8 @@ export type Channel = {
   no_read_only?: boolean;
   no_close?: boolean;
   max_messages_before_readonly?: number | null;
+  application_id?: string | null;
+  application?: MessagingApplication | null;
 };
 
 
