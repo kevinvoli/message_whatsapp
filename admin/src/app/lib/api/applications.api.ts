@@ -2,7 +2,7 @@ import { MessagingApplication } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 export async function getApplications(): Promise<MessagingApplication[]> {
-  const response = await fetch(`${API_BASE_URL}/application`, {
+  const response = await fetch(`${API_BASE_URL}/applications`, {
     method: 'GET',
     credentials: 'include',
   });
@@ -16,7 +16,7 @@ export async function createApplication(data: {
   appSecret: string;
   systemToken?: string;
 }): Promise<MessagingApplication> {
-  const response = await fetch(`${API_BASE_URL}/application`, {
+  const response = await fetch(`${API_BASE_URL}/applications`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -35,7 +35,7 @@ export async function updateApplication(
     systemToken: string;
   }>,
 ): Promise<MessagingApplication> {
-  const response = await fetch(`${API_BASE_URL}/application/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/applications/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -45,7 +45,7 @@ export async function updateApplication(
 }
 
 export async function deleteApplication(id: string): Promise<{ message: string }> {
-  const response = await fetch(`${API_BASE_URL}/application/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/applications/${id}`, {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -53,7 +53,7 @@ export async function deleteApplication(id: string): Promise<{ message: string }
 }
 
 export async function getApplicationChannels(id: string): Promise<import('../definitions').Channel[]> {
-  const response = await fetch(`${API_BASE_URL}/application/${id}/channels`, {
+  const response = await fetch(`${API_BASE_URL}/applications/${id}/channels`, {
     method: 'GET',
     credentials: 'include',
   });

@@ -51,9 +51,13 @@ export default function ApplicationsView() {
     });
 
   const fetchData = useCallback(async () => {
-    const data = await getApplications();
-    setItems(data);
-  }, [setItems]);
+    try {
+      const data = await getApplications();
+      setItems(data);
+    } catch {
+      addToast({ type: 'error', message: 'Impossible de charger les applications.' });
+    }
+  }, [setItems, addToast]);
 
   refreshRef.current = fetchData;
 
