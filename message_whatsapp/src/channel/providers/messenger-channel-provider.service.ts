@@ -3,7 +3,7 @@
  *
  * Extrait de `ChannelService.create()` branche `provider === 'messenger'`.
  */
-import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
 import { ApplicationService } from 'src/application/application.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { MetaTokenService } from '../meta-token.service';
@@ -34,6 +34,12 @@ export class MessengerChannelProviderService implements ChannelProviderStrategy,
     const channelId = dto.channel_id?.trim();
     if (!channelId) {
       throw new ConflictException('channel_id (page_id Facebook) requis pour provider=messenger');
+    }
+
+    if (!dto.application_id) {
+      throw new BadRequestException(
+        `application_id requis pour créer un canal ${this.provider}. Créez d'abord une application dans "Applications Meta".`,
+      );
     }
 
     const externalId = dto.external_id?.trim() || channelId;

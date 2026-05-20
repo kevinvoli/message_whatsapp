@@ -36,6 +36,7 @@ import { json } from 'stream/consumers';
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 import { WhatsappTemplateStatus } from 'src/whatsapp_template/entities/whatsapp_template.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { resolveChannelCredentials } from 'src/channel/helpers/resolve-channel-credentials.helper';
 
 // Les webhooks reçoivent un volume légitime élevé — exemptés du throttler global
 @SkipThrottle()
@@ -267,7 +268,8 @@ export class WhapiController {
     // HMAC validé sur le payload complet (signature couvre tout le body)
     // Résolution tenant basée sur entry[0] (tous les entries partagent le même compte)
     const channelRecord = await this.channelService.findChannelByExternalId('messenger', pageId);
-    this.assertMessengerSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+    const messengerCreds = channelRecord ? resolveChannelCredentials(channelRecord) : null;
+    this.assertMessengerSignature(headers, request.rawBody, payload, messengerCreds?.appSecret ?? null);
 
     const tenantId = await this.resolveTenantOrReject('messenger', pageId);
 
@@ -477,7 +479,8 @@ export class WhapiController {
 
     // Résoudre le canal par external_id (= IG account ID envoyé dans entry[0].id)
     const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
-    this.assertInstagramSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+    const instagramCreds = channelRecord ? resolveChannelCredentials(channelRecord) : null;
+    this.assertInstagramSignature(headers, request.rawBody, payload, instagramCreds?.appSecret ?? null);
 
     const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
     const channelId = channelRecord?.channel_id ?? igAccountId;
@@ -595,9 +598,10 @@ export class WhapiController {
 
     // Résoudre le canal pour obtenir son meta_app_secret, puis valider la signature
     const channel = phoneNumberId
-      ? await this.channelService.findByChannelId(phoneNumberId)
+      ? await this.channelService.findByChannelIdForWebhook(phoneNumberId)
       : null;
-    this.assertMetaSignature(headers, request.rawBody, payload, channel?.meta_app_secret);
+    const metaCreds = channel ? resolveChannelCredentials(channel) : null;
+    this.assertMetaSignature(headers, request.rawBody, payload, metaCreds?.appSecret ?? null);
 
     const tenantId = await this.resolveTenantForMeta(wabaId, phoneNumberId);
     const auditEventKey = this.buildAuditEventKey('meta', metaPayload);

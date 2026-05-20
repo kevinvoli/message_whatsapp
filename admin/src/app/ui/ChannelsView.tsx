@@ -401,11 +401,11 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       const data = await getApplications();
       setApplications(data);
     } catch {
-      // silently ignore — applications list is optional
+      addToast({ type: 'error', message: 'Impossible de charger les applications Meta.' });
     } finally {
       setApplicationsLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     if (META_PROVIDERS.includes(formProvider) && applications.length === 0 && !applicationsLoading) {
@@ -578,7 +578,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const inputClass = 'w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none';
   const labelClass = 'mb-2 block text-sm font-bold text-gray-700';
 
-  const sharedFormFields = (idPrefix: string) => (
+  const sharedFormFields = (idPrefix: string, isEdit = false) => (
     <>
       <div className="mb-4">
         <label htmlFor={`${idPrefix}-label`} className={labelClass}>
@@ -613,25 +613,35 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
       {META_PROVIDERS.includes(formProvider) && (
         <div className="mb-4">
           <label htmlFor={`${idPrefix}-application`} className={labelClass}>
-            Application Meta <span className="ml-1 font-normal text-gray-400 text-xs">(optionnel — hérite des credentials de l&apos;application)</span>
+            Application Meta{' '}
+            {!isEdit && <span className="text-red-500">*</span>}
+            {isEdit && <span className="ml-1 font-normal text-gray-400 text-xs">(optionnel — laisser vide pour conserver les credentials actuels)</span>}
           </label>
-          <select
-            id={`${idPrefix}-application`}
-            className={inputClass}
-            value={formApplicationId}
-            onChange={(e) => setFormApplicationId(e.target.value)}
-            disabled={applicationsLoading}
-          >
-            <option value="">— Credentials directs (App ID / App Secret) —</option>
-            {applications.filter((a) => a.provider === formProvider || a.provider === 'meta').map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label} ({a.appId})
-              </option>
-            ))}
-          </select>
+          {applications.length === 0 && !applicationsLoading && !isEdit ? (
+            <div className="rounded border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
+              Aucune application disponible.{' '}
+              <span className="font-semibold">Créez d&apos;abord une application dans &quot;Applications Meta&quot; avant d&apos;ajouter un canal.</span>
+            </div>
+          ) : (
+            <select
+              id={`${idPrefix}-application`}
+              className={inputClass}
+              value={formApplicationId}
+              onChange={(e) => setFormApplicationId(e.target.value)}
+              disabled={applicationsLoading}
+              required={!isEdit}
+            >
+              {isEdit && <option value="">— Conserver les credentials actuels —</option>}
+              {applications.filter((a) => a.provider === formProvider || a.provider === 'meta').map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label} ({a.appId})
+                </option>
+              ))}
+            </select>
+          )}
           {formApplicationId && (
             <p className="mt-1 text-xs text-emerald-700 bg-emerald-50 rounded px-3 py-2">
-              Les credentials seront hérités de l&apos;application sélectionnée. Les champs App ID / App Secret ci-dessous ne sont pas requis.
+              Les credentials seront hérités de l&apos;application sélectionnée.
             </p>
           )}
         </div>
@@ -886,7 +896,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
         submitLabel="Sauvegarder"
         loadingLabel="Enregistrement..."
       >
-        {sharedFormFields('edit')}
+        {sharedFormFields('edit', true)}
       </EntityFormModal>
 
       {/* ── Modal assignation poste ── */}

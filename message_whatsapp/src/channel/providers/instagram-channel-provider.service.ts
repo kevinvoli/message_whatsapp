@@ -5,7 +5,7 @@
  * Identique à Messenger sur la logique token (long-lived + PAT),
  * mais sans page_id et avec les constantes instagram-graph-api.
  */
-import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
 import { ApplicationService } from 'src/application/application.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { MetaTokenService } from '../meta-token.service';
@@ -37,6 +37,12 @@ export class InstagramChannelProviderService implements ChannelProviderStrategy,
     if (!channelId) {
       throw new ConflictException(
         'channel_id (instagram_business_account_id) requis pour provider=instagram',
+      );
+    }
+
+    if (!dto.application_id) {
+      throw new BadRequestException(
+        `application_id requis pour créer un canal ${this.provider}. Créez d'abord une application dans "Applications Meta".`,
       );
     }
 

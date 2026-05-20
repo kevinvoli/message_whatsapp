@@ -82,8 +82,8 @@ export class ChannelService implements OnModuleInit {
     try {
       const unsecured = await this.channelRepository.find({
         where: [
-          { provider: 'messenger', meta_app_secret: IsNull() },
-          { provider: 'meta', meta_app_secret: IsNull() },
+          { provider: 'messenger', meta_app_secret: IsNull(), application_id: IsNull() },
+          { provider: 'meta', meta_app_secret: IsNull(), application_id: IsNull() },
         ],
         select: ['channel_id', 'provider', 'external_id'],
       });
@@ -280,11 +280,24 @@ export class ChannelService implements OnModuleInit {
   }
 
   /**
+   * Recherche un canal par channel_id sans cache, en chargeant la relation application.
+   * Utilisé par les webhooks pour appeler resolveChannelCredentials() (le cache existant
+   * ne contient pas les relations).
+   */
+  async findByChannelIdForWebhook(channel_id: string): Promise<WhapiChannel | null> {
+    return this.channelRepository.findOne({
+      where: { channel_id },
+      relations: ['application'],
+    });
+  }
+
+  /**
    * Recherche un canal par son external_id (Page ID Facebook, Instagram account ID…).
    */
   async findChannelByExternalId(provider: string, externalId: string): Promise<WhapiChannel | null> {
     return this.channelRepository.findOne({
       where: { provider, external_id: externalId },
+      relations: ['application'],
     });
   }
 
