@@ -5,6 +5,7 @@ import { MetaTokenService } from './meta-token.service';
 import { ChannelProviderRegistry } from './domain/channel-provider.registry';
 import { ChannelPersistenceHelper } from './infrastructure/channel-persistence.helper';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MessagingApplication } from 'src/application/entities/messaging-application.entity';
 import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
@@ -39,7 +40,7 @@ import { RedisModule } from 'src/redis/redis.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste]),
+    TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste, MessagingApplication]),
     LoggingModule,
     JorbsModule,
     WhatsappChatModule,
