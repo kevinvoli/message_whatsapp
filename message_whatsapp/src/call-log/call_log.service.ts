@@ -47,11 +47,24 @@ export class CallLogService {
   }
 
   findMissedByCommercial(commercial_id: string, limit = 30): Promise<CallLog[]> {
+    // BUG-6 : déduplication par numéro — n'affiche qu'une entrée par client_phone
+    // (le plus récent), plus les entrées sans numéro.
     return this.repo
       .createQueryBuilder('cl')
       .where('cl.commercial_id = :cid', { cid: commercial_id })
       .andWhere('cl.outcome = :outcome', { outcome: CallOutcome.PasDeRéponse })
       .andWhere('cl.treated = 0')
+      .andWhere(
+        '(cl.client_phone IS NULL OR cl.id = (' +
+          'SELECT cl2.id FROM call_log cl2 ' +
+          'WHERE cl2.commercial_id = cl.commercial_id ' +
+          'AND cl2.client_phone = cl.client_phone ' +
+          'AND cl2.treated = 0 ' +
+          'AND cl2.outcome = :outcome2 ' +
+          'ORDER BY cl2.called_at DESC, cl2.id ASC LIMIT 1' +
+        '))',
+        { outcome2: CallOutcome.PasDeRéponse },
+      )
       .orderBy('cl.called_at', 'DESC')
       .take(limit)
       .getMany();
@@ -66,39 +79,29 @@ export class CallLogService {
 
     const phone = log.client_phone?.trim() || null;
 
-    // Marque tous les appels non traités du même numéro pour éviter les réapparitions
+    // BUG-4 : utiliser repo.manager.createQueryBuilder() pour les UPDATE (évite les
+    // conflits de contexte SelectQueryBuilder→UpdateQueryBuilder sur TypeORM 0.3.x)
     if (phone) {
-      await this.repo
-        .createQueryBuilder()
-        .update(CallLog)
-        .set({ treated: true })
-        .where(
-          'commercial_id = :cid AND client_phone = :phone AND treated = 0 AND outcome = :outcome',
-          { cid: commercial_id, phone, outcome: CallOutcome.PasDeRéponse },
-        )
-        .execute();
+      await this.repo.manager.query(
+        'UPDATE call_log SET treated = 1 ' +
+        'WHERE commercial_id = ? AND client_phone = ? AND treated = 0 AND outcome = ?',
+        [commercial_id, phone, CallOutcome.PasDeRéponse],
+      );
     } else {
-      await this.repo
-        .createQueryBuilder()
-        .update(CallLog)
-        .set({ treated: true })
-        .where('id = :id AND treated = 0', { id })
-        .execute();
+      await this.repo.manager.query(
+        'UPDATE call_log SET treated = 1 WHERE id = ? AND treated = 0',
+        [id],
+      );
     }
 
     return { ok: true };
   }
 
   async treatAllMine(commercial_id: string): Promise<{ treated: number }> {
-    const result = await this.repo
-      .createQueryBuilder()
-      .update(CallLog)
-      .set({ treated: true })
-      .where('commercial_id = :cid AND treated = 0 AND outcome = :outcome', {
-        cid: commercial_id,
-        outcome: CallOutcome.PasDeRéponse,
-      })
-      .execute();
-    return { treated: result.affected ?? 0 };
+    const result: { affectedRows: number } = await this.repo.manager.query(
+      'UPDATE call_log SET treated = 1 WHERE commercial_id = ? AND treated = 0 AND outcome = ?',
+      [commercial_id, CallOutcome.PasDeRéponse],
+    );
+    return { treated: result?.affectedRows ?? 0 };
   }
 }

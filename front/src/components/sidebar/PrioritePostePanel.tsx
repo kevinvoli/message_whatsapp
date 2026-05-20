@@ -82,7 +82,7 @@ export default function PrioritePostePanel() {
         method: 'PATCH',
         credentials: 'include',
       });
-      if (res.ok) setMissedCalls((prev) => prev.filter((c) => c.id !== callId));
+      if (res.ok) await load(); // recharge depuis DB pour refléter le bulk-treat
     } catch { /* silencieux */ }
     finally { setTreating((prev) => { const n = { ...prev }; delete n[callId]; return n; }); }
   };
