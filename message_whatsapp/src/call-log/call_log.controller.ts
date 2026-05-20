@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   Patch,
+  Post,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -61,5 +62,13 @@ export class CallLogController {
   @UseGuards(AuthGuard('jwt'))
   treat(@Param('id') id: string, @Request() req: { user: JwtUser }) {
     return this.callLogService.markTreated(id, req.user.userId);
+  }
+
+  /** POST /call-logs/mine/treat-all — marque TOUS les appels en absence du commercial comme traités */
+  @Post('call-logs/mine/treat-all')
+  @HttpCode(200)
+  @UseGuards(AuthGuard('jwt'))
+  treatAll(@Request() req: { user: JwtUser }) {
+    return this.callLogService.treatAllMine(req.user.userId);
   }
 }

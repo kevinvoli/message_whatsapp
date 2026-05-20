@@ -31,6 +31,7 @@ export default function PrioritePostePanel() {
   const [showMissed, setShowMissed]       = useState(true);
   const [showPriority, setShowPriority]   = useState(true);
   const [treating, setTreating]           = useState<Record<string, boolean>>({});
+  const [treatingAll, setTreatingAll]     = useState(false);
 
   const selectConversation  = useChatStore((s) => s.selectConversation);
   const conversations       = useChatStore((s) => s.conversations);
@@ -61,6 +62,18 @@ export default function PrioritePostePanel() {
     const id = setInterval(() => void load(), 2 * 60 * 1000);
     return () => clearInterval(id);
   }, [load]);
+
+  const handleTreatAll = async () => {
+    setTreatingAll(true);
+    try {
+      const res = await fetch(`${API_URL}/call-logs/mine/treat-all`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) setMissedCalls([]);
+    } catch { /* silencieux */ }
+    finally { setTreatingAll(false); }
+  };
 
   const handleTreat = async (callId: string) => {
     setTreating((prev) => ({ ...prev, [callId]: true }));
@@ -128,16 +141,27 @@ export default function PrioritePostePanel() {
       {/* Appels en absence */}
       {missedCalls.length > 0 && (
         <div>
-          <button
-            onClick={() => setShowMissed((v) => !v)}
-            className="w-full flex items-center justify-between px-3 py-1 bg-orange-100 text-xs text-orange-700 font-medium"
-          >
-            <span className="flex items-center gap-1">
-              <Phone className="w-3 h-3" />
-              Appels en absence ({missedCalls.length})
-            </span>
-            {showMissed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
+          <div className="flex items-center bg-orange-100">
+            <button
+              onClick={() => setShowMissed((v) => !v)}
+              className="flex-1 flex items-center justify-between px-3 py-1 text-xs text-orange-700 font-medium"
+            >
+              <span className="flex items-center gap-1">
+                <Phone className="w-3 h-3" />
+                Appels en absence ({missedCalls.length})
+              </span>
+              {showMissed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+            <button
+              onClick={() => void handleTreatAll()}
+              disabled={treatingAll}
+              className="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium text-orange-700 hover:bg-orange-200 transition-colors border-l border-orange-200 disabled:opacity-50"
+              title="Tout marquer comme traité"
+            >
+              <Check className="w-3 h-3" />
+              Tout
+            </button>
+          </div>
           {showMissed && (
             <div className="divide-y divide-orange-100 max-h-36 overflow-y-auto">
               {missedCalls.map((call) => (
