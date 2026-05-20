@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -10,7 +11,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       useFactory: (configService: ConfigService) => {
         const isDev = configService.get('NODE_ENV') !== 'production';
         const forceSync = configService.get('TYPEORM_SYNCHRONIZE') === 'true';
-        
+
         return {
           type: 'mysql' as const,
           host: configService.get<string>('MYSQL_HOST'),
@@ -32,6 +33,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           retryAttempts: 3,
           retryDelay: 1000,
           synchronize: isDev && forceSync,
+          migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+          migrationsRun: true,
         };
       },
     }),

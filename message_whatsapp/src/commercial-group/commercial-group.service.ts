@@ -18,7 +18,10 @@ export class CommercialGroupService {
   ) {}
 
   async findAll(): Promise<CommercialGroup[]> {
-    return this.groupRepo.find({ order: { name: 'ASC' } });
+    return this.groupRepo.find({
+      relations: ['commercials', 'commercials.poste'],
+      order: { name: 'ASC' },
+    });
   }
 
   async findOne(id: string): Promise<CommercialGroup> {
