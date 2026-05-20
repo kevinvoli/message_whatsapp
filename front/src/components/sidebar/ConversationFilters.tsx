@@ -1,5 +1,6 @@
 import { Conversation } from '@/types/chat';
 import React, { useMemo } from 'react';
+import { useChatStore } from '@/store/chatStore';
 
 interface ConversationFiltersProps {
     conversations: Conversation[];
@@ -8,14 +9,15 @@ interface ConversationFiltersProps {
 }
 
 export default function ConversationFilters({ conversations, filterStatus, setFilterStatus }: ConversationFiltersProps) {
+    const obligationStatus = useChatStore((s) => s.obligationStatus);
 
-    const counts = useMemo(() => ({
-        all:            conversations.length,
-        active:         conversations.filter((c) => c.window_slot != null && c.is_locked !== true).length,
-        rotation_calls: conversations.filter(
-            (c) => c.window_slot != null && c.call_status != null && c.call_status !== 'à_appeler'
-        ).length,
-    }), [conversations]);
+    const counts = useMemo(() => {
+        return {
+            all:    conversations.length,
+            active: conversations.filter((c) => c.window_slot != null && c.is_locked !== true).length,
+            rotation_calls: obligationStatus?.calledPhones?.length ?? 0,
+        };
+    }, [conversations, obligationStatus]);
 
     const btn = (key: string, label: string, count?: number) => (
         <button

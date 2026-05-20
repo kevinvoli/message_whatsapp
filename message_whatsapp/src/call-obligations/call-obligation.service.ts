@@ -43,6 +43,7 @@ export interface ObligationStatus {
   readyForRotation: boolean;
   reportsRequired: number;
   reportsSubmitted: number;
+  calledPhones: string[];
 }
 
 @Injectable()
@@ -314,6 +315,14 @@ export class CallObligationService {
       this.logger.log('CALL_OBLIGATION_READY_FOR_ROTATION posteId=' + posteId + ' batchId=' + batch.id + ' batchNumber=' + batch.batchNumber);
     }
 
+    const doneTasks = await this.taskRepo.find({
+      where: { batchId: batch.id, status: CallTaskStatus.DONE },
+      select: ['clientPhone'],
+    });
+    const calledPhones = doneTasks
+      .map(t => t.clientPhone)
+      .filter((p): p is string => !!p);
+
     return {
       batchId: batch.id,
       batchNumber: batch.batchNumber,
@@ -325,6 +334,7 @@ export class CallObligationService {
       readyForRotation,
       reportsRequired,
       reportsSubmitted,
+      calledPhones,
     };
   }
 

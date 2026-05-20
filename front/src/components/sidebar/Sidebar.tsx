@@ -16,6 +16,7 @@ import { OutboundModal } from '@/components/conversation/OutboundModal';
 import BusinessMenusPanel from './BusinessMenusPanel';
 import PrioritePostePanel from './PrioritePostePanel';
 import ActionGateBanner from './ActionGateBanner';
+import RotationCallsPanel from './RotationCallsPanel';
 
 interface SidebarProps {
   commercial: Commercial;
@@ -110,13 +111,20 @@ const Sidebar: React.FC<SidebarProps> = ({
               <Plus className="w-4 h-4" />
             </button>
           </div>
-          <ConversationList
-            filteredConversations={conversations}
-            filterStatus={filterStatus}
-            selectedConversation={selectedConversation}
-            onSelectConversation={onSelectConversation}
-            selectedConv={''}
-          />
+          {filterStatus === 'rotation_calls' ? (
+            <RotationCallsPanel
+              selectedConversation={selectedConversation}
+              onSelectConversation={onSelectConversation}
+            />
+          ) : (
+            <ConversationList
+              filteredConversations={conversations}
+              filterStatus={filterStatus}
+              selectedConversation={selectedConversation}
+              onSelectConversation={onSelectConversation}
+              selectedConv={''}
+            />
+          )}
         </>
       ) : viewMode === 'contacts' ? (
         <ContactSidebarPanel searchQuery={searchQuery ?? ''} />
