@@ -167,7 +167,7 @@ resolveChannelCredentials()
 
 ### US-2.4 — Service et Controller `Application`
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** M (2 h)  
 **Dépend de :** US-2.3
 
@@ -519,7 +519,7 @@ resubscribeWhatsappWebhook()
 
 ### US-5.1 — Masquage des champs sensibles dans les réponses API
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** S (1 h)  
 **Dépend de :** US-2.4
 
@@ -542,7 +542,7 @@ resubscribeWhatsappWebhook()
 
 ### US-5.2 — Protection contre la suppression en cascade involontaire
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** S (30 min)  
 **Dépend de :** US-2.4
 

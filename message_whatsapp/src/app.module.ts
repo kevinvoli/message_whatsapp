@@ -90,6 +90,7 @@ import { BullBoardSetupModule } from './queue/bull-board.module';
 import { ErpClientSyncModule } from './erp-client-sync/erp-client-sync.module';
 import { CommercialGroupModule } from './commercial-group/commercial-group.module';
 import { MissedCallModule } from './missed-calls/missed-call.module';
+import { ApplicationModule } from './application/application.module';
 
 @Module({
   imports: [
@@ -270,6 +271,8 @@ import { MissedCallModule } from './missed-calls/missed-call.module';
     CommercialGroupModule,
     // Appels en absence — détection + tâches de rappel automatiques
     MissedCallModule,
+    // Applications Meta (gestion credentials partagés entre canaux)
+    ApplicationModule,
     // Bull Board UI — activé seulement si BULL_BOARD_ENABLED=true
     ...(process.env.BULL_BOARD_ENABLED === 'true' ? [BullBoardSetupModule] : []),
   ],
