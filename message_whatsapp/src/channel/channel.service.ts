@@ -215,7 +215,56 @@ export class ChannelService implements OnModuleInit {
   }
 
   async findAll() {
-    return this.channelRepository.find({ relations: ['poste', 'application'] });
+    const channels = await this.channelRepository.find({ relations: ['poste'] });
+
+    // Charge les applications liées via requête séparée pour éviter
+    // ER_CANT_AGGREGATE_2COLLATIONS entre whapi_channels.application_id (general_ci)
+    // et messaging_applications.id (unicode_ci). Corrigé définitivement par
+    // FixApplicationIdCollation1779408000002 — ce code restera inoffensif après.
+    const appIds = [
+      ...new Set(
+        channels
+          .filter((c) => c.application_id)
+          .map((c) => c.application_id as string),
+      ),
+    ];
+
+    if (appIds.length > 0) {
+      const placeholders = appIds.map(() => '?').join(',');
+      const appRows: Array<{
+        id: string;
+        label: string;
+        provider: string;
+        app_id: string;
+        created_at: Date;
+        updated_at: Date;
+      }> = await this.channelRepository.manager.query(
+        `SELECT id, label, provider, app_id, created_at, updated_at
+         FROM messaging_applications
+         WHERE id IN (${placeholders})`,
+        appIds,
+      );
+      const appMap = new Map(
+        appRows.map((a) => [
+          a.id,
+          {
+            id: a.id,
+            label: a.label,
+            provider: a.provider,
+            appId: a.app_id,
+            createdAt: a.created_at,
+            updatedAt: a.updated_at,
+          },
+        ]),
+      );
+      for (const ch of channels) {
+        if (ch.application_id) {
+          (ch as any).application = appMap.get(ch.application_id) ?? null;
+        }
+      }
+    }
+
+    return channels;
   }
 
   async findOne(id: string) {

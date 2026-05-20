@@ -34,12 +34,25 @@ export class ApplicationService {
   async findAll(): Promise<ApplicationResponseDto[]> {
     const rows = await this.repo
       .createQueryBuilder('app')
-      .loadRelationCountAndMap('app.channelCount', 'app.channels')
       .orderBy('app.createdAt', 'DESC')
       .getMany();
 
+    // Compte les canaux par application sans JOIN inter-tables pour éviter
+    // ER_CANT_AGGREGATE_2COLLATIONS (general_ci vs unicode_ci sur application_id).
+    // On groupe directement dans whapi_channels puis on mappe en mémoire.
+    const countRows: Array<{ application_id: string; cnt: string }> =
+      await this.repo.manager.query(
+        `SELECT application_id, COUNT(*) AS cnt
+         FROM whapi_channels
+         WHERE application_id IS NOT NULL
+         GROUP BY application_id`,
+      );
+    const countMap = new Map(
+      countRows.map((r) => [r.application_id, parseInt(r.cnt, 10)]),
+    );
+
     return rows.map((app) =>
-      ApplicationResponseDto.from(app, (app as any).channelCount ?? 0),
+      ApplicationResponseDto.from(app, countMap.get(app.id) ?? 0),
     );
   }
 
