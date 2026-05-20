@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Or, Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
+import { resolveChannelCredentials } from './helpers/resolve-channel-credentials.helper';
 import { WhapiChannel } from './entities/channel.entity';
 import { AppLogger } from 'src/logging/app-logger.service';
 
@@ -126,7 +127,10 @@ export class MetaTokenService {
    * Déclenche aussi la re-souscription webhook pour éviter la déconnexion silencieuse.
    */
   async refreshChannelToken(channelId: string): Promise<WhapiChannel> {
-    const channel = await this.channelRepo.findOne({ where: { id: channelId } });
+    const channel = await this.channelRepo.findOne({
+      where: { id: channelId },
+      relations: ['application'],
+    });
 
     if (!channel) {
       throw new NotFoundException(`Canal ${channelId} introuvable`);
@@ -139,10 +143,21 @@ export class MetaTokenService {
       );
     }
 
+    const credentials = resolveChannelCredentials(channel);
+
+    // System User token : permanent, pas de refresh nécessaire
+    if (credentials.isSystemToken) {
+      this.logger.log(
+        `Canal ${channelId} utilise un System User token (permanent) — refresh ignoré`,
+        MetaTokenService.name,
+      );
+      return channel;
+    }
+
     const { accessToken, expiresAt } = await this.exchangeForLongLivedToken(
-      channel.token,
-      channel.meta_app_id,
-      channel.meta_app_secret,
+      credentials.accessToken,
+      credentials.appId,
+      credentials.appSecret,
     );
 
     channel.token = accessToken;
@@ -155,11 +170,10 @@ export class MetaTokenService {
     );
 
     // Re-souscription automatique du webhook après refresh
-    // Évite que Meta suspende la livraison des webhooks après changement de token
-    if (channel.provider === 'meta' && channel.meta_app_id && channel.meta_app_secret) {
+    if (channel.provider === 'meta' && credentials.appId && credentials.appSecret) {
       await this.resubscribeWhatsappWebhook(
-        channel.meta_app_id,
-        channel.meta_app_secret,
+        credentials.appId,
+        credentials.appSecret,
         channel.verify_token ?? undefined,
       );
     } else if (['messenger', 'instagram'].includes(channel.provider ?? '') && channel.page_id) {

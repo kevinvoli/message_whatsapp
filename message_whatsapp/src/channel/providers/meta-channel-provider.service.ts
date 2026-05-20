@@ -4,6 +4,7 @@
  * Extrait de `ChannelService.create()` branche `provider === 'meta'`.
  */
 import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { ApplicationService } from 'src/application/application.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { MetaTokenService } from '../meta-token.service';
 import { ChannelProviderStrategy } from '../domain/channel-provider-strategy.interface';
@@ -22,6 +23,7 @@ export class MetaChannelProviderService implements ChannelProviderStrategy, OnMo
     private readonly metaTokenService: MetaTokenService,
     private readonly logger: AppLogger,
     private readonly registry: ChannelProviderRegistry,
+    private readonly applicationService: ApplicationService,
   ) {}
 
   onModuleInit(): void {
@@ -37,15 +39,30 @@ export class MetaChannelProviderService implements ChannelProviderStrategy, OnMo
     const externalId = dto.external_id?.trim() || channelId;
     const nowEpoch = Math.floor(Date.now() / 1000);
 
+    // Résoudre les credentials : application liée > champs directs du DTO
+    let effectiveAppId = dto.meta_app_id;
+    let effectiveAppSecret = dto.meta_app_secret;
+    let isPermanent = !!dto.permanent_token;
     let metaToken = dto.token.trim();
-    let metaTokenExpiresAt: Date | null = dto.permanent_token ? new Date('2099-12-31') : null;
 
-    if (!dto.permanent_token) {
+    if (dto.application_id) {
+      const app = await this.applicationService.findOne(dto.application_id);
+      effectiveAppId = app.appId;
+      effectiveAppSecret = app.appSecret;
+      if (app.systemToken?.trim()) {
+        isPermanent = true;
+        metaToken = app.systemToken.trim();
+      }
+    }
+
+    let metaTokenExpiresAt: Date | null = isPermanent ? new Date('2099-12-31') : null;
+
+    if (!isPermanent) {
       try {
         const exchanged = await this.metaTokenService.exchangeForLongLivedToken(
-          dto.token,
-          dto.meta_app_id,
-          dto.meta_app_secret,
+          metaToken,
+          effectiveAppId,
+          effectiveAppSecret,
         );
         metaToken = exchanged.accessToken;
         metaTokenExpiresAt = exchanged.expiresAt;
@@ -65,8 +82,9 @@ export class MetaChannelProviderService implements ChannelProviderStrategy, OnMo
       token: metaToken,
       tokenExpiresAt: metaTokenExpiresAt,
       channel_id: channelId,
-      meta_app_id: dto.meta_app_id ?? null,
-      meta_app_secret: dto.meta_app_secret ?? null,
+      application_id: dto.application_id ?? null,
+      meta_app_id: dto.application_id ? null : (dto.meta_app_id ?? null),
+      meta_app_secret: dto.application_id ? null : (dto.meta_app_secret ?? null),
       verify_token: dto.verify_token ?? null,
       uptime: 0,
       version: 'meta',
@@ -97,14 +115,9 @@ export class MetaChannelProviderService implements ChannelProviderStrategy, OnMo
       if (dto.permanent_token) {
         (dto as any).tokenExpiresAt = new Date('2099-12-31');
       } else {
-        const appId = dto.meta_app_id || channel.meta_app_id;
-        const appSecret = dto.meta_app_secret || channel.meta_app_secret;
+        const { appId, appSecret } = await this.resolveUpdateCredentials(channel, dto);
         try {
-          const exchanged = await this.metaTokenService.exchangeForLongLivedToken(
-            dto.token,
-            appId,
-            appSecret,
-          );
+          const exchanged = await this.metaTokenService.exchangeForLongLivedToken(dto.token, appId, appSecret);
           dto.token = exchanged.accessToken;
           (dto as any).tokenExpiresAt = exchanged.expiresAt;
         } catch (err: unknown) {
@@ -118,5 +131,24 @@ export class MetaChannelProviderService implements ChannelProviderStrategy, OnMo
     }
     Object.assign(channel, dto);
     return this.helper.save(channel);
+  }
+
+  private async resolveUpdateCredentials(
+    channel: WhapiChannel,
+    dto: UpdateChannelDto,
+  ): Promise<{ appId: string | null | undefined; appSecret: string | null | undefined }> {
+    const applicationId = dto.application_id ?? channel.application_id;
+    if (applicationId) {
+      try {
+        const app = await this.applicationService.findOne(applicationId);
+        return { appId: app.appId, appSecret: app.appSecret };
+      } catch {
+        // application introuvable → fallback champs directs
+      }
+    }
+    return {
+      appId: dto.meta_app_id || channel.meta_app_id,
+      appSecret: dto.meta_app_secret || channel.meta_app_secret,
+    };
   }
 }

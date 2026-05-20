@@ -231,7 +231,7 @@ remove()
 
 ### US-2.5 — Intégration Application dans `MetaChannelProviderService`
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** M (2 h)  
 **Dépend de :** US-2.2, US-2.4
 
@@ -277,7 +277,7 @@ MetaChannelProviderService.update()
 
 ### US-2.6 — Intégration Application dans `MetaTokenService`
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** M (2 h)  
 **Dépend de :** US-2.2, US-2.5
 
