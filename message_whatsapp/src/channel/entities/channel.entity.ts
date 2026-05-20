@@ -1,3 +1,4 @@
+import { MessagingApplication } from 'src/application/entities/messaging-application.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
@@ -145,6 +146,19 @@ export class WhapiChannel {
   })
   @JoinColumn({ name: 'poste_id', referencedColumnName: 'id' })
   poste?: WhatsappPoste | null;
+
+  /** FK vers l'application Meta associée. NULL = credentials portés directement sur le canal (rétrocompat). */
+  @Column({ name: 'application_id', type: 'char', length: 36, nullable: true, default: null })
+  application_id?: string | null;
+
+  // Note : pas de createForeignKeyConstraints ici — la contrainte FK n'existe pas en base
+  // (conflit de collation MySQL à résoudre séparément). TypeORM fait le JOIN via application_id.
+  @ManyToOne(() => MessagingApplication, (app) => app.channels, {
+    nullable: true,
+    createForeignKeyConstraints: false,
+  })
+  @JoinColumn({ name: 'application_id' })
+  application?: MessagingApplication | null;
 
   @CreateDateColumn()
   createdAt: Date;

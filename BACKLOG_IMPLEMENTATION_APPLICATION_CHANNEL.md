@@ -67,7 +67,7 @@
 
 ### US-2.1 — Entité TypeORM `MessagingApplication`
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** S (30 min)  
 **Dépend de :** US-1.1
 
@@ -100,7 +100,7 @@
 
 ### US-2.2 — Helper `resolveChannelCredentials()`
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** S (45 min)  
 **Dépend de :** US-2.1
 
@@ -136,7 +136,7 @@ resolveChannelCredentials()
 
 ### US-2.3 — DTOs Application
 
-**Statut :** 🔲  
+**Statut :** ✅  
 **Effort :** S (30 min)  
 **Dépend de :** US-2.1
 

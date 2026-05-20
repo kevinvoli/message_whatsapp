@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreateChannelDto {
   @IsString()
@@ -54,6 +54,11 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   permanent_token?: boolean;
+
+  /** UUID de l'application Meta associée. Si fourni, remplace meta_app_id/meta_app_secret. */
+  @IsOptional()
+  @IsUUID()
+  application_id?: string;
 
   /** Bloque le passage en lecture seule des conversations de ce channel */
   @IsOptional()
