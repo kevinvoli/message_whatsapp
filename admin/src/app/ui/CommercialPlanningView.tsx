@@ -10,8 +10,9 @@ import {
   createAbsence,
   createReplacement,
   deletePlanning,
+  getCalendarHealth,
 } from '@/app/lib/api/commercial-groups.api';
-import { CommercialGroup, CommercialPresenceItem, CommercialPlanningEntry } from '@/app/lib/definitions';
+import { CommercialGroup, CommercialPresenceItem, CommercialPlanningEntry, CalendarHealthItem } from '@/app/lib/definitions';
 
 function toDateString(d: Date): string {
   const y = d.getFullYear();
@@ -291,19 +292,25 @@ function CommercialRow({ commercial, planning, groupName, date, onRefresh }: {
 export default function CommercialPlanningView() {
   const todayStr = toDateString(new Date());
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [groups, setGroups]     = useState<CommercialGroup[]>([]);
-  const [planning, setPlanning] = useState<CommercialPlanningEntry[]>([]);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [groups, setGroups]             = useState<CommercialGroup[]>([]);
+  const [planning, setPlanning]         = useState<CommercialPlanningEntry[]>([]);
+  const [calendarAlerts, setCalendarAlerts] = useState<CalendarHealthItem[]>([]);
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState<string | null>(null);
   const [showReplacementModal, setShowReplacementModal] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [g, p] = await Promise.all([getGroups(), getPlanningByDate(selectedDate)]);
+      const [g, p, health] = await Promise.all([
+        getGroups(),
+        getPlanningByDate(selectedDate),
+        getCalendarHealth(),
+      ]);
       setGroups(g);
       setPlanning(p);
+      setCalendarAlerts(health);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement.');
     } finally {
@@ -375,6 +382,30 @@ export default function CommercialPlanningView() {
         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           {error}
+        </div>
+      )}
+
+      {calendarAlerts.length > 0 && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+          <div>
+            <p className="font-semibold text-amber-900">
+              {calendarAlerts.length} groupe{calendarAlerts.length > 1 ? 's' : ''} sans calendrier valide dans 7 jours
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {calendarAlerts.map((g) => (
+                <li key={g.groupId} className="text-xs">
+                  <span className="font-medium">{g.groupName}</span>
+                  {g.lastDay
+                    ? ` — dernier jour planifié : ${g.lastDay}`
+                    : ' — aucun calendrier généré'}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-xs text-amber-700">
+              Régénérez le calendrier depuis l'onglet Groupes → Calendrier.
+            </p>
+          </div>
         </div>
       )}
 

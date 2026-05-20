@@ -9,6 +9,7 @@ import { GroupScheduleService } from './group-schedule.service';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { CommercialPlanning } from './entities/commercial-planning.entity';
 import { CommercialPlanningService } from './commercial-planning.service';
+import { CalendarRegenJob } from './jobs/calendar-regen.job';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { CommercialPlanningService } from './commercial-planning.service';
     SystemConfigModule,
   ],
   controllers: [CommercialGroupController],
-  providers: [CommercialGroupService, GroupScheduleService, CommercialPlanningService],
+  providers: [CommercialGroupService, GroupScheduleService, CommercialPlanningService, CalendarRegenJob],
   exports: [CommercialGroupService, GroupScheduleService, CommercialPlanningService],
 })
 export class CommercialGroupModule {}

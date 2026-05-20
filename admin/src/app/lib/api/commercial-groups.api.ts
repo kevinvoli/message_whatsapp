@@ -5,6 +5,7 @@ import {
   GenerateScheduleResult,
   GenerateAllResult,
   GroupScheduleDayItem,
+  CalendarHealthItem,
 } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
@@ -167,6 +168,14 @@ export async function createReplacement(data: {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+  );
+}
+
+export async function getCalendarHealth(): Promise<CalendarHealthItem[]> {
+  return handleResponse<CalendarHealthItem[]>(
+    await fetch(`${API_BASE_URL}/commercial-groups/planning/calendar-health`, {
+      credentials: 'include',
     }),
   );
 }

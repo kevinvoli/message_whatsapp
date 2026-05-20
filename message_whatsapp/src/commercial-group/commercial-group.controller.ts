@@ -33,6 +33,11 @@ export class CommercialGroupController {
     return this.groupScheduleService.generateForAllGroups();
   }
 
+  @Get('planning/calendar-health')
+  getCalendarHealth() {
+    return this.groupScheduleService.getGroupsWithExpiringCalendar(7);
+  }
+
   @Get('planning')
   getPlanningByDate(@Query('date') date?: string) {
     return this.planningService.findByDate(date ?? this.planningService.getTodayString());

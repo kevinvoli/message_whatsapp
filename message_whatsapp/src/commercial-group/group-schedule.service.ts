@@ -92,6 +92,28 @@ export class GroupScheduleService {
     return rows.map((r) => r.groupId);
   }
 
+  async getGroupsWithExpiringCalendar(
+    withinDays = 7,
+  ): Promise<{ groupId: string; groupName: string; lastDay: string | null }[]> {
+    const tz = await this.systemConfigService.getString('APP_TIMEZONE', 'Africa/Abidjan');
+    const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(new Date());
+    const horizonDate = new Date(todayStr + 'T00:00:00Z');
+    horizonDate.setUTCDate(horizonDate.getUTCDate() + withinDays);
+    const horizonStr = horizonDate.toISOString().slice(0, 10);
+
+    const rows: { groupId: string; groupName: string; lastDay: string | null }[] =
+      await this.dataSource.query(
+        `SELECT g.id AS groupId, g.name AS groupName, MAX(d.date) AS lastDay
+         FROM commercial_group g
+         LEFT JOIN group_schedule_day d ON d.group_id = g.id
+         WHERE g.is_active = 1
+         GROUP BY g.id, g.name
+         HAVING lastDay IS NULL OR lastDay <= ?`,
+        [horizonStr],
+      );
+    return rows;
+  }
+
   async getCalendarForGroup(
     groupId: string,
     from: string,

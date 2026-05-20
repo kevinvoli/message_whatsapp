@@ -321,6 +321,12 @@ export interface GenerateAllResult {
   daysGenerated: number;
 }
 
+export interface CalendarHealthItem {
+  groupId: string;
+  groupName: string;
+  lastDay: string | null;
+}
+
 export type Poste = {
   id: string;
   name: string;
