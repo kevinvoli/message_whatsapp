@@ -1,7 +1,0 @@
-[
-  {"id":"a1b2c3d4-0001-4000-8000-000000000001","code":"POSTE_ABOBO","name":"Poste Abobo","is_active":1,"numero_poste":1,"is_queue_enabled":1,"created_at":"2026-01-01 08:00:00","updated_at":"2026-01-01 08:00:00"},
-  {"id":"a1b2c3d4-0002-4000-8000-000000000002","code":"POSTE_COCODY","name":"Poste Cocody","is_active":1,"numero_poste":2,"is_queue_enabled":1,"created_at":"2026-01-01 08:00:00","updated_at":"2026-01-01 08:00:00"},
-  {"id":"a1b2c3d4-0003-4000-8000-000000000003","code":"POSTE_YOPOUGON","name":"Poste Yopougon","is_active":1,"numero_poste":3,"is_queue_enabled":1,"created_at":"2026-01-01 08:00:00","updated_at":"2026-01-01 08:00:00"},
-  {"id":"a1b2c3d4-0004-4000-8000-000000000004","code":"POSTE_MARCORY","name":"Poste Marcory","is_active":1,"numero_poste":4,"is_queue_enabled":1,"created_at":"2026-01-01 08:00:00","updated_at":"2026-01-01 08:00:00"},
-  {"id":"a1b2c3d4-0005-4000-8000-000000000005","code":"POSTE_KOUMASSI","name":"Poste Koumassi","is_active":1,"numero_poste":5,"is_queue_enabled":1,"created_at":"2026-01-01 08:00:00","updated_at":"2026-01-01 08:00:00"}
-]
