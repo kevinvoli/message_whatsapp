@@ -46,18 +46,44 @@ export class CallLogService {
     await this.repo.remove(log);
   }
 
-  findMissedByCommercial(commercial_id: string, limit = 30): Promise<CallLog[]> {
-    return this.repo.find({
-      where: { commercial_id, outcome: CallOutcome.PasDeRéponse, treated: false },
-      order: { called_at: 'DESC' },
-      take: limit,
-    });
+  findMissedByCommercial(commercial_id: string, limit = 50): Promise<CallLog[]> {
+    return this.repo
+      .createQueryBuilder('cl')
+      .where('cl.commercial_id = :cid', { cid: commercial_id })
+      .andWhere('cl.outcome = :outcome', { outcome: CallOutcome.PasDeRéponse })
+      .andWhere('cl.treated = 0')
+      .orderBy('cl.called_at', 'DESC')
+      .take(limit)
+      .getMany();
   }
 
   async markTreated(id: string, commercial_id: string): Promise<{ ok: boolean }> {
-    const log = await this.repo.findOne({ where: { id, commercial_id } });
+    const log = await this.repo.findOne({
+      where: { id, commercial_id },
+      select: ['id', 'client_phone'],
+    });
     if (!log) throw new NotFoundException('CallLog introuvable');
-    await this.repo.update(id, { treated: true });
+
+    // Marque tous les appels non traités du même numéro pour éviter les réapparitions
+    if (log.client_phone) {
+      await this.repo
+        .createQueryBuilder()
+        .update(CallLog)
+        .set({ treated: true })
+        .where(
+          'commercial_id = :cid AND client_phone = :phone AND treated = 0 AND outcome = :outcome',
+          { cid: commercial_id, phone: log.client_phone, outcome: CallOutcome.PasDeRéponse },
+        )
+        .execute();
+    } else {
+      await this.repo
+        .createQueryBuilder()
+        .update(CallLog)
+        .set({ treated: true })
+        .where('id = :id AND treated = 0', { id })
+        .execute();
+    }
+
     return { ok: true };
   }
 }

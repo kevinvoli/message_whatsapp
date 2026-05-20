@@ -313,6 +313,12 @@ export class OrderCallSyncService {
                 callEventExternalId:  String(call.id),
               }),
             );
+
+            // Mettre à jour le statut d'appel du contact pour refléter l'issue de l'appel
+            if (clientContact) {
+              await this.contactRepo.update(clientContact.id, { call_status: mappedStatus });
+            }
+
             this.logger.debug(`call_log créé pour appel DB2 id=${call.id}`);
           }
         } catch (callLogErr) {
