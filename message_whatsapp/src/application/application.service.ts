@@ -10,12 +10,14 @@ import { MessagingApplication } from './entities/messaging-application.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { ApplicationResponseDto } from './dto/application-response.dto';
+import { ApplicationWebhookService } from './application-webhook.service';
 
 @Injectable()
 export class ApplicationService {
   constructor(
     @InjectRepository(MessagingApplication)
     private readonly repo: Repository<MessagingApplication>,
+    private readonly webhookService: ApplicationWebhookService,
   ) {}
 
   async create(dto: CreateApplicationDto): Promise<ApplicationResponseDto> {
@@ -76,6 +78,9 @@ export class ApplicationService {
   async update(id: string, dto: UpdateApplicationDto): Promise<ApplicationResponseDto> {
     const app = await this.findOne(id);
 
+    const appSecretChanged = dto.appSecret !== undefined;
+    const systemTokenChanged = dto.systemToken !== undefined;
+
     if (dto.label !== undefined) app.label = dto.label;
     if (dto.provider !== undefined) app.provider = dto.provider;
     if (dto.appId !== undefined) app.appId = dto.appId;
@@ -85,6 +90,14 @@ export class ApplicationService {
     }
 
     const saved = await this.repo.save(app);
+
+    if (appSecretChanged || systemTokenChanged) {
+      void this.webhookService.resubscribeForApplication(saved, {
+        appSecret: appSecretChanged,
+        systemToken: systemTokenChanged,
+      });
+    }
+
     return ApplicationResponseDto.from(saved);
   }
 

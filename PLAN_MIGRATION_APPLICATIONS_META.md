@@ -50,9 +50,37 @@ Une entité `MessagingApplication` centralise les credentials :
 
 ---
 
-## Phases restantes
+## Phases complétées (2026-05-21)
+
+### Phase 3 — Correction vérification signature webhooks ✅ LIVRÉE
+
+### Phase 4 — Correction surveillance `onModuleInit` ✅ LIVRÉE
+
+### Phase 5 — Application obligatoire à la création ✅ LIVRÉE
+
+### Phase 6 — Nettoyage code providers ✅ LIVRÉE
+
+### Phase 7 — Suppression colonnes `meta_app_id` / `meta_app_secret` ✅ LIVRÉE EN PRODUCTION
+
+Migration `DropLegacyChannelCredentials1779580800001` déployée le 2026-05-21. Colonnes supprimées de `whapi_channels`. Aucun canal orphelin détecté.
 
 ---
+
+## ✅ MIGRATION TERMINÉE — Système entièrement remplacé
+
+Le remplacement de l'ancien système de credentials directs par `MessagingApplication` est **complet et en production**.
+
+| Ce qui a changé | Avant | Après |
+|---|---|---|
+| Credentials Meta | Portés sur chaque canal (`meta_app_id`, `meta_app_secret`) | Centralisés dans `MessagingApplication` |
+| Création de canal Meta | Champs directs optionnels | `application_id` obligatoire |
+| Signature webhook HMAC | `channel.meta_app_secret` direct | `resolveChannelCredentials()` via l'app |
+| Colonnes BDD legacy | `whapi_channels.meta_app_id` / `meta_app_secret` | Supprimées |
+| Token refresh | Lisait les champs directs | Passe par l'application liée |
+
+---
+
+## Archives — Phases initiales
 
 ### Phase 3 — Correction vérification signature webhooks `[P0 — SÉCURITÉ]`
 
