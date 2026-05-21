@@ -66,9 +66,16 @@ Migration `DropLegacyChannelCredentials1779580800001` déployée le 2026-05-21. 
 
 ---
 
-## ✅ MIGRATION TERMINÉE — Système entièrement remplacé
+## ✅ MIGRATION TERMINÉE + AMÉLIORATIONS POST-MIGRATION (2026-05-21)
 
 Le remplacement de l'ancien système de credentials directs par `MessagingApplication` est **complet et en production**.
+
+### Améliorations post-migration ✅ LIVRÉES EN PRODUCTION (2026-05-21)
+
+| Amélioration | Détail | Statut |
+|---|---|---|
+| Contrainte FK en base | `FK_whapi_channels_application_id` — `ON DELETE SET NULL ON UPDATE CASCADE` | ✅ |
+| Re-souscription webhooks automatique | `ApplicationWebhookService` — déclenché sur changement `appSecret`/`systemToken` | ✅ |
 
 | Ce qui a changé | Avant | Après |
 |---|---|---|
