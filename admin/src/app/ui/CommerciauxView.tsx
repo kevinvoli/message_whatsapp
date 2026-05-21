@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List } from 'lucide-react';
 import { PerformanceCommercial, Poste, CommercialStatsDto } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
@@ -7,6 +7,19 @@ import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
 import { useCrudResource } from '../hooks/useCrudResource';
 import { EntityFormModal } from './crud/EntityFormModal';
+
+type CommerciauxTabKey = 'liste' | 'statistiques';
+
+interface CommerciauxTab {
+  key: CommerciauxTabKey;
+  label: string;
+  icon: React.ElementType;
+}
+
+const COMMERCIAUX_TABS: CommerciauxTab[] = [
+  { key: 'liste', label: 'Liste', icon: List },
+  { key: 'statistiques', label: 'Statistiques', icon: BarChart3 },
+];
 
 interface CommerciauxViewProps {
   onRefresh?: () => void;
@@ -42,6 +55,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
     getId: (item) => item.id,
   });
 
+  const [activeTab, setActiveTab] = useState<CommerciauxTabKey>('liste');
   const [disconnecting, setDisconnecting] = useState(false);
   const loading = crudLoading || dataLoading;
   const { addToast } = useToast();
@@ -99,6 +113,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
 
   const handleOpenStatsPanel = useCallback(async (commercial: PerformanceCommercial) => {
     setStatsPanel(commercial);
+    setActiveTab('statistiques');
     if (statsMap[commercial.id]) return; // Déjà chargé
     setStatsLoading((prev) => ({ ...prev, [commercial.id]: true }));
     try {
@@ -279,6 +294,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
       {/* Statistiques globales */}
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -330,478 +346,508 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
         </div>
       </div>
 
-      {/* Barre de recherche et actions */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Rechercher un commercial..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <button
-            onClick={() => void handleDisconnectAll()}
-            disabled={disconnecting}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-            title="Déconnecter tous les commerciaux en ligne"
-          >
-            <LogOut className="w-4 h-4" />
-            {disconnecting ? 'Déconnexion...' : 'Déconnecter tous'}
-          </button>
-          <button
-            onClick={handleOpenAddModal}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <UserPlus className="w-4 h-4" />
-            Ajouter
-          </button>
-        </div>
-      </div>
-
-      {/* Tableau des commerciaux */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commercial</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chats actifs</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Messages</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux réponse</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temps moy.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Heures co.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {dataLoading ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3 text-gray-400">
-                      <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      <span className="text-sm">Chargement des commerciaux...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : commerciauxFiltres.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
-                    {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
-                  </td>
-                </tr>
-              ) : (
-                commerciauxFiltres.map((commercial) => (
-                  <tr key={commercial.id} className="hover:bg-gray-50">
-                    {/* Commercial */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                            {commercial.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${getStatusColor(commercial.isConnected)} border-2 border-white rounded-full`}></div>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{commercial.name}</p>
-                          <p className="text-xs text-gray-500">{commercial.email}</p>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Statut */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.isConnected
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                          }`}>
-                          {commercial.isConnected ? 'En ligne' : 'Hors ligne'}
-                        </span>
-                        {commercial.allowOutsideHours && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Hors horaires
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Poste */}
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-900">{commercial.poste_name}</span>
-                    </td>
-
-                    {/* Chats actifs */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <MessageCircle className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">{commercial.nbChatsActifs}</span>
-                      </div>
-                    </td>
-
-                    {/* Messages */}
-                    <td className="px-6 py-4">
-                      <div className="text-sm">
-                        <p className="font-medium text-gray-900">
-                          {commercial.nbMessagesEnvoyes + commercial.nbMessagesRecus}
-                        </p>
-                        <p className="text-xs">
-                          <span className="text-blue-600 font-semibold">
-                            ↑{commercial.nbMessagesEnvoyes}
-                          </span>
-                          <span className="mx-1 text-slate-400">/</span>
-                          <span className="text-emerald-600 font-semibold">
-                            ↓{commercial.nbMessagesRecus}
-                          </span>
-                        </p>
-                      </div>
-                    </td>
-
-                    {/* Taux de réponse */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(commercial.tauxReponse)
-                          }`}>
-                          {commercial.tauxReponse}%
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {getPerformanceText(commercial.tauxReponse)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Temps moyen */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">
-                          {formatTemps(commercial.tempsReponseMoyen)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Dernière connexion */}
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">
-                        {formatDate(commercial.lastConnectionAt)}
-                      </span>
-                    </td>
-
-                    {/* Heures de connexion */}
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-900">
-                        {commercial.totalConnectionMinutes != null
-                          ? formatTemps(commercial.totalConnectionMinutes * 60)
-                          : '-'}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSelectedDetail(commercial)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Voir les details"
-                          aria-label="Voir les details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => void handleOpenStatsPanel(commercial)}
-                          className="p-1 text-violet-600 hover:bg-violet-50 rounded"
-                          title="Voir les statistiques d'activite"
-                          aria-label="Statistiques d'activite"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                        </button>
-                        {onViewConversations && (
-                          <button
-                            onClick={() => onViewConversations(commercial.id, commercial.poste_id ?? '')}
-                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                            title="Voir les conversations"
-                            aria-label="Voir les conversations"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleOpenEditModal(commercial)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          disabled={loading}
-                          title="Modifier"
-                          aria-label="Modifier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => void handleDeleteCommercial(commercial.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          disabled={loading}
-                          title="Supprimer"
-                          aria-label="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Detail commercial */}
-      {selectedDetail && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      {/* ─── Onglets ──────────────────────────────────────────────────────── */}
+      <div className="overflow-x-auto">
+        <div className="flex min-w-max gap-1 rounded-xl bg-gray-100 p-1">
+          {COMMERCIAUX_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
               <button
-                onClick={() => setSelectedDetail(null)}
-                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap ${
+                  isActive
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
-                <ArrowLeft className="w-5 h-5" />
+                <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                {tab.label}
               </button>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                    {selectedDetail.name.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${getStatusColor(selectedDetail.isConnected)} border-2 border-white rounded-full`}></div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{selectedDetail.name}</h3>
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
-                    <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {selectedDetail.email}</span>
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedDetail.poste_name || 'Non assigne'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-              }`}>
-              {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
-            </span>
-          </div>
-
-          <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <MessageCircle className="w-4 h-4 text-blue-600" />
-                <span className="text-xs text-blue-700 font-medium">Messages envoyes</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-900">{selectedDetail.nbMessagesEnvoyes}</p>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <MessageCircle className="w-4 h-4 text-green-600" />
-                <span className="text-xs text-green-700 font-medium">Messages recus</span>
-              </div>
-              <p className="text-2xl font-bold text-green-900">{selectedDetail.nbMessagesRecus}</p>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <Target className="w-4 h-4 text-purple-600" />
-                <span className="text-xs text-purple-700 font-medium">Chats actifs</span>
-              </div>
-              <p className="text-2xl font-bold text-purple-900">{selectedDetail.nbChatsActifs}</p>
-            </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4 text-orange-600" />
-                <span className="text-xs text-orange-700 font-medium">Taux reponse</span>
-              </div>
-              <p className="text-2xl font-bold text-orange-900">{selectedDetail.tauxReponse}%</p>
-            </div>
-          </div>
-
-          <div className="px-6 pb-6 grid grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Performance</h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Temps reponse moyen</span>
-                  <span className="font-semibold text-gray-900">{formatTemps(selectedDetail.tempsReponseMoyen)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Niveau performance</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(selectedDetail.tauxReponse)}`}>
-                    {getPerformanceText(selectedDetail.tauxReponse)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Total messages</span>
-                  <span className="font-semibold text-gray-900">{selectedDetail.nbMessagesEnvoyes + selectedDetail.nbMessagesRecus}</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Informations</h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Derniere connexion</span>
-                  <span className="font-semibold text-gray-900">{formatDate(selectedDetail.lastConnectionAt)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Poste</span>
-                  <span className="font-semibold text-gray-900">{selectedDetail.poste_name || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">ID</span>
-                  <span className="font-mono text-xs text-gray-500">{selectedDetail.id}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
+      </div>
+
+      {/* ─── Contenu onglet Liste ──────────────────────────────────────── */}
+      {activeTab === 'liste' && (
+        <>
+          {/* Barre de recherche et actions */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 relative">
+                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher un commercial..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={() => void handleDisconnectAll()}
+                disabled={disconnecting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                title="Déconnecter tous les commerciaux en ligne"
+              >
+                <LogOut className="w-4 h-4" />
+                {disconnecting ? 'Déconnexion...' : 'Déconnecter tous'}
+              </button>
+              <button
+                onClick={handleOpenAddModal}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                Ajouter
+              </button>
+            </div>
+          </div>
+
+          {/* Tableau des commerciaux */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commercial</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chats actifs</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Messages</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux réponse</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temps moy.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Heures co.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {dataLoading ? (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center gap-3 text-gray-400">
+                          <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span className="text-sm">Chargement des commerciaux...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : commerciauxFiltres.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                        {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
+                      </td>
+                    </tr>
+                  ) : (
+                    commerciauxFiltres.map((commercial) => (
+                      <tr key={commercial.id} className="hover:bg-gray-50">
+                        {/* Commercial */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                                {commercial.name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${getStatusColor(commercial.isConnected)} border-2 border-white rounded-full`}></div>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{commercial.name}</p>
+                              <p className="text-xs text-gray-500">{commercial.email}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Statut */}
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${commercial.isConnected
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                              }`}>
+                              {commercial.isConnected ? 'En ligne' : 'Hors ligne'}
+                            </span>
+                            {commercial.allowOutsideHours && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                Hors horaires
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Poste */}
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-900">{commercial.poste_name}</span>
+                        </td>
+
+                        {/* Chats actifs */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <MessageCircle className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium text-gray-900">{commercial.nbChatsActifs}</span>
+                          </div>
+                        </td>
+
+                        {/* Messages */}
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            <p className="font-medium text-gray-900">
+                              {commercial.nbMessagesEnvoyes + commercial.nbMessagesRecus}
+                            </p>
+                            <p className="text-xs">
+                              <span className="text-blue-600 font-semibold">
+                                ↑{commercial.nbMessagesEnvoyes}
+                              </span>
+                              <span className="mx-1 text-slate-400">/</span>
+                              <span className="text-emerald-600 font-semibold">
+                                ↓{commercial.nbMessagesRecus}
+                              </span>
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* Taux de réponse */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(commercial.tauxReponse)
+                              }`}>
+                              {commercial.tauxReponse}%
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {getPerformanceText(commercial.tauxReponse)}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Temps moyen */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-gray-900">
+                              {formatTemps(commercial.tempsReponseMoyen)}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Dernière connexion */}
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-600">
+                            {formatDate(commercial.lastConnectionAt)}
+                          </span>
+                        </td>
+
+                        {/* Heures de connexion */}
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-900">
+                            {commercial.totalConnectionMinutes != null
+                              ? formatTemps(commercial.totalConnectionMinutes * 60)
+                              : '-'}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedDetail(commercial)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              title="Voir les details"
+                              aria-label="Voir les details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => void handleOpenStatsPanel(commercial)}
+                              className="p-1 text-violet-600 hover:bg-violet-50 rounded"
+                              title="Voir les statistiques d'activite"
+                              aria-label="Statistiques d'activite"
+                            >
+                              <BarChart3 className="w-4 h-4" />
+                            </button>
+                            {onViewConversations && (
+                              <button
+                                onClick={() => onViewConversations(commercial.id, commercial.poste_id ?? '')}
+                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                                title="Voir les conversations"
+                                aria-label="Voir les conversations"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleOpenEditModal(commercial)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              disabled={loading}
+                              title="Modifier"
+                              aria-label="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => void handleDeleteCommercial(commercial.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              disabled={loading}
+                              title="Supprimer"
+                              aria-label="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Detail commercial */}
+          {selectedDetail && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setSelectedDetail(null)}
+                    className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                        {selectedDetail.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${getStatusColor(selectedDetail.isConnected)} border-2 border-white rounded-full`}></div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{selectedDetail.name}</h3>
+                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {selectedDetail.email}</span>
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedDetail.poste_name || 'Non assigne'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                  {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
+                </span>
+              </div>
+
+              <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageCircle className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs text-blue-700 font-medium">Messages envoyes</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-900">{selectedDetail.nbMessagesEnvoyes}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-xs text-green-700 font-medium">Messages recus</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-900">{selectedDetail.nbMessagesRecus}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-4 h-4 text-purple-600" />
+                    <span className="text-xs text-purple-700 font-medium">Chats actifs</span>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-900">{selectedDetail.nbChatsActifs}</p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp className="w-4 h-4 text-orange-600" />
+                    <span className="text-xs text-orange-700 font-medium">Taux reponse</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-900">{selectedDetail.tauxReponse}%</p>
+                </div>
+              </div>
+
+              <div className="px-6 pb-6 grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Performance</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Temps reponse moyen</span>
+                      <span className="font-semibold text-gray-900">{formatTemps(selectedDetail.tempsReponseMoyen)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Niveau performance</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getPerformanceBadge(selectedDetail.tauxReponse)}`}>
+                        {getPerformanceText(selectedDetail.tauxReponse)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Total messages</span>
+                      <span className="font-semibold text-gray-900">{selectedDetail.nbMessagesEnvoyes + selectedDetail.nbMessagesRecus}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Informations</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Derniere connexion</span>
+                      <span className="font-semibold text-gray-900">{formatDate(selectedDetail.lastConnectionAt)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Poste</span>
+                      <span className="font-semibold text-gray-900">{selectedDetail.poste_name || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">ID</span>
+                      <span className="font-mono text-xs text-gray-500">{selectedDetail.id}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Panneau statistiques d'activite */}
-      {statsPanel && (
+      {/* ─── Contenu onglet Statistiques ──────────────────────────────── */}
+      {activeTab === 'statistiques' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setStatsPanel(null)}
-                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
-                aria-label="Fermer le panneau de statistiques"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Statistiques — {statsPanel.name}
-                </h3>
-                <p className="text-sm text-gray-500">{statsPanel.email}</p>
-              </div>
+          {!statsPanel ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+              <BarChart3 className="w-10 h-10 opacity-30" />
+              <p className="text-sm">Cliquez sur l&apos;icône statistiques d&apos;un commercial dans l&apos;onglet Liste pour afficher ses métriques ici.</p>
             </div>
-            <button
-              onClick={() => void handleRefreshStats(statsPanel.id)}
-              disabled={statsLoading[statsPanel.id]}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 transition-colors"
-              aria-label="Rafraichir les statistiques"
-            >
-              <RefreshCw className={`w-4 h-4 ${statsLoading[statsPanel.id] ? 'animate-spin' : ''}`} />
-              Rafraichir
-            </button>
-          </div>
-
-          <div className="p-6">
-            {statsLoading[statsPanel.id] && !statsMap[statsPanel.id] ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent" />
+          ) : (
+            <>
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Statistiques — {statsPanel.name}
+                  </h3>
+                  <p className="text-sm text-gray-500">{statsPanel.email}</p>
+                </div>
+                <button
+                  onClick={() => void handleRefreshStats(statsPanel.id)}
+                  disabled={statsLoading[statsPanel.id]}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+                  aria-label="Rafraichir les statistiques"
+                >
+                  <RefreshCw className={`w-4 h-4 ${statsLoading[statsPanel.id] ? 'animate-spin' : ''}`} />
+                  Rafraichir
+                </button>
               </div>
-            ) : statsMap[statsPanel.id] ? (
-              <>
-                {/* Statut en ligne */}
-                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 w-fit">
-                  {statsMap[statsPanel.id].isOnline ? (
-                    <Wifi className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <WifiOff className="w-4 h-4 text-gray-400" />
-                  )}
-                  <span className="text-sm text-gray-700">
-                    {statsMap[statsPanel.id].isOnline ? 'En ligne' : 'Hors ligne'}
-                  </span>
-                </div>
 
-                {/* Grille de metriques */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <MessageCircle className="w-4 h-4 text-blue-600" />
-                      <span className="text-xs text-blue-700 font-medium">Messages recus</span>
+              <div className="p-6">
+                {statsLoading[statsPanel.id] && !statsMap[statsPanel.id] ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent" />
+                  </div>
+                ) : statsMap[statsPanel.id] ? (
+                  <>
+                    {/* Statut en ligne */}
+                    <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 w-fit">
+                      {statsMap[statsPanel.id].isOnline ? (
+                        <Wifi className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <WifiOff className="w-4 h-4 text-gray-400" />
+                      )}
+                      <span className="text-sm text-gray-700">
+                        {statsMap[statsPanel.id].isOnline ? 'En ligne' : 'Hors ligne'}
+                      </span>
                     </div>
-                    <p className="text-2xl font-bold text-blue-900">
-                      {statsMap[statsPanel.id].messagesRead}
-                    </p>
-                  </div>
 
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckCheck className="w-4 h-4 text-green-600" />
-                      <span className="text-xs text-green-700 font-medium">Messages traites</span>
+                    {/* Grille de metriques */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MessageCircle className="w-4 h-4 text-blue-600" />
+                          <span className="text-xs text-blue-700 font-medium">Messages recus</span>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {statsMap[statsPanel.id].messagesRead}
+                        </p>
+                      </div>
+
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCheck className="w-4 h-4 text-green-600" />
+                          <span className="text-xs text-green-700 font-medium">Messages traites</span>
+                        </div>
+                        <p className="text-2xl font-bold text-green-900">
+                          {statsMap[statsPanel.id].messagesHandled}
+                        </p>
+                      </div>
+
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Activity className="w-4 h-4 text-purple-600" />
+                          <span className="text-xs text-purple-700 font-medium">Conv. actives</span>
+                        </div>
+                        <p className="text-2xl font-bold text-purple-900">
+                          {statsMap[statsPanel.id].activeConversations}
+                        </p>
+                      </div>
+
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Clock className="w-4 h-4 text-orange-600" />
+                          <span className="text-xs text-orange-700 font-medium">Derniere activite</span>
+                        </div>
+                        <p className="text-sm font-semibold text-orange-900 leading-tight">
+                          {formatDate(statsMap[statsPanel.id].lastActivityAt)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-2xl font-bold text-green-900">
-                      {statsMap[statsPanel.id].messagesHandled}
-                    </p>
-                  </div>
 
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Activity className="w-4 h-4 text-purple-600" />
-                      <span className="text-xs text-purple-700 font-medium">Conv. actives</span>
+                    {/* Taux de reponse */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700">Taux de reponse</span>
+                        <span
+                          className={`text-lg font-bold ${
+                            statsMap[statsPanel.id].responseRate >= 80
+                              ? 'text-green-600'
+                              : statsMap[statsPanel.id].responseRate >= 60
+                                ? 'text-orange-500'
+                                : 'text-red-500'
+                          }`}
+                        >
+                          {statsMap[statsPanel.id].responseRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div
+                        className="w-full h-3 bg-gray-100 rounded-full overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={statsMap[statsPanel.id].responseRate}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Taux de reponse : ${statsMap[statsPanel.id].responseRate.toFixed(1)}%`}
+                      >
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            statsMap[statsPanel.id].responseRate >= 80
+                              ? 'bg-green-500'
+                              : statsMap[statsPanel.id].responseRate >= 60
+                                ? 'bg-orange-400'
+                                : 'bg-red-400'
+                          }`}
+                          style={{ width: `${Math.min(statsMap[statsPanel.id].responseRate, 100)}%` }}
+                        />
+                      </div>
                     </div>
-                    <p className="text-2xl font-bold text-purple-900">
-                      {statsMap[statsPanel.id].activeConversations}
-                    </p>
-                  </div>
-
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Clock className="w-4 h-4 text-orange-600" />
-                      <span className="text-xs text-orange-700 font-medium">Derniere activite</span>
-                    </div>
-                    <p className="text-sm font-semibold text-orange-900 leading-tight">
-                      {formatDate(statsMap[statsPanel.id].lastActivityAt)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Taux de reponse */}
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-700">Taux de reponse</span>
-                    <span
-                      className={`text-lg font-bold ${
-                        statsMap[statsPanel.id].responseRate >= 80
-                          ? 'text-green-600'
-                          : statsMap[statsPanel.id].responseRate >= 60
-                            ? 'text-orange-500'
-                            : 'text-red-500'
-                      }`}
-                    >
-                      {statsMap[statsPanel.id].responseRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div
-                    className="w-full h-3 bg-gray-100 rounded-full overflow-hidden"
-                    role="progressbar"
-                    aria-valuenow={statsMap[statsPanel.id].responseRate}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`Taux de reponse : ${statsMap[statsPanel.id].responseRate.toFixed(1)}%`}
-                  >
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        statsMap[statsPanel.id].responseRate >= 80
-                          ? 'bg-green-500'
-                          : statsMap[statsPanel.id].responseRate >= 60
-                            ? 'bg-orange-400'
-                            : 'bg-red-400'
-                      }`}
-                      style={{ width: `${Math.min(statsMap[statsPanel.id].responseRate, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-8">
-                Aucune donnee disponible.
-              </p>
-            )}
-          </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-8">
+                    Aucune donnee disponible.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
