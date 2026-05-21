@@ -79,6 +79,8 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [savingAuto, setSavingAuto] = useState(false);
   const [savingQueue, setSavingQueue] = useState(false);
   const [savingReadOnly, setSavingReadOnly] = useState(false);
+  const [savingRateLimit, setSavingRateLimit] = useState(false);
+  const [savingIdleDisconnect, setSavingIdleDisconnect] = useState(false);
   const [redispatching, setRedispatching] = useState(false);
   const [resettingStuck, setResettingStuck] = useState(false);
 
@@ -216,6 +218,47 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       });
     } finally {
       setSavingReadOnly(false);
+    }
+  };
+
+  // ── Sauvegarde Rate limit lecture ─────────────────────────────────────────
+
+  const handleSaveRateLimit = async () => {
+    if (!settings) return;
+    try {
+      setSavingRateLimit(true);
+      const saved = await updateDispatchSettings({ maxReadMessagesPerMinute: settings.maxReadMessagesPerMinute });
+      setSettings(saved);
+      addToast({ type: 'success', message: 'Parametre rate limit lecture sauvegarde.' });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur sauvegarde rate limit lecture.',
+      });
+    } finally {
+      setSavingRateLimit(false);
+    }
+  };
+
+  // ── Sauvegarde Deconnexion inactivite ──────────────────────────────────────
+
+  const handleSaveIdleDisconnect = async () => {
+    if (!settings) return;
+    try {
+      setSavingIdleDisconnect(true);
+      const saved = await updateDispatchSettings({
+        idleDisconnectEnabled: settings.idleDisconnectEnabled,
+        idleDisconnectMinutes: settings.idleDisconnectMinutes,
+      });
+      setSettings(saved);
+      addToast({ type: 'success', message: 'Parametres deconnexion inactivite sauvegardes.' });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur sauvegarde deconnexion inactivite.',
+      });
+    } finally {
+      setSavingIdleDisconnect(false);
     }
   };
 
@@ -456,6 +499,124 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                 <p className="mt-1 text-[11px] text-gray-400">
                   0 = désactivé — 1 = comportement actuel (défaut) — N = N messages autorisés
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Lecture messages (rate limit) ── */}
+          {settings && (
+            <div className="border-b border-gray-100 px-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Lecture messages</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Limite le nombre de messages qu&apos;un commercial peut marquer comme lus par minute.
+                    Permet de freiner le traitement automatique trop rapide.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveRateLimit()}
+                  disabled={savingRateLimit}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:bg-emerald-300 shrink-0"
+                >
+                  {savingRateLimit ? 'Sauvegarde...' : 'Sauvegarder'}
+                </button>
+              </div>
+              <div className="mt-3 max-w-xs">
+                <label
+                  htmlFor="maxReadMessagesPerMinute"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                >
+                  Messages lus max / minute
+                </label>
+                <input
+                  id="maxReadMessagesPerMinute"
+                  type="number"
+                  min={1}
+                  max={60}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  value={settings.maxReadMessagesPerMinute ?? 60}
+                  onChange={(e) =>
+                    setSettings({ ...settings, maxReadMessagesPerMinute: Number(e.target.value) })
+                  }
+                />
+                <p className="mt-1 text-[11px] text-gray-400">Min: 1 — Max: 60 messages par minute</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Deconnexion automatique inactivite ── */}
+          {settings && (
+            <div className="border-b border-gray-100 px-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Déconnexion automatique</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Déconnecte automatiquement les commerciaux qui n&apos;ont aucune activité pendant la durée configurée.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveIdleDisconnect()}
+                  disabled={savingIdleDisconnect}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:bg-emerald-300 shrink-0"
+                >
+                  {savingIdleDisconnect ? 'Sauvegarde...' : 'Sauvegarder'}
+                </button>
+              </div>
+              <div className="mt-3 space-y-3">
+                {/* Toggle activation */}
+                <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Déconnecter les commerciaux inactifs</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Lorsque activé, les commerciaux sans activité seront déconnectés automatiquement.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.idleDisconnectEnabled ?? false}
+                    aria-label="Activer la déconnexion automatique pour inactivité"
+                    onClick={() =>
+                      setSettings({ ...settings, idleDisconnectEnabled: !(settings.idleDisconnectEnabled ?? false) })
+                    }
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                      (settings.idleDisconnectEnabled ?? false) ? 'bg-emerald-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                        (settings.idleDisconnectEnabled ?? false) ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Duree inactivite — affiche seulement si le toggle est actif */}
+                {(settings.idleDisconnectEnabled ?? false) && (
+                  <div className="max-w-xs">
+                    <label
+                      htmlFor="idleDisconnectMinutes"
+                      className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                    >
+                      Durée d&apos;inactivité (minutes)
+                    </label>
+                    <input
+                      id="idleDisconnectMinutes"
+                      type="number"
+                      min={1}
+                      max={480}
+                      className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                      value={settings.idleDisconnectMinutes ?? 30}
+                      onChange={(e) =>
+                        setSettings({ ...settings, idleDisconnectMinutes: Number(e.target.value) })
+                      }
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">Min: 1 min — Max: 480 min (8 heures)</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

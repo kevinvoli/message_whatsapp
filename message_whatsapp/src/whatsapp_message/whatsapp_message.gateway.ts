@@ -739,6 +739,15 @@ export class WhatsappMessageGateway
     }
   }
 
+  @SubscribeMessage('presence:ping')
+  async handlePresencePing(@ConnectedSocket() client: Socket) {
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+    void this.commercialRepository.update(agent.commercialId, {
+      lastActivityAt: new Date(),
+    });
+  }
+
   @SubscribeMessage('messages:read')
   async handleMarkAsRead(
     @ConnectedSocket() client: Socket,

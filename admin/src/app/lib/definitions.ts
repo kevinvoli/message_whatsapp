@@ -363,6 +363,12 @@ export type DispatchSettings = {
   auto_message_delay_max_seconds: number;
   auto_message_max_steps: number;
   readOnlyMaxMessages?: number;
+  /** Limite de messages lus par minute par commercial (1–60) */
+  maxReadMessagesPerMinute?: number;
+  /** Active/désactive la déconnexion automatique pour inactivité */
+  idleDisconnectEnabled?: boolean;
+  /** Durée d'inactivité en minutes avant déconnexion automatique (1–480) */
+  idleDisconnectMinutes?: number;
 };
 
 export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';

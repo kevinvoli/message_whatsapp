@@ -46,4 +46,20 @@ export class UpdateDispatchSettingsDto {
   @Min(0)
   @Max(100)
   readOnlyMaxMessages?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  maxReadMessagesPerMinute?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  idleDisconnectEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(480)
+  idleDisconnectMinutes?: number;
 }

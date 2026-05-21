@@ -322,6 +322,15 @@ const WebSocketEvents = () => {
       refreshAfterConnect();
     }
 
+    // Ping de présence toutes les 5 minutes pour maintenir lastActivityAt à jour
+    // et éviter la déconnexion par le job idle-disconnect côté backend.
+    const PING_INTERVAL_MS = 5 * 60 * 1000;
+    const presencePingInterval = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('presence:ping');
+      }
+    }, PING_INTERVAL_MS);
+
     return () => {
       socket.off('chat:event', handleChatEvent);
       socket.off('contact:event', handleContactEvent);
@@ -329,6 +338,7 @@ const WebSocketEvents = () => {
       socket.off('connect', refreshAfterConnect);
       socket.off('queue:updated', handleQueueUpdated);
       socket.off('conversation:read:ack', handleConversationReadAck);
+      clearInterval(presencePingInterval);
       setSocket(null);
       setContactSocket(null);
     };
