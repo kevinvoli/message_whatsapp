@@ -1352,13 +1352,21 @@ export async function getChannelDetailStats(
 }
 
 /**
- * Récupère les statistiques d'activité temps réel d'un commercial.
- * Endpoint : GET /commercials/:id/stats
+ * Récupère les statistiques d'activité d'un commercial pour une période donnée.
+ * Endpoint : GET /users/:id/stats
  */
-export async function getCommercialStats(commercialId: string): Promise<CommercialStatsDto> {
-    const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(commercialId)}/stats`, {
-        method: 'GET',
-        credentials: 'include',
-    });
+export async function getCommercialStats(
+    commercialId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<CommercialStatsDto> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/users/${encodeURIComponent(commercialId)}/stats?${params.toString()}`,
+        { method: 'GET', credentials: 'include' },
+    );
     return handleResponse<CommercialStatsDto>(response);
 }

@@ -116,10 +116,9 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
   const handleOpenStatsPanel = useCallback(async (commercial: PerformanceCommercial) => {
     setStatsPanel(commercial);
     setActiveTab('statistiques');
-    if (statsMap[commercial.id]) return; // Déjà chargé
     setStatsLoading((prev) => ({ ...prev, [commercial.id]: true }));
     try {
-      const data = await getCommercialStats(commercial.id);
+      const data = await getCommercialStats(commercial.id, selectedPeriod, dateFrom, dateTo);
       setStatsMap((prev) => ({ ...prev, [commercial.id]: data }));
     } catch (err) {
       logger.error('Erreur chargement stats commercial', { id: commercial.id, error: err instanceof Error ? err.message : String(err) });
@@ -127,12 +126,12 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
     } finally {
       setStatsLoading((prev) => ({ ...prev, [commercial.id]: false }));
     }
-  }, [statsMap, addToast]);
+  }, [selectedPeriod, dateFrom, dateTo, addToast]);
 
   const handleRefreshStats = useCallback(async (commercialId: string) => {
     setStatsLoading((prev) => ({ ...prev, [commercialId]: true }));
     try {
-      const data = await getCommercialStats(commercialId);
+      const data = await getCommercialStats(commercialId, selectedPeriod, dateFrom, dateTo);
       setStatsMap((prev) => ({ ...prev, [commercialId]: data }));
     } catch (err) {
       logger.error('Erreur rafraichissement stats', { id: commercialId, error: err instanceof Error ? err.message : String(err) });
@@ -140,7 +139,13 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
     } finally {
       setStatsLoading((prev) => ({ ...prev, [commercialId]: false }));
     }
-  }, [addToast]);
+  }, [selectedPeriod, dateFrom, dateTo, addToast]);
+
+  // Recharger les stats du commercial sélectionné quand la période du dashboard change
+  useEffect(() => {
+    if (!statsPanel) return;
+    void handleRefreshStats(statsPanel.id);
+  }, [selectedPeriod, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
   const [formName, setFormName] = useState('');
   const [formPosteId, setFormPosteId] = useState<string | null>(null);
   const [formPassword, setFormPassword] = useState<string>('');

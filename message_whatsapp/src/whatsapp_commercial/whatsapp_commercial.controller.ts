@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Logger,
+  Query,
 } from '@nestjs/common';
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
@@ -40,8 +41,13 @@ export class WhatsappCommercialController {
   }
 
   @Get(':id/stats')
-  async getStats(@Param('id') id: string) {
-    return this.commercialStatsService.getStats(id);
+  async getStats(
+    @Param('id') id: string,
+    @Query('periode') periode = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.commercialStatsService.getStats(id, periode, dateFrom, dateTo);
   }
 
   @Get(':id')
