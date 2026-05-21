@@ -732,10 +732,15 @@ export class WhatsappMessageGateway
         agent.commercialId,
         payload.chatId,
       );
-      client.emit('conversation:read:ack', { markedCount: result.markedCount });
+      const chat = await this.chatService.findBychat_id(payload.chatId);
+      client.emit('conversation:read:ack', {
+        markedCount: result.markedCount,
+        chatId: payload.chatId,
+        unreadCount: chat?.unread_count ?? 0,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur lors du marquage';
-      client.emit('conversation:read:ack', { markedCount: 0, error: message });
+      client.emit('conversation:read:ack', { markedCount: 0, chatId: payload.chatId, unreadCount: 0, error: message });
     }
   }
 

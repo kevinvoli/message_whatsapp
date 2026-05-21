@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappMessage, MessageDirection } from './entities/whatsapp_message.entity';
@@ -37,15 +37,13 @@ export class MessageReadService {
       return { markedCount: 0 };
     }
 
-    const allowed = this.rateLimiter.checkAndConsume(commercialId, messages.length, maxPerMinute);
-    if (!allowed) {
-      throw new HttpException(
-        `Limite de lecture dépassée : maximum ${maxPerMinute} message(s) par minute.`,
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+    const granted = this.rateLimiter.consumeUpTo(commercialId, messages.length, maxPerMinute);
+    if (granted === 0) {
+      return { markedCount: 0 };
     }
 
-    const ids = messages.map((m) => m.id);
+    const toMark = messages.slice(0, granted);
+    const ids = toMark.map((m) => m.id);
     await this.messageRepository
       .createQueryBuilder()
       .update(WhatsappMessage)
@@ -60,12 +58,12 @@ export class MessageReadService {
       .createQueryBuilder()
       .update(WhatsappCommercial)
       .set({
-        messagesReadCount: () => `messages_read_count + ${messages.length}`,
+        messagesReadCount: () => `messages_read_count + ${granted}`,
         lastActivityAt: () => 'NOW()',
       })
       .where('id = :id', { id: commercialId })
       .execute();
 
-    return { markedCount: messages.length };
+    return { markedCount: granted };
   }
 }
