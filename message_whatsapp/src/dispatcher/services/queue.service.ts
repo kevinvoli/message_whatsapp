@@ -222,7 +222,7 @@ export class QueueService implements OnModuleInit {
             .addSelect('COUNT(*)', 'count')
             .where('chat.poste_id IN (:...posteIds)', { posteIds })
             .andWhere('chat.status IN (:...statuses)', {
-              statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+              statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME],
             })
             .groupBy('chat.poste_id')
             .getRawMany<{ poste_id: string; count: string }>();
@@ -280,7 +280,7 @@ export class QueueService implements OnModuleInit {
         .addSelect('COUNT(*)', 'count')
         .where('chat.poste_id IN (:...fallbackIds)', { fallbackIds })
         .andWhere('chat.status IN (:...statuses)', {
-          statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+          statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME],
         })
         .groupBy('chat.poste_id')
         .getRawMany<{ poste_id: string; count: string }>();
