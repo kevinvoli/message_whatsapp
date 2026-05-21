@@ -60,7 +60,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     CampaignLinkModule,
     LoggingModule,
     CallLogModule,
-    JorbsModule,
+    forwardRef(() => JorbsModule),
     NotificationModule,
     WhatsappTemplateModule,
   ],

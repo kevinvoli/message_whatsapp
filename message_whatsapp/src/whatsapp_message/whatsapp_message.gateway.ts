@@ -24,6 +24,7 @@ import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { MessageAutoService } from 'src/message-auto/message-auto.service';
 
 import { WhatsappMessage } from './entities/whatsapp_message.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import {
   WhatsappChat,
   WhatsappChatStatus,
@@ -38,6 +39,7 @@ import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
+import { MessageReadService } from './message-read.service';
 
 type AuthPayload = {
   sub: string;
@@ -83,6 +85,8 @@ export class WhatsappMessageGateway
     private readonly autoMessageService: MessageAutoService,
     @InjectRepository(WhatsappMessage)
     private readonly messageRepository: Repository<WhatsappMessage>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepository: Repository<WhatsappCommercial>,
     private readonly contactService: ContactService,
     private readonly jwtService: JwtService,
     private readonly channelService: ChannelService,
@@ -90,6 +94,7 @@ export class WhatsappMessageGateway
     private readonly callLogService: CallLogService,
     private readonly notificationService: NotificationService,
     private readonly systemAlert: SystemAlertService,
+    private readonly messageReadService: MessageReadService,
   ) {}
 
   afterInit(server: Server): void {
@@ -157,6 +162,7 @@ export class WhatsappMessageGateway
     );
 
     await this.commercialService.updateStatus(commercialId, true);
+    await this.commercialRepository.update(commercialId, { lastActivityAt: new Date() });
     await this.posteService.setActive(posteId, true);
     const poste = await this.posteService.findOneById(posteId);
     if (poste.is_queue_enabled) {
@@ -711,6 +717,26 @@ export class WhatsappMessageGateway
         hasMore,
       },
     });
+  }
+
+  @SubscribeMessage('conversation:read')
+  async handleConversationRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chatId: string },
+  ) {
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+
+    try {
+      const result = await this.messageReadService.markConversationAsRead(
+        agent.commercialId,
+        payload.chatId,
+      );
+      client.emit('conversation:read:ack', { markedCount: result.markedCount });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur lors du marquage';
+      client.emit('conversation:read:ack', { markedCount: 0, error: message });
+    }
   }
 
   @SubscribeMessage('messages:read')

@@ -13,6 +13,7 @@ import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
+import { CommercialStatsService } from './commercial-stats.service';
 
 @Controller('users')
 @UseGuards(AdminGuard) // Use AdminGuard
@@ -21,6 +22,7 @@ export class WhatsappCommercialController {
 
   constructor(
     private readonly whatsappCommercialService: WhatsappCommercialService,
+    private readonly commercialStatsService: CommercialStatsService,
   ) {}
 
   @Post()
@@ -35,6 +37,11 @@ export class WhatsappCommercialController {
   @Get()
   async findAll() {
     return await this.whatsappCommercialService.getCommercialsDashboard();
+  }
+
+  @Get(':id/stats')
+  async getStats(@Param('id') id: string) {
+    return this.commercialStatsService.getStats(id);
   }
 
   @Get(':id')

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, LogOut } from 'lucide-react';
-import { PerformanceCommercial, Poste } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow } from '@/app/lib/api';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff } from 'lucide-react';
+import { PerformanceCommercial, Poste, CommercialStatsDto } from '@/app/lib/definitions';
+import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
@@ -91,6 +91,39 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [formIsActive, setFormIsActive] = useState(true);
+
+  // Stats temps réel par commercial
+  const [statsMap, setStatsMap] = useState<Record<string, CommercialStatsDto>>({});
+  const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
+  const [statsPanel, setStatsPanel] = useState<PerformanceCommercial | null>(null);
+
+  const handleOpenStatsPanel = useCallback(async (commercial: PerformanceCommercial) => {
+    setStatsPanel(commercial);
+    if (statsMap[commercial.id]) return; // Déjà chargé
+    setStatsLoading((prev) => ({ ...prev, [commercial.id]: true }));
+    try {
+      const data = await getCommercialStats(commercial.id);
+      setStatsMap((prev) => ({ ...prev, [commercial.id]: data }));
+    } catch (err) {
+      logger.error('Erreur chargement stats commercial', { id: commercial.id, error: err instanceof Error ? err.message : String(err) });
+      addToast({ type: 'error', message: 'Impossible de charger les statistiques.' });
+    } finally {
+      setStatsLoading((prev) => ({ ...prev, [commercial.id]: false }));
+    }
+  }, [statsMap, addToast]);
+
+  const handleRefreshStats = useCallback(async (commercialId: string) => {
+    setStatsLoading((prev) => ({ ...prev, [commercialId]: true }));
+    try {
+      const data = await getCommercialStats(commercialId);
+      setStatsMap((prev) => ({ ...prev, [commercialId]: data }));
+    } catch (err) {
+      logger.error('Erreur rafraichissement stats', { id: commercialId, error: err instanceof Error ? err.message : String(err) });
+      addToast({ type: 'error', message: 'Impossible de rafraichir les statistiques.' });
+    } finally {
+      setStatsLoading((prev) => ({ ...prev, [commercialId]: false }));
+    }
+  }, [addToast]);
   const [formName, setFormName] = useState('');
   const [formPosteId, setFormPosteId] = useState<string | null>(null);
   const [formPassword, setFormPassword] = useState<string>('');
@@ -479,14 +512,24 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                           onClick={() => setSelectedDetail(commercial)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           title="Voir les details"
+                          aria-label="Voir les details"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleOpenStatsPanel(commercial)}
+                          className="p-1 text-violet-600 hover:bg-violet-50 rounded"
+                          title="Voir les statistiques d'activite"
+                          aria-label="Statistiques d'activite"
+                        >
+                          <BarChart3 className="w-4 h-4" />
                         </button>
                         {onViewConversations && (
                           <button
                             onClick={() => onViewConversations(commercial.id, commercial.poste_id ?? '')}
                             className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
                             title="Voir les conversations"
+                            aria-label="Voir les conversations"
                           >
                             <MessageSquare className="w-4 h-4" />
                           </button>
@@ -496,6 +539,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           disabled={loading}
                           title="Modifier"
+                          aria-label="Modifier"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -504,6 +548,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                           className="p-1 text-red-600 hover:bg-red-50 rounded"
                           disabled={loading}
                           title="Supprimer"
+                          aria-label="Supprimer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -618,6 +663,144 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Panneau statistiques d'activite */}
+      {statsPanel && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setStatsPanel(null)}
+                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                aria-label="Fermer le panneau de statistiques"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Statistiques — {statsPanel.name}
+                </h3>
+                <p className="text-sm text-gray-500">{statsPanel.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => void handleRefreshStats(statsPanel.id)}
+              disabled={statsLoading[statsPanel.id]}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              aria-label="Rafraichir les statistiques"
+            >
+              <RefreshCw className={`w-4 h-4 ${statsLoading[statsPanel.id] ? 'animate-spin' : ''}`} />
+              Rafraichir
+            </button>
+          </div>
+
+          <div className="p-6">
+            {statsLoading[statsPanel.id] && !statsMap[statsPanel.id] ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent" />
+              </div>
+            ) : statsMap[statsPanel.id] ? (
+              <>
+                {/* Statut en ligne */}
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 w-fit">
+                  {statsMap[statsPanel.id].isOnline ? (
+                    <Wifi className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <WifiOff className="w-4 h-4 text-gray-400" />
+                  )}
+                  <span className="text-sm text-gray-700">
+                    {statsMap[statsPanel.id].isOnline ? 'En ligne' : 'Hors ligne'}
+                  </span>
+                </div>
+
+                {/* Grille de metriques */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MessageCircle className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs text-blue-700 font-medium">Messages recus</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {statsMap[statsPanel.id].messagesRead}
+                    </p>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCheck className="w-4 h-4 text-green-600" />
+                      <span className="text-xs text-green-700 font-medium">Messages traites</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-900">
+                      {statsMap[statsPanel.id].messagesHandled}
+                    </p>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Activity className="w-4 h-4 text-purple-600" />
+                      <span className="text-xs text-purple-700 font-medium">Conv. actives</span>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {statsMap[statsPanel.id].activeConversations}
+                    </p>
+                  </div>
+
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="w-4 h-4 text-orange-600" />
+                      <span className="text-xs text-orange-700 font-medium">Derniere activite</span>
+                    </div>
+                    <p className="text-sm font-semibold text-orange-900 leading-tight">
+                      {formatDate(statsMap[statsPanel.id].lastActivityAt)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Taux de reponse */}
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-gray-700">Taux de reponse</span>
+                    <span
+                      className={`text-lg font-bold ${
+                        statsMap[statsPanel.id].responseRate >= 80
+                          ? 'text-green-600'
+                          : statsMap[statsPanel.id].responseRate >= 60
+                            ? 'text-orange-500'
+                            : 'text-red-500'
+                      }`}
+                    >
+                      {statsMap[statsPanel.id].responseRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div
+                    className="w-full h-3 bg-gray-100 rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={statsMap[statsPanel.id].responseRate}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Taux de reponse : ${statsMap[statsPanel.id].responseRate.toFixed(1)}%`}
+                  >
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        statsMap[statsPanel.id].responseRate >= 80
+                          ? 'bg-green-500'
+                          : statsMap[statsPanel.id].responseRate >= 60
+                            ? 'bg-orange-400'
+                            : 'bg-red-400'
+                      }`}
+                      style={{ width: `${Math.min(statsMap[statsPanel.id].responseRate, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-8">
+                Aucune donnee disponible.
+              </p>
+            )}
           </div>
         </div>
       )}

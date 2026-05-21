@@ -206,6 +206,16 @@ export class WhatsappMessageService {
       this.logger.log(
         `OUTBOUND_PERSISTED trace=${traceId} db_message_id=${mes.id}`,
       );
+      if (data.commercial_id) {
+        await this.commercialRepository.increment(
+          { id: data.commercial_id },
+          'messagesHandledCount',
+          1,
+        );
+        await this.commercialRepository.update(data.commercial_id, {
+          lastActivityAt: new Date(),
+        });
+      }
       await this.chatRepository.update(
         { chat_id: chat.chat_id },
         {

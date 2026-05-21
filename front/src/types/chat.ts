@@ -58,6 +58,17 @@ export type StatsState = {
   updateStats: (updates: Partial<Stats>) => void;
 };
 
+/** Réponse de GET /commercials/:id/stats */
+export type CommercialStatsDto = {
+  commercialId: string;
+  messagesRead: number;
+  messagesHandled: number;
+  activeConversations: number;
+  responseRate: number;
+  lastActivityAt: string | null;
+  isOnline: boolean;
+};
+
 export const getPriorityColor = (
   priority: "haute" | "moyenne" | "basse" | string,
 ) => {

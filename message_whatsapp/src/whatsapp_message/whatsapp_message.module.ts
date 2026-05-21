@@ -42,6 +42,8 @@ import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { MessageReadService } from './message-read.service';
+import { MessageReadRateLimiterService } from './message-read-rate-limiter.service';
 
 @Module({
   imports: [
@@ -97,11 +99,15 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     WhatsappPosteService,
     MessageAutoService,
     SocketThrottleGuard,
+    MessageReadService,
+    MessageReadRateLimiterService,
   ],
   exports: [
     WhatsappMessageGateway,
     WhatsappMessageService,
     FirstResponseTimeoutJob,
+    MessageReadService,
+    MessageReadRateLimiterService,
   ],
 })
 export class WhatsappMessageModule {}

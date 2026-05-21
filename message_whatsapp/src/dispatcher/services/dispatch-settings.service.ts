@@ -14,6 +14,9 @@ const DEFAULTS = {
   auto_message_delay_min_seconds: 20,
   auto_message_delay_max_seconds: 45,
   auto_message_max_steps: 3,
+  maxReadMessagesPerMinute: 1,
+  idleDisconnectEnabled: true,
+  idleDisconnectMinutes: 15,
 };
 
 @Injectable()

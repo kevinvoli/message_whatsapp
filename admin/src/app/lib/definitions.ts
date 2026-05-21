@@ -482,6 +482,20 @@ export type CommercialStats = {
 };
 
 /**
+ * Statistiques d'activité temps réel d'un commercial (GET /commercials/:id/stats)
+ */
+export type CommercialStatsDto = {
+  commercialId: string;
+  messagesRead: number;
+  messagesHandled: number;
+  activeConversations: number;
+  /** Pourcentage avec 1 décimale */
+  responseRate: number;
+  lastActivityAt: string | null;
+  isOnline: boolean;
+};
+
+/**
  * Performance détaillée d'un commercial
  */
 export type PerformanceCommercial = {

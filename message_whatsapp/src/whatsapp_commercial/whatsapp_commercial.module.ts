@@ -9,6 +9,7 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { CommercialStatsService } from './commercial-stats.service';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
     ]),
   ],
   controllers: [WhatsappCommercialController],
-  providers: [WhatsappCommercialService, QueueService],
-  exports: [WhatsappCommercialService],
+  providers: [WhatsappCommercialService, QueueService, CommercialStatsService],
+  exports: [WhatsappCommercialService, CommercialStatsService],
 })
 export class WhatsappCommercialModule {}

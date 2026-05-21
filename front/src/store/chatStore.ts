@@ -193,6 +193,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Toujours charger les messages depuis le serveur (pas de pré-chargement au connect)
     socket?.emit("messages:get", { chat_id });
     socket?.emit("messages:read", { chat_id });
+    // Notifier le backend que le commercial a ouvert cette conversation
+    socket?.emit("conversation:read", { chatId: chat_id });
   },
 
   updateConversationContactSummary: (chatId, summary) => {

@@ -297,6 +297,19 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
     delayMaxSeconds: null,
     maxSteps: null,
   },
+  'idle-disconnect': {
+    label: 'Déconnexion automatique — commerciaux inactifs',
+    description:
+      'Toutes les 5 min, déconnecte les commerciaux sans interaction depuis plus de N minutes (idle_disconnect_minutes dans les settings).',
+    enabled: true,
+    scheduleType: 'interval',
+    intervalMinutes: 5,
+    cronExpression: null,
+    ttlDays: null,
+    delayMinSeconds: null,
+    delayMaxSeconds: null,
+    maxSteps: null,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

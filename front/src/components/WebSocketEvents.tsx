@@ -303,11 +303,20 @@ const WebSocketEvents = () => {
       logger.debug('Queue updated', { reason: data.reason, size: data.data?.length });
     };
 
+    // Acquittement serveur après conversation:read — mise à jour locale du unreadCount
+    const handleConversationReadAck = (data: { chatId: string; unreadCount: number }) => {
+      const chatState = useChatStore.getState();
+      const existing = chatState.conversations.find((c) => c.chat_id === data.chatId);
+      if (!existing) return;
+      chatState.updateConversation({ ...existing, unreadCount: data.unreadCount });
+    };
+
     socket.on('chat:event', handleChatEvent);
     socket.on('contact:event', handleContactEvent);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
     socket.on('queue:updated', handleQueueUpdated);
+    socket.on('conversation:read:ack', handleConversationReadAck);
 
     if (socket.connected) {
       refreshAfterConnect();
@@ -319,6 +328,7 @@ const WebSocketEvents = () => {
       socket.off('error', handleSocketError);
       socket.off('connect', refreshAfterConnect);
       socket.off('queue:updated', handleQueueUpdated);
+      socket.off('conversation:read:ack', handleConversationReadAck);
       setSocket(null);
       setContactSocket(null);
     };

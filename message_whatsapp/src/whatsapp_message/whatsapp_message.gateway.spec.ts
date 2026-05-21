@@ -24,6 +24,8 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any, // callLogService
       { create: jest.fn().mockResolvedValue({}) } as any, // notificationService
       {} as any, // systemAlert
+      {} as any, // commercialRepository
+      {} as any, // messageReadService
     );
   };
 
