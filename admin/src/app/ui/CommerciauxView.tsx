@@ -1,5 +1,6 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle } from 'lucide-react';
+
 import { PerformanceCommercial, Poste, CommercialStatsDto } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
@@ -8,7 +9,7 @@ import { formatRelativeDate } from '@/app/lib/dateUtils';
 import { useCrudResource } from '../hooks/useCrudResource';
 import { EntityFormModal } from './crud/EntityFormModal';
 
-type CommerciauxTabKey = 'liste' | 'statistiques';
+type CommerciauxTabKey = 'liste' | 'detail' | 'statistiques';
 
 interface CommerciauxTab {
   key: CommerciauxTabKey;
@@ -18,6 +19,7 @@ interface CommerciauxTab {
 
 const COMMERCIAUX_TABS: CommerciauxTab[] = [
   { key: 'liste', label: 'Liste', icon: List },
+  { key: 'detail', label: 'Détail', icon: UserCircle },
   { key: 'statistiques', label: 'Statistiques', icon: BarChart3 },
 ];
 
@@ -553,7 +555,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setSelectedDetail(commercial)}
+                              onClick={() => { setSelectedDetail(commercial); setActiveTab('detail'); }}
                               className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                               title="Voir les details"
                               aria-label="Voir les details"
@@ -606,35 +608,61 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
             </div>
           </div>
 
-          {/* Detail commercial */}
-          {selectedDetail && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        </>
+      )}
+
+      {/* ─── Contenu onglet Détail ────────────────────────────────────── */}
+      {activeTab === 'detail' && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {/* Filtre par commercial */}
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <label htmlFor="detail-filter-commercial" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Commercial
+              </label>
+              <select
+                id="detail-filter-commercial"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={selectedDetail?.id ?? ''}
+                onChange={(e) => {
+                  const commercial = commerciaux.find((c) => c.id === e.target.value);
+                  setSelectedDetail(commercial ?? null);
+                }}
+              >
+                <option value="">— Sélectionner un commercial —</option>
+                {commerciaux.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}{c.isConnected ? ' 🟢' : ' ⚫'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {!selectedDetail ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+              <UserCircle className="w-10 h-10 opacity-30" />
+              <p className="text-sm">Sélectionnez un commercial dans le filtre ci-dessus pour afficher ses détails.</p>
+            </div>
+          ) : (
+            <>
               <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setSelectedDetail(null)}
-                    className="p-1 text-gray-500 hover:bg-gray-100 rounded"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </button>
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                        {selectedDetail.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${getStatusColor(selectedDetail.isConnected)} border-2 border-white rounded-full`}></div>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                      {selectedDetail.name.substring(0, 2).toUpperCase()}
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{selectedDetail.name}</h3>
-                      <div className="flex items-center gap-3 text-sm text-gray-500">
-                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {selectedDetail.email}</span>
-                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedDetail.poste_name || 'Non assigne'}</span>
-                      </div>
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 ${getStatusColor(selectedDetail.isConnected)} border-2 border-white rounded-full`} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{selectedDetail.name}</h3>
+                    <div className="flex items-center gap-3 text-sm text-gray-500">
+                      <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {selectedDetail.email}</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedDetail.poste_name || 'Non assigné'}</span>
                     </div>
                   </div>
                 </div>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                  }`}>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                   {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
                 </span>
               </div>
@@ -643,14 +671,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <MessageCircle className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs text-blue-700 font-medium">Messages envoyes</span>
+                    <span className="text-xs text-blue-700 font-medium">Messages envoyés</span>
                   </div>
                   <p className="text-2xl font-bold text-blue-900">{selectedDetail.nbMessagesEnvoyes}</p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <MessageCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-xs text-green-700 font-medium">Messages recus</span>
+                    <span className="text-xs text-green-700 font-medium">Messages reçus</span>
                   </div>
                   <p className="text-2xl font-bold text-green-900">{selectedDetail.nbMessagesRecus}</p>
                 </div>
@@ -664,7 +692,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                 <div className="bg-orange-50 p-4 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <TrendingUp className="w-4 h-4 text-orange-600" />
-                    <span className="text-xs text-orange-700 font-medium">Taux reponse</span>
+                    <span className="text-xs text-orange-700 font-medium">Taux réponse</span>
                   </div>
                   <p className="text-2xl font-bold text-orange-900">{selectedDetail.tauxReponse}%</p>
                 </div>
@@ -675,7 +703,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                   <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Performance</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Temps reponse moyen</span>
+                      <span className="text-gray-500">Temps réponse moyen</span>
                       <span className="font-semibold text-gray-900">{formatTemps(selectedDetail.tempsReponseMoyen)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
@@ -694,7 +722,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                   <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Informations</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Derniere connexion</span>
+                      <span className="text-gray-500">Dernière connexion</span>
                       <span className="font-semibold text-gray-900">{formatDate(selectedDetail.lastConnectionAt)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
@@ -708,18 +736,44 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
-        </>
+        </div>
       )}
 
       {/* ─── Contenu onglet Statistiques ──────────────────────────────── */}
       {activeTab === 'statistiques' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {/* Filtre par commercial */}
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <label htmlFor="stats-filter-commercial" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Commercial
+              </label>
+              <select
+                id="stats-filter-commercial"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                value={statsPanel?.id ?? ''}
+                onChange={(e) => {
+                  const commercial = commerciaux.find((c) => c.id === e.target.value);
+                  if (commercial) void handleOpenStatsPanel(commercial);
+                  else setStatsPanel(null);
+                }}
+              >
+                <option value="">— Sélectionner un commercial —</option>
+                {commerciaux.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}{c.isConnected ? ' 🟢' : ' ⚫'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {!statsPanel ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
               <BarChart3 className="w-10 h-10 opacity-30" />
-              <p className="text-sm">Cliquez sur l&apos;icône statistiques d&apos;un commercial dans l&apos;onglet Liste pour afficher ses métriques ici.</p>
+              <p className="text-sm">Sélectionnez un commercial dans le filtre ci-dessus pour afficher ses métriques.</p>
             </div>
           ) : (
             <>
