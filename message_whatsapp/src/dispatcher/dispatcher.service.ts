@@ -568,7 +568,7 @@ export class DispatcherService {
    *  3. Déplacer uniquement les excédents des postes surchargés vers les postes sous-chargés
    * Résultat : tous les postes ont le même nombre de conversations non lues après exécution.
    */
-  async jobRunnerAllPostes(thresholdMinutes = 15, batchSize = 300): Promise<string> {
+  async jobRunnerAllPostes(thresholdMinutes = 20, batchSize = 300): Promise<string> {
     if (this.isSlaRunning) {
       this.logger.warn('SLA checker déjà en cours — cycle ignoré');
       return 'Ignoré — cycle précédent encore en cours';
