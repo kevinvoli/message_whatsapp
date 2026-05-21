@@ -204,7 +204,7 @@ export class QueueService implements OnModuleInit {
         const modeRows = await this.dataSource.query<{ queue_mode: string }[]>(
           'SELECT queue_mode FROM dispatch_settings LIMIT 1',
         );
-        const mode = (modeRows[0]?.queue_mode ?? 'least_loaded') as 'least_loaded' | 'round_robin';
+        const mode = (modeRows[0]?.queue_mode ?? 'round_robin') as 'least_loaded' | 'round_robin';
 
         let best = candidates[0];
 

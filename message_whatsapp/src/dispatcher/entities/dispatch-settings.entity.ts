@@ -15,7 +15,7 @@ export class DispatchSettings {
     name: 'queue_mode',
     type: 'varchar',
     length: 20,
-    default: 'least_loaded',
+    default: 'round_robin',
   })
   queue_mode: 'least_loaded' | 'round_robin';
 
