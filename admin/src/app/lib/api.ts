@@ -1356,7 +1356,7 @@ export async function getChannelDetailStats(
  * Endpoint : GET /commercials/:id/stats
  */
 export async function getCommercialStats(commercialId: string): Promise<CommercialStatsDto> {
-    const response = await fetch(`${API_BASE_URL}/commercials/${encodeURIComponent(commercialId)}/stats`, {
+    const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(commercialId)}/stats`, {
         method: 'GET',
         credentials: 'include',
     });

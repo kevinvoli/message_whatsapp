@@ -30,7 +30,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * Endpoint : GET /commercials/:id/stats
  */
 export async function getCommercialStats(commercialId: string): Promise<CommercialStatsDto> {
-  const response = await fetch(`${API_BASE_URL}/commercials/${commercialId}/stats`, {
+  const response = await fetch(`${API_BASE_URL}/users/${commercialId}/stats`, {
     method: 'GET',
     credentials: 'include',
   });
