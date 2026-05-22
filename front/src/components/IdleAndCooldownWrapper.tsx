@@ -1,27 +1,51 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
 import IdleWarningModal from '@/components/IdleWarningModal';
 import ReadCooldownModal from '@/components/ReadCooldownModal';
 
-const IDLE_DISCONNECT_MINUTES_DEFAULT = 15;
-const IDLE_WARNING_SECONDS_DEFAULT = 10;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+
+interface ClientSettings {
+  readCooldownSeconds: number;
+  idleDisconnectMinutes: number;
+  idleWarningSeconds: number;
+}
+
+const DEFAULTS: ClientSettings = {
+  readCooldownSeconds: 120,
+  idleDisconnectMinutes: 15,
+  idleWarningSeconds: 10,
+};
 
 const IdleAndCooldownWrapper: React.FC = () => {
   const { user } = useAuth();
   const showCooldownModal = useChatStore((s) => s.showCooldownModal);
   const setCooldownModal = useChatStore((s) => s.setCooldownModal);
   const cooldownRemainingMs = useChatStore((s) => s.cooldownRemainingMs);
+  const setCooldownConfig = useChatStore((s) => s.setCooldownConfig);
 
-  const idleMinutes = IDLE_DISCONNECT_MINUTES_DEFAULT;
-  const warningSeconds = IDLE_WARNING_SECONDS_DEFAULT;
+  const [settings, setSettings] = useState<ClientSettings>(DEFAULTS);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${API_BASE_URL}/auth/me/settings`, { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: ClientSettings | null) => {
+        if (data) {
+          setSettings(data);
+          setCooldownConfig(data.readCooldownSeconds);
+        }
+      })
+      .catch(() => {});
+  }, [user, setCooldownConfig]);
 
   const { showWarning, idleSeconds, remainingSeconds, resetActivity } = useIdleTimer(
-    user ? idleMinutes : 0,
-    warningSeconds,
+    user ? settings.idleDisconnectMinutes : 0,
+    settings.idleWarningSeconds,
   );
 
   useEffect(() => {

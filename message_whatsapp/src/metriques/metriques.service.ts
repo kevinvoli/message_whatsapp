@@ -529,14 +529,14 @@ export class MetriquesService {
             .getRawMany()
         : Promise.resolve([]),
 
-      // Req 3 — Messages OUT par commercial (utilise IDX_msg_commercial_dir_time)
+      // Req 3 — Messages traités (is_first_reply) par commercial
       commercialIds.length > 0
         ? this.messageRepository
             .createQueryBuilder('msg')
             .select('msg.commercial_id', 'commercial_id')
             .addSelect('COUNT(*)',        'count')
             .where('msg.commercial_id IN (:...commercialIds)', { commercialIds })
-            .andWhere('msg.direction = "OUT"')
+            .andWhere('msg.isFirstReply = :isFirstReply', { isFirstReply: true })
             .andWhere('msg.deletedAt IS NULL')
             .andWhere('msg.createdAt >= :dateStart', { dateStart })
             .andWhere('msg.createdAt <= :dateEnd',   { dateEnd })
@@ -597,7 +597,7 @@ export class MetriquesService {
 
     // ── Lookup Maps O(1) ──────────────────────────────────────────────────────
     const msgInMap     = new Map(msgInRows.map((r)     => [r.poste_id,      parseInt(r.count) || 0]));
-    const msgOutMap    = new Map(msgOutRows.map((r)    => [r.commercial_id, parseInt(r.count) || 0]));
+    const msgOutMap    = new Map(msgOutRows.map((r)    => [r.commercial_id, parseInt(r.count) || 0])); // premiers tours de réponse
     const chatsMap     = new Map(chatsActifsRows.map((r) => [r.poste_id,   parseInt(r.count) || 0]));
     const tempsParPoste = new Map(tempsRows.map((r)   => [r.poste_id,      parseInt(r.avg)   || 0]));
 

@@ -15,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import { CommercialStatsService } from 'src/whatsapp_commercial/commercial-stats.service';
+import { DispatchSettingsService } from 'src/dispatcher/services/dispatch-settings.service';
 
 @Controller('auth')
 export class AuthController {
@@ -22,6 +23,7 @@ export class AuthController {
     private authService: AuthService,
     private readonly connectionLogService: ConnectionLogService,
     private readonly commercialStatsService: CommercialStatsService,
+    private readonly dispatchSettingsService: DispatchSettingsService,
   ) {}
 
   @Post('login')
@@ -58,6 +60,17 @@ export class AuthController {
     });
 
     return { user, accessToken };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/settings')
+  async getMySettings() {
+    const s = await this.dispatchSettingsService.getSettings();
+    return {
+      readCooldownSeconds:   s.readCooldownSeconds   ?? 120,
+      idleDisconnectMinutes: s.idleDisconnectMinutes  ?? 15,
+      idleWarningSeconds:    s.idleWarningSeconds     ?? 10,
+    };
   }
 
   @UseGuards(AuthGuard('jwt'))
