@@ -268,6 +268,9 @@ export class WhatsappMessage {
   @JoinColumn({ name: 'read_by_commercial_id' })
   readByCommercial?: WhatsappCommercial | null;
 
+  @Column({ name: 'is_first_reply', type: 'tinyint', nullable: true, default: null })
+  isFirstReply: boolean | null;
+
   @CreateDateColumn({
     name: 'createdAt',
     type: 'timestamp',

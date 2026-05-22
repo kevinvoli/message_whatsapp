@@ -227,7 +227,10 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     if (!settings) return;
     try {
       setSavingRateLimit(true);
-      const saved = await updateDispatchSettings({ maxReadMessagesPerMinute: settings.maxReadMessagesPerMinute });
+      const saved = await updateDispatchSettings({
+        maxReadMessagesPerMinute: settings.maxReadMessagesPerMinute,
+        readCooldownSeconds: settings.readCooldownSeconds,
+      });
       setSettings(saved);
       addToast({ type: 'success', message: 'Parametre rate limit lecture sauvegarde.' });
     } catch (error) {
@@ -240,6 +243,29 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
     }
   };
 
+  // ── Sauvegarde Cooldown lecture ────────────────────────────────────────────
+
+  const [savingReadCooldown, setSavingReadCooldown] = useState(false);
+
+  const handleSaveReadCooldown = async () => {
+    if (!settings) return;
+    try {
+      setSavingReadCooldown(true);
+      const saved = await updateDispatchSettings({
+        readCooldownSeconds: settings.readCooldownSeconds,
+      });
+      setSettings(saved);
+      addToast({ type: 'success', message: 'Cooldown lecture sauvegardé.' });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur sauvegarde cooldown lecture.',
+      });
+    } finally {
+      setSavingReadCooldown(false);
+    }
+  };
+
   // ── Sauvegarde Deconnexion inactivite ──────────────────────────────────────
 
   const handleSaveIdleDisconnect = async () => {
@@ -249,6 +275,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       const saved = await updateDispatchSettings({
         idleDisconnectEnabled: settings.idleDisconnectEnabled,
         idleDisconnectMinutes: settings.idleDisconnectMinutes,
+        idleWarningSeconds: settings.idleWarningSeconds,
       });
       setSettings(saved);
       addToast({ type: 'success', message: 'Parametres deconnexion inactivite sauvegardes.' });
@@ -543,6 +570,29 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                 />
                 <p className="mt-1 text-[11px] text-gray-400">Min: 1 — Max: 60 messages par minute</p>
               </div>
+
+              <div className="mt-4 max-w-xs">
+                <label
+                  htmlFor="readCooldownSeconds"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                >
+                  Cooldown entre lectures (secondes)
+                </label>
+                <input
+                  id="readCooldownSeconds"
+                  type="number"
+                  min={30}
+                  max={3600}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                  value={settings.readCooldownSeconds ?? 120}
+                  onChange={(e) =>
+                    setSettings({ ...settings, readCooldownSeconds: Number(e.target.value) })
+                  }
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Temps d&apos;attente entre deux ouvertures de conv non lues. Min: 30 s — Max: 3600 s
+                </p>
+              </div>
             </div>
           )}
 
@@ -615,6 +665,30 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                       }
                     />
                     <p className="mt-1 text-[11px] text-gray-400">Min: 1 min — Max: 480 min (8 heures)</p>
+                  </div>
+                )}
+
+                {/* Secondes d'avertissement */}
+                {(settings.idleDisconnectEnabled ?? false) && (
+                  <div className="max-w-xs">
+                    <label
+                      htmlFor="idleWarningSeconds"
+                      className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                    >
+                      Secondes d&apos;avertissement avant déconnexion
+                    </label>
+                    <input
+                      id="idleWarningSeconds"
+                      type="number"
+                      min={5}
+                      max={60}
+                      className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                      value={settings.idleWarningSeconds ?? 10}
+                      onChange={(e) =>
+                        setSettings({ ...settings, idleWarningSeconds: Number(e.target.value) })
+                      }
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">Min: 5 s — Max: 60 s</p>
                   </div>
                 )}
               </div>

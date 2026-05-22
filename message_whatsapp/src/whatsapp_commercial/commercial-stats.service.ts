@@ -82,7 +82,7 @@ export class CommercialStatsService {
       this.messageRepository
         .createQueryBuilder('m')
         .where('m.commercial_id = :id', { id: commercialId })
-        .andWhere('m.direction = :direction', { direction: MessageDirection.OUT })
+        .andWhere('m.isFirstReply = :isFirstReply', { isFirstReply: true })
         .andWhere('m.createdAt >= :dateStart', { dateStart })
         .andWhere('m.createdAt <= :dateEnd', { dateEnd })
         .getCount(),

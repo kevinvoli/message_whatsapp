@@ -369,6 +369,10 @@ export type DispatchSettings = {
   idleDisconnectEnabled?: boolean;
   /** Durée d'inactivité en minutes avant déconnexion automatique (1–480) */
   idleDisconnectMinutes?: number;
+  /** Durée du cooldown entre deux ouvertures de conv non lues en secondes (30–3600) */
+  readCooldownSeconds?: number;
+  /** Secondes d'avertissement avant déconnexion automatique (5–60) */
+  idleWarningSeconds?: number;
 };
 
 export type AutoMessageScopeType = 'poste' | 'canal' | 'provider';

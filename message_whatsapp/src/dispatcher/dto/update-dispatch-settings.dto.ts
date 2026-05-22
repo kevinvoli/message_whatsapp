@@ -62,4 +62,16 @@ export class UpdateDispatchSettingsDto {
   @Min(1)
   @Max(480)
   idleDisconnectMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(30)
+  @Max(3600)
+  readCooldownSeconds?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(60)
+  idleWarningSeconds?: number;
 }

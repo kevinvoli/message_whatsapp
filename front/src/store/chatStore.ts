@@ -77,6 +77,14 @@ interface ChatState {
   updateConversationContactSummary: (chatId: string, summary: Partial<ContactSummary>) => void;
   setTotalUnread: (count: number) => void;
 
+  // Cooldown sélection conversations non lues
+  lastUnreadOpenedAt: number | null;
+  readCooldownSeconds: number;
+  showCooldownModal: boolean;
+  setCooldownConfig: (seconds: number) => void;
+  cooldownRemainingMs: () => number;
+  setCooldownModal: (v: boolean) => void;
+
   reset: () => void;
 }
 
@@ -107,6 +115,9 @@ const initialState: Omit<
   | "loadMoreMessages"
   | "updateConversationContactSummary"
   | "setTotalUnread"
+  | "setCooldownConfig"
+  | "cooldownRemainingMs"
+  | "setCooldownModal"
 > = {
   socket: null,
   conversations: [],
@@ -124,6 +135,9 @@ const initialState: Omit<
   isLoadingMoreConversations: false,
   conversationCursor: null,
   currentSearch: '',
+  lastUnreadOpenedAt: null,
+  readCooldownSeconds: 120,
+  showCooldownModal: false,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -165,29 +179,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   selectConversation: (chat_id: string) => {
-    set((state) => {
-      const conversation = state.conversations.find(
-        (c) => c.chat_id === chat_id,
-      );
+    const state = get();
+    const conversation = state.conversations.find((c) => c.chat_id === chat_id);
+    if (!conversation) return;
 
-      if (!conversation) return state;
+    // Vérification cooldown pour les conversations non lues
+    if ((conversation.unreadCount ?? 0) > 0) {
+      const remaining = state.cooldownRemainingMs();
+      if (remaining > 0) {
+        set({ showCooldownModal: true });
+        return;
+      }
+      set({ lastUnreadOpenedAt: Date.now() });
+    }
 
-      return {
-        selectedConversation: { ...conversation, unreadCount: 0 },
-        conversations: state.conversations.map((c) =>
-          c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
-        ),
-        messages: [],
-        isLoading: true,
-        isLoadingMore: false,
-        hasMoreMessages: true,
-        messageIdCache: {
-          ...state.messageIdCache,
-          [chat_id]: new Set<string>(),
-        },
-        replyToMessage: null,
-      };
-    });
+    set((s) => ({
+      selectedConversation: { ...conversation, unreadCount: 0 },
+      conversations: s.conversations.map((c) =>
+        c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
+      ),
+      messages: [],
+      isLoading: true,
+      isLoadingMore: false,
+      hasMoreMessages: true,
+      messageIdCache: {
+        ...s.messageIdCache,
+        [chat_id]: new Set<string>(),
+      },
+      replyToMessage: null,
+    }));
 
     const socket = get().socket;
     // Toujours charger les messages depuis le serveur (pas de pré-chargement au connect)
@@ -208,6 +228,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setTotalUnread: (count: number) => set({ totalUnread: count }),
+
+  setCooldownConfig: (seconds: number) => set({ readCooldownSeconds: seconds }),
+
+  cooldownRemainingMs: (): number => {
+    const { lastUnreadOpenedAt, readCooldownSeconds } = get();
+    if (lastUnreadOpenedAt === null) return 0;
+    const elapsed = Date.now() - lastUnreadOpenedAt;
+    const remaining = readCooldownSeconds * 1000 - elapsed;
+    return remaining > 0 ? remaining : 0;
+  },
+
+  setCooldownModal: (v: boolean) => set({ showCooldownModal: v }),
 
   removeConversationBychat_id: (chat_id: string) => {
     set((state) => ({
@@ -606,5 +638,5 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  reset: () => set({ ...initialState }),
+  reset: () => set({ ...initialState, lastUnreadOpenedAt: null, readCooldownSeconds: 120, showCooldownModal: false }),
 }));

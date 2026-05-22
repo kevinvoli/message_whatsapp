@@ -179,6 +179,7 @@ export class MetriquesService {
       .select('COUNT(*)', 'total')
       .addSelect('SUM(CASE WHEN message.direction = "IN"  THEN 1 ELSE 0 END)', 'entrants')
       .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'sortants')
+      .addSelect('SUM(CASE WHEN message.isFirstReply = true THEN 1 ELSE 0 END)', 'premiers_tours')
       .where('message.deletedAt IS NULL')
       .andWhere('message.createdAt >= :dateStart', { dateStart })
       .andWhere('message.createdAt <= :dateEnd', { dateEnd })
@@ -187,8 +188,9 @@ export class MetriquesService {
     const totalMessages    = parseInt(stats?.total)    || 0;
     const messagesEntrants = parseInt(stats?.entrants) || 0;
     const messagesSortants = parseInt(stats?.sortants) || 0;
+    const premiersToursReponse = parseInt(stats?.premiers_tours) || 0;
     const tauxReponse = messagesEntrants > 0
-      ? Math.round((messagesSortants / messagesEntrants) * 100)
+      ? Math.round((premiersToursReponse / messagesEntrants) * 100)
       : 0;
 
     // Requête 2 : temps de réponse moyen

@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthProvider";
 import { SocketProvider } from "@/contexts/SocketProvider";
 import WebSocketEvents from "@/components/WebSocketEvents";
+import IdleAndCooldownWrapper from "@/components/IdleAndCooldownWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({
         <AuthProvider>
           <SocketProvider>
             <WebSocketEvents />
+            <IdleAndCooldownWrapper />
             {children}
           </SocketProvider>
         </AuthProvider>

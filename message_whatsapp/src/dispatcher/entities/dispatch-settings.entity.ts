@@ -70,6 +70,12 @@ export class DispatchSettings {
   @Column({ name: 'idle_disconnect_minutes', type: 'int', default: 15 })
   idleDisconnectMinutes: number;
 
+  @Column({ name: 'read_cooldown_seconds', type: 'int', default: 120 })
+  readCooldownSeconds: number;
+
+  @Column({ name: 'idle_warning_seconds', type: 'int', default: 10 })
+  idleWarningSeconds: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

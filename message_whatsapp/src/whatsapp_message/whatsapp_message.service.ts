@@ -178,6 +178,13 @@ export class WhatsappMessageService {
         throw new NotFoundException('Channel not found');
       }
 
+      // Déterminer si c'est la première réponse après un tour client
+      const lastAnyMessage = await this.messageRepository.findOne({
+        where: { chat_id: data.chat_id },
+        order: { timestamp: 'DESC' },
+      });
+      const isFirstReply = lastAnyMessage?.direction === MessageDirection.IN ? true : false;
+
       // 2️⃣ Création message DB
       const messageEntity = this.messageRepository.create({
         message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
@@ -200,6 +207,7 @@ export class WhatsappMessageService {
         contact: null,
         quotedMessage: quotedMsg ?? undefined,
         dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
+        isFirstReply,
       });
 
       const mes = await this.messageRepository.save(messageEntity);
@@ -337,6 +345,13 @@ export class WhatsappMessageService {
         throw new NotFoundException('Channel not found');
       }
 
+      // Déterminer si c'est la première réponse après un tour client
+      const lastAnyMessageMedia = await this.messageRepository.findOne({
+        where: { chat_id: data.chat_id },
+        order: { timestamp: 'DESC' },
+      });
+      const isFirstReplyMedia = lastAnyMessageMedia?.direction === MessageDirection.IN ? true : false;
+
       // 2. Create message entity
       const messageEntity = this.messageRepository.create({
         message_id: sendResponse.providerMessageId ?? `agent_${Date.now()}`,
@@ -359,6 +374,7 @@ export class WhatsappMessageService {
         commercial: commercial,
         contact: null,
         dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
+        isFirstReply: isFirstReplyMedia,
       });
 
       const savedMessage = await this.messageRepository.save(messageEntity);
@@ -471,6 +487,13 @@ export class WhatsappMessageService {
 
     const phone = chat.chat_id.split('@')[0];
 
+    // Déterminer si c'est la première réponse après un tour client
+    const lastAnyMessageLoc = await this.messageRepository.findOne({
+      where: { chat_id: data.chat_id },
+      order: { timestamp: 'DESC' },
+    });
+    const isFirstReplyLoc = lastAnyMessageLoc?.direction === MessageDirection.IN ? true : false;
+
     const sendResponse = await this.outboundRouter.sendLocationMessage({
       to: phone,
       channelId: data.channel_id,
@@ -508,6 +531,7 @@ export class WhatsappMessageService {
       commercial,
       contact: null,
       dedicated_channel_id: channel.poste_id ? channel.channel_id : null,
+      isFirstReply: isFirstReplyLoc,
     });
 
     const savedMessage = await this.messageRepository.save(messageEntity);

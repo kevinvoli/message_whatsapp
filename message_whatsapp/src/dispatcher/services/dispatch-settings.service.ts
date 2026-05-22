@@ -17,6 +17,8 @@ const DEFAULTS = {
   maxReadMessagesPerMinute: 1,
   idleDisconnectEnabled: true,
   idleDisconnectMinutes: 15,
+  readCooldownSeconds: 120,
+  idleWarningSeconds: 10,
 };
 
 @Injectable()
