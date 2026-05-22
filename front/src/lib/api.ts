@@ -25,12 +25,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/**
- * Récupère les statistiques d'activité d'un commercial.
- * Endpoint : GET /commercials/:id/stats
- */
+/** Récupère les stats d'activité du commercial connecté. */
 export async function getCommercialStats(commercialId: string): Promise<CommercialStatsDto> {
-  const response = await fetch(`${API_BASE_URL}/users/${commercialId}/stats`, {
+  const response = await fetch(`${API_BASE_URL}/auth/me/stats`, {
     method: 'GET',
     credentials: 'include',
   });

@@ -311,12 +311,22 @@ const WebSocketEvents = () => {
       chatState.updateConversation({ ...existing, unreadCount: data.unreadCount });
     };
 
+    // Déconnexion forcée par le serveur (inactivité détectée par idle-disconnect job)
+    const handleForceDisconnect = (data: { commercialId: string }) => {
+      if (data.commercialId !== user.id) return;
+      logger.warn('Force disconnect received from server (idle timeout)');
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login?reason=idle');
+      }
+    };
+
     socket.on('chat:event', handleChatEvent);
     socket.on('contact:event', handleContactEvent);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
     socket.on('queue:updated', handleQueueUpdated);
     socket.on('conversation:read:ack', handleConversationReadAck);
+    socket.on('commercial:force-disconnect', handleForceDisconnect);
 
     if (socket.connected) {
       refreshAfterConnect();
@@ -338,6 +348,7 @@ const WebSocketEvents = () => {
       socket.off('connect', refreshAfterConnect);
       socket.off('queue:updated', handleQueueUpdated);
       socket.off('conversation:read:ack', handleConversationReadAck);
+      socket.off('commercial:force-disconnect', handleForceDisconnect);
       clearInterval(presencePingInterval);
       setSocket(null);
       setContactSocket(null);

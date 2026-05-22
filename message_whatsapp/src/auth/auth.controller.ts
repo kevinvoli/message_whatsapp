@@ -7,18 +7,21 @@ import {
   Get,
   UnauthorizedException,
   Res,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
+import { CommercialStatsService } from 'src/whatsapp_commercial/commercial-stats.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private readonly connectionLogService: ConnectionLogService,
+    private readonly commercialStatsService: CommercialStatsService,
   ) {}
 
   @Post('login')
@@ -55,6 +58,17 @@ export class AuthController {
     });
 
     return { user, accessToken };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/stats')
+  async getMyStats(
+    @Request() req,
+    @Query('periode') periode = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.commercialStatsService.getStats(req.user.userId, periode, dateFrom, dateTo);
   }
 
   @UseGuards(AuthGuard('jwt'))
