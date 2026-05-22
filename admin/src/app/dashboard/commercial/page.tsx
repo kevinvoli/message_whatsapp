@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import {
     navigationItems,
@@ -56,7 +56,7 @@ const VALID_VIEWS: ViewMode[] = [
     'notifications', 'alert-config', 'campaign-links', 'mediatheque', 'settings', 'channel-stats',
 ];
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
@@ -227,5 +227,13 @@ export default function AdminDashboard() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function AdminDashboard() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400"></div></div>}>
+            <AdminDashboardContent />
+        </Suspense>
     );
 }

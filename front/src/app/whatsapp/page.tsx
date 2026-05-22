@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Phone } from 'lucide-react';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ChatHeader from '@/components/chat/ChatHeader';
@@ -18,7 +18,7 @@ import { logger } from '@/lib/logger';
 
 const VALID_FILTER_STATUSES = ['all', 'unread', 'nouveau'];
 
-const WhatsAppPage = () => {
+const WhatsAppPageContent = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,5 +164,11 @@ const WhatsAppPage = () => {
     </div>
   );
 };
+
+const WhatsAppPage = () => (
+  <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>}>
+    <WhatsAppPageContent />
+  </Suspense>
+);
 
 export default WhatsAppPage;
