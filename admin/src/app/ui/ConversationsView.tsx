@@ -58,6 +58,10 @@ export default function ConversationsView({
     const [selectedPosteId, setSelectedPosteId] = useState<string>(initialPosteId ?? '');
     const [selectedCommercialId, setSelectedCommercialId] = useState<string>(initialCommercialId ?? '');
 
+    // Filtre par statut (badge cliquable)
+    type StatusFilter = 'actif' | 'en attente' | 'fermé' | 'unread' | null;
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const mediaInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +79,9 @@ export default function ConversationsView({
     // Mise à jour des filtres si les props initiales changent (navigation depuis Postes/Commerciaux)
     useEffect(() => { setSelectedPosteId(initialPosteId ?? ''); }, [initialPosteId]);
     useEffect(() => { setSelectedCommercialId(initialCommercialId ?? ''); }, [initialCommercialId]);
+
+    // Reset du filtre statut quand on change de poste ou de commercial
+    useEffect(() => { setStatusFilter(null); }, [selectedPosteId, selectedCommercialId]);
 
     const commerciauxForPoste = useMemo(
         () => selectedPosteId
@@ -109,6 +116,8 @@ export default function ConversationsView({
                 periodeEffective,
                 selectedPosteId || undefined,
                 selectedCommercialId || undefined,
+                statusFilter !== 'unread' ? (statusFilter ?? undefined) : undefined,
+                statusFilter === 'unread',
             );
             setChats(result.data);
             setTotal(result.total);
@@ -120,12 +129,16 @@ export default function ConversationsView({
         } finally {
             setLoadingChats(false);
         }
-    }, [selectedPeriod, selectedPosteId, selectedCommercialId]);
+    }, [selectedPeriod, selectedPosteId, selectedCommercialId, statusFilter]);
 
     useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
 
-    // Reset à la page 0 quand la période ou les filtres changent
-    useEffect(() => { setOffset(0); }, [selectedPeriod, selectedPosteId, selectedCommercialId]);
+    // Reset à la page 0 quand la période, les filtres ou le statusFilter changent
+    useEffect(() => { setOffset(0); }, [selectedPeriod, selectedPosteId, selectedCommercialId, statusFilter]);
+
+    const handleStatusFilter = (filter: StatusFilter) => {
+        setStatusFilter(prev => prev === filter ? null : filter);
+    };
 
     useEffect(() => {
         if (selectedChat) {
@@ -500,30 +513,92 @@ export default function ConversationsView({
                         </select>
                     )}
 
-                    {/* Compteurs de contexte */}
+                    {/* Compteurs de contexte — cliquables pour filtrer */}
                     {hasFilter && (
-                        <div className="flex flex-wrap gap-1.5">
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                                {totalAll} total
-                                {selectedPeriod !== 'year' && total !== totalAll && (
-                                    <span className="ml-1 text-slate-400">({total} sur période)</span>
+                        <div className="space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => handleStatusFilter(null)}
+                                    title="Afficher toutes les conversations"
+                                    className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${
+                                        statusFilter === null
+                                            ? 'bg-slate-600 text-white'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {totalAll} total
+                                    {statusFilter === null && selectedPeriod !== 'year' && total !== totalAll && (
+                                        <span className="ml-1 opacity-60">({total} sur période)</span>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleStatusFilter('actif')}
+                                    title="Filtrer : actifs"
+                                    className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                                        statusFilter === 'actif'
+                                            ? 'bg-emerald-600 text-white border-emerald-600'
+                                            : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'
+                                    }`}
+                                >
+                                    {totalActifs} actifs
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleStatusFilter('en attente')}
+                                    title="Filtrer : en attente"
+                                    className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                                        statusFilter === 'en attente'
+                                            ? 'bg-amber-500 text-white border-amber-500'
+                                            : 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
+                                    }`}
+                                >
+                                    {totalEnAttente} en attente
+                                </button>
+                                {(totalFermes > 0 || statusFilter === 'fermé') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleStatusFilter('fermé')}
+                                        title="Filtrer : fermés"
+                                        className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                                            statusFilter === 'fermé'
+                                                ? 'bg-slate-500 text-white border-slate-500'
+                                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {totalFermes} fermés
+                                    </button>
                                 )}
-                            </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                {totalActifs} actifs
-                            </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-                                {totalEnAttente} en attente
-                            </span>
-                            {totalFermes > 0 && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                                    {totalFermes} fermés
-                                </span>
-                            )}
-                            {totalUnread > 0 && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-100">
-                                    {totalUnread} non lus
-                                </span>
+                                {(totalUnread > 0 || statusFilter === 'unread') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleStatusFilter('unread')}
+                                        title="Filtrer : non lus"
+                                        className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                                            statusFilter === 'unread'
+                                                ? 'bg-rose-600 text-white border-rose-600'
+                                                : 'bg-rose-50 text-rose-700 border-rose-100 hover:bg-rose-100'
+                                        }`}
+                                    >
+                                        {totalUnread} non lus
+                                    </button>
+                                )}
+                            </div>
+                            {statusFilter && (
+                                <p className="text-[11px] text-slate-400">
+                                    Filtre actif&nbsp;: <span className="font-medium text-slate-600">
+                                        {statusFilter === 'unread' ? 'non lus' : statusFilter}
+                                    </span>
+                                    {' · '}
+                                    <button
+                                        type="button"
+                                        onClick={() => setStatusFilter(null)}
+                                        className="underline hover:text-slate-800"
+                                    >
+                                        tout afficher
+                                    </button>
+                                </p>
                             )}
                         </div>
                     )}

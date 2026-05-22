@@ -23,6 +23,8 @@ export class WhatsappChatController {
     @Query('periode') periode?: string,
     @Query('poste_id') poste_id?: string,
     @Query('commercial_id') commercial_id?: string,
+    @Query('status') status?: string,
+    @Query('unread_only') unread_only?: string,
   ) {
     let dateStart: Date | undefined;
     if (periode) {
@@ -46,6 +48,8 @@ export class WhatsappChatController {
       dateStart,
       poste_id,
       commercial_id,
+      status,
+      unread_only === 'true',
     );
   }
 

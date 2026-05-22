@@ -281,6 +281,8 @@ export class WhatsappChatService {
     dateStart?: Date,
     posteId?: string,
     commercialId?: string,
+    status?: string,
+    unreadOnly = false,
   ): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalActifs: number; totalEnAttente: number; totalUnread: number; totalFermes: number }> {
     if (chat_id) {
       const data = await this.chatRepository
@@ -330,6 +332,22 @@ export class WhatsappChatService {
             AND m.deletedAt IS NULL
         )`,
         { commercialId },
+      );
+    }
+
+    if (status) {
+      qb.andWhere('chat.status = :status', { status });
+    }
+
+    if (unreadOnly) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM whatsapp_message m
+          WHERE m.chat_id = chat.chat_id
+            AND m.from_me = 0
+            AND m.status IN ('sent','delivered')
+            AND m.deletedAt IS NULL
+        )`,
       );
     }
 

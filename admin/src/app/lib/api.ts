@@ -363,6 +363,8 @@ export async function getChats(
     periode = 'today',
     posteId?: string,
     commercialId?: string,
+    status?: string,
+    unreadOnly?: boolean,
 ): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalActifs: number; totalEnAttente: number; totalUnread: number; totalFermes: number }> {
     const params = new URLSearchParams({
         limit: String(limit),
@@ -371,6 +373,8 @@ export async function getChats(
     });
     if (posteId) params.set('poste_id', posteId);
     if (commercialId) params.set('commercial_id', commercialId);
+    if (status) params.set('status', status);
+    if (unreadOnly) params.set('unread_only', 'true');
     const response = await fetch(`${API_BASE_URL}/chats?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
