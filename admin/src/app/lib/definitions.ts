@@ -35,6 +35,7 @@ export type ViewMode =
   | 'conversations'
   | 'queue'
   | 'dispatch'
+  | 'lecture-seule'
   | 'crons'
   | 'observabilite'
   | 'go_no_go'
