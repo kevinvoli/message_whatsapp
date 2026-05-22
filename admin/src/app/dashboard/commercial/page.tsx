@@ -32,6 +32,7 @@ import MessageAutoView from '@/app/ui/MessageAutoView';
 import ConversationsView from '@/app/ui/ConversationsView';
 import QueueView from '@/app/ui/QueueView';
 import DispatchView from '@/app/ui/DispatchView';
+import LectureSeuleView from '@/app/ui/LectureSeuleView';
 import CronConfigView from '@/app/ui/CronConfigView';
 import AlertConfigView from '@/app/ui/AlertConfigView';
 import ObservabiliteView from '@/app/ui/ObservabiliteView';
@@ -106,6 +107,8 @@ export default function AdminDashboard() {
                 return <QueueView onRefresh={() => {}} />;
             case 'dispatch':
                 return <DispatchView onRefresh={() => {}} />;
+            case 'lecture-seule':
+                return <LectureSeuleView />;
             case 'crons':
                 return <CronConfigView />;
             case 'alert-config':
