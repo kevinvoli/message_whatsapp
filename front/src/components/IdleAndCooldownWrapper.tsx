@@ -27,6 +27,8 @@ const IdleAndCooldownWrapper: React.FC = () => {
   const setCooldownModal = useChatStore((s) => s.setCooldownModal);
   const cooldownRemainingMs = useChatStore((s) => s.cooldownRemainingMs);
   const setCooldownConfig = useChatStore((s) => s.setCooldownConfig);
+  const isLoading = useChatStore((s) => s.isLoading);
+  const clearSelectedConversation = useChatStore((s) => s.clearSelectedConversation);
 
   const [settings, setSettings] = useState<ClientSettings>(DEFAULTS);
 
@@ -73,7 +75,15 @@ const IdleAndCooldownWrapper: React.FC = () => {
       {showCooldownModal && (
         <ReadCooldownModal
           remainingMs={cooldownRemainingMs()}
-          onClose={() => setCooldownModal(false)}
+          onClose={() => {
+            setCooldownModal(false);
+            // Si une conversation est encore en chargement quand le modal se ferme,
+            // on réinitialise complètement la sélection (comme si rien n'avait été cliqué)
+            // pour éviter un loader bloqué et restaurer le unreadCount original
+            if (isLoading) {
+              clearSelectedConversation();
+            }
+          }}
         />
       )}
     </>

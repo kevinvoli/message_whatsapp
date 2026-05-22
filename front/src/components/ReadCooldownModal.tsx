@@ -38,8 +38,14 @@ const ReadCooldownModal: React.FC<ReadCooldownModalProps> = ({ remainingMs: init
     : `${seconds} s`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-3 mb-4">
           <Clock className="text-orange-500" size={24} />
           <h2 className="text-lg font-semibold text-gray-900">Veuillez patienter</h2>

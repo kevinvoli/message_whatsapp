@@ -85,6 +85,11 @@ interface ChatState {
   cooldownRemainingMs: () => number;
   setCooldownModal: (v: boolean) => void;
 
+  /** Unread count de la conversation en cours de chargement (avant reset optimiste) */
+  pendingConversationUnreadCount: number;
+  /** Réinitialise la sélection comme si aucune conversation n'avait été cliquée */
+  clearSelectedConversation: () => void;
+
   reset: () => void;
 }
 
@@ -118,6 +123,7 @@ const initialState: Omit<
   | "setCooldownConfig"
   | "cooldownRemainingMs"
   | "setCooldownModal"
+  | "clearSelectedConversation"
 > = {
   socket: null,
   conversations: [],
@@ -138,6 +144,7 @@ const initialState: Omit<
   lastUnreadOpenedAt: null,
   readCooldownSeconds: 120,
   showCooldownModal: false,
+  pendingConversationUnreadCount: 0,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -183,8 +190,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const conversation = state.conversations.find((c) => c.chat_id === chat_id);
     if (!conversation) return;
 
-    // Vérification cooldown pour les conversations non lues
-    if ((conversation.unreadCount ?? 0) > 0) {
+    const originalUnreadCount = conversation.unreadCount ?? 0;
+
+    // Cooldown : uniquement pour les conversations ayant des messages non lus
+    if (originalUnreadCount > 0) {
       const remaining = state.cooldownRemainingMs();
       if (remaining > 0) {
         set({ showCooldownModal: true });
@@ -207,14 +216,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [chat_id]: new Set<string>(),
       },
       replyToMessage: null,
+      pendingConversationUnreadCount: originalUnreadCount,
     }));
 
-    const socket = get().socket;
     // Toujours charger les messages depuis le serveur (pas de pré-chargement au connect)
-    socket?.emit("messages:get", { chat_id });
-    socket?.emit("messages:read", { chat_id });
-    // Notifier le backend que le commercial a ouvert cette conversation
-    socket?.emit("conversation:read", { chatId: chat_id });
+    get().socket?.emit("messages:get", { chat_id });
+    // messages:read et conversation:read sont émis dans setMessages,
+    // uniquement quand les messages sont réellement reçus
   },
 
   updateConversationContactSummary: (chatId, summary) => {
@@ -240,6 +248,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setCooldownModal: (v: boolean) => set({ showCooldownModal: v }),
+
+  clearSelectedConversation: () => {
+    set((state) => {
+      const pendingId = state.selectedConversation?.chat_id;
+      const pendingUnread = state.pendingConversationUnreadCount;
+      return {
+        selectedConversation: null,
+        isLoading: false,
+        messages: [],
+        pendingConversationUnreadCount: 0,
+        conversations: pendingId && pendingUnread > 0
+          ? state.conversations.map((c) =>
+              c.chat_id === pendingId ? { ...c, unreadCount: pendingUnread } : c,
+            )
+          : state.conversations,
+      };
+    });
+  },
 
   removeConversationBychat_id: (chat_id: string) => {
     set((state) => ({
@@ -387,19 +413,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setMessages: (chat_id, messages, hasMore = false) => {
+    let wasLoading = false;
     set((state) => {
       if (state.selectedConversation?.chat_id !== chat_id) return state;
+      wasLoading = state.isLoading;
       const deduped = dedupeMessagesById(messages);
       return {
         messages: deduped,
         isLoading: false,
         hasMoreMessages: hasMore,
+        pendingConversationUnreadCount: 0,
         messageIdCache: {
           ...state.messageIdCache,
           [chat_id]: new Set(deduped.map((m) => m.id)),
         },
       };
     });
+    // Notifier le backend uniquement quand les messages sont effectivement chargés
+    if (wasLoading) {
+      const socket = get().socket;
+      socket?.emit("messages:read", { chat_id });
+      socket?.emit("conversation:read", { chatId: chat_id });
+    }
   },
 
   prependMessages: (chat_id, older, hasMore = false) => {
