@@ -9,16 +9,20 @@ import ChatInput from '@/components/chat/ChatInput';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useSocket } from '@/contexts/SocketProvider';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { CallStatus, Conversation, ViewMode } from '@/types/chat';
 import { useStatsStore } from '@/store/stats.store';
 import ChatMainArea from '@/components/chat/ChatMainArea';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
 import { logger } from '@/lib/logger';
 
+const VALID_FILTER_STATUSES = ['all', 'unread', 'nouveau'];
+
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const {
     conversations,
     selectedConversation,
@@ -31,10 +35,15 @@ const WhatsAppPage = () => {
   const { stats } = useStatsStore();
 
   const [showStats, setShowStats] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('all');
-
-   const [viewMode, setViewMode] = useState<ViewMode>('conversations');
-    const [searchQuery, setSearchQuery] = useState('');
+  const rawFilter = searchParams.get('filter') ?? 'all';
+  const [filterStatus, setFilterStatus] = useState(
+    VALID_FILTER_STATUSES.includes(rawFilter) ? rawFilter : 'all'
+  );
+  const rawView = searchParams.get('view') as ViewMode;
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    rawView === 'contacts' ? 'contacts' : 'conversations'
+  );
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)
   const isInitialSearchMount = useRef(true);
@@ -103,10 +112,20 @@ const WhatsAppPage = () => {
     });
   }, [conversations, filterStatus]);
 
-    const handleViewModeChange = (mode: ViewMode) => {
-        setViewMode(mode);
-        setSearchQuery(''); // Réinitialiser la recherche lors du changement de vue
-    };
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    setSearchQuery('');
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('view', mode);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  const handleSetFilterStatus = useCallback((status: string) => {
+    setFilterStatus(status);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('filter', status);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, router]);
 
   if (!initialized || !user) {
     return (
@@ -128,7 +147,7 @@ const WhatsAppPage = () => {
         isConnected={isWebSocketConnected}
         onSelectConversation={handleSelectConversation}
 
-        setFilterStatus={setFilterStatus}
+        setFilterStatus={handleSetFilterStatus}
         stats={stats}
         filterStatus={filterStatus}
         totalUnread={totalUnread}
@@ -139,7 +158,7 @@ const WhatsAppPage = () => {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
-      {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />}
+      {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />}
 
       
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import {
     navigationItems,
     navigationGroups as allNavigationGroups
@@ -48,11 +49,25 @@ import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
 import { ViewMode } from '@/app/lib/definitions';
 import { getAdminProfile } from '@/app/lib/api';
 
+const VALID_VIEWS: ViewMode[] = [
+    'overview', 'commerciaux', 'performance', 'analytics', 'messages', 'clients',
+    'rapports', 'postes', 'canaux', 'templates', 'automessages', 'conversations',
+    'queue', 'dispatch', 'lecture-seule', 'crons', 'observabilite', 'go_no_go',
+    'notifications', 'alert-config', 'campaign-links', 'mediatheque', 'settings', 'channel-stats',
+];
+
 export default function AdminDashboard() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+
     const [selectedPeriod, setSelectedPeriod] = useState('today');
     const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
     const [dateTo, setDateTo] = useState<string | undefined>(undefined);
-    const [viewMode, setViewMode] = useState<ViewMode>('overview');
+    const rawView = searchParams.get('view') as ViewMode;
+    const [viewMode, setViewMode] = useState<ViewMode>(
+        VALID_VIEWS.includes(rawView) ? rawView : 'overview'
+    );
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [adminProfile, setAdminProfile] = useState<{ id: string; name: string; email: string } | null>(null);
     const [conversationFilterPosteId, setConversationFilterPosteId] = useState<string | undefined>(undefined);
@@ -66,12 +81,14 @@ export default function AdminDashboard() {
         setConversationFilterPosteId(posteId);
         setConversationFilterCommercialId(undefined);
         setViewMode('conversations');
+        router.replace(`${pathname}?view=conversations`, { scroll: false });
     };
 
     const handleViewCommercialConversations = (commercialId: string, posteId: string) => {
         setConversationFilterPosteId(posteId || undefined);
         setConversationFilterCommercialId(commercialId);
         setViewMode('conversations');
+        router.replace(`${pathname}?view=conversations`, { scroll: false });
     };
 
     const handleSetViewMode = (mode: ViewMode) => {
@@ -80,6 +97,7 @@ export default function AdminDashboard() {
             setConversationFilterCommercialId(undefined);
         }
         setViewMode(mode);
+        router.replace(`${pathname}?view=${mode}`, { scroll: false });
     };
 
     const {
