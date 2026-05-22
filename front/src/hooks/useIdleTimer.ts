@@ -12,6 +12,8 @@ export function useIdleTimer(idleMinutes: number, warningSeconds: number) {
   }, []);
 
   useEffect(() => {
+    if (idleMinutes <= 0) return;
+
     const totalSeconds = idleMinutes * 60;
 
     const interval = setInterval(() => {
