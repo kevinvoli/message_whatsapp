@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Lock, RefreshCw } from 'lucide-react';
+import { Lock, RefreshCw, Info } from 'lucide-react';
 import { DispatchSettings } from '@/app/lib/definitions';
 import { getDispatchSettings, updateDispatchSettings } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -115,6 +115,20 @@ export default function LectureSeuleView() {
 
       {settings && (
         <>
+          {/* ── Bannière info canal dédié ── */}
+          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 mb-6">
+            <Info size={16} className="mt-0.5 shrink-0 text-blue-500" />
+            <div>
+              <p className="text-sm font-semibold text-blue-800">Règles commerciaux uniquement</p>
+              <p className="mt-0.5 text-xs text-blue-600">
+                Ces règles s&apos;appliquent exclusivement aux commerciaux affectés à des postes
+                en <strong>mode pool</strong> (canal partagé). Les postes avec un{' '}
+                <strong>canal dédié</strong> sont automatiquement exclus — leurs opérateurs
+                ne sont pas soumis au rate limit, au cooldown, ni à la déconnexion automatique.
+              </p>
+            </div>
+          </div>
+
           {/* ── Messages avant lecture seule ── */}
           <SectionCard
             title="Messages avant lecture seule"

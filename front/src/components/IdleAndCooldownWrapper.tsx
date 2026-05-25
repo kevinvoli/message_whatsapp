@@ -13,12 +13,14 @@ interface ClientSettings {
   readCooldownSeconds: number;
   idleDisconnectMinutes: number;
   idleWarningSeconds: number;
+  hasDedicatedChannel: boolean;
 }
 
 const DEFAULTS: ClientSettings = {
   readCooldownSeconds: 120,
   idleDisconnectMinutes: 15,
   idleWarningSeconds: 10,
+  hasDedicatedChannel: false,
 };
 
 const IdleAndCooldownWrapper: React.FC = () => {
@@ -39,14 +41,16 @@ const IdleAndCooldownWrapper: React.FC = () => {
       .then((data: ClientSettings | null) => {
         if (data) {
           setSettings(data);
-          setCooldownConfig(data.readCooldownSeconds);
+          if (!data.hasDedicatedChannel) {
+            setCooldownConfig(data.readCooldownSeconds);
+          }
         }
       })
       .catch(() => {});
   }, [user, setCooldownConfig]);
 
   const { showWarning, idleSeconds, remainingSeconds, resetActivity } = useIdleTimer(
-    user ? settings.idleDisconnectMinutes : 0,
+    user && !settings.hasDedicatedChannel ? settings.idleDisconnectMinutes : 0,
     settings.idleWarningSeconds,
   );
 
@@ -61,7 +65,8 @@ const IdleAndCooldownWrapper: React.FC = () => {
     };
   }, [user, resetActivity]);
 
-  if (!user) return null;
+  // Ne rien rendre si pas d'utilisateur ou si poste dédié (aucune règle à appliquer)
+  if (!user || settings.hasDedicatedChannel) return null;
 
   return (
     <>

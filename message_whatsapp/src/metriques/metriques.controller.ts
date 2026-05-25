@@ -7,7 +7,7 @@ import {
   PerformanceCommercialDto,
   PerformanceTemporelleDto,
   StatutChannelDto,
-  TraficHoraireResponseDto,
+  TraficResponseDto,
 } from './dto/create-metrique.dto';
 import { QueueMetricsDto } from './dto/create-metrique.dto';
 import { MetriquesService } from './metriques.service';
@@ -103,14 +103,15 @@ export class MetriquesController {
   }
 
   @Get('trafic-horaire')
-  @ApiOperation({ summary: 'Trafic messages par heure (24h)' })
-  @ApiResponse({ status: 200, type: TraficHoraireResponseDto })
+  @ApiOperation({ summary: 'Trafic messages par heure (24h) ou par jour de semaine (7j)' })
+  @ApiResponse({ status: 200, type: TraficResponseDto })
   async getTraficHoraire(
-    @Query('periode') periode: string = 'today',
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo')   dateTo?: string,
-  ): Promise<TraficHoraireResponseDto> {
-    return this.metriquesService.getTraficHoraire(periode, dateFrom, dateTo);
+    @Query('periode')     periode     : string = 'today',
+    @Query('dateFrom')    dateFrom?   : string,
+    @Query('dateTo')      dateTo?     : string,
+    @Query('granularite') granularite : 'heure' | 'jour' = 'heure',
+  ): Promise<TraficResponseDto> {
+    return this.metriquesService.getTraficHoraire(periode, dateFrom, dateTo, granularite);
   }
 
   @Get('overview')

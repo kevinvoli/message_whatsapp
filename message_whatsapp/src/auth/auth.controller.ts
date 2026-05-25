@@ -16,6 +16,9 @@ import { Response } from 'express';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import { CommercialStatsService } from 'src/whatsapp_commercial/commercial-stats.service';
 import { DispatchSettingsService } from 'src/dispatcher/services/dispatch-settings.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 @Controller('auth')
 export class AuthController {
@@ -24,6 +27,8 @@ export class AuthController {
     private readonly connectionLogService: ConnectionLogService,
     private readonly commercialStatsService: CommercialStatsService,
     private readonly dispatchSettingsService: DispatchSettingsService,
+    @InjectRepository(WhapiChannel)
+    private readonly channelRepository: Repository<WhapiChannel>,
   ) {}
 
   @Post('login')
@@ -64,12 +69,19 @@ export class AuthController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('me/settings')
-  async getMySettings() {
+  async getMySettings(@Request() req) {
     const s = await this.dispatchSettingsService.getSettings();
+
+    const posteId: string | undefined = req.user?.posteId;
+    const hasDedicatedChannel = posteId
+      ? (await this.channelRepository.count({ where: { poste_id: posteId } })) > 0
+      : false;
+
     return {
       readCooldownSeconds:   s.readCooldownSeconds   ?? 120,
       idleDisconnectMinutes: s.idleDisconnectMinutes  ?? 15,
       idleWarningSeconds:    s.idleWarningSeconds     ?? 10,
+      hasDedicatedChannel,
     };
   }
 

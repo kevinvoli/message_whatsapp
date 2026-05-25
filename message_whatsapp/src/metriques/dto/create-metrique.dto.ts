@@ -454,26 +454,7 @@ export class QueueMetricsDto {
   churn_24h: number;
 }
 
-/** Un point horaire dans le diagramme 24h */
-export class TraficHorairePointDto {
-  @ApiProperty({ description: 'Heure (0-23)' })
-  heure: number;
-
-  @ApiProperty({ description: "Label affiché ('00:00', '01:00', ...)" })
-  heureLabel: string;
-
-  @ApiProperty({ description: 'Total messages' })
-  total: number;
-
-  @ApiProperty({ description: 'Messages entrants (direction=IN)' })
-  messages_in: number;
-
-  @ApiProperty({ description: 'Messages sortants (direction=OUT)' })
-  messages_out: number;
-
-  @ApiProperty({ description: 'Moyenne par jour (mode multi-jours)' })
-  avg_par_jour: number;
-}
+/** @deprecated Voir TraficPointDto (alias TraficHorairePointDto à la fin) */
 
 /** Statistiques calculées sur la période */
 export class TraficStatistiquesDto {
@@ -499,14 +480,45 @@ export class TraficStatistiquesDto {
   mode: 'journee' | 'periode';
 }
 
-/** Réponse complète de l'endpoint trafic-horaire */
-export class TraficHoraireResponseDto {
-  horaire: TraficHorairePointDto[];
+/** @deprecated Utiliser TraficResponseDto — conservé pour compatibilité */
+// export class TraficHoraireResponseDto — voir alias à la fin du fichier
+
+
+/** Point du diagramme trafic (heure OU jour selon granularité) */
+export class TraficPointDto {
+  @ApiProperty({ description: 'Index : 0-23 (heure) ou 0-6 (jour, 0=Lun)' })
+  index: number;
+
+  @ApiProperty({ description: "Label : '00:00' ou 'Lun'" })
+  label: string;
+
+  @ApiProperty() total: number;
+  @ApiProperty() messages_in: number;
+  @ApiProperty() messages_out: number;
+  @ApiProperty({ description: 'Moyenne par jour (mode heure) ou par semaine (mode jour)' })
+  avg_par_unite: number;
+}
+
+/** Réponse trafic v2 — remplace TraficHoraireResponseDto */
+export class TraficResponseDto {
+  @ApiProperty({ enum: ['heure', 'jour'] })
+  granularite: 'heure' | 'jour';
+
+  @ApiProperty({ type: [TraficPointDto] })
+  points: TraficPointDto[];
+
+  @ApiProperty({ type: TraficStatistiquesDto })
   statistiques: TraficStatistiquesDto;
+
   meta: {
     periode: string;
     dateStart: string;
     dateEnd: string;
-    jours: number;
+    nb_unites: number;
+    nb_jours: number;
   };
 }
+
+// Alias de rétro-compatibilité
+export { TraficResponseDto as TraficHoraireResponseDto };
+export { TraficPointDto    as TraficHorairePointDto    };

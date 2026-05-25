@@ -47,6 +47,13 @@ export class IdleDisconnectJob implements OnModuleInit {
         '(c.lastActivityAt IS NULL OR c.lastActivityAt < :threshold)',
         { threshold },
       )
+      // Ne jamais déconnecter un commercial sur poste dédié (canal WhapiChannel.poste_id IS NOT NULL)
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM whapi_channels ch
+          WHERE ch.poste_id = poste.id
+        )`,
+      )
       .getMany();
 
     if (idleCommercials.length === 0) {

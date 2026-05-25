@@ -837,14 +837,14 @@ export type CampaignLinkStats = {
 };
 
 
-/** Un point horaire dans le diagramme 24h */
-export type TraficHorairePoint = {
-  heure: number;
-  heureLabel: string;
-  total: number;
-  messages_in: number;
-  messages_out: number;
-  avg_par_jour: number;
+/** Point générique du diagramme trafic (heure ou jour) */
+export type TraficPoint = {
+  index:         number;   // 0-23 (heure) ou 0-6 (jour)
+  label:         string;   // "00:00" ou "Lun"
+  total:         number;
+  messages_in:   number;
+  messages_out:  number;
+  avg_par_unite: number;
 };
 
 /** Statistiques calculées sur la période */
@@ -871,17 +871,23 @@ export type TraficStatistiques = {
   mode: 'journee' | 'periode';
 };
 
-/** Réponse complète de l endpoint trafic-horaire */
-export type TraficHoraireResponse = {
-  horaire: TraficHorairePoint[];
+/** Réponse de l'endpoint trafic-horaire v2 */
+export type TraficResponse = {
+  granularite:  'heure' | 'jour';
+  points:       TraficPoint[];
   statistiques: TraficStatistiques;
   meta: {
-    periode: string;
-    dateStart: string;
-    dateEnd: string;
-    jours: number;
+    periode:    string;
+    dateStart:  string;
+    dateEnd:    string;
+    nb_unites:  number;
+    nb_jours:   number;
   };
 };
+
+// Alias de compatibilité v1 → v2
+export type TraficHoraireResponse = TraficResponse;
+export type TraficHorairePoint    = TraficPoint;
 
 export const COULEURS_STATUT = {
   actif: 'green',

@@ -34,6 +34,7 @@ import { ContactService } from 'src/contact/contact.service';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { ChannelService } from 'src/channel/channel.service';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { SocketThrottleGuard } from './guards/socket-throttle.guard';
 import { CallLogService } from 'src/call-log/call_log.service';
 import { CallLog } from 'src/call-log/entities/call_log.entity';
@@ -66,6 +67,7 @@ export class WhatsappMessageGateway
       posteId: string;
       tenantId: string | null;
       tenantIds: string[];
+      isDedicated: boolean;
     }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
@@ -95,6 +97,8 @@ export class WhatsappMessageGateway
     private readonly notificationService: NotificationService,
     private readonly systemAlert: SystemAlertService,
     private readonly messageReadService: MessageReadService,
+    @InjectRepository(WhapiChannel)
+    private readonly channelRepository: Repository<WhapiChannel>,
   ) {}
 
   afterInit(server: Server): void {
@@ -147,11 +151,16 @@ export class WhatsappMessageGateway
       }
     }
 
+    const isDedicated = posteId
+      ? (await this.channelRepository.count({ where: { poste_id: posteId } })) > 0
+      : false;
+
     this.connectedAgents.set(client.id, {
       commercialId,
       posteId,
       tenantId,
       tenantIds,
+      isDedicated,
     });
     for (const tid of tenantIds) {
       await client.join(`tenant:${tid}`);
@@ -731,6 +740,7 @@ export class WhatsappMessageGateway
       const result = await this.messageReadService.markConversationAsRead(
         agent.commercialId,
         payload.chatId,
+        agent.isDedicated,
       );
       const chat = await this.chatService.findBychat_id(payload.chatId);
       client.emit('conversation:read:ack', {

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   ConflictException,
@@ -169,7 +169,7 @@ export class WhatsappCommercialService {
             createdAt.getFullYear() === today.getFullYear()
           );
         }).length || 0,
-      productivite: 0, // calculé ensuite
+      productivite: 0, // calculÃ© ensuite
     }));
 
     return commerciaux;
@@ -183,7 +183,7 @@ export class WhatsappCommercialService {
 
     const posteIds = users.map((u) => u.poste?.id).filter(Boolean) as string[];
 
-    // Une seule requête agrégée pour compter les messages par poste
+    // Une seule requÃªte agrÃ©gÃ©e pour compter les messages par poste
     const msgCounts: { poste_id: string; sent: string; received: string }[] =
       posteIds.length > 0
         ? await this.messageRepository
@@ -209,7 +209,7 @@ export class WhatsappCommercialService {
       ]),
     );
 
-    // Une seule requête agrégée pour les stats de chats par poste
+    // Une seule requÃªte agrÃ©gÃ©e pour les stats de chats par poste
     const chatStats: {
       poste_id: string;
       actif: string;
@@ -327,7 +327,7 @@ export class WhatsappCommercialService {
       throw new NotFoundException(`User with ID "${id}" not found`);
     }
 
-    // Vérifier l'unicité de l'email si fourni et différent de l'actuel
+    // VÃ©rifier l'unicitÃ© de l'email si fourni et diffÃ©rent de l'actuel
     if (
       updateWhatsappCommercialDto.email &&
       updateWhatsappCommercialDto.email !== user.email
@@ -392,36 +392,36 @@ export class WhatsappCommercialService {
         throw new NotFoundException(`User with ID "${id}" not found`);
       }
 
-      // Vérifier que le rôle est valide
+      // VÃ©rifier que le rÃ´le est valide
       user.isConnected = status;
 
       const updatedUser = await this.whatsappCommercialRepository.save(user);
 
       // Logging selon le statut
-      const statusText = status ? 'connecté' : 'déconnecté';
+      const statusText = status ? 'connectÃ©' : 'dÃ©connectÃ©';
       this.logger.log(
         `Commercial ${user.name} (${user.id}) est maintenant ${statusText}`,
       );
 
-      // Émettre un événement si nécessaire
+      // Ã‰mettre un Ã©vÃ©nement si nÃ©cessaire
       // this.gateway.emitUserStatusUpdate(id, status);
 
       return this.toSafeUser(updatedUser);
     } catch (error) {
-      // Log détaillé de l'erreur
+      // Log dÃ©taillÃ© de l'erreur
       this.logger.error(
         `Erreur lors de la mise a jour du statut pour l'utilisateur ${id}`,
         error instanceof Error ? error.stack : undefined,
       );
 
-      // Si l'erreur est déjà une HttpException, la relancer
+      // Si l'erreur est dÃ©jÃ  une HttpException, la relancer
       if (error instanceof NotFoundException) {
         throw error;
       }
 
       // Pour les autres erreurs, lancer une InternalServerErrorException
       throw new InternalServerErrorException(
-        `Impossible de mettre à jour le statut de l'utilisateur ${id}. Erreur: ${error.message}`,
+        `Impossible de mettre Ã  jour le statut de l'utilisateur ${id}. Erreur: ${error.message}`,
       );
     }
   }
@@ -456,5 +456,19 @@ export class WhatsappCommercialService {
       passwordResetToken: token,
       passwordResetExpires: expires,
     });
+  }
+  /**
+   * Retourne true si le commercial est affect├® ├á un poste qui poss├¿de au moins
+   * un canal d├®di├® (WhapiChannel.poste_id IS NOT NULL).
+   */
+  async hasDedicatedChannel(userId: string): Promise<boolean> {
+    const count = await this.whatsappCommercialRepository
+      .createQueryBuilder('c')
+      .innerJoin('c.poste', 'p')
+      .innerJoin('p.channels', 'ch')
+      .where('c.id = :id', { id: userId })
+      .andWhere('ch.poste_id IS NOT NULL')
+      .getCount();
+    return count > 0;
   }
 }

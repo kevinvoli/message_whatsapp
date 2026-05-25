@@ -20,7 +20,7 @@ import {
   PerformanceTemporelleDto,
   StatutChannelDto,
 } from './dto/create-metrique.dto';
-import { QueueMetricsDto, TraficHorairePointDto, TraficStatistiquesDto, TraficHoraireResponseDto } from './dto/create-metrique.dto';
+import { QueueMetricsDto, TraficPointDto, TraficStatistiquesDto, TraficResponseDto } from './dto/create-metrique.dto';
 
 @Injectable()
 export class MetriquesService {
@@ -959,86 +959,100 @@ export class MetriquesService {
   }
 
 
+  // Libellés des jours (WEEKDAY : 0=Lun ... 6=Dim)
+  private readonly DOW_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
   async getTraficHoraire(
     periode = 'today',
     dateFrom?: string,
     dateTo?: string,
-  ): Promise<TraficHoraireResponseDto> {
+    granularite: 'heure' | 'jour' = 'heure',
+  ): Promise<TraficResponseDto> {
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
+    const nbUnites = granularite === 'heure' ? 24 : 7;
 
-    // Q1 : agrégation par heure
+    // Q1 : agrégation par colonne générée (index-only scan avec IDX_msg_trafic_*)
+    // La sous-requête scalaire `nb_jours_global` est exécutée UNE SEULE FOIS par MySQL
+    const groupCol = granularite === 'heure' ? 'message.hourOfDay' : 'message.dayOfWeekN';
+
     const rows = await this.messageRepository
       .createQueryBuilder('message')
-      .select('HOUR(message.createdAt)', 'heure')
+      .select(groupCol, 'groupe')
       .addSelect('COUNT(*)', 'total')
       .addSelect('SUM(CASE WHEN message.direction = "IN"  THEN 1 ELSE 0 END)', 'messages_in')
       .addSelect('SUM(CASE WHEN message.direction = "OUT" THEN 1 ELSE 0 END)', 'messages_out')
+      // Sous-requête scalaire non-corrélée — remplace la Q2 séparée (N3)
+      .addSelect(
+        `(SELECT COUNT(DISTINCT DATE(m2.createdAt))
+            FROM whatsapp_message m2
+           WHERE m2.deletedAt IS NULL
+             AND m2.createdAt >= :dateStart
+             AND m2.createdAt <= :dateEnd)`,
+        'nb_jours_global',
+      )
       .where('message.deletedAt IS NULL')
       .andWhere('message.createdAt >= :dateStart', { dateStart })
-      .andWhere('message.createdAt <= :dateEnd', { dateEnd })
-      .groupBy('HOUR(message.createdAt)')
-      .orderBy('heure', 'ASC')
+      .andWhere('message.createdAt <= :dateEnd',   { dateEnd })
+      .groupBy(groupCol)
+      .orderBy('groupe', 'ASC')
       .getRawMany();
 
-    // Q2 : nb de jours distincts global
-    const joursResult = await this.messageRepository
-      .createQueryBuilder('m')
-      .select('COUNT(DISTINCT DATE(m.createdAt))', 'nb_jours')
-      .where('m.deletedAt IS NULL')
-      .andWhere('m.createdAt >= :dateStart', { dateStart })
-      .andWhere('m.createdAt <= :dateEnd', { dateEnd })
-      .getRawOne();
+    // Nb jours distincts dans la plage (lu depuis n'importe quel groupe)
+    const nbJoursGlobal = parseInt(rows[0]?.nb_jours_global) || 1;
 
-    const nbJoursGlobal = parseInt(joursResult?.nb_jours) || 1;
-
-    // Construire les 24 points
+    // Construire les N points (remplir les tranches sans données avec 0)
     const dataMap = new Map<number, { total: number; in: number; out: number }>();
-
     for (const row of rows) {
-      const h = parseInt(row.heure);
-      dataMap.set(h, {
+      const g = parseInt(row.groupe);
+      dataMap.set(g, {
         total: parseInt(row.total)        || 0,
         in:    parseInt(row.messages_in)  || 0,
         out:   parseInt(row.messages_out) || 0,
       });
     }
 
-    const horaire: TraficHorairePointDto[] = Array.from({ length: 24 }, (_, h) => {
-      const d = dataMap.get(h) ?? { total: 0, in: 0, out: 0 };
+    const points: TraficPointDto[] = Array.from({ length: nbUnites }, (_, i) => {
+      const d = dataMap.get(i) ?? { total: 0, in: 0, out: 0 };
+      const label = granularite === 'heure'
+        ? `${String(i).padStart(2, '0')}:00`
+        : this.DOW_LABELS[i];
+      const nbSemaines = Math.max(1, Math.floor(nbJoursGlobal / 7));
+      const avgParUnite = granularite === 'heure'
+        ? (nbJoursGlobal > 1 ? Math.round((d.total / nbJoursGlobal) * 10) / 10 : d.total)
+        : (nbJoursGlobal > 6 ? Math.round((d.total / nbSemaines) * 10) / 10 : d.total);
       return {
-        heure:        h,
-        heureLabel:   `${String(h).padStart(2, '0')}:00`,
-        total:        d.total,
-        messages_in:  d.in,
-        messages_out: d.out,
-        avg_par_jour: nbJoursGlobal > 1
-          ? Math.round((d.total / nbJoursGlobal) * 10) / 10
-          : d.total,
+        index:         i,
+        label,
+        total:         d.total,
+        messages_in:   d.in,
+        messages_out:  d.out,
+        avg_par_unite: avgParUnite,
       };
     });
 
-    // Calcul statistiques
-    const totalMsg  = horaire.reduce((s, h) => s + h.total, 0);
-    const totalIn   = horaire.reduce((s, h) => s + h.messages_in, 0);
-    const totalOut  = horaire.reduce((s, h) => s + h.messages_out, 0);
-    const heuresActives = horaire.filter(h => h.total > 0);
-    const nbHeuresActives = heuresActives.length || 1;
+    // Calcul statistiques (identique à la v1, adapté avec `points` au lieu de `horaire`)
+    const totalMsg  = points.reduce((s, p) => s + p.total, 0);
+    const totalIn   = points.reduce((s, p) => s + p.messages_in, 0);
+    const totalOut  = points.reduce((s, p) => s + p.messages_out, 0);
+    const unitesActives = points.filter(p => p.total > 0);
+    const nbUnitesActives = unitesActives.length || 1;
 
     const dureeMs = dateEnd.getTime() - dateStart.getTime();
     const dureeMins = Math.max(1, Math.round(dureeMs / 60000));
 
-    const picHoraire = horaire.reduce((max, h) => h.total > max.total ? h : max, horaire[0]);
-    const picInHoraire = horaire.reduce((max, h) => h.messages_in > max.messages_in ? h : max, horaire[0]);
-    const creuxHoraire = heuresActives.length > 0
-      ? heuresActives.reduce((min, h) => h.total < min.total ? h : min, heuresActives[0])
-      : horaire[0];
+    const picPoint = points.reduce((max, p) => p.total > max.total ? p : max, points[0]);
+    const picInPoint = points.reduce((max, p) => p.messages_in > max.messages_in ? p : max, points[0]);
+    const creuxPoint = unitesActives.length > 0
+      ? unitesActives.reduce((min, p) => p.total < min.total ? p : min, unitesActives[0])
+      : points[0];
 
+    // Répartition journée uniquement pertinente en mode heure
     const tranche = (a: number, b: number) =>
-      horaire.slice(a, b + 1).reduce((s, h) => s + h.total, 0);
-    const tNuit  = tranche(0, 5);
-    const tMatin = tranche(6, 11);
-    const tAprem = tranche(12, 17);
-    const tSoir  = tranche(18, 23);
+      points.slice(a, b + 1).reduce((s, p) => s + p.total, 0);
+    const tNuit  = granularite === 'heure' ? tranche(0, 5)   : 0;
+    const tMatin = granularite === 'heure' ? tranche(6, 11)  : 0;
+    const tAprem = granularite === 'heure' ? tranche(12, 17) : 0;
+    const tSoir  = granularite === 'heure' ? tranche(18, 23) : 0;
     const pct = (v: number) => totalMsg > 0 ? Math.round((v / totalMsg) * 100) : 0;
 
     const isSameDay = dateStart.toDateString() === dateEnd.toDateString();
@@ -1048,12 +1062,12 @@ export class MetriquesService {
       messages_in:  totalIn,
       messages_out: totalOut,
       moy_par_minute: Math.round((totalMsg / dureeMins) * 100) / 100,
-      moy_par_heure:  Math.round((totalMsg / nbHeuresActives) * 10) / 10,
+      moy_par_heure:  Math.round((totalMsg / nbUnitesActives) * 10) / 10,
       moy_par_jour:   Math.round((totalMsg / nbJoursGlobal) * 10) / 10,
-      heure_pic:      picHoraire.heure,
-      messages_pic:   picHoraire.total,
-      heure_creux:    creuxHoraire.heure,
-      heure_pic_in:   picInHoraire.heure,
+      heure_pic:      picPoint.index,
+      messages_pic:   picPoint.total,
+      heure_creux:    creuxPoint.index,
+      heure_pic_in:   picInPoint.index,
       ratio_in_out:   totalOut > 0 ? Math.round((totalIn / totalOut) * 100) / 100 : 0,
       pourcentage_in:  pct(totalIn),
       pourcentage_out: pct(totalOut),
@@ -1061,19 +1075,21 @@ export class MetriquesService {
       concentration_matin: pct(tMatin),
       concentration_aprem: pct(tAprem),
       concentration_soir:  pct(tSoir),
-      heures_actives: nbHeuresActives,
+      heures_actives: nbUnitesActives,
       nb_jours:       nbJoursGlobal,
       mode:           isSameDay ? 'journee' : 'periode',
     };
 
     return {
-      horaire,
+      granularite,
+      points,
       statistiques,
       meta: {
         periode,
         dateStart: dateStart.toISOString(),
         dateEnd:   dateEnd.toISOString(),
-        jours:     nbJoursGlobal,
+        nb_unites: nbUnites,
+        nb_jours:  nbJoursGlobal,
       },
     };
   }

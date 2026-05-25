@@ -296,6 +296,35 @@ export class WhatsappMessage {
   })
   deletedAt?: Date | null;
 
+  // ── Colonnes générées virtuelles (créées par migration AddTrafficGroupingIndexes) ──
+  // Non incluses dans INSERT/UPDATE — lecture seule pour les requêtes d'agrégation.
+
+  @Column({
+    name: 'hour_of_day',
+    type: 'tinyint',
+    unsigned: true,
+    nullable: true,
+    generatedType: 'VIRTUAL',
+    asExpression: `HOUR(\`createdAt\`)`,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  hourOfDay?: number | null;
+
+  @Column({
+    name: 'day_of_week_n',
+    type: 'tinyint',
+    unsigned: true,
+    nullable: true,
+    generatedType: 'VIRTUAL',
+    asExpression: `WEEKDAY(\`createdAt\`)`,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  dayOfWeekN?: number | null;
+
   // @BeforeInsert()
   // clearContactForAgentMessage() {
   //   if (this.from_me) {

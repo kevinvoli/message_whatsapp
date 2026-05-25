@@ -21,10 +21,8 @@ export class MessageReadService {
   async markConversationAsRead(
     commercialId: string,
     chatId: string,
+    isDedicated = false,
   ): Promise<{ markedCount: number }> {
-    const settings = await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } });
-    const maxPerMinute = settings?.maxReadMessagesPerMinute ?? 1;
-
     const messages = await this.messageRepository
       .createQueryBuilder('m')
       .select('m.id')
@@ -37,7 +35,19 @@ export class MessageReadService {
       return { markedCount: 0 };
     }
 
-    const granted = this.rateLimiter.consumeUpTo(commercialId, messages.length, maxPerMinute);
+    // Skip rate limit pour postes dédiés — marquer tous les messages sans restriction
+    let granted: number;
+    if (isDedicated) {
+      granted = messages.length;
+    } else {
+      const settings = await this.settingsRepository.findOne({
+        where: {},
+        order: { createdAt: 'ASC' },
+      });
+      const maxPerMinute = settings?.maxReadMessagesPerMinute ?? 1;
+      granted = this.rateLimiter.consumeUpTo(commercialId, messages.length, maxPerMinute);
+    }
+
     if (granted === 0) {
       return { markedCount: 0 };
     }

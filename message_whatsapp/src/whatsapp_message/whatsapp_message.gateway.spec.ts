@@ -26,6 +26,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any, // systemAlert
       {} as any, // commercialRepository
       {} as any, // messageReadService
+      {} as any, // channelRepository
     );
   };
 
