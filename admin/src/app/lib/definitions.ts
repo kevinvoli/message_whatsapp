@@ -26,6 +26,7 @@ export type ViewMode =
   | 'performance'
   | 'analytics'
   | 'messages'
+  | 'message-traffic'
   | 'clients'
   | 'rapports'
   | 'postes'
@@ -833,6 +834,53 @@ export type CampaignLinkStats = {
   unique_clicks: number;
   clicks_by_day: { date: string; clicks: number; conversions: number }[];
   clicks_by_device: { device_type: string; count: number }[];
+};
+
+
+/** Un point horaire dans le diagramme 24h */
+export type TraficHorairePoint = {
+  heure: number;
+  heureLabel: string;
+  total: number;
+  messages_in: number;
+  messages_out: number;
+  avg_par_jour: number;
+};
+
+/** Statistiques calculées sur la période */
+export type TraficStatistiques = {
+  total: number;
+  messages_in: number;
+  messages_out: number;
+  moy_par_minute: number;
+  moy_par_heure: number;
+  moy_par_jour: number;
+  heure_pic: number;
+  messages_pic: number;
+  heure_creux: number;
+  heure_pic_in: number;
+  ratio_in_out: number;
+  pourcentage_in: number;
+  pourcentage_out: number;
+  concentration_matin: number;
+  concentration_aprem: number;
+  concentration_soir: number;
+  concentration_nuit: number;
+  heures_actives: number;
+  nb_jours: number;
+  mode: 'journee' | 'periode';
+};
+
+/** Réponse complète de l endpoint trafic-horaire */
+export type TraficHoraireResponse = {
+  horaire: TraficHorairePoint[];
+  statistiques: TraficStatistiques;
+  meta: {
+    periode: string;
+    dateStart: string;
+    dateEnd: string;
+    jours: number;
+  };
 };
 
 export const COULEURS_STATUT = {

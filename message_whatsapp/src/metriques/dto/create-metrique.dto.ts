@@ -453,3 +453,60 @@ export class QueueMetricsDto {
   @IsNumber()
   churn_24h: number;
 }
+
+/** Un point horaire dans le diagramme 24h */
+export class TraficHorairePointDto {
+  @ApiProperty({ description: 'Heure (0-23)' })
+  heure: number;
+
+  @ApiProperty({ description: "Label affiché ('00:00', '01:00', ...)" })
+  heureLabel: string;
+
+  @ApiProperty({ description: 'Total messages' })
+  total: number;
+
+  @ApiProperty({ description: 'Messages entrants (direction=IN)' })
+  messages_in: number;
+
+  @ApiProperty({ description: 'Messages sortants (direction=OUT)' })
+  messages_out: number;
+
+  @ApiProperty({ description: 'Moyenne par jour (mode multi-jours)' })
+  avg_par_jour: number;
+}
+
+/** Statistiques calculées sur la période */
+export class TraficStatistiquesDto {
+  total: number;
+  messages_in: number;
+  messages_out: number;
+  moy_par_minute: number;
+  moy_par_heure: number;
+  moy_par_jour: number;
+  heure_pic: number;
+  messages_pic: number;
+  heure_creux: number;
+  heure_pic_in: number;
+  ratio_in_out: number;
+  pourcentage_in: number;
+  pourcentage_out: number;
+  concentration_matin: number;
+  concentration_aprem: number;
+  concentration_soir: number;
+  concentration_nuit: number;
+  heures_actives: number;
+  nb_jours: number;
+  mode: 'journee' | 'periode';
+}
+
+/** Réponse complète de l'endpoint trafic-horaire */
+export class TraficHoraireResponseDto {
+  horaire: TraficHorairePointDto[];
+  statistiques: TraficStatistiquesDto;
+  meta: {
+    periode: string;
+    dateStart: string;
+    dateEnd: string;
+    jours: number;
+  };
+}

@@ -43,6 +43,7 @@ import SettingsView from '@/app/ui/SettingsView';
 import CampaignLinksView from '@/app/ui/CampaignLinksView';
 import MediathequeView from '@/app/ui/MediathequeView';
 import ChannelStatsView from '@/app/ui/ChannelStatsView';
+import MessageTrafficView from '@/app/ui/MessageTrafficView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -51,7 +52,7 @@ import { getAdminProfile } from '@/app/lib/api';
 
 const VALID_VIEWS: ViewMode[] = [
     'overview', 'commerciaux', 'performance', 'analytics', 'messages', 'clients',
-    'rapports', 'postes', 'canaux', 'templates', 'automessages', 'conversations',
+    'message-traffic', 'rapports', 'postes', 'canaux', 'templates', 'automessages', 'conversations',
     'queue', 'dispatch', 'lecture-seule', 'crons', 'observabilite', 'go_no_go',
     'notifications', 'alert-config', 'campaign-links', 'mediatheque', 'settings', 'channel-stats',
 ];
@@ -186,6 +187,8 @@ function AdminDashboardContent() {
                         onProfileUpdated={setAdminProfile}
                     />
                 );
+            case 'message-traffic':
+                return <MessageTrafficView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} />;
             default:
                 return null;
         }
