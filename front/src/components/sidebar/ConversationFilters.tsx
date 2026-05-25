@@ -1,5 +1,6 @@
 import { Conversation } from '@/types/chat';
 import React, { useMemo } from 'react';
+import { useChatStore } from '@/store/chatStore';
 
 interface ConversationFiltersProps {
     conversations: Conversation[];
@@ -9,13 +10,14 @@ interface ConversationFiltersProps {
 }
 
 export default function ConversationFilters({ conversations, totalUnread, filterStatus, setFilterStatus }: ConversationFiltersProps) {
-    // Compteurs calculés depuis la liste complète chargée (non filtrée).
-    // Basés sur les conversations du store — reflètent les pages déjà chargées.
+    const conversationsNouveau = useChatStore((s) => s.conversationsNouveau);
+
+    // Compteurs calculés depuis les tableaux dédiés par onglet (pré-chargés serveur).
     const counts = useMemo(() => ({
         all:     conversations.length,
-        // "Nouveau" = commercial n'a jamais répondu (last_poste_message_at null).
-        nouveau: conversations.filter((c) => !c.last_poste_message_at).length,
-    }), [conversations]);
+        // "Nouveau" issu du tableau dédié pré-chargé, pas du filtre local.
+        nouveau: conversationsNouveau.length,
+    }), [conversations, conversationsNouveau]);
 
     const btn = (key: string, label: string, count?: number) => (
         <button

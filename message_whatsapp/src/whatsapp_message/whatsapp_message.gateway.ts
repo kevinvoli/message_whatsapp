@@ -354,6 +354,8 @@ export class WhatsappMessageGateway
     searchTerm?: string,
     cursor?: { activityAt: string; chatId: string },
     unreadOnly = false,
+    nouveauOnly = false,
+    tab?: string,
   ) {
     const isFirstPage = !cursor;
 
@@ -363,17 +365,18 @@ export class WhatsappMessageGateway
     const isDedicated = dedicatedChannelIds.length > 0;
 
     // Inclure TOUS les statuts (actif, attente, fermé, converti…).
-    // Limite : 300 conversations par page (keyset pagination) sauf en mode dédié ou filtre unread.
+    // Limite : 300 conversations par page (keyset pagination) sauf en mode dédié ou filtre unread/nouveau.
     let { chats, hasMore } = await this.chatService.findByPosteId(
       agent.posteId,
       [],
       isDedicated ? 10_000 : 300,
-      isDedicated || unreadOnly ? undefined : cursor,
+      isDedicated || unreadOnly || nouveauOnly ? undefined : cursor,
       unreadOnly,
+      nouveauOnly,
     );
 
-    // Poste dédié ou filtre non-lus : pas de scroll infini
-    if (isDedicated || unreadOnly) hasMore = false;
+    // Poste dédié ou filtre non-lus ou nouveaux : pas de scroll infini
+    if (isDedicated || unreadOnly || nouveauOnly) hasMore = false;
 
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
@@ -430,11 +433,11 @@ export class WhatsappMessageGateway
 
     client.emit('chat:event', {
       type: 'CONVERSATION_LIST',
-      payload: { conversations, hasMore, nextCursor },
+      payload: { conversations, hasMore, nextCursor, tab },
     });
 
-    // TOTAL_UNREAD_UPDATE seulement sur la première page (évite les doublons)
-    if (isFirstPage) {
+    // TOTAL_UNREAD_UPDATE seulement sur la première page du tab 'tous' (évite les doublons)
+    if (isFirstPage && (!tab || tab === 'tous')) {
       const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
       client.emit('chat:event', {
         type: 'TOTAL_UNREAD_UPDATE',
@@ -521,6 +524,8 @@ export class WhatsappMessageGateway
       search?: string;
       cursor?: { activityAt: string; chatId: string };
       unreadOnly?: boolean;
+      nouveauOnly?: boolean;
+      tab?: string;
     },
   ) {
     if (!this.throttle.allow(client.id, 'conversations:get')) {
@@ -535,6 +540,8 @@ export class WhatsappMessageGateway
         payload?.search,
         payload?.cursor,
         payload?.unreadOnly,
+        payload?.nouveauOnly,
+        payload?.tab,
       );
     } catch (err) {
       this.logger.error(

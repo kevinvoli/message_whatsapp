@@ -59,6 +59,9 @@ export default function ConversationList({
     // de filtre avec 0 résultats sur un poste de 2000+ conversations.
     const filteredCount = filteredConversations.length;
     useEffect(() => {
+        // Pas d'auto-load pour les onglets pré-chargés côté serveur
+        if (filterStatus === 'unread' || filterStatus === 'nouveau') return;
+
         if (filteredCount >= 10) {
             autoLoadCountRef.current = 0; // reset dès qu'on a assez de résultats
             return;

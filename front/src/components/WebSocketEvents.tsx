@@ -22,6 +22,8 @@ const WebSocketEvents = () => {
   const setSocket = useChatStore((s) => s.setSocket);
   const setContactSocket = useContactStore((s) => s.setSocket);
   const loadConversations = useChatStore((s) => s.loadConversations);
+  const loadUnreadConversations = useChatStore((s) => s.loadUnreadConversations);
+  const loadNouveauConversations = useChatStore((s) => s.loadNouveauConversations);
   const setTotalUnread = useChatStore((s) => s.setTotalUnread);
 
   useEffect(() => {
@@ -34,6 +36,8 @@ const WebSocketEvents = () => {
 
     const refreshAfterConnect = () => {
       loadConversations();
+      loadUnreadConversations();
+      loadNouveauConversations();
       socket.emit('contacts:get');
 
       const selectedChatId = useChatStore.getState().selectedConversation?.chat_id;
@@ -138,7 +142,7 @@ const WebSocketEvents = () => {
         }
 
         case 'CONVERSATION_LIST': {
-          // Nouveau format : { conversations, hasMore, nextCursor }
+          // Nouveau format : { conversations, hasMore, nextCursor, tab }
           // Ancien format (compat) : tableau direct
           const raw = data.payload;
           const isNewFormat = raw && typeof raw === 'object' && !Array.isArray(raw) && 'conversations' in raw;
@@ -149,16 +153,22 @@ const WebSocketEvents = () => {
 
           const hasMore: boolean = isNewFormat ? raw.hasMore : false;
           const nextCursor = isNewFormat ? raw.nextCursor : null;
+          const tab: string | undefined = isNewFormat ? raw.tab : undefined;
 
-          // Critère correct : isLoadingMoreConversations indique que la requête
-          // provenait de loadMoreConversations() → append.
-          // nextCursor seul est insuffisant : la DERNIÈRE page a nextCursor=null
-          // mais doit quand même être appendée, pas remplacer toute la liste.
-          if (chatState.isLoadingMoreConversations) {
-            chatState.appendConversations(convArray, hasMore, nextCursor);
+          if (tab === 'unread') {
+            useChatStore.getState().setUnreadConversations(convArray);
+          } else if (tab === 'nouveau') {
+            useChatStore.getState().setNouveauConversations(convArray);
           } else {
-            // Chargement initial (loadConversations) ou recherche — replace
-            chatState.setConversations(convArray, hasMore, nextCursor);
+            // tab === 'tous' ou non défini (compat)
+            // Critère correct : isLoadingMoreConversations indique que la requête
+            // provenait de loadMoreConversations() → append.
+            if (chatState.isLoadingMoreConversations) {
+              chatState.appendConversations(convArray, hasMore, nextCursor);
+            } else {
+              // Chargement initial (loadConversations) ou recherche — replace
+              chatState.setConversations(convArray, hasMore, nextCursor);
+            }
           }
           break;
         }
@@ -353,7 +363,7 @@ const WebSocketEvents = () => {
       setSocket(null);
       setContactSocket(null);
     };
-  }, [socket, user, setSocket, setContactSocket, loadConversations]);
+  }, [socket, user, setSocket, setContactSocket, loadConversations, loadUnreadConversations, loadNouveauConversations]);
 
   return null;
 };

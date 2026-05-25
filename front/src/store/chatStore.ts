@@ -43,10 +43,20 @@ interface ChatState {
   /** Terme de recherche actif — transmis au serveur pour filtrer avant pagination */
   currentSearch: string;
 
+  // Tableaux indépendants par onglet
+  conversationsUnread: Conversation[];
+  isLoadingUnread: boolean;
+  conversationsNouveau: Conversation[];
+  isLoadingNouveau: boolean;
+
   // Actions
   setSocket: (socket: Socket | null) => void;
-  /** Recharge depuis la page 1. Si search est fourni, le backend filtre côté serveur. Si unreadOnly, le backend retourne uniquement les conversations non lues (toutes, sans pagination). */
-  loadConversations: (search?: string, unreadOnly?: boolean) => void;
+  /** Recharge depuis la page 1. Si search est fourni, le backend filtre côté serveur. */
+  loadConversations: (search?: string) => void;
+  loadUnreadConversations: (search?: string) => void;
+  loadNouveauConversations: (search?: string) => void;
+  setUnreadConversations: (conversations: Conversation[]) => void;
+  setNouveauConversations: (conversations: Conversation[]) => void;
   loadMoreConversations: () => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
@@ -98,6 +108,10 @@ const initialState: Omit<
   | "setSocket"
   | "loadConversations"
   | "loadMoreConversations"
+  | "loadUnreadConversations"
+  | "loadNouveauConversations"
+  | "setUnreadConversations"
+  | "setNouveauConversations"
   | "selectConversation"
   | "sendMessage"
   | "setReplyTo"
@@ -141,6 +155,10 @@ const initialState: Omit<
   isLoadingMoreConversations: false,
   conversationCursor: null,
   currentSearch: '',
+  conversationsUnread: [],
+  isLoadingUnread: false,
+  conversationsNouveau: [],
+  isLoadingNouveau: false,
   lastUnreadOpenedAt: null,
   readCooldownSeconds: 120,
   showCooldownModal: false,
@@ -164,15 +182,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSocket: (socket) => set({ socket }),
 
-  loadConversations: (search?: string, unreadOnly?: boolean) => {
+  loadConversations: (search?: string) => {
     const { socket } = get();
     if (!socket) return;
     const searchTerm = search ?? '';
     set({ isLoading: true, conversationCursor: null, hasMoreConversations: false, currentSearch: searchTerm });
-    const payload: { search?: string; unreadOnly?: boolean } = {};
+    const payload: { search?: string; tab: string } = { tab: 'tous' };
     if (searchTerm) payload.search = searchTerm;
-    if (unreadOnly) payload.unreadOnly = true;
-    socket.emit("conversations:get", Object.keys(payload).length > 0 ? payload : undefined);
+    socket.emit("conversations:get", payload);
+  },
+
+  loadUnreadConversations: (search?: string) => {
+    const { socket } = get();
+    if (!socket) return;
+    set({ isLoadingUnread: true });
+    const payload: { unreadOnly: boolean; tab: string; search?: string } = { unreadOnly: true, tab: 'unread' };
+    if (search) payload.search = search;
+    socket.emit('conversations:get', payload);
+  },
+
+  loadNouveauConversations: (search?: string) => {
+    const { socket } = get();
+    if (!socket) return;
+    set({ isLoadingNouveau: true });
+    const payload: { nouveauOnly: boolean; tab: string; search?: string } = { nouveauOnly: true, tab: 'nouveau' };
+    if (search) payload.search = search;
+    socket.emit('conversations:get', payload);
+  },
+
+  setUnreadConversations: (conversations: Conversation[]) => {
+    const selectedChatId = get().selectedConversation?.chat_id;
+    const normalized = selectedChatId
+      ? conversations.map((c) => c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c)
+      : conversations;
+    set({
+      conversationsUnread: normalized,
+      isLoadingUnread: false,
+      totalUnread: normalized.filter((c) => c.unreadCount > 0).length,
+    });
+  },
+
+  setNouveauConversations: (conversations: Conversation[]) => {
+    const selectedChatId = get().selectedConversation?.chat_id;
+    const normalized = selectedChatId
+      ? conversations.map((c) => c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c)
+      : conversations;
+    set({ conversationsNouveau: normalized, isLoadingNouveau: false });
   },
 
   loadMoreConversations: () => {
@@ -187,7 +242,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   selectConversation: (chat_id: string) => {
     const state = get();
-    const conversation = state.conversations.find((c) => c.chat_id === chat_id);
+    const conversation =
+      state.conversations.find((c) => c.chat_id === chat_id) ??
+      state.conversationsUnread.find((c) => c.chat_id === chat_id) ??
+      state.conversationsNouveau.find((c) => c.chat_id === chat_id);
     if (!conversation) return;
 
     const originalUnreadCount = conversation.unreadCount ?? 0;
@@ -205,6 +263,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((s) => ({
       selectedConversation: { ...conversation, unreadCount: 0 },
       conversations: s.conversations.map((c) =>
+        c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
+      ),
+      conversationsUnread: s.conversationsUnread.map((c) =>
+        c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
+      ),
+      conversationsNouveau: s.conversationsNouveau.map((c) =>
         c.chat_id === chat_id ? { ...c, unreadCount: 0 } : c,
       ),
       messages: [],
@@ -263,6 +327,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
               c.chat_id === pendingId ? { ...c, unreadCount: pendingUnread } : c,
             )
           : state.conversations,
+        conversationsUnread: pendingId && pendingUnread > 0
+          ? state.conversationsUnread.map((c) =>
+              c.chat_id === pendingId ? { ...c, unreadCount: pendingUnread } : c,
+            )
+          : state.conversationsUnread,
       };
     });
   },
@@ -270,6 +339,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   removeConversationBychat_id: (chat_id: string) => {
     set((state) => ({
       conversations: state.conversations.filter((c) => c.chat_id !== chat_id),
+      conversationsUnread: state.conversationsUnread.filter((c) => c.chat_id !== chat_id),
+      conversationsNouveau: state.conversationsNouveau.filter((c) => c.chat_id !== chat_id),
       selectedConversation:
         state.selectedConversation?.chat_id === chat_id
           ? null

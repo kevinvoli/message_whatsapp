@@ -60,8 +60,9 @@ export class WhatsappChatService {
     limit = 300,
     cursor?: { activityAt: string; chatId: string },
     unreadOnly = false,
+    nouveauOnly = false,
   ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
-    const effectiveLimit = unreadOnly ? 5_000 : limit;
+    const effectiveLimit = (unreadOnly || nouveauOnly) ? 5_000 : limit;
     const qb = this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
@@ -80,7 +81,11 @@ export class WhatsappChatService {
       qb.andWhere('chat.unread_count > 0');
     }
 
-    if (cursor && !unreadOnly) {
+    if (nouveauOnly) {
+      qb.andWhere('chat.last_poste_message_at IS NULL');
+    }
+
+    if (cursor && !unreadOnly && !nouveauOnly) {
       qb.andWhere(
         '(chat.last_activity_at < :activityAt OR (chat.last_activity_at = :activityAt AND chat.chat_id < :chatId))',
         { activityAt: new Date(cursor.activityAt), chatId: cursor.chatId },

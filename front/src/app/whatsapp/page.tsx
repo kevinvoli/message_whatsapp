@@ -30,6 +30,10 @@ const WhatsAppPageContent = () => {
     totalUnread: totalUnreadFromStore,
     loadConversations,
   } = useChatStore();
+  const conversationsUnread = useChatStore((s) => s.conversationsUnread);
+  const conversationsNouveau = useChatStore((s) => s.conversationsNouveau);
+  const loadUnreadConversations = useChatStore((s) => s.loadUnreadConversations);
+  const loadNouveauConversations = useChatStore((s) => s.loadNouveauConversations);
   
   const { isConnected: isWebSocketConnected } = useSocket();
   const { stats } = useStatsStore();
@@ -47,7 +51,6 @@ const WhatsAppPageContent = () => {
 
   // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)
   const isInitialSearchMount = useRef(true);
-  const isInitialFilterMount = useRef(true);
 
   // Protection de route
   useEffect(() => {
@@ -68,12 +71,11 @@ const WhatsAppPageContent = () => {
 
   
   const totalMessages = selectedConversation ? selectedConversation.messages?.length : 0;
-  // Utilise la valeur globale envoyée par le backend (inclut les conversations fermées
-  // et toutes les conversations du poste, pas seulement celles visibles dans la liste)
-  // Fallback sur le calcul local si le backend n'a pas encore envoyé TOTAL_UNREAD_UPDATE
-  const totalUnread = totalUnreadFromStore || conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+  // totalUnread est mis à jour dans setUnreadConversations via conversationsUnread.length.
+  // Fallback sur totalUnreadFromStore pendant le chargement initial.
+  const totalUnread = totalUnreadFromStore;
 
-  // Recherche côté serveur : quand searchQuery change, recharger depuis le backend.
+  // Recherche côté serveur : quand searchQuery change, recharger les 3 onglets depuis le backend.
   // Debounce 300 ms pour éviter de spammer à chaque frappe.
   // On skip le premier render car WebSocketEvents.tsx gère le chargement initial.
   useEffect(() => {
@@ -82,35 +84,21 @@ const WhatsAppPageContent = () => {
       return;
     }
     const timer = setTimeout(() => {
-      loadConversations(searchQuery || undefined, filterStatus === 'unread');
+      const search = searchQuery || undefined;
+      loadConversations(search);
+      loadUnreadConversations(search);
+      loadNouveauConversations(search);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, loadConversations]);
-
-  // Filtre "non lus" : rechargement côté serveur pour inclure toutes les conversations
-  // non lues du poste, même au-delà de la limite de pagination (300).
-  // Les autres filtres restent côté client.
-  useEffect(() => {
-    if (isInitialFilterMount.current) {
-      isInitialFilterMount.current = false;
-      return;
-    }
-    loadConversations(searchQuery || undefined, filterStatus === 'unread');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus]);
+  }, [searchQuery, loadConversations, loadUnreadConversations, loadNouveauConversations]);
 
   const filteredConversations = useMemo(() => {
-    return conversations.filter((conv) => {
-      switch (filterStatus) {
-        case 'unread':  return conv.unreadCount > 0;
-        // "Nouveaux" = le commercial n'a jamais répondu (last_poste_message_at null).
-        // Ne pas se baser sur conv.status === 'attente' qui reflète l'état du poste
-        // au moment du dispatch (online/offline), pas l'état "jamais traité".
-        case 'nouveau': return !conv.last_poste_message_at;
-        default:        return true; // 'all' et tout autre
-      }
-    });
-  }, [conversations, filterStatus]);
+    switch (filterStatus) {
+      case 'unread':  return conversationsUnread;
+      case 'nouveau': return conversationsNouveau;
+      default:        return conversations;
+    }
+  }, [filterStatus, conversations, conversationsUnread, conversationsNouveau]);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
