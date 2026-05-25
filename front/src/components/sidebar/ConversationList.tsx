@@ -18,32 +18,39 @@ export default function ConversationList({
     onSelectConversation,
     selectedConv,
 }: ConversationListProps) {
-    const typingStatus               = useChatStore((state) => state.typingStatus);
-    const hasMoreConversations       = useChatStore((state) => state.hasMoreConversations);
-    const isLoadingMoreConversations = useChatStore((state) => state.isLoadingMoreConversations);
-    const loadMoreConversations      = useChatStore((state) => state.loadMoreConversations);
-    const conversationCursor         = useChatStore((state) => state.conversationCursor);
-    const currentSearch              = useChatStore((s) => s.currentSearch);
-    const isLoadingNouveau           = useChatStore((s) => s.isLoadingNouveau);
+    const typingStatus                  = useChatStore((state) => state.typingStatus);
+    const hasMoreConversations          = useChatStore((state) => state.hasMoreConversations);
+    const isLoadingMoreConversations    = useChatStore((state) => state.isLoadingMoreConversations);
+    const loadMoreConversations         = useChatStore((state) => state.loadMoreConversations);
+    const hasMoreNouveau                = useChatStore((state) => state.hasMoreNouveau);
+    const isLoadingMoreNouveau          = useChatStore((state) => state.isLoadingMoreNouveau);
+    const loadMoreNouveauConversations  = useChatStore((state) => state.loadMoreNouveauConversations);
+    const currentSearch                 = useChatStore((s) => s.currentSearch);
+    const isLoadingNouveau              = useChatStore((s) => s.isLoadingNouveau);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     // Compteur d'auto-loads consécutifs pour le filtre actif.
-    // Remis à 0 quand filteredCount dépasse le seuil ou quand le filtre change.
     const autoLoadCountRef = useRef(0);
 
+    // Valeurs dérivées selon l'onglet actif
+    const isScrollTab         = filterStatus === 'all' || filterStatus === 'nouveau';
+    const hasMoreCurrentTab   = filterStatus === 'nouveau' ? hasMoreNouveau : hasMoreConversations;
+    const isLoadingMoreCurrentTab = filterStatus === 'nouveau' ? isLoadingMoreNouveau : isLoadingMoreConversations;
+    const loadMoreCurrentTab  = filterStatus === 'nouveau' ? loadMoreNouveauConversations : loadMoreConversations;
+
     // Refs pour lire les valeurs dynamiques sans recréer l'observer
-    const hasMoreRef  = useRef(hasMoreConversations);
-    const loadingRef  = useRef(isLoadingMoreConversations);
+    const hasMoreRef  = useRef(hasMoreCurrentTab);
+    const loadingRef  = useRef(isLoadingMoreCurrentTab);
 
     // Effet 1 : sync des refs — ne recrée PAS l'observer
     useEffect(() => {
-        hasMoreRef.current  = hasMoreConversations;
-        loadingRef.current  = isLoadingMoreConversations;
-    }, [hasMoreConversations, isLoadingMoreConversations]);
+        hasMoreRef.current  = hasMoreCurrentTab;
+        loadingRef.current  = isLoadingMoreCurrentTab;
+    }, [hasMoreCurrentTab, isLoadingMoreCurrentTab]);
 
-    // Effet 2 : observer stable, recréé seulement au changement d'onglet
+    // Effet 2 : observer stable, recréé seulement au changement d'onglet ou de loadMore
     useEffect(() => {
-        if (filterStatus !== 'all') return; // guard double sécurité
+        if (!isScrollTab) return;
 
         const sentinel = sentinelRef.current;
         if (!sentinel) return;
@@ -51,33 +58,31 @@ export default function ConversationList({
         const observer = new IntersectionObserver(([entry]) => {
             if (!entry.isIntersecting) return;
             if (!hasMoreRef.current || loadingRef.current) return;
-            loadMoreConversations();
+            loadMoreCurrentTab();
         }, { threshold: 0.1 });
 
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [filterStatus, loadMoreConversations]);
+    }, [filterStatus, loadMoreCurrentTab, isScrollTab]);
 
     // Reset du compteur d'auto-load quand le filtre ou la recherche change
     useEffect(() => {
         autoLoadCountRef.current = 0;
     }, [filterStatus, currentSearch]);
 
-    // Auto-load limité : quand un filtre produit moins de 10 résultats, on charge
-    // automatiquement jusqu'à 3 pages supplémentaires (900 conversations max).
-    // Au-delà, le scroll manuel prend le relais pour éviter de tout charger en cas
-    // de filtre avec 0 résultats sur un poste de 2000+ conversations.
+    // Auto-load limité : quand un filtre produit moins de 10 résultats sur l'onglet "all",
+    // on charge automatiquement jusqu'à 3 pages supplémentaires.
     const filteredCount = filteredConversations.length;
     useEffect(() => {
-        // Pas d'auto-load pour les onglets pré-chargés côté serveur
-        if (filterStatus === 'unread' || filterStatus === 'nouveau') return;
+        // Auto-load uniquement sur l'onglet "Tous"
+        if (filterStatus !== 'all') return;
 
         if (filteredCount >= 10) {
-            autoLoadCountRef.current = 0; // reset dès qu'on a assez de résultats
+            autoLoadCountRef.current = 0;
             return;
         }
         if (!hasMoreConversations || isLoadingMoreConversations) return;
-        if (autoLoadCountRef.current >= 3) return; // plafond atteint
+        if (autoLoadCountRef.current >= 3) return;
         const sentinel = sentinelRef.current;
         if (!sentinel) return;
         const rect = sentinel.getBoundingClientRect();
@@ -87,7 +92,7 @@ export default function ConversationList({
             loadMoreConversations();
         }, 600);
         return () => clearTimeout(timer);
-    }, [filteredCount, hasMoreConversations, isLoadingMoreConversations, loadMoreConversations]);
+    }, [filteredCount, hasMoreConversations, isLoadingMoreConversations, loadMoreConversations, filterStatus]);
 
     return (
         <div className="flex-1 overflow-y-auto">
@@ -100,9 +105,9 @@ export default function ConversationList({
                     onClick={() => onSelectConversation(conv)}
                 />
             ))}
-            {hasMoreConversations && filterStatus === 'all' && (
+            {isScrollTab && hasMoreCurrentTab && (
                 <div ref={sentinelRef} className="h-8 flex items-center justify-center text-xs text-gray-400">
-                    {isLoadingMoreConversations ? 'Chargement…' : ''}
+                    {isLoadingMoreCurrentTab ? 'Chargement…' : ''}
                 </div>
             )}
             {filterStatus === 'nouveau' && filteredCount === 0 && !isLoadingNouveau && (

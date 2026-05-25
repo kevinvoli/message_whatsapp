@@ -370,14 +370,15 @@ export class WhatsappMessageGateway
       agent.posteId,
       [],
       isDedicated ? 10_000 : 300,
-      isDedicated || unreadOnly || nouveauOnly || !!searchTerm ? undefined : cursor,
+      isDedicated || unreadOnly || !!searchTerm ? undefined : cursor,
       unreadOnly,
       nouveauOnly,
       searchTerm,
     );
 
-    // Poste dédié, filtre non-lus/nouveaux ou recherche : pas de scroll infini
-    if (isDedicated || unreadOnly || nouveauOnly || !!searchTerm) hasMore = false;
+    // Poste dédié, filtre non-lus ou recherche : pas de scroll infini.
+    // nouveauOnly bénéficie du scroll infini (keyset pagination).
+    if (isDedicated || unreadOnly || !!searchTerm) hasMore = false;
 
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);

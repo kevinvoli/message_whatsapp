@@ -48,6 +48,9 @@ interface ChatState {
   isLoadingUnread: boolean;
   conversationsNouveau: Conversation[];
   isLoadingNouveau: boolean;
+  hasMoreNouveau: boolean;
+  isLoadingMoreNouveau: boolean;
+  conversationCursorNouveau: ConversationCursor | null;
 
   // Actions
   setSocket: (socket: Socket | null) => void;
@@ -56,8 +59,10 @@ interface ChatState {
   loadUnreadConversations: (search?: string) => void;
   loadNouveauConversations: (search?: string) => void;
   setUnreadConversations: (conversations: Conversation[]) => void;
-  setNouveauConversations: (conversations: Conversation[]) => void;
+  setNouveauConversations: (conversations: Conversation[], hasMore?: boolean, cursor?: ConversationCursor | null) => void;
   loadMoreConversations: () => void;
+  loadMoreNouveauConversations: () => void;
+  appendNouveauConversations: (conversations: Conversation[], hasMore: boolean, cursor: ConversationCursor | null) => void;
   selectConversation: (chat_id: string) => void;
   sendMessage: (text: string) => void;
   setReplyTo: (message: Message) => void;
@@ -112,6 +117,8 @@ const initialState: Omit<
   | "loadNouveauConversations"
   | "setUnreadConversations"
   | "setNouveauConversations"
+  | "loadMoreNouveauConversations"
+  | "appendNouveauConversations"
   | "selectConversation"
   | "sendMessage"
   | "setReplyTo"
@@ -159,6 +166,9 @@ const initialState: Omit<
   isLoadingUnread: false,
   conversationsNouveau: [],
   isLoadingNouveau: false,
+  hasMoreNouveau: false,
+  isLoadingMoreNouveau: false,
+  conversationCursorNouveau: null,
   lastUnreadOpenedAt: null,
   readCooldownSeconds: 120,
   showCooldownModal: false,
@@ -222,12 +232,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  setNouveauConversations: (conversations: Conversation[]) => {
+  setNouveauConversations: (conversations: Conversation[], hasMore = false, cursor: ConversationCursor | null = null) => {
     const selectedChatId = get().selectedConversation?.chat_id;
     const normalized = selectedChatId
       ? conversations.map((c) => c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c)
       : conversations;
-    set({ conversationsNouveau: normalized, isLoadingNouveau: false });
+    set({
+      conversationsNouveau: normalized,
+      isLoadingNouveau: false,
+      isLoadingMoreNouveau: false,
+      hasMoreNouveau: hasMore,
+      conversationCursorNouveau: cursor ?? null,
+    });
   },
 
   loadMoreConversations: () => {
@@ -241,6 +257,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
     if (currentSearch) payload.search = currentSearch;
     socket.emit("conversations:get", payload);
+  },
+
+  loadMoreNouveauConversations: () => {
+    const { socket, hasMoreNouveau, isLoadingMoreNouveau, conversationCursorNouveau, currentSearch } = get();
+    if (!socket || !hasMoreNouveau || isLoadingMoreNouveau || !conversationCursorNouveau) return;
+    set({ isLoadingMoreNouveau: true });
+    const payload: { cursor: ConversationCursor; search?: string; nouveauOnly: boolean; tab: string } = {
+      cursor: conversationCursorNouveau,
+      nouveauOnly: true,
+      tab: 'nouveau',
+    };
+    if (currentSearch) payload.search = currentSearch;
+    socket.emit('conversations:get', payload);
   },
 
   selectConversation: (chat_id: string) => {
@@ -498,6 +527,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isLoadingMoreConversations: false,
         hasMoreConversations: hasMore,
         conversationCursor: cursor,
+      };
+    });
+  },
+
+  appendNouveauConversations: (conversations, hasMore, cursor) => {
+    set((state) => {
+      const selectedChatId = state.selectedConversation?.chat_id;
+      const normalized = selectedChatId
+        ? conversations.map((c) =>
+            c.chat_id === selectedChatId ? { ...c, unreadCount: 0 } : c,
+          )
+        : conversations;
+      const existingMap = new Map(state.conversationsNouveau.map((c) => [c.chat_id, c]));
+      for (const c of normalized) {
+        const existing = existingMap.get(c.chat_id);
+        if (!existing) {
+          existingMap.set(c.chat_id, c);
+        } else {
+          const existingTime = existing.last_activity_at?.getTime() ?? existing.updatedAt.getTime();
+          const newTime = c.last_activity_at?.getTime() ?? c.updatedAt.getTime();
+          if (newTime > existingTime) existingMap.set(c.chat_id, c);
+        }
+      }
+      const merged = Array.from(existingMap.values()).sort((a, b) => {
+        const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
+        const bTime = b.last_activity_at?.getTime() ?? b.updatedAt.getTime();
+        return bTime - aTime;
+      });
+      return {
+        conversationsNouveau: merged,
+        isLoadingMoreNouveau: false,
+        hasMoreNouveau: hasMore,
+        conversationCursorNouveau: cursor,
       };
     });
   },

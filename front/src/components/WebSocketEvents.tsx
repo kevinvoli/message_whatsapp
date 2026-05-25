@@ -158,7 +158,11 @@ const WebSocketEvents = () => {
           if (tab === 'unread') {
             useChatStore.getState().setUnreadConversations(convArray);
           } else if (tab === 'nouveau') {
-            useChatStore.getState().setNouveauConversations(convArray);
+            if (chatState.isLoadingMoreNouveau) {
+              chatState.appendNouveauConversations(convArray, hasMore, nextCursor);
+            } else {
+              chatState.setNouveauConversations(convArray, hasMore, nextCursor);
+            }
           } else {
             // tab === 'tous' ou non défini (compat)
             // Critère correct : isLoadingMoreConversations indique que la requête
