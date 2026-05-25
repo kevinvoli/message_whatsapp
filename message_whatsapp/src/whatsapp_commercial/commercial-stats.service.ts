@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WhatsappCommercial } from './entities/user.entity';
@@ -71,7 +71,15 @@ export class CommercialStatsService {
 
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
-    const [messagesRead, messagesHandled] = await Promise.all([
+    const [
+      messagesRead,
+      messagesHandled,
+      conversationsReceived,
+      conversationsReplied,
+      conversationsHandledRows,
+    ] = await Promise.all([
+
+      // Index 0 — INCHANGE : messagesRead (COUNT messages individuels lus)
       this.messageRepository
         .createQueryBuilder('m')
         .where('m.readByCommercialId = :id', { id: commercialId })
@@ -79,6 +87,8 @@ export class CommercialStatsService {
         .andWhere('m.readByCommercialAt >= :dateStart', { dateStart })
         .andWhere('m.readByCommercialAt <= :dateEnd', { dateEnd })
         .getCount(),
+
+      // Index 1 — INCHANGE : messagesHandled
       this.messageRepository
         .createQueryBuilder('m')
         .where('m.commercial_id = :id', { id: commercialId })
@@ -86,6 +96,48 @@ export class CommercialStatsService {
         .andWhere('m.createdAt >= :dateStart', { dateStart })
         .andWhere('m.createdAt <= :dateEnd', { dateEnd })
         .getCount(),
+
+      // Index 2 — NOUVEAU : conversationsReceived (COUNT DISTINCT chat_id des messages IN lus)
+      this.messageRepository
+        .createQueryBuilder('m')
+        .select('COUNT(DISTINCT m.chat_id)', 'cnt')
+        .where('m.readByCommercialId = :id', { id: commercialId })
+        .andWhere('m.direction = :dir', { dir: MessageDirection.IN })
+        .andWhere('m.readByCommercialAt >= :dateStart', { dateStart })
+        .andWhere('m.readByCommercialAt <= :dateEnd', { dateEnd })
+        .getRawOne<{ cnt: string }>(),
+
+      // Index 3 — NOUVEAU : conversationsReplied (COUNT DISTINCT chat_id des messages OUT)
+      this.messageRepository
+        .createQueryBuilder('m')
+        .select('COUNT(DISTINCT m.chat_id)', 'cnt')
+        .where('m.commercial_id = :id', { id: commercialId })
+        .andWhere('m.direction = :dir', { dir: MessageDirection.OUT })
+        .andWhere('m.createdAt >= :dateStart', { dateStart })
+        .andWhere('m.createdAt <= :dateEnd', { dateEnd })
+        .getRawOne<{ cnt: string }>(),
+
+      // Index 4 — NOUVEAU : conversationsHandled (dernier message global du chat)
+      this.messageRepository.query(
+        `SELECT COUNT(*) AS cnt
+         FROM (
+           SELECT m.chat_id
+           FROM whatsapp_message m
+           WHERE m.commercial_id = ?
+             AND m.direction = 'OUT'
+             AND m.createdAt >= ?
+             AND m.createdAt <= ?
+             AND m.deletedAt IS NULL
+           GROUP BY m.chat_id
+           HAVING MAX(m.createdAt) = (
+             SELECT MAX(m2.createdAt)
+             FROM whatsapp_message m2
+             WHERE m2.chat_id = m.chat_id
+               AND m2.deletedAt IS NULL
+           )
+         ) AS sub`,
+        [commercialId, dateStart, dateEnd],
+      ) as Promise<Array<{ cnt: string }>>,
     ]);
 
     let activeConversations = 0;
@@ -109,6 +161,10 @@ export class CommercialStatsService {
     dto.responseRate = responseRate;
     dto.lastActivityAt = commercial.lastActivityAt;
     dto.isOnline = commercial.isConnected;
+
+    dto.conversationsReceived = parseInt(conversationsReceived?.cnt ?? '0');
+    dto.conversationsReplied  = parseInt(conversationsReplied?.cnt  ?? '0');
+    dto.conversationsHandled  = parseInt(conversationsHandledRows?.[0]?.cnt ?? '0');
 
     return dto;
   }

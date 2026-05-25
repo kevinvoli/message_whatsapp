@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @fileoverview Ce fichier définit les types et interfaces principaux utilisés
  * dans l'application de chat, ainsi que des fonctions utilitaires pour
  * créer, transformer et valider ces objets.
@@ -67,6 +67,11 @@ export type CommercialStatsDto = {
   responseRate: number;
   lastActivityAt: string | null;
   isOnline: boolean;
+
+  // Mode conversations (NOUVEAU)
+  conversationsReceived: number;
+  conversationsReplied:  number;
+  conversationsHandled:  number;
 };
 
 export const getPriorityColor = (
