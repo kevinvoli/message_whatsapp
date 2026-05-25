@@ -67,11 +67,6 @@ export type CommercialStatsDto = {
   responseRate: number;
   lastActivityAt: string | null;
   isOnline: boolean;
-
-  // Mode conversations (NOUVEAU)
-  conversationsReceived: number;
-  conversationsReplied:  number;
-  conversationsHandled:  number;
 };
 
 export const getPriorityColor = (

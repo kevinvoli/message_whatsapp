@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle, Inbox, Reply, CheckCircle } from 'lucide-react';
 
 import { PerformanceCommercial, Poste, CommercialStatsDto } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats } from '@/app/lib/api';
@@ -29,6 +29,47 @@ interface CommerciauxViewProps {
   dateFrom?: string;
   dateTo?: string;
   onViewConversations?: (commercialId: string, posteId: string) => void;
+}
+
+function ModeToggle({
+  value, onChange,
+}: { value: 'messages' | 'conversations'; onChange: (v: 'messages' | 'conversations') => void }) {
+  return (
+    <div className="inline-flex w-full rounded-lg border border-gray-200 bg-gray-100 p-0.5 gap-0.5 mb-4">
+      {(['messages', 'conversations'] as const).map((m) => (
+        <button
+          key={m}
+          onClick={() => onChange(m)}
+          className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-all ${
+            value === m
+              ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {m === 'messages' ? 'Messages' : 'Conversations'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ConvRateBar({ label, value }: { label: string; value: number }) {
+  const color = value >= 80 ? 'bg-green-500' : value >= 60 ? 'bg-orange-400' : 'bg-red-400';
+  const textColor = value >= 80 ? 'text-green-600' : value >= 60 ? 'text-orange-500' : 'text-red-500';
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-medium text-gray-700">{label}</span>
+        <span className={`text-lg font-bold ${textColor}`}>{value.toFixed(1)}%</span>
+      </div>
+      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', dateFrom, dateTo, onViewConversations }: CommerciauxViewProps) {
@@ -112,6 +153,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
   const [statsMap, setStatsMap] = useState<Record<string, CommercialStatsDto>>({});
   const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
   const [statsPanel, setStatsPanel] = useState<PerformanceCommercial | null>(null);
+  const [statsMode, setStatsMode] = useState<'messages' | 'conversations'>('messages');
 
   const handleOpenStatsPanel = useCallback(async (commercial: PerformanceCommercial) => {
     setStatsPanel(commercial);
@@ -819,85 +861,161 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                       </span>
                     </div>
 
-                    {/* Grille de metriques */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MessageCircle className="w-4 h-4 text-blue-600" />
-                          <span className="text-xs text-blue-700 font-medium">Messages recus</span>
-                        </div>
-                        <p className="text-2xl font-bold text-blue-900">
-                          {statsMap[statsPanel.id].messagesRead}
-                        </p>
-                      </div>
+                    {/* Toggle mode Messages / Conversations */}
+                    <ModeToggle value={statsMode} onChange={setStatsMode} />
 
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <CheckCheck className="w-4 h-4 text-green-600" />
-                          <span className="text-xs text-green-700 font-medium">Messages traites</span>
-                        </div>
-                        <p className="text-2xl font-bold text-green-900">
-                          {statsMap[statsPanel.id].messagesHandled}
-                        </p>
-                      </div>
+                    {/* ── Mode Messages ── */}
+                    {statsMode === 'messages' && (
+                      <>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-blue-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MessageCircle className="w-4 h-4 text-blue-600" />
+                              <span className="text-xs text-blue-700 font-medium">Messages recus</span>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-900">
+                              {statsMap[statsPanel.id].messagesRead}
+                            </p>
+                          </div>
 
-                      <div className="bg-purple-50 p-4 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Activity className="w-4 h-4 text-purple-600" />
-                          <span className="text-xs text-purple-700 font-medium">Conv. actives</span>
-                        </div>
-                        <p className="text-2xl font-bold text-purple-900">
-                          {statsMap[statsPanel.id].activeConversations}
-                        </p>
-                      </div>
+                          <div className="bg-green-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCheck className="w-4 h-4 text-green-600" />
+                              <span className="text-xs text-green-700 font-medium">Messages traites</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-900">
+                              {statsMap[statsPanel.id].messagesHandled}
+                            </p>
+                          </div>
 
-                      <div className="bg-orange-50 p-4 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Clock className="w-4 h-4 text-orange-600" />
-                          <span className="text-xs text-orange-700 font-medium">Derniere activite</span>
-                        </div>
-                        <p className="text-sm font-semibold text-orange-900 leading-tight">
-                          {formatDate(statsMap[statsPanel.id].lastActivityAt)}
-                        </p>
-                      </div>
-                    </div>
+                          <div className="bg-purple-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Activity className="w-4 h-4 text-purple-600" />
+                              <span className="text-xs text-purple-700 font-medium">Conv. actives</span>
+                            </div>
+                            <p className="text-2xl font-bold text-purple-900">
+                              {statsMap[statsPanel.id].activeConversations}
+                            </p>
+                          </div>
 
-                    {/* Taux de reponse */}
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-gray-700">Taux de reponse</span>
-                        <span
-                          className={`text-lg font-bold ${
-                            statsMap[statsPanel.id].responseRate >= 80
-                              ? 'text-green-600'
-                              : statsMap[statsPanel.id].responseRate >= 60
-                                ? 'text-orange-500'
-                                : 'text-red-500'
-                          }`}
-                        >
-                          {statsMap[statsPanel.id].responseRate.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div
-                        className="w-full h-3 bg-gray-100 rounded-full overflow-hidden"
-                        role="progressbar"
-                        aria-valuenow={statsMap[statsPanel.id].responseRate}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Taux de reponse : ${statsMap[statsPanel.id].responseRate.toFixed(1)}%`}
-                      >
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            statsMap[statsPanel.id].responseRate >= 80
-                              ? 'bg-green-500'
-                              : statsMap[statsPanel.id].responseRate >= 60
-                                ? 'bg-orange-400'
-                                : 'bg-red-400'
-                          }`}
-                          style={{ width: `${Math.min(statsMap[statsPanel.id].responseRate, 100)}%` }}
-                        />
-                      </div>
-                    </div>
+                          <div className="bg-orange-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Clock className="w-4 h-4 text-orange-600" />
+                              <span className="text-xs text-orange-700 font-medium">Derniere activite</span>
+                            </div>
+                            <p className="text-sm font-semibold text-orange-900 leading-tight">
+                              {formatDate(statsMap[statsPanel.id].lastActivityAt)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Taux de reponse messages */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-medium text-gray-700">Taux de reponse</span>
+                            <span
+                              className={`text-lg font-bold ${
+                                statsMap[statsPanel.id].responseRate >= 80
+                                  ? 'text-green-600'
+                                  : statsMap[statsPanel.id].responseRate >= 60
+                                    ? 'text-orange-500'
+                                    : 'text-red-500'
+                              }`}
+                            >
+                              {statsMap[statsPanel.id].responseRate.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div
+                            className="w-full h-3 bg-gray-100 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-valuenow={statsMap[statsPanel.id].responseRate}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={`Taux de reponse : ${statsMap[statsPanel.id].responseRate.toFixed(1)}%`}
+                          >
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                statsMap[statsPanel.id].responseRate >= 80
+                                  ? 'bg-green-500'
+                                  : statsMap[statsPanel.id].responseRate >= 60
+                                    ? 'bg-orange-400'
+                                    : 'bg-red-400'
+                              }`}
+                              style={{ width: `${Math.min(statsMap[statsPanel.id].responseRate, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* ── Mode Conversations ── */}
+                    {statsMode === 'conversations' && (
+                      <>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-blue-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Inbox className="w-4 h-4 text-blue-600" />
+                              <span className="text-xs text-blue-700 font-medium">Conv. reçues</span>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-900">
+                              {statsMap[statsPanel.id].conversationsReceived ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="bg-green-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Reply className="w-4 h-4 text-green-600" />
+                              <span className="text-xs text-green-700 font-medium">Répondues</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-900">
+                              {statsMap[statsPanel.id].conversationsReplied ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="bg-emerald-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle className="w-4 h-4 text-emerald-600" />
+                              <span className="text-xs text-emerald-700 font-medium">Traitées</span>
+                            </div>
+                            <p className="text-2xl font-bold text-emerald-900">
+                              {statsMap[statsPanel.id].conversationsHandled ?? 0}
+                            </p>
+                          </div>
+
+                          <div className="bg-purple-50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Activity className="w-4 h-4 text-purple-600" />
+                              <span className="text-xs text-purple-700 font-medium">Actives</span>
+                            </div>
+                            <p className="text-2xl font-bold text-purple-900">
+                              {statsMap[statsPanel.id].activeConversations}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Taux de réponse conversations */}
+                        {(statsMap[statsPanel.id].conversationsReceived ?? 0) > 0 && (
+                          <ConvRateBar
+                            label="Taux de réponse"
+                            value={Math.min(
+                              Math.round(((statsMap[statsPanel.id].conversationsReplied ?? 0) / (statsMap[statsPanel.id].conversationsReceived ?? 1)) * 1000) / 10,
+                              100,
+                            )}
+                          />
+                        )}
+
+                        {/* Taux de traitement */}
+                        {(statsMap[statsPanel.id].conversationsReplied ?? 0) > 0 && (
+                          <ConvRateBar
+                            label="Taux de traitement"
+                            value={Math.min(
+                              Math.round(((statsMap[statsPanel.id].conversationsHandled ?? 0) / (statsMap[statsPanel.id].conversationsReplied ?? 1)) * 1000) / 10,
+                              100,
+                            )}
+                          />
+                        )}
+                      </>
+                    )}
                   </>
                 ) : (
                   <p className="text-sm text-gray-500 text-center py-8">

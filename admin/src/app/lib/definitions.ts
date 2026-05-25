@@ -505,6 +505,12 @@ export type CommercialStatsDto = {
   responseRate: number;
   lastActivityAt: string | null;
   isOnline: boolean;
+  /** Conversations dont au moins un message IN a été lu par ce commercial dans la période */
+  conversationsReceived: number;
+  /** Conversations auxquelles ce commercial a envoyé au moins un message OUT dans la période */
+  conversationsReplied:  number;
+  /** Conversations dont ce commercial a envoyé le dernier message global */
+  conversationsHandled:  number;
 };
 
 /**
