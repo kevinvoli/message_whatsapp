@@ -24,29 +24,39 @@ export default function ConversationList({
     const loadMoreConversations      = useChatStore((state) => state.loadMoreConversations);
     const conversationCursor         = useChatStore((state) => state.conversationCursor);
     const currentSearch              = useChatStore((s) => s.currentSearch);
+    const isLoadingNouveau           = useChatStore((s) => s.isLoadingNouveau);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     // Compteur d'auto-loads consécutifs pour le filtre actif.
     // Remis à 0 quand filteredCount dépasse le seuil ou quand le filtre change.
     const autoLoadCountRef = useRef(0);
 
-    // Sentinel — déclenche le chargement serveur par scroll manuel.
-    // conversationCursor en dépendance : quand une page est chargée, l'observer
-    // est recréé et se déclenche immédiatement si le sentinel est déjà visible.
+    // Refs pour lire les valeurs dynamiques sans recréer l'observer
+    const hasMoreRef  = useRef(hasMoreConversations);
+    const loadingRef  = useRef(isLoadingMoreConversations);
+
+    // Effet 1 : sync des refs — ne recrée PAS l'observer
     useEffect(() => {
+        hasMoreRef.current  = hasMoreConversations;
+        loadingRef.current  = isLoadingMoreConversations;
+    }, [hasMoreConversations, isLoadingMoreConversations]);
+
+    // Effet 2 : observer stable, recréé seulement au changement d'onglet
+    useEffect(() => {
+        if (filterStatus !== 'all') return; // guard double sécurité
+
         const sentinel = sentinelRef.current;
         if (!sentinel) return;
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && hasMoreConversations && !isLoadingMoreConversations) {
-                    loadMoreConversations();
-                }
-            },
-            { threshold: 0.1 },
-        );
+
+        const observer = new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) return;
+            if (!hasMoreRef.current || loadingRef.current) return;
+            loadMoreConversations();
+        }, { threshold: 0.1 });
+
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [hasMoreConversations, isLoadingMoreConversations, loadMoreConversations, conversationCursor]);
+    }, [filterStatus, loadMoreConversations]);
 
     // Reset du compteur d'auto-load quand le filtre ou la recherche change
     useEffect(() => {
@@ -90,14 +100,14 @@ export default function ConversationList({
                     onClick={() => onSelectConversation(conv)}
                 />
             ))}
-            {hasMoreConversations && (
+            {hasMoreConversations && filterStatus === 'all' && (
                 <div ref={sentinelRef} className="h-8 flex items-center justify-center text-xs text-gray-400">
                     {isLoadingMoreConversations ? 'Chargement…' : ''}
                 </div>
             )}
-            {filterStatus === 'nouveau' && filteredCount === 0 && autoLoadCountRef.current >= 3 && !hasMoreConversations && (
+            {filterStatus === 'nouveau' && filteredCount === 0 && !isLoadingNouveau && (
                 <p className="text-xs text-gray-400 text-center py-4 px-3">
-                    Aucune nouvelle conversation parmi les conversations chargées.
+                    Aucune nouvelle conversation.
                 </p>
             )}
         </div>

@@ -370,13 +370,14 @@ export class WhatsappMessageGateway
       agent.posteId,
       [],
       isDedicated ? 10_000 : 300,
-      isDedicated || unreadOnly || nouveauOnly ? undefined : cursor,
+      isDedicated || unreadOnly || nouveauOnly || !!searchTerm ? undefined : cursor,
       unreadOnly,
       nouveauOnly,
+      searchTerm,
     );
 
-    // Poste dédié ou filtre non-lus ou nouveaux : pas de scroll infini
-    if (isDedicated || unreadOnly || nouveauOnly) hasMore = false;
+    // Poste dédié, filtre non-lus/nouveaux ou recherche : pas de scroll infini
+    if (isDedicated || unreadOnly || nouveauOnly || !!searchTerm) hasMore = false;
 
     if (agent.tenantIds.length > 0) {
       const tenantSet = new Set(agent.tenantIds);
@@ -393,17 +394,6 @@ export class WhatsappMessageGateway
       if (newUnassigned.length > 0) {
         chats = [...newUnassigned, ...chats];
       }
-    }
-
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      chats = chats.filter(
-        (c) =>
-          c.name.toLowerCase().includes(lowerSearch) ||
-          c.chat_id.includes(lowerSearch),
-      );
-      // En mode recherche la notion de "page suivante" n'a pas de sens
-      hasMore = false;
     }
 
     const chatIds = chats.map((c) => c.chat_id);

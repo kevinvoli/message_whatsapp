@@ -61,8 +61,9 @@ export class WhatsappChatService {
     cursor?: { activityAt: string; chatId: string },
     unreadOnly = false,
     nouveauOnly = false,
+    search?: string,
   ): Promise<{ chats: WhatsappChat[]; hasMore: boolean }> {
-    const effectiveLimit = (unreadOnly || nouveauOnly) ? 5_000 : limit;
+    const effectiveLimit = (unreadOnly || nouveauOnly || !!search) ? 5_000 : limit;
     const qb = this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
@@ -85,7 +86,15 @@ export class WhatsappChatService {
       qb.andWhere('chat.last_poste_message_at IS NULL');
     }
 
-    if (cursor && !unreadOnly && !nouveauOnly) {
+    if (search) {
+      const likeSearch = `%${search}%`;
+      qb.andWhere(
+        '(chat.name LIKE :search OR chat.chat_id LIKE :search)',
+        { search: likeSearch },
+      );
+    }
+
+    if (cursor && !unreadOnly && !nouveauOnly && !search) {
       qb.andWhere(
         '(chat.last_activity_at < :activityAt OR (chat.last_activity_at = :activityAt AND chat.chat_id < :chatId))',
         { activityAt: new Date(cursor.activityAt), chatId: cursor.chatId },

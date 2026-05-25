@@ -235,7 +235,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!socket || !hasMoreConversations || isLoadingMoreConversations || !conversationCursor) return;
 
     set({ isLoadingMoreConversations: true });
-    const payload: { cursor: ConversationCursor; search?: string } = { cursor: conversationCursor };
+    const payload: { cursor: ConversationCursor; search?: string; tab: string } = {
+      cursor: conversationCursor,
+      tab: 'tous',
+    };
     if (currentSearch) payload.search = currentSearch;
     socket.emit("conversations:get", payload);
   },
@@ -484,7 +487,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         }
       }
-      const merged = Array.from(existingMap.values());
+      const merged = Array.from(existingMap.values()).sort((a, b) => {
+        const aTime = a.last_activity_at?.getTime() ?? a.updatedAt.getTime();
+        const bTime = b.last_activity_at?.getTime() ?? b.updatedAt.getTime();
+        return bTime - aTime;
+      });
 
       return {
         conversations: merged,
