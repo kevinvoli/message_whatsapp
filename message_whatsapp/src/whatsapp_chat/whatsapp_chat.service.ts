@@ -79,7 +79,16 @@ export class WhatsappChatService {
     }
 
     if (unreadOnly) {
-      qb.andWhere('chat.unread_count > 0');
+      // Même critère que getTotalUnreadForPoste : conversations avec au moins 1 message
+      // entrant en statut sent/delivered — indépendant de la colonne unread_count qui
+      // peut être désynchronisée (ex. reset après lecture alors que le statut n'est pas encore READ).
+      qb.andWhere(`EXISTS (
+        SELECT 1 FROM whatsapp_message m
+        WHERE m.chat_id = chat.chat_id
+          AND m.from_me = 0
+          AND m.status IN ('sent', 'delivered')
+          AND m.deletedAt IS NULL
+      )`);
     }
 
     if (nouveauOnly) {
