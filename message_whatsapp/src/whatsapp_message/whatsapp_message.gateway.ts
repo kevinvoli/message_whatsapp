@@ -748,6 +748,13 @@ export class WhatsappMessageGateway
         chatId: payload.chatId,
         unreadCount: chat?.unread_count ?? 0,
       });
+      if (agent.posteId) {
+        const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
+        client.emit('chat:event', {
+          type: 'TOTAL_UNREAD_UPDATE',
+          payload: { totalUnread },
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur lors du marquage';
       client.emit('conversation:read:ack', { markedCount: 0, chatId: payload.chatId, unreadCount: 0, error: message });
@@ -794,9 +801,9 @@ export class WhatsappMessageGateway
       payload: this.mapConversation(chat, lastMessage, 0),
     });
 
-    // Mettre à jour le compteur global non lus pour ce poste
+    // Mettre à jour le compteur global non lus pour ce poste (broadcast à tous les commerciaux du poste)
     const totalUnread = await this.chatService.getTotalUnreadForPoste(chat.poste_id);
-    client.emit('chat:event', {
+    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'TOTAL_UNREAD_UPDATE',
       payload: { totalUnread },
     });
@@ -1261,6 +1268,13 @@ export class WhatsappMessageGateway
         type: 'CONVERSATION_ASSIGNED',
         payload: this.mapConversation(freshChat, lastMessage, freshChat.unread_count ?? 0),
       });
+      if ((freshChat.unread_count ?? 0) > 0) {
+        const totalUnreadAssigned = await this.chatService.getTotalUnreadForPoste(newPosteId);
+        this.server.to(`poste:${newPosteId}`).emit('chat:event', {
+          type: 'TOTAL_UNREAD_UPDATE',
+          payload: { totalUnread: totalUnreadAssigned },
+        });
+      }
     }
 
     this.logger.log(
@@ -1296,6 +1310,13 @@ export class WhatsappMessageGateway
           type: 'CONVERSATION_ASSIGNED',
           payload: this.mapConversation(chat, msgMap.get(chatId) ?? null, chat.unread_count ?? 0),
         });
+        if ((chat.unread_count ?? 0) > 0) {
+          const totalUnreadBatch = await this.chatService.getTotalUnreadForPoste(newPosteId);
+          this.server.to(`poste:${newPosteId}`).emit('chat:event', {
+            type: 'TOTAL_UNREAD_UPDATE',
+            payload: { totalUnread: totalUnreadBatch },
+          });
+        }
       }
     }
 

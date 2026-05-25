@@ -399,12 +399,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
           )
         : conversations;
 
-      // Dédupliquer par chat_id
-      const existingIds = new Set(state.conversations.map((c) => c.chat_id));
-      const newOnes = normalized.filter((c) => !existingIds.has(c.chat_id));
+      // Merge intelligent : garder la version la plus fraîche si une conversation revient en page suivante
+      const existingMap = new Map(state.conversations.map((c) => [c.chat_id, c]));
+      for (const c of normalized) {
+        const existing = existingMap.get(c.chat_id);
+        if (!existing) {
+          existingMap.set(c.chat_id, c);
+        } else {
+          const existingTime = existing.last_activity_at?.getTime() ?? existing.updatedAt.getTime();
+          const newTime = c.last_activity_at?.getTime() ?? c.updatedAt.getTime();
+          if (newTime > existingTime) {
+            existingMap.set(c.chat_id, c);
+          }
+        }
+      }
+      const merged = Array.from(existingMap.values());
 
       return {
-        conversations: [...state.conversations, ...newOnes],
+        conversations: merged,
         isLoadingMoreConversations: false,
         hasMoreConversations: hasMore,
         conversationCursor: cursor,
@@ -562,6 +574,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             messages: preservedMessages,
             contact_summary: preservedContactSummary,
             priority: preservedPriority,
+            last_activity_at:
+              conversationWithUnread.last_activity_at   // valeur de l'UPSERT si présente
+              ?? c.last_activity_at                      // sinon : valeur locale existante
+              ?? conversationWithUnread.updatedAt,       // dernier fallback
           };
         })
         .sort((a, b) => {

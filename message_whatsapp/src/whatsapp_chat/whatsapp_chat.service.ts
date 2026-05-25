@@ -120,6 +120,7 @@ export class WhatsappChatService {
       .innerJoin('whatsapp_chat', 'c', 'c.chat_id = m.chat_id')
       .where('c.poste_id = :poste_id', { poste_id })
       .andWhere('c.deletedAt IS NULL')
+      .andWhere("c.status != 'fermé'")
       .andWhere('m.from_me = :fromMe', { fromMe: false })
       .andWhere('m.status IN (:...statuses)', { statuses: ['sent', 'delivered'] })
       .andWhere('m.deletedAt IS NULL')
@@ -265,8 +266,8 @@ export class WhatsappChatService {
         SELECT COUNT(*)
         FROM whatsapp_message m
         WHERE m.chat_id = c.chat_id
-          AND m.direction = 'IN'
-          AND m.status != 'READ'
+          AND m.from_me = 0
+          AND m.status IN ('sent', 'delivered')
       )
       WHERE c.chat_id = $1
     `,
@@ -419,7 +420,7 @@ export class WhatsappChatService {
       .addSelect("SUM(CASE WHEN chat.status = 'actif' THEN 1 ELSE 0 END)", 'totalActifs')
       .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'totalEnAttente')
       .addSelect(
-        `SUM(CASE WHEN EXISTS (
+        `SUM(CASE WHEN chat.status != 'fermé' AND EXISTS (
            SELECT 1 FROM whatsapp_message m
            WHERE m.chat_id = chat.chat_id
              AND m.from_me = 0

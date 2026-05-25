@@ -23,6 +23,7 @@ export default function ConversationList({
     const isLoadingMoreConversations = useChatStore((state) => state.isLoadingMoreConversations);
     const loadMoreConversations      = useChatStore((state) => state.loadMoreConversations);
     const conversationCursor         = useChatStore((state) => state.conversationCursor);
+    const currentSearch              = useChatStore((s) => s.currentSearch);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     // Compteur d'auto-loads consécutifs pour le filtre actif.
@@ -47,10 +48,10 @@ export default function ConversationList({
         return () => observer.disconnect();
     }, [hasMoreConversations, isLoadingMoreConversations, loadMoreConversations, conversationCursor]);
 
-    // Reset du compteur d'auto-load quand le filtre change
+    // Reset du compteur d'auto-load quand le filtre ou la recherche change
     useEffect(() => {
         autoLoadCountRef.current = 0;
-    }, [filterStatus]);
+    }, [filterStatus, currentSearch]);
 
     // Auto-load limité : quand un filtre produit moins de 10 résultats, on charge
     // automatiquement jusqu'à 3 pages supplémentaires (900 conversations max).
@@ -90,6 +91,11 @@ export default function ConversationList({
                 <div ref={sentinelRef} className="h-8 flex items-center justify-center text-xs text-gray-400">
                     {isLoadingMoreConversations ? 'Chargement…' : ''}
                 </div>
+            )}
+            {filterStatus === 'nouveau' && filteredCount === 0 && autoLoadCountRef.current >= 3 && !hasMoreConversations && (
+                <p className="text-xs text-gray-400 text-center py-4 px-3">
+                    Aucune nouvelle conversation parmi les conversations chargées.
+                </p>
             )}
         </div>
     );
