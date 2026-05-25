@@ -19,10 +19,10 @@ export class FixUnreadCountBatch1748995200002 implements MigrationInterface {
         WHERE m.chat_id = c.chat_id
           AND m.from_me = 0
           AND m.status IN ('sent', 'delivered')
-          AND m.deleted_at IS NULL
+          AND m.deletedAt IS NULL
       )
       WHERE c.status != 'fermé'
-        AND c.deleted_at IS NULL
+        AND c.deletedAt IS NULL
     `);
   }
 
