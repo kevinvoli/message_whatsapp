@@ -1,6 +1,7 @@
 // src/store/chatStore.ts
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
+
 import { ContactSummary, Conversation, ConversationStatus, Message } from "@/types/chat";
 import { logger } from "@/lib/logger";
 

@@ -14,6 +14,7 @@ export default function Home() {
   
   useEffect(() => {
 
+    
     async function checkAuthStatus() {
       try {
         const authenticated = await checkAdminAuth();
