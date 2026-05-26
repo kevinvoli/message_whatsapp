@@ -41,7 +41,6 @@ export class AuthController {
       loginDto.password,
     );
 
-
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
