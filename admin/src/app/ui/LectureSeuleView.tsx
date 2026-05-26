@@ -227,8 +227,8 @@ export default function LectureSeuleView() {
               <input
                 id="readCooldownSeconds"
                 type="number"
-                min={30}
-                max={3600}
+                min={0}
+                max={36000}
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
                 value={settings.readCooldownSeconds ?? 120}
                 onChange={(e) =>
@@ -236,7 +236,7 @@ export default function LectureSeuleView() {
                 }
               />
               <p className="mt-1 text-[11px] text-gray-400">
-                Temps d&apos;attente entre deux ouvertures de conv non lues. Min: 30 s — Max: 3600 s
+                Temps d&apos;attente entre deux ouvertures de conv non lues. Min: 0 s (désactivé) — Max: 36000 s
               </p>
             </div>
           </SectionCard>

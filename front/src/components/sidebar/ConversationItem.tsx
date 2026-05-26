@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers } from 'lucide-react';
+import { User, Image, Video, Mic, FileText, MapPin, Sparkles, Layers, Lock } from 'lucide-react';
 import { Conversation } from '@/types/chat';
 import { TypingIndicator } from '../ui/typingIndicator';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
@@ -92,11 +92,19 @@ const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
   telegram:  { bg: 'bg-sky-100',    text: 'text-sky-600'    },
 };
 
+const isPhoneNumber = (value: string) => /^\+?\d[\d\s\-\.]{5,}$/.test(value.trim());
+
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation, isSelected, isTyping, onClick }) => {
 
   const provider = getProviderFromChatId(conversation.chat_id);
   const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
+
+  const isDedicated = conversation.channel_dedicated && !isSelected;
+  const displayPhone = isDedicated ? '+•• ••••••••••' : conversation.clientPhone;
+  const displayName  = isDedicated && isPhoneNumber(conversation.clientName)
+    ? '+•• ••••••••••'
+    : conversation.clientName;
 
   return (
     <div
@@ -115,12 +123,15 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-gray-800 truncate">{conversation.clientName}</h3>
+            <h3 className="font-semibold text-gray-800 truncate">{displayName}</h3>
             <span className="text-xs text-gray-500">
               {conversation.lastMessage ? formatConversationTime(conversation.lastMessage.timestamp) : "NA"}
             </span>
           </div>
-          <p className="text-sm text-gray-600 truncate">{conversation.clientPhone}</p>
+          <p className={`text-sm truncate flex items-center gap-1 ${isDedicated ? 'text-gray-300 tracking-widest select-none' : 'text-gray-600'}`}>
+            {isDedicated && <Lock className="w-3 h-3 text-gray-300 flex-shrink-0" />}
+            {displayPhone}
+          </p>
           <div className="mt-1">
             {isTyping ? (
               <TypingIndicator />

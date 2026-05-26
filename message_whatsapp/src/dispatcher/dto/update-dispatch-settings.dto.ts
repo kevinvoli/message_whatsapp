@@ -65,8 +65,8 @@ export class UpdateDispatchSettingsDto {
 
   @IsOptional()
   @IsInt()
-  @Min(30)
-  @Max(3600)
+  @Min(0)
+  @Max(36000)
   readCooldownSeconds?: number;
 
   @IsOptional()
