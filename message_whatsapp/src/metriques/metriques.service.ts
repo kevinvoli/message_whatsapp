@@ -341,14 +341,11 @@ export class MetriquesService {
       .addSelect("SUM(CASE WHEN chat.status = 'actif'      THEN 1 ELSE 0 END)",           'actifs')
       .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)",           'en_attente')
       .addSelect("SUM(CASE WHEN chat.status = 'fermé'      THEN 1 ELSE 0 END)",           'fermes')
-      .addSelect('SUM(CASE WHEN chat.unread_count > 0       THEN 1 ELSE 0 END)',           'non_lus')
       .addSelect('SUM(CASE WHEN chat.is_archived = 1        THEN 1 ELSE 0 END)',           'archives')
       .addSelect('SUM(CASE WHEN chat.poste_id IS NOT NULL   THEN 1 ELSE 0 END)',           'assignes')
-      .addSelect('SUM(CASE WHEN chat.unread_count = 0 AND chat.last_poste_message_at IS NULL THEN 1 ELSE 0 END)', 'lus_sans_reponse')
-      .addSelect('SUM(CASE WHEN chat.unread_count = 0 AND chat.last_poste_message_at IS NOT NULL THEN 1 ELSE 0 END)', 'lus_avec_reponse')
       .where('chat.deletedAt IS NULL')
-      .andWhere('chat.createdAt >= :dateStart', { dateStart })
-      .andWhere('chat.createdAt <= :dateEnd',   { dateEnd });
+      .andWhere('chat.last_activity_at >= :dateStart', { dateStart })
+      .andWhere('chat.last_activity_at <= :dateEnd',   { dateEnd });
     this.applyPosteFilter(statsQb, 'chat', options);
     const stats = await statsQb.getRawOne();
 
@@ -365,22 +362,76 @@ export class MetriquesService {
       .where('chat.first_response_deadline_at IS NOT NULL')
       .andWhere('chat.last_client_message_at IS NOT NULL')
       .andWhere('chat.deletedAt IS NULL')
-      .andWhere('chat.createdAt >= :dateStart', { dateStart })
-      .andWhere('chat.createdAt <= :dateEnd',   { dateEnd });
+      .andWhere('chat.last_activity_at >= :dateStart', { dateStart })
+      .andWhere('chat.last_activity_at <= :dateEnd',   { dateEnd });
     this.applyPosteFilter(tempsQb, 'chat', options);
     const tempsPremiereReponse = await tempsQb.getRawOne();
+
+    // Requêtes dédiées non-lus / lus-sans-réponse / lus-avec-réponse
+    // basées sur l'état réel des messages (status sent/delivered) et non sur unread_count
+    const nonLusQb = this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(DISTINCT chat.id)', 'cnt')
+      .innerJoin(
+        'whatsapp_message', 'unread_msg',
+        `unread_msg.chat_id = chat.chat_id AND unread_msg.from_me = 0
+         AND unread_msg.status IN ('sent','delivered') AND unread_msg.deletedAt IS NULL`,
+      )
+      .where('chat.deletedAt IS NULL')
+      .andWhere('chat.last_activity_at >= :dateStart', { dateStart })
+      .andWhere('chat.last_activity_at <= :dateEnd',   { dateEnd });
+    this.applyPosteFilter(nonLusQb, 'chat', options);
+
+    const lusSansQb = this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(DISTINCT chat.id)', 'cnt')
+      .leftJoin(
+        'whatsapp_message', 'unread_msg',
+        `unread_msg.chat_id = chat.chat_id AND unread_msg.from_me = 0
+         AND unread_msg.status IN ('sent','delivered') AND unread_msg.deletedAt IS NULL`,
+      )
+      .where('chat.deletedAt IS NULL')
+      .andWhere('unread_msg.id IS NULL')
+      .andWhere('chat.last_poste_message_at IS NULL')
+      .andWhere('chat.last_activity_at >= :dateStart', { dateStart })
+      .andWhere('chat.last_activity_at <= :dateEnd',   { dateEnd });
+    this.applyPosteFilter(lusSansQb, 'chat', options);
+
+    const lusAvecQb = this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(DISTINCT chat.id)', 'cnt')
+      .leftJoin(
+        'whatsapp_message', 'unread_msg',
+        `unread_msg.chat_id = chat.chat_id AND unread_msg.from_me = 0
+         AND unread_msg.status IN ('sent','delivered') AND unread_msg.deletedAt IS NULL`,
+      )
+      .where('chat.deletedAt IS NULL')
+      .andWhere('unread_msg.id IS NULL')
+      .andWhere('chat.last_poste_message_at IS NOT NULL')
+      .andWhere('chat.last_activity_at >= :dateStart', { dateStart })
+      .andWhere('chat.last_activity_at <= :dateEnd',   { dateEnd });
+    this.applyPosteFilter(lusAvecQb, 'chat', options);
+
+    const [nonLusResult, lusSansResult, lusAvecResult] = await Promise.all([
+      nonLusQb.getRawOne(),
+      lusSansQb.getRawOne(),
+      lusAvecQb.getRawOne(),
+    ]);
+    const chatsNonLus         = parseInt(nonLusResult?.cnt)  || 0;
+    const chatsLusSansReponse = parseInt(lusSansResult?.cnt) || 0;
+    const chatsLusAvecReponse = parseInt(lusAvecResult?.cnt) || 0;
 
     return {
       totalChats,
       chatsActifs:     parseInt(stats?.actifs)     || 0,
       chatsEnAttente:  parseInt(stats?.en_attente) || 0,
       chatsFermes:     parseInt(stats?.fermes)     || 0,
-      chatsNonLus:     parseInt(stats?.non_lus)    || 0,
+      chatsNonLus,
       chatsArchives:   parseInt(stats?.archives)   || 0,
       tauxAssignation: totalChats > 0 ? Math.round((chatsAssignes / totalChats) * 100) : 0,
       tempsPremiereReponse: parseInt(tempsPremiereReponse?.avg_seconds) || 0,
-      chatsLusSansReponse: parseInt(stats?.lus_sans_reponse) || 0,
-      chatsLusAvecReponse: parseInt(stats?.lus_avec_reponse) || 0,
+      chatsLusSansReponse,
+      chatsLusAvecReponse,
     };
   }
 

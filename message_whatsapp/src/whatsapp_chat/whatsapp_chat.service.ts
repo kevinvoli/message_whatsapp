@@ -74,7 +74,7 @@ export class WhatsappChatService {
       .addOrderBy('chat.chat_id', 'DESC')
       .limit(effectiveLimit + 1); // +1 pour détecter hasMore
 
-    if (excludeStatuses.length > 0) {
+    if (excludeStatuses.length > 0 && !unreadOnly) {
       qb.andWhere('chat.status NOT IN (:...excludeStatuses)', { excludeStatuses });
     }
 
@@ -335,10 +335,7 @@ export class WhatsappChatService {
       .orderBy('chat.last_activity_at', 'DESC');
 
     if (dateStart) {
-      qb.andWhere(
-        '(chat.last_activity_at >= :dateStart OR chat.unread_count > 0)',
-        { dateStart },
-      );
+      qb.andWhere('chat.last_activity_at >= :dateStart', { dateStart });
     }
 
     if (posteId) {
@@ -358,7 +355,7 @@ export class WhatsappChatService {
       );
     }
 
-    if (status) {
+    if (status && !unreadOnly) {
       qb.andWhere('chat.status = :status', { status });
     }
 
@@ -453,6 +450,10 @@ export class WhatsappChatService {
       )
       .addSelect("SUM(CASE WHEN chat.status = 'fermé' THEN 1 ELSE 0 END)", 'totalFermes')
       .where('chat.deletedAt IS NULL');
+
+    if (dateStart) {
+      statsQb.andWhere('chat.last_activity_at >= :dateStart', { dateStart });
+    }
 
     if (posteId) statsQb.andWhere('chat.poste_id = :posteId', { posteId });
     if (commercialId) {

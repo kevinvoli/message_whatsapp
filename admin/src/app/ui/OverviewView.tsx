@@ -375,7 +375,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today', date
             <h4 className="text-xs font-semibold text-red-900">Non lus</h4>
           </div>
           <p className="text-xl font-bold text-red-900">{metriques.chatsNonLus}</p>
-          <p className="text-xs text-red-700 mt-1">Conversations</p>
+          <p className="text-xs text-red-700 mt-1">Conversations avec messages non lus</p>
         </div>
 
         {/* Postes Actifs */}
