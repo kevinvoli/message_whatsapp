@@ -76,6 +76,12 @@ export default function DedicatedChannelsView({
 
   useEffect(() => { void load(); }, [load]);
 
+  // Auto-refresh every 90s
+  useEffect(() => {
+    const id = setInterval(() => { void load(); }, 90_000);
+    return () => clearInterval(id);
+  }, [load]);
+
   return (
     <div className="space-y-6">
       {/* En-tête */}
@@ -101,6 +107,16 @@ export default function DedicatedChannelsView({
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
+      </div>
+
+      {/* Bannière d'information */}
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+        <p className="text-xs text-blue-700">
+          Ces métriques concernent <strong>uniquement les postes à canaux dédiés</strong> (usage administratif).
+          Elles sont exclues de la vue Globale, de l&apos;Analytique et de la vue Commerciaux pour ne pas fausser
+          les indicateurs de prise de décision.
+        </p>
       </div>
 
       {error && (
