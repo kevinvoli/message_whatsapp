@@ -200,6 +200,9 @@ export default function LectureSeuleView() {
                 }
               />
               <p className="mt-1 text-[11px] text-gray-400">Min: 1 — Max: 60 messages par minute</p>
+              <p className="mt-2 text-[11px] text-blue-500">
+                Les postes à canal dédié ignorent cette limite — leurs commerciaux marquent tous les messages comme lus sans restriction.
+              </p>
             </div>
           </SectionCard>
 
