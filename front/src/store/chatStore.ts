@@ -776,6 +776,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
+      // Sync conversationsUnread : ajouter/mettre à jour si non lue, retirer si lue
+      if (conversationExists) {
+        const existsInUnread = state.conversationsUnread.some(
+          c => c.chat_id === conversationWithUnread.chat_id,
+        );
+        if (conversationWithUnread.unreadCount > 0 && !isSelected) {
+          newState.conversationsUnread = existsInUnread
+            ? state.conversationsUnread.map(c =>
+                c.chat_id === conversationWithUnread.chat_id ? conversationWithUnread : c)
+            : [conversationWithUnread, ...state.conversationsUnread];
+        } else if (existsInUnread) {
+          newState.conversationsUnread = state.conversationsUnread.filter(
+            c => c.chat_id !== conversationWithUnread.chat_id,
+          );
+        }
+      }
+
       return newState;
     });
   },

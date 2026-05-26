@@ -110,10 +110,13 @@ const WhatsAppPageContent = () => {
 
   const handleSetFilterStatus = useCallback((status: string) => {
     setFilterStatus(status);
+    if (status === 'unread') {
+      loadUnreadConversations(searchQuery || undefined);
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.set('filter', status);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [searchParams, pathname, router]);
+  }, [searchParams, pathname, router, loadUnreadConversations, searchQuery]);
 
   if (!initialized || !user) {
     return (
