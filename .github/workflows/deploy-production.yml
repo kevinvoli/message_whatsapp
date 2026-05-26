@@ -147,15 +147,11 @@ jobs:
   deploy:
     name: Deploy to production server
     needs: [build-backend, build-frontend, build-admin]
-    if: |
+    if: >-
       always() &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled') &&
-      (
-        needs.build-backend.result  == 'success' ||
-        needs.build-frontend.result == 'success' ||
-        needs.build-admin.result    == 'success'
-      )
+      (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success' || needs.build-admin.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
