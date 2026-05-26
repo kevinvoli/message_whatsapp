@@ -100,9 +100,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const provider = getProviderFromChatId(conversation.chat_id);
   const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
 
-  const isDedicated = conversation.channel_dedicated && !isSelected;
-  const displayPhone = isDedicated ? '+•• ••••••••••' : conversation.clientPhone;
-  const displayName  = isDedicated && isPhoneNumber(conversation.clientName)
+  const maskPhone = !isSelected;
+  const displayPhone = maskPhone ? '+•• ••••••••••' : conversation.clientPhone;
+  const displayName  = maskPhone && isPhoneNumber(conversation.clientName)
     ? '+•• ••••••••••'
     : conversation.clientName;
 
@@ -128,8 +128,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.lastMessage ? formatConversationTime(conversation.lastMessage.timestamp) : "NA"}
             </span>
           </div>
-          <p className={`text-sm truncate flex items-center gap-1 ${isDedicated ? 'text-gray-300 tracking-widest select-none' : 'text-gray-600'}`}>
-            {isDedicated && <Lock className="w-3 h-3 text-gray-300 flex-shrink-0" />}
+          <p className={`text-sm truncate flex items-center gap-1 ${maskPhone ? 'text-gray-300 tracking-widest select-none' : 'text-gray-600'}`}>
+            {maskPhone && <Lock className="w-3 h-3 text-gray-300 flex-shrink-0" />}
             {displayPhone}
           </p>
           <div className="mt-1">

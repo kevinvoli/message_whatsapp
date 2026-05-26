@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
-import { User } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
 import { Contact } from '@/types/chat';
 import { formatConversationTime } from '@/lib/dateUtils';
 import { getCallStatusColor, getCallStatusLabel } from '@/types/chat';
+
+const isPhoneNumber = (value: string) => /^\+?\d[\d\s\-\.]{5,}$/.test(value.trim());
 
 interface ContactCardProps {
   contact: Contact;
@@ -14,6 +16,10 @@ interface ContactCardProps {
 
 export function ContactCard({ contact, isSelected, onClick }: ContactCardProps) {
   const lastActivity = contact.last_call_date ?? contact.last_message_date ?? contact.updatedAt;
+
+  const maskPhone = !isSelected;
+  const displayContact = maskPhone ? '+•• ••••••••••' : contact.contact;
+  const displayName    = maskPhone && isPhoneNumber(contact.name) ? '+•• ••••••••••' : contact.name;
 
   const priorityDot: Record<string, string> = {
     haute:   'bg-red-500',
@@ -44,13 +50,16 @@ export function ContactCard({ contact, isSelected, onClick }: ContactCardProps) 
         {/* Contenu */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-gray-800 truncate">{contact.name}</h3>
+            <h3 className="font-semibold text-gray-800 truncate">{displayName}</h3>
             <span className="text-xs text-gray-500 shrink-0 ml-1">
               {formatConversationTime(lastActivity)}
             </span>
           </div>
 
-          <p className="text-sm text-gray-600 truncate">{contact.contact}</p>
+          <p className={`text-sm truncate flex items-center gap-1 ${maskPhone ? 'text-gray-300 tracking-widest select-none' : 'text-gray-600'}`}>
+            {maskPhone && <Lock className="w-3 h-3 text-gray-300 flex-shrink-0" />}
+            {displayContact}
+          </p>
 
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {/* Badge statut appel */}
