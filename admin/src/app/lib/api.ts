@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1393,3 +1393,23 @@ export async function getTraficHoraire(
     );
     return handleResponse<TraficResponse>(response);
 }
+
+/**
+ * Recupere le trafic conversations agrege par heure ou par jour de semaine
+ */
+export async function getTraficConversations(
+    periode      = 'today',
+    dateFrom?:   string,
+    dateTo?:     string,
+    granularite: 'heure' | 'jour' = 'heure',
+): Promise<TraficConversationsResponse> {
+    const params = new URLSearchParams({ periode, granularite });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo)   params.set('dateTo',   dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/api/metriques/trafic-conversations?${params.toString()}`,
+        { method: 'GET', credentials: 'include' },
+    );
+    return handleResponse<TraficConversationsResponse>(response);
+}
+

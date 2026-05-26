@@ -1,11 +1,12 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { RefreshCw, MessageCircle, ArrowDownLeft, ArrowUpRight, Zap, Clock, CalendarDays, TrendingUp, ArrowLeftRight, Info, Radio } from 'lucide-react';
-import { getTraficHoraire } from '@/app/lib/api';
-import { TraficResponse, TraficPoint, TraficStatistiques } from '@/app/lib/definitions';
+import { RefreshCw, MessageCircle, ArrowDownLeft, ArrowUpRight, Zap, Clock, CalendarDays, TrendingUp, ArrowLeftRight, Info, Radio, MessagesSquare } from 'lucide-react';
+import { getTraficHoraire, getTraficConversations } from '@/app/lib/api';
+import { TraficResponse, TraficPoint, TraficStatistiques, TraficConversationsResponse } from '@/app/lib/definitions';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
 import { Spinner } from '@/app/ui/Spinner';
+import ConversationsTrafficTab from '@/app/ui/ConversationsTrafficTab';
 
 const AUTO_REFRESH_MS = 90_000;
 
@@ -27,7 +28,7 @@ function PageHeader({ onRefresh, loading, lastRefresh, isLive }: PageHeaderProps
     <div className="flex items-center justify-between">
       <div>
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-gray-900">Trafic Messages</h2>
+          <h2 className="text-xl font-bold text-gray-900">Trafic Messages &amp; Conversations</h2>
           {isLive && (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 border border-green-200 rounded-full px-2 py-0.5">
               <Radio size={10} className="animate-pulse" />
@@ -280,12 +281,54 @@ function TopHeures({ points, total, granularite }: { points: TraficPoint[]; tota
   );
 }
 
+
+type TabId = 'messages' | 'conversations';
+
+interface TabBarProps {
+  activeTab:    TabId;
+  onTabChange:  (tab: TabId) => void;
+}
+
+function TabBar({ activeTab, onTabChange }: TabBarProps) {
+  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
+    { id: 'messages',      label: 'Messages',      icon: <MessageCircle size={15} />  },
+    { id: 'conversations', label: 'Conversations', icon: <MessagesSquare size={15} /> },
+  ];
+  return (
+    <div className="flex border-b border-gray-200">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={[
+            'flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors',
+            activeTab === tab.id
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+          ].join(' ')}
+        >
+          {tab.icon}
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function MessageTrafficView({ selectedPeriod, dateFrom, dateTo }: MessageTrafficViewProps) {
   const [loading, setLoading]         = useState(false);
   const [data, setData]               = useState<TraficResponse | null>(null);
   const [error, setError]             = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [granularite, setGranularite] = useState<'heure' | 'jour'>('heure');
+
+  // Onglet conversations
+  const [activeTab, setActiveTab]                   = useState<TabId>('messages');
+  const [convLoading, setConvLoading]               = useState(false);
+  const [convData, setConvData]                     = useState<TraficConversationsResponse | null>(null);
+  const [convError, setConvError]                   = useState<string | null>(null);
+  const [convGranularite, setConvGranularite]       = useState<'heure' | 'jour'>('heure');
+  const [lastRefreshConv, setLastRefreshConv]       = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -303,6 +346,25 @@ export default function MessageTrafficView({ selectedPeriod, dateFrom, dateTo }:
 
   useEffect(() => { void load(); }, [load]);
 
+  const loadConv = useCallback(async () => {
+    setConvLoading(true);
+    setConvError(null);
+    try {
+      const result = await getTraficConversations(selectedPeriod, dateFrom, dateTo, convGranularite);
+      setConvData(result);
+      setLastRefreshConv(new Date());
+    } catch {
+      setConvError('Erreur lors du chargement du trafic conversations');
+    } finally {
+      setConvLoading(false);
+    }
+  }, [selectedPeriod, dateFrom, dateTo, convGranularite]);
+
+  useEffect(() => {
+    if (activeTab === 'conversations') void loadConv();
+  }, [activeTab, loadConv]);
+
+  // Auto-refresh messages (today seulement)
   useEffect(() => {
     if (selectedPeriod !== 'today') return;
 
@@ -320,64 +382,98 @@ export default function MessageTrafficView({ selectedPeriod, dateFrom, dateTo }:
     return () => clearInterval(interval);
   }, [selectedPeriod, dateFrom, dateTo, granularite]);
 
+  // Auto-refresh conversations (today seulement)
+  useEffect(() => {
+    if (activeTab !== 'conversations' || selectedPeriod !== 'today') return;
+
+    const silentRefreshConv = async () => {
+      try {
+        const result = await getTraficConversations(selectedPeriod, dateFrom, dateTo, convGranularite);
+        setConvData(result);
+        setLastRefreshConv(new Date());
+      } catch {
+        // Echec silencieux
+      }
+    };
+
+    const interval = setInterval(silentRefreshConv, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [activeTab, selectedPeriod, dateFrom, dateTo, convGranularite]);
+
   const isEmpty   = data !== null && data.statistiques.total === 0;
   const isMoyenne = data !== null && granularite === 'heure' && data.statistiques.mode === 'periode';
 
   return (
     <div className="space-y-6">
       <PageHeader
-        onRefresh={load}
-        lastRefresh={lastRefresh}
-        loading={loading}
+        onRefresh={activeTab === 'messages' ? load : loadConv}
+        lastRefresh={activeTab === 'messages' ? lastRefresh : lastRefreshConv}
+        loading={activeTab === 'messages' ? loading : convLoading}
         isLive={selectedPeriod === 'today'}
       />
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {loading && !data && (
-        <div className="flex items-center justify-center h-48">
-          <Spinner />
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {isEmpty && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center text-center gap-3">
-          <MessageCircle size={36} className="text-gray-300" />
-          <p className="text-gray-500 font-medium">Aucun message sur cette période</p>
-          <p className="text-xs text-gray-400">
-            Essayez une plage de dates différente ou vérifiez que les canaux sont actifs.
-          </p>
-        </div>
-      )}
-
-      {data && !isEmpty && (
+      {activeTab === 'messages' && (
         <>
-          <div className="flex items-center justify-between">
-            <GranulariteToggle value={granularite} onChange={setGranularite} />
-            {granularite === 'jour' && selectedPeriod === 'today' && (
-              <p className="text-xs text-amber-600 flex items-center gap-1">
-                <Info size={12} />
-                Mode jour indisponible pour aujourd&apos;hui — données sur 7 jours
+          {loading && !data && (
+            <div className="flex items-center justify-center h-48">
+              <Spinner />
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {isEmpty && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center text-center gap-3">
+              <MessageCircle size={36} className="text-gray-300" />
+              <p className="text-gray-500 font-medium">Aucun message sur cette période</p>
+              <p className="text-xs text-gray-400">
+                Essayez une plage de dates différente ou vérifiez que les canaux sont actifs.
               </p>
-            )}
-          </div>
-          <KpiGrid stats={data.statistiques} />
-          <TrafficBarChart
-            points={data.points}
-            isMoyenne={isMoyenne}
-            nbJours={data.meta.nb_jours}
-            granularite={granularite}
-            selectedPeriod={selectedPeriod}
-          />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <RepartitionJournee stats={data.statistiques} />
-            <TopHeures points={data.points} total={data.statistiques.total} granularite={granularite} />
-          </div>
+            </div>
+          )}
+
+          {data && !isEmpty && (
+            <>
+              <div className="flex items-center justify-between">
+                <GranulariteToggle value={granularite} onChange={setGranularite} />
+                {granularite === 'jour' && selectedPeriod === 'today' && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <Info size={12} />
+                    Mode jour indisponible pour aujourd&apos;hui — données sur 7 jours
+                  </p>
+                )}
+              </div>
+              <KpiGrid stats={data.statistiques} />
+              <TrafficBarChart
+                points={data.points}
+                isMoyenne={isMoyenne}
+                nbJours={data.meta.nb_jours}
+                granularite={granularite}
+                selectedPeriod={selectedPeriod}
+              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <RepartitionJournee stats={data.statistiques} />
+                <TopHeures points={data.points} total={data.statistiques.total} granularite={granularite} />
+              </div>
+            </>
+          )}
         </>
+      )}
+
+      {activeTab === 'conversations' && (
+        <ConversationsTrafficTab
+          loading={convLoading}
+          data={convData}
+          error={convError}
+          granularite={convGranularite}
+          onGranulariteChange={setConvGranularite}
+          selectedPeriod={selectedPeriod}
+        />
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import {
   PerformanceTemporelleDto,
   StatutChannelDto,
   TraficResponseDto,
+  TraficConversationsResponseDto,
 } from './dto/create-metrique.dto';
 import { QueueMetricsDto } from './dto/create-metrique.dto';
 import { MetriquesService } from './metriques.service';
@@ -112,6 +113,21 @@ export class MetriquesController {
     @Query('granularite') granularite : 'heure' | 'jour' = 'heure',
   ): Promise<TraficResponseDto> {
     return this.metriquesService.getTraficHoraire(periode, dateFrom, dateTo, granularite);
+  }
+
+
+  @Get('trafic-conversations')
+  @ApiOperation({ summary: 'Trafic conversations par heure ou par jour' })
+  @ApiResponse({ status: 200, type: TraficConversationsResponseDto })
+  async getTraficConversations(
+    @Query('periode')     periode: string = 'today',
+    @Query('dateFrom')    dateFrom?: string,
+    @Query('dateTo')      dateTo?: string,
+    @Query('granularite') granularite: 'heure' | 'jour' = 'heure',
+  ): Promise<TraficConversationsResponseDto> {
+    return this.metriquesService.getTraficConversations(
+      periode, dateFrom, dateTo, granularite,
+    );
   }
 
   @Get('overview')

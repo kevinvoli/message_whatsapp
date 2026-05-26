@@ -895,6 +895,45 @@ export type TraficResponse = {
 export type TraficHoraireResponse = TraficResponse;
 export type TraficHorairePoint    = TraficPoint;
 
+export type TraficConversationsPoint = {
+  index:         number;
+  label:         string;
+  total:         number;
+  fermees:       number;
+  actives:       number;
+  avg_par_unite: number;
+};
+
+export type TraficConversationsStatistiques = {
+  total:             number;
+  actives:           number;
+  fermees:           number;
+  en_attente:        number;
+  taux_cloture:      number;
+  taux_actives:      number;
+  moy_par_heure:     number;
+  moy_par_jour:      number;
+  unite_pic:         number;
+  conversations_pic: number;
+  unites_actives:    number;
+  nb_jours:          number;
+  mode:              'journee' | 'periode';
+};
+
+export type TraficConversationsResponse = {
+  granularite:  'heure' | 'jour';
+  points:       TraficConversationsPoint[];
+  statistiques: TraficConversationsStatistiques;
+  meta: {
+    periode:   string;
+    dateStart: string;
+    dateEnd:   string;
+    nb_unites: number;
+    nb_jours:  number;
+  };
+};
+
+
 export const COULEURS_STATUT = {
   actif: 'green',
   'en attente': 'yellow',

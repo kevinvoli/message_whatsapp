@@ -522,3 +522,44 @@ export class TraficResponseDto {
 // Alias de rétro-compatibilité
 export { TraficResponseDto as TraficHoraireResponseDto };
 export { TraficPointDto    as TraficHorairePointDto    };
+
+/** Un point horaire/journalier du graphique conversations */
+export class TraficConversationsPointDto {
+  index:         number;   // heure 0-23 ou jour 0-6
+  label:         string;   // "00:00" ou "Lun"
+  total:         number;   // conversations ouvertes sur ce créneau
+  fermees:       number;   // fermées créées sur ce créneau
+  actives:       number;   // encore actives créées sur ce créneau
+  avg_par_unite: number;   // moyenne par jour (mode multi-jours)
+}
+
+/** Statistiques conversations calculées sur la période */
+export class TraficConversationsStatistiquesDto {
+  total:             number;
+  actives:           number;
+  fermees:           number;
+  en_attente:        number;
+  taux_cloture:      number;
+  taux_actives:      number;
+  moy_par_heure:     number;
+  moy_par_jour:      number;
+  unite_pic:         number;
+  conversations_pic: number;
+  unites_actives:    number;
+  nb_jours:          number;
+  mode:              'journee' | 'periode';
+}
+
+/** Réponse complète de l'endpoint trafic-conversations */
+export class TraficConversationsResponseDto {
+  granularite:   'heure' | 'jour';
+  points:        TraficConversationsPointDto[];
+  statistiques:  TraficConversationsStatistiquesDto;
+  meta: {
+    periode:   string;
+    dateStart: string;
+    dateEnd:   string;
+    nb_unites: number;
+    nb_jours:  number;
+  };
+}

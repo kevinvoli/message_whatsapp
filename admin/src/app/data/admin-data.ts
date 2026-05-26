@@ -24,7 +24,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'conversations', name: 'Conversations', icon: MessageSquare, badge: null },
       { id: 'messages', name: 'Messages', icon: MessageCircle, badge: null },
-      { id: 'message-traffic', name: 'Trafic messages', icon: BarChart2, badge: null },
+      { id: 'message-traffic', name: 'Trafic Messages & Conversations', icon: BarChart2, badge: null },
       { id: 'automessages', name: 'Messages auto', icon: MessageSquareText, badge: null },
     ],
   },

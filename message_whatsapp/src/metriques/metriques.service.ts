@@ -20,7 +20,7 @@ import {
   PerformanceTemporelleDto,
   StatutChannelDto,
 } from './dto/create-metrique.dto';
-import { QueueMetricsDto, TraficPointDto, TraficStatistiquesDto, TraficResponseDto } from './dto/create-metrique.dto';
+import { QueueMetricsDto, TraficPointDto, TraficStatistiquesDto, TraficResponseDto, TraficConversationsPointDto, TraficConversationsStatistiquesDto, TraficConversationsResponseDto } from './dto/create-metrique.dto';
 
 @Injectable()
 export class MetriquesService {
@@ -1093,4 +1093,118 @@ export class MetriquesService {
       },
     };
   }
+
+  async getTraficConversations(
+    periode      = 'today',
+    dateFrom?:   string,
+    dateTo?:     string,
+    granularite: 'heure' | 'jour' = 'heure',
+  ): Promise<TraficConversationsResponseDto> {
+    const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
+
+    const nbUnites = granularite === 'heure' ? 24 : 7;
+    const groupCol = granularite === 'heure'
+      ? 'HOUR(chat.createdAt)'
+      : 'WEEKDAY(chat.createdAt)';
+
+    // ── Q1 : agrégation par créneau ───────────────────────────────────────
+    const rows = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select(groupCol, 'groupe')
+      .addSelect('COUNT(*)', 'total')
+      .addSelect(
+        "SUM(CASE WHEN chat.status = 'fermé'      THEN 1 ELSE 0 END)", 'fermees',
+      )
+      .addSelect(
+        "SUM(CASE WHEN chat.status = 'actif'      THEN 1 ELSE 0 END)", 'actives',
+      )
+      .addSelect(
+        "SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'en_attente',
+      )
+      .where('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd',   { dateEnd })
+      .groupBy(groupCol)
+      .getRawMany();
+
+    // ── Q2 : stats globales ───────────────────────────────────────────────
+    const globRaw = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('COUNT(*)',                                                        'total')
+      .addSelect("SUM(CASE WHEN chat.status = 'fermé'      THEN 1 ELSE 0 END)", 'fermees')
+      .addSelect("SUM(CASE WHEN chat.status = 'actif'      THEN 1 ELSE 0 END)", 'actives')
+      .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'en_attente')
+      .addSelect('COUNT(DISTINCT DATE(chat.createdAt))',                         'nb_jours')
+      .where('chat.deletedAt IS NULL')
+      .andWhere('chat.createdAt >= :dateStart', { dateStart })
+      .andWhere('chat.createdAt <= :dateEnd',   { dateEnd })
+      .getRawOne();
+
+    const totalGlob     = parseInt(globRaw?.total)       || 0;
+    const fermeesGlob   = parseInt(globRaw?.fermees)     || 0;
+    const activesGlob   = parseInt(globRaw?.actives)     || 0;
+    const enAttenteGlob = parseInt(globRaw?.en_attente)  || 0;
+    const nbJoursGlobal = parseInt(globRaw?.nb_jours)    || 1;
+
+    const nbSemaines = Math.max(1, Math.floor(nbJoursGlobal / 7));
+
+    // ── Construction des points (créneaux sans données → 0) ───────────────
+    const dataMap = new Map<number, { total: number; fermees: number; actives: number }>();
+    for (const row of rows) {
+      dataMap.set(parseInt(row.groupe), {
+        total:   parseInt(row.total)   || 0,
+        fermees: parseInt(row.fermees) || 0,
+        actives: parseInt(row.actives) || 0,
+      });
+    }
+
+    const points: TraficConversationsPointDto[] = Array.from({ length: nbUnites }, (_, i) => {
+      const d = dataMap.get(i) ?? { total: 0, fermees: 0, actives: 0 };
+      const label = granularite === 'heure'
+        ? `${String(i).padStart(2, '0')}:00`
+        : this.DOW_LABELS[i];
+      const avgParUnite = granularite === 'heure'
+        ? (nbJoursGlobal > 1 ? Math.round((d.total / nbJoursGlobal) * 10) / 10 : d.total)
+        : (nbJoursGlobal > 6 ? Math.round((d.total / nbSemaines)    * 10) / 10 : d.total);
+      return { index: i, label, total: d.total, fermees: d.fermees,
+               actives: d.actives, avg_par_unite: avgParUnite };
+    });
+
+    // ── Calcul statistiques ───────────────────────────────────────────────
+    const unitesActives   = points.filter(p => p.total > 0);
+    const nbUnitesActives = unitesActives.length || 1;
+    const picPoint        = points.reduce((max, p) => p.total > max.total ? p : max, points[0]);
+    const isSameDay       = dateStart.toDateString() === dateEnd.toDateString();
+    const pct = (v: number) => totalGlob > 0 ? Math.round((v / totalGlob) * 100) : 0;
+
+    const statistiques: TraficConversationsStatistiquesDto = {
+      total:             totalGlob,
+      actives:           activesGlob,
+      fermees:           fermeesGlob,
+      en_attente:        enAttenteGlob,
+      taux_cloture:      pct(fermeesGlob),
+      taux_actives:      pct(activesGlob),
+      moy_par_heure:     Math.round((totalGlob / nbUnitesActives) * 10) / 10,
+      moy_par_jour:      Math.round((totalGlob / nbJoursGlobal)   * 10) / 10,
+      unite_pic:         picPoint.index,
+      conversations_pic: picPoint.total,
+      unites_actives:    nbUnitesActives,
+      nb_jours:          nbJoursGlobal,
+      mode:              isSameDay ? 'journee' : 'periode',
+    };
+
+    return {
+      granularite,
+      points,
+      statistiques,
+      meta: {
+        periode,
+        dateStart: dateStart.toISOString(),
+        dateEnd:   dateEnd.toISOString(),
+        nb_unites: nbUnites,
+        nb_jours:  nbJoursGlobal,
+      },
+    };
+  }
+
 }
