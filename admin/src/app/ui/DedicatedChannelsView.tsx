@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck, RefreshCw, MessageCircle, MessageSquare,
-  Network, Radio, Users, TrendingUp, Clock, CheckCircle,
+  Network, Radio, Users, TrendingUp, Clock, CheckCircle, BellDot,
 } from 'lucide-react';
 import { MetriquesGlobales, PerformanceCommercial } from '@/app/lib/definitions';
 import { getMetriquesDedicated, getPerformanceCommerciauxDedie } from '@/app/lib/api';
@@ -25,7 +25,7 @@ function KpiCard({
   value: number | string;
   subtitle?: string;
   icon: React.ElementType;
-  color?: 'blue' | 'green' | 'purple' | 'orange' | 'slate';
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'slate' | 'red';
 }) {
   const colors = {
     blue:   { bg: 'bg-blue-50',   icon: 'text-blue-600',   border: 'border-blue-200' },
@@ -33,6 +33,7 @@ function KpiCard({
     purple: { bg: 'bg-purple-50', icon: 'text-purple-600', border: 'border-purple-200' },
     orange: { bg: 'bg-orange-50', icon: 'text-orange-600', border: 'border-orange-200' },
     slate:  { bg: 'bg-slate-50',  icon: 'text-slate-600',  border: 'border-slate-200' },
+    red:    { bg: 'bg-red-50',    icon: 'text-red-600',    border: 'border-red-200' },
   };
   const c = colors[color];
   return (
@@ -131,7 +132,7 @@ export default function DedicatedChannelsView({
 
       {metriques && (
         <>
-          {/* KPIs */}
+          {/* KPIs — ligne 1 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               title="Messages"
@@ -148,21 +149,22 @@ export default function DedicatedChannelsView({
               color="green"
             />
             <KpiCard
+              title="Non lus"
+              value={metriques.chatsNonLus.toLocaleString('fr-FR')}
+              subtitle="Conversations avec messages non lus"
+              icon={BellDot}
+              color={metriques.chatsNonLus > 0 ? 'red' : 'slate'}
+            />
+            <KpiCard
               title="Postes dédiés"
               value={metriques.totalPostes.toLocaleString('fr-FR')}
-              subtitle={`${metriques.postesActifs} actifs`}
+              subtitle={`${metriques.postesActifs} actifs · ${metriques.totalChannels} canal${metriques.totalChannels !== 1 ? 'aux' : ''}`}
               icon={Network}
               color="purple"
             />
-            <KpiCard
-              title="Canaux dédiés"
-              value={metriques.totalChannels.toLocaleString('fr-FR')}
-              subtitle={`${metriques.channelsActifs} actifs`}
-              icon={Radio}
-              color="orange"
-            />
           </div>
 
+          {/* KPIs — ligne 2 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               title="Commerciaux"
