@@ -25,19 +25,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch production ref for paths-filter
+      - name: Fetch production ref for diff
         run: git fetch origin production --no-tags
 
-      - uses: dorny/paths-filter@v3
+      - name: Detect changed services
         id: filter
-        with:
-          filters: |
-            backend:
-              - 'message_whatsapp/**'
-            frontend:
-              - 'front/**'
-            admin:
-              - 'admin/**'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "backend=$(echo "$CHANGED"  | grep -qE '^message_whatsapp/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "frontend=$(echo "$CHANGED" | grep -qE '^front/'             && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "admin=$(echo "$CHANGED"    | grep -qE '^admin/'             && echo 'true' || echo 'false')"  >> $GITHUB_OUTPUT
 
   # ──────────────────────────────────────────────
   # 2a. BUILD BACKEND
