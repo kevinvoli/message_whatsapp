@@ -867,6 +867,36 @@ export async function getOverviewMetriques(periode = 'today', dateFrom?: string,
     return { ...result.data, computed_at: result.computed_at, from_snapshot: result.from_snapshot };
 }
 
+export async function getMetriquesDedicated(
+  periode = 'today',
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<MetriquesGlobales> {
+  const params = new URLSearchParams({ periode });
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+  const response = await fetch(`${API_BASE_URL}/api/metriques/globales-dedie?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<MetriquesGlobales>(response);
+}
+
+export async function getPerformanceCommerciauxDedie(
+  periode = 'today',
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<PerformanceCommercial[]> {
+  const params = new URLSearchParams({ periode });
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+  const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux-dedie?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<PerformanceCommercial[]>(response);
+}
+
 export async function getOverviewSection<T>(
   section: 'globales' | 'commerciaux' | 'channels' | 'temporelle',
   periode = 'today',

@@ -27,11 +27,12 @@ export class AnalyticsSnapshotService {
       try {
         const [metriques, performanceCommercial, statutChannels, performanceTemporelle] =
           await Promise.all([
-            this.metriquesService.getMetriquesGlobales(periode),
-            this.metriquesService.getPerformanceCommerciaux(periode),
+            this.metriquesService.getMetriquesGlobales(periode, undefined, undefined, { excludeDedicated: true }),
+            this.metriquesService.getPerformanceCommerciaux(periode, undefined, undefined, { excludeDedicated: true }),
             this.metriquesService.getStatutChannels(periode),
             this.metriquesService.getPerformanceTemporelle(
               { today: 1, week: 7, month: 30, year: 365 }[periode] ?? 7,
+              undefined, undefined, { excludeDedicated: true },
             ),
           ]);
 

@@ -26,7 +26,7 @@ export class MetriquesController {
   ) {}
 
   @Get('globales')
-  @ApiOperation({ summary: 'Recupere toutes les metriques globales' })
+  @ApiOperation({ summary: 'Recupere toutes les metriques globales (canaux pool uniquement)' })
   @ApiResponse({
     status: 200,
     description: 'Metriques globales recuperees avec succes',
@@ -35,11 +35,26 @@ export class MetriquesController {
   async getMetriquesGlobales(
     @Query('periode') periode: string = 'today',
   ): Promise<MetriquesGlobalesDto> {
-    return this.metriquesService.getMetriquesGlobales(periode);
+    return this.metriquesService.getMetriquesGlobales(periode, undefined, undefined, { excludeDedicated: true });
+  }
+
+  @Get('globales-dedie')
+  @ApiOperation({ summary: 'Recupere les metriques des canaux dedies uniquement' })
+  @ApiResponse({
+    status: 200,
+    description: 'Metriques canaux dedies recuperees avec succes',
+    type: MetriquesGlobalesDto,
+  })
+  async getMetriquesDedicated(
+    @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ): Promise<MetriquesGlobalesDto> {
+    return this.metriquesService.getMetriquesDedicated(periode, dateFrom, dateTo);
   }
 
   @Get('commerciaux')
-  @ApiOperation({ summary: 'Recupere la performance des commerciaux' })
+  @ApiOperation({ summary: 'Recupere la performance des commerciaux (pool uniquement)' })
   @ApiResponse({
     status: 200,
     description: 'Performance des commerciaux recuperee avec succes',
@@ -50,7 +65,22 @@ export class MetriquesController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ): Promise<PerformanceCommercialDto[]> {
-    return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo);
+    return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo, { excludeDedicated: true });
+  }
+
+  @Get('commerciaux-dedie')
+  @ApiOperation({ summary: 'Recupere la performance des commerciaux sur canaux dedies' })
+  @ApiResponse({
+    status: 200,
+    description: 'Performance des commerciaux dedies recuperee avec succes',
+    type: [PerformanceCommercialDto],
+  })
+  async getPerformanceCommerciauxDedie(
+    @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ): Promise<PerformanceCommercialDto[]> {
+    return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo, { dedicatedOnly: true });
   }
 
   @Get('channels/:channelId/stats')
@@ -80,7 +110,7 @@ export class MetriquesController {
   }
 
   @Get('performance-temporelle')
-  @ApiOperation({ summary: 'Recupere la performance temporelle' })
+  @ApiOperation({ summary: 'Recupere la performance temporelle (pool uniquement)' })
   @ApiResponse({
     status: 200,
     description: 'Performance temporelle recuperee avec succes',
@@ -88,8 +118,10 @@ export class MetriquesController {
   })
   async getPerformanceTemporelle(
     @Query('jours') jours: number = 7,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ): Promise<PerformanceTemporelleDto[]> {
-    return this.metriquesService.getPerformanceTemporelle(jours);
+    return this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo, { excludeDedicated: true });
   }
 
   @Get('queue')
@@ -223,10 +255,10 @@ export class MetriquesController {
       statutChannels,
       performanceTemporelle,
     ] = await Promise.all([
-      this.metriquesService.getMetriquesGlobales(periode, dateFrom, dateTo),
-      this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo),
+      this.metriquesService.getMetriquesGlobales(periode, dateFrom, dateTo, { excludeDedicated: true }),
+      this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo, { excludeDedicated: true }),
       this.metriquesService.getStatutChannels(periode, dateFrom, dateTo),
-      this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo),
+      this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo, { excludeDedicated: true }),
     ]);
 
     return {
@@ -251,10 +283,10 @@ export class MetriquesController {
     dateTo?: string,
   ): Promise<unknown> {
     switch (section) {
-      case 'globales':    return this.metriquesService.getMetriquesGlobales(periode, dateFrom, dateTo);
-      case 'commerciaux': return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo);
+      case 'globales':    return this.metriquesService.getMetriquesGlobales(periode, dateFrom, dateTo, { excludeDedicated: true });
+      case 'commerciaux': return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo, { excludeDedicated: true });
       case 'channels':    return this.metriquesService.getStatutChannels(periode, dateFrom, dateTo);
-      case 'temporelle':  return this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo);
+      case 'temporelle':  return this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo, { excludeDedicated: true });
     }
   }
 

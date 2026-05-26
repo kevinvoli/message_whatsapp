@@ -44,6 +44,7 @@ import CampaignLinksView from '@/app/ui/CampaignLinksView';
 import MediathequeView from '@/app/ui/MediathequeView';
 import ChannelStatsView from '@/app/ui/ChannelStatsView';
 import MessageTrafficView from '@/app/ui/MessageTrafficView';
+import DedicatedChannelsView from '@/app/ui/DedicatedChannelsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -52,7 +53,7 @@ import { getAdminProfile } from '@/app/lib/api';
 
 const VALID_VIEWS: ViewMode[] = [
     'overview', 'commerciaux', 'performance', 'analytics', 'messages', 'clients',
-    'message-traffic', 'rapports', 'postes', 'canaux', 'templates', 'automessages', 'conversations',
+    'message-traffic', 'rapports', 'postes', 'canaux', 'canaux-dedies', 'templates', 'automessages', 'conversations',
     'queue', 'dispatch', 'lecture-seule', 'crons', 'observabilite', 'go_no_go',
     'notifications', 'alert-config', 'campaign-links', 'mediatheque', 'settings', 'channel-stats',
 ];
@@ -138,6 +139,8 @@ function AdminDashboardContent() {
                 return <GoNoGoView />;
             case 'canaux':
                 return <ChannelsView />;
+            case 'canaux-dedies':
+                return <DedicatedChannelsView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} />;
             case 'templates':
                 return HSM_TEMPLATES_ENABLED ? <TemplatesView /> : null;
             case 'automessages':

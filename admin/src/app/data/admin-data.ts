@@ -43,6 +43,7 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Server,
     items: [
       { id: 'canaux', name: 'Canaux', icon: Globe, badge: null },
+      { id: 'canaux-dedies', name: 'Canaux dédiés', icon: ShieldCheck, badge: null },
       { id: 'channel-stats', name: 'Stats canaux', icon: BarChart3, badge: null },
       { id: 'templates', name: 'Templates HSM', icon: Layout, badge: null },
       { id: 'observabilite', name: 'Observabilite', icon: Activity, badge: 'SLO' },

@@ -45,7 +45,8 @@ export type ViewMode =
   | 'campaign-links'
   | 'mediatheque'
   | 'settings'
-  | 'channel-stats';
+  | 'channel-stats'
+  | 'canaux-dedies';
 
 export type NavigationItem = {
   id: ViewMode;
