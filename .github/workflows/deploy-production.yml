@@ -37,6 +37,7 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          base: origin/master
           filters: |
             backend:
               - 'message_whatsapp/**'
@@ -149,7 +150,12 @@ jobs:
     if: |
       always() &&
       !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
+      !contains(needs.*.result, 'cancelled') &&
+      (
+        needs.build-backend.result  == 'success' ||
+        needs.build-frontend.result == 'success' ||
+        needs.build-admin.result    == 'success'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
