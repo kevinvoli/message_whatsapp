@@ -41,9 +41,9 @@ const IdleAndCooldownWrapper: React.FC = () => {
       .then((data: ClientSettings | null) => {
         if (data) {
           setSettings(data);
-          if (!data.hasDedicatedChannel) {
-            setCooldownConfig(data.readCooldownSeconds);
-          }
+          // Pour les postes dédiés, forcer le cooldown à 0 dans le store
+          // afin que selectConversation ne bloque jamais (store init à 120s par défaut)
+          setCooldownConfig(data.hasDedicatedChannel ? 0 : data.readCooldownSeconds);
         }
       })
       .catch(() => {});
