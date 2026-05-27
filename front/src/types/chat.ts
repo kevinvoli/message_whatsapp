@@ -67,6 +67,7 @@ export type CommercialStatsDto = {
   responseRate: number;
   lastActivityAt: string | null;
   isOnline: boolean;
+  totalConnectionMinutes?: number;
 };
 
 export const getPriorityColor = (

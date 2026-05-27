@@ -10,6 +10,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { CommercialStatsService } from './commercial-stats.service';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { CommercialStatsService } from './commercial-stats.service';
       WhatsappChat,
       WhapiChannel,
     ]),
+    ConnectionLogModule,
   ],
   controllers: [WhatsappCommercialController],
   providers: [WhatsappCommercialService, QueueService, CommercialStatsService],

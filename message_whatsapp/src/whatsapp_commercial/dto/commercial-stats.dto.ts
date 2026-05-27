@@ -14,4 +14,7 @@
 
   /** Conversations dont ce commercial a envoye le dernier message global */
   conversationsHandled: number;
+
+  /** Durée totale de connexion en minutes sur la période */
+  totalConnectionMinutes: number;
 }

@@ -1,5 +1,5 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle, Inbox, Reply, CheckCircle } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle, Inbox, Reply, CheckCircle, Timer } from 'lucide-react';
 
 import { PerformanceCommercial, Poste, CommercialStatsDto } from '@/app/lib/definitions';
 import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats } from '@/app/lib/api';
@@ -863,6 +863,19 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
 
                     {/* Toggle mode Messages / Conversations */}
                     <ModeToggle value={statsMode} onChange={setStatsMode} />
+
+                    {/* Temps de connexion — indépendant du mode */}
+                    {statsMap[statsPanel.id].totalConnectionMinutes != null && (
+                      <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-6 flex items-center gap-4">
+                        <Timer className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-indigo-700 font-medium">Temps de connexion</p>
+                          <p className="text-xl font-bold text-indigo-900">
+                            {formatTemps((statsMap[statsPanel.id].totalConnectionMinutes ?? 0) * 60)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* ── Mode Messages ── */}
                     {statsMode === 'messages' && (

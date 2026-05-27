@@ -44,6 +44,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { MessageReadService } from './message-read.service';
 import { MessageReadRateLimiterService } from './message-read-rate-limiter.service';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { MessageReadRateLimiterService } from './message-read-rate-limiter.servi
     SystemAlertModule,
     WhatsappTemplateModule,
     forwardRef(() => CampaignLinkModule),
+    ConnectionLogModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

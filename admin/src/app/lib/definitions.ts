@@ -512,6 +512,7 @@ export type CommercialStatsDto = {
   conversationsReplied:  number;
   /** Conversations dont ce commercial a envoyé le dernier message global */
   conversationsHandled:  number;
+  totalConnectionMinutes?: number;
 };
 
 /**

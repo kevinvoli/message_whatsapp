@@ -5,6 +5,7 @@ import { WhatsappCommercial } from './entities/user.entity';
 import { WhatsappMessage, MessageDirection } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { CommercialStatsDto } from './dto/commercial-stats.dto';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 
 @Injectable()
 export class CommercialStatsService {
@@ -15,6 +16,7 @@ export class CommercialStatsService {
     private readonly messageRepository: Repository<WhatsappMessage>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepository: Repository<WhatsappChat>,
+    private readonly connectionLogService: ConnectionLogService,
   ) {}
 
   private periodeToDateStart(periode: string): Date {
@@ -77,6 +79,7 @@ export class CommercialStatsService {
       conversationsReceived,
       conversationsReplied,
       conversationsHandledRows,
+      totalConnectionMinutes,
     ] = await Promise.all([
 
       // Index 0 — INCHANGE : messagesRead (COUNT messages individuels lus)
@@ -138,6 +141,13 @@ export class CommercialStatsService {
          ) AS sub`,
         [commercialId, dateStart, dateEnd],
       ) as Promise<Array<{ cnt: string }>>,
+
+      this.connectionLogService.getTotalConnectionMinutes(
+        commercialId,
+        'commercial' as const,
+        dateStart,
+        dateEnd,
+      ),
     ]);
 
     let activeConversations = 0;
@@ -165,6 +175,7 @@ export class CommercialStatsService {
     dto.conversationsReceived = parseInt(conversationsReceived?.cnt ?? '0');
     dto.conversationsReplied  = parseInt(conversationsReplied?.cnt  ?? '0');
     dto.conversationsHandled  = parseInt(conversationsHandledRows?.[0]?.cnt ?? '0');
+    dto.totalConnectionMinutes = totalConnectionMinutes;
 
     return dto;
   }

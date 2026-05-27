@@ -41,6 +41,7 @@ import { CallLog } from 'src/call-log/entities/call_log.entity';
 import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { MessageReadService } from './message-read.service';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 
 type AuthPayload = {
   sub: string;
@@ -97,6 +98,7 @@ export class WhatsappMessageGateway
     private readonly notificationService: NotificationService,
     private readonly systemAlert: SystemAlertService,
     private readonly messageReadService: MessageReadService,
+    private readonly connectionLogService: ConnectionLogService,
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
   ) {}
@@ -294,6 +296,7 @@ export class WhatsappMessageGateway
     if (!agent) return;
 
     this.connectedAgents.delete(client.id);
+    void this.connectionLogService.logLogout(agent.commercialId, 'commercial');
     await this.commercialService.updateStatus(agent.commercialId, false);
 
     // Verifier si un autre commercial du MEME poste est encore connecte.

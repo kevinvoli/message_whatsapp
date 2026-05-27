@@ -7,6 +7,7 @@ import {
   Activity,
   Clock,
   RefreshCw,
+  Timer,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -43,6 +44,12 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
   useEffect(() => {
     void fetchStats();
   }, [fetchStats]);
+
+  const formatMinutes = (min: number): string => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -124,6 +131,19 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
               </p>
             </div>
           </div>
+
+          {/* Temps de connexion */}
+          {stats.totalConnectionMinutes != null && (
+            <div className="bg-indigo-50 rounded-lg p-3 flex items-center gap-3">
+              <Timer className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+              <div>
+                <span className="text-xs font-medium text-indigo-700">Temps de connexion</span>
+                <p className="text-xl font-bold text-indigo-800">
+                  {formatMinutes(stats.totalConnectionMinutes)}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Taux de reponse */}
           <div className="bg-white border border-gray-100 rounded-lg p-3">

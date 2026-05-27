@@ -6,6 +6,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { QueueService } from 'src/dispatcher/services/queue.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 
 @Injectable()
 export class IdleDisconnectJob implements OnModuleInit {
@@ -19,6 +20,7 @@ export class IdleDisconnectJob implements OnModuleInit {
     private readonly settingsRepository: Repository<DispatchSettings>,
     private readonly queueService: QueueService,
     private readonly gateway: WhatsappMessageGateway,
+    private readonly connectionLogService: ConnectionLogService,
   ) {}
 
   onModuleInit(): void {
@@ -68,6 +70,7 @@ export class IdleDisconnectJob implements OnModuleInit {
         }
         commercial.isConnected = false;
         await this.commercialRepository.save(commercial);
+        await this.connectionLogService.logLogout(commercial.id, 'commercial');
         this.gateway.server.emit('commercial:force-disconnect', {
           commercialId: commercial.id,
         });
