@@ -58,19 +58,29 @@ export class ConnectionLogService {
     dateEnd: Date,
   ): Promise<number> {
     const now = new Date();
+    // WHERE : sessions qui chevauchent la période [dateStart, dateEnd]
+    // ON évite COALESCE dans le WHERE (risque de binding TypeORM) en testant
+    // séparément les sessions ouvertes et fermées.
+    // SELECT : intersection GREATEST/LEAST pour ne compter que le temps dans la période.
     const result = await this.repo
       .createQueryBuilder('log')
       .select(
-        'SUM(TIMESTAMPDIFF(MINUTE, GREATEST(log.loginAt, :dateStart), LEAST(COALESCE(log.logoutAt, :now), :dateEnd)))',
+        `SUM(TIMESTAMPDIFF(
+          MINUTE,
+          GREATEST(log.loginAt, :dateStart),
+          LEAST(CASE WHEN log.logoutAt IS NULL THEN :now ELSE log.logoutAt END, :dateEnd)
+        ))`,
         'total_minutes',
       )
       .where('log.userId = :userId', { userId })
       .andWhere('log.userType = :userType', { userType })
-      .andWhere('log.loginAt <= :dateEnd', { dateEnd })
-      .andWhere('COALESCE(log.logoutAt, :now) >= :dateStart', { dateStart })
-      .setParameter('now', now)
+      .andWhere('log.loginAt <= :dateEnd')
+      .andWhere('(log.logoutAt IS NULL OR log.logoutAt >= :dateStart)')
+      .setParameter('userId', userId)
+      .setParameter('userType', userType)
       .setParameter('dateStart', dateStart)
       .setParameter('dateEnd', dateEnd)
+      .setParameter('now', now)
       .getRawOne();
     return parseInt(result?.total_minutes) || 0;
   }
@@ -87,16 +97,22 @@ export class ConnectionLogService {
       .createQueryBuilder('log')
       .select('log.userId', 'userId')
       .addSelect(
-        'SUM(TIMESTAMPDIFF(MINUTE, GREATEST(log.loginAt, :dateStart), LEAST(COALESCE(log.logoutAt, :now), :dateEnd)))',
+        `SUM(TIMESTAMPDIFF(
+          MINUTE,
+          GREATEST(log.loginAt, :dateStart),
+          LEAST(CASE WHEN log.logoutAt IS NULL THEN :now ELSE log.logoutAt END, :dateEnd)
+        ))`,
         'total_minutes',
       )
       .where('log.userId IN (:...userIds)', { userIds })
       .andWhere('log.userType = :userType', { userType })
-      .andWhere('log.loginAt <= :dateEnd', { dateEnd })
-      .andWhere('COALESCE(log.logoutAt, :now) >= :dateStart', { dateStart })
-      .setParameter('now', now)
+      .andWhere('log.loginAt <= :dateEnd')
+      .andWhere('(log.logoutAt IS NULL OR log.logoutAt >= :dateStart)')
+      .setParameter('userIds', userIds)
+      .setParameter('userType', userType)
       .setParameter('dateStart', dateStart)
       .setParameter('dateEnd', dateEnd)
+      .setParameter('now', now)
       .groupBy('log.userId')
       .getRawMany();
     return new Map(
