@@ -16,6 +16,14 @@ import { getCommercialStats } from '@/lib/api';
 import { formatRelativeDate } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger';
 
+type Periode = 'today' | 'week' | 'month';
+
+const PERIODES: { key: Periode; label: string }[] = [
+  { key: 'today', label: "Aujourd'hui" },
+  { key: 'week',  label: 'Semaine' },
+  { key: 'month', label: 'Mois' },
+];
+
 interface ActivityPanelProps {
   commercialId: string;
 }
@@ -24,13 +32,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
   const [stats, setStats] = useState<CommercialStatsDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [periode, setPeriode] = useState<Periode>('today');
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (p: Periode) => {
     if (!commercialId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await getCommercialStats(commercialId);
+      const data = await getCommercialStats(commercialId, p);
       setStats(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur inconnue';
@@ -42,8 +51,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
   }, [commercialId]);
 
   useEffect(() => {
-    void fetchStats();
-  }, [fetchStats]);
+    void fetchStats(periode);
+  }, [fetchStats, periode]);
 
   const formatMinutes = (min: number): string => {
     const h = Math.floor(min / 60);
@@ -59,13 +68,30 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
           Mon activite
         </h3>
         <button
-          onClick={() => void fetchStats()}
+          onClick={() => void fetchStats(periode)}
           disabled={loading}
           aria-label="Rafraichir les statistiques"
           className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
+      </div>
+
+      {/* Filtre période */}
+      <div className="flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 gap-0.5">
+        {PERIODES.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setPeriode(key)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+              periode === key
+                ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Erreur */}

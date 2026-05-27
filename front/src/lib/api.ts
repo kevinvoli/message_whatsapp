@@ -26,8 +26,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 /** Récupère les stats d'activité du commercial connecté. */
-export async function getCommercialStats(commercialId: string): Promise<CommercialStatsDto> {
-  const response = await fetch(`${API_BASE_URL}/auth/me/stats`, {
+export async function getCommercialStats(
+  commercialId: string,
+  periode = 'today',
+): Promise<CommercialStatsDto> {
+  const params = new URLSearchParams({ periode });
+  const response = await fetch(`${API_BASE_URL}/auth/me/stats?${params.toString()}`, {
     method: 'GET',
     credentials: 'include',
   });
