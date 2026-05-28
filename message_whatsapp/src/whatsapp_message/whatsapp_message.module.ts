@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
+import { MediaAssetModule } from 'src/media-asset/media-asset.module';
 import { WhatsappMessageService } from './whatsapp_message.service';
 import { WhatsappMessageController } from './whatsapp_message.controller';
 import { WhatsappMessageGateway } from './whatsapp_message.gateway';
@@ -81,6 +82,7 @@ import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
     WhatsappTemplateModule,
     forwardRef(() => CampaignLinkModule),
     ConnectionLogModule,
+    MediaAssetModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

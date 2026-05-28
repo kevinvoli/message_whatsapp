@@ -60,6 +60,7 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
+import { MediaAssetModule } from 'src/media-asset/media-asset.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
     SystemAlertModule,
     WhatsappTemplateModule,
     CampaignLinkModule,
+    MediaAssetModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
