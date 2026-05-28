@@ -200,7 +200,9 @@ export async function getMessageAuto(): Promise<MessageAuto[]> {
     return handleResponse<MessageAuto[]>(response);
 }
 
-export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'createdAt' | 'updatedAt' | 'keywords'>): Promise<MessageAuto> {
+export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'createdAt' | 'updatedAt' | 'keywords'> & {
+    keywords?: { keyword: string; matchType: string; caseSensitive: boolean; actif?: boolean }[];
+}): Promise<MessageAuto> {
     const response = await fetch(`${API_BASE_URL}/message-auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

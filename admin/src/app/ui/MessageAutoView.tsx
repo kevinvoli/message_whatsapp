@@ -594,6 +594,8 @@ function mediaTypeIcon(type: string): string {
 
 interface ScopeOption { id: string; label: string; }
 
+interface PendingKeyword { keyword: string; matchType: KeywordMatchType; caseSensitive: boolean; }
+
 interface TemplateFormFieldsProps {
   body: string; onBodyChange: (v: string) => void;
   delai: number | undefined; onDelaiChange: (v: number | undefined) => void;
@@ -606,6 +608,8 @@ interface TemplateFormFieldsProps {
   excludedChannelIds: string[]; onExcludedChannelIdsChange: (v: string[]) => void;
   excludedPosteIds: string[]; onExcludedPosteIdsChange: (v: string[]) => void;
   showClientType: boolean;
+  showKeywords: boolean;
+  keywords: PendingKeyword[]; onKeywordsChange: (v: PendingKeyword[]) => void;
   postes: Poste[]; channels: Channel[];
   idPrefix: string;
   mediaAssetId?: string | null;
@@ -620,10 +624,25 @@ function TemplateFormFields({
   scopeLabel, onScopeLabelChange, clientTypeTarget, onClientTypeTargetChange,
   excludedChannelIds, onExcludedChannelIdsChange,
   excludedPosteIds, onExcludedPosteIdsChange,
-  showClientType, postes, channels, idPrefix,
+  showClientType, showKeywords, keywords, onKeywordsChange,
+  postes, channels, idPrefix,
   mediaAsset, onMediaChange,
 }: TemplateFormFieldsProps) {
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [kwInput, setKwInput] = useState('');
+  const [kwMatchType, setKwMatchType] = useState<KeywordMatchType>('contains');
+  const [kwCaseSensitive, setKwCaseSensitive] = useState(false);
+
+  const addPendingKw = () => {
+    const word = kwInput.trim();
+    if (!word || keywords.some((k) => k.keyword.toLowerCase() === word.toLowerCase())) return;
+    onKeywordsChange([...keywords, { keyword: word, matchType: kwMatchType, caseSensitive: kwCaseSensitive }]);
+    setKwInput('');
+  };
+
+  const removePendingKw = (idx: number) => {
+    onKeywordsChange(keywords.filter((_, i) => i !== idx));
+  };
 
   return (
     <>
@@ -827,6 +846,59 @@ function TemplateFormFields({
         </div>
       )}
 
+      {/* Section Mots-clés (trigger F uniquement) */}
+      {showKeywords && (
+        <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-3 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Mots-clés déclencheurs</p>
+          <p className="text-xs text-blue-500">Ce message sera envoyé automatiquement quand le client écrit l&apos;un de ces mots-clés.</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={kwInput}
+              onChange={(e) => setKwInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addPendingKw(); } }}
+              placeholder="Ex: bonjour, aide, urgent..."
+              className="flex-1 rounded border border-blue-200 bg-white px-3 py-1.5 text-sm focus:outline-none"
+            />
+            <select
+              value={kwMatchType}
+              onChange={(e) => setKwMatchType(e.target.value as KeywordMatchType)}
+              className="rounded border border-blue-200 bg-white px-2 py-1.5 text-sm focus:outline-none"
+            >
+              <option value="contains">Contient</option>
+              <option value="exact">Exact</option>
+              <option value="starts_with">Commence par</option>
+            </select>
+            <button
+              type="button"
+              onClick={addPendingKw}
+              disabled={!kwInput.trim()}
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <PlusCircle className="h-4 w-4" />
+            </button>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={kwCaseSensitive} onChange={(e) => setKwCaseSensitive(e.target.checked)} className="rounded" />
+            Respecter la casse
+          </label>
+          {keywords.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {keywords.map((kw, i) => (
+                <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-100 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-800 font-mono">
+                  {kw.keyword}
+                  <span className="text-blue-400">·{kw.matchType === 'contains' ? '⊃' : kw.matchType === 'exact' ? '=' : '^'}</span>
+                  <button type="button" onClick={() => removePendingKw(i)} className="ml-0.5 text-blue-400 hover:text-blue-700">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          {keywords.length === 0 && (
+            <p className="text-xs text-blue-400 italic">Aucun mot-clé ajouté — le trigger ne se déclenchera pas.</p>
+          )}
+        </div>
+      )}
+
       {/* Section Média */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -913,6 +985,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
   const [fExcludedPosteIds, setFExcludedPosteIds] = useState<string[]>([]);
   const [fMediaAssetId, setFMediaAssetId] = useState<string | null>(null);
   const [fMediaAsset, setFMediaAsset] = useState<MediaAsset | null>(null);
+  const [fKeywords, setFKeywords] = useState<PendingKeyword[]>([]);
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
@@ -953,6 +1026,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
     setFExcludedPosteIds(msg?.conditions?.excluded_poste_ids ?? []);
     setFMediaAssetId(msg?.mediaAssetId ?? null);
     setFMediaAsset(msg?.mediaAsset ?? null);
+    setFKeywords(msg?.keywords?.map((k) => ({ keyword: k.keyword, matchType: k.matchType, caseSensitive: k.caseSensitive })) ?? []);
   };
 
   const openAdd = () => { resetForm(); setShowAddModal(true); };
@@ -974,6 +1048,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
         conditions,
         mediaAssetId: fMediaAssetId ?? null,
+        keywords: showKeywords && fKeywords.length ? fKeywords : undefined,
       });
       setTemplates((prev) => [...prev, created]);
       addToast({ type: 'success', message: 'Template ajouté.' });
@@ -1042,6 +1117,8 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
       excludedChannelIds={fExcludedChannelIds} onExcludedChannelIdsChange={setFExcludedChannelIds}
       excludedPosteIds={fExcludedPosteIds} onExcludedPosteIdsChange={setFExcludedPosteIds}
       showClientType={showClientType}
+      showKeywords={showKeywords}
+      keywords={fKeywords} onKeywordsChange={setFKeywords}
       postes={postes} channels={channels}
       mediaAssetId={fMediaAssetId}
       mediaAsset={fMediaAsset}
