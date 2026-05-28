@@ -51,6 +51,21 @@ export class ConnectionLogService {
     }
   }
 
+  async ensureOpenSession(
+    userId: string,
+    userType: ConnectionUserType,
+  ): Promise<void> {
+    const existing = await this.repo.findOne({
+      where: { userId, userType, logoutAt: IsNull() },
+      order: { loginAt: 'DESC' },
+    });
+    if (!existing) {
+      await this.repo.save(
+        this.repo.create({ userId, userType, loginAt: new Date(), logoutAt: null }),
+      );
+    }
+  }
+
   async getTotalConnectionMinutes(
     userId: string,
     userType: ConnectionUserType,

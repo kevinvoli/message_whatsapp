@@ -150,6 +150,13 @@ export class WhatsappMessageGateway
         this.logger.warn(
           `Ghost socket purged: commercial=${commercialId} old=${ghostClientId} new=${client.id}`,
         );
+        try {
+          await this.connectionLogService.logLogout(ghostAgent.commercialId, 'commercial');
+        } catch (err) {
+          this.logger.error(
+            `Ghost logLogout failed for commercial=${ghostAgent.commercialId}: ${String(err)}`,
+          );
+        }
       }
     }
 
@@ -174,6 +181,13 @@ export class WhatsappMessageGateway
 
     await this.commercialService.updateStatus(commercialId, true);
     await this.commercialRepository.update(commercialId, { lastActivityAt: new Date() });
+    try {
+      await this.connectionLogService.ensureOpenSession(commercialId, 'commercial');
+    } catch (err) {
+      this.logger.error(
+        `ensureOpenSession failed for commercial=${commercialId}: ${String(err)}`,
+      );
+    }
     await this.posteService.setActive(posteId, true);
     const poste = await this.posteService.findOneById(posteId);
     if (poste.is_queue_enabled) {
@@ -296,7 +310,13 @@ export class WhatsappMessageGateway
     if (!agent) return;
 
     this.connectedAgents.delete(client.id);
-    void this.connectionLogService.logLogout(agent.commercialId, 'commercial');
+    try {
+      await this.connectionLogService.logLogout(agent.commercialId, 'commercial');
+    } catch (err) {
+      this.logger.error(
+        `logLogout failed for commercial=${agent.commercialId}: ${String(err)}`,
+      );
+    }
     await this.commercialService.updateStatus(agent.commercialId, false);
 
     // Verifier si un autre commercial du MEME poste est encore connecte.
