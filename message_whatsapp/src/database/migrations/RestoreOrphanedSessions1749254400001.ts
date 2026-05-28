@@ -4,10 +4,13 @@ export class RestoreOrphanedSessions1749254400001 implements MigrationInterface 
   name = 'RestoreOrphanedSessions1749254400001';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    // Fermer les sessions encore ouvertes pour les commerciaux déjà déconnectés
+    // Fermer les sessions encore ouvertes pour les commerciaux déjà déconnectés.
+    // COLLATE utf8mb4_unicode_ci sur user_id pour résoudre le conflit de collation
+    // entre messaging_connection_log (utf8mb4_general_ci) et whatsapp_commercial (utf8mb4_unicode_ci).
     await queryRunner.query(`
       UPDATE messaging_connection_log l
-      INNER JOIN whatsapp_commercial c ON c.id = l.user_id
+      INNER JOIN whatsapp_commercial c
+        ON c.id = l.user_id COLLATE utf8mb4_unicode_ci
       SET l.logout_at = l.login_at
       WHERE l.user_type = 'commercial'
         AND l.logout_at IS NULL
@@ -35,7 +38,7 @@ export class RestoreOrphanedSessions1749254400001 implements MigrationInterface 
         AND c.deleted_at IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM messaging_connection_log l
-          WHERE l.user_id = c.id
+          WHERE l.user_id COLLATE utf8mb4_unicode_ci = c.id
             AND l.user_type = 'commercial'
             AND l.logout_at IS NULL
         )
