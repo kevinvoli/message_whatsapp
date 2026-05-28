@@ -2,11 +2,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { AutoMessageKeyword } from './auto-message-keyword.entity';
+import { MediaAsset } from 'src/media-asset/entities/media-asset.entity';
 
 export enum AutoMessageChannel {
   WHATSAPP = 'whatsapp',
@@ -101,6 +104,13 @@ export class MessageAuto {
     eager: false,
   })
   keywords?: AutoMessageKeyword[];
+
+  @Column({ name: 'media_asset_id', type: 'varchar', length: 36, nullable: true })
+  mediaAssetId: string | null;
+
+  @ManyToOne(() => MediaAsset, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'media_asset_id' })
+  mediaAsset: MediaAsset | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

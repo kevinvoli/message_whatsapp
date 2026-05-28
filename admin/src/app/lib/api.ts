@@ -212,7 +212,7 @@ export async function createMessageAuto(messageAuto: Omit<MessageAuto, 'id' | 'c
 
 export async function updateMessageAuto(id: string, messageAuto: Partial<MessageAuto>): Promise<MessageAuto> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, createdAt, updatedAt, ...cleanPayload } = messageAuto as MessageAuto;
+    const { id: _id, createdAt, updatedAt, mediaAsset: _mediaAsset, ...cleanPayload } = messageAuto as MessageAuto;
     const response = await fetch(`${API_BASE_URL}/message-auto/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

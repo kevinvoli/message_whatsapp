@@ -40,6 +40,7 @@ import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.enti
 import { BusinessHoursService } from './business-hours.service';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { MediaAssetModule } from 'src/media-asset/media-asset.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     CallLogModule,
     forwardRef(() => JorbsModule),
     NotificationModule,
+    MediaAssetModule,
   ],
   controllers: [MessageAutoController],
   providers: [

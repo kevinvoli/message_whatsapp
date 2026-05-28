@@ -4,9 +4,11 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   ValidateIf,
@@ -43,8 +45,14 @@ export class CreateAutoMessageKeywordDto {
 }
 
 export class CreateMessageAutoDto {
+  @ValidateIf((o) => !o.mediaAssetId)
+  @IsNotEmpty()
   @IsString()
   body: string;
+
+  @IsOptional()
+  @IsUUID()
+  mediaAssetId?: string | null;
 
   /** Délai en secondes avant l'envoi (0 = utiliser la plage globale des settings) */
   @IsOptional()

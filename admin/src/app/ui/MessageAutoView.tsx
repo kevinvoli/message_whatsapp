@@ -9,8 +9,9 @@ import {
 import { formatDateShort } from '@/app/lib/dateUtils';
 import type {
   MessageAuto, MessageAutoConditions, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig,
-  CronConfig, UpdateCronConfigPayload, Poste, Channel, KeywordMatchType,
+  CronConfig, UpdateCronConfigPayload, Poste, Channel, KeywordMatchType, MediaAsset,
 } from '@/app/lib/definitions';
+import MediaPickerModal from '@/app/ui/MediaPickerModal';
 import {
   getMessageAutoByTrigger, getMessageAuto,
   createMessageAuto, updateMessageAuto, deleteMessageAuto,
@@ -480,6 +481,18 @@ function KeywordManagerModal({ template, onClose, onUpdate }: KeywordManagerModa
   );
 }
 
+// ─── Helpers média ────────────────────────────────────────────────────────────
+
+function mediaTypeIcon(type: string): string {
+  switch (type) {
+    case 'image':    return '🖼';
+    case 'video':    return '🎬';
+    case 'audio':    return '🔊';
+    case 'document': return '📄';
+    default:         return '📎';
+  }
+}
+
 // ─── TemplateFormFields ───────────────────────────────────────────────────────
 
 interface ScopeOption { id: string; label: string; }
@@ -498,6 +511,9 @@ interface TemplateFormFieldsProps {
   showClientType: boolean;
   postes: Poste[]; channels: Channel[];
   idPrefix: string;
+  mediaAssetId?: string | null;
+  mediaAsset?: MediaAsset | null;
+  onMediaChange: (assetId: string | null, asset: MediaAsset | null) => void;
 }
 
 function TemplateFormFields({
@@ -508,11 +524,16 @@ function TemplateFormFields({
   excludedChannelIds, onExcludedChannelIdsChange,
   excludedPosteIds, onExcludedPosteIdsChange,
   showClientType, postes, channels, idPrefix,
+  mediaAsset, onMediaChange,
 }: TemplateFormFieldsProps) {
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+
   return (
     <>
       <div className="mb-4">
-        <label htmlFor={`${idPrefix}-body`} className="mb-1 block text-sm font-bold text-gray-700">Corps du message</label>
+        <label htmlFor={`${idPrefix}-body`} className="mb-1 block text-sm font-bold text-gray-700">
+          {mediaAsset ? 'Légende (optionnel)' : 'Message'}
+        </label>
         <textarea
           id={`${idPrefix}-body`} rows={3}
           className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
@@ -709,6 +730,50 @@ function TemplateFormFields({
         </div>
       )}
 
+      {/* Section Média */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Média associé <span className="text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        <p className="text-xs text-gray-400 mb-2">
+          Si un média est sélectionné, le champ &quot;Message&quot; sera utilisé comme légende.
+        </p>
+
+        {mediaAsset ? (
+          <div className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2">
+            <span className="text-sm text-gray-700 flex items-center gap-2">
+              <span>{mediaTypeIcon(mediaAsset.mediaType)}</span>
+              <span className="font-medium">{mediaAsset.name}</span>
+              <span className="text-gray-400">({mediaAsset.mimeType})</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onMediaChange(null, null)}
+              className="text-xs text-red-500 hover:text-red-700 ml-3"
+            >
+              Retirer
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMediaPickerOpen(true)}
+            className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            Choisir depuis la médiathèque
+          </button>
+        )}
+
+        <MediaPickerModal
+          open={mediaPickerOpen}
+          onClose={() => setMediaPickerOpen(false)}
+          onSelect={(asset) => {
+            onMediaChange(asset.id, asset);
+            setMediaPickerOpen(false);
+          }}
+        />
+      </div>
+
       <div className="mb-4 flex items-center gap-2">
         <input type="checkbox" id={`${idPrefix}-actif`} className="rounded"
           checked={actif} onChange={(e) => onActifChange(e.target.checked)} />
@@ -749,6 +814,8 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
   const [fClientType, setFClientType] = useState('all');
   const [fExcludedChannelIds, setFExcludedChannelIds] = useState<string[]>([]);
   const [fExcludedPosteIds, setFExcludedPosteIds] = useState<string[]>([]);
+  const [fMediaAssetId, setFMediaAssetId] = useState<string | null>(null);
+  const [fMediaAsset, setFMediaAsset] = useState<MediaAsset | null>(null);
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
@@ -787,6 +854,8 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
     setFClientType(msg?.client_type_target ?? 'all');
     setFExcludedChannelIds(msg?.conditions?.excluded_channel_ids ?? []);
     setFExcludedPosteIds(msg?.conditions?.excluded_poste_ids ?? []);
+    setFMediaAssetId(msg?.mediaAssetId ?? null);
+    setFMediaAsset(msg?.mediaAsset ?? null);
   };
 
   const openAdd = () => { resetForm(); setShowAddModal(true); };
@@ -807,6 +876,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
         scope_label: fScopeLabel || null,
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
         conditions,
+        mediaAssetId: fMediaAssetId ?? null,
       });
       setTemplates((prev) => [...prev, created]);
       addToast({ type: 'success', message: 'Template ajouté.' });
@@ -831,6 +901,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
         scope_label: fScopeLabel || null,
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
         conditions,
+        mediaAssetId: fMediaAssetId ?? null,
       });
       setTemplates((prev) => prev.map((t) => t.id === updated.id ? updated : t));
       addToast({ type: 'success', message: 'Template mis à jour.' });
@@ -875,6 +946,9 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
       excludedPosteIds={fExcludedPosteIds} onExcludedPosteIdsChange={setFExcludedPosteIds}
       showClientType={showClientType}
       postes={postes} channels={channels}
+      mediaAssetId={fMediaAssetId}
+      mediaAsset={fMediaAsset}
+      onMediaChange={(assetId, asset) => { setFMediaAssetId(assetId); setFMediaAsset(asset); }}
     />
   );
 
@@ -907,6 +981,11 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
                 <div>
                   <p className="max-w-xs truncate text-sm text-gray-800">{t.body}</p>
                   {scopeBadge(t)}
+                  {t.mediaAsset && (
+                    <span className="ml-1 inline-flex items-center gap-1 rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700">
+                      {mediaTypeIcon(t.mediaAsset.mediaType)} {t.mediaAsset.name}
+                    </span>
+                  )}
                 </div>
               ),
             },

@@ -222,6 +222,8 @@ export type MessageAuto = {
   client_type_target?: 'all' | 'new' | 'returning' | null;
   conditions?: MessageAutoConditions | null;
   keywords?: AutoMessageKeyword[];
+  mediaAssetId?: string | null;
+  mediaAsset?: MediaAsset | null;
   createdAt?: string;
   updatedAt?: string;
 };

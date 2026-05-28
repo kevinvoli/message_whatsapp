@@ -291,12 +291,17 @@ export class AutoMessageMasterJob implements OnModuleInit {
   private async runTriggerF(config: CronConfig | undefined, windowStart: Date): Promise<void> {
     if (!config?.enabled) return;
 
-    // Charger tous les mots-clés actifs avec leur template associé
+    // Charger tous les mots-clés actifs avec leur template associé (+ média)
     const keywords = await this.keywordRepo.find({
       where: { actif: true },
-      relations: ['messageAuto'],
+      relations: ['messageAuto', 'messageAuto.mediaAsset'],
     });
     if (!keywords.length) return;
+
+    // Filtrer une seule fois hors boucle : templates actifs avec trigger keyword
+    const activeKeywords = keywords.filter(
+      (kw) => kw.messageAuto.actif && kw.messageAuto.trigger_type === AutoMessageTriggerType.KEYWORD,
+    );
 
     // Conversations récentes dont le keyword n'a pas encore été traité
     const chats = await this.chatRepo
@@ -316,7 +321,16 @@ export class AutoMessageMasterJob implements OnModuleInit {
         const lastMsg = await this.messageService.findLastInboundMessageBychat_id(chat.chat_id);
         if (!lastMsg?.text) return;
 
-        const matchedKw = keywords.find((kw) => this.matchesKeyword(lastMsg.text!, kw));
+        // Trouver tous les mots-clés qui matchent le dernier message
+        const matchingKeywords = activeKeywords.filter(
+          (kw) => this.matchesKeyword(lastMsg.text!, kw),
+        );
+        if (!matchingKeywords.length) return;
+
+        // Sélection priorisée : poste > canal > global
+        const matchedKw = this.messageAutoService.selectBestKeywordTemplateForChat(
+          matchingKeywords, chat,
+        );
         if (!matchedKw) return;
 
         const scopeOk = await this.scopeConfigService.isEnabledFor(
@@ -324,8 +338,8 @@ export class AutoMessageMasterJob implements OnModuleInit {
         );
         if (!scopeOk) return;
 
-        await this.messageAutoService.sendAutoMessageForTrigger(
-          chat.chat_id, AutoMessageTriggerType.KEYWORD, matchedKw.messageAuto.position,
+        await this.messageAutoService.sendAutoMessageTemplate(
+          chat.chat_id, matchedKw.messageAuto,
         );
       });
     }

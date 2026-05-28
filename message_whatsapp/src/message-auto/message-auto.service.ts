@@ -1,4 +1,6 @@
+import * as fs from 'fs';
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -15,6 +17,7 @@ import { CreateMessageAutoDto, CreateAutoMessageKeywordDto } from './dto/create-
 import { UpdateMessageAutoDto } from './dto/update-message-auto.dto';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { ChannelService } from 'src/channel/channel.service';
+import { MediaAssetService } from 'src/media-asset/media-asset.service';
 
 @Injectable()
 export class MessageAutoService {
@@ -31,12 +34,17 @@ export class MessageAutoService {
     private readonly gateway: WhatsappMessageGateway,
     private readonly logger: AppLogger,
     private readonly channelService: ChannelService,
+    private readonly mediaAssetService: MediaAssetService,
   ) {}
 
   // ─── CRUD de base ─────────────────────────────────────────────────────────
 
   async create(dto: CreateMessageAutoDto): Promise<MessageAuto> {
     const { keywords, ...rest } = dto;
+    const body = dto.body ?? '';
+    if (!dto.mediaAssetId && !body.trim()) {
+      throw new BadRequestException('body ou mediaAssetId est requis');
+    }
     const message = this.autoMessageRepo.create(rest);
     const saved = await this.autoMessageRepo.save(message);
 
@@ -47,13 +55,17 @@ export class MessageAutoService {
       await this.keywordRepo.save(kws);
     }
 
+    if (dto.mediaAssetId) {
+      await this.mediaAssetService.incrementUsage(dto.mediaAssetId);
+    }
+
     return this.findOne(saved.id);
   }
 
   async findAll(): Promise<MessageAuto[]> {
     return this.autoMessageRepo.find({
       order: { trigger_type: 'ASC', position: 'ASC' },
-      relations: ['keywords'],
+      relations: ['keywords', 'mediaAsset'],
     });
   }
 
@@ -61,14 +73,14 @@ export class MessageAutoService {
     return this.autoMessageRepo.find({
       where: { trigger_type: trigger },
       order: { scope_type: 'ASC', position: 'ASC' },
-      relations: ['keywords'],
+      relations: ['keywords', 'mediaAsset'],
     });
   }
 
   async findOne(id: string): Promise<MessageAuto> {
     const message = await this.autoMessageRepo.findOne({
       where: { id },
-      relations: ['keywords'],
+      relations: ['keywords', 'mediaAsset'],
     });
     if (!message) {
       throw new NotFoundException(`Auto message with ID ${id} not found`);
@@ -79,11 +91,32 @@ export class MessageAutoService {
   async update(id: string, dto: UpdateMessageAutoDto): Promise<MessageAuto> {
     const message = await this.findOne(id);
     const { keywords, ...rest } = dto as CreateMessageAutoDto;
+
+    const nextBody = dto.body ?? message.body ?? '';
+    const nextMediaAssetId = dto.mediaAssetId !== undefined ? dto.mediaAssetId : message.mediaAssetId;
+    if (!nextMediaAssetId && !nextBody.trim()) {
+      throw new BadRequestException('body ou mediaAssetId est requis');
+    }
+
+    const ancien = message.mediaAssetId;
+    const nouveau = dto.mediaAssetId !== undefined ? (dto.mediaAssetId ?? null) : message.mediaAssetId;
+
     Object.assign(message, rest);
-    return this.autoMessageRepo.save(message);
+    const saved = await this.autoMessageRepo.save(message);
+
+    if (ancien !== nouveau) {
+      if (nouveau) await this.mediaAssetService.incrementUsage(nouveau);
+      if (ancien) await this.mediaAssetService.decrementUsage(ancien);
+    }
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
+    const existing = await this.findOne(id);
+    if (existing.mediaAssetId) {
+      await this.mediaAssetService.decrementUsage(existing.mediaAssetId);
+    }
     const result = await this.autoMessageRepo.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`Auto message with ID ${id} not found`);
@@ -127,6 +160,7 @@ export class MessageAutoService {
   ): Promise<MessageAuto | null> {
     const allTemplates = await this.autoMessageRepo.find({
       where: { trigger_type: trigger, position: step, actif: true },
+      relations: ['mediaAsset'],
     });
 
     if (!allTemplates.length) return null;
@@ -166,6 +200,44 @@ export class MessageAutoService {
     if (!pool.length) return null;
 
     return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  // ─── Scope helpers ────────────────────────────────────────────────────────
+
+  private templateMatchesChatScope(
+    template: MessageAuto,
+    chat: { poste_id?: string | null; last_msg_client_channel_id?: string | null },
+  ): boolean {
+    if (template.scope_type === 'poste') {
+      return template.scope_id === chat.poste_id;
+    }
+    if (template.scope_type === 'canal') {
+      return template.scope_id === chat.last_msg_client_channel_id;
+    }
+    const excChannels: string[] = (template.conditions as any)?.excluded_channel_ids ?? [];
+    const excPostes: string[]   = (template.conditions as any)?.excluded_poste_ids   ?? [];
+    if (chat.last_msg_client_channel_id && excChannels.includes(chat.last_msg_client_channel_id)) return false;
+    if (chat.poste_id && excPostes.includes(chat.poste_id)) return false;
+    return true;
+  }
+
+  selectBestKeywordTemplateForChat(
+    matchingKeywords: AutoMessageKeyword[],
+    chat: { poste_id?: string | null; last_msg_client_channel_id?: string | null },
+  ): AutoMessageKeyword | undefined {
+    const scopedMatches = matchingKeywords.filter(
+      (kw) => this.templateMatchesChatScope(kw.messageAuto, chat),
+    );
+    return (
+      scopedMatches.find(
+        (kw) => kw.messageAuto.scope_type === 'poste' && kw.messageAuto.scope_id === chat.poste_id,
+      ) ??
+      scopedMatches.find(
+        (kw) => kw.messageAuto.scope_type === 'canal' &&
+                 kw.messageAuto.scope_id === chat.last_msg_client_channel_id,
+      ) ??
+      scopedMatches.find((kw) => !kw.messageAuto.scope_type)
+    );
   }
 
   // ─── Envoi universel ──────────────────────────────────────────────────────
@@ -212,25 +284,97 @@ export class MessageAutoService {
 
     try {
       const text = this.formatMessageAuto({
-        message: template.body,
+        message: template.body ?? '',
         name: chat.name,
         numero: chat.contact_client,
       });
 
-      const message = await this.messageService.createAgentMessage({
-        chat_id: chat.chat_id,
-        poste_id: null,
-        text,
-        timestamp: new Date(),
-        channel_id: chat.last_msg_client_channel_id,
-      });
-
-      await this.gateway.notifyAutoMessage(message, chat);
+      if (template.mediaAsset) {
+        const fileBuffer = await fs.promises.readFile(template.mediaAsset.filePath);
+        const caption = text.trim() ? text : undefined;
+        const message = await this.messageService.createAgentMediaMessage({
+          chat_id: chat.chat_id,
+          poste_id: null,
+          timestamp: new Date(),
+          channel_id: chat.last_msg_client_channel_id,
+          mediaBuffer: fileBuffer,
+          mimeType: template.mediaAsset.mimeType,
+          fileName: template.mediaAsset.originalName,
+          mediaType: template.mediaAsset.mediaType,
+          caption,
+        });
+        await this.gateway.notifyAutoMessage(message, chat);
+      } else {
+        const message = await this.messageService.createAgentMessage({
+          chat_id: chat.chat_id,
+          poste_id: null,
+          text,
+          timestamp: new Date(),
+          channel_id: chat.last_msg_client_channel_id,
+        });
+        await this.gateway.notifyAutoMessage(message, chat);
+      }
 
     } catch (err) {
       // Envoi échoué, mais le tracking est déjà mis à jour → pas de double envoi au prochain tick
       this.logger.error(
         `sendAutoMessageForTrigger: envoi échoué pour ${chatId} trigger=${trigger} step=${step}: ${(err as Error).message}`,
+        undefined,
+        MessageAutoService.name,
+      );
+    } finally {
+      void this.messageService.typingStop(chatId).catch(() => {});
+    }
+  }
+
+  /**
+   * Envoie directement un template (déjà sélectionné) pour un chat donné.
+   * Utilisé par le job keyword pour bypasser le re-chargement du template.
+   */
+  async sendAutoMessageTemplate(
+    chatId: string,
+    template: MessageAuto,
+  ): Promise<void> {
+    const chat = await this.chatService.findBychat_id(chatId);
+    if (!chat || !chat.last_msg_client_channel_id) return;
+
+    if (!this.templateMatchesChatScope(template, chat)) return;
+
+    await this.updateTriggerTracking(chatId, AutoMessageTriggerType.KEYWORD, template.position);
+
+    void this.messageService.typingStart(chatId).catch(() => {});
+    try {
+      if (template.mediaAsset) {
+        const fileBuffer = await fs.promises.readFile(template.mediaAsset.filePath);
+        const caption = template.body?.trim()
+          ? this.formatMessageAuto({ message: template.body, name: chat.name, numero: chat.contact_client })
+          : undefined;
+        const msg = await this.messageService.createAgentMediaMessage({
+          chat_id: chat.chat_id,
+          poste_id: null,
+          timestamp: new Date(),
+          channel_id: chat.last_msg_client_channel_id,
+          mediaBuffer: fileBuffer,
+          mimeType: template.mediaAsset.mimeType,
+          fileName: template.mediaAsset.originalName,
+          mediaType: template.mediaAsset.mediaType,
+          caption,
+        });
+        await this.gateway.notifyAutoMessage(msg, chat);
+      } else {
+        const text = this.formatMessageAuto({ message: template.body ?? '', name: chat.name, numero: chat.contact_client });
+        const msg = await this.messageService.createAgentMessage({
+          chat_id: chat.chat_id,
+          poste_id: null,
+          text,
+          timestamp: new Date(),
+          channel_id: chat.last_msg_client_channel_id,
+        });
+        await this.gateway.notifyAutoMessage(msg, chat);
+      }
+    } catch (err) {
+      this.logger.error(
+        `sendAutoMessageTemplate: échec ${chatId}: ${(err as Error).message}`,
         undefined,
         MessageAutoService.name,
       );
