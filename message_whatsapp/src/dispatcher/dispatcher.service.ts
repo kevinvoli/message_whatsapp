@@ -653,12 +653,22 @@ export class DispatcherService {
       }
 
       // target calculé sur les postes de la queue uniquement (destinations)
-      const target = Math.ceil(totalEligible / queuedPostes.length);
+      // Postes online dans la queue → seules destinations valides pour le target
+      const onlineQueuedPostes = queuedPostes.filter((p) => p.is_active);
+      const targetBase = onlineQueuedPostes.length > 0 ? onlineQueuedPostes.length : queuedPostes.length;
+      const target = Math.ceil(totalEligible / targetBase);
 
-      // Postes surchargés : queue au-dessus du target + tous les postes offline/bloqués
-      // Les postes offline/bloqués ont un target effectif de 0 : toutes leurs conv doivent partir
+      // Postes offline dans la queue (is_active = false) : traités comme indisponibles
+      // → target effectif = 0, toutes leurs conversations doivent être redistribuées
+      const offlineQueuedPostes = queuedPostes.filter(
+        (p) => !p.is_active && (countMap.get(p.id) ?? 0) > 0,
+      );
+      const offlineQueuedIds = new Set(offlineQueuedPostes.map((p) => p.id));
+
+      // Postes surchargés : online au-dessus du target + offline dans queue + hors queue
       const overloaded = [
-        ...queuedPostes.filter((p) => (countMap.get(p.id) ?? 0) > target),
+        ...queuedPostes.filter((p) => !offlineQueuedIds.has(p.id) && (countMap.get(p.id) ?? 0) > target),
+        ...offlineQueuedPostes,
         ...unavailablePostes,
       ].sort((a, b) => (countMap.get(b.id) ?? 0) - (countMap.get(a.id) ?? 0));
 
@@ -666,14 +676,18 @@ export class DispatcherService {
         return `Charge déjà équilibrée — ${target} conv/poste (${totalEligible} conv, ${queuedPostes.length} postes)`;
       }
 
-      // Postes sous-chargés : uniquement les postes de la queue (destinations)
+      // Postes sous-chargés : postes de la queue, online prioritaires
       const underloaded = queuedPostes
         .filter((p) => (countMap.get(p.id) ?? 0) < target)
-        .sort((a, b) => (countMap.get(a.id) ?? 0) - (countMap.get(b.id) ?? 0));
+        .sort((a, b) => {
+          if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+          return (countMap.get(a.id) ?? 0) - (countMap.get(b.id) ?? 0);
+        });
 
       this.logger.log(
         `SLA équilibrage : ${totalEligible} conv éligibles, cible ${target}/poste, ` +
-        `${overloaded.length} surchargé(s), ${underloaded.length} sous-chargé(s)`,
+        `${overloaded.length} surchargé(s), ${underloaded.length} sous-chargé(s) ` +
+        `(${offlineQueuedPostes.length} offline dans queue)`,
       );
 
       // ── 3. Redistribution greedy ──────────────────────────────────────────────
@@ -683,8 +697,10 @@ export class DispatcherService {
 
       const unavailablePosteIdSet = new Set(unavailablePosteIds);
       for (const srcPoste of overloaded) {
-        // Postes offline/bloqués : target effectif = 0 (toutes les conv doivent partir)
-        const srcTarget = unavailablePosteIdSet.has(srcPoste.id) ? 0 : target;
+        // Offline (dans queue ou hors queue) : target effectif = 0, toutes les conv doivent partir
+        const srcTarget = (unavailablePosteIdSet.has(srcPoste.id) || offlineQueuedIds.has(srcPoste.id))
+          ? 0
+          : target;
         const excess = (countMap.get(srcPoste.id) ?? 0) - srcTarget;
         if (excess <= 0 || underIdx >= underloaded.length) continue;
 
