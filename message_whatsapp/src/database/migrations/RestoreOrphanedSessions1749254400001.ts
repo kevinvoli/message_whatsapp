@@ -11,7 +11,7 @@ export class RestoreOrphanedSessions1749254400001 implements MigrationInterface 
       SET l.logout_at = l.login_at
       WHERE l.user_type = 'commercial'
         AND l.logout_at IS NULL
-        AND c.is_connected = 0
+        AND c.isConnected = 0
         AND c.deleted_at IS NULL
     `);
 
@@ -24,14 +24,14 @@ export class RestoreOrphanedSessions1749254400001 implements MigrationInterface 
         c.id,
         'commercial',
         CASE
-          WHEN c.last_connection_at >= CURDATE() THEN c.last_connection_at
+          WHEN c.lastConnectionAt >= CURDATE() THEN c.lastConnectionAt
           ELSE CURDATE()
         END,
         NULL,
         NOW(),
         NOW()
       FROM whatsapp_commercial c
-      WHERE c.is_connected = 1
+      WHERE c.isConnected = 1
         AND c.deleted_at IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM messaging_connection_log l
