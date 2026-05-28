@@ -359,10 +359,25 @@ interface KeywordManagerModalProps {
 function KeywordManagerModal({ template, onClose, onUpdate }: KeywordManagerModalProps) {
   const { addToast } = useToast();
   const [keywords, setKeywords] = useState<AutoMessageKeyword[]>(template.keywords ?? []);
+  const [tab, setTab] = useState<'single' | 'bulk'>('single');
+
+  // Onglet unique
   const [newKeyword, setNewKeyword] = useState('');
   const [newMatchType, setNewMatchType] = useState<KeywordMatchType>('contains');
   const [newCaseSensitive, setNewCaseSensitive] = useState(false);
   const [adding, setAdding] = useState(false);
+
+  // Onglet lot
+  const [bulkText, setBulkText] = useState('');
+  const [bulkMatchType, setBulkMatchType] = useState<KeywordMatchType>('contains');
+  const [bulkCaseSensitive, setBulkCaseSensitive] = useState(false);
+  const [bulkAdding, setBulkAdding] = useState(false);
+
+  const parseBulk = (text: string): string[] => {
+    const raw = text.split(/[\n,]/);
+    const seen = new Set<string>();
+    return raw.map((s) => s.trim().toLowerCase()).filter((s) => s && !seen.has(s) && seen.add(s));
+  };
 
   const handleAdd = async () => {
     if (!newKeyword.trim()) return;
@@ -384,6 +399,29 @@ function KeywordManagerModal({ template, onClose, onUpdate }: KeywordManagerModa
     } finally { setAdding(false); }
   };
 
+  const handleBulkAdd = async () => {
+    const words = parseBulk(bulkText);
+    if (!words.length) return;
+    setBulkAdding(true);
+    try {
+      const results = await Promise.all(
+        words.map((w) => addKeyword(template.id, {
+          keyword: w,
+          matchType: bulkMatchType,
+          caseSensitive: bulkCaseSensitive,
+          actif: true,
+        })),
+      );
+      const next = [...keywords, ...results];
+      setKeywords(next);
+      onUpdate({ ...template, keywords: next });
+      setBulkText('');
+      addToast({ type: 'success', message: `${results.length} mot(s)-clé ajouté(s).` });
+    } catch (err) {
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Erreur ajout en lot.' });
+    } finally { setBulkAdding(false); }
+  };
+
   const handleRemove = async (kw: AutoMessageKeyword) => {
     try {
       await removeKeyword(template.id, kw.id);
@@ -402,69 +440,128 @@ function KeywordManagerModal({ template, onClose, onUpdate }: KeywordManagerModa
     starts_with: 'Commence par',
   };
 
+  const bulkWords = parseBulk(bulkText);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
             <p className="font-semibold text-gray-900">Mots-clés de déclenchement</p>
-            <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{template.body}</p>
+            <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{template.body || '(média seul)'}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-5 py-4 space-y-4">
-          {/* Ajouter un mot-clé */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newKeyword}
-              onChange={(e) => setNewKeyword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
-              placeholder="Ex: aide, problème, urgent..."
-              className="flex-1 rounded border border-gray-200 px-3 py-2 text-sm focus:outline-none"
-            />
-            <select
-              value={newMatchType}
-              onChange={(e) => setNewMatchType(e.target.value as KeywordMatchType)}
-              className="rounded border border-gray-200 px-2 py-2 text-sm focus:outline-none"
-            >
-              <option value="contains">Contient</option>
-              <option value="exact">Exact</option>
-              <option value="starts_with">Commence par</option>
-            </select>
+
+        {/* Onglets ajout */}
+        <div className="flex border-b border-gray-100">
+          {(['single', 'bulk'] as const).map((t) => (
             <button
+              key={t}
               type="button"
-              onClick={() => void handleAdd()}
-              disabled={adding || !newKeyword.trim()}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${tab === t ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              <PlusCircle className="h-4 w-4" />
+              {t === 'single' ? 'Mot-clé unique' : 'En lot'}
             </button>
-          </div>
-          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={newCaseSensitive} onChange={(e) => setNewCaseSensitive(e.target.checked)} className="rounded" />
-            Respecter la casse
-          </label>
+          ))}
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {tab === 'single' ? (
+            <>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
+                  placeholder="Ex: aide, problème, urgent..."
+                  className="flex-1 rounded border border-gray-200 px-3 py-2 text-sm focus:outline-none"
+                />
+                <select
+                  value={newMatchType}
+                  onChange={(e) => setNewMatchType(e.target.value as KeywordMatchType)}
+                  className="rounded border border-gray-200 px-2 py-2 text-sm focus:outline-none"
+                >
+                  <option value="contains">Contient</option>
+                  <option value="exact">Exact</option>
+                  <option value="starts_with">Commence par</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void handleAdd()}
+                  disabled={adding || !newKeyword.trim()}
+                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                </button>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={newCaseSensitive} onChange={(e) => setNewCaseSensitive(e.target.checked)} className="rounded" />
+                Respecter la casse
+              </label>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">Un mot-clé par ligne, ou séparés par virgule</label>
+                <textarea
+                  rows={5}
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  placeholder={"bonjour\nbjr\nbonsoir, bsr"}
+                  className="w-full rounded border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none resize-none"
+                />
+                {bulkWords.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-400">{bulkWords.length} mot(s)-clé détecté(s)</p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  value={bulkMatchType}
+                  onChange={(e) => setBulkMatchType(e.target.value as KeywordMatchType)}
+                  className="rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+                >
+                  <option value="contains">Contient</option>
+                  <option value="exact">Exact</option>
+                  <option value="starts_with">Commence par</option>
+                </select>
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input type="checkbox" checked={bulkCaseSensitive} onChange={(e) => setBulkCaseSensitive(e.target.checked)} className="rounded" />
+                  Respecter la casse
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleBulkAdd()}
+                disabled={bulkAdding || bulkWords.length === 0}
+                className="w-full rounded-md bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {bulkAdding ? 'Ajout en cours...' : `Ajouter ${bulkWords.length > 0 ? bulkWords.length : ''} mot(s)-clé`}
+              </button>
+            </>
+          )}
 
           {/* Liste des mots-clés */}
           {keywords.length === 0 ? (
             <p className="py-4 text-center text-sm text-gray-400">Aucun mot-clé configuré. Le trigger F ne se déclenchera pas pour ce template.</p>
           ) : (
-            <div className="divide-y divide-gray-50 rounded-lg border border-gray-100 overflow-hidden">
+            <div className="divide-y divide-gray-50 rounded-lg border border-gray-100 overflow-hidden max-h-48 overflow-y-auto">
               {keywords.map((kw) => (
                 <div key={kw.id} className="flex items-center justify-between px-3 py-2.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Tag className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                    <span className="font-mono text-sm text-gray-800">{kw.keyword}</span>
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">{matchTypeLabel[kw.matchType]}</span>
-                    {kw.caseSensitive && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600">Aa</span>}
+                    <span className="font-mono text-sm text-gray-800 truncate">{kw.keyword}</span>
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600 flex-shrink-0">{matchTypeLabel[kw.matchType]}</span>
+                    {kw.caseSensitive && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600 flex-shrink-0">Aa</span>}
                   </div>
                   <button
                     type="button"
                     onClick={() => void handleRemove(kw)}
-                    className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                    className="ml-2 rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 flex-shrink-0"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -979,7 +1076,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
               header: 'Message',
               render: (t) => (
                 <div>
-                  <p className="max-w-xs truncate text-sm text-gray-800">{t.body}</p>
+                  <p className="max-w-xs truncate text-sm text-gray-800">{t.body || <span className="italic text-gray-400">Média seul</span>}</p>
                   {scopeBadge(t)}
                   {t.mediaAsset && (
                     <span className="ml-1 inline-flex items-center gap-1 rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700">
@@ -989,6 +1086,34 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
                 </div>
               ),
             },
+            ...(showKeywords ? [{
+              header: 'Mots-clés',
+              render: (t: MessageAuto) => {
+                const kws = t.keywords ?? [];
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setKeywordTarget(t)}
+                    title="Gérer les mots-clés"
+                    className="flex flex-wrap gap-1 text-left hover:opacity-80"
+                  >
+                    {kws.slice(0, 2).map((kw) => (
+                      <span key={kw.id} className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700 font-mono">
+                        {kw.keyword}
+                      </span>
+                    ))}
+                    {kws.length > 2 && (
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                        +{kws.length - 2}
+                      </span>
+                    )}
+                    {kws.length === 0 && (
+                      <span className="text-xs text-gray-400 italic">Aucun</span>
+                    )}
+                  </button>
+                );
+              },
+            }] : []),
             ...(showClientType ? [{
               header: 'Cible',
               render: (t: MessageAuto) => (
@@ -1017,16 +1142,6 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
               header: 'Actions',
               render: (t) => (
                 <div className="flex items-center gap-1">
-                  {showKeywords && (
-                    <button
-                      type="button"
-                      onClick={() => setKeywordTarget(t)}
-                      title="Gérer les mots-clés"
-                      className="rounded p-1.5 text-blue-500 hover:bg-blue-50"
-                    >
-                      <Tag className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                   <button type="button" onClick={() => openEdit(t)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50">
                     <Edit className="h-3.5 w-3.5" />
                   </button>
