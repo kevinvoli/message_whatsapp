@@ -269,9 +269,10 @@ export class WhatsappChatService {
     // Fusion des 2 UPDATE en 1 seul aller-retour DB
     await this.chatRepository.query(
       `UPDATE whatsapp_chat
-       SET unread_count    = unread_count + 1,
-           last_activity_at = NOW(),
-           updatedAt        = updatedAt
+       SET unread_count           = unread_count + 1,
+           last_activity_at       = NOW(),
+           last_client_message_at = NOW(),
+           updatedAt              = updatedAt
        WHERE chat_id = ?`,
       [chat_id],
     );

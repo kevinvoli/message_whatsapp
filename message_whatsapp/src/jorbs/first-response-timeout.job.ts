@@ -59,7 +59,7 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
     const chats = await this.chatRepo
       .createQueryBuilder('chat')
       .where('chat.unread_count > 0')
-      .andWhere('chat.last_client_message_at < :threshold', { threshold })
+      .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
       .andWhere('chat.deletedAt IS NULL')
       .andWhere(dedicatedExclusion)
       .orderBy('chat.last_client_message_at', 'ASC')
