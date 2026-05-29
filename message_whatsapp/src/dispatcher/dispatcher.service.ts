@@ -594,10 +594,22 @@ export class DispatcherService {
       // Déclaré tôt : nécessaire pour la requête unavailableCountRows (NOT IN) et step 3.
       const posteIds = queuedPostes.map((p) => p.id);
 
+      // Critère "conversation nécessitant une réponse" — miroir exact du frontend :
+      // unread_count > 0 OU existence d'un message client non lu (from_me=0, sent/delivered).
+      // NE PAS utiliser last_poste_message_at IS NULL seul : trop large (48 k+ faux positifs).
+      const unreadEligibility = `(
+        chat.unread_count > 0
+        OR EXISTS (
+          SELECT 1 FROM whatsapp_message msg
+          WHERE msg.chat_id = chat.chat_id
+            AND msg.from_me = 0
+            AND msg.status IN ('sent', 'delivered')
+            AND msg.deletedAt IS NULL
+        )
+      )`;
+
       // ── Step 0 : Réouverture des convs FERME non répondues sur postes actifs ──
       // Indépendant de la taille de la queue — tourne même avec un seul poste.
-      // Critère : FERME + read_only:false + (unread_count > 0 OU agent n'a jamais répondu).
-      // Couvre le cas où markAsRead a remis unread_count à 0 sans réponse réelle.
       const onlinePosteIds = queuedPostes.filter(p => p.is_active).map(p => p.id);
       if (onlinePosteIds.length > 0) {
         const fermeNonRepondues = await this.chatRepository
@@ -605,7 +617,7 @@ export class DispatcherService {
           .where('chat.poste_id IN (:...onlinePosteIds)', { onlinePosteIds })
           .andWhere('chat.status = :ferme', { ferme: WhatsappChatStatus.FERME })
           .andWhere('chat.read_only = false')
-          .andWhere('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
+          .andWhere(unreadEligibility)
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
           .getMany();
@@ -626,13 +638,11 @@ export class DispatcherService {
       }
 
       // ── 2. Convs non répondues sur postes hors queue (offline temporaire OU désactivé) ──
-      // Critère élargi : unread_count > 0 OU last_poste_message_at IS NULL (agent jamais répondu).
-      // Couvre les convs où markAsRead a remis unread_count à 0 sans réponse réelle de l'agent.
       const unavailableCountRows = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
-        .where('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
+        .where(unreadEligibility)
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
         .andWhere('chat.deletedAt IS NULL')
         .andWhere('chat.poste_id IS NOT NULL')
@@ -661,7 +671,7 @@ export class DispatcherService {
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
         .where('chat.poste_id IN (:...posteIds)', { posteIds })
-        .andWhere('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
+        .andWhere(unreadEligibility)
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
         .andWhere('chat.deletedAt IS NULL')
         .andWhere(dedicatedExclusion)
@@ -737,7 +747,7 @@ export class DispatcherService {
         const srcChats = await this.chatRepository
           .createQueryBuilder('chat')
           .where('chat.poste_id = :posteId', { posteId: srcPoste.id })
-          .andWhere('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
+          .andWhere(unreadEligibility)
           .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
