@@ -594,16 +594,45 @@ export class DispatcherService {
       // Déclaré tôt : nécessaire pour la requête unavailableCountRows (NOT IN) et step 3.
       const posteIds = queuedPostes.map((p) => p.id);
 
-      // ── 2. Convs non lues sur postes hors queue (offline temporaire OU désactivé) ──
-      // Détectés EN PREMIER pour ne pas être bloqués par le guard queuedPostes.length < 2.
-      // Avant : filtre is_queue_enabled = false → ratait les postes is_active = false (offline
-      // temporaire, purged from queue) dont les convs EN_ATTENTE/FERME restaient assignées.
-      // Fix : on capture toutes les convs sur postes absents de la queue courante (NOT IN).
+      // ── Step 0 : Réouverture des convs FERME non répondues sur postes actifs ──
+      // Indépendant de la taille de la queue — tourne même avec un seul poste.
+      // Critère : FERME + read_only:false + (unread_count > 0 OU agent n'a jamais répondu).
+      // Couvre le cas où markAsRead a remis unread_count à 0 sans réponse réelle.
+      const onlinePosteIds = queuedPostes.filter(p => p.is_active).map(p => p.id);
+      if (onlinePosteIds.length > 0) {
+        const fermeNonRepondues = await this.chatRepository
+          .createQueryBuilder('chat')
+          .where('chat.poste_id IN (:...onlinePosteIds)', { onlinePosteIds })
+          .andWhere('chat.status = :ferme', { ferme: WhatsappChatStatus.FERME })
+          .andWhere('chat.read_only = false')
+          .andWhere('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
+          .andWhere('chat.deletedAt IS NULL')
+          .andWhere(dedicatedExclusion)
+          .getMany();
+        const reopenedChats: WhatsappChat[] = [];
+        for (const chat of fermeNonRepondues) {
+          await this.chatRepository.update(chat.id, {
+            status: WhatsappChatStatus.ACTIF,
+            first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
+          });
+          reopenedChats.push(chat);
+        }
+        if (reopenedChats.length > 0) {
+          this.logger.log(`SLA checker: ${reopenedChats.length} conversation(s) FERME réouvertes sur postes actifs`);
+          for (const chat of reopenedChats) {
+            void this.messageGateway.emitConversationUpsertByChatId(chat.chat_id);
+          }
+        }
+      }
+
+      // ── 2. Convs non répondues sur postes hors queue (offline temporaire OU désactivé) ──
+      // Critère élargi : unread_count > 0 OU last_poste_message_at IS NULL (agent jamais répondu).
+      // Couvre les convs où markAsRead a remis unread_count à 0 sans réponse réelle de l'agent.
       const unavailableCountRows = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
-        .where('chat.unread_count > 0')
+        .where('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
         .andWhere('chat.deletedAt IS NULL')
         .andWhere('chat.poste_id IS NOT NULL')
@@ -632,7 +661,7 @@ export class DispatcherService {
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
         .where('chat.poste_id IN (:...posteIds)', { posteIds })
-        .andWhere('chat.unread_count > 0')
+        .andWhere('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
         .andWhere('chat.deletedAt IS NULL')
         .andWhere(dedicatedExclusion)
@@ -708,7 +737,7 @@ export class DispatcherService {
         const srcChats = await this.chatRepository
           .createQueryBuilder('chat')
           .where('chat.poste_id = :posteId', { posteId: srcPoste.id })
-          .andWhere('chat.unread_count > 0')
+          .andWhere('(chat.unread_count > 0 OR chat.last_poste_message_at IS NULL)')
           .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
