@@ -42,6 +42,7 @@ import { NotificationService } from 'src/notification/notification.service';
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { MessageReadService } from './message-read.service';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
+import { ConversationRestrictionService } from 'src/conversation-restriction/conversation-restriction.service';
 
 type AuthPayload = {
   sub: string;
@@ -101,6 +102,7 @@ export class WhatsappMessageGateway
     private readonly connectionLogService: ConnectionLogService,
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
+    private readonly restrictionService: ConversationRestrictionService,
   ) {}
 
   afterInit(server: Server): void {
@@ -782,6 +784,22 @@ export class WhatsappMessageGateway
     }
   }
 
+  @SubscribeMessage('conversation:accessed')
+  async handleConversationAccessed(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chat_id: string },
+  ) {
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+
+    const config = await this.restrictionService.getRestrictionConfig();
+    if (!config.enabled) return;
+
+    await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
+    const status = await this.restrictionService.checkRestriction(agent.commercialId);
+    client.emit('restriction:status', status);
+  }
+
   @SubscribeMessage('presence:ping')
   async handlePresencePing(@ConnectedSocket() client: Socket) {
     const agent = this.connectedAgents.get(client.id);
@@ -969,6 +987,21 @@ export class WhatsappMessageGateway
       }
 
       sendSucceeded = true;
+
+      // Restriction lecture : enregistrer la réponse et réévaluer le statut
+      const restrictionConfig = await this.restrictionService.getRestrictionConfig();
+      if (restrictionConfig.enabled) {
+        const textLength = (payload.text ?? '').trim().length;
+        await this.restrictionService.recordResponse(
+          agent.commercialId,
+          payload.chat_id,
+          textLength,
+        );
+        const restrictionStatus = await this.restrictionService.checkRestriction(
+          agent.commercialId,
+        );
+        client.emit('restriction:status', restrictionStatus);
+      }
 
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
         type: 'MESSAGE_ADD',

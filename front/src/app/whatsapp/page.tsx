@@ -15,6 +15,7 @@ import { useStatsStore } from '@/store/stats.store';
 import ChatMainArea from '@/components/chat/ChatMainArea';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
 import { logger } from '@/lib/logger';
+import ConversationRestrictionModal from '@/components/ConversationRestrictionModal';
 
 const VALID_FILTER_STATUSES = ['all', 'unread', 'nouveau'];
 
@@ -151,7 +152,7 @@ const WhatsAppPageContent = () => {
       />
       {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />}
 
-      
+      <ConversationRestrictionModal />
     </div>
   );
 };

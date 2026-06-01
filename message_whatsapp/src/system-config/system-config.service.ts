@@ -48,6 +48,12 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'LOGIN_HOUR_START', label: 'Heure de début des connexions', category: 'access', description: 'Heure (0–23) à partir de laquelle les commerciaux peuvent se connecter (défaut : 5)' },
   { key: 'LOGIN_HOUR_END',   label: 'Heure de fin des connexions',   category: 'access', description: 'Heure (0–23) après laquelle les connexions sont bloquées (défaut : 21)' },
 
+  // ─── Restriction lecture conversations ──────────────────────────────────────
+  { key: 'RESTRICTION_ENABLED', label: 'Restriction lecture conversations activée', category: 'restriction', description: 'true / false — active la restriction si le commercial ouvre trop de conversations sans répondre' },
+  { key: 'RESTRICTION_MAX_UNRESPONDED_CONVS', label: 'Nombre max de conversations sans réponse', category: 'restriction', description: 'Nombre de conversations ouvertes sans réponse avant déclenchement de la restriction (défaut : 1)' },
+  { key: 'RESTRICTION_MIN_RESPONSE_CHARS', label: 'Longueur minimale d\'une réponse valide', category: 'restriction', description: 'Nombre de caractères minimum pour qu\'un message soit comptabilisé comme réponse (défaut : 50)' },
+  { key: 'RESTRICTION_REQUIRE_LAST_MESSAGE_MINE', label: 'Exiger que le dernier message soit du commercial', category: 'restriction', description: 'true / false — si true, une conversation est considérée répondue seulement si le dernier message est from_me (défaut : false)' },
+
 ];
 
 

@@ -945,3 +945,14 @@ export const COULEURS_STATUT = {
   online: 'green',
   offline: 'gray',
 } as const;
+
+// ============================================
+// RESTRICTION LECTURE CONVERSATIONS
+// ============================================
+
+export interface RestrictionConfig {
+  enabled: boolean;
+  maxUnrespondedConvs: number;
+  minResponseChars: number;
+  requireLastMessageMine: boolean;
+}

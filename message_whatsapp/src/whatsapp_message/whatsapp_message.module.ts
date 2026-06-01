@@ -46,6 +46,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
 import { MessageReadService } from './message-read.service';
 import { MessageReadRateLimiterService } from './message-read-rate-limiter.service';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
+import { ConversationRestrictionModule } from 'src/conversation-restriction/conversation-restriction.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
     forwardRef(() => CampaignLinkModule),
     ConnectionLogModule,
     MediaAssetModule,
+    ConversationRestrictionModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

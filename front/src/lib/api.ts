@@ -1,5 +1,5 @@
 // front/src/lib/api.ts
-import { CommercialStatsDto } from '@/types/chat';
+import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -23,6 +23,20 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new Error(errorMessage);
   }
   return response.json() as Promise<T>;
+}
+
+/** Récupère la configuration de restriction de lecture des conversations. */
+export async function getRestrictionConfig(): Promise<RestrictionConfig | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/system-config/restriction`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    return response.json() as Promise<RestrictionConfig>;
+  } catch {
+    return null;
+  }
 }
 
 /** Récupère les stats d'activité du commercial connecté. */

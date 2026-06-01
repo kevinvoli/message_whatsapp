@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1443,5 +1443,27 @@ export async function getTraficConversations(
         { method: 'GET', credentials: 'include' },
     );
     return handleResponse<TraficConversationsResponse>(response);
+}
+
+// ─── Restriction lecture conversations ───────────────────────────────────────
+
+/** Récupère la configuration de restriction de lecture des conversations. */
+export async function getRestrictionConfig(): Promise<RestrictionConfig> {
+    const response = await fetch(`${API_BASE_URL}/admin/system-config/restriction`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<RestrictionConfig>(response);
+}
+
+/** Met à jour la configuration de restriction de lecture des conversations. */
+export async function updateRestrictionConfig(config: RestrictionConfig): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/admin/system-config/restriction`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(config),
+    });
+    await handleResponse<void>(response);
 }
 

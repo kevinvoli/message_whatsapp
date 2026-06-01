@@ -121,6 +121,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const avgResponseTime = useMemo(() => computeAvgResponseTime(storeMessages), [storeMessages]);
   const replyToMessage = useChatStore((s) => s.replyToMessage);
   const clearReplyTo = useChatStore((s) => s.clearReplyTo);
+  const restrictionConfig = useChatStore((s) => s.restrictionConfig);
+  const restrictionUnresponded = useChatStore((s) => s.restrictionUnresponded);
+  const selectedConversation = useChatStore((s) => s.selectedConversation);
+
+  // Vérifier si la conversation courante est dans la liste des non-répondues
+  const isUnresponded = restrictionConfig?.enabled
+    ? restrictionUnresponded.some((c) => c.chat_id === selectedConversation?.chat_id)
+    : false;
+  const minResponseChars = restrictionConfig?.minResponseChars ?? 0;
 
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
@@ -493,6 +502,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
         )}
         {avgResponseTime && (
           <p className="text-xs text-gray-500">Temps de reponse moyen: {avgResponseTime}</p>
+        )}
+        {isUnresponded && minResponseChars > 0 && (
+          <p className={`text-xs font-medium ${message.length >= minResponseChars ? 'text-green-600' : 'text-red-500'}`}>
+            {message.length}/{minResponseChars} caractères requis
+          </p>
         )}
       </div>
     </div>

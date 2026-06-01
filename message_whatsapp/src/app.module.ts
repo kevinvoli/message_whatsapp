@@ -40,6 +40,7 @@ import { SystemConfigModule } from './system-config/system-config.module';
 import { SystemAlertModule } from './system-alert/system-alert.module';
 import { CampaignLinkModule } from './campaign-link/campaign-link.module';
 import { MediaAssetModule } from './media-asset/media-asset.module';
+import { ConversationRestrictionModule } from './conversation-restriction/conversation-restriction.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { MediaAssetModule } from './media-asset/media-asset.module';
     SystemAlertModule,
     CampaignLinkModule,
     MediaAssetModule,
+    ConversationRestrictionModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

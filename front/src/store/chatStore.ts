@@ -2,7 +2,8 @@
 import { create } from "zustand";
 import { Socket } from "socket.io-client";
 
-import { ContactSummary, Conversation, ConversationStatus, Message } from "@/types/chat";
+import { ContactSummary, Conversation, ConversationStatus, Message, RestrictionConfig, RestrictionStatus, RestrictionUnrespondedConv } from "@/types/chat";
+import { getRestrictionConfig } from "@/lib/api";
 import { logger } from "@/lib/logger";
 
 // crypto.randomUUID() n'est disponible qu'en contexte sécurisé (HTTPS/localhost)
@@ -105,6 +106,16 @@ interface ChatState {
   /** Réinitialise la sélection comme si aucune conversation n'avait été cliquée */
   clearSelectedConversation: () => void;
 
+  // Restriction lecture conversations
+  restrictionConfig: RestrictionConfig | null;
+  restrictionTriggered: boolean;
+  restrictionUnresponded: RestrictionUnrespondedConv[];
+  pendingConversationId: string | null;
+  loadRestrictionConfig: () => Promise<void>;
+  dismissRestriction: (chatId: string) => void;
+  /** Sélection directe sans vérification de restriction (usage interne et modal) */
+  _doSelectConversation: (chat_id: string) => void;
+
   reset: () => void;
 }
 
@@ -145,6 +156,9 @@ const initialState: Omit<
   | "cooldownRemainingMs"
   | "setCooldownModal"
   | "clearSelectedConversation"
+  | "loadRestrictionConfig"
+  | "dismissRestriction"
+  | "_doSelectConversation"
 > = {
   socket: null,
   conversations: [],
@@ -173,6 +187,10 @@ const initialState: Omit<
   readCooldownSeconds: 120,
   showCooldownModal: false,
   pendingConversationUnreadCount: 0,
+  restrictionConfig: null,
+  restrictionTriggered: false,
+  restrictionUnresponded: [],
+  pendingConversationId: null,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -190,7 +208,32 @@ const dedupeMessagesById = (messages: Message[]): Message[] => {
 export const useChatStore = create<ChatState>((set, get) => ({
   ...initialState,
 
-  setSocket: (socket) => set({ socket }),
+  setSocket: (socket) => {
+    set({ socket });
+
+    if (socket) {
+      // Charger la config restriction au moment de la connexion socket
+      void get().loadRestrictionConfig();
+
+      // Gestionnaire de l'événement restriction:status
+      socket.on('restriction:status', (status: RestrictionStatus) => {
+        set({
+          restrictionConfig: status.config,
+          restrictionTriggered: status.triggered,
+          restrictionUnresponded: status.unrespondedConversations,
+        });
+
+        if (!status.triggered) {
+          // Continuer la sélection qui était en attente
+          const pending = get().pendingConversationId;
+          if (pending) {
+            set({ pendingConversationId: null });
+            get()._doSelectConversation(pending);
+          }
+        }
+      });
+    }
+  },
 
   loadConversations: (search?: string) => {
     const { socket } = get();
@@ -272,7 +315,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.emit('conversations:get', payload);
   },
 
-  selectConversation: (chat_id: string) => {
+  _doSelectConversation: (chat_id: string) => {
     const state = get();
     const conversation =
       state.conversations.find((c) => c.chat_id === chat_id) ??
@@ -292,6 +335,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ lastUnreadOpenedAt: Date.now() });
     }
 
+    // Fermer le modal de restriction si ouvert
     set((s) => ({
       selectedConversation: { ...conversation, unreadCount: 0 },
       conversations: s.conversations.map((c) =>
@@ -313,12 +357,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
       replyToMessage: null,
       pendingConversationUnreadCount: originalUnreadCount,
+      restrictionTriggered: false,
+      pendingConversationId: null,
     }));
 
     // Toujours charger les messages depuis le serveur (pas de pré-chargement au connect)
     get().socket?.emit("messages:get", { chat_id });
     // messages:read et conversation:read sont émis dans setMessages,
     // uniquement quand les messages sont réellement reçus
+  },
+
+  selectConversation: (chat_id: string) => {
+    const state = get();
+
+    // Si restriction désactivée ou config non chargée → comportement direct
+    if (!state.restrictionConfig?.enabled) {
+      get()._doSelectConversation(chat_id);
+      return;
+    }
+
+    // Émettre l'événement WebSocket et attendre la réponse restriction:status
+    const socket = state.socket;
+    if (!socket) {
+      get()._doSelectConversation(chat_id);
+      return;
+    }
+
+    set({ pendingConversationId: chat_id });
+    socket.emit("conversation:accessed", { chat_id });
+    // La suite est traitée dans le gestionnaire socket.on('restriction:status', ...)
+    // enregistré dans setSocket
+  },
+
+  loadRestrictionConfig: async () => {
+    const config = await getRestrictionConfig();
+    set({ restrictionConfig: config });
+  },
+
+  dismissRestriction: (chatId: string) => {
+    // Permet de sélectionner une conversation depuis le modal en bypassant la restriction
+    get()._doSelectConversation(chatId);
   },
 
   updateConversationContactSummary: (chatId, summary) => {
@@ -846,5 +924,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  reset: () => set({ ...initialState, lastUnreadOpenedAt: null, readCooldownSeconds: 120, showCooldownModal: false }),
+  reset: () => set({
+    ...initialState,
+    lastUnreadOpenedAt: null,
+    readCooldownSeconds: 120,
+    showCooldownModal: false,
+    restrictionConfig: null,
+    restrictionTriggered: false,
+    restrictionUnresponded: [],
+    pendingConversationId: null,
+  }),
 }));

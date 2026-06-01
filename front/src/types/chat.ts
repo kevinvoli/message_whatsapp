@@ -998,4 +998,29 @@ export const isWebSocketMessageType = (
   );
 };
 
+// ==============================================
+// RESTRICTION LECTURE CONVERSATIONS
+// ==============================================
+
+export interface RestrictionConfig {
+  enabled: boolean;
+  maxUnrespondedConvs: number;
+  minResponseChars: number;
+  requireLastMessageMine: boolean;
+}
+
+export interface RestrictionUnrespondedConv {
+  chat_id: string;
+  contact_name: string;
+  last_client_message: string;
+  accessed_at: string; // ISO string
+}
+
+export interface RestrictionStatus {
+  triggered: boolean;
+  unrespondedCount: number;
+  unrespondedConversations: RestrictionUnrespondedConv[];
+  config: RestrictionConfig;
+}
+
 
