@@ -43,6 +43,17 @@ export interface UnifiedInteractive {
   description?: string;
 }
 
+export interface UnifiedReferral {
+  sourceUrl?:  string;
+  sourceType:  string;
+  sourceId:    string;
+  headline?:   string;
+  body?:       string;
+  mediaType?:  string;
+  imageUrl?:   string;
+  ctwaClid?:   string;
+}
+
 export interface UnifiedMessage {
   provider: ProviderId;
   providerMessageId: string;
@@ -60,5 +71,6 @@ export interface UnifiedMessage {
   interactive?: UnifiedInteractive;
   /** Provider message ID of the quoted message (Whapi: context.quoted_id) */
   quotedProviderMessageId?: string;
+  metaReferral?: UnifiedReferral | null;
   raw: unknown;
 }

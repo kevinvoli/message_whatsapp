@@ -298,6 +298,9 @@ export class WhatsappChat {
   @Column({ name: 'campaign_link_id', type: 'char', length: 36, nullable: true, default: null })
   campaignLinkId: string | null;
 
+  @Column({ name: 'is_ctwa', type: 'boolean', default: false })
+  isCtwa: boolean;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 

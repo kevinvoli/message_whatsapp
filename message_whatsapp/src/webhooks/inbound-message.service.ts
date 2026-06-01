@@ -28,6 +28,7 @@ import { AutoMessageOrchestrator } from 'src/message-auto/auto-message-orchestra
 import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
+import { MetaAdReferralService } from 'src/meta-ad-referral/meta-ad-referral.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -57,6 +58,7 @@ export class InboundMessageService {
     private readonly systemAlert: SystemAlertService,
     private readonly messengerService: CommunicationMessengerService,
     private readonly campaignLinkService: CampaignLinkService,
+    private readonly metaAdReferralService: MetaAdReferralService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -105,6 +107,12 @@ export class InboundMessageService {
               `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`,
             );
             return;
+          }
+
+          if (message.provider === 'meta' && message.metaReferral && !conversation.isCtwa) {
+            await this.metaAdReferralService.createIfAbsent(conversation.id, message.metaReferral);
+            await this.chatService.update(conversation.chat_id, { isCtwa: true });
+            conversation.isCtwa = true;
           }
 
           let savedMessage: Awaited<

@@ -61,6 +61,7 @@ import { SystemAlertModule } from 'src/system-alert/system-alert.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
 import { MediaAssetModule } from 'src/media-asset/media-asset.module';
+import { MetaAdReferralModule } from 'src/meta-ad-referral/meta-ad-referral.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { MediaAssetModule } from 'src/media-asset/media-asset.module';
     WhatsappTemplateModule,
     CampaignLinkModule,
     MediaAssetModule,
+    MetaAdReferralModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

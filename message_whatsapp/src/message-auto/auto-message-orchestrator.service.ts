@@ -278,12 +278,14 @@ export class AutoMessageOrchestrator implements OnModuleInit {
       return;
     }
 
-    // 🔒 Fenêtre de messagerie 23h : si le client n'a pas écrit depuis plus de 23h,
-    // ne pas envoyer d'auto-message (WhatsApp n'autorise pas l'envoi hors fenêtre).
-    const WINDOW_MS = 23 * 60 * 60 * 1000;
+    // 🔒 Fenêtre de messagerie — 72h pour les chats CTWA, 23h pour les autres.
+    // WhatsApp n'autorise pas l'envoi hors fenêtre.
+    const WINDOW_MS = freshChat.isCtwa
+      ? 72 * 60 * 60 * 1000
+      : 23 * 60 * 60 * 1000;
     if (Date.now() - new Date(lastClient).getTime() > WINDOW_MS) {
       this.logger.warn(
-        `Auto-message blocked for ${chatId}: 23h window expired (last client msg: ${lastClient.toISOString()})`,
+        `Auto-message blocked for ${chatId}: ${freshChat.isCtwa ? '72h' : '23h'} window expired (last client msg: ${lastClient.toISOString()})`,
         AutoMessageOrchestrator.name,
       );
       await this.chatService.update(chatId, { read_only: false });

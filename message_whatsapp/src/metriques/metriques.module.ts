@@ -13,6 +13,7 @@ import { AnalyticsSnapshot } from './entities/analytics-snapshot.entity';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
 import { CampaignLink } from 'src/campaign-link/entities/campaign-link.entity';
+import { MetaAdKpiService } from './meta-ad-kpi.service';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { CampaignLink } from 'src/campaign-link/entities/campaign-link.entity';
     ConnectionLogModule,
   ],
   controllers: [MetriquesController],
-  providers: [MetriquesService, AnalyticsSnapshotService],
+  providers: [MetriquesService, AnalyticsSnapshotService, MetaAdKpiService],
   exports: [MetriquesService],
 })
 export class MetriquesModule {}

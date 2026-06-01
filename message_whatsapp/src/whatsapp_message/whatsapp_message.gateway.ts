@@ -907,9 +907,11 @@ export class WhatsappMessageGateway
         return;
       }
 
-      // 🔒 Fenêtre de messagerie 23h — si le client n'a pas écrit depuis plus de 23h,
-      // WhatsApp n'autorise plus l'envoi de messages ordinaires.
-      const WINDOW_MS = 23 * 60 * 60 * 1000;
+      // 🔒 Fenêtre de messagerie — 72h pour les chats CTWA (Click-to-WhatsApp Ads),
+      // 23h pour les autres. WhatsApp n'autorise plus l'envoi hors fenêtre.
+      const WINDOW_MS = chat.isCtwa
+        ? 72 * 60 * 60 * 1000
+        : 23 * 60 * 60 * 1000;
       const lastClientAt = chat.last_client_message_at;
       if (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS) {
         client.emit('chat:event', {

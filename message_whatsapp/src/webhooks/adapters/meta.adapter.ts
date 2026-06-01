@@ -7,6 +7,7 @@ import {
 import {
   UnifiedMessage,
   UnifiedMessageType,
+  UnifiedReferral,
 } from '../normalization/unified-message';
 import { UnifiedStatus } from '../normalization/unified-status';
 import { AdapterContext, ProviderAdapter } from './provider-adapter.interface';
@@ -61,7 +62,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
     const type = this.mapType(message.type);
     const chatId = `${message.from}@s.whatsapp.net`;
     const timestamp = Number.parseInt(message.timestamp, 10);
-    return {
+    const unified: UnifiedMessage = {
       provider: context.provider,
       providerMessageId: message.id,
       tenantId: context.tenantId,
@@ -78,6 +79,21 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       interactive: this.resolveInteractive(message),
       raw,
     };
+
+    if (message.referral) {
+      unified.metaReferral = {
+        sourceUrl:  message.referral.source_url,
+        sourceType: message.referral.source_type,
+        sourceId:   message.referral.source_id,
+        headline:   message.referral.headline,
+        body:       message.referral.body,
+        mediaType:  message.referral.media_type,
+        imageUrl:   message.referral.image_url,
+        ctwaClid:   message.referral.ctwa_clid,
+      };
+    }
+
+    return unified;
   }
 
   private mapStatus(

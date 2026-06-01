@@ -119,6 +119,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
     const maxSteps    = config.maxSteps ?? 1;
     const cutoff      = new Date(Date.now() - thresholdMs);
     const window23h   = new Date(Date.now() - 23 * 60 * 60_000);
+    const window72h   = new Date(Date.now() - 72 * 60 * 60_000);
 
     const qb = this.chatRepo
       .createQueryBuilder('c')
@@ -126,7 +127,11 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .where('c.last_client_message_at IS NOT NULL')
       .andWhere('(c.last_poste_message_at IS NULL OR c.last_client_message_at > c.last_poste_message_at)')
       .andWhere('c.no_response_auto_step < :maxSteps', { maxSteps })
-      .andWhere('c.last_client_message_at >= :window23h', { window23h })
+      .andWhere(
+        `((c.is_ctwa = 0 AND c.last_client_message_at >= :window23h)
+          OR (c.is_ctwa = 1 AND c.last_client_message_at >= :window72h))`,
+        { window23h, window72h },
+      )
       .andWhere(
         `(
           (c.no_response_auto_step = 0 AND c.last_client_message_at <= :cutoff)
@@ -243,6 +248,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
     const maxSteps    = config.maxSteps ?? 1;
     const cutoff      = new Date(Date.now() - thresholdMs);
     const window23h   = new Date(Date.now() - 23 * 60 * 60_000);
+    const window72h   = new Date(Date.now() - 72 * 60 * 60_000);
 
     const qb = this.chatRepo
       .createQueryBuilder('c')
@@ -250,7 +256,11 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .where('c.poste_id IS NULL')
       .andWhere('c.status = :status', { status: WhatsappChatStatus.EN_ATTENTE })
       .andWhere('c.last_client_message_at IS NOT NULL')
-      .andWhere('c.last_client_message_at >= :window23h', { window23h })
+      .andWhere(
+        `((c.is_ctwa = 0 AND c.last_client_message_at >= :window23h)
+          OR (c.is_ctwa = 1 AND c.last_client_message_at >= :window72h))`,
+        { window23h, window72h },
+      )
       .andWhere('c.queue_wait_auto_step < :maxSteps', { maxSteps })
       .andWhere(
         `(
