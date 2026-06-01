@@ -395,8 +395,53 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   dismissRestriction: (chatId: string) => {
-    // Permet de sélectionner une conversation depuis le modal en bypassant la restriction
-    get()._doSelectConversation(chatId);
+    const state = get();
+
+    // Chercher dans tous les onglets + selectedConversation comme fallback
+    const conversation =
+      state.conversations.find((c) => c.chat_id === chatId) ??
+      state.conversationsUnread.find((c) => c.chat_id === chatId) ??
+      state.conversationsNouveau.find((c) => c.chat_id === chatId) ??
+      (state.selectedConversation?.chat_id === chatId ? state.selectedConversation : undefined);
+
+    if (!conversation) {
+      // Conv introuvable localement : fermer le modal quand même et charger les messages
+      set({ restrictionTriggered: false, pendingConversationId: null });
+      state.socket?.emit('messages:get', { chat_id: chatId });
+      return;
+    }
+
+    // Bypass du cooldown : la commerciale DOIT accéder à cette conv pour répondre
+    if ((conversation.unreadCount ?? 0) > 0) {
+      set({ lastUnreadOpenedAt: Date.now() });
+    }
+
+    set((s) => ({
+      selectedConversation: { ...conversation, unreadCount: 0 },
+      conversations: s.conversations.map((c) =>
+        c.chat_id === chatId ? { ...c, unreadCount: 0 } : c,
+      ),
+      conversationsUnread: s.conversationsUnread.map((c) =>
+        c.chat_id === chatId ? { ...c, unreadCount: 0 } : c,
+      ),
+      conversationsNouveau: s.conversationsNouveau.map((c) =>
+        c.chat_id === chatId ? { ...c, unreadCount: 0 } : c,
+      ),
+      messages: [],
+      isLoading: true,
+      isLoadingMore: false,
+      hasMoreMessages: true,
+      messageIdCache: {
+        ...s.messageIdCache,
+        [chatId]: new Set<string>(),
+      },
+      replyToMessage: null,
+      pendingConversationUnreadCount: conversation.unreadCount ?? 0,
+      restrictionTriggered: false,
+      pendingConversationId: null,
+    }));
+
+    get().socket?.emit('messages:get', { chat_id: chatId });
   },
 
   updateConversationContactSummary: (chatId, summary) => {
