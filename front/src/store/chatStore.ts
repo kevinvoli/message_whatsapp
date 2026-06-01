@@ -220,9 +220,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Gestionnaire de l'événement restriction:status
       socket.on('restriction:status', (status: RestrictionStatus) => {
+        const currentChatId = get().selectedConversation?.chat_id;
+
+        // Ne pas déclencher le modal si la seule conversation bloquante est
+        // celle déjà ouverte : le commercial est en train d'y répondre.
+        // Le modal ne s'affiche que si une conversation AUTRE que l'active est non-répondue.
+        const shouldTrigger =
+          status.triggered &&
+          status.unrespondedConversations.some((c) => c.chat_id !== currentChatId);
+
         set({
           restrictionConfig: status.config,
-          restrictionTriggered: status.triggered,
+          restrictionTriggered: shouldTrigger,
           restrictionUnresponded: status.unrespondedConversations,
         });
 
