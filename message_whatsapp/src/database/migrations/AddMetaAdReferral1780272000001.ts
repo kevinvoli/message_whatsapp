@@ -25,10 +25,24 @@ export class AddMetaAdReferral1780272000001 implements MigrationInterface {
 
   public async up(qr: QueryRunner): Promise<void> {
     if (!(await qr.hasTable('meta_ad_referral'))) {
+      // Lire la définition exacte de whatsapp_chat.id pour que chat_id soit
+      // strictement compatible (type + charset + collation) avec la colonne référencée.
+      const [idCol] = await qr.query(
+        `SELECT COLUMN_TYPE, CHARACTER_SET_NAME, COLLATION_NAME
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME   = 'whatsapp_chat'
+           AND COLUMN_NAME  = 'id'`,
+      ) as Array<{ COLUMN_TYPE: string; CHARACTER_SET_NAME: string; COLLATION_NAME: string }>;
+
+      const chatIdColDef = idCol
+        ? `${idCol.COLUMN_TYPE} CHARACTER SET ${idCol.CHARACTER_SET_NAME} COLLATE ${idCol.COLLATION_NAME} NOT NULL`
+        : `CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL`;
+
       await qr.query(`
         CREATE TABLE \`meta_ad_referral\` (
-          \`id\`          CHAR(36)      NOT NULL,
-          \`chat_id\`     CHAR(36)      NOT NULL,
+          \`id\`          CHAR(36)      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+          \`chat_id\`     ${chatIdColDef},
           \`source_url\`  VARCHAR(2048) NULL,
           \`source_type\` VARCHAR(50)   NOT NULL,
           \`source_id\`   VARCHAR(255)  NOT NULL,
