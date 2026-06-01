@@ -389,8 +389,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.conversationsNouveau.find((c) => c.chat_id === chat_id) ??
       (state.selectedConversation?.chat_id === chat_id ? state.selectedConversation : undefined);
 
-    // Si restriction désactivée, config non chargée, ou conversation en lecture seule → comportement direct
-    if (!state.restrictionConfig?.enabled || conversation?.readonly) {
+    // Bypass restriction si :
+    // – restriction désactivée ou config non encore chargée
+    // – conversation en lecture seule (commercial ne peut pas répondre)
+    // – conversation sans message non lu (consultation pure, aucune réponse attendue)
+    if (
+      !state.restrictionConfig?.enabled ||
+      conversation?.readonly ||
+      (conversation != null && conversation.unreadCount <= 0)
+    ) {
       get()._doSelectConversation(chat_id);
       return;
     }
