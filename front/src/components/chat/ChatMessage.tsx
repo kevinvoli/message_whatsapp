@@ -318,6 +318,13 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             <p className="text-sm italic opacity-80">[Message vide]</p>
           )}
 
+          {/* Nom de la commerciale (messages sortants uniquement) */}
+          {isFromMe && msg.from_name && (
+            <p className="text-[10px] text-green-200 text-right italic mt-0.5 leading-tight">
+              {msg.from_name}
+            </p>
+          )}
+
           {/* Timestamp + status */}
           <div
             className={`flex items-center gap-1 mt-1 text-xs ${

@@ -201,7 +201,7 @@ export class WhatsappMessageService {
         chat: chat,
         poste: chat.poste ?? undefined,
         from: extractPhoneNumber(chat?.chat_id),
-        from_name: chat.name,
+        from_name: commercial?.name ?? 'Agent',
         channel: channel,
         commercial: commercial,
         contact: null,

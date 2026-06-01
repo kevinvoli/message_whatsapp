@@ -109,7 +109,7 @@ export class ConversationRestrictionService {
     const today = this.todayDateString();
 
     // Récupérer tous les accès du jour sans réponse enregistrée
-    const unrespondedAccesses = await this.accessRepository
+    const rawAccesses = await this.accessRepository
       .createQueryBuilder('cca')
       .where('cca.commercialId = :commercialId', { commercialId })
       .andWhere('cca.accessDate = :today', { today })
@@ -117,11 +117,58 @@ export class ConversationRestrictionService {
       .orderBy('cca.accessedAt', 'DESC')
       .getMany();
 
+    // Précharger les chats en une seule requête
+    const chatIds = rawAccesses.map((a) => a.chatId);
+    const chats = chatIds.length > 0
+      ? await this.chatRepository
+          .createQueryBuilder('chat')
+          .where('chat.chat_id IN (:...chatIds)', { chatIds })
+          .getMany()
+      : [];
+    const chatMap = new Map(chats.map((c) => [c.chat_id, c]));
+
+    // Début du jour pour la vérification bootstrap
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Filtrer les accès :
+    // 1. Exclure les convs en lecture seule (commercial bloqué, ne peut pas répondre)
+    // 2. Bootstrap : si la commerciale a déjà envoyé un msg qualifiant aujourd'hui, marquer répondu
+    const effectiveAccesses: CommercialConversationAccess[] = [];
+    for (const access of rawAccesses) {
+      const chat = chatMap.get(access.chatId);
+
+      // Exclure si en lecture seule → commercial ne peut physiquement pas répondre
+      if (chat?.read_only) continue;
+
+      // Bootstrap : vérifier si un message qualifiant existe aujourd'hui dans whatsapp_message
+      const hasQualifyingMsg = await this.messageRepository
+        .createQueryBuilder('msg')
+        .where('msg.chat_id = :chatId', { chatId: access.chatId })
+        .andWhere('msg.commercial_id = :commercialId', { commercialId })
+        .andWhere('msg.from_me = :fromMe', { fromMe: true })
+        .andWhere('msg.timestamp >= :todayStart', { todayStart })
+        .andWhere(`CHAR_LENGTH(COALESCE(msg.text, '')) >= :minChars`, { minChars: config.minResponseChars })
+        .andWhere('msg.deletedAt IS NULL')
+        .getCount();
+
+      if (hasQualifyingMsg > 0) {
+        // Synchroniser le cache DB pour les prochains appels
+        void this.accessRepository.update(access.id, {
+          respondedAt: new Date(),
+          responseLength: config.minResponseChars,
+        });
+        continue;
+      }
+
+      effectiveAccesses.push(access);
+    }
+
     // Si requireLastMessageMine : filtrer les conversations dont le dernier message est from_me = true
-    let effectiveUnresponded = unrespondedAccesses;
+    let effectiveUnresponded = effectiveAccesses;
     if (config.requireLastMessageMine) {
       const filtered: CommercialConversationAccess[] = [];
-      for (const access of unrespondedAccesses) {
+      for (const access of effectiveAccesses) {
         const lastMsg = await this.messageRepository
           .createQueryBuilder('msg')
           .where('msg.chat_id = :chatId', { chatId: access.chatId })
@@ -141,12 +188,10 @@ export class ConversationRestrictionService {
     const unrespondedCount = effectiveUnresponded.length;
     const triggered = config.enabled && unrespondedCount >= config.maxUnrespondedConvs;
 
-    // Enrichir chaque conversation non-répondue
+    // Enrichir chaque conversation non-répondue (chat déjà en cache)
     const unrespondedConversations = await Promise.all(
       effectiveUnresponded.map(async (access) => {
-        const chat = await this.chatRepository.findOne({
-          where: { chat_id: access.chatId },
-        });
+        const chat = chatMap.get(access.chatId);
 
         const lastClientMsg = await this.messageRepository
           .createQueryBuilder('msg')
