@@ -382,8 +382,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectConversation: (chat_id: string) => {
     const state = get();
 
-    // Si restriction désactivée ou config non chargée → comportement direct
-    if (!state.restrictionConfig?.enabled) {
+    // Résoudre la conversation dans tous les onglets possibles
+    const conversation =
+      state.conversations.find((c) => c.chat_id === chat_id) ??
+      state.conversationsUnread.find((c) => c.chat_id === chat_id) ??
+      state.conversationsNouveau.find((c) => c.chat_id === chat_id) ??
+      (state.selectedConversation?.chat_id === chat_id ? state.selectedConversation : undefined);
+
+    // Si restriction désactivée, config non chargée, ou conversation en lecture seule → comportement direct
+    if (!state.restrictionConfig?.enabled || conversation?.readonly) {
       get()._doSelectConversation(chat_id);
       return;
     }

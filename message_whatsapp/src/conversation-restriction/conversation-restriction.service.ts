@@ -44,6 +44,13 @@ export class ConversationRestrictionService {
    * Si un accès existe déjà avec une réponse valide (respondedAt IS NOT NULL), on ne réinitialise pas.
    */
   async recordAccess(commercialId: string, chatId: string): Promise<void> {
+    // Ne pas tracer les conversations en lecture seule ou fermées :
+    // le commercial ne peut pas y répondre, elles ne doivent pas compter dans la restriction.
+    const chat = await this.chatRepository.findOne({ where: { chat_id: chatId } });
+    if (!chat || chat.read_only || chat.status === WhatsappChatStatus.FERME) {
+      return;
+    }
+
     const today = this.todayDateString();
 
     const existing = await this.accessRepository.findOne({
