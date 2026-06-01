@@ -113,6 +113,7 @@ export class CommunicationInstagramService {
           type: attachmentType,
           payload: { attachment_id: attachmentId },
         },
+        ...(data.caption ? { text: data.caption } : {}),
       },
     };
 
@@ -147,7 +148,9 @@ export class CommunicationInstagramService {
       case 'video':
         return 'video';
       case 'document':
-        return 'file';
+        throw new BadRequestException(
+          "Instagram Graph API ne supporte pas l'envoi de documents en DM",
+        );
     }
   }
 }
