@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle, Link, Copy, ExternalLink, ShieldAlert } from 'lucide-react';
-import { SystemConfigEntry, WebhookEntry, RestrictionConfig } from '@/app/lib/definitions';
-import { bulkUpdateSystemConfig, getSystemConfigs, getWebhookUrls, getRestrictionConfig, updateRestrictionConfig } from '@/app/lib/api';
+import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle, Link, Copy, ExternalLink } from 'lucide-react';
+import { SystemConfigEntry, WebhookEntry } from '@/app/lib/definitions';
+import { bulkUpdateSystemConfig, getSystemConfigs, getWebhookUrls } from '@/app/lib/api';
 
 interface AdminProfile {
   id: string;
@@ -18,7 +18,7 @@ interface SettingsViewProps {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
-type Tab = 'profile' | 'password' | 'system' | 'webhooks' | 'restriction';
+type Tab = 'profile' | 'password' | 'system' | 'webhooks';
 
 const CATEGORY_LABELS: Record<string, string> = {
   general: 'Général',
@@ -334,179 +334,6 @@ function SystemConfigTab() {
   );
 }
 
-// ─── Restriction Tab ──────────────────────────────────────────────────────────
-
-function RestrictionTab() {
-  const defaultConfig: RestrictionConfig = {
-    enabled: false,
-    maxUnrespondedConvs: 3,
-    minResponseChars: 20,
-    requireLastMessageMine: false,
-  };
-
-  const [config, setConfig] = useState<RestrictionConfig>(defaultConfig);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const data = await getRestrictionConfig();
-        setConfig(data);
-      } catch {
-        // Config inaccessible → on reste sur les valeurs par défaut
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setStatus(null);
-    try {
-      await updateRestrictionConfig(config);
-      setStatus({ ok: true, message: 'Configuration enregistrée avec succès.' });
-    } catch (e) {
-      setStatus({ ok: false, message: e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-32 text-gray-400">
-        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-        Chargement…
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6 max-w-xl">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="p-2 bg-red-100 rounded-lg">
-          <ShieldAlert className="w-5 h-5 text-red-600" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Restriction de lecture</h2>
-          <p className="text-xs text-gray-500">
-            Bloque l&apos;ouverture d&apos;une nouvelle conversation si la commerciale n&apos;a pas répondu aux précédentes.
-          </p>
-        </div>
-      </div>
-
-      {/* Activer / désactiver */}
-      <div className="flex items-center justify-between py-3 border-b border-gray-100">
-        <label htmlFor="restriction-enabled" className="text-sm font-medium text-gray-700">
-          Activer la restriction
-        </label>
-        <button
-          id="restriction-enabled"
-          type="button"
-          role="switch"
-          aria-checked={config.enabled}
-          onClick={() => setConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 ${
-            config.enabled ? 'bg-red-600' : 'bg-gray-300'
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-              config.enabled ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* Nombre max de conversations non répondues */}
-      <div>
-        <label htmlFor="restriction-max" className="block text-sm font-medium text-gray-700 mb-1">
-          Conversations non-répondues avant blocage
-        </label>
-        <p className="text-xs text-gray-400 mb-2">
-          Nombre maximum de conversations consultées sans réponse avant que le modal bloquant s&apos;affiche.
-        </p>
-        <input
-          id="restriction-max"
-          type="number"
-          min={1}
-          value={config.maxUnrespondedConvs}
-          onChange={(e) =>
-            setConfig((prev) => ({ ...prev, maxUnrespondedConvs: Math.max(1, parseInt(e.target.value, 10) || 1) }))
-          }
-          className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={!config.enabled}
-        />
-      </div>
-
-      {/* Nombre minimum de caractères */}
-      <div>
-        <label htmlFor="restriction-chars" className="block text-sm font-medium text-gray-700 mb-1">
-          Caractères minimum par réponse
-        </label>
-        <p className="text-xs text-gray-400 mb-2">
-          Une réponse doit contenir au moins ce nombre de caractères pour être considérée comme valide.
-        </p>
-        <input
-          id="restriction-chars"
-          type="number"
-          min={1}
-          value={config.minResponseChars}
-          onChange={(e) =>
-            setConfig((prev) => ({ ...prev, minResponseChars: Math.max(1, parseInt(e.target.value, 10) || 1) }))
-          }
-          className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={!config.enabled}
-        />
-      </div>
-
-      {/* Dernier message de la commerciale */}
-      <div className="flex items-start gap-3 py-3 border-t border-gray-100">
-        <input
-          id="restriction-last-mine"
-          type="checkbox"
-          checked={config.requireLastMessageMine}
-          onChange={(e) =>
-            setConfig((prev) => ({ ...prev, requireLastMessageMine: e.target.checked }))
-          }
-          disabled={!config.enabled}
-          className="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
-        />
-        <label htmlFor="restriction-last-mine" className="text-sm text-gray-700">
-          La dernière réponse doit venir de la commerciale
-          <span className="block text-xs text-gray-400 mt-0.5">
-            Si coché, la conversation n&apos;est considérée comme répondue que si la commerciale a écrit en dernier.
-          </span>
-        </label>
-      </div>
-
-      {/* Status */}
-      {status && (
-        <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${
-          status.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-        }`}>
-          {status.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          {status.message}
-        </div>
-      )}
-
-      {/* Bouton enregistrer */}
-      <button
-        type="button"
-        onClick={() => void handleSave()}
-        disabled={saving}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-      >
-        <Save className="w-4 h-4" />
-        {saving ? 'Enregistrement…' : 'Enregistrer'}
-      </button>
-    </div>
-  );
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsView({ adminProfile, onProfileUpdated }: SettingsViewProps) {
@@ -584,7 +411,6 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
     { id: 'password', label: 'Mot de passe', icon: <Lock className="w-4 h-4" /> },
     { id: 'webhooks', label: 'URLs Webhooks', icon: <Link className="w-4 h-4" /> },
     { id: 'system', label: 'Configuration système', icon: <Settings className="w-4 h-4" /> },
-    { id: 'restriction', label: 'Restriction lecture', icon: <ShieldAlert className="w-4 h-4" /> },
   ];
 
   return (
@@ -730,8 +556,6 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
       {/* System config tab */}
       {activeTab === 'system' && <SystemConfigTab />}
 
-      {/* Restriction lecture tab */}
-      {activeTab === 'restriction' && <RestrictionTab />}
     </div>
   );
 }

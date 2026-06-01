@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Lock, RefreshCw, Info } from 'lucide-react';
-import { DispatchSettings } from '@/app/lib/definitions';
-import { getDispatchSettings, updateDispatchSettings } from '@/app/lib/api';
+import { Lock, RefreshCw, Info, CheckCircle, AlertCircle } from 'lucide-react';
+import { DispatchSettings, RestrictionConfig } from '@/app/lib/definitions';
+import { getDispatchSettings, updateDispatchSettings, getRestrictionConfig, updateRestrictionConfig } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
 
 function SectionCard({
@@ -42,6 +42,13 @@ function SectionCard({
   );
 }
 
+const defaultRestrictionConfig: RestrictionConfig = {
+  enabled: false,
+  maxUnrespondedConvs: 1,
+  minResponseChars: 50,
+  requireLastMessageMine: false,
+};
+
 export default function LectureSeuleView() {
   const [settings, setSettings] = useState<DispatchSettings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +56,12 @@ export default function LectureSeuleView() {
   const [savingRateLimit, setSavingRateLimit] = useState(false);
   const [savingCooldown, setSavingCooldown] = useState(false);
   const [savingIdle, setSavingIdle] = useState(false);
+
+  const [restriction, setRestriction] = useState<RestrictionConfig>(defaultRestrictionConfig);
+  const [restrictionLoading, setRestrictionLoading] = useState(false);
+  const [savingRestriction, setSavingRestriction] = useState(false);
+  const [restrictionStatus, setRestrictionStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
   const { addToast } = useToast();
 
   const load = async () => {
@@ -62,7 +75,31 @@ export default function LectureSeuleView() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  const loadRestriction = async () => {
+    try {
+      setRestrictionLoading(true);
+      setRestriction(await getRestrictionConfig());
+    } catch {
+      // Config inaccessible → valeurs par défaut
+    } finally {
+      setRestrictionLoading(false);
+    }
+  };
+
+  const saveRestriction = async () => {
+    setSavingRestriction(true);
+    setRestrictionStatus(null);
+    try {
+      await updateRestrictionConfig(restriction);
+      setRestrictionStatus({ ok: true, message: 'Configuration enregistrée.' });
+    } catch (e) {
+      setRestrictionStatus({ ok: false, message: e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.' });
+    } finally {
+      setSavingRestriction(false);
+    }
+  };
+
+  useEffect(() => { void load(); void loadRestriction(); }, []);
 
   const save = async (
     patch: Partial<DispatchSettings>,
@@ -241,6 +278,129 @@ export default function LectureSeuleView() {
               <p className="mt-1 text-[11px] text-gray-400">
                 Temps d&apos;attente entre deux ouvertures de conv non lues. Min: 0 s (désactivé) — Max: 36000 s
               </p>
+            </div>
+          </SectionCard>
+
+          {/* ── Restriction réponse avant navigation ── */}
+          <SectionCard
+            title="Restriction de réponse"
+            description="Bloque l'ouverture d'une nouvelle conversation si la commerciale n'a pas répondu aux précédentes (réponse valide = minimum N caractères)."
+            saving={savingRestriction}
+            hasSettings={true}
+            onSave={() => void saveRestriction()}
+          >
+            <div className="space-y-4">
+              {restrictionLoading ? (
+                <p className="text-xs text-gray-400">Chargement…</p>
+              ) : (
+                <>
+                  {/* Toggle activation */}
+                  <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Activer la restriction</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        Oblige la commerciale à répondre aux conversations consultées avant d&apos;en ouvrir une nouvelle.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={restriction.enabled}
+                      aria-label="Activer la restriction de réponse"
+                      onClick={() => setRestriction((prev) => ({ ...prev, enabled: !prev.enabled }))}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        restriction.enabled ? 'bg-emerald-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                          restriction.enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {restriction.enabled && (
+                    <div className="grid gap-4 max-w-sm md:grid-cols-2">
+                      {/* Max conversations non-répondues */}
+                      <div>
+                        <label
+                          htmlFor="restriction-max-convs"
+                          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                        >
+                          Conversations avant blocage
+                        </label>
+                        <input
+                          id="restriction-max-convs"
+                          type="number"
+                          min={1}
+                          className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                          value={restriction.maxUnrespondedConvs}
+                          onChange={(e) =>
+                            setRestriction((prev) => ({ ...prev, maxUnrespondedConvs: Math.max(1, parseInt(e.target.value, 10) || 1) }))
+                          }
+                        />
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          Nombre de conv. consultées sans réponse avant le modal bloquant
+                        </p>
+                      </div>
+
+                      {/* Min caractères */}
+                      <div>
+                        <label
+                          htmlFor="restriction-min-chars"
+                          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                        >
+                          Caractères min. par réponse
+                        </label>
+                        <input
+                          id="restriction-min-chars"
+                          type="number"
+                          min={1}
+                          className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                          value={restriction.minResponseChars}
+                          onChange={(e) =>
+                            setRestriction((prev) => ({ ...prev, minResponseChars: Math.max(1, parseInt(e.target.value, 10) || 1) }))
+                          }
+                        />
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          Une réponse doit contenir au moins ce nombre de caractères
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dernier message de la commerciale */}
+                  {restriction.enabled && (
+                    <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-3">
+                      <input
+                        id="restriction-last-mine"
+                        type="checkbox"
+                        checked={restriction.requireLastMessageMine}
+                        onChange={(e) =>
+                          setRestriction((prev) => ({ ...prev, requireLastMessageMine: e.target.checked }))
+                        }
+                        className="mt-0.5 h-4 w-4 cursor-pointer text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                      />
+                      <label htmlFor="restriction-last-mine" className="text-sm text-gray-700 cursor-pointer">
+                        La dernière réponse doit venir de la commerciale
+                        <span className="block text-xs text-gray-400 mt-0.5">
+                          Si coché, la conversation n&apos;est considérée comme répondue que si la commerciale a écrit en dernier.
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  {restrictionStatus && (
+                    <div className={`flex items-center gap-2 text-xs p-2 rounded-lg ${
+                      restrictionStatus.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                    }`}>
+                      {restrictionStatus.ok ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      {restrictionStatus.message}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </SectionCard>
 

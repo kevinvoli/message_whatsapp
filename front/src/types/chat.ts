@@ -27,8 +27,6 @@ export type PerformanceData = {
   conversions: number;
 };
 
-
-
 export type Stats = {
   messagesTraites: number;
   tauxReponse: number;
