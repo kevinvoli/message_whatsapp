@@ -956,3 +956,19 @@ export interface RestrictionConfig {
   minResponseChars: number;
   requireLastMessageMine: boolean;
 }
+
+// ============================================
+// CAMPAGNES META (CTWA / Click-to-WhatsApp)
+// ============================================
+
+export interface MetaAdKpiRow {
+  source_id:             string;
+  headline:              string | null;
+  total_conversations:   number;
+  conversations_closed:  number;
+  conversion_rate:       number;
+  avg_messages_per_chat: number;
+  avg_first_response_s:  number | null;
+  first_seen:            string;
+  last_seen:             string;
+}

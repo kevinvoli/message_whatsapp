@@ -44,7 +44,7 @@ export class AddMetaAdReferral1780272000001 implements MigrationInterface {
           CONSTRAINT \`FK_meta_ad_referral_chat\`
             FOREIGN KEY (\`chat_id\`) REFERENCES \`whatsapp_chat\` (\`id\`)
             ON DELETE CASCADE ON UPDATE CASCADE
-        ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC
+        ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
     }
 

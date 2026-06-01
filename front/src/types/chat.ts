@@ -333,6 +333,9 @@ export interface Conversation {
   /** Données du contact associé, chargées en batch avec les conversations. */
   contact_summary?: ContactSummary | null;
 
+  /** Conversation issue d'une publicité Click-to-WhatsApp (fenêtre 72h). */
+  isCtwa?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -535,6 +538,7 @@ interface RawConversationData {
   closed_by?: string;
   read_only?: boolean;
   channel_dedicated?: boolean;
+  is_ctwa?: boolean;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
   contact_summary?: {
@@ -818,6 +822,8 @@ export const transformToConversation = (
           is_active: raw.contact_summary.is_active ?? true,
         }
       : null,
+
+    isCtwa: raw.is_ctwa ?? false,
 
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),

@@ -146,6 +146,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.status.replace('_', ' ')}
             </span>
             <ProviderBadge chatId={conversation.chat_id} showLabel={true} />
+            {conversation.isCtwa && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm-1-5h2V9h-2v6zm0-8h2V5h-2v2z"/>
+                </svg>
+                Pub Meta
+              </span>
+            )}
             {conversation?.tags?.map((tag, idx) => (
               <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
                 {tag}
