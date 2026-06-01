@@ -1,7 +1,18 @@
+import { IsBoolean, IsInt, Min } from 'class-validator';
+
 export class RestrictionConfigDto {
+  @IsBoolean()
   enabled: boolean;
+
+  @IsInt()
+  @Min(1)
   maxUnrespondedConvs: number;
+
+  @IsInt()
+  @Min(1)
   minResponseChars: number;
+
+  @IsBoolean()
   requireLastMessageMine: boolean;
 }
 
