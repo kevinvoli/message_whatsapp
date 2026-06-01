@@ -52,7 +52,7 @@ const ConversationRestrictionModal: React.FC = () => {
           pouvoir en ouvrir une nouvelle :
         </p>
 
-        <div className="space-y-3 mb-6">
+        <div className="space-y-3 mb-6 max-h-64 overflow-y-auto pr-1">
           {restrictionUnresponded.map((conv) => (
             <div
               key={conv.chat_id}
