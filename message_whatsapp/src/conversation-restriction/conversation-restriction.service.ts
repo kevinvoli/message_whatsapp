@@ -104,7 +104,7 @@ export class ConversationRestrictionService {
   /**
    * Calcule si la restriction doit être déclenchée pour ce commercial.
    */
-  async checkRestriction(commercialId: string): Promise<RestrictionStatusDto> {
+  async checkRestriction(commercialId: string, posteId?: string): Promise<RestrictionStatusDto> {
     const config = await this.getRestrictionConfig();
     const today = this.todayDateString();
 
@@ -140,6 +140,9 @@ export class ConversationRestrictionService {
 
       // Exclure si fermée ou en lecture seule → commercial ne peut pas répondre
       if (!chat || chat.status === WhatsappChatStatus.FERME || chat.read_only) continue;
+
+      // Exclure si la conversation n'est plus sur le poste de la commerciale
+      if (posteId && chat.poste_id !== null && chat.poste_id !== posteId) continue;
 
       // Bootstrap : vérifier si un message qualifiant existe aujourd'hui dans whatsapp_message
       const hasQualifyingMsg = await this.messageRepository

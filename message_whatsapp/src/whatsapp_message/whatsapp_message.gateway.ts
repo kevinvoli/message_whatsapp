@@ -796,7 +796,7 @@ export class WhatsappMessageGateway
     if (!config.enabled) return;
 
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
-    const status = await this.restrictionService.checkRestriction(agent.commercialId);
+    const status = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
     client.emit('restriction:status', status);
   }
 
@@ -999,6 +999,7 @@ export class WhatsappMessageGateway
         );
         const restrictionStatus = await this.restrictionService.checkRestriction(
           agent.commercialId,
+          agent.posteId,
         );
         client.emit('restriction:status', restrictionStatus);
       }
