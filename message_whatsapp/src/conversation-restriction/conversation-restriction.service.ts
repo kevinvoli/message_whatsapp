@@ -7,7 +7,7 @@ import {
   RestrictionStatusDto,
 } from './dto/restriction-config.dto';
 import { SystemConfigService } from 'src/system-config/system-config.service';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 
 @Injectable()
@@ -138,8 +138,8 @@ export class ConversationRestrictionService {
     for (const access of rawAccesses) {
       const chat = chatMap.get(access.chatId);
 
-      // Exclure si en lecture seule → commercial ne peut physiquement pas répondre
-      if (chat?.read_only) continue;
+      // Exclure si fermée ou en lecture seule → commercial ne peut pas répondre
+      if (!chat || chat.status === WhatsappChatStatus.FERME || chat.read_only) continue;
 
       // Bootstrap : vérifier si un message qualifiant existe aujourd'hui dans whatsapp_message
       const hasQualifyingMsg = await this.messageRepository

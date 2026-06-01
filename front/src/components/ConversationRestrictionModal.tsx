@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { AlertCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, MessageSquare, X } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { formatTime } from '@/lib/dateUtils';
 
@@ -10,6 +10,7 @@ const ConversationRestrictionModal: React.FC = () => {
   const restrictionUnresponded = useChatStore((s) => s.restrictionUnresponded);
   const restrictionConfig = useChatStore((s) => s.restrictionConfig);
   const dismissRestriction = useChatStore((s) => s.dismissRestriction);
+  const closeRestrictionModal = useChatStore((s) => s.closeRestrictionModal);
 
   // Fermeture automatique quand la restriction est levée
   useEffect(() => {
@@ -29,9 +30,20 @@ const ConversationRestrictionModal: React.FC = () => {
         className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 mb-4">
-          <AlertCircle className="text-red-500 shrink-0" size={24} />
-          <h2 className="text-lg font-semibold text-gray-900">Réponse requise</h2>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="text-red-500 shrink-0" size={24} />
+            <h2 className="text-lg font-semibold text-gray-900">Réponse requise</h2>
+          </div>
+          <button
+            type="button"
+            onClick={closeRestrictionModal}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Fermer et répondre à la conversation ouverte"
+            title="Fermer — répondre à la conversation ouverte"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <p className="text-gray-600 mb-5">

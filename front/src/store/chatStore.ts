@@ -113,6 +113,8 @@ interface ChatState {
   pendingConversationId: string | null;
   loadRestrictionConfig: () => Promise<void>;
   dismissRestriction: (chatId: string) => void;
+  /** Ferme le modal sans naviguer — la commerciale répond à la conv déjà ouverte */
+  closeRestrictionModal: () => void;
   /** Sélection directe sans vérification de restriction (usage interne et modal) */
   _doSelectConversation: (chat_id: string) => void;
 
@@ -158,6 +160,7 @@ const initialState: Omit<
   | "clearSelectedConversation"
   | "loadRestrictionConfig"
   | "dismissRestriction"
+  | "closeRestrictionModal"
   | "_doSelectConversation"
 > = {
   socket: null,
@@ -442,6 +445,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     get().socket?.emit('messages:get', { chat_id: chatId });
+  },
+
+  closeRestrictionModal: () => {
+    set({ restrictionTriggered: false, pendingConversationId: null });
   },
 
   updateConversationContactSummary: (chatId, summary) => {
