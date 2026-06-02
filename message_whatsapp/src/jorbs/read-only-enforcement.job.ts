@@ -5,9 +5,10 @@ import {
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
-import { LessThan, Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { ChannelService } from 'src/channel/channel.service';
+import { AppLogger } from 'src/logging/app-logger.service';
 
 export interface ReadOnlyEnforcementPreview {
   total: number;
@@ -28,6 +29,7 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     private readonly gateway: WhatsappMessageGateway,
     private readonly cronConfigService: CronConfigService,
     private readonly channelService: ChannelService,
+    private readonly logger: AppLogger,
   ) {}
 
   onModuleInit(): void {
@@ -50,27 +52,25 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
   }
 
   /**
-   * Conversations éligibles à la fermeture automatique :
+   * Conversations éligibles par inactivité client :
    * - status != fermé
-   * - last_activity_at < seuil → aucune activité (client ou commercial) depuis plus de N heures
-   *
-   * On se base sur last_activity_at plutôt que last_poste_message_at ou createdAt
-   * pour éviter de refermer une conversation que le client vient de rouvrir.
-   * last_activity_at est mis à jour à chaque message entrant (incrementUnreadCount).
+   * - last_client_message_at < seuil OU null (client n'a jamais/plus écrit)
    */
-  private async findEligible(limit: Date): Promise<WhatsappChat[]> {
-    return this.chatRepo.find({
-      where: {
-        status: Not(WhatsappChatStatus.FERME),
-        last_activity_at: LessThan(limit),
-      },
-    });
+  private async findEligibleByClientInactivity(limit: Date): Promise<WhatsappChat[]> {
+    return this.chatRepo
+      .createQueryBuilder('chat')
+      .where('chat.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .andWhere(
+        '(chat.last_client_message_at IS NULL OR chat.last_client_message_at < :limit)',
+        { limit },
+      )
+      .getMany();
   }
 
   async preview(): Promise<ReadOnlyEnforcementPreview> {
     const thresholdMs = await this.getThresholdMs();
     const limit = new Date(Date.now() - thresholdMs);
-    const chats = await this.findEligible(limit);
+    const chats = await this.findEligibleByClientInactivity(limit);
 
     const eligible: typeof chats = [];
     for (const c of chats) {
@@ -86,9 +86,9 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
         name: c.name,
         status: c.status,
         last_activity_at: c.last_activity_at,
-        idle_hours: Math.floor(
-          (Date.now() - new Date(c.last_activity_at).getTime()) / 3_600_000,
-        ),
+        idle_hours: c.last_client_message_at
+          ? Math.floor((Date.now() - new Date(c.last_client_message_at).getTime()) / 3_600_000)
+          : -1,
       })),
     };
   }
@@ -96,12 +96,16 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
   async enforce(): Promise<string> {
     const thresholdMs = await this.getThresholdMs();
     const limit = new Date(Date.now() - thresholdMs);
-    const chats = await this.findEligible(limit);
+    const chats = await this.findEligibleByClientInactivity(limit);
+
+    this.logger.log(
+      `READ_ONLY_ENFORCE candidates=${chats.length}`,
+      ReadOnlyEnforcementJob.name,
+    );
 
     let closed = 0;
     let skipped = 0;
     for (const chat of chats) {
-      // Priorité : canal permanent de la conversation, puis canal du dernier message client
       const channelId = chat.channel_id ?? chat.last_msg_client_channel_id ?? null;
       if (channelId && await this.channelService.shouldSkipAutoClose(channelId)) {
         skipped++;
