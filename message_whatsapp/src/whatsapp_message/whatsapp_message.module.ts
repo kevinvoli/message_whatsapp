@@ -47,6 +47,7 @@ import { MessageReadService } from './message-read.service';
 import { MessageReadRateLimiterService } from './message-read-rate-limiter.service';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { ConversationRestrictionModule } from 'src/conversation-restriction/conversation-restriction.module';
+import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { ConversationRestrictionModule } from 'src/conversation-restriction/conv
       AutoMessageKeyword,
       WhatsappMedia,
       DispatchSettings,
+      MetaAdReferral,
     ]),
     WhatsappChatModule,
     forwardRef(() => DispatcherModule),

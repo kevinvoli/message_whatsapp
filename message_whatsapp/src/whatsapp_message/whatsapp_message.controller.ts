@@ -37,6 +37,8 @@ import { Request, Response } from 'express';
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-whatsapp-template.dto';
 import { UpdateWhatsappTemplateDto } from 'src/whatsapp_template/dto/update-whatsapp-template.dto';
+import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
+import axios from 'axios';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
 
@@ -58,12 +60,44 @@ export class WhatsappMessageController {
     private readonly chatService: WhatsappChatService,
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
+    @InjectRepository(MetaAdReferral)
+    private readonly metaAdReferralRepository: Repository<MetaAdReferral>,
     private readonly channelService: ChannelService,
     private readonly metaService: CommunicationMetaService,
     private readonly messengerService: CommunicationMessengerService,
     private readonly whapiService: CommunicationWhapiService,
     private readonly templateService: WhatsappTemplateService,
   ) {}
+
+  /**
+   * Proxy l'image d'une publicité Meta (CTWA) pour éviter le blocage
+   * par les protections anti-pistage des navigateurs (fbcdn.net bloqué).
+   */
+  @Get('media/referral-ad/:chatId')
+  async streamReferralAdImage(
+    @Param('chatId') chatId: string,
+    @Res() res: Response,
+  ) {
+    const referral = await this.metaAdReferralRepository.findOne({
+      where: { chatId },
+    });
+    if (!referral?.imageUrl) {
+      throw new NotFoundException('Image publicitaire introuvable');
+    }
+    try {
+      const response = await axios.get(referral.imageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 10_000,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      const mimeType = (response.headers['content-type'] as string) ?? 'image/jpeg';
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(Buffer.from(response.data));
+    } catch {
+      throw new NotFoundException('Impossible de récupérer l\'image publicitaire');
+    }
+  }
 
   @Post()
   @UseGuards(AdminGuard)

@@ -3,6 +3,7 @@ import { Conversation, Message } from '@/types/chat';
 import ChatMessage from './ChatMessage';
 import { formatDateLong } from '@/lib/dateUtils';
 import { useChatStore } from '@/store/chatStore';
+import { resolveMediaUrl } from '@/lib/utils';
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -93,7 +94,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
               </p>
               {currentConv.metaAdReferral.imageUrl && (
                 <img
-                  src={currentConv.metaAdReferral.imageUrl}
+                  src={resolveMediaUrl(`/messages/media/referral-ad/${currentConv.chat_id}`)}
                   alt="Publicité Meta"
                   className="w-full rounded-xl object-cover max-h-48"
                 />
