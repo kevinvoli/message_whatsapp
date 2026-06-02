@@ -94,7 +94,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
               </p>
               {currentConv.metaAdReferral.imageUrl && (
                 <img
-                  src={resolveMediaUrl(`/messages/media/referral-ad/${currentConv.chat_id}`)}
+                  src={resolveMediaUrl(`/messages/media/referral-ad/${currentConv.chat_id}`) ?? undefined}
                   alt="Publicité Meta"
                   className="w-full rounded-xl object-cover max-h-48"
                 />
