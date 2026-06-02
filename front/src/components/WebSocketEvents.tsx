@@ -222,6 +222,13 @@ const WebSocketEvents = () => {
         case 'RATE_LIMITED': {
           const event = (data.payload as { event?: string }).event ?? 'unknown';
           logger.warn('Rate limited by server', { event });
+          // Si messages:get est rate-limité, libérer isLoading pour éviter le spinner infini
+          if (event === 'messages:get') {
+            const selectedId = chatState.selectedConversation?.chat_id;
+            if (selectedId && chatState.isLoading) {
+              chatState.setMessages(selectedId, [], false);
+            }
+          }
           break;
         }
 

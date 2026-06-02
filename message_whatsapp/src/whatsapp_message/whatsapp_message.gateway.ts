@@ -533,6 +533,13 @@ export class WhatsappMessageGateway
     });
   }
 
+  /** Postes dédiés exemptés du throttle socket (canal admin). */
+  private isThrottled(clientId: string, event: string): boolean {
+    const agent = this.connectedAgents.get(clientId);
+    if (agent?.isDedicated) return false;
+    return !this.throttle.allow(clientId, event);
+  }
+
   @SubscribeMessage('conversations:get')
   async handleGetConversations(
     @ConnectedSocket() client: Socket,
@@ -544,7 +551,7 @@ export class WhatsappMessageGateway
       tab?: string;
     },
   ) {
-    if (!this.throttle.allow(client.id, 'conversations:get')) {
+    if (this.isThrottled(client.id, 'conversations:get')) {
       return this.emitRateLimited(client, 'conversations:get');
     }
     const agent = this.connectedAgents.get(client.id);
@@ -573,7 +580,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
-    if (!this.throttle.allow(client.id, 'contact:get_detail')) {
+    if (this.isThrottled(client.id, 'contact:get_detail')) {
       return this.emitRateLimited(client, 'contact:get_detail');
     }
     const contact = await this.contactService.findOneByChatId(payload.chat_id);
@@ -585,7 +592,7 @@ export class WhatsappMessageGateway
 
   @SubscribeMessage('contacts:get')
   async handleGetContacts(@ConnectedSocket() client: Socket) {
-    if (!this.throttle.allow(client.id, 'contacts:get')) {
+    if (this.isThrottled(client.id, 'contacts:get')) {
       return this.emitRateLimited(client, 'contacts:get');
     }
     this.logger.debug(`Contacts list requested (${client.id})`);
@@ -598,7 +605,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { contact_id: string },
   ) {
-    if (!this.throttle.allow(client.id, 'call_logs:get')) {
+    if (this.isThrottled(client.id, 'call_logs:get')) {
       return this.emitRateLimited(client, 'call_logs:get');
     }
     const logs = await this.callLogService.findByContactId(payload.contact_id);
@@ -614,7 +621,7 @@ export class WhatsappMessageGateway
     @MessageBody()
     data: { type: string; payload?: { chat_id?: string; status?: string } },
   ) {
-    if (!this.throttle.allow(client.id, 'chat:event')) {
+    if (this.isThrottled(client.id, 'chat:event')) {
       return this.emitRateLimited(client, 'chat:event');
     }
 
@@ -697,11 +704,18 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; limit?: number; before?: string },
   ) {
-    if (!this.throttle.allow(client.id, 'messages:get')) {
-      return this.emitRateLimited(client, 'messages:get');
-    }
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
+
+    if (this.isThrottled(client.id, 'messages:get')) {
+      // Émettre MESSAGE_LIST vide plutôt que RATE_LIMITED pour libérer isLoading.
+      // Les postes dédiés ne passent jamais par ce chemin (isThrottled bypasse pour eux).
+      client.emit('chat:event', {
+        type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
+        payload: { chat_id: payload.chat_id, messages: [], hasMore: false },
+      });
+      return;
+    }
 
     const tenantIds = this.getTenantIds(client);
     const chat = await this.chatService.findBychat_id(payload.chat_id);
@@ -825,7 +839,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string },
   ) {
-    if (!this.throttle.allow(client.id, 'messages:read')) {
+    if (this.isThrottled(client.id, 'messages:read')) {
       return this.emitRateLimited(client, 'messages:read');
     }
     const tenantIds = this.getTenantIds(client);
@@ -864,7 +878,7 @@ export class WhatsappMessageGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { chat_id: string; text: string; tempId: string; quotedMessageId?: string },
   ) {
-    if (!this.throttle.allow(client.id, 'message:send')) {
+    if (this.isThrottled(client.id, 'message:send')) {
       return this.emitRateLimited(client, 'message:send');
     }
   
