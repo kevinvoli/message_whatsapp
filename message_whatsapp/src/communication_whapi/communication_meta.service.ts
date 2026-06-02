@@ -15,6 +15,10 @@ export class CommunicationMetaService {
     process.env.META_OUTBOUND_MAX_RETRIES ?? 2,
   );
 
+  // Cache des mediaId définitivement introuvables (400 Object does not exist).
+  // Évite de retenter un download sur des médias expirés lors de bursts de webhooks.
+  private readonly permanentlyFailedMediaIds = new Set<string>();
+
   constructor(private readonly logger: AppLogger) {}
 
   async sendTextMessage(data: {
@@ -312,6 +316,10 @@ export class CommunicationMetaService {
         | undefined;
       const reason =
         data?.error?.message ?? axiosError.message ?? 'unknown_error';
+      // 400 = objet inexistant sur Meta (expiré, supprimé) — échec permanent, ne plus réessayer
+      if (statusCode === 400 && mediaId) {
+        this.permanentlyFailedMediaIds.add(mediaId);
+      }
       this.logger.warn(
         `Failed to get Meta media URL for mediaId=${mediaId} status=${statusCode ?? 'unknown'} reason=${reason}`,
         CommunicationMetaService.name,
@@ -325,6 +333,10 @@ export class CommunicationMetaService {
     accessToken: string,
     phoneNumberId?: string,
   ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    // Court-circuit immédiat pour les médias définitivement introuvables (400 permanent).
+    if (this.permanentlyFailedMediaIds.has(mediaId)) {
+      return null;
+    }
     try {
       // Step 1: Get the temporary download URL
       const mediaUrl = await this.getMediaUrl(
@@ -353,7 +365,7 @@ export class CommunicationMetaService {
       const response = await axios.get(mediaUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
         responseType: 'arraybuffer',
-        timeout: 15_000,
+        timeout: 10_000,
       });
 
       const buffer = Buffer.from(response.data);

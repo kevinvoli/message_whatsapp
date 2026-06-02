@@ -663,7 +663,20 @@ export class WhapiController {
         );
       }
 
-      await this.whapiService.handleMetaWebhook(metaPayload, tenantId);
+      // Retourner vite a Meta: attendre le traitement complet peut provoquer
+      // des timeouts webhook puis des retries en rafale lors des bursts media.
+      const asyncStartedAt = Date.now();
+      void this.whapiService.handleMetaWebhook(metaPayload, tenantId)
+        .then(() => {
+          this.healthService.record(provider, true, Date.now() - asyncStartedAt);
+        })
+        .catch((err: Error) => {
+          this.auditLogger.error(
+            `WEBHOOK_ASYNC_ERROR provider=meta tenant_id=${tenantId} error=${err.message}`,
+          );
+          this.metricsService.recordError(provider, tenantId, 'async_exception');
+          this.healthService.record(provider, false, Date.now() - asyncStartedAt);
+        });
     } catch (err) {
       if (err instanceof HttpException) {
         this.healthService.record(
@@ -685,7 +698,6 @@ export class WhapiController {
       throw err;
     }
 
-    this.healthService.record(provider, true, Date.now() - startedAt);
     this.metricsService.recordLatency(provider, Date.now() - startedAt);
     return { status: 'EVENT_RECEIVED' };
   }
