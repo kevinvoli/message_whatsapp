@@ -45,6 +45,7 @@ import MediathequeView from '@/app/ui/MediathequeView';
 import ChannelStatsView from '@/app/ui/ChannelStatsView';
 import MessageTrafficView from '@/app/ui/MessageTrafficView';
 import DedicatedChannelsView from '@/app/ui/DedicatedChannelsView';
+import MetaCampaignsView from '@/app/ui/MetaCampaignsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -56,6 +57,7 @@ const VALID_VIEWS: ViewMode[] = [
     'message-traffic', 'rapports', 'postes', 'canaux', 'canaux-dedies', 'templates', 'automessages', 'conversations',
     'queue', 'dispatch', 'lecture-seule', 'crons', 'observabilite', 'go_no_go',
     'notifications', 'alert-config', 'campaign-links', 'mediatheque', 'settings', 'channel-stats',
+    'campagnes-meta',
 ];
 
 function AdminDashboardContent() {
@@ -192,6 +194,8 @@ function AdminDashboardContent() {
                 );
             case 'message-traffic':
                 return <MessageTrafficView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} />;
+            case 'campagnes-meta':
+                return <MetaCampaignsView />;
             default:
                 return null;
         }

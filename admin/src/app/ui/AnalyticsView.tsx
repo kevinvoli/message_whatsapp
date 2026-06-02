@@ -13,10 +13,9 @@ import {
     LineChart,
     Line,
 } from 'recharts';
-import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle, Megaphone } from 'lucide-react';
-import { getOverviewSection, getCampagnesMeta } from '@/app/lib/api';
-import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, MetaAdKpiRow } from '@/app/lib/definitions';
-import { formatDateShort } from '@/app/lib/dateUtils';
+import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle } from 'lucide-react';
+import { getOverviewSection } from '@/app/lib/api';
+import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
 
 const PERIODS = [
@@ -27,18 +26,6 @@ const PERIODS = [
 ] as const;
 
 type Period = typeof PERIODS[number]['value'];
-
-type AnalyticsTab = 'metriques' | 'campagnes-meta';
-
-function defaultDateFrom(): string {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
-}
-
-function defaultDateTo(): string {
-    return new Date().toISOString().slice(0, 10);
-}
 
 function formatSeconds(sec: number | null): string {
     if (!sec || sec <= 0) return '—';
@@ -79,9 +66,6 @@ function KpiCard({ label, value, sub, icon, color }: KpiCardProps) {
 }
 
 export default function AnalyticsView() {
-    const [activeTab, setActiveTab] = useState<AnalyticsTab>('metriques');
-
-    // ── Onglet Métriques ──────────────────────────────────────────────────────
     const [period, setPeriod] = useState<Period>('today');
     const [loading, setLoading] = useState(false);
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
@@ -96,33 +80,6 @@ export default function AnalyticsView() {
     const [activeDateFrom, setActiveDateFrom] = useState('');
     const [activeDateTo, setActiveDateTo] = useState('');
     const hasCustomRange = !!(activeDateFrom && activeDateTo);
-
-    // ── Onglet Campagnes Meta ─────────────────────────────────────────────────
-    const [campDateFrom, setCampDateFrom] = useState<string>(defaultDateFrom());
-    const [campDateTo, setCampDateTo] = useState<string>(defaultDateTo());
-    const [campLoading, setCampLoading] = useState(false);
-    const [campRows, setCampRows] = useState<MetaAdKpiRow[] | null>(null);
-    const [campError, setCampError] = useState(false);
-
-    const loadCampagnes = useCallback(async (from: string, to: string) => {
-        setCampLoading(true);
-        setCampError(false);
-        try {
-            const data = await getCampagnesMeta(from, to);
-            setCampRows(data);
-        } catch {
-            setCampError(true);
-            setCampRows(null);
-        } finally {
-            setCampLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (activeTab === 'campagnes-meta' && campRows === null && !campLoading) {
-            void loadCampagnes(campDateFrom, campDateTo);
-        }
-    }, [activeTab, campRows, campLoading, campDateFrom, campDateTo, loadCampagnes]);
 
     const load = useCallback(async (p: Period, from?: string, to?: string) => {
         setLoading(true);
@@ -268,163 +225,6 @@ export default function AnalyticsView() {
                     </button>
                 </div>
             </div>
-
-            {/* Navigation onglets */}
-            <div className="flex gap-1 border-b border-gray-200">
-                <button
-                    onClick={() => setActiveTab('metriques')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === 'metriques'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                >
-                    <TrendingUp className="w-4 h-4" />
-                    Métriques
-                </button>
-                <button
-                    onClick={() => setActiveTab('campagnes-meta')}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === 'campagnes-meta'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                >
-                    <Megaphone className="w-4 h-4" />
-                    Campagnes Meta
-                </button>
-            </div>
-
-            {/* ── Onglet Campagnes Meta ───────────────────────────────────────── */}
-            {activeTab === 'campagnes-meta' && (
-                <div className="space-y-5">
-                    {/* Filtres de dates */}
-                    <div className="flex flex-wrap items-end gap-4 bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-500 uppercase">Du</label>
-                            <input
-                                type="date"
-                                value={campDateFrom}
-                                onChange={(e) => setCampDateFrom(e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-gray-500 uppercase">Au</label>
-                            <input
-                                type="date"
-                                value={campDateTo}
-                                onChange={(e) => setCampDateTo(e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <button
-                            onClick={() => {
-                                setCampRows(null);
-                                void loadCampagnes(campDateFrom, campDateTo);
-                            }}
-                            disabled={!campDateFrom || !campDateTo || campLoading}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${campLoading ? 'animate-spin' : ''}`} />
-                            Actualiser
-                        </button>
-                    </div>
-
-                    {/* Tableau */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-                            <Megaphone className="w-5 h-5 text-blue-600" />
-                            <h2 className="text-base font-semibold text-gray-900">Campagnes publicitaires Meta (CTWA)</h2>
-                        </div>
-
-                        {campLoading && (
-                            <div className="flex justify-center py-12">
-                                <Spinner />
-                            </div>
-                        )}
-
-                        {!campLoading && campError && (
-                            <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg mx-6 my-4 px-4 py-3 text-sm">
-                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                Impossible de charger les campagnes Meta.
-                            </div>
-                        )}
-
-                        {!campLoading && !campError && campRows !== null && campRows.length === 0 && (
-                            <p className="text-sm text-gray-400 text-center py-12">
-                                Aucune campagne Meta sur cette période.
-                            </p>
-                        )}
-
-                        {!campLoading && !campError && campRows !== null && campRows.length > 0 && (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-100 bg-gray-50">
-                                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Publicite</th>
-                                            <th className="text-right py-3 px-3 text-xs font-semibold text-gray-500 uppercase">Conversations</th>
-                                            <th className="text-right py-3 px-3 text-xs font-semibold text-gray-500 uppercase">Fermees</th>
-                                            <th className="text-right py-3 px-3 text-xs font-semibold text-gray-500 uppercase">Taux conv.</th>
-                                            <th className="text-right py-3 px-3 text-xs font-semibold text-gray-500 uppercase">Moy. messages</th>
-                                            <th className="text-right py-3 px-3 text-xs font-semibold text-gray-500 uppercase">1re reponse</th>
-                                            <th className="text-right py-3 px-3 text-xs font-semibold text-gray-500 uppercase">1er contact</th>
-                                            <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Dernier contact</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {campRows.map((row) => (
-                                            <tr key={row.source_id} className="hover:bg-gray-50">
-                                                <td className="py-3 px-4">
-                                                    <p className="font-medium text-gray-900 truncate max-w-xs">
-                                                        {row.headline ?? null}
-                                                    </p>
-                                                    <p className="text-xs text-gray-400 font-mono truncate max-w-xs">
-                                                        {row.source_id.length > 20
-                                                            ? `${row.source_id.slice(0, 20)}…`
-                                                            : row.source_id}
-                                                    </p>
-                                                </td>
-                                                <td className="py-3 px-3 text-right font-semibold text-gray-900">
-                                                    {row.total_conversations.toLocaleString('fr-FR')}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-gray-600">
-                                                    {row.conversations_closed.toLocaleString('fr-FR')}
-                                                </td>
-                                                <td className="py-3 px-3 text-right">
-                                                    <span className={`font-medium ${
-                                                        row.conversion_rate >= 60 ? 'text-green-600'
-                                                        : row.conversion_rate >= 30 ? 'text-yellow-600'
-                                                        : 'text-red-500'
-                                                    }`}>
-                                                        {row.conversion_rate}%
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-gray-600">
-                                                    {row.avg_messages_per_chat.toLocaleString('fr-FR')}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-gray-600">
-                                                    {formatSeconds(row.avg_first_response_s)}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-gray-500 text-xs">
-                                                    {formatDateShort(row.first_seen)}
-                                                </td>
-                                                <td className="py-3 px-4 text-right text-gray-500 text-xs">
-                                                    {formatDateShort(row.last_seen)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* ── Onglet Métriques (contenu existant) ────────────────────────── */}
-            {activeTab === 'metriques' && (
-            <>
 
             {/* Badge plage active */}
             {hasCustomRange && (
@@ -626,9 +426,6 @@ export default function AnalyticsView() {
                         </div>
                     </div>
                 </>
-            )}
-
-            </> /* fin onglet métriques */
             )}
 
         </div>
