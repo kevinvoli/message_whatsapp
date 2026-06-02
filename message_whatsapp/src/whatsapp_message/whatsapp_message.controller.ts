@@ -78,9 +78,13 @@ export class WhatsappMessageController {
     @Param('chatId') chatId: string,
     @Res() res: Response,
   ) {
-    const referral = await this.metaAdReferralRepository.findOne({
-      where: { chatId },
-    });
+    // chatId reçu = whatsapp_chat.chat_id (ex: "22545177919@s.whatsapp.net")
+    // mais meta_ad_referral.chat_id = UUID PK de whatsapp_chat → JOIN nécessaire
+    const referral = await this.metaAdReferralRepository
+      .createQueryBuilder('ref')
+      .innerJoin('ref.chat', 'chat')
+      .where('chat.chat_id = :chatId', { chatId })
+      .getOne();
     if (!referral?.imageUrl) {
       throw new NotFoundException('Image publicitaire introuvable');
     }
