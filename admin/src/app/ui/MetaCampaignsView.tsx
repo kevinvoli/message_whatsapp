@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Megaphone, RefreshCw, AlertCircle } from 'lucide-react';
-import { getCampagnesMeta, getReferralAdImageUrl } from '../lib/api';
+import { getCampagnesMeta } from '../lib/api';
+import { resolveMediaUrl } from '../lib/utils';
 import { MetaAdKpiRow } from '../lib/definitions';
 import { formatDateShort } from '../lib/dateUtils';
 import { Spinner } from './Spinner';
@@ -136,7 +137,7 @@ export default function MetaCampaignsView() {
                                             <div className="flex items-center gap-3">
                                                 {row.image_url && row.sample_chat_id ? (
                                                     <img
-                                                        src={getReferralAdImageUrl(row.sample_chat_id)}
+                                                        src={resolveMediaUrl(`/messages/media/referral-ad/${row.sample_chat_id}`) ?? undefined}
                                                         alt={row.headline ?? 'Publicité Meta'}
                                                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200"
                                                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}

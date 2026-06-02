@@ -1480,7 +1480,4 @@ export async function getCampagnesMeta(
     return handleResponse<MetaAdKpiRow[]>(res);
 }
 
-export function getReferralAdImageUrl(chatId: string): string {
-    return `${API_BASE_URL}/api/messages/media/referral-ad/${encodeURIComponent(chatId)}`;
-}
 
