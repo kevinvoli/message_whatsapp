@@ -795,10 +795,15 @@ export class WhatsappMessageGateway
     const config = await this.restrictionService.getRestrictionConfig();
     if (!config.enabled) return;
 
-    // Postes dédiés (canal admin) : exemptés de la restriction de réponse
+    // Postes dédiés (canal admin) : exemptés de la restriction de réponse.
+    // On émet quand même restriction:status triggered=false pour débloquer le
+    // pendingConversationId côté frontend.
     if (agent.posteId) {
       const dedicatedIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
-      if (dedicatedIds.length > 0) return;
+      if (dedicatedIds.length > 0) {
+        client.emit('restriction:status', { triggered: false, unrespondedCount: 0, unrespondedConversations: [], config });
+        return;
+      }
     }
 
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
