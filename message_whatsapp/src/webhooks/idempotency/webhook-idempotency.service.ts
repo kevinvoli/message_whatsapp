@@ -154,7 +154,7 @@ export class WebhookIdempotencyService {
       const statusIds =
         whapiPayload?.statuses
           ?.map((status) =>
-            status?.id ? `${status.id}:${eventType}:out` : null,
+            status?.id ? `${status.id}:${eventType}:out:${status.status ?? 'unknown'}` : null,
           )
           .filter((value): value is string => Boolean(value)) ?? [];
 
@@ -186,7 +186,7 @@ export class WebhookIdempotencyService {
 
     const statusIds =
       value?.statuses
-        ?.map((status) => (status?.id ? `${status.id}:${eventType}:out` : null))
+        ?.map((status) => (status?.id ? `${status.id}:${eventType}:out:${status.status ?? 'unknown'}` : null))
         .filter((value: unknown): value is string => Boolean(value)) ?? [];
 
     const keys = [...messageIds, ...statusIds];
