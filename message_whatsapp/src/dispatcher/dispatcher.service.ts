@@ -245,6 +245,8 @@ export class DispatcherService {
         assigned_mode: null,
         first_response_deadline_at: null,
         last_client_message_at: new Date(),
+        channel_id: channelId ?? undefined,
+        last_msg_client_channel_id: channelId ?? undefined,
       });
 
       this.logger.log(
@@ -319,8 +321,9 @@ export class DispatcherService {
       assigned_at: new Date(),
       assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
       first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-
       last_client_message_at: new Date(),
+      channel_id: channelId ?? undefined,
+      last_msg_client_channel_id: channelId ?? undefined,
     });
 
     this.logger.debug(`Nouvelle conversation creee (${newChat.chat_id})`);

@@ -151,8 +151,16 @@ export class ConversationRestrictionService {
     for (const access of rawAccesses) {
       const chat = chatMap.get(access.chatId);
 
-      // Exclure si fermée ou en lecture seule → commercial ne peut pas répondre
-      if (!chat || chat.status === WhatsappChatStatus.FERME || chat.read_only) continue;
+      // Exclure si fermée, convertie, en lecture seule → commercial ne peut pas répondre
+      if (
+        !chat ||
+        chat.status === WhatsappChatStatus.FERME ||
+        (chat.status as string) === 'converti' ||
+        chat.read_only
+      ) continue;
+
+      // Exclure si aucun canal résolvable → commercial ne peut pas envoyer de message
+      if (!chat.channel_id && !chat.last_msg_client_channel_id) continue;
 
       // Exclure si la conversation n'est plus sur le poste de la commerciale
       if (posteId && chat.poste_id !== null && chat.poste_id !== posteId) continue;
