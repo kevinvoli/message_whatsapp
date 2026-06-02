@@ -9,6 +9,8 @@ export interface MetaAdKpiDto {
 export interface MetaAdKpiRow {
   source_id:             string;
   headline:              string | null;
+  image_url:             string | null;
+  sample_chat_id:        string;
   total_conversations:   number;
   conversations_closed:  number;
   conversion_rate:       number;
@@ -34,6 +36,7 @@ export class MetaAdKpiService {
         SELECT
           r.source_id,
           r.headline,
+          r.image_url,
           r.created_at          AS referral_created_at,
           c.id                  AS chat_uuid,
           c.chat_id             AS wa_chat_id,
@@ -84,6 +87,8 @@ export class MetaAdKpiService {
       SELECT
         cc.source_id,
         MAX(cc.headline)                                              AS headline,
+        MAX(cc.image_url)                                             AS image_url,
+        ANY_VALUE(cc.wa_chat_id)                                      AS sample_chat_id,
         COUNT(DISTINCT cc.chat_uuid)                                  AS total_conversations,
         SUM(CASE WHEN cc.status = 'fermé' THEN 1 ELSE 0 END)         AS conversations_closed,
         ROUND(

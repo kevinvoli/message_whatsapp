@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Megaphone, RefreshCw, AlertCircle } from 'lucide-react';
-import { getCampagnesMeta } from '../lib/api';
+import { getCampagnesMeta, getReferralAdImageUrl } from '../lib/api';
 import { MetaAdKpiRow } from '../lib/definitions';
 import { formatDateShort } from '../lib/dateUtils';
 import { Spinner } from './Spinner';
@@ -133,14 +133,30 @@ export default function MetaCampaignsView() {
                                 {rows.map((row) => (
                                     <tr key={row.source_id} className="hover:bg-gray-50">
                                         <td className="py-3 px-4">
-                                            <p className="font-medium text-gray-900 truncate max-w-xs">
-                                                {row.headline ?? null}
-                                            </p>
-                                            <p className="text-xs text-gray-400 font-mono truncate max-w-xs">
-                                                {row.source_id.length > 20
-                                                    ? `${row.source_id.slice(0, 20)}…`
-                                                    : row.source_id}
-                                            </p>
+                                            <div className="flex items-center gap-3">
+                                                {row.image_url && row.sample_chat_id ? (
+                                                    <img
+                                                        src={getReferralAdImageUrl(row.sample_chat_id)}
+                                                        alt={row.headline ?? 'Publicité Meta'}
+                                                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                                                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 border border-gray-200 flex items-center justify-center">
+                                                        <Megaphone className="w-5 h-5 text-gray-300" />
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-gray-900 truncate max-w-xs">
+                                                        {row.headline ?? '—'}
+                                                    </p>
+                                                    <p className="text-xs text-gray-400 font-mono truncate max-w-xs">
+                                                        {row.source_id.length > 20
+                                                            ? `${row.source_id.slice(0, 20)}…`
+                                                            : row.source_id}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="py-3 px-3 text-right font-semibold text-gray-900">
                                             {row.total_conversations.toLocaleString('fr-FR')}

@@ -971,6 +971,8 @@ export interface RestrictionConfig {
 export interface MetaAdKpiRow {
   source_id:             string;
   headline:              string | null;
+  image_url:             string | null;
+  sample_chat_id:        string;
   total_conversations:   number;
   conversations_closed:  number;
   conversion_rate:       number;
