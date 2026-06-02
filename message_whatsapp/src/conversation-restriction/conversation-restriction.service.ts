@@ -51,6 +51,12 @@ export class ConversationRestrictionService {
       return;
     }
 
+    // Ne pas tracer les conversations sans canal résolvable :
+    // le commercial ne peut physiquement pas envoyer de message → ne doit pas déclencher la restriction.
+    if (!chat.channel_id && !chat.last_msg_client_channel_id) {
+      return;
+    }
+
     const today = this.todayDateString();
 
     const existing = await this.accessRepository.findOne({

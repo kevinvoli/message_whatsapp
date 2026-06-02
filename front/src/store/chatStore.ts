@@ -118,6 +118,10 @@ interface ChatState {
   /** Sélection directe sans vérification de restriction (usage interne et modal) */
   _doSelectConversation: (chat_id: string) => void;
 
+  /** Erreur d'envoi à afficher dans la zone de saisie (ex : CHANNEL_NOT_FOUND) */
+  sendError: string | null;
+  setSendError: (msg: string | null) => void;
+
   reset: () => void;
 }
 
@@ -162,6 +166,7 @@ const initialState: Omit<
   | "dismissRestriction"
   | "closeRestrictionModal"
   | "_doSelectConversation"
+  | "setSendError"
 > = {
   socket: null,
   conversations: [],
@@ -194,6 +199,7 @@ const initialState: Omit<
   restrictionTriggered: false,
   restrictionUnresponded: [],
   pendingConversationId: null,
+  sendError: null,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -999,6 +1005,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  setSendError: (msg: string | null) => set({ sendError: msg }),
+
   reset: () => set({
     ...initialState,
     lastUnreadOpenedAt: null,
@@ -1008,5 +1016,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     restrictionTriggered: false,
     restrictionUnresponded: [],
     pendingConversationId: null,
+    sendError: null,
   }),
 }));

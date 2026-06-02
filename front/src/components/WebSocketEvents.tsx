@@ -237,6 +237,12 @@ const WebSocketEvents = () => {
               chatState.setMessages(selectedChatId, next);
             }
           }
+          const errorCode = (data.payload as { code?: string }).code;
+          if (errorCode === 'CHANNEL_NOT_FOUND' || errorCode === 'RESPONSE_TIMEOUT_EXCEEDED') {
+            const errorMsg = (data.payload as { message?: string }).message
+              ?? 'Impossible d\'envoyer : canal introuvable pour cette conversation.';
+            chatState.setSendError(errorMsg);
+          }
           logger.warn('Message send error received', {
             code: data.payload?.code,
             message: data.payload?.message,

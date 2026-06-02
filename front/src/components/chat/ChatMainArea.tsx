@@ -5,6 +5,7 @@ import ChatInput from "./ChatInput";
 import { useSocket } from "@/contexts/SocketProvider";
 import { useChatStore } from "@/store/chatStore";
 import { Phone } from "lucide-react";
+import { useEffect } from "react";
 
 export default function ChatMainArea() {
   const { isConnected: isWebSocketConnected } = useSocket();
@@ -17,19 +18,35 @@ export default function ChatMainArea() {
     sendMessage,
     onTypingStart,
     onTypingStop,
+    sendError,
+    setSendError,
   } = useChatStore();
 
   const totalMessages = selectedConversation ? messages?.length : 0;
 
-  // Fenêtre de messagerie 23h : si le client n'a pas écrit depuis plus de 23h,
+  // Fenêtre de messagerie : si le client n'a pas écrit depuis plus de X heures,
   // l'envoi de messages ordinaires est interdit côté WhatsApp.
   // Exception : les canaux dédiés à un poste ne sont pas soumis à cette restriction.
-  const WINDOW_MS = 23 * 60 * 60 * 1000;
+  // CTWA (Click-to-WhatsApp Ads) bénéficie d'une fenêtre étendue à 72h.
+  const WINDOW_MS = selectedConversation?.isCtwa
+    ? 72 * 60 * 60 * 1000  // 72h pour les conversations CTWA
+    : 23 * 60 * 60 * 1000; // 23h pour les autres
   const lastClientAt = selectedConversation?.last_client_message_at;
   const windowExpired =
     selectedConversation != null &&
     !selectedConversation.channel_dedicated &&
     (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS);
+
+  // Conversation sans canal résolvable → l'envoi est impossible côté backend
+  const noChannel =
+    selectedConversation != null && selectedConversation.source === 'inconnu';
+
+  // Auto-effacer le sendError après 5 secondes
+  useEffect(() => {
+    if (!sendError) return;
+    const timer = setTimeout(() => setSendError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [sendError, setSendError]);
 
   return (
     <div className="flex-1 flex flex-col">
@@ -62,9 +79,10 @@ export default function ChatMainArea() {
                 onTypingStart={onTypingStart}
                 onTypingStop={onTypingStop}
                 isConnected={isWebSocketConnected}
-                disabled={!!selectedConversation?.readonly || windowExpired || selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
-                windowExpired={windowExpired && selectedConversation?.status !== 'fermé' && selectedConversation?.status !== 'converti'}
+                disabled={!!selectedConversation?.readonly || windowExpired || noChannel || selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
+                windowExpired={windowExpired && !noChannel && selectedConversation?.status !== 'fermé' && selectedConversation?.status !== 'converti'}
                 conversationClosed={selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
+                noChannel={noChannel}
                 lastClientMessageAt={selectedConversation?.last_client_message_at}
                 firstResponseDeadlineAt={selectedConversation?.first_response_deadline_at}
               />
@@ -72,6 +90,11 @@ export default function ChatMainArea() {
           {error && (
             <div className="bg-red-100 border-t border-red-200 p-2 text-center">
               <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+          {sendError && (
+            <div className="bg-red-100 border-t border-red-300 p-2 text-center">
+              <p className="text-red-700 text-sm font-medium">{sendError}</p>
             </div>
           )}
         </>

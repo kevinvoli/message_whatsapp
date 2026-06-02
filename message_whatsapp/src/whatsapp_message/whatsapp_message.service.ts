@@ -144,9 +144,10 @@ export class WhatsappMessageService {
         const lastMessageDate = new Date(lastInboundMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
-        if (diffHours > this.getResponseTimeoutHours()) {
+        const timeoutHours = chat.isCtwa ? 72 : this.getResponseTimeoutHours();
+        if (diffHours > timeoutHours) {
           throw new Error(
-            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${this.getResponseTimeoutHours()}h) est expirée`,
+            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${timeoutHours}h) est expirée`,
           );
         }
       }
@@ -314,9 +315,10 @@ export class WhatsappMessageService {
         const lastMessageDate = new Date(lastInboundMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
         const diffHours = Math.ceil(diff / (1000 * 60 * 60));
-        if (diffHours > this.getResponseTimeoutHours()) {
+        const timeoutHours = chat.isCtwa ? 72 : this.getResponseTimeoutHours();
+        if (diffHours > timeoutHours) {
           throw new Error(
-            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${this.getResponseTimeoutHours()}h) est expirée`,
+            `RESPONSE_TIMEOUT_EXCEEDED: La fenêtre de réponse (${timeoutHours}h) est expirée`,
           );
         }
       }

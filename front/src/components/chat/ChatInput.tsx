@@ -20,6 +20,7 @@ interface ChatInputProps {
   disabled?: boolean;
   windowExpired?: boolean;
   conversationClosed?: boolean;
+  noChannel?: boolean;
   lastClientMessageAt?: Date | null;
   firstResponseDeadlineAt?: Date | null;
 }
@@ -100,12 +101,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
   disabled = false,
   windowExpired = false,
   conversationClosed = false,
+  noChannel = false,
   lastClientMessageAt,
   firstResponseDeadlineAt,
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -135,6 +138,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMessage((prev) => prev + emoji.native);
     setShowEmojiPicker(false);
   }, []);
+
+  // Effacer l'erreur d'upload quand la conversation change
+  useEffect(() => {
+    setUploadError(null);
+  }, [chat_id]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -191,11 +199,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
     if (!file || !chat_id) return;
 
     setIsUploading(true);
+    setUploadError(null);
     try {
       await uploadMedia(chat_id, file, file.name);
       logger.debug('Media uploaded', { chat_id, fileName: file.name });
     } catch (err) {
-      logger.error('Media upload failed', { error: err instanceof Error ? err.message : String(err) });
+      const errorMsg = err instanceof Error ? err.message : 'Echec envoi média';
+      logger.error('Media upload failed', { error: errorMsg });
+      setUploadError(errorMsg);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -334,6 +345,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 ⚠ SLA dépassé — le délai de première réponse ({new Date(firstResponseDeadlineAt!).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}) n&apos;a pas été respecté.
               </p>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Conversation sans canal → l'envoi est impossible, afficher une bannière d'avertissement
+  if (noChannel) {
+    return (
+      <div className="bg-yellow-50 border-t border-yellow-200 p-4">
+        <div className="max-w-4xl mx-auto flex items-center gap-3 text-yellow-700">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Canal introuvable</p>
+            <p className="text-xs text-yellow-600">
+              Aucun canal n&apos;est associé à cette conversation — l&apos;envoi de messages est impossible.
+            </p>
           </div>
         </div>
       </div>
@@ -498,6 +526,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <p className="text-xs text-red-500 flex items-center gap-1">
             <AlertCircle className="w-3 h-3" />
             Connexion perdue. Tentative de reconnexion...
+          </p>
+        )}
+        {uploadError && (
+          <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+            <AlertCircle className="w-3 h-3" />
+            {uploadError}
           </p>
         )}
         {avgResponseTime && (
