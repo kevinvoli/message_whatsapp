@@ -924,7 +924,20 @@ export class WhatsappMessageGateway
         ? 72 * 60 * 60 * 1000
         : 23 * 60 * 60 * 1000;
       const lastClientAt = chat.last_client_message_at;
-      if (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS) {
+      let windowExpired = !lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS;
+
+      // Fallback : last_client_message_at peut être désynchronisé (webhook manqué,
+      // canal introuvable au moment du traitement…). On vérifie le dernier message
+      // client réel en base et on répare la colonne si un message récent existe.
+      if (windowExpired) {
+        const latestClientMsg = await this.messageService.findLastInboundMessageBychat_id(payload.chat_id);
+        if (latestClientMsg?.timestamp && Date.now() - new Date(latestClientMsg.timestamp).getTime() <= WINDOW_MS) {
+          windowExpired = false;
+          void this.chatService.update(payload.chat_id, { last_client_message_at: new Date(latestClientMsg.timestamp) });
+        }
+      }
+
+      if (windowExpired) {
         client.emit('chat:event', {
           type: 'MESSAGE_SEND_ERROR',
           payload: {
