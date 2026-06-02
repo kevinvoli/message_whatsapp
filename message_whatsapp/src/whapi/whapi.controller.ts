@@ -308,11 +308,23 @@ export class WhapiController {
             );
           }
         } else {
-          await this.unifiedIngressService.ingestMessenger(singleEntryPayload, {
+          // Fire-and-forget : retourner vite à Messenger pour éviter les retries.
+          const asyncStartedAt = Date.now();
+          void this.unifiedIngressService.ingestMessenger(singleEntryPayload, {
             provider: 'messenger',
             tenantId,
             channelId: entryChannelId,
-          });
+          })
+            .then(() => {
+              this.healthService.record(provider, true, Date.now() - asyncStartedAt);
+            })
+            .catch((err: Error) => {
+              this.auditLogger.error(
+                `WEBHOOK_ASYNC_ERROR provider=messenger tenant_id=${tenantId} entry=${entryPageId} error=${err.message}`,
+              );
+              this.metricsService.recordError(provider, tenantId, 'async_exception');
+              this.healthService.record(provider, false, Date.now() - asyncStartedAt);
+            });
         }
       }
 
@@ -335,7 +347,6 @@ export class WhapiController {
       throw err;
     }
 
-    this.healthService.record(provider, true, Date.now() - startedAt);
     this.metricsService.recordLatency(provider, Date.now() - startedAt);
     return { status: 'ok' };
   }
