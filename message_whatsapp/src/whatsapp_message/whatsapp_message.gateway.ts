@@ -795,6 +795,12 @@ export class WhatsappMessageGateway
     const config = await this.restrictionService.getRestrictionConfig();
     if (!config.enabled) return;
 
+    // Postes dédiés (canal admin) : exemptés de la restriction de réponse
+    if (agent.posteId) {
+      const dedicatedIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
+      if (dedicatedIds.length > 0) return;
+    }
+
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
     const status = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
     client.emit('restriction:status', status);
@@ -993,17 +999,22 @@ export class WhatsappMessageGateway
       // Restriction lecture : enregistrer la réponse et réévaluer le statut
       const restrictionConfig = await this.restrictionService.getRestrictionConfig();
       if (restrictionConfig.enabled) {
-        const textLength = (payload.text ?? '').trim().length;
-        await this.restrictionService.recordResponse(
-          agent.commercialId,
-          payload.chat_id,
-          textLength,
-        );
-        const restrictionStatus = await this.restrictionService.checkRestriction(
-          agent.commercialId,
-          agent.posteId,
-        );
-        client.emit('restriction:status', restrictionStatus);
+        const isDedicatedPoste = agent.posteId
+          ? (await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId)).length > 0
+          : false;
+        if (!isDedicatedPoste) {
+          const textLength = (payload.text ?? '').trim().length;
+          await this.restrictionService.recordResponse(
+            agent.commercialId,
+            payload.chat_id,
+            textLength,
+          );
+          const restrictionStatus = await this.restrictionService.checkRestriction(
+            agent.commercialId,
+            agent.posteId,
+          );
+          client.emit('restriction:status', restrictionStatus);
+        }
       }
 
       this.server.to(`poste:${agent.posteId}`).emit('chat:event', {
