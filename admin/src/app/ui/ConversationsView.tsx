@@ -26,6 +26,15 @@ interface ConversationsViewProps {
     initialCommercialId?: string;
 }
 
+function parseMediaPreview(text: string): { previewUrl: string | null; cleanText: string } {
+  const match = /https?:\/\/\S+\/media\/preview\/[a-zA-Z0-9-]+/.exec(text);
+  if (!match) return { previewUrl: null, cleanText: text };
+  return {
+    previewUrl: match[0],
+    cleanText: text.replace(match[0], '').trim(),
+  };
+}
+
 export default function ConversationsView({
     onRefresh,
     selectedPeriod = 'today',
@@ -880,7 +889,7 @@ export default function ConversationsView({
                                       </p>
                                       {selectedChat.metaAdReferral.imageUrl && (
                                         <img
-                                          src={selectedChat.metaAdReferral.imageUrl}
+                                          src={resolveMediaUrl(`/messages/media/referral-ad/${selectedChat.chat_id}`) ?? undefined}
                                           alt="Publicité Meta"
                                           className="w-full rounded-xl object-cover max-h-48"
                                         />
@@ -908,10 +917,16 @@ export default function ConversationsView({
                                                         const mediaType = media.type ?? media.mime_type?.split('/')[0] ?? '';
                                                         const mediaSrc = resolveMediaUrl(media.url);
                                                         if (mediaType === 'image' && mediaSrc) {
+                                                            const isOut = msg.direction === 'OUT';
                                                             return (
-                                                                <a key={idx} href={mediaSrc} target="_blank" rel="noopener noreferrer">
-                                                                    <img src={mediaSrc} alt={media.caption ?? 'Image'} className="max-w-full rounded-md max-h-48 object-cover" />
-                                                                </a>
+                                                                <div key={idx} className={`rounded-xl overflow-hidden border ${isOut ? 'bg-blue-500/20 border-blue-400/30' : 'bg-gray-100 border-gray-200'}`}>
+                                                                    <a href={mediaSrc} target="_blank" rel="noopener noreferrer" className="block">
+                                                                        <img src={mediaSrc} alt={media.caption ?? 'Image'} className="max-w-full max-h-80 object-cover cursor-pointer" loading="lazy" />
+                                                                    </a>
+                                                                    {media.caption && (
+                                                                        <p className={`text-xs px-3 py-2 ${isOut ? 'text-blue-100' : 'text-gray-500'}`}>{media.caption}</p>
+                                                                    )}
+                                                                </div>
                                                             );
                                                         }
                                                         if (mediaType === 'video') {
@@ -1011,7 +1026,31 @@ export default function ConversationsView({
                                                     })}
                                                 </div>
                                             )}
-                                            <p>{resolveAdminMessageText(msg)}</p>
+                                            {(() => {
+                                                const rawText = resolveAdminMessageText(msg);
+                                                const { previewUrl, cleanText } = parseMediaPreview(rawText);
+                                                const isOut = msg.direction === 'OUT';
+                                                return (
+                                                    <>
+                                                        {previewUrl && (
+                                                            <div className={`mb-2 rounded-xl overflow-hidden border ${isOut ? 'bg-blue-500/20 border-blue-400/30' : 'bg-gray-100 border-gray-200'}`}>
+                                                                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                                                    <img
+                                                                        src={previewUrl}
+                                                                        alt="Média campagne"
+                                                                        className="max-w-full max-h-80 object-cover cursor-pointer"
+                                                                        loading="lazy"
+                                                                    />
+                                                                </a>
+                                                            </div>
+                                                        )}
+                                                        {cleanText && <p className="text-sm whitespace-pre-wrap break-words">{cleanText}</p>}
+                                                    </>
+                                                );
+                                            })()}
+                                            {msg.direction === 'OUT' && msg.from_name && (
+                                                <p className="text-[10px] text-blue-200 text-right italic mt-0.5 leading-tight">{msg.from_name}</p>
+                                            )}
                                             <span className="block text-right text-xs mt-1 opacity-75">
                                                 {formatDateTimeWithSeconds(msg.timestamp)}
                                                 {msg.status && (

@@ -80,7 +80,7 @@ export class MetaAdapter implements ProviderAdapter<MetaWebhookPayload> {
       raw,
     };
 
-    if (message.referral) {
+    if (message.referral && message.referral.source_type && message.referral.source_id) {
       unified.metaReferral = {
         sourceUrl:  message.referral.source_url,
         sourceType: message.referral.source_type,
