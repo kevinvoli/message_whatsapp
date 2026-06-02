@@ -871,7 +871,29 @@ export default function ConversationsView({
                             ) : messages.length === 0 ? (
                                 <p className="text-center text-gray-500">Aucun message dans cette conversation.</p>
                             ) : (
-                                messages.map((msg) => (
+                                <>
+                                {selectedChat?.isCtwa && selectedChat?.metaAdReferral && (
+                                  <div className="flex justify-center mb-4 px-4">
+                                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 max-w-xs w-full">
+                                      <p className="text-xs text-blue-600 font-medium text-center mb-2">
+                                        Client venant d&apos;une publicité Meta
+                                      </p>
+                                      {selectedChat.metaAdReferral.imageUrl && (
+                                        <img
+                                          src={selectedChat.metaAdReferral.imageUrl}
+                                          alt="Publicité Meta"
+                                          className="w-full rounded-xl object-cover max-h-48"
+                                        />
+                                      )}
+                                      {selectedChat.metaAdReferral.headline && (
+                                        <p className="text-xs text-gray-600 text-center mt-2">
+                                          {selectedChat.metaAdReferral.headline}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {messages.map((msg) => (
                                     <div
                                         key={msg.id}
                                         className={`flex ${msg.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}
@@ -1007,7 +1029,8 @@ export default function ConversationsView({
                                             </span>
                                         </div>
                                     </div>
-                                ))
+                                ))}
+                                </>
                             )}
                             <div ref={messagesEndRef} />
                         </div>

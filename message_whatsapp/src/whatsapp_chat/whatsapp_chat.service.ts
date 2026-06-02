@@ -68,6 +68,7 @@ export class WhatsappChatService {
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
       .where('chat.poste_id = :poste_id', { poste_id })
       .andWhere('chat.deletedAt IS NULL')
       .orderBy('chat.last_activity_at', 'DESC')
@@ -124,6 +125,7 @@ export class WhatsappChatService {
     return this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
       .where('chat.poste_id IS NULL')
       .andWhere('chat.status = :status', { status: 'en attente' })
       .andWhere('chat.deletedAt IS NULL')
@@ -313,6 +315,7 @@ export class WhatsappChatService {
         .createQueryBuilder('chat')
         .leftJoinAndSelect('chat.poste', 'poste')
         .leftJoinAndSelect('chat.channel', 'channel')
+        .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
         .leftJoinAndMapOne(
           'chat.contact',
           Contact,
@@ -327,6 +330,7 @@ export class WhatsappChatService {
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
       .leftJoinAndMapOne(
         'chat.contact',
         Contact,
@@ -488,6 +492,7 @@ export class WhatsappChatService {
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
       .leftJoinAndMapOne(
         'chat.contact',
         Contact,
@@ -505,6 +510,7 @@ export class WhatsappChatService {
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
+      .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
       .leftJoinAndMapOne(
         'chat.contact',
         Contact,
@@ -522,6 +528,7 @@ export class WhatsappChatService {
       .leftJoinAndSelect('chat.poste', 'poste')
       .leftJoinAndSelect('chat.channel', 'channel')
       .leftJoinAndSelect('chat.messages', 'messages')
+      .leftJoinAndSelect('chat.metaAdReferral', 'metaAdReferral')
       .leftJoinAndMapOne(
         'chat.contact',
         Contact,

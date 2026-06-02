@@ -11,7 +11,7 @@ export class MetaAdReferral {
   @Column({ name: 'chat_id', type: 'char', length: 36, unique: true })
   chatId: string;
 
-  @OneToOne(() => WhatsappChat, { onDelete: 'CASCADE' })
+  @OneToOne(() => WhatsappChat, (chat) => chat.metaAdReferral, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'chat_id' })
   chat: WhatsappChat;
 

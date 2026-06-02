@@ -326,6 +326,12 @@ export type WhatsappChat = {
   createdAt: string;
   updatedAt: string;
   campaign_link_id?: string | null;
+  isCtwa?: boolean;
+  metaAdReferral?: {
+    headline: string | null;
+    imageUrl: string | null;
+    sourceId: string;
+  } | null;
   last_message?: WhatsappMessage | null;
   channel?: Channel;
   contact?: Client;

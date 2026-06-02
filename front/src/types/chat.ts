@@ -336,6 +336,14 @@ export interface Conversation {
   /** Conversation issue d'une publicité Click-to-WhatsApp (fenêtre 72h). */
   isCtwa?: boolean;
 
+  /** Données de référence de la publicité Meta ayant déclenché la conversation CTWA. */
+  metaAdReferral?: {
+    headline:  string | null;
+    imageUrl:  string | null;
+    sourceId:  string;
+    sourceUrl?: string | null;
+  } | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -539,6 +547,12 @@ interface RawConversationData {
   read_only?: boolean;
   channel_dedicated?: boolean;
   is_ctwa?: boolean;
+  meta_ad_referral?: {
+    headline:   string | null;
+    image_url:  string | null;
+    source_id:  string;
+    source_url?: string | null;
+  } | null;
   createdAt?: string | number | Date;
   updatedAt?: string | number | Date;
   contact_summary?: {
@@ -824,6 +838,15 @@ export const transformToConversation = (
       : null,
 
     isCtwa: raw.is_ctwa ?? false,
+
+    metaAdReferral: raw.meta_ad_referral
+      ? {
+          headline:  raw.meta_ad_referral.headline  ?? null,
+          imageUrl:  raw.meta_ad_referral.image_url  ?? null,
+          sourceId:  raw.meta_ad_referral.source_id,
+          sourceUrl: raw.meta_ad_referral.source_url ?? null,
+        }
+      : null,
 
     createdAt: new Date(raw.created_at ?? raw.createdAt ?? Date.now()),
     updatedAt: new Date(raw.updated_at ?? raw.updatedAt ?? Date.now()),

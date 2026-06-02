@@ -3,6 +3,7 @@ import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_cha
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 import {
   Column,
   CreateDateColumn,
@@ -12,6 +13,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -300,6 +302,9 @@ export class WhatsappChat {
 
   @Column({ name: 'is_ctwa', type: 'boolean', default: false })
   isCtwa: boolean;
+
+  @OneToOne(() => MetaAdReferral, (referral) => referral.chat, { nullable: true, eager: false })
+  metaAdReferral: MetaAdReferral | null;
 
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];

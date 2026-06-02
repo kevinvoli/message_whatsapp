@@ -85,6 +85,27 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
             <p className="text-xs text-gray-500">Début de la conversation - {formatDateLong(currentConv?.createdAt)}</p>
           </div>
         </div>
+        {currentConv?.isCtwa && currentConv?.metaAdReferral && (
+          <div className="flex justify-center mb-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 max-w-xs w-full">
+              <p className="text-xs text-blue-600 font-medium text-center mb-2">
+                Client venant d'une publicité Meta
+              </p>
+              {currentConv.metaAdReferral.imageUrl && (
+                <img
+                  src={currentConv.metaAdReferral.imageUrl}
+                  alt="Publicité Meta"
+                  className="w-full rounded-xl object-cover max-h-48"
+                />
+              )}
+              {currentConv.metaAdReferral.headline && (
+                <p className="text-xs text-gray-600 text-center mt-2">
+                  {currentConv.metaAdReferral.headline}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
         {messages.map((msg, index) => (
           <ChatMessage key={msg.id} msg={msg} index={index} />
         ))}
