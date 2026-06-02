@@ -1658,6 +1658,15 @@ export class WhatsappMessageGateway
       channel_dedicated: !!(chat.channel?.poste_id),
       contact_client: chat.contact_client,
       first_response_deadline_at: chat.first_response_deadline_at,
+      is_ctwa: chat.isCtwa ?? false,
+      meta_ad_referral: chat.metaAdReferral
+        ? {
+            headline:   chat.metaAdReferral.headline,
+            image_url:  chat.metaAdReferral.imageUrl,
+            source_id:  chat.metaAdReferral.sourceId,
+            source_url: chat.metaAdReferral.sourceUrl,
+          }
+        : null,
     };
   }
 
