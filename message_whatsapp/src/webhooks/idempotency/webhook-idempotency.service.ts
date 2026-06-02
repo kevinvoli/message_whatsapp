@@ -322,11 +322,18 @@ export class WebhookIdempotencyService {
           existing.payload_hash &&
           existing.payload_hash !== params.payloadHash
         ) {
+          // Hash différent = même clé mais payload de batch différent (l'événement
+          // spécifique est identique, seul le contexte du batch change). On enregistre
+          // la métrique pour l'observabilité mais on traite comme un doublon : retourner
+          // 'conflict' provoquerait un 409 → retry Meta → boucle de faux conflits.
           this.metricsService.recordIdempotencyConflict(
             params.provider,
             params.tenantId,
           );
-          return 'conflict';
+          this.logger.warn(
+            `IDEMPOTENCY_HASH_MISMATCH key=${params.eventKey} provider=${params.provider} tenant=${params.tenantId ?? 'unknown'}`,
+          );
+          return 'duplicate';
         }
         return 'duplicate';
       }
