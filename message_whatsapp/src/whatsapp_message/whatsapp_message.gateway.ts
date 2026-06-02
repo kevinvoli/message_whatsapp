@@ -1135,9 +1135,11 @@ export class WhatsappMessageGateway
       `Unread count updated (${chat.chat_id}) = ${unreadCount}`,
     );
 
+    // Utiliser freshChatForUnread (chargé avec toutes les relations dont metaAdReferral)
+    // pour éviter d'écraser les données CTWA dans le store frontend.
     this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
       type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, resolvedLastMessage, unreadCount),
+      payload: this.mapConversation(freshChatForUnread ?? chat, resolvedLastMessage, unreadCount),
     });
   }
 
