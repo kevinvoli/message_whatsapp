@@ -558,6 +558,7 @@ function normalizeWhatsappChat(
     client_phone?: string;
     contact_client?: string;
     status?: string;
+    campaignLinkId?: string | null;
   },
 ): WhatsappChat {
   const unread = chat.unread_count ?? chat.unreadCount ?? 0;
@@ -600,6 +601,9 @@ function normalizeWhatsappChat(
     waiting_client_reply: chat.waiting_client_reply ?? false,
     last_auto_message_sent_at: chat.last_auto_message_sent_at ?? null,
     last_activity_at: chat.last_activity_at ?? '',
+    campaign_link_id: chat.campaign_link_id ?? chat.campaignLinkId ?? null,
+    isCtwa: chat.isCtwa ?? false,
+    metaAdReferral: chat.metaAdReferral ?? null,
     createdAt: chat.createdAt ?? new Date(0).toISOString(),
     updatedAt: chat.updatedAt ?? new Date(0).toISOString(),
     poste: chat.poste as WhatsappChat['poste'],

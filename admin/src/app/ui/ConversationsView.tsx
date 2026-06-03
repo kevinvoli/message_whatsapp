@@ -657,6 +657,22 @@ export default function ConversationsView({
                                             ? resolveAdminMessageText(chat.messages[chat.messages.length - 1])
                                             : '[Message client]'}
                                     </p>
+                                    {(chat.isCtwa || chat.campaign_link_id) && (
+                                        <div className="flex flex-wrap gap-1 mt-0.5">
+                                            {chat.isCtwa && (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                                                    <BadgeCheck className="w-2.5 h-2.5" />
+                                                    Pub Meta
+                                                </span>
+                                            )}
+                                            {chat.campaign_link_id && (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700">
+                                                    <Link2 className="w-2.5 h-2.5" />
+                                                    Campagne
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                     <p className="text-[11px] text-slate-400 mt-1 truncate">
                                         {getStatusLabel(chat)} • Poste: {resolvePosteLabel(chat)} • Canal: {resolveChannelLabel(chat)}
                                     </p>
@@ -892,7 +908,7 @@ export default function ConversationsView({
                                     </div>
                                 </div>
                                 
-                                {(selectedChat?.isCtwa || selectedChat?.metaAdReferral) && (
+                                {(selectedChat.metaAdReferral?.imageUrl || selectedChat.metaAdReferral?.headline) && (
                                   <div className="flex justify-center mb-4">
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 max-w-xs w-full">
                                       <p className="text-xs text-blue-600 font-medium text-center mb-2">
