@@ -877,8 +877,6 @@ export default function ConversationsView({
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {loadingMessages ? (
                                 <div className="flex justify-center items-center h-full"><Spinner /></div>
-                            ) : messages.length === 0 ? (
-                                <p className="text-center text-gray-500">Aucun message dans cette conversation.</p>
                             ) : (
                                 <>
                                 {selectedChat?.isCtwa && selectedChat?.metaAdReferral && (
@@ -892,6 +890,7 @@ export default function ConversationsView({
                                           src={resolveMediaUrl(`/messages/media/referral-ad/${selectedChat.chat_id}`) ?? undefined}
                                           alt="Publicité Meta"
                                           className="w-full rounded-xl object-cover max-h-48"
+                                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                                         />
                                       )}
                                       {selectedChat.metaAdReferral.headline && (
@@ -899,8 +898,16 @@ export default function ConversationsView({
                                           {selectedChat.metaAdReferral.headline}
                                         </p>
                                       )}
+                                      {selectedChat.metaAdReferral.sourceId && (
+                                        <p className="text-[10px] text-blue-400 text-center mt-1 font-mono truncate">
+                                          ID : {selectedChat.metaAdReferral.sourceId}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
+                                )}
+                                {messages.length === 0 && (
+                                  <p className="text-center text-gray-500">Aucun message dans cette conversation.</p>
                                 )}
                                 {messages.map((msg) => (
                                     <div
