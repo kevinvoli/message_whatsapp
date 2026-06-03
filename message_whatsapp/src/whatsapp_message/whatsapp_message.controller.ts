@@ -99,7 +99,10 @@ export class WhatsappMessageController {
       res.setHeader('Cache-Control', 'public, max-age=86400');
       return res.send(Buffer.from(response.data));
     } catch {
-      throw new NotFoundException('Impossible de récupérer l\'image publicitaire');
+      // URL Meta CDN expirée : rediriger directement vers elle plutôt que 404.
+      // Le navigateur tentera de charger depuis Meta CDN ; si elle est vraiment
+      // expirée il affichera une image cassée, sinon elle s'affichera.
+      return res.redirect(302, referral.imageUrl);
     }
   }
 

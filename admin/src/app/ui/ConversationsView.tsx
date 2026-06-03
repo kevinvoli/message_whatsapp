@@ -885,14 +885,26 @@ export default function ConversationsView({
                                       <p className="text-xs text-blue-600 font-medium text-center mb-2">
                                         Client venant d&apos;une publicité Meta
                                       </p>
-                                      {selectedChat.metaAdReferral.imageUrl && (
-                                        <img
-                                          src={resolveMediaUrl(`/messages/media/referral-ad/${selectedChat.chat_id}`) ?? undefined}
-                                          alt="Publicité Meta"
-                                          className="w-full rounded-xl object-cover max-h-48"
-                                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                                        />
-                                      )}
+                                      {selectedChat.metaAdReferral.imageUrl && (() => {
+                                        const directUrl = selectedChat.metaAdReferral!.imageUrl!;
+                                        const proxyUrl  = resolveMediaUrl(`/messages/media/referral-ad/${selectedChat.chat_id}`);
+                                        return (
+                                          <img
+                                            src={proxyUrl ?? directUrl}
+                                            alt="Publicité Meta"
+                                            className="w-full rounded-xl object-cover max-h-48"
+                                            referrerPolicy="no-referrer"
+                                            onError={(e) => {
+                                              const img = e.currentTarget as HTMLImageElement;
+                                              if (img.src !== directUrl) {
+                                                img.src = directUrl;
+                                              } else {
+                                                img.style.display = 'none';
+                                              }
+                                            }}
+                                          />
+                                        );
+                                      })()}
                                       {selectedChat.metaAdReferral.headline && (
                                         <p className="text-xs text-gray-600 text-center mt-2">
                                           {selectedChat.metaAdReferral.headline}
