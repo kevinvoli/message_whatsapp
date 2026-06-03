@@ -10,7 +10,7 @@ import OutboundMessageModal from './OutboundMessageModal';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
-import { formatDate, formatTime, formatDateTimeWithSeconds } from '@/app/lib/dateUtils';
+import { formatDate, formatTime, formatDateTimeWithSeconds, formatDateLong } from '@/app/lib/dateUtils';
 import { Pagination } from './Pagination';
 
 const LocationMapThumb = dynamic(() => import('./LocationMapThumb'), {
@@ -874,13 +874,25 @@ export default function ConversationsView({
                         )}
 
                         {activeTab === 'conversation' && (
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                             {loadingMessages ? (
                                 <div className="flex justify-center items-center h-full"><Spinner /></div>
+                            ) : messages.length === 0 ? (
+                                <div className="flex-1 flex items-center justify-center">
+                                    <div className="text-center text-gray-400">
+                                        <p className="text-lg">Aucun message</p>
+                                        <p className="text-sm mt-2">Aucun message dans cette conversation.</p>
+                                    </div>
+                                </div>
                             ) : (
-                                <>
+                                <div className="max-w-4xl mx-auto space-y-3">
+                                <div className="text-center mb-6">
+                                    <div className="inline-block bg-white px-4 py-2 rounded-full shadow-sm">
+                                        <p className="text-xs text-gray-500">Début de la conversation - {formatDateLong(selectedChat.createdAt)}</p>
+                                    </div>
+                                </div>
                                 {selectedChat?.isCtwa && selectedChat?.metaAdReferral && (
-                                  <div className="flex justify-center mb-4 px-4">
+                                  <div className="flex justify-center mb-4">
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 max-w-xs w-full">
                                       <p className="text-xs text-blue-600 font-medium text-center mb-2">
                                         Client venant d&apos;une publicité Meta
@@ -897,16 +909,8 @@ export default function ConversationsView({
                                           {selectedChat.metaAdReferral.headline}
                                         </p>
                                       )}
-                                      {selectedChat.metaAdReferral.sourceId && (
-                                        <p className="text-[10px] text-blue-400 text-center mt-1 font-mono truncate">
-                                          ID : {selectedChat.metaAdReferral.sourceId}
-                                        </p>
-                                      )}
                                     </div>
                                   </div>
-                                )}
-                                {messages.length === 0 && (
-                                  <p className="text-center text-gray-500">Aucun message dans cette conversation.</p>
                                 )}
                                 {messages.map((msg) => (
                                     <div
@@ -1075,7 +1079,7 @@ export default function ConversationsView({
                                         </div>
                                     </div>
                                 ))}
-                                </>
+                                </div>
                             )}
                             <div ref={messagesEndRef} />
                         </div>
