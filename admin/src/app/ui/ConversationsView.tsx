@@ -891,6 +891,7 @@ export default function ConversationsView({
                                         <p className="text-xs text-gray-500">Début de la conversation - {formatDateLong(selectedChat.createdAt)}</p>
                                     </div>
                                 </div>
+                                
                                 {(selectedChat?.isCtwa || selectedChat?.metaAdReferral) && (
                                   <div className="flex justify-center mb-4">
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 max-w-xs w-full">
