@@ -13,7 +13,6 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
-import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 
 @Module({
   imports: [
@@ -25,7 +24,6 @@ import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.e
       WhatsappPoste,
       WhatsappMessage,
       WhapiChannel,
-      MetaAdReferral,
     ]),
   ],
   controllers: [WhatsappChatController],

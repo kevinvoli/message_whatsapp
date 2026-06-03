@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -44,9 +44,8 @@ export class WhatsappChatService {
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     @InjectRepository(WhatsappPoste)
     private readonly posteRepository: Repository<WhatsappPoste>,
-    @InjectRepository(MetaAdReferral)
-    private readonly metaAdReferralRepository: Repository<MetaAdReferral>,
     private readonly posteService: WhatsappPosteService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -383,11 +382,12 @@ export class WhatsappChatService {
 
     // Bulk-fetch metaAdReferral séparément : leftJoinAndSelect + take()/skip()
     // ne charge pas correctement les relations OneToOne inverses dans TypeORM.
+    // DataSource évite d'avoir à enregistrer MetaAdReferral dans chaque module.
     if (data.length > 0) {
       const chatUuids = data.map((c) => c.id);
-      const referrals = await this.metaAdReferralRepository.find({
-        where: { chatId: In(chatUuids) },
-      });
+      const referrals = await this.dataSource
+        .getRepository(MetaAdReferral)
+        .find({ where: { chatId: In(chatUuids) } });
       const referralMap = new Map(referrals.map((r) => [r.chatId, r]));
       for (const chat of data) {
         chat.metaAdReferral = referralMap.get(chat.id) ?? null;
