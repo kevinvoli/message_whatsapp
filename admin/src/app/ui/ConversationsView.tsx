@@ -891,20 +891,20 @@ export default function ConversationsView({
                                         <p className="text-xs text-gray-500">Début de la conversation - {formatDateLong(selectedChat.createdAt)}</p>
                                     </div>
                                 </div>
-                                {selectedChat?.isCtwa && selectedChat?.metaAdReferral && (
+                                {(selectedChat?.isCtwa || selectedChat?.metaAdReferral) && (
                                   <div className="flex justify-center mb-4">
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 max-w-xs w-full">
                                       <p className="text-xs text-blue-600 font-medium text-center mb-2">
                                         Client venant d&apos;une publicité Meta
                                       </p>
-                                      {selectedChat.metaAdReferral.imageUrl && (
+                                      {selectedChat.metaAdReferral?.imageUrl && (
                                         <img
                                           src={resolveMediaUrl(`/messages/media/referral-ad/${selectedChat.chat_id}`) ?? undefined}
                                           alt="Publicité Meta"
                                           className="w-full rounded-xl object-cover max-h-48"
                                         />
                                       )}
-                                      {selectedChat.metaAdReferral.headline && (
+                                      {selectedChat.metaAdReferral?.headline && (
                                         <p className="text-xs text-gray-600 text-center mt-2">
                                           {selectedChat.metaAdReferral.headline}
                                         </p>

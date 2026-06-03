@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 
 export interface PosteStats {
   poste_id: string;
@@ -43,6 +44,8 @@ export class WhatsappChatService {
     private readonly commercialRepository: Repository<WhatsappCommercial>,
     @InjectRepository(WhatsappPoste)
     private readonly posteRepository: Repository<WhatsappPoste>,
+    @InjectRepository(MetaAdReferral)
+    private readonly metaAdReferralRepository: Repository<MetaAdReferral>,
     private readonly posteService: WhatsappPosteService,
   ) {}
 
@@ -377,6 +380,19 @@ export class WhatsappChatService {
     }
 
     const [data, total] = await qb.take(limit).skip(offset).getManyAndCount();
+
+    // Bulk-fetch metaAdReferral séparément : leftJoinAndSelect + take()/skip()
+    // ne charge pas correctement les relations OneToOne inverses dans TypeORM.
+    if (data.length > 0) {
+      const chatUuids = data.map((c) => c.id);
+      const referrals = await this.metaAdReferralRepository.find({
+        where: { chatId: In(chatUuids) },
+      });
+      const referralMap = new Map(referrals.map((r) => [r.chatId, r]));
+      for (const chat of data) {
+        chat.metaAdReferral = referralMap.get(chat.id) ?? null;
+      }
+    }
 
     // Bulk-fetch unread count réel depuis whatsapp_message (même logique que countUnreadMessagesBulk)
     // pour être cohérent avec ce que voit le commercial (pas la colonne statique unread_count)
