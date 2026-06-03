@@ -17,6 +17,8 @@ import {
   Res,
   NotFoundException,
 } from '@nestjs/common';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
@@ -390,16 +392,30 @@ export class WhatsappMessageController {
     @Query('channelId') channelId: string | undefined,
     @Res() res: Response,
   ) {
-
     if (!providerMediaId) {
       throw new BadRequestException('providerMediaId is required');
     }
 
+    // Cache disque : évite de rappeler l'API Meta à chaque requête.
+    // Les médias Meta ne changent jamais une fois reçus.
+    const cacheDir = join(process.cwd(), 'uploads', 'media-meta');
+    if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
+
+    const safeName = providerMediaId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const metaFile    = join(cacheDir, `${safeName}.bin`);
+    const metaMime    = join(cacheDir, `${safeName}.mime`);
+
+    if (existsSync(metaFile) && existsSync(metaMime)) {
+      const buffer   = readFileSync(metaFile);
+      const mimeType = readFileSync(metaMime, 'utf8');
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.send(buffer);
+    }
+
     const media = await this.mediaRepository.findOne({
       where: { provider_media_id: providerMediaId, provider: 'meta' },
-      // relations: ['channel', 'message', 'message.channel', 'message.chat'],
     });
-
 
     const resolvedChannelId =
       media?.channel?.channel_id ??
@@ -412,52 +428,42 @@ export class WhatsappMessageController {
       throw new NotFoundException('Channel not resolved for media');
     }
 
-    const channel =
-      await this.channelService.findByChannelId(resolvedChannelId);
+    const channel = await this.channelService.findByChannelId(resolvedChannelId);
     if (!channel?.token) {
       throw new NotFoundException('Channel token not found');
     }
 
-    let mediaUrl = media?.url ?? null;
+    // Tenter d'abord depuis l'URL stockée (si absolue), sinon via l'API Meta
+    const storedUrl = media?.url;
+    const isAbsolute = typeof storedUrl === 'string' && storedUrl.startsWith('http');
+    let downloaded = isAbsolute
+      ? await this.metaService.downloadMediaByUrl(storedUrl!, channel.token)
+      : null;
 
-
-
-    // Try direct URL from webhook if present
-    let downloaded =
-      mediaUrl && channel?.token
-        ? await this.metaService.downloadMediaByUrl(mediaUrl, channel.token)
-        : null;
-
-
-    // If direct URL is missing or expired, refresh via Meta API
     if (!downloaded) {
       const refreshedUrl = await this.metaService.getMediaUrl(
         providerMediaId,
         channel.token,
         channel.channel_id,
       );
-
       if (refreshedUrl) {
         if (media && refreshedUrl !== media.url) {
           await this.mediaRepository.update(media.id, { url: refreshedUrl });
         }
-        mediaUrl = refreshedUrl;
-        downloaded = await this.metaService.downloadMediaByUrl(
-          refreshedUrl,
-          channel.token,
-        );
+        downloaded = await this.metaService.downloadMediaByUrl(refreshedUrl, channel.token);
       }
-      // getMediaUrl a retourné null : le media ID n'existe plus côté Meta,
-      // inutile d'appeler downloadMedia qui rappellerait getMediaUrl une seconde fois.
     }
-
 
     if (!downloaded) {
       throw new NotFoundException('Meta media not found');
     }
 
+    // Sauvegarder en cache disque pour les prochaines requêtes
+    writeFileSync(metaFile, downloaded.buffer);
+    writeFileSync(metaMime, downloaded.mimeType);
+
     res.setHeader('Content-Type', downloaded.mimeType);
-    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     return res.send(downloaded.buffer);
   }
 
