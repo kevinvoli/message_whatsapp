@@ -14,6 +14,7 @@ export function formatTime(value: Date | string | number | null | undefined): st
   return d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 }
 
+
 /** Date courte : "18/02/2026" */
 export function formatDateShort(value: Date | string | number | null | undefined): string {
   const d = safeDate(value);
