@@ -38,7 +38,6 @@ const WebSocketEvents = () => {
       loadConversations();
       loadUnreadConversations();
       loadNouveauConversations();
-      socket.emit('contacts:get');
 
       const selectedChatId = useChatStore.getState().selectedConversation?.chat_id;
       if (selectedChatId) {

@@ -101,9 +101,14 @@ const WhatsAppPageContent = () => {
     }
   }, [filterStatus, conversations, conversationsUnread, conversationsNouveau]);
 
+  const socket = useChatStore((s) => s.socket);
+
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
     setSearchQuery('');
+    if (mode === 'contacts' && socket) {
+      socket.emit('contacts:get');
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.set('view', mode);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
