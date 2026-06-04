@@ -278,14 +278,20 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false, hasWin
             </div>
           </div>
           {!isMaster && (
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="checkbox" checked={applyToReadOnly} onChange={(e) => setApplyToReadOnly(e.target.checked)} className="rounded" />
-                Conversations lecture seule
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={applyToReadOnly} onChange={(e) => setApplyToReadOnly(e.target.checked)} className="rounded mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-sm text-gray-700">Conversations lecture seule</span>
+                  <p className="text-xs text-gray-400 mt-0.5">Par défaut, ce trigger ignore les conversations en lecture seule (fenêtre de messagerie expirée). Cocher pour l&apos;appliquer aussi quand la fenêtre est fermée — utile uniquement si vous envoyez des templates HSM.</p>
+                </div>
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="checkbox" checked={applyToClosed} onChange={(e) => setApplyToClosed(e.target.checked)} className="rounded" />
-                Conversations fermées
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={applyToClosed} onChange={(e) => setApplyToClosed(e.target.checked)} className="rounded mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-sm text-gray-700">Conversations fermées</span>
+                  <p className="text-xs text-gray-400 mt-0.5">Par défaut, ce trigger ignore les conversations au statut &quot;Fermé&quot;. Cocher pour l&apos;appliquer même aux conversations fermées — à utiliser avec précaution.</p>
+                </div>
               </label>
             </div>
           )}
