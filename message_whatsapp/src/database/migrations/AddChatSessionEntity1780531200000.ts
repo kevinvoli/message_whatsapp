@@ -20,10 +20,25 @@ export class AddChatSessionEntity1780531200000 implements MigrationInterface {
   public async up(qr: QueryRunner): Promise<void> {
     // 1. Créer la table chat_session
     if (!(await qr.hasTable('chat_session'))) {
+      // Lire la définition exacte de whatsapp_chat.id pour que whatsapp_chat_id
+      // soit strictement compatible (type + charset + collation) avec la colonne référencée.
+      // Même pattern que AddMetaAdReferral1780272000001.
+      const [idCol] = await qr.query(
+        `SELECT COLUMN_TYPE, CHARACTER_SET_NAME, COLLATION_NAME
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME   = 'whatsapp_chat'
+           AND COLUMN_NAME  = 'id'`,
+      ) as Array<{ COLUMN_TYPE: string; CHARACTER_SET_NAME: string; COLLATION_NAME: string }>;
+
+      const chatIdColDef = idCol
+        ? `${idCol.COLUMN_TYPE} CHARACTER SET ${idCol.CHARACTER_SET_NAME} COLLATE ${idCol.COLLATION_NAME} NOT NULL`
+        : `CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL`;
+
       await qr.query(`
         CREATE TABLE \`chat_session\` (
           \`id\`                           CHAR(36)      NOT NULL DEFAULT (UUID()) PRIMARY KEY,
-          \`whatsapp_chat_id\`             CHAR(36)      NOT NULL,
+          \`whatsapp_chat_id\`             ${chatIdColDef},
           \`started_at\`                   DATETIME      NOT NULL,
           \`ended_at\`                     DATETIME      NULL DEFAULT NULL,
           \`is_ctwa\`                      TINYINT(1)    NOT NULL DEFAULT 0,
