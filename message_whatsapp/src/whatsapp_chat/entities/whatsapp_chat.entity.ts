@@ -297,11 +297,20 @@ export class WhatsappChat {
   @Column({ name: 'on_assign_auto_sent', type: 'boolean', default: false })
   on_assign_auto_sent: boolean;
 
+  // ─── Trigger J — Rappel fenêtre ──────────────────────────────────────────
+
+  /** Cache synchronisé depuis ChatSession.lastWindowReminderSentAt (source de vérité) */
+  @Column({ name: 'last_window_reminder_sent_at', type: 'timestamp', nullable: true })
+  last_window_reminder_sent_at: Date | null;
+
   @Column({ name: 'campaign_link_id', type: 'char', length: 36, nullable: true, default: null })
   campaignLinkId: string | null;
 
   @Column({ name: 'is_ctwa', type: 'boolean', default: false })
   isCtwa: boolean;
+
+  @Column({ name: 'active_session_id', type: 'char', length: 36, nullable: true, default: null })
+  activeSessionId: string | null;
 
   @OneToOne(() => MetaAdReferral, (referral) => referral.chat, { nullable: true, eager: false })
   metaAdReferral: MetaAdReferral | null;

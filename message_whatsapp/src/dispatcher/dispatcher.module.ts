@@ -39,6 +39,8 @@ import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity
 import { CallLogModule } from 'src/call-log/call_log.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { ChatSession } from 'src/chat-session/entities/chat-session.entity';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({
   imports: [
@@ -55,6 +57,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
       Contact,
       WhatsappPoste,
       WhatsappMedia,
+      ChatSession,
     ]),
     forwardRef(() => WhatsappMessageModule),
     CampaignLinkModule,
@@ -63,6 +66,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     forwardRef(() => JorbsModule),
     NotificationModule,
     WhatsappTemplateModule,
+    ChatSessionModule,
   ],
   controllers: [DispatcherController],
   providers: [

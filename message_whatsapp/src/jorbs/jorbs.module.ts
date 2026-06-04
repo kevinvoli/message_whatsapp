@@ -8,6 +8,8 @@ import { AutoMessageMasterJob } from './auto-message-master.job';
 import { DisconnectAllCommercialsJob } from './disconnect-all-commercials.job';
 import { IdleDisconnectJob } from './idle-disconnect.job';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { ChatSession } from 'src/chat-session/entities/chat-session.entity';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 import { AutoMessageKeyword } from 'src/message-auto/entities/auto-message-keyword.entity';
 import { MessageAutoModule } from 'src/message-auto/message-auto.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
@@ -26,6 +28,7 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
       AutoMessageKeyword,
       WhatsappCommercial,
       DispatchSettings,
+      ChatSession,
     ]),
     forwardRef(() => MessageAutoModule),
     forwardRef(() => WhatsappMessageModule),
@@ -33,6 +36,7 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
     LoggingModule,
     NotificationModule,
     ConnectionLogModule,
+    ChatSessionModule,
   ],
   controllers: [CronConfigController],
   providers: [

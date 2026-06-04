@@ -11,6 +11,7 @@ import { Mutex, MutexInterface, withTimeout } from 'async-mutex';
 import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import {
   ExtractedMedia,
   WhapiRawMedia,
@@ -29,6 +30,8 @@ import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
 import { MetaAdReferralService } from 'src/meta-ad-referral/meta-ad-referral.service';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
+import { CronConfigService } from 'src/jorbs/cron-config.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -59,6 +62,8 @@ export class InboundMessageService {
     private readonly messengerService: CommunicationMessengerService,
     private readonly campaignLinkService: CampaignLinkService,
     private readonly metaAdReferralService: MetaAdReferralService,
+    private readonly chatSessionService: ChatSessionService,
+    private readonly cronConfigService: CronConfigService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -109,17 +114,66 @@ export class InboundMessageService {
             return;
           }
 
+          // Conserver l'enregistrement du referral pour analytics
           if (message.provider === 'meta' && message.metaReferral && !conversation.isCtwa) {
             await this.metaAdReferralService.createIfAbsent(conversation.id, message.metaReferral);
-            await this.chatService.update(conversation.chat_id, { isCtwa: true });
-            conversation.isCtwa = true;
           }
 
-          let savedMessage: Awaited<
-            ReturnType<
-              typeof this.whatsappMessageService.saveIncomingFromUnified
-            >
-          >;
+          // Synchroniser la ChatSession (non-bloquant sur erreur — P3)
+          try {
+            const config = await this.cronConfigService.findByKey('read-only-enforcement').catch(() => null);
+            const ttlNormal = (config?.ttlDays && config.ttlDays > 0) ? config.ttlDays : 24;
+            const ttlCtwa = 72;
+
+            const referral = message.metaReferral
+              ? {
+                  sourceId: message.metaReferral.sourceId,
+                  sourceType: message.metaReferral.sourceType,
+                  headline: message.metaReferral.headline,
+                  imageUrl: message.metaReferral.imageUrl,
+                }
+              : undefined;
+
+            // Fallback : si activeSessionId n'est pas chargé, chercher via getActiveSession
+            let activeSessionId = conversation.activeSessionId;
+            if (!activeSessionId) {
+              const existingSession = await this.chatSessionService.getActiveSession(conversation.id);
+              if (existingSession) {
+                activeSessionId = existingSession.id;
+                conversation.activeSessionId = activeSessionId;
+              }
+            }
+
+            if (activeSessionId) {
+              await this.chatSessionService.onClientMessage(activeSessionId, conversation.id, ttlNormal, referral);
+              // Mettre à jour le cache local pour la suite du traitement
+              if (referral?.sourceId && !conversation.isCtwa) {
+                await this.chatService.update(conversation.chat_id, { isCtwa: true });
+                conversation.isCtwa = true;
+              }
+            } else {
+              const isCtwa = !!(referral?.sourceId);
+              const session = await this.chatSessionService.openSession(
+                conversation.id,
+                isCtwa,
+                ttlNormal,
+                ttlCtwa,
+                referral,
+              );
+              conversation.activeSessionId = session.id;
+              if (isCtwa && !conversation.isCtwa) {
+                await this.chatService.update(conversation.chat_id, { isCtwa: true });
+                conversation.isCtwa = true;
+              }
+            }
+          } catch (err) {
+            this.logger.error(
+              `ChatSession sync failed (non-blocking): ${(err as Error)?.message}`,
+              err,
+            );
+          }
+
+          let savedMessage: WhatsappMessage;
           try {
             savedMessage = await this.whatsappMessageService.saveIncomingFromUnified(
               message,

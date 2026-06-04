@@ -11,6 +11,8 @@ import { AutoMessageScopeConfigService } from 'src/message-auto/auto-message-sco
 import { BusinessHoursService } from 'src/message-auto/business-hours.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
+import { ChatSession } from 'src/chat-session/entities/chat-session.entity';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 const MASTER_KEY = 'auto-message-master';
 
@@ -32,12 +34,16 @@ export class AutoMessageMasterJob implements OnModuleInit {
     @InjectRepository(AutoMessageKeyword)
     private readonly keywordRepo: Repository<AutoMessageKeyword>,
 
+    @InjectRepository(ChatSession)
+    private readonly sessionRepo: Repository<ChatSession>,
+
     private readonly cronConfigService: CronConfigService,
     private readonly messageAutoService: MessageAutoService,
     private readonly scopeConfigService: AutoMessageScopeConfigService,
     private readonly businessHoursService: BusinessHoursService,
     private readonly messageService: WhatsappMessageService,
     private readonly logger: AppLogger,
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   onModuleInit(): void {
@@ -94,6 +100,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
     await this.safeRun('G-client_type',  () => this.runTriggerG(allConfigs.get('client-type-auto-message'), windowStart));
     await this.safeRun('H-inactivity',   () => this.runTriggerH(allConfigs.get('inactivity-auto-message'), orchestratorActive));
     await this.safeRun('I-on_assign',    () => this.runTriggerI(allConfigs.get('on-assign-auto-message'), windowStart));
+    await this.safeRun('J-window-reminder', () => this.runWindowReminder());
 
     const durationMs = Date.now() - runStart;
     this.logger.debug(
@@ -479,6 +486,100 @@ export class AutoMessageMasterJob implements OnModuleInit {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // TRIGGER J — Rappel fenêtre glissante
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async runWindowReminder(): Promise<void> {
+    const config = await this.cronConfigService.findByKey('window-reminder-auto-message').catch(() => null);
+    if (!config?.enabled) return;
+
+    const normalMinBeforeMin = config.windowReminderNormalStartMin ?? 10;
+    const normalMaxBeforeMin = config.windowReminderNormalEndMin   ?? 2 * 60;
+    const ctwaMinBeforeMin   = config.windowReminderCtwaStartMin   ?? 10;
+    const ctwaMaxBeforeMin   = config.windowReminderCtwaEndMin     ?? 4 * 60;
+    const minReplies         = config.windowReminderMinReplies     ?? 1;
+    const now = Date.now();
+
+    // Bornes : auto_close_at dans [now + minBefore, now + maxBefore]
+    const normalExpiresMin = new Date(now + normalMinBeforeMin * 60_000);
+    const normalExpiresMax = new Date(now + normalMaxBeforeMin * 60_000);
+    const ctwaExpiresMin   = new Date(now + ctwaMinBeforeMin   * 60_000);
+    const ctwaExpiresMax   = new Date(now + ctwaMaxBeforeMin   * 60_000);
+
+    // Fast-exit : aucun template J actif du tout
+    const [hasJ1, hasJ2] = await Promise.all([
+      this.messageAutoService.hasWindowReminderTemplate('with_replies'),
+      this.messageAutoService.hasWindowReminderTemplate('no_replies'),
+    ]);
+    if (!hasJ1 && !hasJ2) return;
+
+    // Source de vérité : ChatSession — jointure WhatsappChat pour statut/canal
+    const sessions = await this.sessionRepo
+      .createQueryBuilder('s')
+      .innerJoinAndSelect('s.chat', 'c')
+      .leftJoinAndSelect('c.channel', 'channel')
+      .where('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .andWhere('c.activeSessionId = s.id')
+      .andWhere('s.endedAt IS NULL')
+      .andWhere(`(
+        (s.isCtwa = 0
+          AND s.autoCloseAt BETWEEN :normalExpiresMin AND :normalExpiresMax)
+        OR
+        (s.isCtwa = 1
+          AND s.autoCloseAt BETWEEN :ctwaExpiresMin AND :ctwaExpiresMax)
+      )`)
+      .andWhere('s.lastWindowReminderSentAt IS NULL')
+      .setParameters({ normalExpiresMin, normalExpiresMax, ctwaExpiresMin, ctwaExpiresMax })
+      .limit(100)
+      .getMany();
+
+    this.logger.debug(
+      `TriggerJ: ${sessions.length} session(s) éligible(s)`,
+      AutoMessageMasterJob.name,
+    );
+
+    for (const session of sessions) {
+      await this.safeSend(session.chat, async () => {
+        const chat = session.chat;
+
+        // Vérification scope auto-message (même pattern que triggers A-I)
+        const scopeOk = await this.scopeConfigService.isEnabledFor(
+          chat.poste_id, chat.last_msg_client_channel_id, chat.channel?.provider ?? null,
+        );
+        if (!scopeOk) return;
+
+        // J1 vs J2 : le commercial a-t-il répondu au moins minReplies fois dans cette session ?
+        const hasPosteReply = !!(
+          session.lastPosteMessageAt &&
+          session.lastClientMessageAt &&
+          session.lastPosteMessageAt >= session.lastClientMessageAt
+        );
+        const variant: 'with_replies' | 'no_replies' =
+          (hasPosteReply ? 1 : 0) >= minReplies ? 'with_replies' : 'no_replies';
+
+        // Résolution du template (scope-aware)
+        const template = await this.messageAutoService.getTemplateForTrigger(
+          AutoMessageTriggerType.WINDOW_REMINDER,
+          1,
+          {
+            posteId: chat.poste_id,
+            channelId: chat.last_msg_client_channel_id,
+            windowReminderTarget: variant,
+          },
+        );
+        if (!template) return;
+
+        // Anti-concurrence : UPDATE atomique IS NULL → false si déjà fait par autre instance
+        const marked = await this.chatSessionService.markWindowReminderSent(session.id, chat.id);
+        if (!marked) return;
+
+        // Envoi avec template déjà résolu
+        await this.messageAutoService.sendWindowReminderWithTemplate(chat.chat_id, template);
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Preview — aperçu sans action
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -525,6 +626,7 @@ export class AutoMessageMasterJob implements OnModuleInit {
       'no-response-auto-message', 'out-of-hours-auto-message', 'reopened-auto-message',
       'queue-wait-auto-message', 'keyword-auto-message', 'client-type-auto-message',
       'inactivity-auto-message', 'on-assign-auto-message',
+      'window-reminder-auto-message',
     ]);
   }
 

@@ -156,6 +156,7 @@ export class MessageAutoService {
       posteId?: string | null;
       channelId?: string | null;
       clientTypeTarget?: 'new' | 'returning' | 'all';
+      windowReminderTarget?: 'with_replies' | 'no_replies';
     },
   ): Promise<MessageAuto | null> {
     const allTemplates = await this.autoMessageRepo.find({
@@ -175,6 +176,14 @@ export class MessageAutoService {
     }
 
     if (!filtered.length) return null;
+
+    // Filtre window_reminder_target
+    if (options?.windowReminderTarget) {
+      filtered = filtered.filter(
+        (t) => t.windowReminderTarget === options.windowReminderTarget,
+      );
+      if (!filtered.length) return null;
+    }
 
     // Pools de priorité
     const poolPoste = options?.posteId
@@ -250,7 +259,10 @@ export class MessageAutoService {
     chatId: string,
     trigger: AutoMessageTriggerType,
     step: number,
-    options?: { clientTypeTarget?: 'new' | 'returning' | 'all' },
+    options?: {
+      clientTypeTarget?: 'new' | 'returning' | 'all';
+      windowReminderTarget?: 'with_replies' | 'no_replies';
+    },
   ): Promise<void> {
     const chat = await this.chatService.findBychat_id(chatId);
     if (!chat) return;
@@ -265,6 +277,7 @@ export class MessageAutoService {
       posteId: chat.poste_id,
       channelId: chat.last_msg_client_channel_id,
       clientTypeTarget: options?.clientTypeTarget,
+      windowReminderTarget: options?.windowReminderTarget,
     });
 
     if (!template) {
@@ -425,6 +438,71 @@ export class MessageAutoService {
 
     if (Object.keys(patch).length) {
       await this.chatService.update(chatId, patch as any);
+    }
+  }
+
+  /** Vérifie qu'au moins un template J actif existe pour le variant donné. */
+  async hasWindowReminderTemplate(variant: 'with_replies' | 'no_replies'): Promise<boolean> {
+    const count = await this.autoMessageRepo.count({
+      where: {
+        trigger_type: AutoMessageTriggerType.WINDOW_REMINDER,
+        actif: true,
+        windowReminderTarget: variant,
+      },
+    });
+    return count > 0;
+  }
+
+  /**
+   * Envoie J avec un template déjà résolu depuis runWindowReminder().
+   * Le tracking est géré par ChatSessionService.markWindowReminderSent — ne pas appeler
+   * updateTriggerTracking ici.
+   */
+  async sendWindowReminderWithTemplate(chatId: string, template: MessageAuto): Promise<void> {
+    const chat = await this.chatService.findBychat_id(chatId);
+    if (!chat || !chat.last_msg_client_channel_id) return;
+
+    void this.messageService.typingStart(chatId).catch(() => {});
+    try {
+      const text = this.formatMessageAuto({
+        message: template.body ?? '',
+        name: chat.name,
+        numero: chat.contact_client,
+      });
+
+      if (template.mediaAsset) {
+        const fileBuffer = await fs.promises.readFile(template.mediaAsset.filePath);
+        const caption = text.trim() ? text : undefined;
+        const message = await this.messageService.createAgentMediaMessage({
+          chat_id: chat.chat_id,
+          poste_id: null,
+          timestamp: new Date(),
+          channel_id: chat.last_msg_client_channel_id,
+          mediaBuffer: fileBuffer,
+          mimeType: template.mediaAsset.mimeType,
+          fileName: template.mediaAsset.originalName,
+          mediaType: template.mediaAsset.mediaType,
+          caption,
+        });
+        await this.gateway.notifyAutoMessage(message, chat);
+      } else {
+        const message = await this.messageService.createAgentMessage({
+          chat_id: chat.chat_id,
+          poste_id: null,
+          text,
+          timestamp: new Date(),
+          channel_id: chat.last_msg_client_channel_id,
+        });
+        await this.gateway.notifyAutoMessage(message, chat);
+      }
+    } catch (err) {
+      this.logger.error(
+        `sendWindowReminderWithTemplate: échec ${chatId}: ${(err as Error).message}`,
+        undefined,
+        MessageAutoService.name,
+      );
+    } finally {
+      void this.messageService.typingStop(chatId).catch(() => {});
     }
   }
 

@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   Edit, PlusCircle, Trash2, RefreshCw, CheckCircle2, PauseCircle,
   Settings, Clock, Moon, RotateCcw, Timer, Search, Users, Battery,
-  UserCheck, List, Zap, Tag, X,
+  UserCheck, List, Zap, Tag, X, Bell,
 } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import type {
@@ -38,17 +38,30 @@ const TRIGGER_TABS: Array<{
   hasClientType: boolean;
   hasKeywords: boolean;
   hasBusinessHours: boolean;
+  hasWindowReminder: boolean;
 }> = [
-  { key: 'master', label: 'CRON Global', cronKey: 'auto-message-master', icon: Zap, description: 'Planification et délais du CRON maître', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false },
-  { key: 'no_response', label: 'A – Sans réponse', cronKey: 'auto-message-no-response', icon: Clock, description: 'Aucune réponse agent après X minutes', hasThreshold: 'noResponse', hasClientType: false, hasKeywords: false, hasBusinessHours: false },
-  { key: 'sequence', label: 'B – Séquence', cronKey: null, icon: List, description: 'Séquence multi-étapes à la demande', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false },
-  { key: 'out_of_hours', label: 'C – Hors horaires', cronKey: 'auto-message-out-of-hours', icon: Moon, description: 'Message reçu en dehors des horaires', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: true },
-  { key: 'reopened', label: 'D – Réouverture', cronKey: 'auto-message-reopened', icon: RotateCcw, description: 'Client ré-écrit après fermeture', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false },
-  { key: 'queue_wait', label: 'E – File d\'attente', cronKey: 'auto-message-queue-wait', icon: Timer, description: 'Client en attente de prise en charge', hasThreshold: 'queueWait', hasClientType: false, hasKeywords: false, hasBusinessHours: false },
-  { key: 'keyword', label: 'F – Mot-clé', cronKey: 'auto-message-keyword', icon: Search, description: 'Mot-clé détecté dans le message client', hasThreshold: null, hasClientType: false, hasKeywords: true, hasBusinessHours: false },
-  { key: 'client_type', label: 'G – Type de client', cronKey: 'auto-message-client-type', icon: Users, description: 'Nouveau contact ou client fidèle', hasThreshold: null, hasClientType: true, hasKeywords: false, hasBusinessHours: false },
-  { key: 'inactivity', label: 'H – Inactivité', cronKey: 'auto-message-inactivity', icon: Battery, description: 'Aucune activité des deux côtés depuis X min', hasThreshold: 'inactivity', hasClientType: false, hasKeywords: false, hasBusinessHours: false },
-  { key: 'on_assign', label: 'I – Assignation', cronKey: 'auto-message-on-assign', icon: UserCheck, description: 'Message lors de l\'assignation à un agent', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false },
+  { key: 'master', label: 'CRON Global', cronKey: 'auto-message-master', icon: Zap, description: 'Planification et délais du CRON maître', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'no_response', label: 'A – Sans réponse', cronKey: 'auto-message-no-response', icon: Clock, description: 'Aucune réponse agent après X minutes', hasThreshold: 'noResponse', hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'sequence', label: 'B – Séquence', cronKey: null, icon: List, description: 'Séquence multi-étapes à la demande', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'out_of_hours', label: 'C – Hors horaires', cronKey: 'auto-message-out-of-hours', icon: Moon, description: 'Message reçu en dehors des horaires', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: true, hasWindowReminder: false },
+  { key: 'reopened', label: 'D – Réouverture', cronKey: 'auto-message-reopened', icon: RotateCcw, description: 'Client ré-écrit après fermeture', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'queue_wait', label: 'E – File d\'attente', cronKey: 'auto-message-queue-wait', icon: Timer, description: 'Client en attente de prise en charge', hasThreshold: 'queueWait', hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'keyword', label: 'F – Mot-clé', cronKey: 'auto-message-keyword', icon: Search, description: 'Mot-clé détecté dans le message client', hasThreshold: null, hasClientType: false, hasKeywords: true, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'client_type', label: 'G – Type de client', cronKey: 'auto-message-client-type', icon: Users, description: 'Nouveau contact ou client fidèle', hasThreshold: null, hasClientType: true, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'inactivity', label: 'H – Inactivité', cronKey: 'auto-message-inactivity', icon: Battery, description: 'Aucune activité des deux côtés depuis X min', hasThreshold: 'inactivity', hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  { key: 'on_assign', label: 'I – Assignation', cronKey: 'auto-message-on-assign', icon: UserCheck, description: 'Message lors de l\'assignation à un agent', hasThreshold: null, hasClientType: false, hasKeywords: false, hasBusinessHours: false, hasWindowReminder: false },
+  {
+    key: 'window_reminder',
+    label: 'J – Rappel fenêtre',
+    cronKey: 'window-reminder-auto-message',
+    icon: Bell,
+    description: 'Réactivation avant expiration : incite le client à répondre pour prolonger la fenêtre de discussion',
+    hasThreshold: null,
+    hasClientType: false,
+    hasKeywords: false,
+    hasBusinessHours: false,
+    hasWindowReminder: true,
+  },
 ];
 
 const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -59,9 +72,11 @@ interface TriggerCronConfigCardProps {
   cronKey: string;
   hasThreshold: 'noResponse' | 'queueWait' | 'inactivity' | null;
   isMaster?: boolean;
+  hasWindowReminder?: boolean;
+  hasTtlCtwa?: boolean;
 }
 
-function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false }: TriggerCronConfigCardProps) {
+function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false, hasWindowReminder = false, hasTtlCtwa = false }: TriggerCronConfigCardProps) {
   const { addToast } = useToast();
   const [config, setConfig] = useState<CronConfig | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,6 +93,12 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false }: Trig
   const [applyToClosed, setApplyToClosed] = useState(false);
   const [activeHourStart, setActiveHourStart] = useState<number | ''>('');
   const [activeHourEnd, setActiveHourEnd] = useState<number | ''>('');
+  const [normalStartMin, setNormalStartMin] = useState(10);
+  const [normalEndMin,   setNormalEndMin]   = useState(120);
+  const [ctwaStartMin,   setCtwaStartMin]   = useState(10);
+  const [ctwaEndMin,     setCtwaEndMin]     = useState(240);
+  const [minReplies,     setMinReplies]     = useState(1);
+  const [ttlDaysCtwa,    setTtlDaysCtwa]    = useState(72);
 
   const load = useCallback(async () => {
     try {
@@ -96,6 +117,12 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false }: Trig
         setApplyToClosed(found.applyToClosed ?? false);
         setActiveHourStart(found.activeHourStart ?? '');
         setActiveHourEnd(found.activeHourEnd ?? '');
+        setNormalStartMin(found.windowReminderNormalStartMin ?? 10);
+        setNormalEndMin(  found.windowReminderNormalEndMin   ?? 120);
+        setCtwaStartMin(  found.windowReminderCtwaStartMin   ?? 10);
+        setCtwaEndMin(    found.windowReminderCtwaEndMin     ?? 240);
+        setMinReplies(    found.windowReminderMinReplies     ?? 1);
+        setTtlDaysCtwa(   found.ttlDaysCtwa                 ?? 72);
       }
     } catch { /* ignore */ }
   }, [cronKey, hasThreshold]);
@@ -134,6 +161,14 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false }: Trig
       }
       if (activeHourStart !== '') payload.activeHourStart = Number(activeHourStart);
       if (activeHourEnd !== '') payload.activeHourEnd = Number(activeHourEnd);
+      if (hasWindowReminder) {
+        payload.windowReminderNormalStartMin = normalStartMin;
+        payload.windowReminderNormalEndMin   = normalEndMin;
+        payload.windowReminderCtwaStartMin   = ctwaStartMin;
+        payload.windowReminderCtwaEndMin     = ctwaEndMin;
+        payload.windowReminderMinReplies     = minReplies;
+      }
+      if (hasTtlCtwa) payload.ttlDaysCtwa = ttlDaysCtwa;
 
       const updated = await updateCronConfig(config.key, payload);
       setConfig(updated);
@@ -173,6 +208,11 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false }: Trig
             {(config.activeHourStart !== null && config.activeHourEnd !== null) && (
               <p className="text-xs text-gray-500">
                 Plage active : {config.activeHourStart}h–{config.activeHourEnd}h
+              </p>
+            )}
+            {hasWindowReminder && (
+              <p className="text-xs text-gray-500">
+                Normal: {normalStartMin}–{normalEndMin} min avant · CTWA: {ctwaStartMin}–{ctwaEndMin} min avant
               </p>
             )}
           </div>
@@ -247,6 +287,53 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false }: Trig
                 <input type="checkbox" checked={applyToClosed} onChange={(e) => setApplyToClosed(e.target.checked)} className="rounded" />
                 Conversations fermées
               </label>
+            </div>
+          )}
+          {hasWindowReminder && (
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mt-2">Plage de déclenchement</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Début normal (min avant fermeture)</label>
+                  <input type="number" min={1} max={59} value={normalStartMin}
+                    onChange={(e) => setNormalStartMin(Number(e.target.value))}
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Fin normal (min avant fermeture)</label>
+                  <input type="number" min={60} value={normalEndMin}
+                    onChange={(e) => setNormalEndMin(Number(e.target.value))}
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Début CTWA (min avant fermeture)</label>
+                  <input type="number" min={1} max={59} value={ctwaStartMin}
+                    onChange={(e) => setCtwaStartMin(Number(e.target.value))}
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">Fin CTWA (min avant fermeture)</label>
+                  <input type="number" min={60} value={ctwaEndMin}
+                    onChange={(e) => setCtwaEndMin(Number(e.target.value))}
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">Réponses min agent pour J1 (max 1)</label>
+                <input type="number" min={1} max={1} value={minReplies}
+                  onChange={(e) => setMinReplies(Math.min(1, Number(e.target.value)))}
+                  className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
+                <p className="mt-0.5 text-xs text-gray-400">Si l&apos;agent a répondu → J1 &quot;agent disponible&quot;. Sinon → J2 &quot;demande en attente&quot;.</p>
+              </div>
+            </div>
+          )}
+          {hasTtlCtwa && (
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Délai fermeture clients Pub Meta (heures)</label>
+              <input type="number" min={24} value={ttlDaysCtwa}
+                onChange={(e) => setTtlDaysCtwa(Number(e.target.value))}
+                className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
+              <p className="mt-0.5 text-xs text-gray-400">Fenêtre CTWA (clic pub Meta). Défaut : 72h. Le TTL standard est le champ &quot;Délai TTL&quot; ci-dessus.</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
@@ -615,6 +702,9 @@ interface TemplateFormFieldsProps {
   mediaAssetId?: string | null;
   mediaAsset?: MediaAsset | null;
   onMediaChange: (assetId: string | null, asset: MediaAsset | null) => void;
+  showWindowReminder: boolean;
+  windowReminderTarget: string;
+  onWindowReminderTargetChange: (v: string) => void;
 }
 
 function TemplateFormFields({
@@ -627,6 +717,7 @@ function TemplateFormFields({
   showClientType, showKeywords, keywords, onKeywordsChange,
   postes, channels, idPrefix,
   mediaAsset, onMediaChange,
+  showWindowReminder, windowReminderTarget, onWindowReminderTargetChange,
 }: TemplateFormFieldsProps) {
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [kwInput, setKwInput] = useState('');
@@ -744,6 +835,35 @@ function TemplateFormFields({
             <option value="new">Nouveau contact uniquement</option>
             <option value="returning">Client fidèle uniquement</option>
           </select>
+        </div>
+      )}
+
+      {/* Window reminder variant (trigger J uniquement) */}
+      {showWindowReminder && (
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-bold text-gray-700">
+            Variante <span className="text-red-500">*</span>
+          </label>
+          <select
+            required
+            value={windowReminderTarget}
+            onChange={(e) => onWindowReminderTargetChange(e.target.value)}
+            className="w-full rounded border px-3 py-2 text-gray-700 shadow focus:outline-none"
+          >
+            <option value="">-- Sélectionner la variante --</option>
+            <option value="with_replies">J1 – Agent a déjà répondu</option>
+            <option value="no_replies">J2 – Agent n&apos;a pas encore répondu</option>
+          </select>
+          <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            <p className="text-xs font-semibold text-amber-700 mb-1">Contenu obligatoire</p>
+            <p className="text-xs text-amber-600">
+              Ce message doit inciter le client à répondre (question courte ou proposition d&apos;action).
+              Un message purement informatif ne prolonge pas la fenêtre de discussion.
+            </p>
+            <p className="text-xs text-amber-500 mt-1 italic">
+              Exemples : &quot;Avez-vous d&apos;autres questions ?&quot; · &quot;Souhaitez-vous continuer ? Répondez OUI.&quot;
+            </p>
+          </div>
         </div>
       )}
 
@@ -958,9 +1078,10 @@ interface TemplatePanelProps {
   trigger: AutoMessageTriggerType;
   showClientType: boolean;
   showKeywords: boolean;
+  showWindowReminder: boolean;
 }
 
-function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelProps) {
+function TemplatePanel({ trigger, showClientType, showKeywords, showWindowReminder }: TemplatePanelProps) {
   const { addToast } = useToast();
   const [templates, setTemplates] = useState<MessageAuto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -986,6 +1107,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
   const [fMediaAssetId, setFMediaAssetId] = useState<string | null>(null);
   const [fMediaAsset, setFMediaAsset] = useState<MediaAsset | null>(null);
   const [fKeywords, setFKeywords] = useState<PendingKeyword[]>([]);
+  const [fWindowReminderTarget, setFWindowReminderTarget] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
@@ -1027,6 +1149,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
     setFMediaAssetId(msg?.mediaAssetId ?? null);
     setFMediaAsset(msg?.mediaAsset ?? null);
     setFKeywords(msg?.keywords?.map((k) => ({ keyword: k.keyword, matchType: k.matchType, caseSensitive: k.caseSensitive })) ?? []);
+    setFWindowReminderTarget(msg?.windowReminderTarget ?? '');
   };
 
   const openAdd = () => { resetForm(); setShowAddModal(true); };
@@ -1046,6 +1169,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
         scope_id: fScopeId || null,
         scope_label: fScopeLabel || null,
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
+        windowReminderTarget: showWindowReminder ? (fWindowReminderTarget as 'with_replies' | 'no_replies' || null) : null,
         conditions,
         mediaAssetId: fMediaAssetId ?? null,
         keywords: showKeywords && fKeywords.length ? fKeywords : undefined,
@@ -1072,6 +1196,7 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
         scope_id: fScopeId || null,
         scope_label: fScopeLabel || null,
         client_type_target: (showClientType ? fClientType : 'all') as MessageAuto['client_type_target'],
+        windowReminderTarget: showWindowReminder ? (fWindowReminderTarget as 'with_replies' | 'no_replies' || null) : null,
         conditions,
         mediaAssetId: fMediaAssetId ?? null,
       });
@@ -1123,6 +1248,9 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
       mediaAssetId={fMediaAssetId}
       mediaAsset={fMediaAsset}
       onMediaChange={(assetId, asset) => { setFMediaAssetId(assetId); setFMediaAsset(asset); }}
+      showWindowReminder={showWindowReminder}
+      windowReminderTarget={fWindowReminderTarget}
+      onWindowReminderTargetChange={setFWindowReminderTarget}
     />
   );
 
@@ -1198,6 +1326,22 @@ function TemplatePanel({ trigger, showClientType, showKeywords }: TemplatePanelP
                   {clientTypeLabel[t.client_type_target ?? 'all']}
                 </span>
               ),
+            }] : []),
+            ...(showWindowReminder ? [{
+              header: 'Variante',
+              render: (t: MessageAuto) => {
+                const v = t.windowReminderTarget;
+                if (!v) return <span className="text-xs text-red-400 italic">Non définie</span>;
+                return (
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    v === 'with_replies'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-orange-50 text-orange-700'
+                  }`}>
+                    {v === 'with_replies' ? 'J1 – Agent a répondu' : 'J2 – En attente'}
+                  </span>
+                );
+              },
             }] : []),
             {
               header: 'Délai',
@@ -1326,6 +1470,7 @@ export default function MessageAutoView({ onRefresh: _onRefresh }: MessageAutoVi
         <TriggerCronConfigCard
           cronKey={activeTabDef.cronKey}
           hasThreshold={activeTabDef.hasThreshold}
+          hasWindowReminder={activeTabDef.hasWindowReminder}
         />
       )}
 
@@ -1338,6 +1483,7 @@ export default function MessageAutoView({ onRefresh: _onRefresh }: MessageAutoVi
           trigger={activeTab as AutoMessageTriggerType}
           showClientType={activeTabDef.hasClientType}
           showKeywords={activeTabDef.hasKeywords}
+          showWindowReminder={activeTabDef.hasWindowReminder}
         />
       )}
     </div>

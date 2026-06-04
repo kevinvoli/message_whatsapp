@@ -62,6 +62,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
 import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
 import { MediaAssetModule } from 'src/media-asset/media-asset.module';
 import { MetaAdReferralModule } from 'src/meta-ad-referral/meta-ad-referral.module';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { MetaAdReferralModule } from 'src/meta-ad-referral/meta-ad-referral.modu
     CampaignLinkModule,
     MediaAssetModule,
     MetaAdReferralModule,
+    ChatSessionModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

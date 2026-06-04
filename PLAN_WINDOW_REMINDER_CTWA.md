@@ -161,7 +161,7 @@ activeSessionId: string | null;
 |---|---|
 | **J envoye, client ne repond pas avant `autoCloseAt`** | `read-only-enforcement` ferme la session + chat (`status = fermé`). Chat reste dans l'historique. |
 | **Client repond apres fermeture** | Nouveau message entrant → `openSession()` cree une NOUVELLE session. Pas de referral Meta → `isCtwa = false`, `serviceWindowExpiresAt = now+24h`. Pas de `freeEntryExpiresAt` (avantage CTWA lie a la session precedente, non reporte). |
-| **Client repond avant fermeture** | `onClientMessage()` → `serviceWindowExpiresAt = lastMsg + 24h` + recalcul `autoCloseAt`. Fenetre prolongee. J pourra etre renvoye dans un nouveau cycle si `autoCloseAt` s'approche a nouveau. |
+| **Client repond avant fermeture** | `onClientMessage()` → `serviceWindowExpiresAt = lastMsg + 24h` + recalcul `autoCloseAt`. Fenetre prolongee. J **ne sera pas renvoye** dans cette session (`lastWindowReminderSentAt` non null). |
 
 ### Regle critique : `freeEntryExpiresAt` n'est JAMAIS incremente
 
@@ -296,7 +296,8 @@ async closeSession(sessionId: string, whatsappChatId: string): Promise<void> {
 async closeExpiredSessionAndChat(sessionId: string, whatsappChatId: string, chatBusinessId: string): Promise<void> {
   return this.dataSource.transaction(async (manager) => {
     await manager.update(ChatSession, { id: sessionId }, { endedAt: new Date() });
-    // read_only = false a la fermeture (comportement existant — verifie dans le cron actuel)
+    // ⚠ VERIFIER : read_only doit correspondre exactement au comportement du cron actuel
+    // (lire read-only-enforcement.job.ts avant d'implementer)
     await manager.update(WhatsappChat, { id: whatsappChatId }, {
       activeSessionId: null,
       status: WhatsappChatStatus.FERME,
@@ -318,7 +319,7 @@ async markWindowReminderSent(sessionId: string, whatsappChatId: string): Promise
       .update(ChatSession)
       .set({ lastWindowReminderSentAt: now })
       .where('id = :id', { id: sessionId })
-      .andWhere('(last_window_reminder_sent_at IS NULL OR last_window_reminder_sent_at < last_client_message_at)')
+      .andWhere('last_window_reminder_sent_at IS NULL')  // J = 1 seul envoi par session
       .execute();
 
     if (!result.affected) return false;
@@ -495,7 +496,13 @@ Si le client repond a J :
 - `ChatSession.lastClientMessageAt` est mis a jour
 - `serviceWindowExpiresAt` est recalcule (`+ 24h`)
 - `autoCloseAt` est recalcule (potentiellement repousse)
-- J peut etre renvoyable dans un nouveau cycle si la fenetre approche a nouveau
+- **J a rempli son role** : la fenetre est prolongee, la session continue — J n'est plus
+  envoye dans cette session (`lastWindowReminderSentAt` est positionne)
+
+Si le client ne repond **pas** a J :
+- `autoCloseAt` est atteint → `closeExpiredSessionAndChat()` ferme la session et le chat
+- Si le client ecrit plus tard → nouvelle session → `lastWindowReminderSentAt = null`
+  → J peut etre envoye dans cette nouvelle session
 
 **Regle de contenu obligatoire :** Le template J doit poser une question ou proposer une
 action courte pour provoquer une reponse. Un message purement informatif ne prolonge rien.
@@ -531,8 +538,10 @@ Pour chaque conversation eligible, UN SEUL des deux messages est envoye :
 
 Le seuil N (`min_replies_for_j1`) est configurable par l'admin (defaut : 1).
 
-Un seul envoi par session client : une fois J envoye, il n'est pas renvoye tant que
-`last_window_reminder_sent_at >= last_client_message_at`.
+Un seul envoi par session : une fois J envoye dans une `ChatSession`, il n'est **jamais**
+renvoye dans cette meme session, meme si le client repond et prolonge la fenetre.
+A l'ouverture d'une **nouvelle session**, `lastWindowReminderSentAt` repart a `null`
+et J peut etre envoye a nouveau.
 
 ---
 
@@ -745,10 +754,7 @@ private async runWindowReminder(): Promise<void> {
       (s.is_ctwa = 1
         AND s.auto_close_at BETWEEN :ctwaExpiresMin AND :ctwaExpiresMax)
     )`)
-    .andWhere(`(
-      s.last_window_reminder_sent_at IS NULL
-      OR s.last_window_reminder_sent_at < s.last_client_message_at
-    )`)
+    .andWhere('s.last_window_reminder_sent_at IS NULL') // J = 1 seul envoi par session
     .setParameters({ normalExpiresMin, normalExpiresMax, ctwaExpiresMin, ctwaExpiresMax })
     .limit(100)
     .getMany();
@@ -984,38 +990,60 @@ Dans le panneau de configuration de `read-only-enforcement`, ajouter un champ
 
 ## 4. Epic 3 — Analyse des cas limites
 
+> **Rappel architectural :** 1 client = 1 `WhatsappChat` (permanent, identifie par
+> son numero de telephone). Les sessions (`ChatSession`) sont ephemeres : un meme
+> `WhatsappChat` peut avoir N sessions successives, mais **une seule session active
+> a la fois** (`WhatsappChat.activeSessionId`).
+>
+> **Regle J :** J est envoye **une seule fois par `ChatSession`**, sans exception.
+> Le tracking `lastWindowReminderSentAt IS NULL` garantit l'unicite : une fois J envoye,
+> ce champ est positionne et J ne peut plus partir dans cette session, meme si le client
+> repond et prolonge la fenetre. A l'ouverture d'une nouvelle session, le champ repart
+> a `null` et J peut etre envoye a nouveau dans cette nouvelle session.
+
 ### Cas 1 : Client CTWA qui revient sans pub
 
-**Scenario :** Un client interagit via une pub Meta (`isCtwa = true`, chat ferme a 72h).
-Une semaine plus tard, il envoie un message direct sans pub.
+**Scenario :** Un client interagit via une pub Meta (session 1 : `isCtwa = true`,
+`autoCloseAt = T0+72h`). La session et le chat se ferment a T0+72h. Une semaine
+plus tard, le client envoie un message direct sans cliquer sur une pub.
 
-**Probleme :** Un client ne peut avoir qu'un seul `WhatsappChat`. Il n'y a pas de
-"nouvelle conversation B" — c'est le meme `WhatsappChat` qui se reuvre. Si `isCtwa`
-reste `true`, ce second echange direct herite a tort d'une fenetre 72h.
+**Comportement :**
+- 1 client = 1 `WhatsappChat` : pas de "nouvelle conversation", c'est le meme
+  `WhatsappChat` qui se reuvre via une **nouvelle `ChatSession`** (session 2).
+- Pas de referral Meta dans le nouveau message → `openSession()` cree la session 2
+  avec `isCtwa = false`, `serviceWindowExpiresAt = now+24h`, `freeEntryExpiresAt = null`.
+- `WhatsappChat.isCtwa` (cache) est mis a jour a `false` transactionnellement.
+- La session 2 obtient une fenetre de 24h : l'avantage CTWA etait lie a la session 1,
+  il n'est pas reporte sur les sessions suivantes.
 
-**Resolution (dependante de l'Epic 0 — ChatSession) :**
-- A la reouverture, le service inbound cree une nouvelle `ChatSession` avec `isCtwa = false`
-  (pas de referral Meta dans ce message)
-- `WhatsappChat.isCtwa` est mis a jour en consequence (cache de la session active)
-- La nouvelle session obtient une fenetre de 24h (`serviceWindowExpiresAt = now + 24h`, sans avantage CTWA)
+**Regle :** `isCtwa` represente "la session **courante** a ete initiee par une pub Meta",
+pas "ce client a un jour clique sur une pub Meta". La valeur est recalculee a chaque
+ouverture de session depuis la presence ou l'absence d'un referral Meta.
 
-**Sans Epic 0 (solution minimale) :** Reinitialiser `WhatsappChat.isCtwa = false` dans
-`inbound-message.service.ts` quand le chat est ferme puis reouvert sans referral Meta.
+**Resolution :** Gere nativement par `ChatSessionService.openSession()`. Aucune action
+supplementaire requise.
 
 ---
 
-### Cas 2 : Conversation CTWA reuverte par le client avant 72h
+### Cas 2 : Conversation CTWA — client repond avant la fermeture
 
-**Scenario :** Session CTWA, `autoCloseAt = T0+72h`. Job J envoye a T0+68h (4h avant `autoCloseAt`).
-A T0+71h le client repond.
+**Scenario :** Session CTWA ouverte en T0, `freeEntryExpiresAt = T0+72h`,
+`autoCloseAt = T0+72h`. Job J envoye a T0+68h (4h avant fermeture). Le client
+repond a T0+71h (1h avant l'expiration initiale).
 
 **Comportement :**
-- `lastClientMessageAt` se met a jour a T0+71h → `serviceWindowExpiresAt = T0+95h`, `autoCloseAt = T0+95h`
-- Le cron de fermeture ne ferme plus (autoCloseAt repousse)
-- `lastWindowReminderSentAt = T0+68h` < nouveau `lastClientMessageAt (T0+71h)`
-  → J eligible pour un nouveau cycle si `autoCloseAt` s'approche a nouveau dans la plage configuree
+- `lastClientMessageAt` → T0+71h
+- `serviceWindowExpiresAt` → T0+71h + 24h = **T0+95h**
+- `freeEntryExpiresAt` = T0+72h (non modifiee — fixee a l'ouverture de session, jamais incrementee)
+- `autoCloseAt` = max(T0+95h, T0+72h) = **T0+95h** (fenetre etendue de +23h au-dela
+  du CTWA initial — comportement intentionnel, cf. tableau d'extension § "Regle critique")
+- Le cron de fermeture ne ferme plus (`autoCloseAt` repousse)
+- `lastWindowReminderSentAt` = T0+68h (non null) → **J ne sera plus envoye dans cette session**,
+  meme avec le nouveau `autoCloseAt` a T0+95h. La regle est : 1 seul J par `ChatSession`.
+- La fenetre est prolongee, la conversation reste ouverte, mais aucun second rappel n'est envoye.
 
-**Resolution :** Aucune action necessaire, le mecanisme de tracking couvre ce cas.
+**Resolution :** Aucune action necessaire, le champ `lastWindowReminderSentAt IS NULL`
+garantit l'unicite per-session.
 
 ---
 
@@ -1024,32 +1052,38 @@ A T0+71h le client repond.
 **Scenario :** Une conversation existe mais le client n'a jamais envoye de message
 (conversation creee manuellement ou via un broadcast sortant).
 
-**Comportement actuel :** Le cron de fermeture considere `IS NULL` comme eligible
-et ferme immediatement (ou apres le seuil initial).
-
-**Comportement apres :** Identique pour les deux seuils (normal et CTWA) : IS NULL
-→ fermeture immediata. Le job J ignore ces conversations (pas de `last_client_message_at`
-→ hors de la plage BETWEEN).
+**Comportement :** La session backfillee a `lastClientMessageAt = null` et
+`autoCloseAt = createdAt + 24h`. Le cron de fermeture la detecte comme expiree si
+`autoCloseAt < now`. Le job J l'ignore : pas de `lastClientMessageAt` → filtre
+`BETWEEN` non satisfait, et un rappel sans message client prealable n'a pas de sens.
 
 **Resolution :** Comportement acceptable. Pas de changement necessaire.
 
 ---
 
-### Cas 4 : Meme contact avec plusieurs conversations simultanées
+### Cas 4 : Session CTWA suivie d'une session normale sur le meme chat
 
-**Scenario :** Un contact aurait une conversation CTWA et une conversation normale en parallele.
+**Scenario :** Un client a une session CTWA (session 1, `isCtwa = true`) qui se ferme.
+Quelques jours plus tard, le meme client revient via un message direct sans pub
+(session 2). On pourrait craindre un conflit entre les comportements CTWA et normal.
 
-**Correction :** Ce scenario est impossible : un client n'a qu'un seul `WhatsappChat`
-identifie par son numero de telephone. Il ne peut pas avoir deux conversations ouvertes
-simultanement avec des statuts `isCtwa` differents.
+**Note :** Un client ne peut avoir qu'un seul `WhatsappChat` et qu'**une seule session
+active a la fois** (`activeSessionId`). Il est impossible d'avoir deux sessions
+simultanement actives sur le meme contact. La confusion vient du fait que les sessions
+sont successives, pas paralleles.
 
-**Comportement reel :** A chaque nouveau message entrant, c'est toujours le meme
-`WhatsappChat` qui est reactif. Le statut `isCtwa` de la session courante est
-determine par la presence ou non d'un referral Meta dans ce message entrant.
+**Comportement :**
+- Session 1 fermee → `WhatsappChat.activeSessionId = null`, `status = ferme`
+- Message entrant sans referral → `openSession()` cree la session 2 : `isCtwa = false`,
+  fenetre 24h, pas de `freeEntryExpiresAt`
+- Les champs `lastWindowReminderSentAt` et `lastPosteMessageAt` de la session 2
+  partent a `null` : chaque session a son propre tracking, independant des sessions precedentes
+- Le job J et le cron lisent uniquement la session active
+  (filtre `.andWhere('c.active_session_id = s.id')`) → aucun conflit possible
 
-**Impact plan :** Le job J et le cron de fermeture n'ont pas a gerer de conflit
-de sessions paralleles. En revanche, il faut s'assurer que `isCtwa` est bien
-recalcule a chaque reouverture (voir Cas 1 et Cas 9).
+**Resolution :** Gere nativement par l'architecture ChatSession. Le filtre
+`c.active_session_id = s.id` garantit qu'une seule session est traitee par chat a
+tout moment.
 
 ---
 
@@ -1059,26 +1093,35 @@ recalcule a chaque reouverture (voir Cas 1 et Cas 9).
 repond 30min plus tard. Le cron tourne de nouveau 5 minutes apres.
 
 **Comportement :**
-- `lastWindowReminderSentAt` est fixe (avant le message commercial) < `lastClientMessageAt` original → OK (J deja envoye)
-- Le message commercial met a jour `lastPosteMessageAt` mais PAS `lastClientMessageAt`
-- `autoCloseAt` est toujours dans la plage declenchement J → eligible techniquement
-- Mais `lastWindowReminderSentAt >= lastClientMessageAt` → **J NON renvoye** (correct, idempotence garantie)
+- Le message commercial met a jour `ChatSession.lastPosteMessageAt` mais **pas** `lastClientMessageAt`
+- `lastWindowReminderSentAt` est non null (J deja envoye) → filtre `IS NULL` non satisfait
+  → **J NON renvoye**, meme si le commercial repond, meme si le client repond ensuite
+- Regle : 1 seul J par session, la reponse du commercial ne change rien au tracking
 
-**Resolution :** Le tracking sur `last_client_message_at` garantit l'unicite. Un seul
-J (J1 ou J2) par session client.
+**Resolution :** Le filtre `lastWindowReminderSentAt IS NULL` garantit l'unicite.
+Un seul J (J1 ou J2) par `ChatSession`, sans exception.
 
 ---
 
-### Cas 6 : Message J envoye mais la conversation se ferme avant que le client voie
+### Cas 6 : Message J envoye — la conversation se ferme avant que le client repondent
 
-**Scenario :** J est envoye 20min avant `autoCloseAt`. Le cron de fermeture tourne et la session se ferme quand `autoCloseAt` est depasse.
+**Scenario :** J est envoye 20min avant `autoCloseAt`. Le cron de fermeture tourne
+et `autoCloseAt` est depasse.
 
-**Comportement :** La conversation se ferme normalement. Si le client repond apres
-la fermeture, la conversation est reuverte (trigger D `REOPENED`). La nouvelle
-session cliente repart avec `last_client_message_at` a jour → le J precedent
-ne sera pas renvoye (tracking < nouveau message client).
+**Comportement :**
+- `closeExpiredSessionAndChat()` ferme atomiquement la session **et** le chat :
+  `ChatSession.endedAt = now`, `WhatsappChat.status = ferme`,
+  `WhatsappChat.activeSessionId = null`
+- Si le client repond **apres** la fermeture : `activeSessionId = null` → `openSession()`
+  cree une **nouvelle session** :
+  - Sans referral Meta → `isCtwa = false`, fenetre 24h
+  - Avec referral Meta → `isCtwa = true`, fenetre 72h (CTWA)
+- Trigger D (`REOPENED`) s'applique sur la reouverture.
+- Les champs `lastWindowReminderSentAt` de la nouvelle session partent a `null` :
+  le J de la session precedente ne pollue pas la nouvelle session.
 
-**Resolution :** Comportement correct. La sequence naturelle est J → fermeture → reouverture si besoin.
+**Resolution :** Comportement correct. La sequence naturelle est J → fermeture →
+reouverture avec nouvelle session si le client repond.
 
 ---
 
@@ -1102,38 +1145,35 @@ il y a potentiellement ~23 executions dans cette plage. Deux instances pourraien
 selectionner la meme session avant que l'une ait fini.
 
 **Comportement :** Double protection :
-1. `UPDATE ... WHERE last_window_reminder_sent_at IS NULL OR ... < last_client_message_at` est
-   atomique — seule l'instance dont l'UPDATE retourne `affected = 1` poursuit l'envoi.
-2. La conversation disparait du SELECT des executions suivantes (le champ est mis a jour).
+1. `UPDATE ... WHERE last_window_reminder_sent_at IS NULL` est atomique — seule l'instance
+   dont l'UPDATE retourne `affected = 1` poursuit l'envoi. Toute instance concurrente
+   trouvera le champ non null et retournera `false`.
+2. La session disparait du SELECT des executions suivantes (filtre `IS NULL` non satisfait).
 
-**Resolution :** Garanti par l'UPDATE atomique. Aucune action supplementaire.
+**Resolution :** Garanti par l'UPDATE atomique dans `markWindowReminderSent()`. Aucune action supplementaire.
 
 ---
 
-### Cas 9 : Changement de `isCtwa` en cours de conversation
+### Cas 9 : Changement de `isCtwa` en cours de session
 
 **Scenario :** Un client CTWA (`isCtwa = true`) envoie un second message direct
-(sans pub) dans la meme conversation ouverte.
-
-**Correction :** La resolution "on ne degrade pas le statut" etait incorrecte dans
-le plan initial. Si `isCtwa` reste `true` indefiniment, tous les echanges futurs du
-client (meme sans pub) recevront une fenetre 72h — ce qui est faux.
+(sans pub) dans la **meme session encore ouverte**.
 
 **Comportement correct :**
 
 | Situation | Comportement `isCtwa` |
 |---|---|
-| Message entrant avec referral Meta | `isCtwa = true` (ou reste true si session deja CTWA) |
-| Chat encore ouvert, session CTWA en cours | Garder `isCtwa = true` (la session est CTWA) |
-| Chat ferme, client revient **sans** referral | `isCtwa = false` (nouvelle session non-CTWA) |
-| Chat ferme, client revient **avec** referral | `isCtwa = true` (nouvelle session CTWA) |
+| Message entrant avec referral Meta, session non-CTWA | Upgrade : `isCtwa = true` (via `onClientMessage` → `becomeCtwa`) |
+| Message entrant **sans** referral, session CTWA en cours | `isCtwa` **reste `true`** — pas de degradation en cours de session |
+| Chat ferme, client revient **sans** referral | Nouvelle session : `isCtwa = false` (recalcule a l'ouverture) |
+| Chat ferme, client revient **avec** referral | Nouvelle session : `isCtwa = true` |
 
-**Implementation :**
-- Avec Epic 0 (ChatSession) : `isCtwa` est un champ de `ChatSession`, recalcule a chaque ouverture de session
-- Sans Epic 0 : dans `inbound-message.service.ts`, reinitialiser `WhatsappChat.isCtwa = false` quand le chat est rouvre sans referral Meta
+**Note :** `isCtwa` ne peut qu'etre **upgrade** au sein d'une session (false → true),
+jamais degrade. La degradation intervient uniquement a l'ouverture d'une **nouvelle session**.
+Cette regle est encodee dans `onClientMessage()` :
+`becomeCtwa = !session.isCtwa && !!referral?.sourceId`.
 
-**Regle simple :** `isCtwa` represente "la session **courante** a ete initiee par une pub Meta",
-pas "ce client a un jour clique sur une pub Meta".
+**Resolution :** Gere dans `ChatSessionService.onClientMessage()`. Pas de modification requise.
 
 ---
 
@@ -1143,8 +1183,8 @@ pas "ce client a un jour clique sur une pub Meta".
 "5min-3h" pendant une execution du job.
 
 **Comportement :** La config est lue a chaque execution du job. Le changement prend
-effet au prochain tick (5 minutes apres). Les conversations deja trackees avec
-`last_window_reminder_sent_at` ne recoivent pas de second message.
+effet au prochain tick (5 minutes apres). Les sessions deja trackees avec
+`lastWindowReminderSentAt` ne recoivent pas de second message.
 
 **Resolution :** Comportement acceptable. Pas de gestion speciale necessaire.
 
@@ -1221,7 +1261,93 @@ effet au prochain tick (5 minutes apres). Les conversations deja trackees avec
 
 ---
 
-## 7. Recapitulatif des parametres configurables
+## 7. Points de vigilance avant implementation
+
+### P1 — CRITIQUE : Dependance circulaire CronConfigService ↔ ChatSessionService
+
+La Decision 6 (injecter `CronConfigService` dans `ChatSessionService`) cree une
+dependance circulaire NestJS = crash au demarrage :
+- `chat-session` module → importe `jorbs` (pour `CronConfigService`)
+- `jorbs` module → importe `chat-session` (pour `ChatSessionService`)
+
+**Resolution obligatoire avant implementation :**
+Extraire `CronConfigService` dans un module partage (`shared` ou `config`) importe
+par les deux, OU passer les TTL en parametres depuis le job (qui a deja `CronConfigService`)
+plutot que de les lire dans `ChatSessionService`.
+
+---
+
+### P2 — HAUT : Supprimer `auto_close_at IS NULL` dans `findExpiredSessions()`
+
+```typescript
+// A changer :
+.andWhere('(s.auto_close_at IS NULL OR s.auto_close_at < :now)', { now: new Date() })
+// En :
+.andWhere('s.auto_close_at < :now', { now: new Date() })
+```
+
+`openSession()` calcule toujours `auto_close_at` — le cas `IS NULL` ne doit jamais
+arriver. Le conserver fermerait immediatement toute session creee avec un bug de
+calcul, risque de fermeture abusive.
+
+---
+
+### P3 — HAUT : Filet dans `inbound-message.service.ts` (hot path)
+
+Les appels `openSession()` / `onClientMessage()` / `onPosteMessage()` dans le hot
+path des messages entrants **ne doivent pas bloquer le traitement du message** en
+cas d'erreur transitoire (panne DB, deadlock).
+
+**Pattern obligatoire :**
+```typescript
+try {
+  await this.chatSessionService.openSession(...); // ou onClientMessage
+} catch (err) {
+  this.logger.error('ChatSession update failed, message processing continues', err);
+  // Le message est traite normalement — ChatSession sera reconciliee au prochain message
+}
+```
+
+---
+
+### P4 — HAUT : Verification post-backfill obligatoire
+
+Avant d'activer le nouveau `read-only-enforcement`, verifier que tous les chats
+ouverts ont bien un `active_session_id` non null :
+
+```sql
+SELECT COUNT(*) FROM whatsapp_chat
+WHERE status != 'ferme' AND active_session_id IS NULL;
+-- Doit retourner 0 apres le backfill
+```
+
+Si > 0 : ces chats ne seront plus jamais fermes automatiquement.
+Remedy : relancer le UPDATE du backfill sur les manquants.
+
+---
+
+### P5 — MOYEN : Index complement pour `read-only-enforcement`
+
+Le job `read-only-enforcement` filtre principalement sur `(ended_at IS NULL, auto_close_at < now)`.
+L'index `IDX_chat_session_window (auto_close_at, last_window_reminder_sent_at)` est
+optimise pour le job J, pas pour le cron de fermeture.
+
+**Index supplementaire a ajouter dans la migration :**
+```sql
+CREATE INDEX IDX_chat_session_enforcement ON chat_session (ended_at, auto_close_at);
+```
+
+---
+
+### P6 — MOYEN : Verifier `read_only` dans le cron actuel avant d'implementer
+
+`closeExpiredSessionAndChat()` inclut `read_only: false` marque "comportement existant".
+**Lire `read-only-enforcement.job.ts` actuel** avant d'implementer pour s'assurer que
+la valeur est correcte (risque de laisser des chats en mauvais etat si inversee).
+
+---
+
+## 8. Recapitulatif des parametres configurables
 
 | Parametre | Cle config | Defaut | Description |
 |---|---|---|---|

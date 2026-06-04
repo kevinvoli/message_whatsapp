@@ -173,7 +173,8 @@ export type AutoMessageTriggerType =
   | 'keyword'
   | 'client_type'
   | 'inactivity'
-  | 'on_assign';
+  | 'on_assign'
+  | 'window_reminder';
 
 export type KeywordMatchType = 'exact' | 'contains' | 'starts_with';
 
@@ -221,6 +222,7 @@ export type MessageAuto = {
   scope_id?: string | null;
   scope_label?: string | null;
   client_type_target?: 'all' | 'new' | 'returning' | null;
+  windowReminderTarget?: 'with_replies' | 'no_replies' | null;
   conditions?: MessageAutoConditions | null;
   keywords?: AutoMessageKeyword[];
   mediaAssetId?: string | null;
@@ -686,6 +688,12 @@ export type CronConfig = {
   applyToClosed: boolean | null;
   activeHourStart: number | null;
   activeHourEnd: number | null;
+  windowReminderNormalStartMin: number | null;
+  windowReminderNormalEndMin:   number | null;
+  windowReminderCtwaStartMin:   number | null;
+  windowReminderCtwaEndMin:     number | null;
+  windowReminderMinReplies:     number | null;
+  ttlDaysCtwa:                  number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -705,6 +713,12 @@ export type UpdateCronConfigPayload = {
   applyToClosed?: boolean;
   activeHourStart?: number;
   activeHourEnd?: number;
+  windowReminderNormalStartMin?: number;
+  windowReminderNormalEndMin?:   number;
+  windowReminderCtwaStartMin?:   number;
+  windowReminderCtwaEndMin?:     number;
+  windowReminderMinReplies?:     number;
+  ttlDaysCtwa?:                  number;
 };
 
 // ============================================

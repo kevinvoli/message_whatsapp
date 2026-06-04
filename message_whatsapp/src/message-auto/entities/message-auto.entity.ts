@@ -25,8 +25,9 @@ export enum AutoMessageTriggerType {
   QUEUE_WAIT   = 'queue_wait',
   KEYWORD      = 'keyword',
   CLIENT_TYPE  = 'client_type',
-  INACTIVITY   = 'inactivity',
-  ON_ASSIGN    = 'on_assign',
+  INACTIVITY      = 'inactivity',
+  ON_ASSIGN       = 'on_assign',
+  WINDOW_REMINDER = 'window_reminder',
 }
 
 @Entity({ name: 'messages_predefinis', engine: 'InnoDB ROW_FORMAT=DYNAMIC' })
@@ -82,6 +83,16 @@ export class MessageAuto {
     default: 'all',
   })
   client_type_target?: 'new' | 'returning' | 'all' | null;
+
+  /** Pour trigger_type='window_reminder' : J1 (agent a répondu) ou J2 (pas encore) */
+  @Column({
+    name: 'window_reminder_target',
+    type: 'enum',
+    enum: ['with_replies', 'no_replies'],
+    nullable: true,
+    default: null,
+  })
+  windowReminderTarget?: 'with_replies' | 'no_replies' | null;
 
   @Column({
     type: 'longtext',

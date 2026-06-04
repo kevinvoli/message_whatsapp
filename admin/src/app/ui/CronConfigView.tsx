@@ -394,6 +394,7 @@ function ConfigPanel({
   const [intervalMinutes, setIntervalMinutes]           = useState(config.intervalMinutes ?? 5);
   const [cronExpression, setCronExpression]             = useState(config.cronExpression ?? '');
   const [ttlDays, setTtlDays]                           = useState(config.ttlDays ?? (config.key === 'read-only-enforcement' ? 24 : config.key === 'meta-token-refresh' ? 7 : 14));
+  const [ttlDaysCtwa, setTtlDaysCtwa]                   = useState(config.ttlDaysCtwa ?? 72);
   const [delayMin, setDelayMin]                         = useState(config.delayMinSeconds ?? 20);
   const [delayMax, setDelayMax]                         = useState(config.delayMaxSeconds ?? 45);
   const [maxSteps, setMaxSteps]                         = useState(config.maxSteps ?? 3);
@@ -413,6 +414,7 @@ function ConfigPanel({
     setIntervalMinutes(config.intervalMinutes ?? 5);
     setCronExpression(config.cronExpression ?? '');
     setTtlDays(config.ttlDays ?? (config.key === 'read-only-enforcement' ? 24 : config.key === 'meta-token-refresh' ? 7 : 14));
+    setTtlDaysCtwa(config.ttlDaysCtwa ?? 72);
     setDelayMin(config.delayMinSeconds ?? 20);
     setDelayMax(config.delayMaxSeconds ?? 45);
     setMaxSteps(config.maxSteps ?? 3);
@@ -429,6 +431,9 @@ function ConfigPanel({
       if (config.scheduleType === 'cron')     payload.cronExpression  = cronExpression;
       if (config.key === 'webhook-purge' || config.key === 'read-only-enforcement' || config.key === 'meta-token-refresh') {
         payload.ttlDays = ttlDays;
+      }
+      if (config.key === 'read-only-enforcement') {
+        payload.ttlDaysCtwa = ttlDaysCtwa;
       }
       if (config.key === 'auto-message') {
         payload.delayMinSeconds = delayMin;
@@ -602,6 +607,24 @@ function ConfigPanel({
               />
               <p className="mt-1 text-[11px] text-gray-400">
                 Passage en lecture seule après {ttlDays}h sans message client.
+              </p>
+            </div>
+          )}
+
+          {/* TTL CTWA read-only-enforcement */}
+          {config.key === 'read-only-enforcement' && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Délai fermeture clients Pub Meta (heures)
+              </label>
+              <input
+                type="number" min={24}
+                value={ttlDaysCtwa}
+                onChange={(e) => setTtlDaysCtwa(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Fenêtre CTWA (clic pub Meta). Défaut : 72h. Le TTL standard est le champ &quot;Seuil inactivité&quot; ci-dessus.
               </p>
             </div>
           )}

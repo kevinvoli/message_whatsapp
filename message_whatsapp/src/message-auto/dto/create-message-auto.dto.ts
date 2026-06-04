@@ -98,6 +98,11 @@ export class CreateMessageAutoDto {
   @IsIn(['new', 'returning', 'all'])
   client_type_target?: 'new' | 'returning' | 'all';
 
+  /** Pour trigger_type='window_reminder' : J1 (agent a répondu) ou J2 (pas encore) */
+  @IsOptional()
+  @IsIn(['with_replies', 'no_replies'])
+  windowReminderTarget?: 'with_replies' | 'no_replies' | null;
+
   /** Mots-clés déclencheurs (pour trigger_type='keyword') */
   @IsOptional()
   @IsArray()
