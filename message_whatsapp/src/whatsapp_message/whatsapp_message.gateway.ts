@@ -705,7 +705,14 @@ export class WhatsappMessageGateway
     @MessageBody() payload: { chat_id: string; limit?: number; before?: string },
   ) {
     const agent = this.connectedAgents.get(client.id);
-    if (!agent) return;
+    if (!agent) {
+      // Agent pas encore enregistré (reconnexion socket en cours) — débloquer isLoading côté front.
+      client.emit('chat:event', {
+        type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
+        payload: { chat_id: payload.chat_id, messages: [], hasMore: false },
+      });
+      return;
+    }
 
     if (this.isThrottled(client.id, 'messages:get')) {
       // Émettre MESSAGE_LIST vide plutôt que RATE_LIMITED pour libérer isLoading.

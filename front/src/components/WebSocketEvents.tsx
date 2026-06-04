@@ -314,6 +314,10 @@ const WebSocketEvents = () => {
           contactState.addCallLog(transformToCallLog(call_log));
           break;
         }
+        case 'CONTACT_LIST':
+          // Liste initiale envoyée à la connexion — ignorée car les contacts sont chargés
+          // à la demande via contact:event CONTACT_DETAIL / CONTACT_UPSERT.
+          break;
         default:
           logger.warn('Unhandled contact event type', { type: data.type });
       }
