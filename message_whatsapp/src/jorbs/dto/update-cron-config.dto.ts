@@ -81,4 +81,36 @@ export class UpdateCronConfigDto {
   @Min(1)
   @Max(23)
   activeHourEnd?: number;
+
+  // ─── Champs window-reminder-auto-message ─────────────────────────────────
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  windowReminderNormalStartMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  windowReminderNormalEndMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  windowReminderCtwaStartMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  windowReminderCtwaEndMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  windowReminderMinReplies?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(24)
+  ttlDaysCtwa?: number;
 }
