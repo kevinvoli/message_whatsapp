@@ -463,18 +463,17 @@ export class WhapiController {
     );
     const igPayload = this.assertInstagramPayload(payload);
 
-    const igAccountId = igPayload.entry?.[0]?.id;
+    const rawEntryId = igPayload.entry?.[0]?.id;
+    // Meta envoie entry[0].id = "0" pour les DMs ; le vrai identifiant est dans recipient.id
+    const igAccountId = (rawEntryId && rawEntryId !== '0')
+      ? rawEntryId
+      : igPayload.entry?.[0]?.messaging?.[0]?.recipient?.id;
+
     if (!igAccountId) {
-       this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ici 2 { status: 'ignored', reason: 'missing_ig_account_id' }`,
-    );
       return { status: 'ignored', reason: 'missing_ig_account_id' };
-      
     }
 
-
-
-    // Résoudre le canal par external_id (= IG account ID envoyé dans entry[0].id)
+    // Résoudre le canal par external_id (= IG account ID)
     const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
     this.auditLogger.log(`INSTAGRAM_DEBUG ig_account_id=${igAccountId} channel_found=${!!channelRecord} has_secret=${!!channelRecord?.meta_app_secret}`);
     try {
