@@ -432,9 +432,7 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${mode} provider=instagram tenant_id ig_account_id unknown`,
-    );
+ 
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('instagram', token);
       if (matchesDb) {
@@ -453,7 +451,7 @@ export class WhapiController {
 
     const startedAt = Date.now();
      this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${startedAt} provider=instagram tenant_id ig_account_id unknown`,
+      `WEBHOOK_ACCEPTED request_id=${startedAt} provider=instagram ici 1`,
     );
     const provider = 'instagram';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
@@ -461,14 +459,19 @@ export class WhapiController {
     this.assertPayloadSize(request.rawBody);
 
     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ig_account_id unknown`,
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ici 2`,
     );
     const igPayload = this.assertInstagramPayload(payload);
 
     const igAccountId = igPayload.entry?.[0]?.id;
     if (!igAccountId) {
       return { status: 'ignored', reason: 'missing_ig_account_id' };
+       this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ici 2 { status: 'ignored', reason: 'missing_ig_account_id' }`,
+    );
     }
+
+
 
     // Résoudre le canal par external_id (= IG account ID envoyé dans entry[0].id)
     const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
