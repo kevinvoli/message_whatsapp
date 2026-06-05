@@ -450,7 +450,11 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
+
     const startedAt = Date.now();
+     this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${startedAt} provider=instagram tenant_id ig_account_id unknown`,
+    );
     const provider = 'instagram';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
 
