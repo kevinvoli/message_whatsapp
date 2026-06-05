@@ -465,10 +465,11 @@ export class WhapiController {
 
     const igAccountId = igPayload.entry?.[0]?.id;
     if (!igAccountId) {
-      return { status: 'ignored', reason: 'missing_ig_account_id' };
        this.auditLogger.log(
       `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ici 2 { status: 'ignored', reason: 'missing_ig_account_id' }`,
     );
+      return { status: 'ignored', reason: 'missing_ig_account_id' };
+      
     }
 
 
@@ -779,9 +780,15 @@ export class WhapiController {
   private assertInstagramPayload(
     payload: unknown,
   ): InstagramWebhookPayload {
+
+      this.auditLogger.log(
+      `WEBHOOK_ACCEPTED  provider=instagram tenant_id ici 3`,
+    );
+
     if (!payload || typeof payload !== 'object') {
       throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
     }
+
     const p = payload as InstagramWebhookPayload;
     if (p.object !== 'instagram') {
        this.auditLogger.log(
