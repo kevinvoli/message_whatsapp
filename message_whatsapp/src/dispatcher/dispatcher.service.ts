@@ -446,16 +446,23 @@ export class DispatcherService {
       if (dedicatedPosteId) {
         const dedicatedPoste = await this.posteRepository.findOne({ where: { id: dedicatedPosteId } });
         if (dedicatedPoste) {
-          await this.chatRepository.update(chat.id, {
-            poste: dedicatedPoste,
-            poste_id: dedicatedPoste.id,
-            assigned_mode: dedicatedPoste.is_active ? 'ONLINE' : 'OFFLINE',
-            status: dedicatedPoste.is_active
-              ? WhatsappChatStatus.ACTIF
-              : WhatsappChatStatus.EN_ATTENTE,
-            assigned_at: new Date(),
-            first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-          });
+          // R2 — WHERE poste_id IS NULL : atomique, évite la double assignation si un
+          // webhook a déjà dispatché la conversation entre la lecture et cet update.
+          const dedicatedResult = await this.chatRepository.createQueryBuilder()
+            .update(WhatsappChat)
+            .set({
+              poste_id: dedicatedPoste.id,
+              assigned_mode: dedicatedPoste.is_active ? 'ONLINE' : 'OFFLINE',
+              status: dedicatedPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
+              assigned_at: new Date(),
+              first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+            })
+            .where('id = :id AND poste_id IS NULL', { id: chat.id })
+            .execute();
+          if (!dedicatedResult.affected) {
+            this.logger.debug(`Orphelin dédié ignoré (${chat.chat_id}): poste_id déjà assigné entre-temps`);
+            return;
+          }
           await this.messageGateway.emitConversationAssigned(chat.chat_id);
           this.logger.log(`Orphelin dédié dispatché (${chat.chat_id}) → poste dédié ${dedicatedPoste.name}`);
           return;
@@ -471,16 +478,23 @@ export class DispatcherService {
       return;
     }
 
-    await this.chatRepository.update(chat.id, {
-      poste: nextPoste,
-      poste_id: nextPoste.id,
-      assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
-      status: nextPoste.is_active
-        ? WhatsappChatStatus.ACTIF
-        : WhatsappChatStatus.EN_ATTENTE,
-      assigned_at: new Date(),
-      first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-    });
+    // R2 — WHERE poste_id IS NULL : atomique, évite la double assignation si un webhook
+    // a assigné un poste entre le moment où l'orphan-checker a lu poste_id=null et maintenant.
+    const orphanResult = await this.chatRepository.createQueryBuilder()
+      .update(WhatsappChat)
+      .set({
+        poste_id: nextPoste.id,
+        assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
+        status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
+        assigned_at: new Date(),
+        first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+      })
+      .where('id = :id AND poste_id IS NULL', { id: chat.id })
+      .execute();
+    if (!orphanResult.affected) {
+      this.logger.debug(`Orphelin ignoré (${chat.chat_id}): poste_id déjà assigné entre-temps`);
+      return;
+    }
 
     await this.messageGateway.emitConversationAssigned(chat.chat_id);
     this.logger.log(`Orphelin dispatché (${chat.chat_id}) → poste ${nextPoste.id}`);
@@ -586,6 +600,9 @@ export class DispatcherService {
         .filter((p): p is WhatsappPoste => p != null);
 
       const threshold = new Date(Date.now() - thresholdMinutes * 60_000);
+      // R1 — Le commercial a répondu après le dernier message client → ne pas re-dispatcher.
+      // Évite la race condition où un commercial rédige sa réponse pendant que le sla-checker tourne.
+      const noReplyFilter = `(chat.last_poste_message_at IS NULL OR chat.last_poste_message_at < chat.last_client_message_at)`;
       // Exclut : conversations venant d'un canal dédié OU assignées à un poste dédié
       const dedicatedExclusion = `(
         (chat.channel_id IS NULL OR chat.channel_id NOT IN
@@ -621,6 +638,7 @@ export class DispatcherService {
           .andWhere('chat.status = :ferme', { ferme: WhatsappChatStatus.FERME })
           .andWhere('chat.read_only = false')
           .andWhere(unreadEligibility)
+          .andWhere(noReplyFilter)
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
           .getMany();
@@ -647,6 +665,7 @@ export class DispatcherService {
         .addSelect('COUNT(*)', 'cnt')
         .where(unreadEligibility)
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
+        .andWhere(noReplyFilter)
         .andWhere('chat.deletedAt IS NULL')
         .andWhere('chat.poste_id IS NOT NULL')
         .andWhere('chat.poste_id NOT IN (:...posteIds)', { posteIds })
@@ -676,6 +695,7 @@ export class DispatcherService {
         .where('chat.poste_id IN (:...posteIds)', { posteIds })
         .andWhere(unreadEligibility)
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
+        .andWhere(noReplyFilter)
         .andWhere('chat.deletedAt IS NULL')
         .andWhere(dedicatedExclusion)
         .groupBy('chat.poste_id')
@@ -752,6 +772,7 @@ export class DispatcherService {
           .where('chat.poste_id = :posteId', { posteId: srcPoste.id })
           .andWhere(unreadEligibility)
           .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
+          .andWhere(noReplyFilter)
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
           .orderBy('chat.last_client_message_at', 'ASC')
