@@ -193,11 +193,8 @@ export class CommunicationMessengerService {
       messaging_type: 'RESPONSE',
     };
 
-    if (data.quotedMessageId) {
-      (payload.message as Record<string, unknown>).reply_to = {
-        mid: data.quotedMessageId,
-      };
-    }
+    // Messenger API ne supporte pas reply_to (contrairement à WhatsApp Cloud API).
+    // Le champ quotedMessageId est accepté en paramètre pour la compatibilité d'interface mais ignoré ici.
 
     this.logger.log(
       `MESSENGER_OUTBOUND_TEXT url=${url} page=${data.pageId} to=${data.recipientPsid} token_prefix=${effectiveToken?.slice(0, 12)}...`,
