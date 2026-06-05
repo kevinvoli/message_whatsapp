@@ -784,6 +784,9 @@ export class WhapiController {
     }
     const p = payload as InstagramWebhookPayload;
     if (p.object !== 'instagram') {
+       this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${Array.toString.call(p.entry)} provider=instagram tenant_id ici 3`,
+    );
       throw new HttpException(
         'Not an Instagram event',
         HttpStatus.BAD_REQUEST,
