@@ -432,6 +432,9 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${mode} provider=instagram tenant_id ig_account_id unknown`,
+    );
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('instagram', token);
       if (matchesDb) {
@@ -453,6 +456,9 @@ export class WhapiController {
 
     this.assertPayloadSize(request.rawBody);
 
+    this.auditLogger.log(
+      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ig_account_id unknown`,
+    );
     const igPayload = this.assertInstagramPayload(payload);
 
     const igAccountId = igPayload.entry?.[0]?.id;
