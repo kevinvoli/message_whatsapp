@@ -465,19 +465,30 @@ export class WhapiController {
     }
 
     const rawEntryId = igPayload.entry?.[0]?.id;
-    const recipientId = igPayload.entry?.[0]?.messaging?.[0]?.recipient?.id;
-    const senderId = igPayload.entry?.[0]?.messaging?.[0]?.sender?.id;
-    const msgType = igPayload.entry?.[0]?.messaging?.[0]?.message ? 'message'
-      : igPayload.entry?.[0]?.messaging?.[0]?.read ? 'read'
+    const entry0 = igPayload.entry?.[0] as any;
+
+    // Format Messenger Platform : entry[0].messaging[]
+    const messagingRecipientId = entry0?.messaging?.[0]?.recipient?.id;
+    const messagingSenderId    = entry0?.messaging?.[0]?.sender?.id;
+
+    // Format Graph API webhook : entry[0].changes[].value.recipient_id / sender_id
+    const changesValue      = entry0?.changes?.[0]?.value;
+    const changesRecipientId = changesValue?.recipient_id;
+    const changesSenderId    = changesValue?.sender_id;
+
+    const recipientId = messagingRecipientId ?? changesRecipientId;
+    const senderId    = messagingSenderId    ?? changesSenderId;
+
+    const msgType = entry0?.messaging?.[0]?.message ? 'message'
+      : entry0?.messaging?.[0]?.read ? 'read'
+      : changesValue?.message ? 'message_changes'
       : 'other';
 
-    // Meta envoie entry[0].id = "0" pour les DMs ; le vrai identifiant est dans recipient.id
-    const igAccountId = (rawEntryId && rawEntryId !== '0')
-      ? rawEntryId
-      : recipientId;
+    const igAccountId = (rawEntryId && rawEntryId !== '0') ? rawEntryId : recipientId;
 
+    const entryDump = JSON.stringify(entry0).slice(0, 400);
     this.auditLogger.log(
-      `IG[2/8] ids raw_entry_id=${rawEntryId} recipient_id=${recipientId} sender_id=${senderId} resolved_account_id=${igAccountId} msg_type=${msgType} entries=${igPayload.entry?.length}`,
+      `IG[2/8] ids raw_entry_id=${rawEntryId} recipient_id=${recipientId} sender_id=${senderId} resolved_account_id=${igAccountId} msg_type=${msgType} entries=${igPayload.entry?.length} has_messaging=${!!entry0?.messaging?.length} has_changes=${!!entry0?.changes?.length} entry_dump=${entryDump}`,
     );
 
     if (!igAccountId) {
