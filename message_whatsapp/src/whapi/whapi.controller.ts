@@ -804,6 +804,7 @@ export class WhapiController {
     );
 
     if (!payload || typeof payload !== 'object') {
+      this.auditLogger.warn("WEBHOOK_INVALID_PAYLOAD provider=instagram reason=not_an_object", typeof payload);
       throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
     }
 
