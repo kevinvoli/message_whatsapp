@@ -475,7 +475,13 @@ export class WhapiController {
 
     // Résoudre le canal par external_id (= IG account ID envoyé dans entry[0].id)
     const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
-    this.assertInstagramSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+    this.auditLogger.log(`INSTAGRAM_DEBUG ig_account_id=${igAccountId} channel_found=${!!channelRecord} has_secret=${!!channelRecord?.meta_app_secret}`);
+    try {
+      this.assertInstagramSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+    } catch (sigErr) {
+      this.auditLogger.warn(`INSTAGRAM_SIGNATURE_FAILED ig_account_id=${igAccountId} error=${String(sigErr)}`);
+      throw sigErr;
+    }
 
     const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
     const channelId = channelRecord?.channel_id ?? igAccountId;
