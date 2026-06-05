@@ -448,42 +448,65 @@ export class WhapiController {
     @Req() request: Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-
     const startedAt = Date.now();
-     this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${startedAt} provider=instagram ici 1`,
-    );
     const provider = 'instagram';
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
 
+    this.auditLogger.log(`IG[1/8] webhook_received request_id=${requestId} raw_body_size=${request.rawBody?.length ?? 0}`);
+
     this.assertPayloadSize(request.rawBody);
 
-    this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${requestId} provider=instagram tenant_id ici 2`,
-    );
-    const igPayload = this.assertInstagramPayload(payload);
+    let igPayload: ReturnType<typeof this.assertInstagramPayload>;
+    try {
+      igPayload = this.assertInstagramPayload(payload);
+    } catch (e) {
+      this.auditLogger.warn(`IG[1/8] payload_invalid error=${String(e)} object=${(payload as any)?.object}`);
+      throw e;
+    }
 
     const rawEntryId = igPayload.entry?.[0]?.id;
+    const recipientId = igPayload.entry?.[0]?.messaging?.[0]?.recipient?.id;
+    const senderId = igPayload.entry?.[0]?.messaging?.[0]?.sender?.id;
+    const msgType = igPayload.entry?.[0]?.messaging?.[0]?.message ? 'message'
+      : igPayload.entry?.[0]?.messaging?.[0]?.read ? 'read'
+      : 'other';
+
     // Meta envoie entry[0].id = "0" pour les DMs ; le vrai identifiant est dans recipient.id
     const igAccountId = (rawEntryId && rawEntryId !== '0')
       ? rawEntryId
-      : igPayload.entry?.[0]?.messaging?.[0]?.recipient?.id;
+      : recipientId;
+
+    this.auditLogger.log(
+      `IG[2/8] ids raw_entry_id=${rawEntryId} recipient_id=${recipientId} sender_id=${senderId} resolved_account_id=${igAccountId} msg_type=${msgType} entries=${igPayload.entry?.length}`,
+    );
 
     if (!igAccountId) {
+      this.auditLogger.warn(`IG[2/8] missing_ig_account_id — ignored`);
       return { status: 'ignored', reason: 'missing_ig_account_id' };
     }
 
-    // Résoudre le canal par external_id (= IG account ID)
     const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
-    this.auditLogger.log(`INSTAGRAM_DEBUG ig_account_id=${igAccountId} channel_found=${!!channelRecord} has_secret=${!!channelRecord?.meta_app_secret}`);
+    this.auditLogger.log(
+      `IG[3/8] channel_lookup ig_account_id=${igAccountId} channel_found=${!!channelRecord} channel_id=${channelRecord?.channel_id} has_secret=${!!channelRecord?.meta_app_secret}`,
+    );
+
     try {
       this.assertInstagramSignature(headers, request.rawBody, payload, channelRecord?.meta_app_secret);
+      this.auditLogger.log(`IG[4/8] signature_ok`);
     } catch (sigErr) {
-      this.auditLogger.warn(`INSTAGRAM_SIGNATURE_FAILED ig_account_id=${igAccountId} error=${String(sigErr)}`);
+      this.auditLogger.warn(`IG[4/8] signature_failed error=${String(sigErr)}`);
       throw sigErr;
     }
 
-    const tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
+    let tenantId: string;
+    try {
+      tenantId = await this.resolveTenantOrReject('instagram', igAccountId);
+      this.auditLogger.log(`IG[5/8] tenant_resolved tenant_id=${tenantId}`);
+    } catch (e) {
+      this.auditLogger.warn(`IG[5/8] tenant_failed ig_account_id=${igAccountId} error=${String(e)}`);
+      throw e;
+    }
+
     const channelId = channelRecord?.channel_id ?? igAccountId;
 
     this.auditLogger.log(
@@ -494,11 +517,8 @@ export class WhapiController {
     this.assertCircuitBreaker(provider);
     this.metricsService.recordReceived(provider, tenantId);
 
-    const idempotency = await this.whapiService.isReplayEvent(
-      igPayload,
-      'instagram',
-      tenantId,
-    );
+    const idempotency = await this.whapiService.isReplayEvent(igPayload, 'instagram', tenantId);
+    this.auditLogger.log(`IG[6/8] idempotency=${idempotency}`);
 
     if (idempotency === 'conflict') {
       throw new HttpException('Idempotency conflict', HttpStatus.CONFLICT);
@@ -510,19 +530,18 @@ export class WhapiController {
       return { status: 'duplicate_ignored' };
     }
 
+    this.auditLogger.log(`IG[7/8] calling_ingest tenant_id=${tenantId} channel_id=${channelId}`);
     try {
       await this.unifiedIngressService.ingestInstagram(igPayload, {
         provider: 'instagram',
         tenantId,
         channelId,
       });
+      this.auditLogger.log(`IG[8/8] ingest_ok tenant_id=${tenantId} latency_ms=${Date.now() - startedAt}`);
     } catch (err) {
+      this.auditLogger.warn(`IG[8/8] ingest_failed error=${String(err)}`);
       if (err instanceof HttpException) {
-        this.healthService.record(
-          provider,
-          err.getStatus() < 500,
-          Date.now() - startedAt,
-        );
+        this.healthService.record(provider, err.getStatus() < 500, Date.now() - startedAt);
         throw err;
       }
       this.healthService.record(provider, false, Date.now() - startedAt);
