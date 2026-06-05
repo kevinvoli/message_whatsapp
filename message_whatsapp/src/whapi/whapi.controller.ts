@@ -819,8 +819,14 @@ export class WhapiController {
       );
     }
     if (!Array.isArray(p.entry) || p.entry.length === 0) {
+        this.auditLogger.log(
+      `WEBHOOK_REJECTED  provider=instagram tenant_id ici 4 reason=missing_entry ${Array.toString.call(p.entry)}`,
+    );
       throw new HttpException('Missing entry', HttpStatus.BAD_REQUEST);
     }
+      this.auditLogger.log(
+      `WEBHOOK_ACCEPTED  provider=instagram assert instagram payload ok ${Array.toString.call(p.entry)}`, 
+    );
     return p;
   }
 
