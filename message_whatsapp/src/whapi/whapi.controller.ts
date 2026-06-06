@@ -809,35 +809,20 @@ export class WhapiController {
   private assertInstagramPayload(
     payload: unknown,
   ): InstagramWebhookPayload {
-
-      this.auditLogger.log(
-      `WEBHOOK_ACCEPTED  provider=instagram tenant_id ici 3`,
-    );
-
     if (!payload || typeof payload !== 'object') {
-      this.auditLogger.warn("WEBHOOK_INVALID_PAYLOAD provider=instagram reason=not_an_object", typeof payload);
       throw new HttpException('Invalid payload', HttpStatus.BAD_REQUEST);
     }
 
     const p = payload as InstagramWebhookPayload;
     if (p.object !== 'instagram') {
-       this.auditLogger.log(
-      `WEBHOOK_ACCEPTED request_id=${Array.toString.call(p.entry)} provider=instagram tenant_id ici 3`,
-    );
       throw new HttpException(
         'Not an Instagram event',
         HttpStatus.BAD_REQUEST,
       );
     }
     if (!Array.isArray(p.entry) || p.entry.length === 0) {
-        this.auditLogger.log(
-      `WEBHOOK_REJECTED  provider=instagram tenant_id ici 4 reason=missing_entry ${Array.toString.call(p.entry)}`,
-    );
       throw new HttpException('Missing entry', HttpStatus.BAD_REQUEST);
     }
-      this.auditLogger.log(
-      `WEBHOOK_ACCEPTED  provider=instagram assert instagram payload ok ${Array.toString.call(p.entry)}`, 
-    );
     return p;
   }
 
