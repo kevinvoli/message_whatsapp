@@ -133,6 +133,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
     ? restrictionUnresponded.some((c) => c.chat_id === selectedConversation?.chat_id)
     : false;
   const minResponseChars = restrictionConfig?.minResponseChars ?? 0;
+  const minCharsSendEnabled = restrictionConfig?.minCharsSendEnabled ?? false;
+  const trimmedLen = message.trim().length;
+  const charsTooFew = minCharsSendEnabled && trimmedLen > 0 && trimmedLen < minResponseChars;
 
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
@@ -157,7 +160,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, [showEmojiPicker]);
 
   const handleSubmit = () => {
-    if (message.trim() && !disabled && isConnected) {
+    if (message.trim() && !disabled && isConnected && !charsTooFew) {
       onSendMessage(message.trim());
       setMessage('');
 
@@ -514,7 +517,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!message.trim() || disabled || !isConnected || isUploading}
+              disabled={!message.trim() || disabled || !isConnected || isUploading || charsTooFew}
               className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               <Send className="w-5 h-5" />
@@ -537,9 +540,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {avgResponseTime && (
           <p className="text-xs text-gray-500">Temps de reponse moyen: {avgResponseTime}</p>
         )}
-        {isUnresponded && minResponseChars > 0 && (
-          <p className={`text-xs font-medium ${message.length >= minResponseChars ? 'text-green-600' : 'text-red-500'}`}>
-            {message.length}/{minResponseChars} caractères requis
+        {charsTooFew && (
+          <p className="text-xs font-medium text-red-600 flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            Vous ne pouvez pas envoyer ce message — encore {minResponseChars - trimmedLen} caractère{minResponseChars - trimmedLen > 1 ? 's' : ''} requis ({trimmedLen}/{minResponseChars})
+          </p>
+        )}
+        {minCharsSendEnabled && !charsTooFew && trimmedLen > 0 && trimmedLen >= minResponseChars && (
+          <p className="text-xs font-medium text-green-600">
+            {trimmedLen}/{minResponseChars} caractères ✓
+          </p>
+        )}
+        {isUnresponded && minResponseChars > 0 && !minCharsSendEnabled && (
+          <p className={`text-xs font-medium ${trimmedLen >= minResponseChars ? 'text-green-600' : 'text-red-500'}`}>
+            {trimmedLen}/{minResponseChars} caractères requis
           </p>
         )}
       </div>

@@ -23,11 +23,12 @@ export class ConversationRestrictionService {
   ) {}
 
   async getRestrictionConfig(): Promise<RestrictionConfigDto> {
-    const [enabled, maxStr, minCharsStr, requireLastStr] = await Promise.all([
+    const [enabled, maxStr, minCharsStr, requireLastStr, minCharsSendStr] = await Promise.all([
       this.systemConfigService.get('RESTRICTION_ENABLED'),
       this.systemConfigService.get('RESTRICTION_MAX_UNRESPONDED_CONVS'),
       this.systemConfigService.get('RESTRICTION_MIN_RESPONSE_CHARS'),
       this.systemConfigService.get('RESTRICTION_REQUIRE_LAST_MESSAGE_MINE'),
+      this.systemConfigService.get('RESTRICTION_MIN_CHARS_SEND_ENABLED'),
     ]);
 
     return {
@@ -36,6 +37,7 @@ export class ConversationRestrictionService {
       minResponseChars: minCharsStr !== null ? parseInt(minCharsStr, 10) : 50,
       requireLastMessageMine:
         requireLastStr !== null ? requireLastStr === 'true' : false,
+      minCharsSendEnabled: minCharsSendStr !== null ? minCharsSendStr === 'true' : false,
     };
   }
 

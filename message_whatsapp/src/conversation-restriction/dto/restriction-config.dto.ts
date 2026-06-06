@@ -14,6 +14,9 @@ export class RestrictionConfigDto {
 
   @IsBoolean()
   requireLastMessageMine: boolean;
+
+  @IsBoolean()
+  minCharsSendEnabled: boolean;
 }
 
 export class RestrictionStatusDto {

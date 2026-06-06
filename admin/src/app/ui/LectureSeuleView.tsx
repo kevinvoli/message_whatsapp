@@ -47,6 +47,7 @@ const defaultRestrictionConfig: RestrictionConfig = {
   maxUnrespondedConvs: 1,
   minResponseChars: 50,
   requireLastMessageMine: false,
+  minCharsSendEnabled: false,
 };
 
 export default function LectureSeuleView() {
@@ -390,6 +391,33 @@ export default function LectureSeuleView() {
                       </label>
                     </div>
                   )}
+
+                  {/* Toggle blocage envoi messages trop courts */}
+                  <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Bloquer l&apos;envoi des messages trop courts</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        Si activé, les commerciaux ne peuvent pas envoyer un message contenant moins de{' '}
+                        <strong>{restriction.minResponseChars}</strong> caractères.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={restriction.minCharsSendEnabled}
+                      aria-label="Bloquer l'envoi des messages trop courts"
+                      onClick={() => setRestriction((prev) => ({ ...prev, minCharsSendEnabled: !prev.minCharsSendEnabled }))}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        restriction.minCharsSendEnabled ? 'bg-emerald-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                          restriction.minCharsSendEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
 
                   {restrictionStatus && (
                     <div className={`flex items-center gap-2 text-xs p-2 rounded-lg ${

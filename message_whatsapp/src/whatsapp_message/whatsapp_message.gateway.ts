@@ -988,6 +988,24 @@ export class WhatsappMessageGateway
         return;
       }
 
+      // 🔒 Restriction min caractères d'envoi — bloque si le message est trop court
+      const restrictionCfg = await this.restrictionService.getRestrictionConfig();
+      if (restrictionCfg.minCharsSendEnabled) {
+        const textLen = normalizedText.length;
+        if (textLen < restrictionCfg.minResponseChars) {
+          client.emit('chat:event', {
+            type: 'MESSAGE_SEND_ERROR',
+            payload: {
+              chat_id: payload.chat_id,
+              tempId: payload.tempId,
+              code: 'MESSAGE_TOO_SHORT',
+              message: `Message trop court — il manque ${restrictionCfg.minResponseChars - textLen} caractère(s).`,
+            },
+          });
+          return;
+        }
+      }
+
       let message: WhatsappMessage;
       try {
         message = await this.messageService.createAgentMessage({
@@ -1036,8 +1054,7 @@ export class WhatsappMessageGateway
       sendSucceeded = true;
 
       // Restriction lecture : enregistrer la réponse et réévaluer le statut
-      const restrictionConfig = await this.restrictionService.getRestrictionConfig();
-      if (restrictionConfig.enabled) {
+      if (restrictionCfg.enabled) {
         const isDedicatedPoste = agent.posteId
           ? (await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId)).length > 0
           : false;

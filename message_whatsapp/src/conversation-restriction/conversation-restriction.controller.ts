@@ -58,6 +58,10 @@ export class ConversationRestrictionAdminController {
         key: 'RESTRICTION_REQUIRE_LAST_MESSAGE_MINE',
         value: String(dto.requireLastMessageMine),
       },
+      {
+        key: 'RESTRICTION_MIN_CHARS_SEND_ENABLED',
+        value: String(dto.minCharsSendEnabled),
+      },
     ]);
     return this.restrictionService.getRestrictionConfig();
   }

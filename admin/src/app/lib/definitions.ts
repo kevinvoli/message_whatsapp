@@ -976,6 +976,7 @@ export interface RestrictionConfig {
   maxUnrespondedConvs: number;
   minResponseChars: number;
   requireLastMessageMine: boolean;
+  minCharsSendEnabled: boolean;
 }
 
 // ============================================

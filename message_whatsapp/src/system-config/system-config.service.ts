@@ -53,6 +53,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'RESTRICTION_MAX_UNRESPONDED_CONVS', label: 'Nombre max de conversations sans réponse', category: 'restriction', description: 'Nombre de conversations ouvertes sans réponse avant déclenchement de la restriction (défaut : 1)' },
   { key: 'RESTRICTION_MIN_RESPONSE_CHARS', label: 'Longueur minimale d\'une réponse valide', category: 'restriction', description: 'Nombre de caractères minimum pour qu\'un message soit comptabilisé comme réponse (défaut : 50)' },
   { key: 'RESTRICTION_REQUIRE_LAST_MESSAGE_MINE', label: 'Exiger que le dernier message soit du commercial', category: 'restriction', description: 'true / false — si true, une conversation est considérée répondue seulement si le dernier message est from_me (défaut : false)' },
+  { key: 'RESTRICTION_MIN_CHARS_SEND_ENABLED', label: 'Bloquer l\'envoi si message trop court', category: 'restriction', description: 'true / false — si true, les commerciaux ne peuvent pas envoyer de message contenant moins de RESTRICTION_MIN_RESPONSE_CHARS caractères (défaut : false)' },
 
 ];
 
