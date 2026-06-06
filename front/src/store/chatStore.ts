@@ -544,8 +544,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: (text: string) => {
     if (isSending) return;
 
-    const { socket, selectedConversation, replyToMessage } = get();
+    const { socket, selectedConversation, replyToMessage, restrictionConfig } = get();
     if (!socket || !selectedConversation) return;
+
+    // Blocage min caractères : si activé et texte trop court, refus immédiat sans émettre
+    if (
+      restrictionConfig?.minCharsSendEnabled &&
+      restrictionConfig.minResponseChars > 0 &&
+      text.trim().length < restrictionConfig.minResponseChars
+    ) {
+      return;
+    }
 
     isSending = true;
 
