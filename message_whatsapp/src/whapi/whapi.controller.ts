@@ -805,33 +805,7 @@ export class WhapiController {
       isProd,
     );
 
-    
     if (!valid) {
-      // Fallback: tenter la validation sur JSON.stringify(payload) au cas où le proxy modifie le body
-      const jsonBuffer = Buffer.from(JSON.stringify(payload));
-      const jsonDigest = createHmac('sha256', secrets[0]).update(jsonBuffer).digest('hex');
-      const jsonSig = `sha256=${jsonDigest}`;
-      const normalizedProvided = (signatureHeader ?? '').trim().toLowerCase();
-      const jsonMatches =
-        jsonSig.toLowerCase() === normalizedProvided ||
-        jsonDigest.toLowerCase() === normalizedProvided;
-
-      if (jsonMatches) {
-        this.auditLogger.warn(`IG[4/8] signature_ok_via_json_fallback raw_body_size=${rawBody?.length ?? 0} — proxy modifies body`);
-        return;
-      }
-
-      const rawBodyHex = rawBody?.subarray(0, 32).toString('hex') ?? 'n/a';
-      const computedDigest = rawBody
-        ? createHmac('sha256', secrets[0]).update(rawBody).digest('hex')
-        : null;
-      this.auditLogger.warn(
-        `IG[4/8] signature_mismatch` +
-        ` raw_body_hex_start=${rawBodyHex}` +
-        ` computed_prefix=${computedDigest ? 'sha256=' + computedDigest.slice(0, 12) : 'no_rawbody'}` +
-        ` json_prefix=sha256=${jsonDigest.slice(0, 12)}` +
-        ` provided_prefix=${signatureHeader?.slice(0, 20)}...`,
-      );
       this.metricsService.recordSignatureInvalid('instagram');
       throw new ForbiddenException('Invalid Instagram webhook signature');
     }
@@ -986,7 +960,6 @@ export class WhapiController {
           'Webhook signature secret not configured',
         );
       }
-      this.auditLogger.warn(`META_SIG_BYPASS dev_mode=true no_secret`);
       return;
     }
 
@@ -1011,7 +984,6 @@ export class WhapiController {
       this.metricsService.recordSignatureInvalid('meta');
       throw new ForbiddenException('Invalid webhook signature');
     }
-    this.auditLogger.log(`META_SIG_OK raw_body_size=${rawBody?.length ?? 'undefined'}`);
   }
 
   private headerValue(
