@@ -90,11 +90,14 @@ export class InboundMessageService {
         continue;
       }
 
-      // Résolution du nom pour Messenger (le webhook ne contient pas le nom).
+      // Résolution du nom pour Messenger et Instagram (le webhook ne contient pas le nom).
       // L'appel est AVANT le mutex pour ne pas bloquer le verrou pendant l'appel Graph API.
       // Le timeout de 5s (dans getUserName) borne la latence ajoutée.
       if (message.provider === 'messenger' && !message.fromName && message.from && message.channelId) {
         message.fromName = await this.resolveMessengerFromName(message.from, message.channelId);
+      }
+      if (message.provider === 'instagram' && !message.fromName && message.from && message.channelId) {
+        message.fromName = await this.resolveInstagramFromName(message.from, message.channelId);
       }
 
       try {
@@ -506,6 +509,32 @@ export class InboundMessageService {
 
       const name = await this.messengerService.getUserName(
         psid,
+        channel.token,
+        channel.external_id ?? undefined,
+      );
+      return name ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async resolveInstagramFromName(
+    igsid: string,
+    channelId: string,
+  ): Promise<string | undefined> {
+    try {
+      const channel = await this.channelService.findByChannelId(channelId);
+
+      if (!channel?.token) {
+        this.logger.warn(
+          `INSTAGRAM_NAME_SKIP igsid=${igsid} channelId=${channelId} — channel introuvable ou token manquant.`,
+        );
+        return undefined;
+      }
+
+      // Même endpoint Graph API que Messenger : GET /{igsid}?fields=name
+      const name = await this.messengerService.getUserName(
+        igsid,
         channel.token,
         channel.external_id ?? undefined,
       );
