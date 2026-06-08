@@ -762,6 +762,10 @@ export class WhatsappMessageGateway
       });
     }
 
+    this.logger.debug(
+      `MSG_GET chat_id=${payload.chat_id} total=${messages.length} filtered=${filteredMessages.length} isOwnPoste=${isOwnPosteChat} poste_id=${agent.posteId} chat_poste=${chat?.poste_id}`,
+    );
+
     client.emit('chat:event', {
       type: payload.before ? 'MESSAGE_LIST_PREPEND' : 'MESSAGE_LIST',
       payload: {
@@ -1592,7 +1596,7 @@ export class WhatsappMessageGateway
   // ======================================================
   private mapMessage = (message: WhatsappMessage) => ({
     id: message.id,
-    chat_id: message.chat.chat_id,
+    chat_id: message.chat?.chat_id ?? message.chat_id,
     from_me: message.from_me,
     text: this.resolveMessageText(message) ?? undefined,
     timestamp: message.timestamp ?? message.createdAt,

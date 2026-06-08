@@ -191,10 +191,11 @@ export class InboundMessageService {
               msg.toLowerCase().includes('not found')
             ) {
               this.logger.warn(
-                `INCOMING_CHANNEL_NOT_FOUND trace=${traceId} channel=${message.channelId} — message ignoré, provider ne réessaiera pas`,
+                `INCOMING_CHANNEL_NOT_FOUND trace=${traceId} provider=${message.provider} channel=${message.channelId} — message ignoré, provider ne réessaiera pas`,
               );
               return;
             }
+            this.logger.error(`INCOMING_SAVE_ERROR trace=${traceId} provider=${message.provider} error=${msg}`);
             throw saveErr;
           }
 
