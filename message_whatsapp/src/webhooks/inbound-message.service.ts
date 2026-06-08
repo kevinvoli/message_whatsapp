@@ -102,9 +102,12 @@ export class InboundMessageService {
 
       try {
         await this.getChatMutex(message.chatId).runExclusive(async () => {
+          const fallbackName = message.provider === 'instagram'
+            ? `Instagram #${(message.from ?? '').slice(-6)}`
+            : 'Client';
           const conversation = await this.dispatcherService.assignConversation(
             message.chatId,
-            message.fromName ?? 'Client',
+            message.fromName ?? fallbackName,
             traceId,
             message.tenantId,
             message.channelId,

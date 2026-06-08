@@ -140,105 +140,105 @@ export class CommunicationMessengerService {
       return cached.name;
     }
 
-    // Dériver un Page Access Token si pageId fourni
-    let effectiveToken = accessToken;
+    // Construire la liste des tokens à essayer :
+    // 1. Token brut (system user token) — peut fonctionner directement avec instagram_manage_messages
+    // 2. PAT dérivé depuis page_id — nécessite que page_id soit le bon Facebook Page ID
+    const tokensToTry: string[] = [accessToken];
     if (pageId) {
       const derived = await this.derivePageAccessToken(pageId, accessToken);
-      if (derived) {
-        effectiveToken = derived;
+      if (derived && derived !== accessToken) {
+        tokensToTry.push(derived);
         this.logger.log(`IG_NAME[2/3] PAT_DERIVED pageId=${pageId}`, CommunicationMessengerService.name);
-      } else {
-        this.logger.warn(`IG_NAME[2/3] PAT_DERIVE_FAILED pageId=${pageId} — utilisation du token brut`, CommunicationMessengerService.name);
+      } else if (!derived) {
+        this.logger.warn(`IG_NAME[2/3] PAT_DERIVE_FAILED pageId=${pageId}`, CommunicationMessengerService.name);
       }
     } else {
-      this.logger.warn(`IG_NAME[2/3] NO_PAGE_ID igsid=${igsid} — pas de pageId, token brut utilisé (configurer page_id sur le canal)`, CommunicationMessengerService.name);
+      this.logger.warn(`IG_NAME[2/3] NO_PAGE_ID igsid=${igsid} — page_id non configuré sur le canal`, CommunicationMessengerService.name);
     }
 
     // ── Méthode 1 : Conversations API avec platform=instagram ────────────────
-    this.logger.log(`IG_NAME[2/3] METHOD1_START igsid=${igsid} — GET /me/conversations?platform=instagram`, CommunicationMessengerService.name);
-    try {
-      const response = await axios.get<{
-        data?: Array<{
-          participants?: { data?: Array<{ id: string; name?: string; username?: string }> };
-        }>;
-      }>(
-        `https://graph.facebook.com/${this.META_API_VERSION}/me/conversations`,
-        {
-          params: {
-            platform: 'instagram',
-            user_id: igsid,
-            fields: 'participants',
-            access_token: effectiveToken,
+    // Tentée avec chaque token (brut d'abord, puis PAT si disponible)
+    this.logger.log(`IG_NAME[2/3] METHOD1_START igsid=${igsid} tokens_count=${tokensToTry.length}`, CommunicationMessengerService.name);
+    for (const [i, token] of tokensToTry.entries()) {
+      try {
+        const response = await axios.get<{
+          data?: Array<{
+            participants?: { data?: Array<{ id: string; name?: string; username?: string }> };
+          }>;
+        }>(
+          `https://graph.facebook.com/${this.META_API_VERSION}/me/conversations`,
+          {
+            params: { platform: 'instagram', user_id: igsid, fields: 'participants', access_token: token },
+            timeout: 5_000,
           },
-          timeout: 5_000,
-        },
-      );
+        );
 
-      const conversations = response.data?.data ?? [];
-      this.logger.log(
-        `IG_NAME[2/3] METHOD1_RESULT igsid=${igsid} conversations_count=${conversations.length}`,
-        CommunicationMessengerService.name,
-      );
-
-      if (conversations.length > 0) {
-        const participants = conversations[0].participants?.data ?? [];
+        const conversations = response.data?.data ?? [];
         this.logger.log(
-          `IG_NAME[2/3] METHOD1_PARTICIPANTS igsid=${igsid} participants=${JSON.stringify(participants.map((p) => ({ id: p.id, name: p.name, username: p.username })))}`,
+          `IG_NAME[2/3] METHOD1_RESULT token_index=${i} igsid=${igsid} conversations_count=${conversations.length}`,
           CommunicationMessengerService.name,
         );
-        const user = participants.find((p) => p.id !== pageId && (p.name?.trim() || p.username?.trim()));
-        const name = user?.name?.trim() || user?.username?.trim() || null;
-        if (name) {
-          this.nameCache.set(cacheKey, { name, expiresAt: Date.now() + 60 * 60_000 });
-          this.logger.log(`IG_NAME_RESOLVED_CONV igsid=${igsid} name="${name}"`, CommunicationMessengerService.name);
-          return name;
+
+        if (conversations.length > 0) {
+          const participants = conversations[0].participants?.data ?? [];
+          this.logger.log(
+            `IG_NAME[2/3] METHOD1_PARTICIPANTS igsid=${igsid} participants=${JSON.stringify(participants.map((p) => ({ id: p.id, name: p.name, username: p.username })))}`,
+            CommunicationMessengerService.name,
+          );
+          const user = participants.find((p) => p.id !== pageId && (p.name?.trim() || p.username?.trim()));
+          const name = user?.name?.trim() || user?.username?.trim() || null;
+          if (name) {
+            this.nameCache.set(cacheKey, { name, expiresAt: Date.now() + 60 * 60_000 });
+            this.logger.log(`IG_NAME_RESOLVED_CONV igsid=${igsid} name="${name}"`, CommunicationMessengerService.name);
+            return name;
+          }
+          this.logger.warn(`IG_NAME[2/3] METHOD1_NO_NAME token_index=${i} igsid=${igsid} — participants sans nom`, CommunicationMessengerService.name);
         }
-        this.logger.warn(`IG_NAME[2/3] METHOD1_NO_NAME igsid=${igsid} — participants trouvés mais aucun nom exploitable`, CommunicationMessengerService.name);
+      } catch (err) {
+        const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
+        const detail = axiosErr.response?.data?.error?.message ?? String(err);
+        this.logger.warn(`IG_NAME_CONV_FAILED token_index=${i} igsid=${igsid} — ${detail}`, CommunicationMessengerService.name);
       }
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
-      const detail = axiosErr.response?.data?.error?.message ?? String(err);
-      this.logger.warn(`IG_NAME_CONV_FAILED igsid=${igsid} — ${detail}`, CommunicationMessengerService.name);
     }
 
     // ── Méthode 2 : Profil direct ─────────────────────────────────────────────
-    this.logger.log(`IG_NAME[2/3] METHOD2_START igsid=${igsid} — GET /${igsid}?fields=name,username`, CommunicationMessengerService.name);
-    try {
-      const response = await axios.get<{ name?: string; username?: string }>(
-        `https://graph.facebook.com/${this.META_API_VERSION}/${igsid}`,
-        {
-          params: { fields: 'name,username', access_token: effectiveToken },
-          timeout: 5_000,
-        },
-      );
+    this.logger.log(`IG_NAME[2/3] METHOD2_START igsid=${igsid} tokens_count=${tokensToTry.length}`, CommunicationMessengerService.name);
+    for (const [i, token] of tokensToTry.entries()) {
+      try {
+        const response = await axios.get<{ name?: string; username?: string }>(
+          `https://graph.facebook.com/${this.META_API_VERSION}/${igsid}`,
+          {
+            params: { fields: 'name,username', access_token: token },
+            timeout: 5_000,
+          },
+        );
 
-      const data = response.data;
-      this.logger.log(
-        `IG_NAME[2/3] METHOD2_RESULT igsid=${igsid} name="${data?.name ?? 'null'}" username="${data?.username ?? 'null'}"`,
-        CommunicationMessengerService.name,
-      );
-      const name = data?.name?.trim() || data?.username?.trim() || null;
-
-      if (name) {
-        this.nameCache.set(cacheKey, { name, expiresAt: Date.now() + 60 * 60_000 });
-        this.logger.log(`IG_NAME_RESOLVED_DIRECT igsid=${igsid} name="${name}"`, CommunicationMessengerService.name);
-        return name;
+        const data = response.data;
+        this.logger.log(
+          `IG_NAME[2/3] METHOD2_RESULT token_index=${i} igsid=${igsid} name="${data?.name ?? 'null'}" username="${data?.username ?? 'null'}"`,
+          CommunicationMessengerService.name,
+        );
+        const name = data?.name?.trim() || data?.username?.trim() || null;
+        if (name) {
+          this.nameCache.set(cacheKey, { name, expiresAt: Date.now() + 60 * 60_000 });
+          this.logger.log(`IG_NAME_RESOLVED_DIRECT igsid=${igsid} name="${name}"`, CommunicationMessengerService.name);
+          return name;
+        }
+        this.logger.warn(
+          `IG_NAME_EMPTY token_index=${i} igsid=${igsid} — réponse sans nom`,
+          CommunicationMessengerService.name,
+        );
+      } catch (err) {
+        const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
+        const apiError = axiosErr.response?.data?.error;
+        const detail = apiError
+          ? `code=${apiError.code} type=${apiError.type ?? '-'}: ${apiError.message}`
+          : String(err);
+        this.logger.warn(`IG_NAME_DIRECT_FAILED token_index=${i} igsid=${igsid} — ${detail}`, CommunicationMessengerService.name);
       }
-
-      this.logger.warn(
-        `IG_NAME_EMPTY igsid=${igsid} — Graph API a répondu mais sans nom. Vérifiez instagram_manage_messages et page_id sur le canal.`,
-        CommunicationMessengerService.name,
-      );
-      return null;
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
-      const apiError = axiosErr.response?.data?.error;
-      const detail = apiError
-        ? `code=${apiError.code} type=${apiError.type ?? '-'}: ${apiError.message}`
-        : String(err);
-      this.logger.warn(`IG_NAME_DIRECT_FAILED igsid=${igsid} — ${detail}`, CommunicationMessengerService.name);
-      return null;
     }
+
+    return null;
   }
 
   /**
