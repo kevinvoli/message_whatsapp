@@ -972,6 +972,7 @@ export class WhapiController {
           'Webhook signature secret not configured',
         );
       }
+      this.auditLogger.warn(`META_SIG_BYPASS dev_mode=true no_secret`);
       return;
     }
 
@@ -996,6 +997,7 @@ export class WhapiController {
       this.metricsService.recordSignatureInvalid('meta');
       throw new ForbiddenException('Invalid webhook signature');
     }
+    this.auditLogger.log(`META_SIG_OK raw_body_size=${rawBody?.length ?? 'undefined'}`);
   }
 
   private headerValue(
