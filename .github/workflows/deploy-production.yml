@@ -31,13 +31,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch master ref for diff
-        run: git fetch origin master --no-tags
-
       - name: Detect changed services
         id: filter
         run: |
-          CHANGED=$(git diff --name-only origin/master...HEAD)
+          BEFORE="${{ github.event.before }}"
+          # Premier push sur la branche : comparer avec le commit racine
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE="$(git rev-list --max-parents=0 HEAD)"
+          fi
+          CHANGED=$(git diff --name-only "$BEFORE" HEAD)
+          echo "Files changed since last push:"
+          echo "$CHANGED"
           echo "backend=$(echo "$CHANGED"  | grep -qE '^message_whatsapp/' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
           echo "frontend=$(echo "$CHANGED" | grep -qE '^front/'             && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
           echo "admin=$(echo "$CHANGED"    | grep -qE '^admin/'             && echo 'true' || echo 'false')"  >> $GITHUB_OUTPUT
