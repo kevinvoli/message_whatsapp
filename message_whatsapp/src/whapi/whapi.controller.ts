@@ -768,6 +768,11 @@ export class WhapiController {
     payload: unknown,
     channelSecret?: string | null,
   ): void {
+    if (process.env.INSTAGRAM_WEBHOOK_SKIP_SIGNATURE === 'true') {
+      this.auditLogger.warn(`IG[4/8] signature_skipped INSTAGRAM_WEBHOOK_SKIP_SIGNATURE=true`);
+      return;
+    }
+
     const isProd = process.env.NODE_ENV === 'production';
 
     const secrets: string[] = [];
