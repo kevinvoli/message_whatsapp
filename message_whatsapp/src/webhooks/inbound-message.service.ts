@@ -526,27 +526,33 @@ export class InboundMessageService {
       const channel = await this.channelService.findByChannelId(channelId);
 
       if (!channel) {
-        this.logger.warn(`INSTAGRAM_NAME_SKIP igsid=${igsid} channelId=${channelId} — canal introuvable`);
+        this.logger.warn(`INSTAGRAM_NAME[1/3] SKIP igsid=${igsid} channelId=${channelId} — canal introuvable en BDD`);
         return undefined;
       }
 
       if (!channel.token) {
-        this.logger.warn(`INSTAGRAM_NAME_SKIP igsid=${igsid} channelId=${channelId} — token vide sur le canal`);
+        this.logger.warn(`INSTAGRAM_NAME[1/3] SKIP igsid=${igsid} channelId=${channelId} — token vide sur le canal`);
         return undefined;
       }
 
-      // page_id = ID de la Facebook Page liée au compte Instagram Business
-      // external_id = ID du compte Instagram Business (≠ Page ID)
-      // La dérivation du PAT nécessite le Page ID, pas l'IG account ID
       const pageId = channel.page_id ?? channel.external_id ?? undefined;
-      this.logger.debug(
-        `INSTAGRAM_NAME_ATTEMPT igsid=${igsid} channelId=${channelId} page_id=${channel.page_id} external_id=${channel.external_id}`,
+      this.logger.log(
+        `INSTAGRAM_NAME[1/3] START igsid=${igsid} channelId=${channelId} has_token=true page_id=${channel.page_id ?? 'null'} external_id=${channel.external_id ?? 'null'} pageId_used=${pageId ?? 'null'}`,
       );
 
       const name = await this.messengerService.getInstagramUserName(igsid, channel.token, pageId);
+
+      if (name) {
+        this.logger.log(`INSTAGRAM_NAME[3/3] SUCCESS igsid=${igsid} name="${name}"`);
+      } else {
+        this.logger.warn(
+          `INSTAGRAM_NAME[3/3] FAIL igsid=${igsid} — aucun nom retourné. Vérifiez les logs IG_NAME_* ci-dessus pour le détail de l'erreur Graph API.`,
+        );
+      }
+
       return name ?? undefined;
     } catch (err) {
-      this.logger.warn(`INSTAGRAM_NAME_ERROR igsid=${igsid} error=${String(err)}`);
+      this.logger.warn(`INSTAGRAM_NAME[ERR] igsid=${igsid} error=${String(err)}`);
       return undefined;
     }
   }
