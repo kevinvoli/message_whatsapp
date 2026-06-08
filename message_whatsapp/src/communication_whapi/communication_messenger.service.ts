@@ -128,6 +128,105 @@ export class CommunicationMessengerService {
   }
 
   /**
+   * Récupère le nom d'un utilisateur Instagram via son IGSID.
+   * Utilise d'abord l'API Conversations Instagram (platform=instagram),
+   * puis en fallback l'endpoint profil direct.
+   */
+  async getInstagramUserName(igsid: string, accessToken: string, pageId?: string): Promise<string | null> {
+    const cacheKey = `ig:${igsid}`;
+    const cached = this.nameCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.name;
+
+    const effectiveToken = pageId
+      ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+      : accessToken;
+
+    // ── Méthode 1 : Conversations API avec platform=instagram ────────────────
+    // GET /me/conversations?platform=instagram&user_id={igsid}&fields=participants
+    try {
+      const response = await axios.get<{
+        data?: Array<{
+          participants?: { data?: Array<{ id: string; name?: string; username?: string }> };
+        }>;
+      }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/me/conversations`,
+        {
+          params: {
+            platform: 'instagram',
+            user_id: igsid,
+            fields: 'participants',
+            access_token: effectiveToken,
+          },
+          timeout: 5_000,
+        },
+      );
+
+      const conversations = response.data?.data ?? [];
+      if (conversations.length > 0) {
+        const participants = conversations[0].participants?.data ?? [];
+        const user = participants.find((p) => p.id !== pageId && (p.name?.trim() || p.username?.trim()));
+        const name = user?.name?.trim() || user?.username?.trim() || null;
+        if (name) {
+          this.nameCache.set(cacheKey, { name, expiresAt: Date.now() + 60 * 60_000 });
+          this.logger.log(
+            `IG_NAME_RESOLVED_CONV igsid=${igsid} name="${name}"`,
+            CommunicationMessengerService.name,
+          );
+          return name;
+        }
+      }
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
+      const detail = axiosErr.response?.data?.error?.message ?? String(err);
+      this.logger.warn(
+        `IG_NAME_CONV_FAILED igsid=${igsid} — ${detail}`,
+        CommunicationMessengerService.name,
+      );
+    }
+
+    // ── Méthode 2 : Profil direct ─────────────────────────────────────────────
+    // GET /{igsid}?fields=name,username — requiert instagram_manage_messages
+    try {
+      const response = await axios.get<{ name?: string; username?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${igsid}`,
+        {
+          params: { fields: 'name,username', access_token: effectiveToken },
+          timeout: 5_000,
+        },
+      );
+
+      const data = response.data;
+      const name = data?.name?.trim() || data?.username?.trim() || null;
+
+      if (name) {
+        this.nameCache.set(cacheKey, { name, expiresAt: Date.now() + 60 * 60_000 });
+        this.logger.log(
+          `IG_NAME_RESOLVED_DIRECT igsid=${igsid} name="${name}"`,
+          CommunicationMessengerService.name,
+        );
+        return name;
+      }
+
+      this.logger.warn(
+        `IG_NAME_EMPTY igsid=${igsid} — Vérifiez instagram_manage_messages et page_id sur le canal.`,
+        CommunicationMessengerService.name,
+      );
+      return null;
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
+      const apiError = axiosErr.response?.data?.error;
+      const detail = apiError
+        ? `code=${apiError.code} type=${apiError.type ?? '-'}: ${apiError.message}`
+        : String(err);
+      this.logger.warn(
+        `IG_NAME_DIRECT_FAILED igsid=${igsid} — ${detail}`,
+        CommunicationMessengerService.name,
+      );
+      return null;
+    }
+  }
+
+  /**
    * Récupère le nom d'un utilisateur Messenger via l'API Conversations.
    * Requiert uniquement pages_messaging (pas de permission supplémentaire).
    * Cherche dans les conversations récentes de la page l'entrée correspondant au PSID.

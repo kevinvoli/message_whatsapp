@@ -525,21 +525,28 @@ export class InboundMessageService {
     try {
       const channel = await this.channelService.findByChannelId(channelId);
 
-      if (!channel?.token) {
-        this.logger.warn(
-          `INSTAGRAM_NAME_SKIP igsid=${igsid} channelId=${channelId} — channel introuvable ou token manquant.`,
-        );
+      if (!channel) {
+        this.logger.warn(`INSTAGRAM_NAME_SKIP igsid=${igsid} channelId=${channelId} — canal introuvable`);
         return undefined;
       }
 
-      // Même endpoint Graph API que Messenger : GET /{igsid}?fields=name
-      const name = await this.messengerService.getUserName(
-        igsid,
-        channel.token,
-        channel.external_id ?? undefined,
+      if (!channel.token) {
+        this.logger.warn(`INSTAGRAM_NAME_SKIP igsid=${igsid} channelId=${channelId} — token vide sur le canal`);
+        return undefined;
+      }
+
+      // page_id = ID de la Facebook Page liée au compte Instagram Business
+      // external_id = ID du compte Instagram Business (≠ Page ID)
+      // La dérivation du PAT nécessite le Page ID, pas l'IG account ID
+      const pageId = channel.page_id ?? channel.external_id ?? undefined;
+      this.logger.debug(
+        `INSTAGRAM_NAME_ATTEMPT igsid=${igsid} channelId=${channelId} page_id=${channel.page_id} external_id=${channel.external_id}`,
       );
+
+      const name = await this.messengerService.getInstagramUserName(igsid, channel.token, pageId);
       return name ?? undefined;
-    } catch {
+    } catch (err) {
+      this.logger.warn(`INSTAGRAM_NAME_ERROR igsid=${igsid} error=${String(err)}`);
       return undefined;
     }
   }
