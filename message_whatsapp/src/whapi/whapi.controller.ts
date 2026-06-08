@@ -805,6 +805,7 @@ export class WhapiController {
       isProd,
     );
 
+    
     if (!valid) {
       const computedDigest = rawBody
         ? createHmac('sha256', secrets[0]).update(rawBody).digest('hex')
