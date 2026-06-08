@@ -801,6 +801,9 @@ export class WhapiController {
     );
 
     if (!valid) {
+      this.auditLogger.warn(
+        `IG[4/8] signature_mismatch raw_body_size=${rawBody?.length ?? 'undefined'} secret_prefix=${channelSecret?.trim().slice(0, 4) ?? 'none'}*** sig_header=${signatureHeader?.slice(0, 20)}...`,
+      );
       this.metricsService.recordSignatureInvalid('instagram');
       throw new ForbiddenException('Invalid Instagram webhook signature');
     }
