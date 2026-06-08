@@ -806,8 +806,16 @@ export class WhapiController {
     );
 
     if (!valid) {
+      const computedDigest = rawBody
+        ? createHmac('sha256', secrets[0]).update(rawBody).digest('hex')
+        : null;
       this.auditLogger.warn(
-        `IG[4/8] signature_mismatch raw_body_size=${rawBody?.length ?? 'undefined'} secret_prefix=${channelSecret?.trim().slice(0, 4) ?? 'none'}*** sig_header=${signatureHeader?.slice(0, 20)}...`,
+        `IG[4/8] signature_mismatch` +
+        ` raw_body_available=${rawBody != null}` +
+        ` raw_body_size=${rawBody?.length ?? 'undefined'}` +
+        ` secret_prefix=${channelSecret?.trim().slice(0, 6) ?? 'none'}***` +
+        ` computed_prefix=${computedDigest ? 'sha256=' + computedDigest.slice(0, 12) + '...' : 'no_rawbody'}` +
+        ` provided_prefix=${signatureHeader?.slice(0, 20)}...`,
       );
       this.metricsService.recordSignatureInvalid('instagram');
       throw new ForbiddenException('Invalid Instagram webhook signature');
