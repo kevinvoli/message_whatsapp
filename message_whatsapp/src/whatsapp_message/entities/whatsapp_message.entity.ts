@@ -72,7 +72,7 @@ export class WhatsappMessage {
   @Column({
     name: 'provider_message_id',
     type: 'varchar',
-    length: 191,
+    length: 512,
     nullable: true,
   })
   provider_message_id?: string | null;
@@ -80,7 +80,7 @@ export class WhatsappMessage {
   @Column({
     name: 'message_id',
     type: 'varchar',
-    length: 100,
+    length: 512,
     nullable: true,
   })
   message_id: string | null;
@@ -88,7 +88,7 @@ export class WhatsappMessage {
   @Column({
     name: 'external_id',
     type: 'varchar',
-    length: 100,
+    length: 512,
     nullable: true,
   })
   external_id?: string;
