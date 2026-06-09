@@ -81,6 +81,18 @@ export class WhatsappMedia {
   @Column({ name: 'url', type: 'text', nullable: true })
   url?: string | null;
 
+  @Column({ name: 'local_url', type: 'varchar', length: 512, nullable: true })
+  local_url?: string | null;
+
+  @Column({ name: 'local_path', type: 'varchar', length: 512, nullable: true })
+  local_path?: string | null;
+
+  @Column({ name: 'provider_url_expired', type: 'tinyint', width: 1, default: 0 })
+  provider_url_expired: boolean;
+
+  @Column({ name: 'downloaded_at', type: 'datetime', nullable: true })
+  downloaded_at?: Date | null;
+
   @Column({ name: 'mime_type', type: 'varchar', length: 100, nullable: false })
   mime_type: string;
 

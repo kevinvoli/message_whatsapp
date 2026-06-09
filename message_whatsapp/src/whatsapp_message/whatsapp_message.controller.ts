@@ -40,6 +40,7 @@ import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template
 import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-whatsapp-template.dto';
 import { UpdateWhatsappTemplateDto } from 'src/whatsapp_template/dto/update-whatsapp-template.dto';
 import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
+import { MediaStorageService } from 'src/media-storage/media-storage.service';
 import axios from 'axios';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
@@ -69,6 +70,7 @@ export class WhatsappMessageController {
     private readonly messengerService: CommunicationMessengerService,
     private readonly whapiService: CommunicationWhapiService,
     private readonly templateService: WhatsappTemplateService,
+    private readonly mediaStorageService: MediaStorageService,
   ) {}
 
   /**
@@ -396,6 +398,16 @@ export class WhatsappMessageController {
       throw new BadRequestException('providerMediaId is required');
     }
 
+    // Priorité 0 : chercher le média en DB pour la vérification local_url
+    const media = await this.mediaRepository.findOne({
+      where: { provider_media_id: providerMediaId, provider: 'meta' },
+    });
+
+    // Priorité 1 : copie locale disponible → redirect immédiat
+    if (media?.local_url) {
+      return res.redirect(302, media.local_url);
+    }
+
     // Cache disque : évite de rappeler l'API Meta à chaque requête.
     // Les médias Meta ne changent jamais une fois reçus.
     const cacheDir = join(process.cwd(), 'uploads', 'media-meta');
@@ -412,10 +424,6 @@ export class WhatsappMessageController {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       return res.send(buffer);
     }
-
-    const media = await this.mediaRepository.findOne({
-      where: { provider_media_id: providerMediaId, provider: 'meta' },
-    });
 
     const resolvedChannelId =
       media?.channel?.channel_id ??
@@ -455,12 +463,34 @@ export class WhatsappMessageController {
     }
 
     if (!downloaded) {
-      throw new NotFoundException('Meta media not found');
+      if (media) {
+        await this.mediaRepository.update(media.id, { provider_url_expired: true });
+      }
+      throw new NotFoundException('Meta media not found or URL expired');
     }
 
     // Sauvegarder en cache disque pour les prochaines requêtes
     writeFileSync(metaFile, downloaded.buffer);
     writeFileSync(metaMime, downloaded.mimeType);
+
+    // Stocker localement et mettre à jour l'entité (seulement si pas encore fait)
+    if (media && !media.local_path) {
+      try {
+        const stored = await this.mediaStorageService.store(
+          downloaded.buffer,
+          downloaded.mimeType,
+          media.id,
+          media.tenant_id,
+        );
+        await this.mediaRepository.update(media.id, {
+          local_url: stored.localUrl,
+          local_path: stored.localPath,
+          downloaded_at: new Date(),
+        });
+      } catch {
+        // Échec du stockage local non bloquant — on sert quand même le buffer
+      }
+    }
 
     res.setHeader('Content-Type', downloaded.mimeType);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -477,15 +507,21 @@ export class WhatsappMessageController {
       throw new BadRequestException('messageId is required');
     }
 
+    // Chercher le média en DB pour local_url et tenant_id
+    const media = await this.mediaRepository.findOne({
+      where: { whapi_media_id: messageId, provider: 'whapi' },
+      relations: ['message'],
+    });
+
+    // Priorité 1 : copie locale disponible → redirect immédiat
+    if (media?.local_url) {
+      return res.redirect(302, media.local_url);
+    }
+
     // Résolution du channelId depuis la DB si absent du query string
     const resolvedChannelId =
       channelId ??
-      (
-        await this.mediaRepository.findOne({
-          where: { whapi_media_id: messageId, provider: 'whapi' },
-          relations: ['message'],
-        })
-      )?.message?.channel_id ??
+      media?.message?.channel_id ??
       null;
 
     if (!resolvedChannelId) {
@@ -498,7 +534,29 @@ export class WhatsappMessageController {
     );
 
     if (!downloaded) {
-      throw new NotFoundException('Média Whapi introuvable');
+      if (media) {
+        await this.mediaRepository.update(media.id, { provider_url_expired: true });
+      }
+      throw new NotFoundException('Média Whapi introuvable ou URL expirée');
+    }
+
+    // Stocker localement et mettre à jour l'entité
+    if (media) {
+      try {
+        const stored = await this.mediaStorageService.store(
+          downloaded.buffer,
+          downloaded.mimeType,
+          media.id,
+          media.tenant_id,
+        );
+        await this.mediaRepository.update(media.id, {
+          local_url: stored.localUrl,
+          local_path: stored.localPath,
+          downloaded_at: new Date(),
+        });
+      } catch {
+        // Échec du stockage local non bloquant — on sert quand même le buffer
+      }
     }
 
     res.setHeader('Content-Type', downloaded.mimeType);
@@ -521,6 +579,11 @@ export class WhatsappMessageController {
       where: { provider_media_id: messageId, provider: 'messenger' },
       relations: ['message'],
     });
+
+    // Priorité 1 : copie locale disponible → redirect immédiat
+    if (media?.local_url) {
+      return res.redirect(302, media.local_url);
+    }
 
     const resolvedChannelId =
       media?.message?.channel_id ??
@@ -551,6 +614,9 @@ export class WhatsappMessageController {
       );
 
       if (!resolved) {
+        if (media) {
+          await this.mediaRepository.update(media.id, { provider_url_expired: true });
+        }
         throw new NotFoundException('Vidéo Messenger introuvable (CDN URL non résolue)');
       }
 
@@ -598,7 +664,10 @@ export class WhatsappMessageController {
     );
 
     if (!downloaded) {
-      throw new NotFoundException('Média Messenger introuvable');
+      if (media) {
+        await this.mediaRepository.update(media.id, { provider_url_expired: true });
+      }
+      throw new NotFoundException('Média Messenger introuvable ou URL expirée');
     }
 
     // Normaliser le MIME type pour les audios M4A servis en video/mp4 par le CDN.
@@ -612,6 +681,25 @@ export class WhatsappMessageController {
       }
       if (effectiveMime === 'application/octet-stream') {
         effectiveMime = 'audio/mp4';
+      }
+    }
+
+    // Stocker localement (audio / image / sticker / document uniquement — pas vidéo)
+    if (media) {
+      try {
+        const stored = await this.mediaStorageService.store(
+          downloaded.buffer,
+          effectiveMime,
+          media.id,
+          media.tenant_id,
+        );
+        await this.mediaRepository.update(media.id, {
+          local_url: stored.localUrl,
+          local_path: stored.localPath,
+          downloaded_at: new Date(),
+        });
+      } catch {
+        // Échec du stockage local non bloquant — on sert quand même le buffer
       }
     }
 

@@ -41,6 +41,7 @@ import { SystemAlertModule } from './system-alert/system-alert.module';
 import { CampaignLinkModule } from './campaign-link/campaign-link.module';
 import { MediaAssetModule } from './media-asset/media-asset.module';
 import { ConversationRestrictionModule } from './conversation-restriction/conversation-restriction.module';
+import { MediaStorageModule } from './media-storage/media-storage.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { ConversationRestrictionModule } from './conversation-restriction/conver
     CampaignLinkModule,
     MediaAssetModule,
     ConversationRestrictionModule,
+    MediaStorageModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

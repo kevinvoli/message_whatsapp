@@ -48,6 +48,7 @@ import { MessageReadRateLimiterService } from './message-read-rate-limiter.servi
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { ConversationRestrictionModule } from 'src/conversation-restriction/conversation-restriction.module';
 import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
+import { MediaStorageModule } from 'src/media-storage/media-storage.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.e
     ConnectionLogModule,
     MediaAssetModule,
     ConversationRestrictionModule,
+    MediaStorageModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [
