@@ -13,6 +13,7 @@ import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service'
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
       WhatsappPoste,
       WhatsappMessage,
       WhapiChannel,
+      WhatsappMedia,
     ]),
   ],
   controllers: [WhatsappChatController],
