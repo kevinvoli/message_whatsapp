@@ -56,16 +56,7 @@ export class FirstResponseTimeoutJob implements OnModuleInit {
         (SELECT c.poste_id FROM whapi_channels c WHERE c.poste_id IS NOT NULL))
     )`;
 
-    const unreadEligibility = `(
-      chat.unread_count > 0
-      OR EXISTS (
-        SELECT 1 FROM whatsapp_message msg
-        WHERE msg.chat_id = chat.chat_id
-          AND msg.from_me = 0
-          AND msg.status IN ('sent', 'delivered')
-          AND msg.deletedAt IS NULL
-      )
-    )`;
+    const unreadEligibility = `chat.unread_count > 0`;
 
     const noReplyFilter = `(chat.last_poste_message_at IS NULL OR chat.last_poste_message_at < chat.last_client_message_at)`;
 

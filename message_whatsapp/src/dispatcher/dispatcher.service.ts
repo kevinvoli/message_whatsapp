@@ -614,19 +614,11 @@ export class DispatcherService {
       // Déclaré tôt : nécessaire pour la requête unavailableCountRows (NOT IN) et step 3.
       const posteIds = queuedPostes.map((p) => p.id);
 
-      // Critère "conversation nécessitant une réponse" — miroir exact du frontend :
-      // unread_count > 0 OU existence d'un message client non lu (from_me=0, sent/delivered).
+      // Critère "conversation nécessitant une réponse" : unread_count > 0 uniquement.
+      // Une conversation lue (unread_count = 0) ne doit jamais être redispatchée,
+      // même si des messages client sont encore en statut 'sent'/'delivered'.
       // NE PAS utiliser last_poste_message_at IS NULL seul : trop large (48 k+ faux positifs).
-      const unreadEligibility = `(
-        chat.unread_count > 0
-        OR EXISTS (
-          SELECT 1 FROM whatsapp_message msg
-          WHERE msg.chat_id = chat.chat_id
-            AND msg.from_me = 0
-            AND msg.status IN ('sent', 'delivered')
-            AND msg.deletedAt IS NULL
-        )
-      )`;
+      const unreadEligibility = `chat.unread_count > 0`;
 
       // ── Step 0 : Réouverture des convs FERME non répondues sur postes actifs ──
       // Indépendant de la taille de la queue — tourne même avec un seul poste.
