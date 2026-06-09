@@ -57,6 +57,17 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
 
   return (
     <div className="flex-1 flex flex-col">
+      {panelEnabled && (
+        <div className="flex justify-end border-b border-gray-100 bg-white px-3 py-1.5">
+          <button
+            onClick={onTogglePanel}
+            title="Panneau médias"
+            className={`p-1.5 rounded-lg transition-colors ${panelOpen ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
+          >
+            <PanelTop className="w-5 h-5" />
+          </button>
+        </div>
+      )}
       {selectedConversation ? (
         <>
           {isLoading ? (
@@ -71,9 +82,6 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
               <ChatHeader
                 currentConv={selectedConversation}
                 totalMessages={totalMessages || 0}
-                panelEnabled={panelEnabled}
-                panelOpen={panelOpen}
-                onTogglePanel={onTogglePanel}
               />
               <ClientInfoBanner currentConv={selectedConversation} />
               <ChatMessages

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, User, Clock, PanelTop } from 'lucide-react';
+import { MessageCircle, User, Clock } from 'lucide-react';
 import { CallStatus, Conversation, ConversationStatus } from '@/types/chat';
 import { getStatusBadge } from '@/lib/utils';
 import { CallButton } from '../conversation/callButton';
@@ -17,9 +17,6 @@ const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
 interface ChatHeaderProps {
     currentConv: Conversation;
     totalMessages: number;
-    panelEnabled?: boolean;
-    panelOpen?: boolean;
-    onTogglePanel?: () => void;
 }
 
 function SlaCountdown({ deadline }: { deadline: Date }) {
@@ -58,7 +55,7 @@ function SlaCountdown({ deadline }: { deadline: Date }) {
     );
 }
 
-export default function ChatHeader({ currentConv, totalMessages, panelEnabled, panelOpen, onTogglePanel }: ChatHeaderProps) {
+export default function ChatHeader({ currentConv, totalMessages }: ChatHeaderProps) {
     const { updateConversation, changeConversationStatus } = useChatStore();
     const provider = getProviderFromChatId(currentConv.chat_id);
     const avatarColor = AVATAR_COLORS[provider] ?? AVATAR_COLORS.whatsapp;
@@ -123,15 +120,6 @@ export default function ChatHeader({ currentConv, totalMessages, panelEnabled, p
                     <CallButton conversation={currentConv}
                     onCallStatusChange={handleCallStatusChange} />
                     <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />
-                    {panelEnabled && (
-                        <button
-                            onClick={onTogglePanel}
-                            title="Panneau médias"
-                            className={`p-1.5 rounded-lg transition-colors ${panelOpen ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
-                        >
-                            <PanelTop className="w-5 h-5" />
-                        </button>
-                    )}
                 </div>
             </div>
         </div>
