@@ -1078,6 +1078,9 @@ export default function ConversationsView({
                                             {msg.direction === 'OUT' && msg.from_name && (
                                                 <p className="text-[10px] text-blue-200 text-right italic mt-0.5 leading-tight">{msg.from_name}</p>
                                             )}
+                                            {msg.direction === 'IN' && msg.from_name && (
+                                                <p className="text-[10px] text-gray-400 text-left italic mt-0.5 leading-tight">{msg.from_name}</p>
+                                            )}
                                             <span className="block text-right text-xs mt-1 opacity-75">
                                                 {formatDateTimeWithSeconds(msg.timestamp)}
                                                 {msg.status && (

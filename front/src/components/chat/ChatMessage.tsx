@@ -318,9 +318,14 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             <p className="text-sm italic opacity-80">[Message vide]</p>
           )}
 
-          {/* Nom de la commerciale (messages sortants uniquement) */}
+          {/* Nom de l'expéditeur */}
           {isFromMe && msg.from_name && (
             <p className="text-[10px] text-green-200 text-right italic mt-0.5 leading-tight">
+              {msg.from_name}
+            </p>
+          )}
+          {!isFromMe && msg.from_name && (
+            <p className="text-[10px] text-gray-400 text-left italic mt-0.5 leading-tight">
               {msg.from_name}
             </p>
           )}
