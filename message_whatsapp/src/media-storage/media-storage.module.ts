@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaStorageService } from './media-storage.service';
-import { MediaFileController } from './media-file.controller';
 import { MediaDownloadService } from './media-download.service';
 import { MediaBackfillService } from './media-backfill.service';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
@@ -19,7 +18,6 @@ import { LoggingModule } from 'src/logging/logging.module';
     ChannelModule,
     LoggingModule,
   ],
-  controllers: [MediaFileController],
   providers: [
     MediaStorageService,
     MediaDownloadService,

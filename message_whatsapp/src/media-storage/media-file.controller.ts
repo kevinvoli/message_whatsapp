@@ -2,12 +2,11 @@ import {
   Controller,
   Get,
   NotFoundException,
-  Param,
   Req,
   Res,
 } from '@nestjs/common';
 import { existsSync, readFileSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, normalize } from 'path';
 import { Request, Response } from 'express';
 
 const EXT_TO_MIME: Record<string, string> = {
@@ -44,31 +43,56 @@ function extToMime(ext: string): string {
 export class MediaFileController {
   @Get('*')
   serveMediaFile(
-    @Param('*') filePath: string,
     @Req() req: Request,
     @Res() res: Response,
   ): Response | void {
-    // Protection path traversal
-    const normalized = filePath.replace(/\\/g, '/').replace(/\.\.+/g, '').replace(/^\/+/, '');
+    // En Express, req.params[0] capture le segment après le préfixe du contrôleur.
+    // req.path est plus fiable : contient le chemin complet incluant /media/
+    const rawPath: string = (req.params as Record<string, string>)[0]
+      ?? req.path.replace(/^\/media\//, '')
+      ?? '';
 
-    const absolutePath = join(process.cwd(), 'uploads', 'media', normalized);
+    // Protection path traversal : normaliser et rejeter tout '..'
+    const cleaned = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const normalized = normalize(cleaned);
+    if (normalized.includes('..')) {
+      throw new NotFoundException('Chemin invalide');
+    }
+
+    const mediaRoot = join(process.cwd(), 'uploads', 'media');
+    const absolutePath = join(mediaRoot, normalized);
+
+    // S'assurer que le chemin reste dans le dossier media (double vérification)
+    if (!absolutePath.startsWith(mediaRoot)) {
+      throw new NotFoundException('Chemin invalide');
+    }
 
     if (!existsSync(absolutePath)) {
       throw new NotFoundException('Fichier média introuvable');
     }
 
+    const stat = statSync(absolutePath);
+    if (stat.isDirectory()) {
+      throw new NotFoundException('Fichier média introuvable');
+    }
+
     const ext = (absolutePath.split('.').pop() ?? '').toLowerCase();
     const contentType = extToMime(ext);
-    const totalSize = statSync(absolutePath).size;
+    const totalSize = stat.size;
 
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('Content-Type', contentType);
     res.setHeader('Accept-Ranges', 'bytes');
 
-    // Inline pour images/vidéos/audio, attachment pour documents
-    const isInline = contentType.startsWith('image/') || contentType.startsWith('video/') || contentType.startsWith('audio/');
-    res.setHeader('Content-Disposition', isInline ? 'inline' : `attachment; filename="${normalized.split('/').pop()}"`);
+    const isInline = contentType.startsWith('image/')
+      || contentType.startsWith('video/')
+      || contentType.startsWith('audio/');
+    const filename = normalized.split('/').pop() ?? 'media';
+    res.setHeader(
+      'Content-Disposition',
+      isInline ? 'inline' : `attachment; filename="${filename}"`,
+    );
 
     // Support Range pour lecture audio/vidéo dans les navigateurs
     const rangeHeader = req.headers['range'];
@@ -90,6 +114,6 @@ export class MediaFileController {
 
     const buffer = readFileSync(absolutePath);
     res.setHeader('Content-Length', totalSize);
-    res.send(buffer);
+    return res.send(buffer);
   }
 }

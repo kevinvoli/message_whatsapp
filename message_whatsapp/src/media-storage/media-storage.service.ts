@@ -64,7 +64,7 @@ export class MediaStorageService {
     const relativePath = `${yyyy}/${mm}/${dd}/${tenant}/${mediaId}.${ext}`;
 
     const localPath = join(process.cwd(), 'uploads', 'media', relativePath);
-    const localUrl  = `/media/${relativePath}`;
+    const localUrl  = `/uploads/media/${relativePath}`;
 
     // Créer les dossiers intermédiaires si nécessaire
     mkdirSync(dirname(localPath), { recursive: true });

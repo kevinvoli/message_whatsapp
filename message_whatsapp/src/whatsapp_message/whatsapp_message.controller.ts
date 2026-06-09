@@ -17,7 +17,7 @@ import {
   Res,
   NotFoundException,
 } from '@nestjs/common';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -403,9 +403,17 @@ export class WhatsappMessageController {
       where: { provider_media_id: providerMediaId, provider: 'meta' },
     });
 
-    // Priorité 1 : copie locale disponible → redirect immédiat
-    if (media?.local_url) {
-      return res.redirect(302, media.local_url);
+    // Priorité 1 : copie locale disponible ET fichier présent sur disque → redirect
+    if (media?.local_url && media.local_path) {
+      try {
+        const stat = statSync(media.local_path);
+        if (stat.isFile()) return res.redirect(302, media.local_url);
+      } catch {
+        // Fichier disparu du disque — réinitialiser et retélécharger via proxy
+        await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
+        media.local_url = null;
+        media.local_path = null;
+      }
     }
 
     // Cache disque : évite de rappeler l'API Meta à chaque requête.
@@ -513,9 +521,16 @@ export class WhatsappMessageController {
       relations: ['message'],
     });
 
-    // Priorité 1 : copie locale disponible → redirect immédiat
-    if (media?.local_url) {
-      return res.redirect(302, media.local_url);
+    // Priorité 1 : copie locale disponible ET fichier présent sur disque → redirect
+    if (media?.local_url && media.local_path) {
+      try {
+        const stat = statSync(media.local_path);
+        if (stat.isFile()) return res.redirect(302, media.local_url);
+      } catch {
+        await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
+        media.local_url = null;
+        media.local_path = null;
+      }
     }
 
     // Résolution du channelId depuis la DB si absent du query string
@@ -580,9 +595,16 @@ export class WhatsappMessageController {
       relations: ['message'],
     });
 
-    // Priorité 1 : copie locale disponible → redirect immédiat
-    if (media?.local_url) {
-      return res.redirect(302, media.local_url);
+    // Priorité 1 : copie locale disponible ET fichier présent sur disque → redirect
+    if (media?.local_url && media.local_path) {
+      try {
+        const stat = statSync(media.local_path);
+        if (stat.isFile()) return res.redirect(302, media.local_url);
+      } catch {
+        await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
+        media.local_url = null;
+        media.local_path = null;
+      }
     }
 
     const resolvedChannelId =
