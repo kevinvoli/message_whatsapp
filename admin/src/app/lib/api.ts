@@ -1519,7 +1519,7 @@ export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions> {
 }
 
 export async function getPostePanelConfig(posteId: string): Promise<PostePanelConfig> {
-    const response = await fetch(`/poste//panel`, {
+    const response = await fetch(`${API_BASE_URL}/poste/${posteId}/panel`, {
         method: 'GET',
         credentials: 'include',
     });
@@ -1527,7 +1527,7 @@ export async function getPostePanelConfig(posteId: string): Promise<PostePanelCo
 }
 
 export async function updatePostePanelConfig(posteId: string, payload: { enabled: boolean; types: string[] }): Promise<void> {
-    const response = await fetch(`/poste//panel`, {
+    const response = await fetch(`${API_BASE_URL}/poste/${posteId}/panel`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
