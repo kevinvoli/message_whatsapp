@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 
 /** Correspondance MIME → extension fichier */
@@ -75,5 +75,22 @@ export class MediaStorageService {
     this.logger.debug(`Média stocké localement : ${localPath}`);
 
     return { localPath, localUrl };
+  }
+
+  /**
+   * Supprime un fichier local à partir de son chemin absolu stocké en DB.
+   * Utilisé pour le GDPR opt-out et le nettoyage périodique.
+   * Sans effet si le fichier n'existe pas (idempotent).
+   */
+  deleteFile(localPath: string): void {
+    try {
+      if (existsSync(localPath)) {
+        unlinkSync(localPath);
+        this.logger.debug(`Fichier supprimé : ${localPath}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Échec suppression fichier ${localPath} : ${msg}`);
+    }
   }
 }

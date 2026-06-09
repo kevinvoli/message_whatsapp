@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { MediaDownloadService } from './media-download.service';
+import { MediaStorageService } from './media-storage.service';
 
 @Injectable()
 export class MediaBackfillService {
@@ -13,6 +14,7 @@ export class MediaBackfillService {
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
     private readonly mediaDownloadService: MediaDownloadService,
+    private readonly mediaStorageService: MediaStorageService,
   ) {}
 
   /**
@@ -74,5 +76,37 @@ export class MediaBackfillService {
     this.logger.log(
       `MEDIA_EXPIRE_DONE affectés=${result.affected ?? 0}`,
     );
+  }
+
+  /**
+   * Nettoyage des fichiers locaux de plus de 6 mois pour libérer l'espace disque.
+   * Supprime le fichier physique puis efface local_path/local_url en DB.
+   * Les médias récents (< 6 mois) ne sont jamais touchés.
+   */
+  @Cron('0 5 1 * *') // 1er du mois à 5h du matin
+  async purgeOldLocalFiles(): Promise<void> {
+    this.logger.log('MEDIA_PURGE_START — nettoyage des fichiers locaux > 6 mois');
+
+    const medias = await this.mediaRepository
+      .createQueryBuilder('m')
+      .select(['m.id', 'm.local_path'])
+      .where('m.local_path IS NOT NULL')
+      .andWhere('m.downloaded_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)')
+      .getMany();
+
+    this.logger.log(`MEDIA_PURGE_FOUND count=${medias.length} fichiers à supprimer`);
+
+    let deleted = 0;
+    for (const media of medias) {
+      this.mediaStorageService.deleteFile(media.local_path!);
+      await this.mediaRepository.update(media.id, {
+        local_path: null,
+        local_url: null,
+        downloaded_at: null,
+      });
+      deleted++;
+    }
+
+    this.logger.log(`MEDIA_PURGE_DONE supprimés=${deleted}/${medias.length}`);
   }
 }

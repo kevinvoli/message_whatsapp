@@ -3,13 +3,13 @@ import {
   Get,
   NotFoundException,
   Param,
+  Req,
   Res,
 } from '@nestjs/common';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 
-/** Table extension → Content-Type (suffisante pour les médias WhatsApp/Meta) */
 const EXT_TO_MIME: Record<string, string> = {
   jpg:  'image/jpeg',
   jpeg: 'image/jpeg',
@@ -37,19 +37,19 @@ function extToMime(ext: string): string {
  *
  * URL : GET /media/<yyyy>/<mm>/<dd>/<tenant>/<filename>
  *
- * Nginx peut prendre le relais en production avec un alias :
+ * En production, Nginx peut court-circuiter ce contrôleur :
  *   location /media/ { alias /app/uploads/media/; }
- * Ce contrôleur est le fallback NestJS quand Nginx n'est pas configuré.
  */
 @Controller('media')
 export class MediaFileController {
   @Get('*')
   serveMediaFile(
     @Param('*') filePath: string,
+    @Req() req: Request,
     @Res() res: Response,
-  ): void {
-    // Sécurité : rejeter toute tentative de path traversal
-    const normalized = filePath.replace(/\\/g, '/').replace(/\.\.+/g, '');
+  ): Response | void {
+    // Protection path traversal
+    const normalized = filePath.replace(/\\/g, '/').replace(/\.\.+/g, '').replace(/^\/+/, '');
 
     const absolutePath = join(process.cwd(), 'uploads', 'media', normalized);
 
@@ -57,13 +57,39 @@ export class MediaFileController {
       throw new NotFoundException('Fichier média introuvable');
     }
 
-    const buffer = readFileSync(absolutePath);
-    const ext = absolutePath.split('.').pop() ?? '';
+    const ext = (absolutePath.split('.').pop() ?? '').toLowerCase();
     const contentType = extToMime(ext);
+    const totalSize = statSync(absolutePath).size;
 
-    res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    // Inline pour images/vidéos/audio, attachment pour documents
+    const isInline = contentType.startsWith('image/') || contentType.startsWith('video/') || contentType.startsWith('audio/');
+    res.setHeader('Content-Disposition', isInline ? 'inline' : `attachment; filename="${normalized.split('/').pop()}"`);
+
+    // Support Range pour lecture audio/vidéo dans les navigateurs
+    const rangeHeader = req.headers['range'];
+    if (rangeHeader) {
+      const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+      if (match) {
+        const start = match[1] ? parseInt(match[1], 10) : 0;
+        const end   = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+        const clampedEnd = Math.min(end, totalSize - 1);
+        const chunkSize = clampedEnd - start + 1;
+
+        const buffer = readFileSync(absolutePath);
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${clampedEnd}/${totalSize}`);
+        res.setHeader('Content-Length', chunkSize);
+        return res.send(buffer.subarray(start, clampedEnd + 1));
+      }
+    }
+
+    const buffer = readFileSync(absolutePath);
+    res.setHeader('Content-Length', totalSize);
     res.send(buffer);
   }
 }

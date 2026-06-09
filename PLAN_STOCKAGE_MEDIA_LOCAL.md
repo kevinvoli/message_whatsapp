@@ -324,18 +324,18 @@ MEDIA_MAX_FILE_SIZE_MB=50
 
 ## 7. Ordre d'implémentation recommandé
 
-| # | Phase | Durée | Dépendances |
+| # | Phase | Statut | Notes |
 |---|---|---|---|
-| 1 | Migration DB (nouvelles colonnes) | 30 min | — |
-| 2 | `MediaStorageService` (écriture disque) | 1h | Phase 1 |
-| 3 | `MediaDownloadService` (téléchargement providers) | 1h30 | Phase 2 |
-| 4 | `MediaDownloadProcessor` (BullMQ consumer) | 1h | Phase 3 |
-| 5 | Intégration flux inbound (enqueue après saveMedia) | 30 min | Phase 4 |
-| 6 | Modification endpoints proxy (redirect si local_url rempli) | 1h | Phase 4 |
-| 7 | Endpoint static files `/media/*` | 30 min | Phase 2 |
-| 8 | Job backfill + expiry checker | 1h30 | Phase 4 |
+| 1 | Migration DB (4 colonnes) | ✅ LIVRÉ | `AddLocalMediaStorage1749427200001` |
+| 2 | `MediaStorageService` (écriture disque) | ✅ LIVRÉ | `src/media-storage/media-storage.service.ts` |
+| 3 | `MediaDownloadService` (téléchargement providers) | ✅ LIVRÉ | `src/media-storage/media-download.service.ts` |
+| 4 | Asynchrone download (setImmediate) | ✅ LIVRÉ | Remplace BullMQ — pas de Redis requis |
+| 5 | Intégration flux inbound (après saveMedia) | ✅ LIVRÉ | `src/webhooks/inbound-message.service.ts` |
+| 6 | Endpoints proxy (redirect si local_url) | ✅ LIVRÉ | Meta + Whapi + Messenger |
+| 7 | Endpoint static files `/media/*` | ✅ LIVRÉ | `MediaFileController` avec Range support |
+| 8 | Crons backfill + expiry + purge | ✅ LIVRÉ | `src/media-storage/media-backfill.service.ts` |
 
-**Total estimé : ~7h30 de développement**
+**IMPLÉMENTATION COMPLÈTE — 0 erreur TypeScript**
 
 ---
 
@@ -352,8 +352,8 @@ MEDIA_MAX_FILE_SIZE_MB=50
 - Headers `Content-Security-Policy` sur les fichiers servis
 
 ### GDPR / Opt-out
-- Quand un contact fait opt-out, supprimer les fichiers locaux de ses médias
-- Réutiliser le hook GDPR existant pour appeler `MediaStorageService.deleteFile()`
+- `MediaStorageService.deleteFile(localPath)` est disponible — idempotent, logué
+- Quand un contact fait opt-out : appeler `deleteFile()` pour chaque `WhatsappMedia.local_path` du contact, puis effacer `local_path`, `local_url`, `downloaded_at` en DB
 
 ### Providers sans download direct
 - **Whapi** : `downloadMedia()` appelle l'API Whapi → pas d'URL CDN directe, nécessite le token
