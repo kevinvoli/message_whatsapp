@@ -349,6 +349,14 @@ export class DispatcherService {
       return null;
     }
 
+    // Conversation déjà lue : ne jamais réinjecter ni changer de poste.
+    if ((chat.unread_count ?? 0) === 0) {
+      this.logger.debug(
+        `Reinjection ignoree: conversation deja lue (unread_count=0) (${chat.chat_id})`,
+      );
+      return null;
+    }
+
     // Channel dédié : ne jamais réinjecter dans la queue globale.
     // La conversation doit rester sur le poste dédié — on renouvelle juste la deadline.
     const channelId = chat.channel_id ?? chat.last_msg_client_channel_id;
@@ -818,7 +826,7 @@ export class DispatcherService {
 
   async redispatchWaiting(): Promise<{ dispatched: number; still_waiting: number }> {
     const waitingChats = await this.chatRepository.find({
-      where: { status: WhatsappChatStatus.EN_ATTENTE },
+      where: { status: WhatsappChatStatus.EN_ATTENTE, unread_count: MoreThan(0) },
       relations: ['poste'],
     });
 
