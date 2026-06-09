@@ -13,7 +13,7 @@ import {
 } from 'typeorm';
 
 @Entity()
-// filtrages fréquents dans MetriquesService et QueueService
+// filtrages frequents dans MetriquesService et QueueService
 @Index('IDX_poste_is_active',         ['is_active'])
 @Index('IDX_poste_queue_enabled',     ['is_queue_enabled'])
 export class WhatsappPoste {
@@ -37,6 +37,18 @@ export class WhatsappPoste {
 
   @Column({ default: true })
   is_queue_enabled: boolean;
+
+  @Column({ name: 'media_panel_enabled', type: 'tinyint', width: 1, default: 0 })
+  media_panel_enabled: boolean;
+
+  @Column({ name: 'media_panel_types', type: 'varchar', length: 255, nullable: true })
+  media_panel_types: string | null;
+
+  get panelTypes(): string[] {
+    if (!this.media_panel_types) return [];
+    try { return JSON.parse(this.media_panel_types); }
+    catch { return []; }
+  }
 
   @Column({
     name: 'name',

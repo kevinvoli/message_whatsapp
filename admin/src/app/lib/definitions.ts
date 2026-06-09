@@ -96,12 +96,19 @@ export type ProduitsPopulaires = {
   ca: number;
 };
 
+export type PostePanelConfig = {
+  enabled: boolean;
+  types: string[];
+};
+
 export type Poste = {
   id: string;
   name: string;
   code: string;
   is_active: boolean;
   is_queue_enabled?: boolean;
+  media_panel_enabled?: boolean;
+  media_panel_types?: string | null;
   createdAt?: string;
   updatedAt?: string;
   chats?: WhatsappChat[] | null;

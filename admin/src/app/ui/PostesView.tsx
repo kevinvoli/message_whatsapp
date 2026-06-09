@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw, MessageSquare } from 'lucide-react';
+import { Ban, Edit, LayoutPanelTop, PlusCircle, ShieldCheck, Trash2, RefreshCw, MessageSquare } from 'lucide-react';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import {
   blockPosteFromQueue,
@@ -16,6 +16,7 @@ import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
 import { useToast } from '@/app/ui/ToastProvider';
+import PosteMediaPanelModal from '@/app/ui/PosteMediaPanelModal';
 
 interface PostesViewProps {
   onRefresh?: () => void;
@@ -64,6 +65,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
   const [formCode, setFormCode] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
   const [queueActionLoadingId, setQueueActionLoadingId] = useState<string | null>(null);
+  const [panelPoste, setPanelPoste] = useState<Poste | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'blocked' | 'allowed'>('all');
   const { addToast } = useToast();
 

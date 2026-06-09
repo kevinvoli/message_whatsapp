@@ -3,11 +3,18 @@ import ClientInfoBanner from "./ClientInfoBanner";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
 import { useSocket } from "@/contexts/SocketProvider";
+import { PanelTop } from 'lucide-react';
 import { useChatStore } from "@/store/chatStore";
 import { Phone } from "lucide-react";
 import { useEffect } from "react";
 
-export default function ChatMainArea() {
+interface ChatMainAreaProps {
+  panelEnabled?: boolean;
+  panelOpen?: boolean;
+  onTogglePanel?: () => void;
+}
+
+export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }: ChatMainAreaProps = {}) {
   const { isConnected: isWebSocketConnected } = useSocket();
   const {
     conversations,

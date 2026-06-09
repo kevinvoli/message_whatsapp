@@ -16,6 +16,8 @@ import ChatMainArea from '@/components/chat/ChatMainArea';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
 import { logger } from '@/lib/logger';
 import ConversationRestrictionModal from '@/components/ConversationRestrictionModal';
+import MediaPanel from '@/components/panel/MediaPanel';
+import { getPanelMedia } from '@/lib/api';
 
 const VALID_FILTER_STATUSES = ['all', 'unread', 'nouveau'];
 
@@ -49,6 +51,8 @@ const WhatsAppPageContent = () => {
     rawView === 'contacts' ? 'contacts' : 'conversations'
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelEnabled, setPanelEnabled] = useState(false);
 
   // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)
   const isInitialSearchMount = useRef(true);
@@ -155,7 +159,10 @@ const WhatsAppPageContent = () => {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
-      {viewMode === 'conversations' ? <ChatMainArea /> : <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />}
+      {viewMode === 'conversations' ? <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} /> : <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />}
+      {panelEnabled && panelOpen && (
+        <MediaPanel onClose={() => setPanelOpen(false)} />
+      )}
 
       <ConversationRestrictionModal />
     </div>

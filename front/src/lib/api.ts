@@ -1,5 +1,6 @@
 // front/src/lib/api.ts
 import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
+import { PanelMediaResponse } from '@/types/media-panel';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -50,4 +51,14 @@ export async function getCommercialStats(
     credentials: 'include',
   });
   return handleResponse<CommercialStatsDto>(response);
+}
+
+/** Recupere les medias du panneau pour le commercial connecte. */
+export async function getPanelMedia(page = 1, limit = 30): Promise<PanelMediaResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const response = await fetch(`${API_BASE_URL}/poste-panel/media?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<PanelMediaResponse>(response);
 }

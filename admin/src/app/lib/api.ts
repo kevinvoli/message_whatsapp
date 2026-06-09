@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions } from './definitions';
+import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1516,4 +1516,24 @@ export async function getStoredMedias(params?: {
 export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions> {
   const res = await fetch(`${API_BASE_URL}/media-storage/gallery/filters`, { credentials: 'include' });
   return handleResponse<GalerieFilterOptions>(res);
+}
+
+export async function getPostePanelConfig(posteId: string): Promise<PostePanelConfig> {
+    const response = await fetch(`/poste//panel`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<PostePanelConfig>(response);
+}
+
+export async function updatePostePanelConfig(posteId: string, payload: { enabled: boolean; types: string[] }): Promise<void> {
+    const response = await fetch(`/poste//panel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    if (!response.ok) {
+        await handleResponse<void>(response);
+    }
 }
