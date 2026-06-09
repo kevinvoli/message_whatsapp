@@ -400,7 +400,7 @@ export class CommunicationWhapiService {
 
       const msg = response.data as Record<string, any>;
       const mediaTypes = [
-        'image', 'video', 'audio', 'voice', 'document', 'gif',
+        'image', 'video', 'audio', 'voice', 'document', 'gif', 'sticker',
       ] as const;
       for (const type of mediaTypes) {
         const media = msg[type] as (WhapiMediaBase & { id?: string }) | undefined;
