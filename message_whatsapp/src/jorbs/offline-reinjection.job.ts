@@ -43,12 +43,13 @@ export class OfflineReinjectionJob implements OnModuleInit {
     });
     const candidatesHorsLigne = activesHorsLigne.filter((c) => c.poste && !c.poste.is_active);
 
-    // Conversations orphelines (poste_id = null, tous statuts non lus)
+    // Conversations orphelines (poste_id = null, non lues uniquement)
     const orphelines = await this.chatRepo.find({
       where: {
         poste_id: IsNull(),
         status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
         read_only: false,
+        unread_count: MoreThan(0),
       },
     });
 
@@ -89,13 +90,14 @@ export class OfflineReinjectionJob implements OnModuleInit {
       reinjectedOffline++;
     }
 
-    // 2. Conversations orphelines (poste_id = null) — jamais assignées ou perdues
+    // 2. Conversations orphelines (poste_id = null, non lues uniquement)
     // take: 20 — même limite que orphan-checker pour cohérence
     const orphelines = await this.chatRepo.find({
       where: {
         poste_id: IsNull(),
         status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
         read_only: false,
+        unread_count: MoreThan(0),
       },
       take: 20,
     });

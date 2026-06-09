@@ -5,7 +5,7 @@ import {
   WhatsappChat,
   WhatsappChatStatus,
 } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Repository } from 'typeorm';
 import { CronConfigService } from './cron-config.service';
 
 @Injectable()
@@ -40,6 +40,7 @@ export class OrphanCheckerJob implements OnModuleInit {
         poste_id: IsNull(),
         status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
         read_only: false,
+        unread_count: MoreThan(0),
       },
       order: { last_activity_at: 'ASC' },
       take: 20,
