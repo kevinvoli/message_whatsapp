@@ -56,8 +56,11 @@ const WhatsAppPageContent = () => {
 
   useEffect(() => {
     getPanelMedia(1, 1)
-      .then(r => setPanelEnabled(r.enabled))
-      .catch(() => {});
+      .then(r => {
+        console.log('[MediaPanel] response:', r);
+        setPanelEnabled(r.enabled);
+      })
+      .catch((err) => console.error('[MediaPanel] error:', err));
   }, []);
 
   // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)

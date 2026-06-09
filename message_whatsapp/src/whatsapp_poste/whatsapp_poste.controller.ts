@@ -28,11 +28,11 @@ export class WhatsappPosteController {
   @Get('poste-panel/media')
   @UseGuards(AuthGuard('jwt'))
   async getMyPanelMedia(
-    @Request() req: { user: { id: string } },
+    @Request() req: { user: { userId: string } },
     @Query('page') page = '1',
     @Query('limit') limit = '30',
   ) {
-    return this.whatsappPosteService.getPanelMediaForCommercial(req.user.id, +page, +limit);
+    return this.whatsappPosteService.getPanelMediaForCommercial(req.user.userId, +page, +limit);
   }
 
   @Get(':id/panel')
