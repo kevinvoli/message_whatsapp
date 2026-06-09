@@ -7,6 +7,14 @@ import { getStoredMedias, getGalerieFilterOptions } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate } from '@/app/lib/dateUtils';
 
+// local_url est un chemin relatif stocké en DB (/uploads/media/...).
+// Les fichiers sont servis par le backend (api.gicop.ci), pas par l'admin.
+// On préfixe avec l'origine du backend en retirant le segment /api final.
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/api\/?$/, '');
+function mediaUrl(localUrl: string): string {
+  return `${API_BASE}${localUrl}`;
+}
+
 function MediaTypeIcon({ type, size = 36 }: { type: StoredMediaType; size?: number }) {
   const props = { width: size, height: size };
   switch (type) {
@@ -40,13 +48,13 @@ function StoredMediaCard({ media }: { media: StoredMedia }) {
   const directionLabel = isIN ? 'Client' : 'Agent';
   const directionClass = isIN ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
   const handleClick = () => {
-    if (media.local_url) window.open(media.local_url, '_blank');
+    if (media.local_url) window.open(mediaUrl(media.local_url), '_blank');
   };
   return (
     <div onClick={handleClick} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden group cursor-pointer hover:shadow-md hover:border-gray-300 transition-all">
       <div className="h-32 flex items-center justify-center bg-gray-50 overflow-hidden relative">
         {(media.media_type === 'image' || media.media_type === 'sticker') && media.local_url ? (
-          <img src={media.local_url} alt={media.file_name ?? media.media_type} className="h-full w-full object-cover" loading="lazy" />
+          <img src={mediaUrl(media.local_url)} alt={media.file_name ?? media.media_type} className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <div className="flex flex-col items-center gap-1">
             <MediaTypeIcon type={media.media_type} size={40} />

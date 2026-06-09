@@ -2,6 +2,7 @@
 
 **Date :** 2026-06-09  
 **Branche :** production  
+**Statut :** ✅ LIVRÉ COMPLET — 0 erreur TypeScript  
 **Objectif :** Page admin permettant de naviguer dans tous les médias téléchargés localement, avec filtres par canal, poste, direction (envoyé/reçu) et type de média.  
 **Dépendance :** Feature stockage local (`PLAN_STOCKAGE_MEDIA_LOCAL.md`) ✅ LIVRÉ
 
@@ -29,7 +30,7 @@ Cette page est l'équivalent, pour les médias de conversation, de ce que la Mé
 
 ### 2.1 Backend
 
-Nouveau endpoint dans le module `media-storage` existant :
+Endpoint dans le module `media-storage` :
 
 ```
 GET /media-storage/gallery
@@ -41,6 +42,9 @@ GET /media-storage/gallery
   &limit=24
   &sort=createdAt|fileSize
   &order=asc|desc
+
+GET /media-storage/gallery/filters
+  → { channels: [...], postes: [...] }
 ```
 
 **Guard :** `AdminGuard` (lecture seule, panel admin uniquement)  
@@ -51,22 +55,22 @@ GET /media-storage/gallery
 ```
 admin/src/app/
 ├── ui/
-│   └── GalerieMediaView.tsx        ← composant principal (nouveau)
+│   └── GalerieMediaView.tsx        ← composant principal ✅
 └── dashboard/
     └── galerie-media/
-        └── page.tsx                ← route Next.js (nouveau)
+        └── page.tsx                ← route Next.js ✅
 ```
 
 Fichiers modifiés :
-- `admin/src/app/lib/definitions.ts` — nouveaux types `StoredMedia`, `StoredMediaResponse`
-- `admin/src/app/lib/api.ts` — nouvelle fonction `getStoredMedias()`
-- `admin/src/app/data/admin-data.ts` — entrée de navigation
+- `admin/src/app/lib/definitions.ts` — types `StoredMedia`, `StoredMediaResponse`, `GalerieFilterOptions` ✅
+- `admin/src/app/lib/api.ts` — `getStoredMedias()` + `getGalerieFilterOptions()` ✅
+- `admin/src/app/data/admin-data.ts` — entrée de navigation "Galerie médias" ✅
 
 ---
 
-## 3. Backend — Détails d'implémentation
+## 3. Backend — Implémentation livrée
 
-### 3.1 DTO
+### 3.1 DTO ✅
 
 **Fichier :** `src/media-storage/dto/gallery-query.dto.ts`
 
@@ -78,150 +82,76 @@ export class GalleryQueryDto {
   @IsOptional() @IsString() channelId?: string;
   @IsOptional() @IsString() posteId?: string;
   @IsOptional() @IsIn(['IN', 'OUT']) direction?: 'IN' | 'OUT';
-  @IsOptional() @IsIn(['image','video','audio','document','voice','sticker','gif','location','contact'])
+  @IsOptional()
+  @IsIn(['image','video','audio','document','voice','sticker','gif','location','contact'])
   mediaType?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number = 24;
-  @IsOptional() @IsIn(['createdAt','fileSize']) sort?: string = 'createdAt';
-  @IsOptional() @IsIn(['asc','desc']) order?: 'asc' | 'desc' = 'desc';
+  @IsOptional() @IsIn(['createdAt', 'fileSize']) sort?: string = 'createdAt';
+  @IsOptional() @IsIn(['asc', 'desc']) order?: 'asc' | 'desc' = 'desc';
 }
 ```
 
-### 3.2 Service
+### 3.2 Service ✅
 
 **Fichier :** `src/media-storage/galerie-media.service.ts`
 
-```typescript
-@Injectable()
-export class GalerieMediaService {
-  constructor(
-    @InjectRepository(WhatsappMedia)
-    private readonly mediaRepo: Repository<WhatsappMedia>,
-  ) {}
+- `findGallery(dto)` : QueryBuilder avec `INNER JOIN media.message AS msg`, `LEFT JOIN media.channel AS channel`, `LEFT JOIN msg.poste AS poste`. Filtre `local_url IS NOT NULL` + `deletedAt IS NULL` sur media et message. Filtres dynamiques, tri, pagination.
+- `getFilterOptions()` : retourne les canaux distincts et postes distincts présents dans les médias locaux via `getRawMany()`.
 
-  async findGallery(dto: GalleryQueryDto) {
-    const qb = this.mediaRepo
-      .createQueryBuilder('media')
-      .innerJoin('media.message', 'msg')            // direction + poste_id + from_name + from
-      .leftJoin('media.channel', 'channel')          // label canal
-      .leftJoin('msg.poste', 'poste')                // nom du poste
-      .select([
-        'media.id',
-        'media.local_url',
-        'media.media_type',
-        'media.mime_type',
-        'media.file_name',
-        'media.file_size',
-        'media.caption',
-        'media.duration_seconds',
-        'media.width',
-        'media.height',
-        'media.downloaded_at',
-        'media.createdAt',
-        'msg.direction',
-        'msg.from',
-        'msg.from_name',
-        'msg.poste_id',
-        'channel.id',
-        'channel.label',
-        'channel.phone_number',
-        'channel.provider',
-        'poste.id',
-        'poste.name',
-        'poste.code',
-      ])
-      .where('media.local_url IS NOT NULL');          // seuls les médias locaux
-
-    if (dto.channelId)  qb.andWhere('media.channel_id = :channelId', { channelId: dto.channelId });
-    if (dto.posteId)    qb.andWhere('msg.poste_id = :posteId', { posteId: dto.posteId });
-    if (dto.direction)  qb.andWhere('msg.direction = :direction', { direction: dto.direction });
-    if (dto.mediaType)  qb.andWhere('media.media_type = :mediaType', { mediaType: dto.mediaType });
-
-    const sortCol = dto.sort === 'fileSize' ? 'media.file_size' : 'media.createdAt';
-    qb.orderBy(sortCol, (dto.order ?? 'desc').toUpperCase() as 'ASC' | 'DESC');
-
-    const page  = dto.page  ?? 1;
-    const limit = dto.limit ?? 24;
-    qb.skip((page - 1) * limit).take(limit);
-
-    const [items, total] = await qb.getManyAndCount();
-    return { items, total, pages: Math.ceil(total / limit) };
-  }
-
-  async getFilterOptions() {
-    const channels = await this.mediaRepo
-      .createQueryBuilder('media')
-      .innerJoin('media.channel', 'channel')
-      .where('media.local_url IS NOT NULL')
-      .select(['channel.id AS id', 'channel.label AS label', 'channel.phone_number AS phone_number'])
-      .distinct(true)
-      .getRawMany();
-
-    const postes = await this.mediaRepo
-      .createQueryBuilder('media')
-      .innerJoin('media.message', 'msg')
-      .innerJoin('msg.poste', 'poste')
-      .where('media.local_url IS NOT NULL')
-      .andWhere('msg.poste_id IS NOT NULL')
-      .select(['poste.id AS id', 'poste.name AS name', 'poste.code AS code'])
-      .distinct(true)
-      .getRawMany();
-
-    return { channels, postes };
-  }
+**Structure de retour `findGallery` :**
+```
+{
+  items: WhatsappMedia[],   // media.message et media.channel hydratés
+  total: number,
+  pages: number
 }
 ```
 
-**Note JOIN :** `INNER JOIN` sur `message` filtre les médias orphelins (sans message associé). Acceptable car un média sans message ne peut pas avoir de direction ni de poste.
+**Arbre d'hydratation TypeORM (important) :**
+```
+media
+├── message                  ← WhatsappMessage (direction, from, from_name, poste_id)
+│   └── poste                ← WhatsappPoste (id, name, code) — imbriqué ici, PAS au niveau racine
+└── channel                  ← WhapiChannel (id, label, phone_number, provider)
+```
 
-### 3.3 Controller
+### 3.3 Controller ✅
 
 **Fichier :** `src/media-storage/galerie-media.controller.ts`
 
 ```typescript
-@Controller('media-storage')
+@Controller('media-storage')   // ← PAS de préfixe 'api/' (cohérent avec les autres controllers)
 @UseGuards(AdminGuard)
 export class GalerieMediaController {
-  constructor(private readonly galerieService: GalerieMediaService) {}
-
-  @Get('gallery')
-  async getGallery(@Query() dto: GalleryQueryDto) {
-    return this.galerieService.findGallery(dto);
-  }
-
-  @Get('gallery/filters')
-  async getFilterOptions() {
-    return this.galerieService.getFilterOptions();
-  }
+  @Get('gallery') async getGallery(@Query() dto: GalleryQueryDto) { ... }
+  @Get('gallery/filters') async getFilterOptions() { ... }
 }
 ```
 
-### 3.4 Mise à jour du module
+> **Note convention :** Le projet n'a PAS de `app.setGlobalPrefix('api')` dans `main.ts`. Le préfixe `/api/` dans `NEXT_PUBLIC_API_URL` est inclus dans la variable d'env côté frontend, pas dans le backend. Seul le controller `notification.controller.ts` déroge à cette règle avec `@Controller('api/notifications')`.
+
+### 3.4 Module ✅
 
 **Fichier :** `src/media-storage/media-storage.module.ts`
 
-Ajouter dans `providers` :
-```typescript
-GalerieMediaService,
-GalerieMediaController,
-```
-Ajouter `WhatsappMessage` dans `TypeOrmModule.forFeature([...])` si pas déjà présent (vérifier).
-
-Ajouter dans `controllers` :
-```typescript
-controllers: [GalerieMediaController],
-```
+- `controllers: [GalerieMediaController]` ajouté
+- `GalerieMediaService` ajouté dans `providers`
+- `WhatsappMessage` **non ajouté** dans `TypeOrmModule.forFeature` — non nécessaire car le service n'injecte que le repo `WhatsappMedia` et effectue les JOINs via QueryBuilder (les métadonnées d'entités sont globalement disponibles)
 
 ---
 
-## 4. Frontend Admin — Détails d'implémentation
+## 4. Frontend Admin — Implémentation livrée
 
-### 4.1 Types TypeScript
+### 4.1 Types TypeScript ✅
 
-**Fichier :** `admin/src/app/lib/definitions.ts` — ajouter en fin de fichier :
+**Fichier :** `admin/src/app/lib/definitions.ts`
 
 ```typescript
-export type StoredMediaType = 'image' | 'video' | 'audio' | 'document' | 'voice' | 'sticker' | 'gif' | 'location' | 'contact';
+export type StoredMediaType =
+  | 'image' | 'video' | 'audio' | 'document' | 'voice'
+  | 'sticker' | 'gif' | 'location' | 'contact';
+
 export type MediaDirection = 'IN' | 'OUT';
 
 export type StoredMedia = {
@@ -237,23 +167,20 @@ export type StoredMedia = {
   height: string | null;
   downloaded_at: string | null;
   createdAt: string;
-  msg: {
+  message: {
     direction: MediaDirection;
     from: string;
     from_name: string;
     poste_id: string | null;
-  };
+    poste: { id: string; name: string; code: string } | null;  // imbriqué sous message
+  } | null;
   channel: {
     id: string;
     label: string | null;
     phone_number: string | null;
     provider: string | null;
   } | null;
-  poste: {
-    id: string;
-    name: string;
-    code: string;
-  } | null;
+  // PAS de poste au niveau racine — il est dans media.message.poste
 };
 
 export type StoredMediaResponse = {
@@ -268,188 +195,100 @@ export type GalerieFilterOptions = {
 };
 ```
 
-### 4.2 Appels API
+### 4.2 Appels API ✅
 
-**Fichier :** `admin/src/app/lib/api.ts` — ajouter :
+**Fichier :** `admin/src/app/lib/api.ts`
 
 ```typescript
-export async function getStoredMedias(params?: {
-  channelId?: string;
-  posteId?: string;
-  direction?: 'IN' | 'OUT';
-  mediaType?: string;
-  page?: number;
-  limit?: number;
-  sort?: string;
-  order?: string;
-}): Promise<StoredMediaResponse> {
-  const qs = new URLSearchParams();
-  if (params?.channelId)  qs.set('channelId',  params.channelId);
-  if (params?.posteId)    qs.set('posteId',    params.posteId);
-  if (params?.direction)  qs.set('direction',  params.direction);
-  if (params?.mediaType)  qs.set('mediaType',  params.mediaType);
-  if (params?.page)       qs.set('page',       String(params.page));
-  if (params?.limit)      qs.set('limit',      String(params.limit));
-  if (params?.sort)       qs.set('sort',       params.sort);
-  if (params?.order)      qs.set('order',      params.order);
-  const res = await fetch(`${API_BASE_URL}/media-storage/gallery?${qs}`, { credentials: 'include' });
-  if (!res.ok) throw new Error('Erreur chargement galerie médias');
-  return res.json();
-}
-
-export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions> {
-  const res = await fetch(`${API_BASE_URL}/media-storage/gallery/filters`, { credentials: 'include' });
-  if (!res.ok) throw new Error('Erreur chargement filtres galerie');
-  return res.json();
-}
+// URL CORRECTE : ${API_BASE_URL}/media-storage/gallery (sans /api/ redondant)
+export async function getStoredMedias(params?: { ... }): Promise<StoredMediaResponse>
+export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions>
 ```
 
-### 4.3 Navigation
+### 4.3 Navigation ✅
 
 **Fichier :** `admin/src/app/data/admin-data.ts`
 
-Dans le groupe "Analytics" (ou "Conversations" selon pertinence), ajouter :
-```typescript
-{ id: 'galerie-media', name: 'Galerie médias', icon: HardDrive, badge: null }
-```
-Import nécessaire : `HardDrive` de `lucide-react`.
+Entrée `{ id: 'galerie-media', name: 'Galerie médias', icon: HardDrive }` ajoutée dans le groupe Analytics.
 
-### 4.4 Page route
+### 4.4 Page route ✅
 
 **Fichier :** `admin/src/app/dashboard/galerie-media/page.tsx`
 
-```typescript
-import GalerieMediaView from '@/app/ui/GalerieMediaView';
-
-export default function GalerieMediaPage() {
-  return <GalerieMediaView />;
-}
-```
-
-### 4.5 Composant principal — `GalerieMediaView.tsx`
+### 4.5 Composant `GalerieMediaView.tsx` ✅
 
 **Fichier :** `admin/src/app/ui/GalerieMediaView.tsx`
 
-#### Structure du composant
-
-```
-GalerieMediaView
-├── Barre de filtres
-│   ├── Tabs types de médias : Tous | Images | Vidéos | Audios | Documents | Autres
-│   ├── Select canal (options depuis getGalerieFilterOptions)
-│   ├── Select poste (options depuis getGalerieFilterOptions)
-│   ├── Toggle direction : Tous | Reçus (IN) | Envoyés (OUT)
-│   └── Select tri : Date ↓ | Date ↑ | Taille ↓
-├── Compteur total ("X médias stockés")
-├── Grille médias (responsive, 2-6 colonnes)
-│   └── StoredMediaCard (voir ci-dessous)
-└── Pagination (Précédent / Page X/Y / Suivant)
-```
-
-#### `StoredMediaCard` — contenu de chaque carte
-
-```
-┌─────────────────────────────┐
-│  [miniature ou icône type]  │ ← image: <img>, vidéo: poster ou icône, audio: icône onde, doc: icône PDF
-│                             │
-│  Badge direction:           │ ← "Client" (IN, bleu) | "Agent" (OUT, vert)
-│  Nom fichier (ou type)      │
-│  Taille · Date téléchargé   │
-│  Canal: label               │
-│  Poste: name (si défini)    │
-│  De: from_name (si IN)      │
-└─────────────────────────────│
-```
-
-**Clic sur la carte :** ouvre l'URL locale dans un nouvel onglet (`window.open(media.local_url, '_blank')`).
-
-#### Groupement par type (variante)
-
-Si aucun filtre de type sélectionné, les médias peuvent être affichés en sections par type :
-```
-── Images (N) ──────────────────────
-[grille images]
-
-── Vidéos (N) ──────────────────────
-[grille vidéos]
-
-── Audios (N) ──────────────────────
-[grille audios]
-
-── Documents (N) ───────────────────
-[grille documents]
-```
-Mais cette variante nécessite N requêtes ou une logique de groupement côté client. **Recommandé :** garder la liste unique + onglets de type (même pattern que la Médiathèque).
-
-#### Gestion des miniatures
-
-| Type | Affichage |
-|---|---|
-| `image` | `<img src={media.local_url} loading="lazy" />` |
-| `video` | Icône `Video` (lucide) + durée si disponible |
-| `audio` / `voice` | Icône `Music` ou `Mic` + durée |
-| `document` | Icône `FileText` + nom fichier |
-| `sticker` | `<img src={media.local_url} />` (même qu'image) |
-| `location` | Icône `MapPin` |
-| Autres | Icône `File` générique |
-
-#### État de chargement et erreurs
-
-- Skeleton loader pendant `loading` (grille de placeholders)
-- Message vide : "Aucun média stocké ne correspond à vos filtres" avec icône
-- Erreur réseau : toast d'erreur
+Structure :
+- **Onglets type** : Tous / Images / Vidéos / Audios / Documents / Vocaux / Stickers
+- **Toggle direction** : Tous / Reçus (IN, bleu) / Envoyés (OUT, vert)
+- **Select canal** : peuplé depuis `getGalerieFilterOptions()`
+- **Select poste** : peuplé depuis `getGalerieFilterOptions()`
+- **Select tri** : Date récent/ancien, Taille grande/petite
+- **Grille** : 2-6 colonnes responsive, skeleton loader, état vide
+- **StoredMediaCard** : miniature (img pour image/sticker, icône pour autres), badge direction, taille, date, canal, poste (`media.message?.poste`), expéditeur si IN
+- **Clic** : `window.open(media.local_url, '_blank')`
+- **Pagination** : Précédent / Page X / Y / Suivant
 
 ---
 
-## 5. Ordre d'implémentation
+## 5. Bilan d'implémentation
 
-| # | Fichier | Action | Durée |
-|---|---|---|---|
-| 1 | `src/media-storage/dto/gallery-query.dto.ts` | CRÉER | 15 min |
-| 2 | `src/media-storage/galerie-media.service.ts` | CRÉER | 45 min |
-| 3 | `src/media-storage/galerie-media.controller.ts` | CRÉER | 20 min |
-| 4 | `src/media-storage/media-storage.module.ts` | MODIFIER (ajouter service+controller+entity) | 10 min |
-| 5 | `admin/src/app/lib/definitions.ts` | MODIFIER (ajouter types) | 15 min |
-| 6 | `admin/src/app/lib/api.ts` | MODIFIER (ajouter appels API) | 15 min |
-| 7 | `admin/src/app/data/admin-data.ts` | MODIFIER (entrée navigation) | 5 min |
-| 8 | `admin/src/app/dashboard/galerie-media/page.tsx` | CRÉER | 5 min |
-| 9 | `admin/src/app/ui/GalerieMediaView.tsx` | CRÉER | 2h30 |
+| # | Fichier | Statut |
+|---|---|---|
+| 1 | `src/media-storage/dto/gallery-query.dto.ts` | ✅ CRÉÉ |
+| 2 | `src/media-storage/galerie-media.service.ts` | ✅ CRÉÉ |
+| 3 | `src/media-storage/galerie-media.controller.ts` | ✅ CRÉÉ |
+| 4 | `src/media-storage/media-storage.module.ts` | ✅ MODIFIÉ |
+| 5 | `admin/src/app/lib/definitions.ts` | ✅ MODIFIÉ |
+| 6 | `admin/src/app/lib/api.ts` | ✅ MODIFIÉ |
+| 7 | `admin/src/app/data/admin-data.ts` | ✅ MODIFIÉ |
+| 8 | `admin/src/app/dashboard/galerie-media/page.tsx` | ✅ CRÉÉ |
+| 9 | `admin/src/app/ui/GalerieMediaView.tsx` | ✅ CRÉÉ |
 
-**Durée totale estimée : ~4h**
-
----
-
-## 6. Points de vigilance
-
-### JOIN INNER vs LEFT
-Le `INNER JOIN` sur `msg` (message) filtre les médias orphelins, mais peut exclure des médias dont le message a été supprimé (soft-delete). Si `WhatsappMessage` a un `deletedAt`, ajouter `.andWhere('msg.deletedAt IS NULL')` dans le QueryBuilder.
-
-### Volume de données
-Sans pagination stricte côté backend, une requête peut retourner des milliers de lignes. Le `limit: 24` par défaut + `local_url IS NOT NULL` réduisent fortement le scope, mais **s'assurer que les index existants couvrent les colonnes filtrées** :
-- `IDX_whatsapp_media_local_path` (existant) — couvre `local_url IS NOT NULL` partiellement
-- `channel_id` sur `whatsapp_media` — vérifier existence d'un index FK
-- `poste_id` + `direction` sur `whatsapp_message` — index `IDX_msg_poste_dir_time` (existant) couvre `(poste_id, direction, createdAt)`
-
-### Sécurité URLs
-Les `local_url` sont de la forme `/uploads/media/...`. Elles sont publiquement accessibles via Express static **sans authentification**. C'est intentionnel (même comportement que la Médiathèque et les proxies média existants). Ne pas exposer `local_path` (chemin absolu disque) dans la réponse API.
-
-### WhatsappMessage entity dans le module
-`WhatsappMessage` n'est pas actuellement dans `TypeOrmModule.forFeature([...])` de `MediaStorageModule`. Il faut l'ajouter pour que `GalerieMediaService` puisse faire les JOINs via le repository `WhatsappMedia`.
-
-**Alternative :** utiliser directement le `QueryBuilder` sur `WhatsappMedia` avec des JOINs (pas besoin d'injecter le repository de `WhatsappMessage` séparément — le QB peut joindre des entités non injectées).
-
-### Médias sans message (direction inconnue)
-Si `INNER JOIN msg` est trop restrictif, utiliser `LEFT JOIN` et gérer `msg.direction = null` côté frontend (badge "Inconnu" ou absence de badge). À décider selon les données réelles en production.
+**TypeScript :** 0 erreur nouvelle (2 erreurs préexistantes `LocationMapThumb.tsx` non liées)
 
 ---
 
-## 7. Ce qui NE change pas
+## 6. Corrections post-implémentation
 
-- Aucune migration SQL nécessaire (pas de nouvelle colonne)
-- Les crons de backfill/expiry/purge (`MediaBackfillService`) ne sont pas modifiés
-- Les endpoints proxy (`/messages/media/...`) ne sont pas modifiés
-- Les données sources (`whatsapp_media`) ne sont pas modifiées — page lecture seule uniquement
+### Bug 1 — Préfixe `/api/` en double dans api.ts ✅ CORRIGÉ
+
+**Symptôme :** `GET /api/media-storage/gallery → 404 Not Found`
+
+**Cause :** L'agent a généré `${API_BASE_URL}/api/media-storage/gallery` alors que `API_BASE_URL` inclut déjà `/api` (ex : `https://api.gicop.ci/api`). Tous les autres endpoints du projet utilisent `${API_BASE_URL}/resource` sans répéter `/api/`.
+
+**Fix :** Retiré `/api/` des deux fetch dans `api.ts` → `${API_BASE_URL}/media-storage/gallery`.
+
+### Bug 2 — `poste` au mauvais niveau dans le type TypeScript ✅ CORRIGÉ
+
+**Symptôme :** `media.poste` toujours `undefined` → le poste ne s'affichait jamais dans les cards.
+
+**Cause :** Le type `StoredMedia` plaçait `poste` à la racine, mais TypeORM hydrate `poste` imbriqué sous `media.message.poste` (puisque le JOIN est `msg.poste`, pas `media.poste`).
+
+**Fix :**
+- `definitions.ts` : `poste` déplacé dans `message.poste` (supprimé du niveau racine)
+- `GalerieMediaView.tsx` : `media.poste` → `media.message?.poste`
 
 ---
 
-*Plan créé le 2026-06-09*
+## 7. Points de vigilance futurs
+
+### Convention routes backend
+Le projet **n'utilise pas** `app.setGlobalPrefix('api')`. Le préfixe `/api` est dans `NEXT_PUBLIC_API_URL`. Ne jamais ajouter `/api/` dans les `@Controller()` (sauf héritage de `notification.controller.ts` qui déroge).
+
+### `getFilterOptions()` et TypeORM raw aliases
+`getRawMany()` avec `select(['col AS alias'])` retourne les colonnes préfixées par l'alias d'entité en TypeORM (ex: `channel_id` au lieu de `id`). Si les filtres ne se peuplent pas, remplacer par :
+```typescript
+qb.select('channel.id', 'id').addSelect('channel.label', 'label')...
+```
+
+### Volume et performance
+La galerie filtre sur `local_url IS NOT NULL`. L'index `IDX_whatsapp_media_local_path` n'indexe pas `local_url` directement. Si la table `whatsapp_media` grossit fortement, envisager un index sur `(local_url, created_at)`.
+
+### Sécurité
+Les `local_url` (`/uploads/media/...`) sont accessibles sans auth via Express static. C'est intentionnel. Ne jamais exposer `local_path` (chemin absolu disque) dans la réponse API.
+
+---
+
+*Plan créé le 2026-06-09 — Implémentation complète le 2026-06-09*
