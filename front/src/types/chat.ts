@@ -10,6 +10,7 @@ export type ConversationStatus =
   | "converti"
   | "fermé";
 
+  
    export type  ViewMode = 'conversations' | 'contacts'
 
 export type Priority = "haute" | "moyenne" | "basse";

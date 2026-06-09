@@ -81,6 +81,7 @@ export function formatConversationTime(value: Date | string | number | null | un
   const d = safeDate(value);
   if (!d) return '-';
 
+  
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfYesterday = new Date(startOfToday.getTime() - 86400000);
