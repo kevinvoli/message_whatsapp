@@ -376,6 +376,13 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
                     </button>
                   )}
                   <button
+                    onClick={() => setPanelPoste(poste)}
+                    className="rounded p-1 text-violet-600 hover:bg-violet-50"
+                    title="Configurer le panneau médias"
+                  >
+                    <LayoutPanelTop className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => openEditModal(poste)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50"
                     disabled={loading}
@@ -444,6 +451,10 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
           </label>
         </div>
       </EntityFormModal>
+
+      {panelPoste && (
+        <PosteMediaPanelModal poste={panelPoste} onClose={() => setPanelPoste(null)} />
+      )}
 
       <EntityFormModal
         isOpen={showEditModal && !!currentPoste}

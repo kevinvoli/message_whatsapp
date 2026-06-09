@@ -71,6 +71,9 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
               <ChatHeader
                 currentConv={selectedConversation}
                 totalMessages={totalMessages || 0}
+                panelEnabled={panelEnabled}
+                panelOpen={panelOpen}
+                onTogglePanel={onTogglePanel}
               />
               <ClientInfoBanner currentConv={selectedConversation} />
               <ChatMessages

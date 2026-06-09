@@ -54,6 +54,12 @@ const WhatsAppPageContent = () => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelEnabled, setPanelEnabled] = useState(false);
 
+  useEffect(() => {
+    getPanelMedia(1, 1)
+      .then(r => setPanelEnabled(r.enabled))
+      .catch(() => {});
+  }, []);
+
   // Évite un double chargement au montage (WebSocketEvents.tsx gère le premier via refreshAfterConnect)
   const isInitialSearchMount = useRef(true);
 
