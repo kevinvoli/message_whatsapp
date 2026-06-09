@@ -32,6 +32,7 @@ import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
 import { MetaAdReferralService } from 'src/meta-ad-referral/meta-ad-referral.service';
 import { ChatSessionService } from 'src/chat-session/chat-session.service';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
+import { MediaDownloadService } from 'src/media-storage/media-download.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -64,6 +65,7 @@ export class InboundMessageService {
     private readonly metaAdReferralService: MetaAdReferralService,
     private readonly chatSessionService: ChatSessionService,
     private readonly cronConfigService: CronConfigService,
+    private readonly mediaDownloadService: MediaDownloadService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -393,6 +395,15 @@ export class InboundMessageService {
     entity.view_once = '0';
 
     await this.mediaRepository.save(entity);
+
+    // Téléchargement local asynchrone — ne bloque pas le flux webhook
+    setImmediate(() => {
+      this.mediaDownloadService.downloadForMedia(entity).catch((err) =>
+        this.logger.warn(
+          `Échec téléchargement local media ${entity.id}: ${(err as Error)?.message}`,
+        ),
+      );
+    });
   }
 
   private extractMediaFromUnified(message: UnifiedMessage): ExtractedMedia[] {

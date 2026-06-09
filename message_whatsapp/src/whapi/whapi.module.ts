@@ -63,6 +63,7 @@ import { CampaignLinkModule } from 'src/campaign-link/campaign-link.module';
 import { MediaAssetModule } from 'src/media-asset/media-asset.module';
 import { MetaAdReferralModule } from 'src/meta-ad-referral/meta-ad-referral.module';
 import { ChatSessionModule } from 'src/chat-session/chat-session.module';
+import { MediaStorageModule } from 'src/media-storage/media-storage.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { ChatSessionModule } from 'src/chat-session/chat-session.module';
     MediaAssetModule,
     MetaAdReferralModule,
     ChatSessionModule,
+    MediaStorageModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [
