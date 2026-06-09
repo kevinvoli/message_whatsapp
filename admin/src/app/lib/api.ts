@@ -1509,11 +1509,11 @@ export async function getStoredMedias(params?: {
   if (params?.limit)      qs.set('limit',      String(params.limit));
   if (params?.sort)       qs.set('sort',       params.sort);
   if (params?.order)      qs.set('order',      params.order);
-  const res = await fetch(`${API_BASE_URL}/api/media-storage/gallery?${qs}`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE_URL}/media-storage/gallery?${qs}`, { credentials: 'include' });
   return handleResponse<StoredMediaResponse>(res);
 }
 
 export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions> {
-  const res = await fetch(`${API_BASE_URL}/api/media-storage/gallery/filters`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE_URL}/media-storage/gallery/filters`, { credentials: 'include' });
   return handleResponse<GalerieFilterOptions>(res);
 }
