@@ -47,7 +47,8 @@ export type ViewMode =
   | 'settings'
   | 'channel-stats'
   | 'canaux-dedies'
-  | 'campagnes-meta';
+  | 'campagnes-meta'
+  | 'galerie-media';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -996,3 +997,59 @@ export interface MetaAdKpiRow {
   first_seen:            string;
   last_seen:             string;
 }
+
+// ============================================
+// GALERIE MEDIAS SERVEUR
+// ============================================
+
+export type StoredMediaType =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'document'
+  | 'voice'
+  | 'sticker'
+  | 'gif'
+  | 'location'
+  | 'contact';
+
+export type MediaDirection = 'IN' | 'OUT';
+
+export type StoredMedia = {
+  id: string;
+  local_url: string;
+  media_type: StoredMediaType;
+  mime_type: string;
+  file_name: string | null;
+  file_size: string | null;
+  caption: string | null;
+  duration_seconds: number | null;
+  width: string | null;
+  height: string | null;
+  downloaded_at: string | null;
+  createdAt: string;
+  message: {
+    direction: MediaDirection;
+    from: string;
+    from_name: string;
+    poste_id: string | null;
+    poste: { id: string; name: string; code: string } | null;
+  } | null;
+  channel: {
+    id: string;
+    label: string | null;
+    phone_number: string | null;
+    provider: string | null;
+  } | null;
+};
+
+export type StoredMediaResponse = {
+  items: StoredMedia[];
+  total: number;
+  pages: number;
+};
+
+export type GalerieFilterOptions = {
+  channels: { id: string; label: string | null; phone_number: string | null }[];
+  postes: { id: string; name: string; code: string }[];
+};

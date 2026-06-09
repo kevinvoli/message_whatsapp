@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaStorageService } from './media-storage.service';
 import { MediaDownloadService } from './media-download.service';
 import { MediaBackfillService } from './media-backfill.service';
+import { GalerieMediaService } from './galerie-media.service';
+import { GalerieMediaController } from './galerie-media.controller';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
@@ -18,6 +20,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     ChannelModule,
     LoggingModule,
   ],
+  controllers: [GalerieMediaController],
   providers: [
     MediaStorageService,
     MediaDownloadService,
@@ -25,6 +28,7 @@ import { LoggingModule } from 'src/logging/logging.module';
     CommunicationMetaService,
     CommunicationWhapiService,
     CommunicationMessengerService,
+    GalerieMediaService,
   ],
   exports: [MediaStorageService, MediaDownloadService],
 })

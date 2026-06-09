@@ -46,6 +46,7 @@ import ChannelStatsView from '@/app/ui/ChannelStatsView';
 import MessageTrafficView from '@/app/ui/MessageTrafficView';
 import DedicatedChannelsView from '@/app/ui/DedicatedChannelsView';
 import MetaCampaignsView from '@/app/ui/MetaCampaignsView';
+import GalerieMediaView from '@/app/ui/GalerieMediaView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -58,6 +59,7 @@ const VALID_VIEWS: ViewMode[] = [
     'queue', 'dispatch', 'lecture-seule', 'crons', 'observabilite', 'go_no_go',
     'notifications', 'alert-config', 'campaign-links', 'mediatheque', 'settings', 'channel-stats',
     'campagnes-meta',
+    'galerie-media',
 ];
 
 function AdminDashboardContent() {
@@ -196,6 +198,8 @@ function AdminDashboardContent() {
                 return <MessageTrafficView selectedPeriod={selectedPeriod} dateFrom={dateFrom} dateTo={dateTo} />;
             case 'campagnes-meta':
                 return <MetaCampaignsView />;
+            case 'galerie-media':
+                return <GalerieMediaView />;
             default:
                 return null;
         }

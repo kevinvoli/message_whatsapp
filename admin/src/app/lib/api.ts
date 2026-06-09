@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow } from './definitions';
+import { Commercial, StatsGlobales, Poste, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1485,3 +1485,35 @@ export async function getCampagnesMeta(
 }
 
 
+
+// ============================================
+// GALERIE MEDIAS SERVEUR
+// ============================================
+
+export async function getStoredMedias(params?: {
+  channelId?: string;
+  posteId?: string;
+  direction?: 'IN' | 'OUT';
+  mediaType?: string;
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: string;
+}): Promise<StoredMediaResponse> {
+  const qs = new URLSearchParams();
+  if (params?.channelId)  qs.set('channelId',  params.channelId);
+  if (params?.posteId)    qs.set('posteId',    params.posteId);
+  if (params?.direction)  qs.set('direction',  params.direction);
+  if (params?.mediaType)  qs.set('mediaType',  params.mediaType);
+  if (params?.page)       qs.set('page',       String(params.page));
+  if (params?.limit)      qs.set('limit',      String(params.limit));
+  if (params?.sort)       qs.set('sort',       params.sort);
+  if (params?.order)      qs.set('order',      params.order);
+  const res = await fetch(`${API_BASE_URL}/api/media-storage/gallery?${qs}`, { credentials: 'include' });
+  return handleResponse<StoredMediaResponse>(res);
+}
+
+export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions> {
+  const res = await fetch(`${API_BASE_URL}/api/media-storage/gallery/filters`, { credentials: 'include' });
+  return handleResponse<GalerieFilterOptions>(res);
+}
