@@ -56,7 +56,7 @@ export async function getCommercialStats(
 /** Recupere les medias du panneau pour le commercial connecte. */
 export async function getPanelMedia(page = 1, limit = 30): Promise<PanelMediaResponse> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-  const response = await fetch(`${API_BASE_URL}/poste-panel/media?${params.toString()}`, {
+  const response = await fetch(`${API_BASE_URL}/poste/poste-panel/media?${params.toString()}`, {
     method: 'GET',
     credentials: 'include',
   });
