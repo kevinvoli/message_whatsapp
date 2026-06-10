@@ -41,6 +41,7 @@ import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-what
 import { UpdateWhatsappTemplateDto } from 'src/whatsapp_template/dto/update-whatsapp-template.dto';
 import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 import { MediaStorageService } from 'src/media-storage/media-storage.service';
+import { MessageRestrictionService } from 'src/message-restriction/message-restriction.service';
 import axios from 'axios';
 
 type MediaType = 'image' | 'video' | 'audio' | 'document';
@@ -71,6 +72,7 @@ export class WhatsappMessageController {
     private readonly whapiService: CommunicationWhapiService,
     private readonly templateService: WhatsappTemplateService,
     private readonly mediaStorageService: MediaStorageService,
+    private readonly messageRestrictionService: MessageRestrictionService,
   ) {}
 
   /**
@@ -319,6 +321,7 @@ export class WhatsappMessageController {
   async uploadMedia(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { chat_id: string; caption?: string },
+    @Body('duration_seconds') durationSecondsRaw: string | undefined,
     @Req() req: any,
   ) {
     if (!file) {
@@ -356,6 +359,30 @@ export class WhatsappMessageController {
     }
 
     const mediaType = detectMediaType(file.mimetype);
+
+    if (mediaType === 'audio') {
+      // Postes dédiés exemptés des restrictions de contenu (même règle que rate-limit,
+      // cooldown et idle-disconnect). On vérifie via le canal résolu : poste_id != null.
+      const resolvedChannel = await this.channelService.findOne(resolvedChannelId);
+      const isDedicatedChannel = resolvedChannel?.poste_id != null;
+
+      if (!isDedicatedChannel) {
+        const durationSeconds = durationSecondsRaw !== undefined ? Number(durationSecondsRaw) : undefined;
+        const restrictionConfig = await this.messageRestrictionService.getConfig();
+        const violation = this.messageRestrictionService.validateAudioDuration(
+          Number.isFinite(durationSeconds) ? durationSeconds : undefined,
+          restrictionConfig,
+        );
+        if (violation) {
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            error: 'MESSAGE_RESTRICTION_VIOLATED',
+            violations: [violation],
+          });
+        }
+      }
+    }
+
     const user = req.user;
 
     let message;

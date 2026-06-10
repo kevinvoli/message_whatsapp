@@ -976,6 +976,16 @@ export const COULEURS_STATUT = {
 } as const;
 
 // ============================================
+// RESTRICTION CONTENU MESSAGES COMMERCIAUX
+// ============================================
+
+export interface MessageRestrictionConfig {
+  maxWordLength: number;
+  maxRepeatedChars: number;
+  minAudioDurationSeconds: number;
+}
+
+// ============================================
 // RESTRICTION LECTURE CONVERSATIONS
 // ============================================
 

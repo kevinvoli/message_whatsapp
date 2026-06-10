@@ -49,6 +49,7 @@ import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { ConversationRestrictionModule } from 'src/conversation-restriction/conversation-restriction.module';
 import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 import { MediaStorageModule } from 'src/media-storage/media-storage.module';
+import { MessageRestrictionModule } from 'src/message-restriction/message-restriction.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { MediaStorageModule } from 'src/media-storage/media-storage.module';
     MediaAssetModule,
     ConversationRestrictionModule,
     MediaStorageModule,
+    MessageRestrictionModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [

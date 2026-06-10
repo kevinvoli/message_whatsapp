@@ -1020,6 +1020,9 @@ export class WhatsappMessageGateway
           timestamp: new Date(),
           commercial_id: agent.commercialId,
           quotedMessageId: payload.quotedMessageId,
+          // Postes dédiés exemptés des restrictions de contenu (même règle que rate-limit,
+          // cooldown et idle-disconnect).
+          validateContent: !agent.isDedicated,
         });
         this.logger.log(
           `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,

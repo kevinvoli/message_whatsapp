@@ -11,6 +11,25 @@ import Picker from '@emoji-mart/react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+function checkMaxWordLength(text: string, max: number): string | null {
+  const words = text.split(/\s+/);
+  for (const word of words) {
+    if ([...word].length > max) {
+      return `Le mot "${word.slice(0, 20)}${word.length > 20 ? '…' : ''}" dépasse la longueur maximale autorisée (${max} caractères).`;
+    }
+  }
+  return null;
+}
+
+function checkRepeatedChars(text: string, max: number): string | null {
+  const pattern = new RegExp(`(.)\\1{${max},}`, 'gi');
+  const match = pattern.exec(text);
+  if (match) {
+    return `Le texte contient "${match[0]}" — la répétition successive d'une même lettre est limitée à ${max} fois.`;
+  }
+  return null;
+}
+
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   onTypingStart: (chat_id: string) => void;
@@ -73,11 +92,12 @@ async function sendLocation(chatId: string, latitude: number, longitude: number)
   return response.json();
 }
 
-async function uploadMedia(chatId: string, file: File | Blob, fileName: string, caption?: string) {
+async function uploadMedia(chatId: string, file: File | Blob, fileName: string, caption?: string, durationSeconds?: number) {
   const formData = new FormData();
   formData.append('file', file, fileName);
   formData.append('chat_id', chatId);
   if (caption) formData.append('caption', caption);
+  if (durationSeconds !== undefined) formData.append('duration_seconds', String(durationSeconds));
 
   const response = await fetch(`${API_URL}/messages/media`, {
     method: 'POST',
@@ -118,6 +138,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingDurationRef = useRef<number>(0);
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
   const isTyping = useRef(false);
   const storeMessages = useChatStore((s) => s.messages);
@@ -127,6 +148,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const restrictionConfig = useChatStore((s) => s.restrictionConfig);
   const restrictionUnresponded = useChatStore((s) => s.restrictionUnresponded);
   const selectedConversation = useChatStore((s) => s.selectedConversation);
+  const messageRestrictionConfig = useChatStore((s) => s.messageRestrictionConfig);
 
   // Vérifier si la conversation courante est dans la liste des non-répondues
   const isUnresponded = restrictionConfig?.enabled
@@ -136,6 +158,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const minCharsSendEnabled = restrictionConfig?.minCharsSendEnabled ?? false;
   const trimmedLen = message.trim().length;
   const charsTooFew = minCharsSendEnabled && trimmedLen > 0 && trimmedLen < minResponseChars;
+
+  const textViolation = useMemo<string | null>(() => {
+    if (!messageRestrictionConfig || !message.trim()) return null;
+    return (
+      checkMaxWordLength(message, messageRestrictionConfig.maxWordLength) ??
+      checkRepeatedChars(message, messageRestrictionConfig.maxRepeatedChars)
+    );
+  }, [message, messageRestrictionConfig]);
 
   const handleEmojiSelect = useCallback((emoji: { native: string }) => {
     setMessage((prev) => prev + emoji.native);
@@ -160,7 +190,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, [showEmojiPicker]);
 
   const handleSubmit = () => {
-    if (message.trim() && !disabled && isConnected && !charsTooFew) {
+    if (message.trim() && !disabled && isConnected && !charsTooFew && !textViolation) {
       onSendMessage(message.trim());
       setMessage('');
 
@@ -260,7 +290,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        const capturedDuration = recordingDurationRef.current;
         if (blob.size > 0 && chat_id) {
+          const minDuration = messageRestrictionConfig?.minAudioDurationSeconds ?? 0;
+          if (minDuration > 0 && capturedDuration < minDuration) {
+            setUploadError(`Le message audio est trop court (${capturedDuration}s). Durée minimale : ${minDuration}s.`);
+            return;
+          }
           setIsUploading(true);
           try {
             const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
@@ -269,7 +305,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               : normalizedMime === 'audio/opus'
                 ? 'opus'
                 : 'ogg';
-            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.${extension}`);
+            await uploadMedia(chat_id, blob, `vocal_${Date.now()}.${extension}`, undefined, capturedDuration);
             logger.debug('Voice message uploaded', { chat_id });
           } catch (err) {
             logger.error('Voice upload failed', { error: err instanceof Error ? err.message : String(err) });
@@ -282,7 +318,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingDuration(0);
+      recordingDurationRef.current = 0;
       recordingIntervalRef.current = setInterval(() => {
+        recordingDurationRef.current += 1;
         setRecordingDuration((d) => d + 1);
       }, 1000);
     } catch (err) {
@@ -517,7 +555,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!message.trim() || disabled || !isConnected || isUploading || charsTooFew}
+              disabled={!message.trim() || disabled || !isConnected || isUploading || charsTooFew || !!textViolation}
               className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               <Send className="w-5 h-5" />
@@ -544,6 +582,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <p className="text-xs font-medium text-red-600 flex items-center gap-1">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
             Vous ne pouvez pas envoyer ce message — encore {minResponseChars - trimmedLen} caractère{minResponseChars - trimmedLen > 1 ? 's' : ''} requis ({trimmedLen}/{minResponseChars})
+          </p>
+        )}
+        {textViolation && (
+          <p className="text-xs font-medium text-red-600 flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            {textViolation}
           </p>
         )}
         {minCharsSendEnabled && !charsTooFew && trimmedLen > 0 && trimmedLen >= minResponseChars && (

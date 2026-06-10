@@ -1,4 +1,4 @@
-import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
   MessageDirection,
   WhatsappMessage,
@@ -25,6 +25,7 @@ import {
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
+import { MessageRestrictionService } from 'src/message-restriction/message-restriction.service';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -51,6 +52,7 @@ export class WhatsappMessageService {
     private readonly templateService: WhatsappTemplateService,
     @Inject(forwardRef(() => CampaignLinkService))
     private readonly campaignLinkService: CampaignLinkService,
+    private readonly messageRestrictionService: MessageRestrictionService,
   ) {}
 
   private resolveIncomingText(message: WhapiMessage): string {
@@ -121,6 +123,8 @@ export class WhatsappMessageService {
     channel_id: string;
     /** DB UUID du message à citer (fonctionnalité reply) */
     quotedMessageId?: string;
+    /** Activer la validation du contenu (restrictions texte commercial) */
+    validateContent?: boolean;
   }): Promise<WhatsappMessage> {
     const traceId = this.buildTraceId(undefined, data.chat_id);
     let chat: WhatsappChat | null = null;
@@ -151,6 +155,18 @@ export class WhatsappMessageService {
           );
         }
       }
+      if (data.validateContent) {
+        const restrictionConfig = await this.messageRestrictionService.getConfig();
+        const violations = this.messageRestrictionService.validateTextContent(data.text, restrictionConfig);
+        if (violations.length > 0) {
+          throw new UnprocessableEntityException({
+            statusCode: 422,
+            error: 'MESSAGE_RESTRICTION_VIOLATED',
+            violations,
+          });
+        }
+      }
+
       // 1️⃣ Envoi réel vers WhatsApp (routage Whapi / Meta)
       function extractPhoneNumber(chat_id: string): string {
         return chat_id.split('@')[0];

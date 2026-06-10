@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { Lock, RefreshCw, Info, CheckCircle, AlertCircle } from 'lucide-react';
-import { DispatchSettings, RestrictionConfig } from '@/app/lib/definitions';
-import { getDispatchSettings, updateDispatchSettings, getRestrictionConfig, updateRestrictionConfig } from '@/app/lib/api';
+import { DispatchSettings, MessageRestrictionConfig, RestrictionConfig } from '@/app/lib/definitions';
+import { getDispatchSettings, getMessageRestrictionConfig, updateDispatchSettings, updateMessageRestrictionConfig, getRestrictionConfig, updateRestrictionConfig } from '@/app/lib/api';
 import { useToast } from '@/app/ui/ToastProvider';
 
 function SectionCard({
@@ -50,6 +50,12 @@ const defaultRestrictionConfig: RestrictionConfig = {
   minCharsSendEnabled: false,
 };
 
+const defaultMessageRestrictionConfig: MessageRestrictionConfig = {
+  maxWordLength: 26,
+  maxRepeatedChars: 3,
+  minAudioDurationSeconds: 10,
+};
+
 export default function LectureSeuleView() {
   const [settings, setSettings] = useState<DispatchSettings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,6 +68,11 @@ export default function LectureSeuleView() {
   const [restrictionLoading, setRestrictionLoading] = useState(false);
   const [savingRestriction, setSavingRestriction] = useState(false);
   const [restrictionStatus, setRestrictionStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const [messageRestriction, setMessageRestriction] = useState<MessageRestrictionConfig>(defaultMessageRestrictionConfig);
+  const [messageRestrictionLoading, setMessageRestrictionLoading] = useState(false);
+  const [savingMessageRestriction, setSavingMessageRestriction] = useState(false);
+  const [messageRestrictionStatus, setMessageRestrictionStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   const { addToast } = useToast();
 
@@ -87,6 +98,31 @@ export default function LectureSeuleView() {
     }
   };
 
+  const loadMessageRestriction = async () => {
+    try {
+      setMessageRestrictionLoading(true);
+      setMessageRestriction(await getMessageRestrictionConfig());
+    } catch {
+      // Config inaccessible → valeurs par défaut
+    } finally {
+      setMessageRestrictionLoading(false);
+    }
+  };
+
+  const saveMessageRestriction = async () => {
+    setSavingMessageRestriction(true);
+    setMessageRestrictionStatus(null);
+    try {
+      const saved = await updateMessageRestrictionConfig(messageRestriction);
+      setMessageRestriction(saved);
+      setMessageRestrictionStatus({ ok: true, message: 'Configuration enregistrée.' });
+    } catch (e) {
+      setMessageRestrictionStatus({ ok: false, message: e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.' });
+    } finally {
+      setSavingMessageRestriction(false);
+    }
+  };
+
   const saveRestriction = async () => {
     setSavingRestriction(true);
     setRestrictionStatus(null);
@@ -100,7 +136,7 @@ export default function LectureSeuleView() {
     }
   };
 
-  useEffect(() => { void load(); void loadRestriction(); }, []);
+  useEffect(() => { void load(); void loadRestriction(); void loadMessageRestriction(); }, []);
 
   const save = async (
     patch: Partial<DispatchSettings>,
@@ -425,6 +461,94 @@ export default function LectureSeuleView() {
                     }`}>
                       {restrictionStatus.ok ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
                       {restrictionStatus.message}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </SectionCard>
+
+          {/* ── Restriction du contenu des messages ── */}
+          <SectionCard
+            title="Restriction du contenu des messages"
+            description="Contrôle la longueur des mots, les répétitions de caractères et la durée minimale des messages audio envoyés par les commerciaux."
+            saving={savingMessageRestriction}
+            hasSettings={true}
+            onSave={() => void saveMessageRestriction()}
+          >
+            <div className="space-y-4">
+              {messageRestrictionLoading ? (
+                <p className="text-xs text-gray-400">Chargement…</p>
+              ) : (
+                <>
+                  <div className="grid gap-4 max-w-sm md:grid-cols-3">
+                    <div>
+                      <label
+                        htmlFor="msg-restriction-max-word-length"
+                        className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                      >
+                        Longueur max d&apos;un mot (caractères)
+                      </label>
+                      <input
+                        id="msg-restriction-max-word-length"
+                        type="number"
+                        min={1}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        value={messageRestriction.maxWordLength}
+                        onChange={(e) =>
+                          setMessageRestriction((prev) => ({ ...prev, maxWordLength: Math.max(1, parseInt(e.target.value, 10) || 1) }))
+                        }
+                      />
+                      <p className="mt-1 text-[11px] text-gray-400">Défaut : 26</p>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="msg-restriction-max-repeated-chars"
+                        className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                      >
+                        Répétitions successives max d&apos;une lettre
+                      </label>
+                      <input
+                        id="msg-restriction-max-repeated-chars"
+                        type="number"
+                        min={1}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        value={messageRestriction.maxRepeatedChars}
+                        onChange={(e) =>
+                          setMessageRestriction((prev) => ({ ...prev, maxRepeatedChars: Math.max(1, parseInt(e.target.value, 10) || 1) }))
+                        }
+                      />
+                      <p className="mt-1 text-[11px] text-gray-400">Défaut : 3</p>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="msg-restriction-min-audio-duration"
+                        className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                      >
+                        Durée min d&apos;un message audio (secondes)
+                      </label>
+                      <input
+                        id="msg-restriction-min-audio-duration"
+                        type="number"
+                        min={1}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        value={messageRestriction.minAudioDurationSeconds}
+                        onChange={(e) =>
+                          setMessageRestriction((prev) => ({ ...prev, minAudioDurationSeconds: Math.max(1, parseInt(e.target.value, 10) || 1) }))
+                        }
+                      />
+                      <p className="mt-1 text-[11px] text-gray-400">Défaut : 10</p>
+                    </div>
+                  </div>
+
+                  {messageRestrictionStatus && (
+                    <div className={`flex items-center gap-2 text-xs p-2 rounded-lg ${
+                      messageRestrictionStatus.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                    }`}>
+                      {messageRestrictionStatus.ok ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      {messageRestrictionStatus.message}
                     </div>
                   )}
                 </>

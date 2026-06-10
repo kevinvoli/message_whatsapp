@@ -2,6 +2,12 @@
 import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
 import { PanelMediaResponse } from '@/types/media-panel';
 
+export interface MessageRestrictionConfig {
+  maxWordLength: number;
+  maxRepeatedChars: number;
+  minAudioDurationSeconds: number;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -24,6 +30,20 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new Error(errorMessage);
   }
   return response.json() as Promise<T>;
+}
+
+/** Récupère la configuration de restriction du contenu des messages commerciaux. */
+export async function getMessageRestrictionConfig(): Promise<MessageRestrictionConfig | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/message-restrictions/config`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    return response.json() as Promise<MessageRestrictionConfig>;
+  } catch {
+    return null;
+  }
 }
 
 /** Récupère la configuration de restriction de lecture des conversations. */

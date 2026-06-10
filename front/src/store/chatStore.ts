@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { Socket } from "socket.io-client";
 
 import { ContactSummary, Conversation, ConversationStatus, Message, RestrictionConfig, RestrictionStatus, RestrictionUnrespondedConv } from "@/types/chat";
-import { getRestrictionConfig } from "@/lib/api";
+import { getMessageRestrictionConfig, getRestrictionConfig, MessageRestrictionConfig } from "@/lib/api";
 import { logger } from "@/lib/logger";
 
 // crypto.randomUUID() n'est disponible qu'en contexte sécurisé (HTTPS/localhost)
@@ -112,6 +112,10 @@ interface ChatState {
   restrictionUnresponded: RestrictionUnrespondedConv[];
   pendingConversationId: string | null;
   loadRestrictionConfig: () => Promise<void>;
+
+  // Restriction contenu messages commerciaux
+  messageRestrictionConfig: MessageRestrictionConfig | null;
+  loadMessageRestrictionConfig: () => Promise<void>;
   dismissRestriction: (chatId: string) => void;
   /** Ferme le modal sans naviguer — la commerciale répond à la conv déjà ouverte */
   closeRestrictionModal: () => void;
@@ -167,6 +171,7 @@ const initialState: Omit<
   | "closeRestrictionModal"
   | "_doSelectConversation"
   | "setSendError"
+  | "loadMessageRestrictionConfig"
 > = {
   socket: null,
   conversations: [],
@@ -200,6 +205,7 @@ const initialState: Omit<
   restrictionUnresponded: [],
   pendingConversationId: null,
   sendError: null,
+  messageRestrictionConfig: null,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -221,8 +227,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ socket });
 
     if (socket) {
-      // Charger la config restriction au moment de la connexion socket
+      // Charger les configs restriction au moment de la connexion socket
       void get().loadRestrictionConfig();
+      void get().loadMessageRestrictionConfig();
 
       // Gestionnaire de l'événement restriction:status
       socket.on('restriction:status', (status: RestrictionStatus) => {
@@ -424,6 +431,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadRestrictionConfig: async () => {
     const config = await getRestrictionConfig();
     set({ restrictionConfig: config });
+  },
+
+  loadMessageRestrictionConfig: async () => {
+    const config = await getMessageRestrictionConfig();
+    set({ messageRestrictionConfig: config });
   },
 
   dismissRestriction: (chatId: string) => {
@@ -1026,5 +1038,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     restrictionUnresponded: [],
     pendingConversationId: null,
     sendError: null,
+    messageRestrictionConfig: null,
   }),
 }));

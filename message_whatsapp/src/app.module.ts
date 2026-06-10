@@ -42,6 +42,7 @@ import { CampaignLinkModule } from './campaign-link/campaign-link.module';
 import { MediaAssetModule } from './media-asset/media-asset.module';
 import { ConversationRestrictionModule } from './conversation-restriction/conversation-restriction.module';
 import { MediaStorageModule } from './media-storage/media-storage.module';
+import { MessageRestrictionModule } from './message-restriction/message-restriction.module';
 
 @Module({
   imports: [
@@ -122,6 +123,7 @@ import { MediaStorageModule } from './media-storage/media-storage.module';
     MediaAssetModule,
     ConversationRestrictionModule,
     MediaStorageModule,
+    MessageRestrictionModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],
