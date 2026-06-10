@@ -19,6 +19,8 @@ import { MetaTokenService } from './meta-token.service';
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { AppLogger } from 'src/logging/app-logger.service';
 
+export type SanitizedChannel = Omit<WhapiChannel, 'token' | 'meta_app_secret' | 'webhook_secret' | 'verify_token'>;
+
 @Injectable()
 export class ChannelService implements OnModuleInit {
   constructor(
@@ -138,9 +140,8 @@ export class ChannelService implements OnModuleInit {
         ChannelService.name,
       );
 
-      return this.channelRepository.findOne({
-        where: { id: savedTg.id },
-      });
+      const createdTg = await this.channelRepository.findOne({ where: { id: savedTg.id } });
+      return createdTg ? this.sanitizeChannel(createdTg) : createdTg;
     }
 
     if (provider === 'messenger') {
@@ -233,9 +234,8 @@ export class ChannelService implements OnModuleInit {
         ChannelService.name,
       );
 
-      return this.channelRepository.findOne({
-        where: { id: savedMessenger.id },
-      });
+      const createdMessenger = await this.channelRepository.findOne({ where: { id: savedMessenger.id } });
+      return createdMessenger ? this.sanitizeChannel(createdMessenger) : createdMessenger;
     }
 
     if (provider === 'instagram') {
@@ -306,9 +306,8 @@ export class ChannelService implements OnModuleInit {
         ChannelService.name,
       );
 
-      return this.channelRepository.findOne({
-        where: { id: savedIg.id },
-      });
+      const createdIg = await this.channelRepository.findOne({ where: { id: savedIg.id } });
+      return createdIg ? this.sanitizeChannel(createdIg) : createdIg;
     }
 
     if (provider === 'meta') {
@@ -378,9 +377,8 @@ export class ChannelService implements OnModuleInit {
         ChannelService.name,
       );
 
-      return this.channelRepository.findOne({
-        where: { id: savedMeta.id },
-      });
+      const createdMeta = await this.channelRepository.findOne({ where: { id: savedMeta.id } });
+      return createdMeta ? this.sanitizeChannel(createdMeta) : createdMeta;
     }
 
     const channel = await this.connmunicationService.getChannel(dto);
@@ -418,16 +416,15 @@ export class ChannelService implements OnModuleInit {
       ChannelService.name,
     );
 
-    return this.channelRepository.findOne({
-      where: { id: savedWhapi.id },
-    });
+    const createdWhapi = await this.channelRepository.findOne({ where: { id: savedWhapi.id } });
+    return createdWhapi ? this.sanitizeChannel(createdWhapi) : createdWhapi;
   }
 
   /**
    * Assigne (ou désassigne) un poste dédié à un channel.
    * poste_id = null → retour en mode pool (queue globale).
    */
-  async assignPoste(channelId: string, posteId: string | null): Promise<WhapiChannel> {
+  async assignPoste(channelId: string, posteId: string | null): Promise<SanitizedChannel> {
     if (posteId !== null) {
       const poste = await this.posteRepository.findOne({ where: { id: posteId } });
       if (!poste) {
@@ -454,7 +451,7 @@ export class ChannelService implements OnModuleInit {
     if (!updated) {
       throw new NotFoundException(`Channel introuvable : ${channelId}`);
     }
-    return updated;
+    return this.sanitizeChannel(updated);
   }
 
   /**
@@ -552,6 +549,13 @@ export class ChannelService implements OnModuleInit {
       select: ['channel_id', 'no_close', 'poste_id'],
     });
     return !!ch?.no_close || !!ch?.poste_id;
+  }
+
+  private sanitizeChannel(
+    channel: WhapiChannel,
+  ): Omit<WhapiChannel, 'token' | 'meta_app_secret' | 'webhook_secret' | 'verify_token'> {
+    const { token: _t, meta_app_secret: _s, webhook_secret: _w, verify_token: _v, ...safe } = channel;
+    return safe;
   }
 
   async findAll() {
@@ -711,7 +715,8 @@ export class ChannelService implements OnModuleInit {
     }
 
     Object.assign(channel, dto);
-    return await this.channelRepository.save(channel);
+    const saved = await this.channelRepository.save(channel);
+    return this.sanitizeChannel(saved);
   }
 
   async remove(id: string) {

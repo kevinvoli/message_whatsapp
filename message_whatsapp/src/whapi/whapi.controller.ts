@@ -59,7 +59,7 @@ export class WhapiController {
     const requestId = this.headerValue(headers['x-request-id']) ?? randomUUID();
     this.assertPayloadSize(request.rawBody);
 
-    // this.assertWhapiSecret(headers, request.rawBody, payload);
+    this.assertWhapiSecret(headers, request.rawBody, payload);
 
     
     
@@ -208,15 +208,12 @@ export class WhapiController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    console.log("verification de webhooks", mode, token, challenge);
-    
+    this.auditLogger.debug(`verify_messenger mode=${mode} challenge=${challenge}`);
+
     if (mode === 'subscribe') {
       const matchesDb = await this.channelService.hasMatchingVerifyToken('messenger', token);
-    console.log("verification matchsDb", matchesDb);
 
       if (matchesDb) {
-    console.log("verification token if:", challenge);
-
         return challenge;
       }
     }
