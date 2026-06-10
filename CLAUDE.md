@@ -145,3 +145,26 @@ LOG_LEVEL  (défaut: info)
 - **Idempotence** : tout webhook handler et job BullMQ doit déduplicationner par `external_id`/`message_id` avant d'agir
 - **Zéro `any`** TypeScript — point bloquant en review
 - **Zéro N+1** — pas de requête dans une boucle — utiliser `leftJoinAndSelect` ou `IN (:...ids)`
+
+---
+
+## Règles de sécurité
+
+### Webhooks entrants
+- La vérification HMAC **doit être active** — ne jamais commenter `assertWhapiSecret()`, `assertMetaSignature()`, `assertMessengerSignature()`
+- Utiliser `crypto.timingSafeEqual` pour toutes les comparaisons de signature (déjà en place — ne pas remplacer par `===`)
+- Si `webhook_secret` est absent sur un canal en production, rejeter avec 401 — ne pas silencieusement accepter
+
+### Tokens et secrets dans les réponses API
+- Ne jamais retourner `token`, `meta_app_secret`, `webhook_secret`, `verify_token` dans les réponses HTTP
+- Utiliser `sanitizeChannel()` dans `ChannelService` avant tout retour depuis un contrôleur
+- `findAll()` / `findOne()` retournent les entités complètes pour usage interne — appliquer `sanitizeChannel()` au niveau du contrôleur
+
+### Logs
+- Ne jamais loguer `token`, `system_token`, `meta_app_secret`, `webhook_secret` — même en `debug`
+- En cas d'erreur de connexion DB2, loguer un message générique (pas les credentials)
+- Utiliser `this.logger.debug(...)` ou `this.auditLogger.debug(...)`, pas `console.log`
+
+### QueryBuilders TypeORM
+- Toujours utiliser des paramètres liés : `where('x = :val', { val })` ou `setParameter('val', value)`
+- Interdit : concaténation de chaîne dans une clause SQL — `where(\`col = '${input}'\`)` est un point bloquant en review

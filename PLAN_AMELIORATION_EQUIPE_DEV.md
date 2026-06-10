@@ -234,7 +234,7 @@ team-lead reçoit une US complexe
 - [x] Fix BLOQUANT 2 (partiel) : `sanitizeChannel()` appliqué sur `create()`, `update()`, `assignPoste()` — `findAll()` et `findOne()` toujours complets (usage interne nécessaire) — **vérifier que `GET /channel` ne retourne pas de tokens via `findAll()`**
 - [x] Fix ATTENTION : `console.log verify_token` supprimés, remplacés par `auditLogger.debug` sans token
 - [x] Fix `GET /channel` : `sanitizeChannel()` rendu public, appliqué dans le contrôleur sur `findAll()` et `findOne()` — build OK
-- [ ] Documenter les règles de sécurité dans `CLAUDE.md`
+- [x] Règles de sécurité documentées dans `CLAUDE.md` (webhooks HMAC, sanitisation API, logs, QueryBuilders)
 
 **Gain attendu** : réduction de la surface d'attaque, conformité données clients.
 

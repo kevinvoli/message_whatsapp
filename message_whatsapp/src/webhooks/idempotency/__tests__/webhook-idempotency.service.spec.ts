@@ -130,7 +130,10 @@ describe('WebhookIdempotencyService', () => {
     expect(second).toBe('duplicate');
   });
 
-  it('detects conflict on different payload hash', async () => {
+  it('retourne duplicate (pas conflict) sur hash différent pour la même clé', async () => {
+    // Le service traite volontairement le hash-mismatch comme un doublon afin d'éviter
+    // les boucles de retry Meta (cf. commentaire dans tryRegisterEventKey).
+    // La métrique IDEMPOTENCY_HASH_MISMATCH est émise pour l'observabilité.
     const repo = new FakeRepo() as unknown as Repository<WebhookEventLog>;
     const metrics = new WebhookMetricsService();
     const service = new WebhookIdempotencyService(repo, metrics);
@@ -175,7 +178,7 @@ describe('WebhookIdempotencyService', () => {
       tenantId: 'tenant-1',
     });
 
-    expect(result).toBe('conflict');
+    expect(result).toBe('duplicate');
   });
 
   it('uses fallback hash with minute bucket when ids missing', async () => {

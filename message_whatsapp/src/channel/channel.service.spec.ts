@@ -5,10 +5,12 @@ import { ChannelService } from './channel.service';
 import { WhapiChannel } from './entities/channel.entity';
 import { ProviderChannel } from './entities/provider-channel.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { CommunicationWhapiService } from 'src/communication_whapi/communication_whapi.service';
 import { MetaTokenService } from './meta-token.service';
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { AppLogger } from 'src/logging/app-logger.service';
+import { mockRepository } from '../../test/helpers/mock-repository';
 
 describe('ChannelService', () => {
   let service: ChannelService;
@@ -39,10 +41,11 @@ describe('ChannelService', () => {
         { provide: getRepositoryToken(WhapiChannel), useValue: channelRepository },
         { provide: getRepositoryToken(ProviderChannel), useValue: providerChannelRepository },
         { provide: getRepositoryToken(WhatsappPoste), useValue: posteRepository },
+        { provide: getRepositoryToken(DispatchSettings), useValue: mockRepository<DispatchSettings>() },
         { provide: CommunicationWhapiService, useValue: {} },
         { provide: MetaTokenService, useValue: {} },
         { provide: CommunicationTelegramService, useValue: {} },
-        { provide: AppLogger, useValue: { log: jest.fn(), warn: jest.fn(), error: jest.fn() } },
+        { provide: AppLogger, useValue: { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() } },
       ],
     }).compile();
 
