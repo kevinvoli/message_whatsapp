@@ -552,6 +552,7 @@ export type PerformanceCommercial = {
   tempsReponseMoyen: number;
   lastConnectionAt: string | null;
   totalConnectionMinutes?: number;
+  nbMessagesLusSansReponse: number;
 };
 
 /**

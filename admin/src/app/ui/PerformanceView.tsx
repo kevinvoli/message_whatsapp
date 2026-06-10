@@ -198,6 +198,7 @@ export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }:
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Chats actifs</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Taux rep.</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Temps rep.</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Lu sans rép.</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
               </tr>
             </thead>
@@ -228,6 +229,11 @@ export default function PerformanceView({ onRefresh, selectedPeriod = 'today' }:
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-right text-gray-600">{formatTemps(c.tempsReponseMoyen)}</td>
+                  <td className="px-6 py-4 text-sm text-right">
+                    <span className={c.nbMessagesLusSansReponse >= 1 ? 'text-orange-600 font-semibold' : 'text-gray-400'}>
+                      {c.nbMessagesLusSansReponse}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       c.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'

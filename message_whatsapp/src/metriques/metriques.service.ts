@@ -670,7 +670,7 @@ export class MetriquesService {
     const commercialIds = commerciaux.map((c) => c.id);
 
     // ── Requêtes 2-5 en parallèle : chacune cible un index précis ──────────────
-    const [msgInRows, msgOutRows, chatsActifsRows, tempsRows, connectionMinutesMap] = await Promise.all([
+    const [msgInRows, msgOutRows, chatsActifsRows, tempsRows, lusSansReponseRows, connectionMinutesMap] = await Promise.all([
 
       // Req 2 — Messages IN par poste (utilise IDX_msg_poste_dir_time)
       posteIds.length > 0
@@ -742,7 +742,33 @@ export class MetriquesService {
             .getRawMany()
         : Promise.resolve([]),
 
-      // Req 6 — Minutes de connexion par commercial
+      // Req 6 — Messages IN lus par commercial mais sans réponse OUT dans le même chat après lecture
+      commercialIds.length > 0
+        ? this.messageRepository
+            .createQueryBuilder('msg')
+            .select('msg.readByCommercialId', 'commercial_id')
+            .addSelect('COUNT(*)', 'count')
+            .where('msg.readByCommercialId IN (:...commercialIds)', { commercialIds })
+            .andWhere('msg.readByCommercialAt IS NOT NULL')
+            .andWhere('msg.direction = :dirIn', { dirIn: 'IN' })
+            .andWhere('msg.deletedAt IS NULL')
+            .andWhere('msg.createdAt >= :dateStart', { dateStart })
+            .andWhere('msg.createdAt <= :dateEnd', { dateEnd })
+            .andWhere(
+              `NOT EXISTS (
+                SELECT 1 FROM whatsapp_message reply
+                WHERE reply.chat_id = msg.chat_id
+                  AND reply.commercial_id = msg.readByCommercialId
+                  AND reply.direction = 'OUT'
+                  AND reply.timestamp > msg.readByCommercialAt
+                  AND reply.deleted_at IS NULL
+              )`,
+            )
+            .groupBy('msg.readByCommercialId')
+            .getRawMany()
+        : Promise.resolve([]),
+
+      // Req 7 — Minutes de connexion par commercial
       commercialIds.length > 0
         ? this.connectionLogService.getBulkConnectionMinutes(
             commercialIds,
@@ -754,10 +780,11 @@ export class MetriquesService {
     ]);
 
     // ── Lookup Maps O(1) ──────────────────────────────────────────────────────
-    const msgInMap     = new Map(msgInRows.map((r)     => [r.poste_id,      parseInt(r.count) || 0]));
-    const msgOutMap    = new Map(msgOutRows.map((r)    => [r.commercial_id, parseInt(r.count) || 0])); // premiers tours de réponse
-    const chatsMap     = new Map(chatsActifsRows.map((r) => [r.poste_id,   parseInt(r.count) || 0]));
-    const tempsParPoste = new Map(tempsRows.map((r)   => [r.poste_id,      parseInt(r.avg)   || 0]));
+    const msgInMap          = new Map(msgInRows.map((r)          => [r.poste_id,      parseInt(r.count) || 0]));
+    const msgOutMap         = new Map(msgOutRows.map((r)         => [r.commercial_id, parseInt(r.count) || 0])); // premiers tours de réponse
+    const chatsMap          = new Map(chatsActifsRows.map((r)   => [r.poste_id,      parseInt(r.count) || 0]));
+    const tempsParPoste     = new Map(tempsRows.map((r)         => [r.poste_id,      parseInt(r.avg)   || 0]));
+    const lusSansReponseMap = new Map(lusSansReponseRows.map((r) => [r.commercial_id, parseInt(r.count) || 0]));
 
     const result = commerciaux
       .map((perf) => {
@@ -778,8 +805,9 @@ export class MetriquesService {
           tauxReponse:      nbMessagesRecus > 0
             ? Math.round((nbMessagesEnvoyes / nbMessagesRecus) * 100)
             : 0,
-          tempsReponseMoyen:      tempsParPoste.get(perf.poste_id) ?? 0,
-          totalConnectionMinutes: connectionMinutesMap.get(perf.id) ?? 0,
+          tempsReponseMoyen:           tempsParPoste.get(perf.poste_id) ?? 0,
+          totalConnectionMinutes:      connectionMinutesMap.get(perf.id) ?? 0,
+          nbMessagesLusSansReponse:    lusSansReponseMap.get(perf.id) ?? 0,
         };
       })
       .sort((a, b) => b.nbMessagesEnvoyes - a.nbMessagesEnvoyes);

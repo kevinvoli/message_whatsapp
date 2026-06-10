@@ -165,7 +165,6 @@ export class MetriquesGlobalesDto {
   channelsActifs: number;
 
   // ========== MÉTRIQUES PERFORMANCE ==========
-  @ApiProperty({ description: 'Messages en attente de traitement' })
   @ApiProperty({ description: 'Pourcentage de chats assignés' })
   @IsNumber()
   tauxAssignation: number;
@@ -239,6 +238,10 @@ export class PerformanceCommercialDto {
   @IsOptional()
   @IsNumber()
   totalConnectionMinutes?: number;
+
+  @ApiProperty({ description: 'Messages lus sans réponse' })
+  @IsNumber()
+  nbMessagesLusSansReponse: number;
 }
 
 /**
