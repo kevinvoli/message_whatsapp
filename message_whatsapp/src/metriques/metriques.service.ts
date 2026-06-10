@@ -758,10 +758,10 @@ export class MetriquesService {
               `NOT EXISTS (
                 SELECT 1 FROM whatsapp_message reply
                 WHERE reply.chat_id = msg.chat_id
-                  AND reply.commercial_id = msg.readByCommercialId
+                  AND reply.commercial_id = msg.read_by_commercial_id
                   AND reply.direction = 'OUT'
-                  AND reply.timestamp > msg.readByCommercialAt
-                  AND reply.deleted_at IS NULL
+                  AND reply.timestamp > msg.read_by_commercial_at
+                  AND reply.\`deletedAt\` IS NULL
               )`,
             )
             .groupBy('msg.readByCommercialId')
