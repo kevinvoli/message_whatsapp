@@ -1,15 +1,15 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle, Inbox, Reply, CheckCircle, Timer } from 'lucide-react';
 
-import { PerformanceCommercial, Poste, CommercialStatsDto } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats } from '@/app/lib/api';
+import { PerformanceCommercial, Poste, CommercialStatsDto, ChatLuSansReponse } from '@/app/lib/definitions';
+import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats, getChatsLusSansReponse } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
 import { useCrudResource } from '../hooks/useCrudResource';
 import { EntityFormModal } from './crud/EntityFormModal';
 
-type CommerciauxTabKey = 'liste' | 'detail' | 'statistiques';
+type CommerciauxTabKey = 'liste' | 'detail' | 'statistiques' | 'lus-sans-reponse';
 
 interface CommerciauxTab {
   key: CommerciauxTabKey;
@@ -21,6 +21,7 @@ const COMMERCIAUX_TABS: CommerciauxTab[] = [
   { key: 'liste', label: 'Liste', icon: List },
   { key: 'detail', label: 'Détail', icon: UserCircle },
   { key: 'statistiques', label: 'Statistiques', icon: BarChart3 },
+  { key: 'lus-sans-reponse', label: 'Lus sans réponse', icon: MessageCircle },
 ];
 
 interface CommerciauxViewProps {
@@ -154,6 +155,9 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
   const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
   const [statsPanel, setStatsPanel] = useState<PerformanceCommercial | null>(null);
   const [statsMode, setStatsMode] = useState<'messages' | 'conversations'>('messages');
+  const [chatsSansReponse, setChatsSansReponse] = useState<ChatLuSansReponse[]>([]);
+  const [chatsSansReponseLoading, setChatsSansReponseLoading] = useState(false);
+  const [chatsSansReponseCommercial, setChatsSansReponseCommercial] = useState<PerformanceCommercial | null>(null);
 
   const handleOpenStatsPanel = useCallback(async (commercial: PerformanceCommercial) => {
     setStatsPanel(commercial);
@@ -167,6 +171,20 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
       addToast({ type: 'error', message: 'Impossible de charger les statistiques.' });
     } finally {
       setStatsLoading((prev) => ({ ...prev, [commercial.id]: false }));
+    }
+  }, [selectedPeriod, dateFrom, dateTo, addToast]);
+
+  const handleOpenChatsLusSansReponse = useCallback(async (commercial: PerformanceCommercial) => {
+    setChatsSansReponseCommercial(commercial);
+    setActiveTab('lus-sans-reponse');
+    setChatsSansReponseLoading(true);
+    try {
+      const data = await getChatsLusSansReponse(commercial.id, selectedPeriod, dateFrom, dateTo);
+      setChatsSansReponse(data);
+    } catch {
+      addToast({ type: 'error', message: 'Impossible de charger les conversations.' });
+    } finally {
+      setChatsSansReponseLoading(false);
     }
   }, [selectedPeriod, dateFrom, dateTo, addToast]);
 
@@ -585,9 +603,18 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
 
                         {/* Lu sans réponse */}
                         <td className="px-6 py-4">
-                          <span className={`text-sm font-semibold ${commercial.nbMessagesLusSansReponse >= 1 ? 'text-orange-600' : 'text-gray-400'}`}>
-                            {commercial.nbMessagesLusSansReponse}
-                          </span>
+                          {commercial.nbMessagesLusSansReponse > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenChatsLusSansReponse(commercial)}
+                              className="text-sm font-semibold text-orange-600 hover:underline cursor-pointer"
+                              title="Voir les conversations lues sans réponse"
+                            >
+                              {commercial.nbMessagesLusSansReponse}
+                            </button>
+                          ) : (
+                            <span className="text-sm font-semibold text-gray-400">0</span>
+                          )}
                         </td>
 
                         {/* Dernière connexion */}
@@ -1052,6 +1079,84 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ─── Contenu onglet Lus sans réponse ─────────────────────────── */}
+      {activeTab === 'lus-sans-reponse' && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">
+                {chatsSansReponseCommercial
+                  ? `${chatsSansReponseCommercial.name} — Conversations lues sans réponse`
+                  : 'Conversations lues sans réponse'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('liste')}
+              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            >
+              Retour à la liste
+            </button>
+          </div>
+
+          <div className="p-4">
+            {chatsSansReponseLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin w-8 h-8 rounded-full border-2 border-orange-500 border-t-transparent" />
+              </div>
+            ) : chatsSansReponse.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+                <MessageCircle className="w-10 h-10 opacity-30" />
+                <p className="text-sm">Aucune conversation lue sans réponse</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière activité</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lu le</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {chatsSansReponse.map((chat) => (
+                      <tr key={chat.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {chat.name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {chat.contact_client || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            chat.status === 'actif'
+                              ? 'bg-green-100 text-green-800'
+                              : chat.status === 'en attente'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {chat.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatRelativeDate(chat.last_activity_at)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatRelativeDate(chat.last_read_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -1072,3 +1072,14 @@ export type GalerieFilterOptions = {
   channels: { id: string; label: string | null; phone_number: string | null }[];
   postes: { id: string; name: string; code: string }[];
 };
+
+export type ChatLuSansReponse = {
+  id: string;
+  chat_id: string;
+  name: string;
+  contact_client: string;
+  status: string;
+  last_activity_at: string | null;
+  last_client_message_at: string | null;
+  last_read_at: string | null;
+};

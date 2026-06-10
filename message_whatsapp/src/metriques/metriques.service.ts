@@ -15,6 +15,7 @@ import {
   ChannelLinkStatsDto,
   ChannelTemporalPointDto,
   ChargePosteDto,
+  ChatLuSansReponseDto,
   MetriquesGlobalesDto,
   PerformanceCommercialDto,
   PerformanceTemporelleDto,
@@ -1399,6 +1400,84 @@ export class MetriquesService {
         nb_jours:  nbJoursGlobal,
       },
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public — Conversations lues sans réponse pour un commercial
+  // ---------------------------------------------------------------------------
+
+  async getChatsLusSansReponse(
+    commercialId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<ChatLuSansReponseDto[]> {
+    const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
+
+    const rows = await this.chatRepository
+      .createQueryBuilder('chat')
+      .select('chat.id', 'id')
+      .addSelect('chat.chat_id', 'chat_id')
+      .addSelect('chat.name', 'name')
+      .addSelect('chat.contact_client', 'contact_client')
+      .addSelect('chat.status', 'status')
+      .addSelect('chat.last_activity_at', 'last_activity_at')
+      .addSelect('chat.last_client_message_at', 'last_client_message_at')
+      .addSelect(
+        `(SELECT MAX(m_read.read_by_commercial_at)
+            FROM whatsapp_message m_read
+           WHERE m_read.chat_id = chat.chat_id
+             AND m_read.read_by_commercial_id = :commercialId
+             AND m_read.read_by_commercial_at IS NOT NULL
+             AND m_read.direction = 'IN'
+             AND m_read.\`deletedAt\` IS NULL)`,
+        'last_read_at',
+      )
+      .where('chat.deletedAt IS NULL')
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM whatsapp_message m_in
+          WHERE m_in.chat_id = chat.chat_id
+            AND m_in.read_by_commercial_id = :commercialId
+            AND m_in.read_by_commercial_at IS NOT NULL
+            AND m_in.direction = 'IN'
+            AND m_in.\`deletedAt\` IS NULL
+            AND m_in.\`createdAt\` >= :dateStart
+            AND m_in.\`createdAt\` <= :dateEnd
+        )`,
+      )
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM whatsapp_message m_out
+          WHERE m_out.chat_id = chat.chat_id
+            AND m_out.commercial_id = :commercialId
+            AND m_out.direction = 'OUT'
+            AND m_out.\`deletedAt\` IS NULL
+            AND m_out.timestamp > (
+              SELECT MAX(m_rd.read_by_commercial_at)
+              FROM whatsapp_message m_rd
+              WHERE m_rd.chat_id = chat.chat_id
+                AND m_rd.read_by_commercial_id = :commercialId
+                AND m_rd.read_by_commercial_at IS NOT NULL
+                AND m_rd.direction = 'IN'
+                AND m_rd.\`deletedAt\` IS NULL
+            )
+        )`,
+      )
+      .setParameters({ commercialId, dateStart, dateEnd })
+      .orderBy('chat.last_activity_at', 'DESC')
+      .getRawMany<Record<string, unknown>>();
+
+    return rows.map((r) => ({
+      id:                     r['id'] as string,
+      chat_id:                r['chat_id'] as string,
+      name:                   (r['name'] as string | null) ?? '',
+      contact_client:         (r['contact_client'] as string | null) ?? '',
+      status:                 (r['status'] as string | null) ?? '',
+      last_activity_at:       (r['last_activity_at'] as Date | null) ?? null,
+      last_client_message_at: (r['last_client_message_at'] as Date | null) ?? null,
+      last_read_at:           (r['last_read_at'] as Date | null) ?? null,
+    }));
   }
 
 }

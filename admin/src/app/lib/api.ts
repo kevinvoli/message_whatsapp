@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig } from './definitions';
+import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1536,6 +1536,22 @@ export async function getStoredMedias(params?: {
 export async function getGalerieFilterOptions(): Promise<GalerieFilterOptions> {
   const res = await fetch(`${API_BASE_URL}/media-storage/gallery/filters`, { credentials: 'include' });
   return handleResponse<GalerieFilterOptions>(res);
+}
+
+export async function getChatsLusSansReponse(
+  commercialId: string,
+  periode = 'today',
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<ChatLuSansReponse[]> {
+  const params = new URLSearchParams({ periode });
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+  const response = await fetch(
+    `${API_BASE_URL}/api/metriques/commerciaux/${commercialId}/chats-lus-sans-reponse?${params.toString()}`,
+    { method: 'GET', credentials: 'include' },
+  );
+  return handleResponse<ChatLuSansReponse[]>(response);
 }
 
 export async function getPostePanelConfig(posteId: string): Promise<PostePanelConfig> {

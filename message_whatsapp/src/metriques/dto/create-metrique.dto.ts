@@ -526,6 +526,43 @@ export class TraficResponseDto {
 export { TraficResponseDto as TraficHoraireResponseDto };
 export { TraficPointDto    as TraficHorairePointDto    };
 
+/**
+ * DTO pour une conversation lue sans réponse par un commercial
+ */
+export class ChatLuSansReponseDto {
+  @ApiProperty({ description: 'ID interne du chat' })
+  @IsString()
+  id: string;
+
+  @ApiProperty({ description: 'ID WhatsApp du chat' })
+  @IsString()
+  chat_id: string;
+
+  @ApiProperty({ description: 'Nom du contact' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Numéro/contact client' })
+  @IsString()
+  contact_client: string;
+
+  @ApiProperty({ description: 'Statut de la conversation' })
+  @IsString()
+  status: string;
+
+  @ApiProperty({ description: 'Dernière activité', required: false })
+  @IsOptional()
+  last_activity_at: Date | null;
+
+  @ApiProperty({ description: 'Dernier message client', required: false })
+  @IsOptional()
+  last_client_message_at: Date | null;
+
+  @ApiProperty({ description: 'Date de lecture la plus récente par ce commercial', required: false })
+  @IsOptional()
+  last_read_at: Date | null;
+}
+
 /** Un point horaire/journalier du graphique conversations */
 export class TraficConversationsPointDto {
   index:         number;   // heure 0-23 ou jour 0-6

@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/admin.guard';
 import {
   ChannelDetailStatsDto,
+  ChatLuSansReponseDto,
   MetriquesGlobalesDto,
   PerformanceCommercialDto,
   PerformanceTemporelleDto,
@@ -83,6 +84,18 @@ export class MetriquesController {
     @Query('dateTo') dateTo?: string,
   ): Promise<PerformanceCommercialDto[]> {
     return this.metriquesService.getPerformanceCommerciaux(periode, dateFrom, dateTo, { dedicatedOnly: true });
+  }
+
+  @Get('commerciaux/:commercialId/chats-lus-sans-reponse')
+  @ApiOperation({ summary: 'Conversations lues sans réponse pour un commercial' })
+  @ApiResponse({ status: 200, type: [ChatLuSansReponseDto] })
+  async getChatsLusSansReponse(
+    @Param('commercialId') commercialId: string,
+    @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ): Promise<ChatLuSansReponseDto[]> {
+    return this.metriquesService.getChatsLusSansReponse(commercialId, periode, dateFrom, dateTo);
   }
 
   @Get('channels/:channelId/stats')
