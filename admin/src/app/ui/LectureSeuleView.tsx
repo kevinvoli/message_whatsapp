@@ -51,6 +51,7 @@ const defaultRestrictionConfig: RestrictionConfig = {
 };
 
 const defaultMessageRestrictionConfig: MessageRestrictionConfig = {
+  enabled: true,
   maxWordLength: 26,
   maxRepeatedChars: 3,
   minAudioDurationSeconds: 10,
@@ -481,7 +482,33 @@ export default function LectureSeuleView() {
                 <p className="text-xs text-gray-400">Chargement…</p>
               ) : (
                 <>
-                  <div className="grid gap-4 max-w-sm md:grid-cols-3">
+                  {/* Toggle activation restriction contenu */}
+                  <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Activer la restriction de contenu</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        Si désactivé, les règles ci-dessous sont ignorées côté frontend commercial.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={messageRestriction.enabled}
+                      aria-label="Activer la restriction de contenu des messages"
+                      onClick={() => setMessageRestriction((prev) => ({ ...prev, enabled: !prev.enabled }))}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        messageRestriction.enabled ? 'bg-emerald-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
+                          messageRestriction.enabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className={`grid gap-4 max-w-sm md:grid-cols-3 transition-opacity duration-200 ${messageRestriction.enabled ? '' : 'opacity-40'}`}>
                     <div>
                       <label
                         htmlFor="msg-restriction-max-word-length"
@@ -493,7 +520,8 @@ export default function LectureSeuleView() {
                         id="msg-restriction-max-word-length"
                         type="number"
                         min={1}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        disabled={!messageRestriction.enabled}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none disabled:cursor-not-allowed"
                         value={messageRestriction.maxWordLength}
                         onChange={(e) =>
                           setMessageRestriction((prev) => ({ ...prev, maxWordLength: Math.max(1, parseInt(e.target.value, 10) || 1) }))
@@ -513,7 +541,8 @@ export default function LectureSeuleView() {
                         id="msg-restriction-max-repeated-chars"
                         type="number"
                         min={1}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        disabled={!messageRestriction.enabled}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none disabled:cursor-not-allowed"
                         value={messageRestriction.maxRepeatedChars}
                         onChange={(e) =>
                           setMessageRestriction((prev) => ({ ...prev, maxRepeatedChars: Math.max(1, parseInt(e.target.value, 10) || 1) }))
@@ -533,7 +562,8 @@ export default function LectureSeuleView() {
                         id="msg-restriction-min-audio-duration"
                         type="number"
                         min={1}
-                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                        disabled={!messageRestriction.enabled}
+                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none disabled:cursor-not-allowed"
                         value={messageRestriction.minAudioDurationSeconds}
                         onChange={(e) =>
                           setMessageRestriction((prev) => ({ ...prev, minAudioDurationSeconds: Math.max(1, parseInt(e.target.value, 10) || 1) }))

@@ -8,12 +8,14 @@ export interface ValidationViolation {
 }
 
 const CONFIG_KEYS = {
+  ENABLED: 'MSG_RESTRICTION_ENABLED',
   MAX_WORD_LENGTH: 'MSG_RESTRICTION_MAX_WORD_LENGTH',
   MAX_REPEATED_CHARS: 'MSG_RESTRICTION_MAX_REPEATED_CHARS',
   MIN_AUDIO_DURATION: 'MSG_RESTRICTION_MIN_AUDIO_DURATION_SECONDS',
 } as const;
 
 const DEFAULTS = {
+  enabled: false,
   maxWordLength: 26,
   maxRepeatedChars: 3,
   minAudioDurationSeconds: 10,
@@ -24,13 +26,15 @@ export class MessageRestrictionService {
   constructor(private readonly systemConfigService: SystemConfigService) {}
 
   async getConfig(): Promise<MessageRestrictionConfigDto> {
-    const [maxWordStr, maxRepeatedStr, minAudioStr] = await Promise.all([
+    const [enabledStr, maxWordStr, maxRepeatedStr, minAudioStr] = await Promise.all([
+      this.systemConfigService.get(CONFIG_KEYS.ENABLED),
       this.systemConfigService.get(CONFIG_KEYS.MAX_WORD_LENGTH),
       this.systemConfigService.get(CONFIG_KEYS.MAX_REPEATED_CHARS),
       this.systemConfigService.get(CONFIG_KEYS.MIN_AUDIO_DURATION),
     ]);
 
     return {
+      enabled: enabledStr !== null ? enabledStr === 'true' : DEFAULTS.enabled,
       maxWordLength: maxWordStr !== null ? parseInt(maxWordStr, 10) : DEFAULTS.maxWordLength,
       maxRepeatedChars: maxRepeatedStr !== null ? parseInt(maxRepeatedStr, 10) : DEFAULTS.maxRepeatedChars,
       minAudioDurationSeconds: minAudioStr !== null ? parseInt(minAudioStr, 10) : DEFAULTS.minAudioDurationSeconds,
@@ -39,6 +43,7 @@ export class MessageRestrictionService {
 
   async updateConfig(dto: MessageRestrictionConfigDto): Promise<MessageRestrictionConfigDto> {
     await this.systemConfigService.setBulk([
+      { key: CONFIG_KEYS.ENABLED, value: String(dto.enabled) },
       { key: CONFIG_KEYS.MAX_WORD_LENGTH, value: String(dto.maxWordLength) },
       { key: CONFIG_KEYS.MAX_REPEATED_CHARS, value: String(dto.maxRepeatedChars) },
       { key: CONFIG_KEYS.MIN_AUDIO_DURATION, value: String(dto.minAudioDurationSeconds) },
@@ -47,6 +52,8 @@ export class MessageRestrictionService {
   }
 
   validateTextContent(text: string, config: MessageRestrictionConfigDto): ValidationViolation[] {
+    if (!config.enabled) return [];
+
     const violations: ValidationViolation[] = [];
 
     const words = text.split(/\s+/).filter((w) => w.length > 0);
@@ -60,7 +67,7 @@ export class MessageRestrictionService {
       }
     }
 
-    const repeatedRegex = new RegExp(`(.)\\1{${config.maxRepeatedChars},}`, 'gi');
+    const repeatedRegex = new RegExp(`(\\p{L})\\1{${config.maxRepeatedChars},}`, 'giu');
     const matches = text.match(repeatedRegex);
     if (matches) {
       violations.push({
@@ -76,6 +83,8 @@ export class MessageRestrictionService {
     durationSeconds: number | undefined | null,
     config: MessageRestrictionConfigDto,
   ): ValidationViolation | null {
+    if (!config.enabled) return null;
+
     if (durationSeconds === undefined || durationSeconds === null) {
       return null;
     }

@@ -1,6 +1,9 @@
-import { IsInt, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, Max, Min } from 'class-validator';
 
 export class MessageRestrictionConfigDto {
+  @IsBoolean()
+  enabled: boolean;
+
   @IsInt()
   @Min(1)
   @Max(500)

@@ -980,6 +980,7 @@ export const COULEURS_STATUT = {
 // ============================================
 
 export interface MessageRestrictionConfig {
+  enabled: boolean;
   maxWordLength: number;
   maxRepeatedChars: number;
   minAudioDurationSeconds: number;

@@ -3,6 +3,7 @@ import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
 import { PanelMediaResponse } from '@/types/media-panel';
 
 export interface MessageRestrictionConfig {
+  enabled: boolean;
   maxWordLength: number;
   maxRepeatedChars: number;
   minAudioDurationSeconds: number;

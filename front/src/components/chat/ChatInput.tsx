@@ -22,7 +22,7 @@ function checkMaxWordLength(text: string, max: number): string | null {
 }
 
 function checkRepeatedChars(text: string, max: number): string | null {
-  const pattern = new RegExp(`(.)\\1{${max},}`, 'gi');
+  const pattern = new RegExp(`(\\p{L})\\1{${max},}`, 'giu');
   const match = pattern.exec(text);
   if (match) {
     return `Le texte contient "${match[0]}" — la répétition successive d'une même lettre est limitée à ${max} fois.`;
@@ -160,7 +160,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const charsTooFew = minCharsSendEnabled && trimmedLen > 0 && trimmedLen < minResponseChars;
 
   const textViolation = useMemo<string | null>(() => {
-    if (!messageRestrictionConfig || !message.trim()) return null;
+    if (!messageRestrictionConfig || !messageRestrictionConfig.enabled || !message.trim()) return null;
     return (
       checkMaxWordLength(message, messageRestrictionConfig.maxWordLength) ??
       checkRepeatedChars(message, messageRestrictionConfig.maxRepeatedChars)
@@ -292,7 +292,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         const capturedDuration = recordingDurationRef.current;
         if (blob.size > 0 && chat_id) {
-          const minDuration = messageRestrictionConfig?.minAudioDurationSeconds ?? 0;
+          const minDuration = messageRestrictionConfig?.enabled ? (messageRestrictionConfig.minAudioDurationSeconds ?? 0) : 0;
           if (minDuration > 0 && capturedDuration < minDuration) {
             setUploadError(`Le message audio est trop court (${capturedDuration}s). Durée minimale : ${minDuration}s.`);
             return;

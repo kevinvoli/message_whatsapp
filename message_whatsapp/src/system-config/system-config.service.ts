@@ -56,6 +56,7 @@ const CONFIG_CATALOGUE: ConfigEntry[] = [
   { key: 'RESTRICTION_MIN_CHARS_SEND_ENABLED', label: 'Bloquer l\'envoi si message trop court', category: 'restriction', description: 'true / false — si true, les commerciaux ne peuvent pas envoyer de message contenant moins de RESTRICTION_MIN_RESPONSE_CHARS caractères (défaut : false)' },
 
   // ─── Restriction contenu messages commerciaux ───────────────────────────────
+  { key: 'MSG_RESTRICTION_ENABLED', label: 'Restriction contenu messages activée', category: 'msg_restriction', description: 'true / false — active les restrictions de contenu (longueur mot, répétitions, durée audio) pour les messages commerciaux (défaut : false)' },
   { key: 'MSG_RESTRICTION_MAX_WORD_LENGTH', label: 'Longueur maximale d\'un mot', category: 'msg_restriction', description: 'Nombre maximum de caractères Unicode dans un mot (défaut : 26)' },
   { key: 'MSG_RESTRICTION_MAX_REPEATED_CHARS', label: 'Répétition de caractères consécutifs maximale', category: 'msg_restriction', description: 'Nombre maximal de fois qu\'un même caractère peut apparaître consécutivement (défaut : 3)' },
   { key: 'MSG_RESTRICTION_MIN_AUDIO_DURATION_SECONDS', label: 'Durée minimale d\'un message audio (secondes)', category: 'msg_restriction', description: 'Durée minimale en secondes d\'un message vocal avant envoi (défaut : 10)' },
