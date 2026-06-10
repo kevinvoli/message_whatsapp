@@ -759,7 +759,6 @@ export class MetriquesService {
               `NOT EXISTS (
                 SELECT 1 FROM whatsapp_message reply
                 WHERE reply.chat_id = msg.chat_id
-                  AND reply.commercial_id = msg.read_by_commercial_id
                   AND reply.direction = 'OUT'
                   AND reply.timestamp > msg.read_by_commercial_at
                   AND reply.\`deletedAt\` IS NULL
@@ -1450,7 +1449,6 @@ export class MetriquesService {
         `NOT EXISTS (
           SELECT 1 FROM whatsapp_message m_out
           WHERE m_out.chat_id = chat.chat_id
-            AND m_out.commercial_id = :commercialId
             AND m_out.direction = 'OUT'
             AND m_out.\`deletedAt\` IS NULL
             AND m_out.timestamp > (
