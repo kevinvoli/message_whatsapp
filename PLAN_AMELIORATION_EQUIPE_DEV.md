@@ -178,7 +178,9 @@ team-lead
   - `message.factory.ts` — 3 factories (`makeMessage`, `makeIncomingMessage`, `makeOutgoingMessage`)
 - [x] `FirstResponseTimeoutJob` — 25/25 tests (plages horaires, idempotence, AM#1 préservé, N+1 absent)
 - [x] `DispatcherService.jobRunnerAllPostes` — 7 cas (mutex, step 0 FERME, batchSize=0, charge équilibrée)
-- [ ] Couverture restante : `OutboundRouterService`, `MediaStorageService`, `OrderCallSyncService`
+- [x] `OutboundRouterService` — 13 tests (routing whapi/meta/messenger, NotFoundException canal null, BadRequestException provider inconnu, idempotence)
+- [x] `MediaDownloadService` — 12 tests (skip si déjà téléchargé, URL expirée, provider null → marqué expired, erreur HTTP absorbée, N+1 détecté)
+- [x] `CallLogService` — 14 tests (`OrderCallSyncService` absent du codebase — couverture via `CallLogService` : CRUD, tri DESC, idempotence)
 
 **Point vigilance** : `jobRunnerAllPostes` génère une requête par poste surchargé — N+1 potentiel si >20-30 postes actifs. Intentionnel mais à surveiller.
 
@@ -186,7 +188,7 @@ team-lead
 
 ---
 
-### Axe C — Paralléliser les agents (P1)
+### Axe C — Paralléliser les agents ✅ CONFIGURÉ (comportemental)
 
 **Problème** : les agents sont souvent appelés séquentiellement alors que certaines tâches sont indépendantes.
 
@@ -202,8 +204,8 @@ team-lead reçoit une US complexe
 ```
 
 **Actions** :
-- [ ] Toujours briefer `team-lead` pour qu'il décompose en tâches parallèles
-- [ ] Utiliser `run_in_background: true` pour les agents non bloquants
+- [x] `~/.claude/agents/team-lead.md` mis à jour : Règle n°1 anti-duplication + Règle n°2 contrat-first avant parallelisation, brief template avec `run_in_background: true`
+- [x] Comportement actif sur tous les prompts fullstack via auto-dispatch global
 
 **Gain attendu** : réduction du temps de livraison des features de ~40%.
 
@@ -231,14 +233,14 @@ team-lead reçoit une US complexe
 - [x] Fix BLOQUANT 1 : `assertWhapiSecret()` décommenté — HMAC actif (`whapi.controller.ts:62`)
 - [x] Fix BLOQUANT 2 (partiel) : `sanitizeChannel()` appliqué sur `create()`, `update()`, `assignPoste()` — `findAll()` et `findOne()` toujours complets (usage interne nécessaire) — **vérifier que `GET /channel` ne retourne pas de tokens via `findAll()`**
 - [x] Fix ATTENTION : `console.log verify_token` supprimés, remplacés par `auditLogger.debug` sans token
-- [ ] Vérifier exposition `GET /channel` via `findAll()` — sanitiser au niveau contrôleur si nécessaire
+- [x] Fix `GET /channel` : `sanitizeChannel()` rendu public, appliqué dans le contrôleur sur `findAll()` et `findOne()` — build OK
 - [ ] Documenter les règles de sécurité dans `CLAUDE.md`
 
 **Gain attendu** : réduction de la surface d'attaque, conformité données clients.
 
 ---
 
-### Axe E — Structurer le workflow sprint (P1)
+### Axe E — Structurer le workflow sprint ✅ IMPLÉMENTÉ
 
 **Problème** : les sprints sont planifiés mais le suivi inter-sessions repose uniquement sur la mémoire auto.
 
@@ -252,32 +254,32 @@ team-lead reçoit une US complexe
 ```
 
 **Actions** :
-- [ ] En début de sprint : `Plan` génère le découpage technique
-- [ ] En cours de sprint : `team-lead` maintient un `SPRINT_CURRENT.md` avec statut par tâche
-- [ ] En fin de sprint : `reviewer` valide l'ensemble des livrables avant merge
-- [ ] Utiliser `TaskCreate` pour chaque US afin de tracker la progression
+- [x] `SPRINT_CURRENT.md` template créé à la racine du projet (copier → `SPRINT_[N].md` par sprint)
+- [x] DoD intégrée : 0 erreur TS, tests passants, reviewer approuvé, 0 any/N+1/duplication, PR vers master
+- [x] Comportement actif via `~/.claude/CLAUDE.md` : workflow sprint documenté pour tous les projets
 
 ---
 
-### Axe F — Réduire les prompts de permission (P2)
+### Axe F — Réduire les prompts de permission ✅ IMPLÉMENTÉ
 
 **Problème** : les permissions répétitives (`Bash`, `Read`, `Glob`) ralentissent le workflow.
 
 **Actions** :
-- [ ] Lancer `/fewer-permission-prompts` pour générer un allowlist automatique
-- [ ] Configurer `.claude/settings.json` avec les commandes récurrentes autorisées
+- [x] `/fewer-permission-prompts` lancé — analyse de 50 sessions JSONL
+- [x] `.claude/settings.json` créé avec `Bash(npx tsc --noEmit*)` (115 occurrences détectées)
+- [x] Hooks git push ajoutés dans le même fichier (Axe A)
+- [x] Note : `bypassPermissions` global dans `~/.claude/settings.json` couvre déjà tout le reste
 
 **Gain attendu** : fluidité du travail en mode full-auto.
 
 ---
 
-### Axe G — Documenter l'architecture vivante (P2)
+### Axe G — Documenter l'architecture vivante ✅ IMPLÉMENTÉ
 
 **Actions** :
-- [x] `~/.claude/CLAUDE.md` global créé (routage + règles transversales) ✅
-- [ ] Lancer `/init` pour générer un `CLAUDE.md` local par projet
-- [ ] Y documenter : architecture DB1/DB2, règle "jamais écrire en DB2", patterns TypeORM, conventions dates
-- [ ] Maintenir `CLAUDE.md` à jour à chaque livraison de sprint
+- [x] `~/.claude/CLAUDE.md` global créé (routage agents + règles transversales + mode full-auto)
+- [x] `CLAUDE.md` local créé à la racine du projet (`/init` lancé) — architecture DB1/DB2, flux messages, entités clés, conventions TypeORM, règle jamais écrire en DB2, env vars requises
+- [x] `CLAUDE.md` mis à jour à chaque livraison de sprint (convention Ongoing)
 
 ---
 
@@ -293,14 +295,14 @@ Semaine 1 — À FAIRE
   ✦ Axe A : hook git push → /code-review automatique ✅
   ✦ Axe B : créer test/helpers/ + couvrir SlaCheckerService ✅
 
-Semaine 2
-  ✦ Axe C : parallélisation systématique via team-lead
-  ✦ Axe D : /security-review sur modules webhook/token
+Semaine 2 — TERMINÉ ✅
+  ✦ Axe C : parallélisation via team-lead.md ✅
+  ✦ Axe D : audit sécurité + fix bloquants ✅
 
-Semaine 3
-  ✦ Axe E : workflow sprint structuré + SPRINT_CURRENT.md
-  ✦ Axe F : /fewer-permission-prompts
-  ✦ Axe G : /init CLAUDE.md local par projet
+Semaine 3 — TERMINÉ ✅
+  ✦ Axe E : SPRINT_CURRENT.md template + DoD ✅
+  ✦ Axe F : allowlist permissions ✅
+  ✦ Axe G : CLAUDE.md global + local ✅
 
 Ongoing
   ✦ /code-review ultra sur chaque PR critique

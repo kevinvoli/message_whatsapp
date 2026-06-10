@@ -33,13 +33,15 @@ export class ChannelController {
   }
 
   @Get()
-  findAll() {
-    return this.communicationWhapiService.findAll();
+  async findAll() {
+    const channels = await this.communicationWhapiService.findAll();
+    return channels.map(c => this.communicationWhapiService.sanitizeChannel(c));
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.communicationWhapiService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    const channel = await this.communicationWhapiService.findOne(id);
+    return channel ? this.communicationWhapiService.sanitizeChannel(channel) : null;
   }
 
   @Patch(':id')

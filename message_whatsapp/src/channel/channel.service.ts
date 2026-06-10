@@ -551,7 +551,7 @@ export class ChannelService implements OnModuleInit {
     return !!ch?.no_close || !!ch?.poste_id;
   }
 
-  private sanitizeChannel(
+  sanitizeChannel(
     channel: WhapiChannel,
   ): Omit<WhapiChannel, 'token' | 'meta_app_secret' | 'webhook_secret' | 'verify_token'> {
     const { token: _t, meta_app_secret: _s, webhook_secret: _w, verify_token: _v, ...safe } = channel;
