@@ -64,6 +64,7 @@ import { MediaAssetModule } from 'src/media-asset/media-asset.module';
 import { MetaAdReferralModule } from 'src/meta-ad-referral/meta-ad-referral.module';
 import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 import { MediaStorageModule } from 'src/media-storage/media-storage.module';
+import { MessageRestrictionModule } from 'src/message-restriction/message-restriction.module';
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { MediaStorageModule } from 'src/media-storage/media-storage.module';
     MetaAdReferralModule,
     ChatSessionModule,
     MediaStorageModule,
+    MessageRestrictionModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

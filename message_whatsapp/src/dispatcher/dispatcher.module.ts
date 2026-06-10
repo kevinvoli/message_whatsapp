@@ -41,6 +41,7 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { ChatSession } from 'src/chat-session/entities/chat-session.entity';
 import { ChatSessionModule } from 'src/chat-session/chat-session.module';
+import { MessageRestrictionModule } from 'src/message-restriction/message-restriction.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { ChatSessionModule } from 'src/chat-session/chat-session.module';
     NotificationModule,
     WhatsappTemplateModule,
     ChatSessionModule,
+    MessageRestrictionModule,
   ],
   controllers: [DispatcherController],
   providers: [
