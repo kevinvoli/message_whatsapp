@@ -146,48 +146,53 @@ export class ConversationRestrictionService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // Filtrer les accès :
-    // 1. Exclure les convs en lecture seule (commercial bloqué, ne peut pas répondre)
-    // 2. Bootstrap : si la commerciale a déjà envoyé un msg qualifiant aujourd'hui, marquer répondu
-    const effectiveAccesses: CommercialConversationAccess[] = [];
-    for (const access of rawAccesses) {
+    // Filtrer d'abord les accès selon les règles métier (chat valide, poste, canal)
+    const candidateAccesses = rawAccesses.filter((access) => {
       const chat = chatMap.get(access.chatId);
-
-      // Exclure si fermée, convertie, en lecture seule → commercial ne peut pas répondre
+      if (!chat) return false;
       if (
-        !chat ||
         chat.status === WhatsappChatStatus.FERME ||
         (chat.status as string) === 'converti' ||
         chat.read_only
-      ) continue;
+      ) return false;
+      if (!chat.channel_id && !chat.last_msg_client_channel_id) return false;
+      if (posteId && chat.poste_id !== null && chat.poste_id !== posteId) return false;
+      return true;
+    });
 
-      // Exclure si aucun canal résolvable → commercial ne peut pas envoyer de message
-      if (!chat.channel_id && !chat.last_msg_client_channel_id) continue;
-
-      // Exclure si la conversation n'est plus sur le poste de la commerciale
-      if (posteId && chat.poste_id !== null && chat.poste_id !== posteId) continue;
-
-      // Bootstrap : vérifier si un message qualifiant existe aujourd'hui dans whatsapp_message
-      const hasQualifyingMsg = await this.messageRepository
+    // Bootstrap en une seule requête groupée
+    const effectiveAccesses: CommercialConversationAccess[] = [];
+    if (candidateAccesses.length > 0) {
+      const candidateChatIds = candidateAccesses.map((a) => a.chatId);
+      const respondedRows = await this.messageRepository
         .createQueryBuilder('msg')
-        .where('msg.chat_id = :chatId', { chatId: access.chatId })
+        .select('msg.chat_id', 'chatId')
+        .where('msg.chat_id IN (:...candidateChatIds)', { candidateChatIds })
         .andWhere('msg.commercial_id = :commercialId', { commercialId })
         .andWhere('msg.from_me = :fromMe', { fromMe: true })
         .andWhere('msg.timestamp >= :todayStart', { todayStart })
         .andWhere(`CHAR_LENGTH(COALESCE(msg.text, '')) >= :minChars`, { minChars: config.minResponseChars })
         .andWhere('msg.deletedAt IS NULL')
-        .getCount();
+        .groupBy('msg.chat_id')
+        .getRawMany<{ chatId: string }>();
 
-      if (hasQualifyingMsg > 0) {
-        // Synchroniser le cache DB pour les prochains appels
-        void this.accessRepository.update(access.id, {
-          respondedAt: new Date(),
-          responseLength: config.minResponseChars,
-        });
-        continue;
+      const respondedChatIdSet = new Set(respondedRows.map((r) => r.chatId));
+
+      const toMarkResponded = candidateAccesses.filter((a) => respondedChatIdSet.has(a.chatId));
+      if (toMarkResponded.length > 0) {
+        void this.accessRepository
+          .createQueryBuilder()
+          .update()
+          .set({ respondedAt: new Date(), responseLength: config.minResponseChars })
+          .whereInIds(toMarkResponded.map((a) => a.id))
+          .execute();
       }
 
-      effectiveAccesses.push(access);
+      for (const access of candidateAccesses) {
+        if (!respondedChatIdSet.has(access.chatId)) {
+          effectiveAccesses.push(access);
+        }
+      }
     }
 
     // Si requireLastMessageMine : filtrer les conversations dont le dernier message est from_me = true
@@ -212,7 +217,7 @@ export class ConversationRestrictionService {
     }
 
     const unrespondedCount = effectiveUnresponded.length;
-    const triggered = config.enabled && unrespondedCount >= config.maxUnrespondedConvs;
+    const triggered = config.enabled && unrespondedCount > config.maxUnrespondedConvs;
 
     // Enrichir chaque conversation non-répondue (chat déjà en cache)
     const unrespondedConversations = await Promise.all(

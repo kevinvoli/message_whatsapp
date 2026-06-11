@@ -831,6 +831,11 @@ export class WhatsappMessageGateway
       }
     }
 
+    const preCheck = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
+    if (preCheck.triggered) {
+      client.emit('restriction:status', preCheck);
+      return;
+    }
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
     const status = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
     client.emit('restriction:status', status);
