@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse } from './definitions';
+import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse, ChatReadStatus } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1552,6 +1552,14 @@ export async function getChatsLusSansReponse(
     { method: 'GET', credentials: 'include' },
   );
   return handleResponse<ChatLuSansReponse[]>(response);
+}
+
+export async function getChatReadStatus(chatId: string): Promise<ChatReadStatus> {
+    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/read-status`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<ChatReadStatus>(response);
 }
 
 export async function getPostePanelConfig(posteId: string): Promise<PostePanelConfig> {

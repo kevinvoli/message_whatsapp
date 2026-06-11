@@ -2,12 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
-import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
+import { MessageDirection, WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
 import { WhatsappPosteService } from 'src/whatsapp_poste/whatsapp_poste.service';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
+import { ChatReadStatusDto } from './dto/chat-read-status.dto';
 
 export interface PosteStats {
   poste_id: string;
@@ -296,7 +297,7 @@ export class WhatsappChatService {
           AND m.from_me = 0
           AND m.status IN ('sent', 'delivered')
       )
-      WHERE c.chat_id = $1
+      WHERE c.chat_id = ?
     `,
       [chat_id],
     );
@@ -611,6 +612,37 @@ export class WhatsappChatService {
       reopened_auto_sent: false,
       out_of_hours_auto_sent: false,
     });
+  }
+
+  async getChatReadStatus(chatId: string): Promise<ChatReadStatusDto> {
+    const lastRead = await this.messageRepository
+      .createQueryBuilder('msg')
+      .leftJoinAndSelect('msg.readByCommercial', 'commercial')
+      .where('msg.chat_id = :chatId', { chatId })
+      .andWhere('msg.direction = :dir', { dir: MessageDirection.IN })
+      .andWhere('msg.readByCommercialId IS NOT NULL')
+      .andWhere('msg.deletedAt IS NULL')
+      .orderBy('msg.readByCommercialAt', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (!lastRead || !lastRead.readByCommercialAt) {
+      return { lastReadAt: null, lastReadByName: null, hasUnrespondedRead: false };
+    }
+
+    const hasReply = await this.messageRepository
+      .createQueryBuilder('msg')
+      .where('msg.chat_id = :chatId', { chatId })
+      .andWhere('msg.direction = :dir', { dir: MessageDirection.OUT })
+      .andWhere('msg.timestamp > :readAt', { readAt: lastRead.readByCommercialAt })
+      .andWhere('msg.deletedAt IS NULL')
+      .getCount();
+
+    return {
+      lastReadAt: lastRead.readByCommercialAt,
+      lastReadByName: lastRead.readByCommercial?.name ?? null,
+      hasUnrespondedRead: hasReply === 0,
+    };
   }
 
   async lockConversation(id: string) {

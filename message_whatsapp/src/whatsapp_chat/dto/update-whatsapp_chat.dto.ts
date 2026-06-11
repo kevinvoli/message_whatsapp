@@ -1,6 +1,12 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateWhatsappChatDto } from './create-whatsapp_chat.dto';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { WhatsappChatStatus } from '../entities/whatsapp_chat.entity';
 
-export class UpdateWhatsappChatDto extends PartialType(CreateWhatsappChatDto) {
-  id: string;
+export class UpdateWhatsappChatDto {
+  @IsOptional()
+  @IsBoolean()
+  read_only?: boolean;
+
+  @IsOptional()
+  @IsEnum(WhatsappChatStatus)
+  status?: WhatsappChatStatus;
 }

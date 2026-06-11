@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { WhatsappChatService } from './whatsapp_chat.service';
 import { AdminGuard } from '../auth/admin.guard';
+import { ChatReadStatusDto } from './dto/chat-read-status.dto';
+import { UpdateWhatsappChatDto } from './dto/update-whatsapp_chat.dto';
 
 @Controller('chats')
 @UseGuards(AdminGuard)
@@ -64,13 +66,19 @@ export class WhatsappChatController {
     return this.chatService.getStatsByCommercial();
   }
 
+  // ⚠️ Doit être AVANT @Get(':chat_id') pour éviter le conflit de route
+  @Get(':chatId/read-status')
+  async getReadStatus(@Param('chatId') chatId: string): Promise<ChatReadStatusDto> {
+    return this.chatService.getChatReadStatus(chatId);
+  }
+
   @Get(':chat_id')
   async findOne(@Param('chat_id') chat_id: string) {
     return this.chatService.findBychat_id(chat_id);
   }
 
   @Patch(':chat_id')
-  async update(@Param('chat_id') chat_id: string, @Body() data: any) {
+  async update(@Param('chat_id') chat_id: string, @Body() data: UpdateWhatsappChatDto) {
     return this.chatService.update(chat_id, data);
   }
 }

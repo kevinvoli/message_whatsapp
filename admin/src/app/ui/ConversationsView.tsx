@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip, Link2 } from 'lucide-react';
-import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getPostes, getChatStatsByCommercial, patchChat, getChannels } from '@/app/lib/api';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip, Link2, Eye, AlertCircle } from 'lucide-react';
+import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getPostes, getChatStatsByCommercial, patchChat, getChannels, getChatReadStatus } from '@/app/lib/api';
 import { Spinner } from './Spinner';
-import { Channel, CommercialStats, Poste, WhatsappChat, WhatsappMessage } from '../lib/definitions';
+import { Channel, CommercialStats, Poste, WhatsappChat, WhatsappMessage, ChatReadStatus } from '../lib/definitions';
 import OutboundMessageModal from './OutboundMessageModal';
 import { resolveAdminMessageText, resolveMediaUrl } from '../lib/utils';
 import { useToast } from './ToastProvider';
 import { useRealtimePolling } from '@/app/hooks/useRealtimePolling';
-import { formatDate, formatTime, formatDateTimeWithSeconds, formatDateLong } from '@/app/lib/dateUtils';
+import { formatDate, formatTime, formatDateTimeWithSeconds, formatDateLong, formatRelativeDate } from '@/app/lib/dateUtils';
 import { Pagination } from './Pagination';
 
 const LocationMapThumb = dynamic(() => import('./LocationMapThumb'), {
@@ -78,6 +78,8 @@ export default function ConversationsView({
     const [showOutboundModal, setShowOutboundModal] = useState(false);
     const [channels, setChannels] = useState<Channel[]>([]);
 
+    const [readStatus, setReadStatus] = useState<ChatReadStatus | null>(null);
+
     // Chargement initial des postes, commerciaux et canaux (une seule fois)
     useEffect(() => {
         void getPostes().then(setPostes).catch(() => {});
@@ -91,6 +93,16 @@ export default function ConversationsView({
 
     // Reset du filtre statut quand on change de poste ou de commercial
     useEffect(() => { setStatusFilter(null); }, [selectedPosteId, selectedCommercialId]);
+
+    useEffect(() => {
+        if (!selectedChat) {
+            setReadStatus(null);
+            return;
+        }
+        getChatReadStatus(selectedChat.chat_id)
+            .then(setReadStatus)
+            .catch(() => setReadStatus(null));
+    }, [selectedChat?.chat_id]);
 
     const commerciauxForPoste = useMemo(
         () => selectedPosteId
@@ -293,8 +305,6 @@ export default function ConversationsView({
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
-        console.log("une foi ici 11111111111111111111111111");
-        
         e.preventDefault();
         // Removed: if (!messageInput.trim() || !selectedChat || !token) { return; }
         if (!messageInput.trim() || !selectedChat) { // Keep checks for messageInput and selectedChat
@@ -331,8 +341,6 @@ export default function ConversationsView({
                 throw new Error("Impossible d'envoyer: channel_id manquant pour cette conversation.");
             }
 
-            console.log("222222222222222222222222222222222222222222222222222");
-            
             const sentMessage = await sendMessage(
                 selectedChat.chat_id,
                 currentMessageText,
@@ -757,6 +765,29 @@ export default function ConversationsView({
                                         </span>
                                     )}
                                 </div>
+                                {(readStatus?.lastReadByName || readStatus?.hasUnrespondedRead || selectedChat.last_poste_message_at) && (
+                                    <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                                        {readStatus?.lastReadByName && readStatus?.lastReadAt && (
+                                            <span className="flex items-center gap-1">
+                                                <Eye className="w-3 h-3" />
+                                                Lu par <span className="font-medium text-slate-700">{readStatus.lastReadByName}</span>
+                                                · {formatRelativeDate(readStatus.lastReadAt)}
+                                            </span>
+                                        )}
+                                        {readStatus?.hasUnrespondedRead && (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-medium">
+                                                <AlertCircle className="w-3 h-3" />
+                                                Lu sans réponse
+                                            </span>
+                                        )}
+                                        {selectedChat.last_poste_message_at && (
+                                            <span className="flex items-center gap-1">
+                                                <MessageSquare className="w-3 h-3" />
+                                                Dernier msg commercial · {formatRelativeDate(selectedChat.last_poste_message_at)}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div className="ml-auto flex items-center gap-2">
                                 <button

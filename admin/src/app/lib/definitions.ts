@@ -1084,3 +1084,9 @@ export type ChatLuSansReponse = {
   last_read_at: string | null;
   last_poste_message_at: string | null;
 };
+
+export type ChatReadStatus = {
+  lastReadAt: string | null;
+  lastReadByName: string | null;
+  hasUnrespondedRead: boolean;
+};
