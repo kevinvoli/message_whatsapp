@@ -1122,6 +1122,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière activité</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lu le</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernier msg commercial</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -1149,6 +1150,9 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {formatRelativeDate(chat.last_read_at)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {chat.last_poste_message_at ? formatRelativeDate(chat.last_poste_message_at) : '—'}
                         </td>
                       </tr>
                     ))}

@@ -1422,6 +1422,7 @@ export class MetriquesService {
       .addSelect('chat.status', 'status')
       .addSelect('chat.last_activity_at', 'last_activity_at')
       .addSelect('chat.last_client_message_at', 'last_client_message_at')
+      .addSelect('chat.last_poste_message_at', 'last_poste_message_at')
       .addSelect(
         `(SELECT MAX(m_read.read_by_commercial_at)
             FROM whatsapp_message m_read
@@ -1472,9 +1473,10 @@ export class MetriquesService {
       name:                   (r['name'] as string | null) ?? '',
       contact_client:         (r['contact_client'] as string | null) ?? '',
       status:                 (r['status'] as string | null) ?? '',
-      last_activity_at:       (r['last_activity_at'] as Date | null) ?? null,
-      last_client_message_at: (r['last_client_message_at'] as Date | null) ?? null,
-      last_read_at:           (r['last_read_at'] as Date | null) ?? null,
+      last_activity_at:        (r['last_activity_at'] as Date | null) ?? null,
+      last_client_message_at:  (r['last_client_message_at'] as Date | null) ?? null,
+      last_read_at:            (r['last_read_at'] as Date | null) ?? null,
+      last_poste_message_at:   (r['last_poste_message_at'] as Date | null) ?? null,
     }));
   }
 

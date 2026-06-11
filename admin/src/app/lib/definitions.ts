@@ -1082,4 +1082,5 @@ export type ChatLuSansReponse = {
   last_activity_at: string | null;
   last_client_message_at: string | null;
   last_read_at: string | null;
+  last_poste_message_at: string | null;
 };

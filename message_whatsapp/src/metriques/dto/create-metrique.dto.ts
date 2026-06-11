@@ -561,6 +561,10 @@ export class ChatLuSansReponseDto {
   @ApiProperty({ description: 'Date de lecture la plus récente par ce commercial', required: false })
   @IsOptional()
   last_read_at: Date | null;
+
+  @ApiProperty({ description: 'Dernier message envoyé par le commercial dans ce chat', required: false })
+  @IsOptional()
+  last_poste_message_at: Date | null;
 }
 
 /** Un point horaire/journalier du graphique conversations */
