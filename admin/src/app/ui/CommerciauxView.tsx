@@ -1123,6 +1123,10 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière activité</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lu le</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernier msg commercial</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ouverture session</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fermeture session</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Relance</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -1153,6 +1157,24 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {chat.last_poste_message_at ? formatRelativeDate(chat.last_poste_message_at) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {chat.last_opened_at ? formatRelativeDate(chat.last_opened_at) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {chat.last_closed_at ? formatRelativeDate(chat.last_closed_at) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {chat.last_relaunched_at ? formatRelativeDate(chat.last_relaunched_at) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {chat.session_count > 1 ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                              {chat.session_count}
+                            </span>
+                          ) : (
+                            1
+                          )}
                         </td>
                       </tr>
                     ))}

@@ -492,6 +492,7 @@ export class DispatcherService {
         : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
       first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
+      ...(nextPoste.is_active ? { lastOpenedAt: new Date() } : {}),
     });
 
     void this.notificationService.create(
@@ -540,6 +541,7 @@ export class DispatcherService {
               status: dedicatedPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
               assigned_at: new Date(),
               first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+              ...(dedicatedPoste.is_active ? { lastOpenedAt: new Date() } : {}),
             })
             .where('id = :id AND poste_id IS NULL', { id: chat.id })
             .execute();
@@ -569,6 +571,7 @@ export class DispatcherService {
             status: readerPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
             assigned_at: new Date(),
             first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+            ...(readerPoste.is_active ? { lastOpenedAt: new Date() } : {}),
           })
           .where('id = :id AND poste_id IS NULL', { id: chat.id })
           .execute();
@@ -596,6 +599,7 @@ export class DispatcherService {
         status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
         assigned_at: new Date(),
         first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+        ...(nextPoste.is_active ? { lastOpenedAt: new Date() } : {}),
       })
       .where('id = :id AND poste_id IS NULL', { id: chat.id })
       .execute();
@@ -641,6 +645,7 @@ export class DispatcherService {
       // 15 min au lieu de 5 min — evite que toutes les conversations non repondues
       // reviennent dans le SLA checker a chaque cycle de 5 min (boucle de charge infinie)
       first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
+      ...(nextPoste.is_active ? { lastOpenedAt: new Date() } : {}),
     });
 
     const updatedChat = await this.chatRepository.findOne({
@@ -899,6 +904,7 @@ export class DispatcherService {
                 : WhatsappChatStatus.EN_ATTENTE,
               assigned_at: new Date(),
               first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
+              ...(destPoste.is_active ? { lastOpenedAt: new Date() } : {}),
             });
 
             countMap.set(srcPoste.id, (countMap.get(srcPoste.id) ?? 1) - 1);
@@ -958,6 +964,7 @@ export class DispatcherService {
           assigned_at: new Date(),
           assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
           first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
+          ...(nextAgent.is_active ? { lastOpenedAt: new Date() } : {}),
         });
 
         // Notifier l'ancien poste si la conversation lui etait deja assignee

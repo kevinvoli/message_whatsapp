@@ -1083,6 +1083,10 @@ export type ChatLuSansReponse = {
   last_client_message_at: string | null;
   last_read_at: string | null;
   last_poste_message_at: string | null;
+  last_opened_at: string | null;
+  last_closed_at: string | null;
+  last_relaunched_at: string | null;
+  session_count: number;
 };
 
 export type ChatReadStatus = {

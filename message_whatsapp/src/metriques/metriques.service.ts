@@ -1424,6 +1424,22 @@ export class MetriquesService {
       .addSelect('chat.last_client_message_at', 'last_client_message_at')
       .addSelect('chat.last_poste_message_at', 'last_poste_message_at')
       .addSelect(
+        `(SELECT cs.started_at FROM chat_session cs WHERE cs.whatsapp_chat_id = chat.id ORDER BY cs.started_at DESC LIMIT 1)`,
+        'last_opened_at',
+      )
+      .addSelect(
+        `(SELECT cs.ended_at FROM chat_session cs WHERE cs.whatsapp_chat_id = chat.id ORDER BY cs.started_at DESC LIMIT 1)`,
+        'last_closed_at',
+      )
+      .addSelect(
+        `(SELECT CASE WHEN (SELECT COUNT(*) FROM chat_session cs2 WHERE cs2.whatsapp_chat_id = chat.id) > 1 THEN cs.started_at ELSE NULL END FROM chat_session cs WHERE cs.whatsapp_chat_id = chat.id ORDER BY cs.started_at DESC LIMIT 1)`,
+        'last_relaunched_at',
+      )
+      .addSelect(
+        `(SELECT COUNT(*) FROM chat_session cs WHERE cs.whatsapp_chat_id = chat.id)`,
+        'session_count',
+      )
+      .addSelect(
         `(SELECT MAX(m_read.read_by_commercial_at)
             FROM whatsapp_message m_read
            WHERE m_read.chat_id = chat.chat_id
@@ -1477,6 +1493,10 @@ export class MetriquesService {
       last_client_message_at:  (r['last_client_message_at'] as Date | null) ?? null,
       last_read_at:            (r['last_read_at'] as Date | null) ?? null,
       last_poste_message_at:   (r['last_poste_message_at'] as Date | null) ?? null,
+      last_opened_at:          (r['last_opened_at'] as Date | null) ?? null,
+      last_closed_at:          (r['last_closed_at'] as Date | null) ?? null,
+      last_relaunched_at:      (r['last_relaunched_at'] as Date | null) ?? null,
+      session_count:           (r['session_count'] as number | null) ?? 1,
     }));
   }
 

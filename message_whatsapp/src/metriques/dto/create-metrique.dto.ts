@@ -565,6 +565,22 @@ export class ChatLuSansReponseDto {
   @ApiProperty({ description: 'Dernier message envoyé par le commercial dans ce chat', required: false })
   @IsOptional()
   last_poste_message_at: Date | null;
+
+  @ApiProperty({ description: 'Date d\'ouverture de la dernière session', required: false })
+  @IsOptional()
+  last_opened_at: Date | null;
+
+  @ApiProperty({ description: 'Date de clôture de la dernière session', required: false })
+  @IsOptional()
+  last_closed_at: Date | null;
+
+  @ApiProperty({ description: 'Date de la dernière relance (réouverture après fermeture)', required: false })
+  @IsOptional()
+  last_relaunched_at: Date | null;
+
+  @ApiProperty({ description: 'Nombre total de sessions' })
+  @IsNumber()
+  session_count: number;
 }
 
 /** Un point horaire/journalier du graphique conversations */
