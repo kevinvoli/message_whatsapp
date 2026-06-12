@@ -41,6 +41,7 @@ import { BusinessHoursService } from './business-hours.service';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { MediaAssetModule } from 'src/media-asset/media-asset.module';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { MediaAssetModule } from 'src/media-asset/media-asset.module';
     forwardRef(() => JorbsModule),
     NotificationModule,
     MediaAssetModule,
+    ChatSessionModule,
   ],
   controllers: [MessageAutoController],
   providers: [
