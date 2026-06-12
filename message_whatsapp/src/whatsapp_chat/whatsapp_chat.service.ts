@@ -9,6 +9,7 @@ import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 import { ChatReadStatusDto } from './dto/chat-read-status.dto';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 export interface PosteStats {
   poste_id: string;
@@ -47,6 +48,7 @@ export class WhatsappChatService {
     private readonly posteRepository: Repository<WhatsappPoste>,
     private readonly posteService: WhatsappPosteService,
     private readonly dataSource: DataSource,
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   /**
@@ -600,6 +602,10 @@ export class WhatsappChatService {
     }
 
     await this.chatRepository.update({ chat_id }, data);
+
+    if (data.status === WhatsappChatStatus.FERME) {
+      await this.chatSessionService.closeSessionByWhapiChatId(chat_id);
+    }
   }
 
   /**

@@ -198,6 +198,39 @@ export class ChatSessionService {
   }
 
   /**
+   * Ferme la session active d'un chat identifié par son UUID (whatsapp_chat.id).
+   * Utilisé quand on ne connaît pas le sessionId (ex : changement de statut vers FERME).
+   * Idempotent : n'affecte que la session avec ended_at IS NULL.
+   */
+  async closeSessionByChatId(whatsappChatId: string): Promise<void> {
+    await this.sessionRepo
+      .createQueryBuilder()
+      .update(ChatSession)
+      .set({ endedAt: new Date() })
+      .where('whatsapp_chat_id = :whatsappChatId', { whatsappChatId })
+      .andWhere('ended_at IS NULL')
+      .execute();
+  }
+
+  /**
+   * Ferme la session active d'un chat identifié par son chat_id Whapi (ex: 336...@c.us).
+   * Utilise une sous-requête pour éviter un aller-retour DB supplémentaire.
+   * Idempotent : n'affecte que la session avec ended_at IS NULL.
+   */
+  async closeSessionByWhapiChatId(whapiChatId: string): Promise<void> {
+    await this.sessionRepo
+      .createQueryBuilder()
+      .update(ChatSession)
+      .set({ endedAt: new Date() })
+      .where(
+        'whatsapp_chat_id IN (SELECT id FROM whatsapp_chat WHERE chat_id = :whapiChatId)',
+        { whapiChatId },
+      )
+      .andWhere('ended_at IS NULL')
+      .execute();
+  }
+
+  /**
    * Ferme une session expirée et met à jour le chat (status=fermé, read_only=false).
    * Retourne le chat_id métier (identifiant Whapi) pour l'émission du websocket.
    */
