@@ -1,6 +1,7 @@
 // front/src/lib/api.ts
 import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
 import { PanelMediaResponse } from '@/types/media-panel';
+import type { QuizTodayStatus, QuizStartResult, QuizSubmitResult, QuizAttemptResult, QuizPdf } from '@/lib/definitions';
 
 export interface MessageRestrictionConfig {
   enabled: boolean;
@@ -82,4 +83,55 @@ export async function getPanelMedia(page = 1, limit = 30): Promise<PanelMediaRes
     credentials: 'include',
   });
   return handleResponse<PanelMediaResponse>(response);
+}
+
+/** @deprecated Utiliser QuizTodayStatus depuis definitions.ts */
+export type TodaySessionResponse = QuizTodayStatus;
+
+export async function getQuizToday(): Promise<QuizTodayStatus> {
+  const response = await fetch(`${API_BASE_URL}/quiz/today`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<QuizTodayStatus>(response);
+}
+
+export async function startQuizAttempt(sessionId: string): Promise<QuizStartResult> {
+  const response = await fetch(`${API_BASE_URL}/quiz/today/start`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  return handleResponse<QuizStartResult>(response);
+}
+
+export async function submitQuizAttempt(
+  attemptId: string,
+  answers: { questionId: string; answerId: string | null; timedOut: boolean }[],
+  timedOut: boolean,
+): Promise<QuizSubmitResult> {
+  const response = await fetch(`${API_BASE_URL}/quiz/today/submit`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attemptId, answers, timedOut }),
+  });
+  return handleResponse<QuizSubmitResult>(response);
+}
+
+export async function getQuizAttemptResult(attemptId: string): Promise<QuizAttemptResult> {
+  const response = await fetch(`${API_BASE_URL}/quiz/today/result/${attemptId}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<QuizAttemptResult>(response);
+}
+
+export async function getQuizPdfs(): Promise<QuizPdf[]> {
+  const response = await fetch(`${API_BASE_URL}/quiz/pdfs`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<QuizPdf[]>(response);
 }

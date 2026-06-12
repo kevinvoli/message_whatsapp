@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse, ChatReadStatus, QuizCategory, QuizQuestion, QuizSession, QuizExemption } from './definitions';
+import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse, ChatReadStatus, QuizCategory, QuizQuestion, QuizSession, QuizExemption, QuizSessionResult, QuizPdf } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -1713,6 +1713,13 @@ export async function deleteQuizExemption(id: string): Promise<void> {
   await handleResponse<void>(res);
 }
 
+export async function getQuizSessionResults(sessionId: string): Promise<QuizSessionResult[]> {
+  const res = await fetch(`${API_BASE_URL}/quiz/admin/sessions/${encodeURIComponent(sessionId)}/results`, {
+    credentials: 'include',
+  });
+  return handleResponse<QuizSessionResult[]>(res);
+}
+
 export async function getChatReadStatus(chatId: string): Promise<ChatReadStatus> {
     const response = await fetch(`${API_BASE_URL}/chats/${chatId}/read-status`, {
         method: 'GET',
@@ -1739,4 +1746,50 @@ export async function updatePostePanelConfig(posteId: string, payload: { enabled
     if (!response.ok) {
         await handleResponse<void>(response);
     }
+}
+
+// ─── QCM Documents (PDFs) ─────────────────────────────────────────────────────
+
+export async function getQuizPdfs(): Promise<QuizPdf[]> {
+  const res = await fetch(`${API_BASE_URL}/quiz/admin/pdfs`, { credentials: 'include' });
+  return handleResponse<QuizPdf[]>(res);
+}
+
+export async function uploadQuizPdf(formData: FormData): Promise<QuizPdf> {
+  const res = await fetch(`${API_BASE_URL}/quiz/admin/pdfs`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  return handleResponse<QuizPdf>(res);
+}
+
+export async function uploadSessionPdf(sessionId: string, formData: FormData): Promise<QuizPdf> {
+  const res = await fetch(`${API_BASE_URL}/quiz/admin/sessions/${encodeURIComponent(sessionId)}/pdf`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  return handleResponse<QuizPdf>(res);
+}
+
+export async function updateQuizPdf(
+  id: string,
+  data: Partial<Pick<QuizPdf, 'allowInlineView' | 'isPermanent' | 'availableFrom' | 'availableUntil'>>,
+): Promise<QuizPdf> {
+  const res = await fetch(`${API_BASE_URL}/quiz/admin/pdfs/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  });
+  return handleResponse<QuizPdf>(res);
+}
+
+export async function deleteQuizPdf(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/quiz/admin/pdfs/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  await handleResponse<void>(res);
 }

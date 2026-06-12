@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { QuizSession } from './entities/quiz-session.entity';
 import { QuizSessionQuestion } from './entities/quiz-session-question.entity';
 import { CreateSessionDto } from './dto/create-session.dto';
@@ -141,30 +141,37 @@ export class QuizSessionService {
         continue;
       }
 
-      await this.dataSource.transaction(async (manager) => {
-        const newSession = manager.create(QuizSession, {
-          title: source.title,
-          sessionDate: date,
-          isActive: source.isActive,
-          passingScore: source.passingScore,
-          maxAttempts: source.maxAttempts,
-          totalTimeMinutes: source.totalTimeMinutes,
+      try {
+        await this.dataSource.transaction(async (manager) => {
+          const newSession = manager.create(QuizSession, {
+            title: source.title,
+            sessionDate: date,
+            isActive: source.isActive,
+            passingScore: source.passingScore,
+            maxAttempts: source.maxAttempts,
+            totalTimeMinutes: source.totalTimeMinutes,
+          });
+          const saved = await manager.save(QuizSession, newSession);
+
+          if (sourceQuestions.length > 0) {
+            const newQuestions = sourceQuestions.map((sq) =>
+              manager.create(QuizSessionQuestion, {
+                sessionId: saved.id,
+                questionId: sq.questionId,
+                position: sq.position,
+              }),
+            );
+            await manager.save(QuizSessionQuestion, newQuestions);
+          }
         });
-        const saved = await manager.save(QuizSession, newSession);
-
-        if (sourceQuestions.length > 0) {
-          const newQuestions = sourceQuestions.map((sq) =>
-            manager.create(QuizSessionQuestion, {
-              sessionId: saved.id,
-              questionId: sq.questionId,
-              position: sq.position,
-            }),
-          );
-          await manager.save(QuizSessionQuestion, newQuestions);
+        created.push(date);
+      } catch (err) {
+        if (err instanceof QueryFailedError && (err as QueryFailedError & { code: string }).code === 'ER_DUP_ENTRY') {
+          skipped.push(date);
+        } else {
+          throw err;
         }
-      });
-
-      created.push(date);
+      }
     }
 
     return { created, skipped };

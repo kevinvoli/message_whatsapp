@@ -15,8 +15,20 @@ import {
   updateQuizSession,
   deleteQuizSession,
   duplicateQuizSession,
+  getQuizPdfs,
+  uploadQuizPdf,
+  updateQuizPdf,
+  deleteQuizPdf,
+  getQuizExemptions,
+  createQuizExemption,
+  deleteQuizExemption,
+  getQuizSessionResults,
+  getCommerciaux,
+  getPostes,
 } from '@/app/lib/api';
-import { QuizCategory, QuizQuestion, QuizSession } from '@/app/lib/definitions';
+import { QuizCategory, QuizQuestion, QuizSession, QuizPdf, QuizExemption, QuizSessionResult } from '@/app/lib/definitions';
+import { Commercial, Poste } from '@/app/lib/definitions';
+import { formatDateShort, formatDate } from '@/app/lib/dateUtils';
 import { useToast } from '@/app/ui/ToastProvider';
 import { logger } from '@/app/lib/logger';
 
@@ -1108,6 +1120,765 @@ function SessionsTab() {
   );
 }
 
+// ─── Onglet Documents ─────────────────────────────────────────────────────────
+
+interface PdfFormState {
+  file: File | null;
+  isPermanent: boolean;
+  allowInlineView: boolean;
+  availableFrom: string;
+  availableUntil: string;
+}
+
+function emptyPdfForm(): PdfFormState {
+  return {
+    file: null,
+    isPermanent: true,
+    allowInlineView: false,
+    availableFrom: '',
+    availableUntil: '',
+  };
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+function DocumentsTab() {
+  const { addToast } = useToast();
+  const [pdfs, setPdfs] = useState<QuizPdf[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingPdf, setEditingPdf] = useState<QuizPdf | null>(null);
+  const [form, setForm] = useState<PdfFormState>(emptyPdfForm());
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setPdfs(await getQuizPdfs());
+    } catch (e) {
+      logger.error('getQuizPdfs', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors du chargement des documents' });
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const openAdd = () => {
+    setEditingPdf(null);
+    setForm(emptyPdfForm());
+    setShowModal(true);
+  };
+
+  const openEdit = (pdf: QuizPdf) => {
+    setEditingPdf(pdf);
+    setForm({
+      file: null,
+      isPermanent: pdf.isPermanent,
+      allowInlineView: pdf.allowInlineView,
+      availableFrom: pdf.availableFrom ?? '',
+      availableUntil: pdf.availableUntil ?? '',
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingPdf(null);
+    setForm(emptyPdfForm());
+  };
+
+  const handleSubmit = async () => {
+    if (!editingPdf && !form.file) {
+      addToast({ type: 'error', message: 'Veuillez sélectionner un fichier PDF' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (editingPdf) {
+        await updateQuizPdf(editingPdf.id, {
+          isPermanent: form.isPermanent,
+          allowInlineView: form.allowInlineView,
+          availableFrom: form.isPermanent ? null : (form.availableFrom || null),
+          availableUntil: form.isPermanent ? null : (form.availableUntil || null),
+        });
+        addToast({ type: 'success', message: 'Document mis à jour' });
+      } else {
+        const fd = new FormData();
+        fd.append('file', form.file as File);
+        fd.append('allowInlineView', String(form.allowInlineView));
+        fd.append('isPermanent', String(form.isPermanent));
+        if (!form.isPermanent && form.availableFrom) fd.append('availableFrom', form.availableFrom);
+        if (!form.isPermanent && form.availableUntil) fd.append('availableUntil', form.availableUntil);
+        await uploadQuizPdf(fd);
+        addToast({ type: 'success', message: 'Document ajouté' });
+      }
+      closeModal();
+      void load();
+    } catch (e) {
+      logger.error('saveQuizPdf', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors de la sauvegarde' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (pdf: QuizPdf) => {
+    if (!window.confirm(`Supprimer ce PDF ?`)) return;
+    try {
+      await deleteQuizPdf(pdf.id);
+      addToast({ type: 'success', message: 'Document supprimé' });
+      void load();
+    } catch (e) {
+      logger.error('deleteQuizPdf', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors de la suppression' });
+    }
+  };
+
+  const handleToggleInlineView = async (pdf: QuizPdf) => {
+    try {
+      const updated = await updateQuizPdf(pdf.id, { allowInlineView: !pdf.allowInlineView });
+      setPdfs((prev) => prev.map((p) => p.id === pdf.id ? updated : p));
+    } catch (e) {
+      logger.error('toggleInlineView', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors de la mise à jour' });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-500">{pdfs.length} document(s)</span>
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4" />
+          Ajouter un PDF global
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-gray-400 text-sm">Chargement...</div>
+        ) : pdfs.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">Aucun document</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Nom du fichier</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Lié à</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Vue en ligne</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Accessibilité</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Du</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Au</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Taille</th>
+                  <th className="px-4 py-3 font-medium text-gray-600 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pdfs.map((pdf) => (
+                  <tr key={pdf.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-900 max-w-[200px] truncate" title={pdf.originalName}>
+                      {pdf.originalName}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {pdf.sessionId ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700">
+                          Session liée
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Global</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggleInlineView(pdf)}
+                        aria-label={pdf.allowInlineView ? 'Désactiver vue en ligne' : 'Activer vue en ligne'}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          pdf.allowInlineView ? 'bg-blue-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            pdf.allowInlineView ? 'translate-x-4' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      {pdf.isPermanent ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-50 text-green-700">
+                          Permanent
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-orange-50 text-orange-700">
+                          Fenêtre de dates
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {pdf.availableFrom ? formatDateShort(pdf.availableFrom) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {pdf.availableUntil ? formatDateShort(pdf.availableUntil) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {formatFileSize(pdf.fileSize)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => openEdit(pdf)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Modifier"
+                          aria-label={`Modifier ${pdf.originalName}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(pdf)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Supprimer"
+                          aria-label={`Supprimer ${pdf.originalName}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">
+                {editingPdf ? 'Modifier le document' : 'Ajouter un PDF global'}
+              </h3>
+              <button
+                onClick={closeModal}
+                className="p-1 text-gray-400 hover:text-gray-600"
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {!editingPdf && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Fichier PDF</label>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))
+                  }
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:text-xs file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.allowInlineView}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setForm((f) => ({ ...f, allowInlineView: e.target.checked }))
+                  }
+                  className="rounded"
+                />
+                Autoriser la vue en ligne
+              </label>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Accessibilité</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setForm((f) => ({ ...f, isPermanent: true }))}
+                  className={`flex-1 py-2 text-xs rounded border transition-colors ${
+                    form.isPermanent
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  Permanent
+                </button>
+                <button
+                  onClick={() => setForm((f) => ({ ...f, isPermanent: false }))}
+                  className={`flex-1 py-2 text-xs rounded border transition-colors ${
+                    !form.isPermanent
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  Fenêtre de dates
+                </button>
+              </div>
+            </div>
+
+            {!form.isPermanent && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Disponible du</label>
+                  <input
+                    type="date"
+                    value={form.availableFrom}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setForm((f) => ({ ...f, availableFrom: e.target.value }))
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Au</label>
+                  <input
+                    type="date"
+                    value={form.availableUntil}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setForm((f) => ({ ...f, availableUntil: e.target.value }))
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet Exemptions ────────────────────────────────────────────────────────
+
+interface ExemptionFormState {
+  scope: 'commercial' | 'poste';
+  commercialId: string;
+  posteId: string;
+  reason: string;
+}
+
+function emptyExemptionForm(): ExemptionFormState {
+  return { scope: 'commercial', commercialId: '', posteId: '', reason: '' };
+}
+
+function ExemptionsTab() {
+  const { addToast } = useToast();
+  const [exemptions, setExemptions] = useState<QuizExemption[]>([]);
+  const [commerciaux, setCommerciaux] = useState<Commercial[]>([]);
+  const [postes, setPostes] = useState<Poste[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState<ExemptionFormState>(emptyExemptionForm());
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [exs, coms, psts] = await Promise.all([
+        getQuizExemptions(),
+        getCommerciaux(),
+        getPostes(),
+      ]);
+      setExemptions(exs);
+      setCommerciaux(coms);
+      setPostes(psts);
+    } catch (e) {
+      logger.error('loadExemptions', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors du chargement des exemptions' });
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Supprimer cette exemption ?')) return;
+    try {
+      await deleteQuizExemption(id);
+      addToast({ type: 'success', message: 'Exemption supprimée' });
+      void load();
+    } catch (e) {
+      logger.error('deleteQuizExemption', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors de la suppression' });
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (form.scope === 'commercial' && !form.commercialId) {
+      addToast({ type: 'error', message: 'Veuillez sélectionner un commercial' });
+      return;
+    }
+    if (form.scope === 'poste' && !form.posteId) {
+      addToast({ type: 'error', message: 'Veuillez sélectionner un poste' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createQuizExemption({
+        scope: form.scope,
+        commercialId: form.scope === 'commercial' ? form.commercialId : undefined,
+        posteId: form.scope === 'poste' ? form.posteId : undefined,
+        reason: form.reason.trim() || undefined,
+      });
+      addToast({ type: 'success', message: 'Exemption créée' });
+      setShowModal(false);
+      setForm(emptyExemptionForm());
+      void load();
+    } catch (e) {
+      logger.error('createQuizExemption', { error: e });
+      addToast({ type: 'error', message: "Erreur lors de la création" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resolveLabel = (ex: QuizExemption): string => {
+    if (ex.scope === 'commercial') {
+      if (ex.commercial) return ex.commercial.name;
+      const found = commerciaux.find((c) => c.id === ex.commercialId);
+      return found?.name ?? ex.commercialId ?? '—';
+    }
+    if (ex.poste) return ex.poste.name;
+    const found = postes.find((p) => p.id === ex.posteId);
+    return found?.name ?? ex.posteId ?? '—';
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-500">{exemptions.length} exemption(s) active(s)</span>
+        <button
+          onClick={() => { setForm(emptyExemptionForm()); setShowModal(true); }}
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4" />
+          Ajouter une exemption
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-gray-400 text-sm">Chargement...</div>
+        ) : exemptions.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">Aucune exemption active</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Nom</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Raison</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Date création</th>
+                <th className="px-4 py-3 font-medium text-gray-600 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {exemptions.map((ex) => (
+                <tr key={ex.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    {ex.scope === 'commercial' ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-medium">
+                        Commercial
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-50 text-purple-700 font-medium">
+                        Poste
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-900">{resolveLabel(ex)}</td>
+                  <td className="px-4 py-3 text-gray-600 max-w-xs truncate" title={ex.reason ?? undefined}>
+                    {ex.reason ?? <span className="text-gray-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{formatDateShort(ex.createdAt)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleDelete(ex.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Supprimer"
+                      aria-label={`Supprimer l'exemption`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">Nouvelle exemption</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Type d'exemption</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setForm((f) => ({ ...f, scope: 'commercial', posteId: '' }))}
+                  className={`flex-1 py-2 text-xs rounded border transition-colors ${
+                    form.scope === 'commercial'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  Commercial
+                </button>
+                <button
+                  onClick={() => setForm((f) => ({ ...f, scope: 'poste', commercialId: '' }))}
+                  className={`flex-1 py-2 text-xs rounded border transition-colors ${
+                    form.scope === 'poste'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}
+                >
+                  Poste
+                </button>
+              </div>
+            </div>
+
+            {form.scope === 'commercial' && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Commercial</label>
+                <select
+                  value={form.commercialId}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                    setForm((f) => ({ ...f, commercialId: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Sélectionner un commercial"
+                >
+                  <option value="">Sélectionner...</option>
+                  {commerciaux.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {form.scope === 'poste' && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Poste</label>
+                <select
+                  value={form.posteId}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                    setForm((f) => ({ ...f, posteId: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Sélectionner un poste"
+                >
+                  <option value="">Sélectionner...</option>
+                  {postes.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Raison (optionnel)</label>
+              <input
+                type="text"
+                value={form.reason}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setForm((f) => ({ ...f, reason: e.target.value }))
+                }
+                placeholder="Motif de l'exemption..."
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet Résultats ──────────────────────────────────────────────────────────
+
+function ResultsTab() {
+  const { addToast } = useToast();
+  const [sessions, setSessions] = useState<QuizSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [results, setResults] = useState<QuizSessionResult[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingResults, setLoadingResults] = useState(false);
+
+  const loadSessions = useCallback(async () => {
+    setLoadingSessions(true);
+    try {
+      const all = await getQuizSessions();
+      const sorted = [...all].sort(
+        (a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime(),
+      );
+      setSessions(sorted);
+    } catch (e) {
+      logger.error('loadSessionsForResults', { error: e });
+      addToast({ type: 'error', message: 'Erreur lors du chargement des sessions' });
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { void loadSessions(); }, [loadSessions]);
+
+  useEffect(() => {
+    if (!selectedSessionId) {
+      setResults([]);
+      return;
+    }
+    setLoadingResults(true);
+    getQuizSessionResults(selectedSessionId)
+      .then(setResults)
+      .catch((e: unknown) => {
+        logger.error('loadSessionResults', { error: e });
+        addToast({ type: 'error', message: 'Erreur lors du chargement des résultats' });
+      })
+      .finally(() => setLoadingResults(false));
+  }, [selectedSessionId, addToast]);
+
+  const formatScore = (result: QuizSessionResult): string => {
+    if (result.bestScore == null) return '—';
+    if (result.maxScore == null) return String(result.bestScore);
+    const pct = Math.round((result.bestScore / result.maxScore) * 100);
+    return `${result.bestScore}/${result.maxScore} — ${pct}%`;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <label className="block text-xs text-gray-500 mb-1">Session</label>
+        {loadingSessions ? (
+          <div className="text-sm text-gray-400">Chargement des sessions...</div>
+        ) : (
+          <select
+            value={selectedSessionId}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              setSelectedSessionId(e.target.value)
+            }
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Sélectionner une session"
+          >
+            <option value="">Sélectionner une session...</option>
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {formatDateShort(s.sessionDate)} — {s.title}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {selectedSessionId && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {loadingResults ? (
+            <div className="p-8 text-center text-gray-400 text-sm">Chargement des résultats...</div>
+          ) : results.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 text-sm">Aucun résultat pour cette session</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Commercial</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Poste</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Tentatives</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Meilleur score</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Réussi</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Complété le</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {results.map((r) => (
+                  <tr key={r.commercialId} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-900">{r.commercialName}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.posteName}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.attemptsCount}</td>
+                    <td className="px-4 py-3 text-gray-700 font-medium">{formatScore(r)}</td>
+                    <td className="px-4 py-3">
+                      {r.isPassed === null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : r.isPassed ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-50 text-green-700 font-medium">
+                          Réussi
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-50 text-red-700 font-medium">
+                          Echoué
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{formatDate(r.completedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Composant principal ───────────────────────────────────────────────────────
 
 export default function QuizView() {
@@ -1118,6 +1889,9 @@ export default function QuizView() {
       case 'categories': return <CategoriesTab />;
       case 'questions': return <QuestionsTab />;
       case 'sessions': return <SessionsTab />;
+      case 'documents': return <DocumentsTab />;
+      case 'exemptions': return <ExemptionsTab />;
+      case 'resultats': return <ResultsTab />;
       default: return <ComingSoonPlaceholder />;
     }
   };

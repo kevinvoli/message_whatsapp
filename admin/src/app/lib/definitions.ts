@@ -1144,5 +1144,30 @@ export type QuizExemption = {
   commercialId: string | null;
   posteId: string | null;
   reason: string | null;
+  commercial?: { id: string; name: string };
+  poste?: { id: string; name: string };
   createdAt: string;
 };
+
+export interface QuizSessionResult {
+  commercialId: string;
+  commercialName: string;
+  posteName: string;
+  attemptsCount: number;
+  bestScore: number | null;
+  maxScore: number | null;
+  isPassed: boolean | null;
+  completedAt: string | null;
+}
+
+export interface QuizPdf {
+  id: string;
+  sessionId: string | null;
+  originalName: string;
+  fileSize: number;
+  allowInlineView: boolean;
+  isPermanent: boolean;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  uploadedAt: string;
+}
