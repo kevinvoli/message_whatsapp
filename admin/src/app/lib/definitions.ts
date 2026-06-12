@@ -48,7 +48,8 @@ export type ViewMode =
   | 'channel-stats'
   | 'canaux-dedies'
   | 'campagnes-meta'
-  | 'galerie-media';
+  | 'galerie-media'
+  | 'quiz';
 
 export type NavigationItem = {
   id: ViewMode;
@@ -1093,4 +1094,55 @@ export type ChatReadStatus = {
   lastReadAt: string | null;
   lastReadByName: string | null;
   hasUnrespondedRead: boolean;
+};
+
+// ============================================
+// QCM FORMATION
+// ============================================
+
+export type QuizCategory = {
+  id: string;
+  name: string;
+  color: string | null;
+  createdAt: string;
+};
+
+export type QuizAnswer = {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  position: number;
+};
+
+export type QuizQuestion = {
+  id: string;
+  categoryId: string;
+  category?: QuizCategory;
+  text: string;
+  points: number;
+  timeLimitSeconds: number | null;
+  isActive: boolean;
+  answers: QuizAnswer[];
+  createdAt: string;
+};
+
+export type QuizSession = {
+  id: string;
+  title: string;
+  sessionDate: string;
+  isActive: boolean;
+  passingScore: number | null;
+  maxAttempts: number;
+  totalTimeMinutes: number | null;
+  questionCount?: number;
+  createdAt: string;
+};
+
+export type QuizExemption = {
+  id: string;
+  scope: 'commercial' | 'poste';
+  commercialId: string | null;
+  posteId: string | null;
+  reason: string | null;
+  createdAt: string;
 };

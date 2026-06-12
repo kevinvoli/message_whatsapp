@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, BarChart2, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Layout, Link2, Library, Lock, Megaphone, HardDrive } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, BarChart2, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Layout, Link2, Library, Lock, Megaphone, HardDrive, GraduationCap } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -61,6 +61,13 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'galerie-media', name: 'Galerie médias', icon: HardDrive, badge: null },
       { id: 'clients', name: 'Clients', icon: Briefcase, badge: null },
       { id: 'rapports', name: 'Rapports', icon: FileText, badge: null },
+    ],
+  },
+  {
+    label: 'Formation',
+    icon: GraduationCap,
+    items: [
+      { id: 'quiz', name: 'QCM Formation', icon: GraduationCap, badge: null },
     ],
   },
   {

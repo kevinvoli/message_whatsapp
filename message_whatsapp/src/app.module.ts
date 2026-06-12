@@ -43,6 +43,7 @@ import { MediaAssetModule } from './media-asset/media-asset.module';
 import { ConversationRestrictionModule } from './conversation-restriction/conversation-restriction.module';
 import { MediaStorageModule } from './media-storage/media-storage.module';
 import { MessageRestrictionModule } from './message-restriction/message-restriction.module';
+import { QuizModule } from './quiz/quiz.module';
 
 @Module({
   imports: [
@@ -124,6 +125,7 @@ import { MessageRestrictionModule } from './message-restriction/message-restrict
     ConversationRestrictionModule,
     MediaStorageModule,
     MessageRestrictionModule,
+    QuizModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],
