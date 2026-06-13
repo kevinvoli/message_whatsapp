@@ -29,7 +29,7 @@ export class QuizSession {
   @Column({ name: 'max_attempts', type: 'tinyint', default: 1 })
   maxAttempts: number;
 
-  @Column({ name: 'total_time_minutes', nullable: true })
+  @Column({ name: 'total_time_minutes', type: 'int', nullable: true })
   totalTimeMinutes: number | null;
 
   @CreateDateColumn({ name: 'created_at' })

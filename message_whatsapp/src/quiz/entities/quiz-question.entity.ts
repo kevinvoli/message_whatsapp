@@ -30,7 +30,7 @@ export class QuizQuestion {
   @Column({ name: 'points', type: 'decimal', precision: 5, scale: 2, default: 1 })
   points: number;
 
-  @Column({ name: 'time_limit_seconds', nullable: true })
+  @Column({ name: 'time_limit_seconds', type: 'int', nullable: true })
   timeLimitSeconds: number | null;
 
   @Column({ name: 'is_active', type: 'tinyint', default: 1 })

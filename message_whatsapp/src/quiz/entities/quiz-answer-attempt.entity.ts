@@ -17,7 +17,7 @@ export class QuizAnswerAttempt {
   @Column({ name: 'question_id' })
   questionId: string;
 
-  @Column({ name: 'answer_id', nullable: true })
+  @Column({ name: 'answer_id', type: 'varchar', length: 36, nullable: true })
   answerId: string | null;
 
   @Column({ name: 'is_correct', type: 'tinyint', default: 0 })

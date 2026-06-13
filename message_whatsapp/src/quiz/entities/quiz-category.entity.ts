@@ -16,7 +16,7 @@ export class QuizCategory {
   @Column({ name: 'name', length: 100 })
   name: string;
 
-  @Column({ name: 'color', length: 7, nullable: true })
+  @Column({ name: 'color', type: 'varchar', length: 7, nullable: true })
   color: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

@@ -14,13 +14,13 @@ export class QuizExemption {
   @Column({ name: 'scope', type: 'enum', enum: ['commercial', 'poste'] })
   scope: 'commercial' | 'poste';
 
-  @Column({ name: 'commercial_id', nullable: true })
+  @Column({ name: 'commercial_id', type: 'varchar', length: 36, nullable: true })
   commercialId: string | null;
 
-  @Column({ name: 'poste_id', nullable: true })
+  @Column({ name: 'poste_id', type: 'varchar', length: 36, nullable: true })
   posteId: string | null;
 
-  @Column({ name: 'reason', length: 255, nullable: true })
+  @Column({ name: 'reason', type: 'varchar', length: 255, nullable: true })
   reason: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

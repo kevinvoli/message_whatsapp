@@ -17,7 +17,7 @@ export class QuizPdf {
   @JoinColumn({ name: 'session_id' })
   session: QuizSession | null;
 
-  @Column({ name: 'session_id', nullable: true })
+  @Column({ name: 'session_id', type: 'varchar', length: 36, nullable: true })
   sessionId: string | null;
 
   @Column({ name: 'original_name', length: 255 })
