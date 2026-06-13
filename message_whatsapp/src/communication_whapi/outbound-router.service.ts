@@ -439,13 +439,19 @@ export class OutboundRouterService {
       OutboundRouterService.name,
     );
 
-    // Transcoder WebM → OGG pour Whapi (WhatsApp ne lit pas WebM)
+    // Transcoder WebM/OGG/Opus → OGG pour Whapi (WhatsApp ne lit pas WebM brut ni OGG Firefox sans recodage)
     let whapiBuffer = data.mediaBuffer;
     let whapiMime = data.mimeType;
     let whapiFileName = data.fileName;
-    if (data.mediaType === 'audio' && data.mimeType.split(';')[0].trim().toLowerCase() === 'audio/webm') {
+    const normalizedWhapi = data.mimeType.split(';')[0].trim().toLowerCase();
+    if (
+      data.mediaType === 'audio' &&
+      (normalizedWhapi === 'audio/webm' ||
+        normalizedWhapi === 'audio/ogg' ||
+        normalizedWhapi === 'audio/opus')
+    ) {
       try {
-        whapiBuffer = await this.metaService.transcodeWebmToOgg(whapiBuffer);
+        whapiBuffer = await this.metaService.transcodeWebmToOgg(whapiBuffer, normalizedWhapi);
         whapiMime = 'audio/ogg';
         whapiFileName = data.fileName.replace(/\.[^.]+$/, '') + '.ogg';
       } catch (err) {

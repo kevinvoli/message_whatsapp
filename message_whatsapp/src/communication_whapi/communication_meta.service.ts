@@ -136,9 +136,14 @@ export class CommunicationMetaService {
     let fileName = data.fileName;
 
     const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
-    if (data.mediaType === 'audio' && normalizedMime === 'audio/webm') {
+    if (
+      data.mediaType === 'audio' &&
+      (normalizedMime === 'audio/webm' ||
+        normalizedMime === 'audio/ogg' ||
+        normalizedMime === 'audio/opus')
+    ) {
       try {
-        mediaBuffer = await this.transcodeWebmToOgg(mediaBuffer);
+        mediaBuffer = await this.transcodeWebmToOgg(mediaBuffer, normalizedMime);
         mimeType = 'audio/ogg';
         fileName = fileName.replace(/\.[^.]+$/, '') + '.ogg';
       } catch (error) {
@@ -430,9 +435,14 @@ export class CommunicationMetaService {
     }
   }
 
-  public async transcodeWebmToOgg(input: Buffer): Promise<Buffer> {
+  public async transcodeWebmToOgg(input: Buffer, inputMime = 'audio/webm'): Promise<Buffer> {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-audio-'));
-    const inputPath = path.join(tmpDir, 'input.webm');
+    const ext = inputMime.startsWith('audio/ogg')
+      ? 'ogg'
+      : inputMime.startsWith('audio/opus')
+        ? 'opus'
+        : 'webm';
+    const inputPath = path.join(tmpDir, `input.${ext}`);
     const outputPath = path.join(tmpDir, 'output.ogg');
 
     fs.writeFileSync(inputPath, input);
