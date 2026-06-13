@@ -17,8 +17,8 @@ import {
   Res,
   NotFoundException,
 } from '@nestjs/common';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, createReadStream } from 'fs';
+import { join, extname } from 'path';
 import { WhapiOutboundError } from 'src/communication_whapi/errors/whapi-outbound.error';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
@@ -419,6 +419,7 @@ export class WhatsappMessageController {
   async streamMetaMedia(
     @Param('providerMediaId') providerMediaId: string,
     @Query('channelId') channelId: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     if (!providerMediaId) {
@@ -430,17 +431,16 @@ export class WhatsappMessageController {
       where: { provider_media_id: providerMediaId, provider: 'meta' },
     });
 
-    // Priorité 1 : copie locale disponible ET fichier présent sur disque → redirect
+    // Priorité 1 : copie locale disponible ET fichier présent sur disque → streaming
     if (media?.local_url && media.local_path) {
-      try {
-        const stat = statSync(media.local_path);
-        if (stat.isFile()) return res.redirect(302, media.local_url);
-      } catch {
-        // Fichier disparu du disque — réinitialiser et retélécharger via proxy
-        await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
-        media.local_url = null;
-        media.local_path = null;
+      const absolutePath = join(process.cwd(), media.local_path);
+      if (existsSync(absolutePath)) {
+        const mimeType = media.mime_type ?? this.guessMimeFromPath(media.local_path);
+        return this.streamLocalMedia(media.local_path, mimeType, req, res);
       }
+      await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
+      media.local_url = null;
+      media.local_path = null;
     }
 
     // Cache disque : évite de rappeler l'API Meta à chaque requête.
@@ -536,6 +536,7 @@ export class WhatsappMessageController {
   async streamWhapiMedia(
     @Param('messageId') messageId: string,
     @Query('channelId') channelId: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     if (!messageId) {
@@ -548,16 +549,16 @@ export class WhatsappMessageController {
       relations: ['message'],
     });
 
-    // Priorité 1 : copie locale disponible ET fichier présent sur disque → redirect
+    // Priorité 1 : copie locale disponible ET fichier présent sur disque → streaming
     if (media?.local_url && media.local_path) {
-      try {
-        const stat = statSync(media.local_path);
-        if (stat.isFile()) return res.redirect(302, media.local_url);
-      } catch {
-        await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
-        media.local_url = null;
-        media.local_path = null;
+      const absolutePath = join(process.cwd(), media.local_path);
+      if (existsSync(absolutePath)) {
+        const mimeType = media.mime_type ?? this.guessMimeFromPath(media.local_path);
+        return this.streamLocalMedia(media.local_path, mimeType, req, res);
       }
+      await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
+      media.local_url = null;
+      media.local_path = null;
     }
 
     // Résolution du channelId depuis la DB si absent du query string
@@ -622,16 +623,16 @@ export class WhatsappMessageController {
       relations: ['message'],
     });
 
-    // Priorité 1 : copie locale disponible ET fichier présent sur disque → redirect
+    // Priorité 1 : copie locale disponible ET fichier présent sur disque → streaming
     if (media?.local_url && media.local_path) {
-      try {
-        const stat = statSync(media.local_path);
-        if (stat.isFile()) return res.redirect(302, media.local_url);
-      } catch {
-        await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
-        media.local_url = null;
-        media.local_path = null;
+      const absolutePath = join(process.cwd(), media.local_path);
+      if (existsSync(absolutePath)) {
+        const mimeType = media.mime_type ?? this.guessMimeFromPath(media.local_path);
+        return this.streamLocalMedia(media.local_path, mimeType, req, res);
       }
+      await this.mediaRepository.update(media.id, { local_url: null, local_path: null, downloaded_at: null });
+      media.local_url = null;
+      media.local_path = null;
     }
 
     const resolvedChannelId =
@@ -842,6 +843,60 @@ export class WhatsappMessageController {
     }
 
     return directUrl;
+  }
+
+  private guessMimeFromPath(localPath: string): string {
+    const ext = extname(localPath).toLowerCase();
+    const map: Record<string, string> = {
+      '.ogg': 'audio/ogg',
+      '.mp3': 'audio/mpeg',
+      '.mp4': 'audio/mp4',
+      '.m4a': 'audio/mp4',
+      '.webm': 'audio/webm',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.pdf': 'application/pdf',
+    };
+    return map[ext] ?? 'application/octet-stream';
+  }
+
+  private streamLocalMedia(
+    localPath: string,
+    mimeType: string,
+    req: Request,
+    res: Response,
+  ): void {
+    const absolutePath = join(process.cwd(), localPath);
+    const stat = statSync(absolutePath);
+    const fileSize = stat.size;
+    const rangeHeader = req.headers['range'] as string | undefined;
+
+    const contentType = mimeType.startsWith('audio/ogg')
+      ? 'audio/ogg; codecs=opus'
+      : mimeType || 'application/octet-stream';
+
+    if (rangeHeader) {
+      const [startStr, endStr] = rangeHeader.replace('bytes=', '').split('-');
+      const start = parseInt(startStr, 10);
+      const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+      res.status(206).set({
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': String(chunkSize),
+        'Content-Type': contentType,
+      });
+      createReadStream(absolutePath, { start, end }).pipe(res);
+    } else {
+      res.status(200).set({
+        'Content-Length': String(fileSize),
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+        'Content-Disposition': 'inline',
+      });
+      createReadStream(absolutePath).pipe(res);
+    }
   }
 
   @Get()

@@ -430,12 +430,11 @@ export class CommunicationMetaService {
   private async transcodeWebmToOgg(input: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', [
-        '-i',
-        'pipe:0',
-        '-f',
-        'ogg',
-        '-acodec',
-        'libopus',
+        '-i', 'pipe:0',
+        '-ar', '48000',
+        '-b:a', '64k',
+        '-f', 'ogg',
+        '-acodec', 'libopus',
         '-vn',
         'pipe:1',
       ]);
@@ -453,12 +452,13 @@ export class CommunicationMetaService {
       });
 
       ffmpeg.on('close', (code) => {
-        if (code === 0 && chunks.length > 0) {
-          resolve(Buffer.concat(chunks));
+        const output = Buffer.concat(chunks);
+        if (code === 0 && output.length >= 512) {
+          resolve(output);
         } else {
           reject(
             new Error(
-              stderr || `ffmpeg exited with code ${code ?? 'unknown'}`,
+              `ffmpeg exit=${code ?? 'null'} output_size=${output.length}B stderr=${stderr.slice(0, 500)}`,
             ),
           );
         }
