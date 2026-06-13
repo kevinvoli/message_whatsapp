@@ -267,9 +267,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
       const supportedMimeTypes = [
         'audio/ogg;codecs=opus',
         'audio/ogg',
-        'audio/opus',
         'audio/webm;codecs=opus',
         'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
       ];
       const mimeType = supportedMimeTypes.find((type) =>
         MediaRecorder.isTypeSupported(type),
@@ -300,11 +301,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
           setIsUploading(true);
           try {
             const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
-            const extension = normalizedMime === 'audio/webm'
-              ? 'webm'
-              : normalizedMime === 'audio/opus'
-                ? 'opus'
-                : 'ogg';
+            const extension = normalizedMime === 'audio/webm' ? 'webm'
+                            : normalizedMime === 'audio/opus'  ? 'opus'
+                            : normalizedMime === 'audio/mp4'   ? 'mp4'
+                            : 'ogg';
             await uploadMedia(chat_id, blob, `vocal_${Date.now()}.${extension}`, undefined, capturedDuration);
             logger.debug('Voice message uploaded', { chat_id });
           } catch (err) {

@@ -136,19 +136,30 @@ export class CommunicationMetaService {
     let fileName = data.fileName;
 
     const normalizedMime = mimeType.split(';')[0].trim().toLowerCase();
-    if (
-      data.mediaType === 'audio' &&
-      (normalizedMime === 'audio/webm' ||
-        normalizedMime === 'audio/ogg' ||
-        normalizedMime === 'audio/opus')
-    ) {
+    if (data.mediaType === 'audio') {
       try {
-        mediaBuffer = await this.transcodeWebmToOgg(mediaBuffer, normalizedMime);
+        if (normalizedMime === 'audio/webm') {
+          // Chrome / Edge : WebM→OGG direct (chemin validé, garder tel quel)
+          mediaBuffer = await this.transcodeWebmToOgg(mediaBuffer, normalizedMime);
+        } else if (
+          normalizedMime === 'audio/ogg' ||
+          normalizedMime === 'audio/opus' ||
+          normalizedMime === 'audio/mp4' ||
+          normalizedMime === 'audio/aac' ||
+          normalizedMime === 'audio/mpeg'
+        ) {
+          // Firefox (OGG/Opus), Safari (MP4/AAC), autres : via WAV intermédiaire
+          const ext = normalizedMime === 'audio/ogg'  ? 'ogg'
+                    : normalizedMime === 'audio/opus' ? 'opus'
+                    : normalizedMime === 'audio/mp4'  ? 'mp4'
+                    : normalizedMime === 'audio/aac'  ? 'aac'
+                    : 'mp3';
+          mediaBuffer = await this.transcodeToOggViaPcm(mediaBuffer, ext);
+        }
         mimeType = 'audio/ogg';
         fileName = fileName.replace(/\.[^.]+$/, '') + '.ogg';
       } catch (error) {
-        const reason =
-          error instanceof Error ? error.message : 'unknown_transcode_error';
+        const reason = error instanceof Error ? error.message : 'unknown_transcode_error';
         throw new WhapiOutboundError(
           `Meta audio transcode failed: ${reason}`,
           'permanent',
@@ -517,6 +528,69 @@ export class CommunicationMetaService {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {
       // nettoyage best-effort, non bloquant
+    }
+  }
+
+  private runFfmpegStep(args: string[], tmpDir: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const proc = spawn('ffmpeg', args);
+      let stderr = '';
+      proc.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
+      proc.on('error', (err) => { this.cleanupTmpDir(tmpDir); reject(err); });
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          this.logger.error(
+            `ffmpeg step failed (code=${code ?? 'null'}): ${stderr.slice(0, 600)}`,
+            CommunicationMetaService.name,
+          );
+          this.cleanupTmpDir(tmpDir);
+          reject(new Error(`ffmpeg exit=${code ?? 'null'} stderr=${stderr.slice(0, 300)}`));
+        }
+      });
+    });
+  }
+
+  public async transcodeToOggViaPcm(input: Buffer, inputExt: string): Promise<Buffer> {
+    const tmpDir     = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-audio-'));
+    const inputPath  = path.join(tmpDir, `input.${inputExt}`);
+    const wavPath    = path.join(tmpDir, 'intermediate.wav');
+    const outputPath = path.join(tmpDir, 'output.ogg');
+
+    fs.writeFileSync(inputPath, input);
+
+    try {
+      // Passe 1 : décoder vers WAV PCM — force le décodage Opus complet, élimine les headers Firefox
+      await this.runFfmpegStep([
+        '-i', inputPath,
+        '-ar', '48000',
+        '-ac', '1',
+        '-f', 'wav',
+        '-acodec', 'pcm_s16le',
+        '-vn', '-y', wavPath,
+      ], tmpDir);
+
+      // Passe 2 : encoder WAV → OGG/Opus conforme WhatsApp
+      await this.runFfmpegStep([
+        '-i', wavPath,
+        '-ar', '48000',
+        '-ac', '1',
+        '-b:a', '24k',
+        '-f', 'ogg',
+        '-acodec', 'libopus',
+        '-vn', '-y', outputPath,
+      ], tmpDir);
+
+      const output = fs.readFileSync(outputPath);
+      this.cleanupTmpDir(tmpDir);
+      if (output.length < 512) {
+        throw new Error(`ffmpeg via-pcm output too small: ${output.length}B`);
+      }
+      return output;
+    } catch (err) {
+      this.cleanupTmpDir(tmpDir);
+      throw err;
     }
   }
 

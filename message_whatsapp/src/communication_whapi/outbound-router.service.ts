@@ -439,24 +439,34 @@ export class OutboundRouterService {
       OutboundRouterService.name,
     );
 
-    // Transcoder WebM/OGG/Opus → OGG pour Whapi (WhatsApp ne lit pas WebM brut ni OGG Firefox sans recodage)
-    let whapiBuffer = data.mediaBuffer;
-    let whapiMime = data.mimeType;
-    let whapiFileName = data.fileName;
+    // Transcoder audio → OGG/Opus conforme WhatsApp selon le navigateur source
     const normalizedWhapi = data.mimeType.split(';')[0].trim().toLowerCase();
-    if (
-      data.mediaType === 'audio' &&
-      (normalizedWhapi === 'audio/webm' ||
-        normalizedWhapi === 'audio/ogg' ||
-        normalizedWhapi === 'audio/opus')
-    ) {
+    let whapiBuffer   = data.mediaBuffer;
+    let whapiMime     = data.mimeType;
+    let whapiFileName = data.fileName;
+    if (data.mediaType === 'audio') {
       try {
-        whapiBuffer = await this.metaService.transcodeWebmToOgg(whapiBuffer, normalizedWhapi);
-        whapiMime = 'audio/ogg';
+        if (normalizedWhapi === 'audio/webm') {
+          whapiBuffer = await this.metaService.transcodeWebmToOgg(whapiBuffer, normalizedWhapi);
+        } else if (
+          normalizedWhapi === 'audio/ogg' ||
+          normalizedWhapi === 'audio/opus' ||
+          normalizedWhapi === 'audio/mp4' ||
+          normalizedWhapi === 'audio/aac' ||
+          normalizedWhapi === 'audio/mpeg'
+        ) {
+          const ext = normalizedWhapi === 'audio/ogg'  ? 'ogg'
+                    : normalizedWhapi === 'audio/opus' ? 'opus'
+                    : normalizedWhapi === 'audio/mp4'  ? 'mp4'
+                    : normalizedWhapi === 'audio/aac'  ? 'aac'
+                    : 'mp3';
+          whapiBuffer = await this.metaService.transcodeToOggViaPcm(whapiBuffer, ext);
+        }
+        whapiMime     = 'audio/ogg';
         whapiFileName = data.fileName.replace(/\.[^.]+$/, '') + '.ogg';
       } catch (err) {
         this.logger.warn(
-          `Whapi audio transcode failed, sending raw WebM: ${err instanceof Error ? err.message : String(err)}`,
+          `Whapi audio transcode failed, sending raw: ${err instanceof Error ? err.message : String(err)}`,
           OutboundRouterService.name,
         );
       }
