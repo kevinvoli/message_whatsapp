@@ -439,7 +439,6 @@ export class OutboundRouterService {
       OutboundRouterService.name,
     );
 
-    // Transcoder audio → OGG/Opus conforme WhatsApp selon le navigateur source
     const normalizedWhapi = data.mimeType.split(';')[0].trim().toLowerCase();
     let whapiBuffer   = data.mediaBuffer;
     let whapiMime     = data.mimeType;
@@ -447,7 +446,9 @@ export class OutboundRouterService {
     if (data.mediaType === 'audio') {
       try {
         if (normalizedWhapi === 'audio/webm') {
-          whapiBuffer = await this.metaService.transcodeWebmToOgg(whapiBuffer, normalizedWhapi);
+          whapiBuffer   = await this.metaService.transcodeWebmToOgg(whapiBuffer, normalizedWhapi);
+          whapiMime     = 'audio/ogg';
+          whapiFileName = data.fileName.replace(/\.[^.]+$/, '') + '.ogg';
         } else if (
           normalizedWhapi === 'audio/ogg' ||
           normalizedWhapi === 'audio/opus' ||
@@ -460,10 +461,10 @@ export class OutboundRouterService {
                     : normalizedWhapi === 'audio/mp4'  ? 'mp4'
                     : normalizedWhapi === 'audio/aac'  ? 'aac'
                     : 'mp3';
-          whapiBuffer = await this.metaService.transcodeToOggViaPcm(whapiBuffer, ext);
+          whapiBuffer   = await this.metaService.transcodeToMp3(whapiBuffer, ext);
+          whapiMime     = 'audio/mpeg';
+          whapiFileName = data.fileName.replace(/\.[^.]+$/, '') + '.mp3';
         }
-        whapiMime     = 'audio/ogg';
-        whapiFileName = data.fileName.replace(/\.[^.]+$/, '') + '.ogg';
       } catch (err) {
         this.logger.warn(
           `Whapi audio transcode failed, sending raw: ${err instanceof Error ? err.message : String(err)}`,

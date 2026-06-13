@@ -139,8 +139,10 @@ export class CommunicationMetaService {
     if (data.mediaType === 'audio') {
       try {
         if (normalizedMime === 'audio/webm') {
-          // Chrome / Edge : WebM→OGG direct (chemin validé, garder tel quel)
+          // Chrome / Edge : WebM→OGG (fonctionne, garder tel quel)
           mediaBuffer = await this.transcodeWebmToOgg(mediaBuffer, normalizedMime);
+          mimeType  = 'audio/ogg';
+          fileName  = fileName.replace(/\.[^.]+$/, '') + '.ogg';
         } else if (
           normalizedMime === 'audio/ogg' ||
           normalizedMime === 'audio/opus' ||
@@ -148,16 +150,16 @@ export class CommunicationMetaService {
           normalizedMime === 'audio/aac' ||
           normalizedMime === 'audio/mpeg'
         ) {
-          // Firefox (OGG/Opus), Safari (MP4/AAC), autres : via WAV intermédiaire
+          // Firefox (OGG), Safari (MP4), autres → MP3 via libmp3lame (toujours dispo sur Alpine)
           const ext = normalizedMime === 'audio/ogg'  ? 'ogg'
                     : normalizedMime === 'audio/opus' ? 'opus'
                     : normalizedMime === 'audio/mp4'  ? 'mp4'
                     : normalizedMime === 'audio/aac'  ? 'aac'
                     : 'mp3';
-          mediaBuffer = await this.transcodeToOggViaPcm(mediaBuffer, ext);
+          mediaBuffer = await this.transcodeToMp3(mediaBuffer, ext);
+          mimeType  = 'audio/mpeg';
+          fileName  = fileName.replace(/\.[^.]+$/, '') + '.mp3';
         }
-        mimeType = 'audio/ogg';
-        fileName = fileName.replace(/\.[^.]+$/, '') + '.ogg';
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'unknown_transcode_error';
         throw new WhapiOutboundError(
@@ -586,6 +588,36 @@ export class CommunicationMetaService {
       this.cleanupTmpDir(tmpDir);
       if (output.length < 512) {
         throw new Error(`ffmpeg via-pcm output too small: ${output.length}B`);
+      }
+      return output;
+    } catch (err) {
+      this.cleanupTmpDir(tmpDir);
+      throw err;
+    }
+  }
+
+  public async transcodeToMp3(input: Buffer, inputExt: string): Promise<Buffer> {
+    const tmpDir     = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-audio-'));
+    const inputPath  = path.join(tmpDir, `input.${inputExt}`);
+    const outputPath = path.join(tmpDir, 'output.mp3');
+
+    fs.writeFileSync(inputPath, input);
+
+    try {
+      await this.runFfmpegStep([
+        '-i', inputPath,
+        '-ar', '44100',
+        '-ac', '1',
+        '-b:a', '128k',
+        '-f', 'mp3',
+        '-acodec', 'libmp3lame',
+        '-vn', '-y', outputPath,
+      ], tmpDir);
+
+      const output = fs.readFileSync(outputPath);
+      this.cleanupTmpDir(tmpDir);
+      if (output.length < 512) {
+        throw new Error(`mp3 output too small: ${output.length}B`);
       }
       return output;
     } catch (err) {
