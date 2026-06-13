@@ -439,15 +439,32 @@ export class OutboundRouterService {
       OutboundRouterService.name,
     );
 
-    const mediaBase64 = data.mediaBuffer.toString('base64');
+    // Transcoder WebM → OGG pour Whapi (WhatsApp ne lit pas WebM)
+    let whapiBuffer = data.mediaBuffer;
+    let whapiMime = data.mimeType;
+    let whapiFileName = data.fileName;
+    if (data.mediaType === 'audio' && data.mimeType.split(';')[0].trim().toLowerCase() === 'audio/webm') {
+      try {
+        whapiBuffer = await this.metaService.transcodeWebmToOgg(whapiBuffer);
+        whapiMime = 'audio/ogg';
+        whapiFileName = data.fileName.replace(/\.[^.]+$/, '') + '.ogg';
+      } catch (err) {
+        this.logger.warn(
+          `Whapi audio transcode failed, sending raw WebM: ${err instanceof Error ? err.message : String(err)}`,
+          OutboundRouterService.name,
+        );
+      }
+    }
+
+    const mediaBase64 = whapiBuffer.toString('base64');
     const result = await this.whapiService.sendMediaToWhapiChannel({
       to: data.to,
       channelId: data.channelId,
       mediaBase64,
-      mimeType: data.mimeType,
+      mimeType: whapiMime,
       mediaType: data.mediaType,
       caption: data.caption,
-      fileName: data.fileName,
+      fileName: whapiFileName,
     });
 
     const messageId = result.message.id;

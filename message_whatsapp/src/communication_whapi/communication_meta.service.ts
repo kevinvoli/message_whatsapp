@@ -430,9 +430,10 @@ export class CommunicationMetaService {
     }
   }
 
-  private async transcodeWebmToOgg(input: Buffer): Promise<Buffer> {
+  public async transcodeWebmToOgg(input: Buffer): Promise<Buffer> {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-audio-'));
     const inputPath = path.join(tmpDir, 'input.webm');
+    const outputPath = path.join(tmpDir, 'output.ogg');
 
     fs.writeFileSync(inputPath, input);
 
@@ -446,13 +447,12 @@ export class CommunicationMetaService {
         '-f', 'ogg',
         '-acodec', 'libopus',
         '-vn',
-        'pipe:1',
+        '-y',
+        outputPath,
       ]);
 
-      const chunks: Buffer[] = [];
       let stderr = '';
 
-      ffmpeg.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
       ffmpeg.stderr.on('data', (chunk: Buffer) => {
         stderr += chunk.toString();
       });
@@ -463,14 +463,32 @@ export class CommunicationMetaService {
       });
 
       ffmpeg.on('close', (code) => {
-        this.cleanupTmpDir(tmpDir);
-        const output = Buffer.concat(chunks);
-        if (code === 0 && output.length >= 512) {
-          resolve(output);
+        if (code === 0) {
+          try {
+            const output = fs.readFileSync(outputPath);
+            this.cleanupTmpDir(tmpDir);
+            if (output.length >= 512) {
+              resolve(output);
+            } else {
+              reject(
+                new Error(
+                  `ffmpeg exit=0 but output_size=${output.length}B is too small`,
+                ),
+              );
+            }
+          } catch (readErr) {
+            this.cleanupTmpDir(tmpDir);
+            reject(readErr);
+          }
         } else {
+          this.logger.error(
+            `ffmpeg transcode failed: ${stderr.slice(0, 800)}`,
+            CommunicationMetaService.name,
+          );
+          this.cleanupTmpDir(tmpDir);
           reject(
             new Error(
-              `ffmpeg exit=${code ?? 'null'} output_size=${output.length}B stderr=${stderr.slice(0, 500)}`,
+              `ffmpeg exit=${code ?? 'null'} stderr=${stderr.slice(0, 500)}`,
             ),
           );
         }
