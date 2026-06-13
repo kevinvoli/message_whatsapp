@@ -2,6 +2,9 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { AppLogger } from 'src/logging/app-logger.service';
 import {
   WhapiFailureKind,
@@ -428,11 +431,18 @@ export class CommunicationMetaService {
   }
 
   private async transcodeWebmToOgg(input: Buffer): Promise<Buffer> {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-audio-'));
+    const inputPath = path.join(tmpDir, 'input.webm');
+
+    fs.writeFileSync(inputPath, input);
+
     return new Promise((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', [
-        '-i', 'pipe:0',
+        '-fflags', '+genpts',
+        '-i', inputPath,
         '-ar', '48000',
-        '-b:a', '64k',
+        '-ac', '1',
+        '-b:a', '24k',
         '-f', 'ogg',
         '-acodec', 'libopus',
         '-vn',
@@ -448,10 +458,12 @@ export class CommunicationMetaService {
       });
 
       ffmpeg.on('error', (err) => {
+        this.cleanupTmpDir(tmpDir);
         reject(err);
       });
 
       ffmpeg.on('close', (code) => {
+        this.cleanupTmpDir(tmpDir);
         const output = Buffer.concat(chunks);
         if (code === 0 && output.length >= 512) {
           resolve(output);
@@ -463,9 +475,15 @@ export class CommunicationMetaService {
           );
         }
       });
-
-      ffmpeg.stdin.end(input);
     });
+  }
+
+  private cleanupTmpDir(tmpDir: string): void {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // nettoyage best-effort, non bloquant
+    }
   }
 
   /**
