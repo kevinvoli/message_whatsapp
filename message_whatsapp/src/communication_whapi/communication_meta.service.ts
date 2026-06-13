@@ -448,8 +448,13 @@ export class CommunicationMetaService {
     fs.writeFileSync(inputPath, input);
 
     return new Promise((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', [
-        '-fflags', '+genpts',
+      // +genpts uniquement pour WebM : corrige les timestamps manquants de Chrome MediaRecorder.
+      // Sur OGG/Opus de Firefox, +genpts réinitialise les granule positions → audio silencieux.
+      const ffmpegArgs: string[] = [];
+      if (ext === 'webm') {
+        ffmpegArgs.push('-fflags', '+genpts');
+      }
+      ffmpegArgs.push(
         '-i', inputPath,
         '-ar', '48000',
         '-ac', '1',
@@ -459,7 +464,8 @@ export class CommunicationMetaService {
         '-vn',
         '-y',
         outputPath,
-      ]);
+      );
+      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
 
       let stderr = '';
 
