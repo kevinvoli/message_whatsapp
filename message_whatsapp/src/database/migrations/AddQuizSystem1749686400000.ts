@@ -195,22 +195,6 @@ export class AddQuizSystem1749686400000 implements MigrationInterface {
         }),
         true,
       );
-      await queryRunner.createForeignKey(
-        'quiz_exemption',
-        new TableForeignKey({
-          columnNames: ['commercial_id'],
-          referencedTableName: 'whatsapp_commercial',
-          referencedColumnNames: ['id'],
-        }),
-      );
-      await queryRunner.createForeignKey(
-        'quiz_exemption',
-        new TableForeignKey({
-          columnNames: ['poste_id'],
-          referencedTableName: 'whatsapp_poste',
-          referencedColumnNames: ['id'],
-        }),
-      );
     }
 
     const attemptExists = await queryRunner.hasTable('quiz_attempt');
@@ -240,14 +224,6 @@ export class AddQuizSystem1749686400000 implements MigrationInterface {
         new TableIndex({
           name: 'IDX_quiz_attempt_commercial_session',
           columnNames: ['commercial_id', 'session_id', 'attempt_number'],
-        }),
-      );
-      await queryRunner.createForeignKey(
-        'quiz_attempt',
-        new TableForeignKey({
-          columnNames: ['commercial_id'],
-          referencedTableName: 'whatsapp_commercial',
-          referencedColumnNames: ['id'],
         }),
       );
       await queryRunner.createForeignKey(
