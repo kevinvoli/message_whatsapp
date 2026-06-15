@@ -31,6 +31,7 @@ import { CommunicationMessengerService } from 'src/communication_whapi/communica
 import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
 import { MetaAdReferralService } from 'src/meta-ad-referral/meta-ad-referral.service';
 import { ChatSessionService } from 'src/chat-session/chat-session.service';
+import { TTL_CTWA_HOURS, TTL_NORMAL_HOURS } from 'src/chat-session/constants';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { MediaDownloadService } from 'src/media-storage/media-download.service';
 
@@ -130,8 +131,8 @@ export class InboundMessageService {
           // Synchroniser la ChatSession (non-bloquant sur erreur — P3)
           try {
             const config = await this.cronConfigService.findByKey('read-only-enforcement').catch(() => null);
-            const ttlNormal = (config?.ttlDays && config.ttlDays > 0) ? config.ttlDays : 24;
-            const ttlCtwa = 72;
+            const ttlNormal = (config?.ttlDays && config.ttlDays > 0) ? config.ttlDays : TTL_NORMAL_HOURS;
+            const ttlCtwa = (config?.ttlDaysCtwa && config.ttlDaysCtwa > 0) ? config.ttlDaysCtwa : TTL_CTWA_HOURS;
 
             const referral = message.metaReferral
               ? {
@@ -153,7 +154,7 @@ export class InboundMessageService {
             }
 
             if (activeSessionId) {
-              await this.chatSessionService.onClientMessage(activeSessionId, conversation.id, ttlNormal, referral);
+              await this.chatSessionService.onClientMessage(activeSessionId, conversation.id, ttlNormal, ttlCtwa, referral);
               // Mettre à jour le cache local pour la suite du traitement
               if (referral?.sourceId && !conversation.isCtwa) {
                 await this.chatService.update(conversation.chat_id, { isCtwa: true });

@@ -1723,6 +1723,9 @@ export class WhatsappMessageGateway
       last_activity_at: chat.last_activity_at,
       last_client_message_at: chat.last_client_message_at || null,
       last_poste_message_at: chat.last_poste_message_at || null,
+      window_expires_at: chat.windowExpiresAt
+        ? new Date(chat.windowExpiresAt).toISOString()
+        : null,
       updatedAt: chat.updatedAt,
       poste: chat.poste || null,
       last_message: lastMessage

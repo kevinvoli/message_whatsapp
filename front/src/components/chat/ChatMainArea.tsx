@@ -31,18 +31,14 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
 
   const totalMessages = selectedConversation ? messages?.length : 0;
 
-  // Fenêtre de messagerie : si le client n'a pas écrit depuis plus de X heures,
-  // l'envoi de messages ordinaires est interdit côté WhatsApp.
+  // Fenêtre de messagerie : le backend expose window_expires_at (date d'expiration
+  // faisant autorité, 24h normal / 72h CTWA déjà calculés côté serveur).
   // Exception : les canaux dédiés à un poste ne sont pas soumis à cette restriction.
-  // CTWA (Click-to-WhatsApp Ads) bénéficie d'une fenêtre étendue à 72h.
-  const WINDOW_MS = selectedConversation?.isCtwa
-    ? 72 * 60 * 60 * 1000  // 72h pour les conversations CTWA
-    : 23 * 60 * 60 * 1000; // 23h pour les autres
-  const lastClientAt = selectedConversation?.last_client_message_at;
+  const windowExpiresAt = selectedConversation?.window_expires_at;
   const windowExpired =
     selectedConversation != null &&
     !selectedConversation.channel_dedicated &&
-    (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS);
+    (!windowExpiresAt || new Date(windowExpiresAt).getTime() <= Date.now());
 
   // Conversation sans canal résolvable → l'envoi est impossible côté backend
   const noChannel =

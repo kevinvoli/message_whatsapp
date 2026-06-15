@@ -312,6 +312,14 @@ export class WhatsappChat {
   @Column({ name: 'active_session_id', type: 'char', length: 36, nullable: true, default: null })
   activeSessionId: string | null;
 
+  /**
+   * Dénormalisation de ChatSession.autoCloseAt (session active).
+   * Mis à jour par chat-session.service.ts à chaque computeWindows, NULL à la fermeture.
+   * Permet d'exclure les conversations à fenêtre expirée sans join (read-only, restriction, front).
+   */
+  @Column({ name: 'window_expires_at', type: 'timestamp', nullable: true, default: null })
+  windowExpiresAt: Date | null;
+
   @OneToOne(() => MetaAdReferral, (referral) => referral.chat, { nullable: true, eager: false })
   metaAdReferral: MetaAdReferral | null;
 

@@ -320,6 +320,7 @@ export interface Conversation {
   
   // Timestamps backend
   last_client_message_at?: Date | null;
+  window_expires_at?: Date | null;
   last_poste_message_at?: Date | null;
   last_activity_at?: Date | null;
   
@@ -538,6 +539,7 @@ interface RawConversationData {
   updated_at?: string | number | Date;
 
   last_client_message_at?: string | number | Date | null;
+  window_expires_at?: string | number | Date | null;
   last_poste_message_at?: string | number | Date | null;
   last_activity_at?: string | number | Date | null;
   
@@ -795,6 +797,9 @@ export const transformToConversation = (
 
     last_client_message_at: raw.last_client_message_at
       ? new Date(raw.last_client_message_at)
+      : null,
+    window_expires_at: raw.window_expires_at
+      ? new Date(raw.window_expires_at)
       : null,
     last_poste_message_at: raw.last_poste_message_at
       ? new Date(raw.last_poste_message_at)

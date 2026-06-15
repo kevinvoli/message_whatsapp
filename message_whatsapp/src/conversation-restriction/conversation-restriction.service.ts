@@ -46,10 +46,16 @@ export class ConversationRestrictionService {
    * Si un accès existe déjà avec une réponse valide (respondedAt IS NOT NULL), on ne réinitialise pas.
    */
   async recordAccess(commercialId: string, chatId: string): Promise<void> {
-    // Ne pas tracer les conversations en lecture seule ou fermées :
-    // le commercial ne peut pas y répondre, elles ne doivent pas compter dans la restriction.
+    // Ne pas tracer les conversations en lecture seule, fermées, ou dont la fenêtre
+    // WhatsApp (24h/72h) est expirée : le commercial ne peut pas y répondre,
+    // elles ne doivent pas compter dans la restriction.
     const chat = await this.chatRepository.findOne({ where: { chat_id: chatId } });
-    if (!chat || chat.read_only || chat.status === WhatsappChatStatus.FERME) {
+    if (
+      !chat ||
+      chat.read_only ||
+      chat.status === WhatsappChatStatus.FERME ||
+      this.isWindowExpired(chat)
+    ) {
       return;
     }
 
@@ -153,7 +159,8 @@ export class ConversationRestrictionService {
       if (
         chat.status === WhatsappChatStatus.FERME ||
         (chat.status as string) === 'converti' ||
-        chat.read_only
+        chat.read_only ||
+        this.isWindowExpired(chat)
       ) return false;
       if (!chat.channel_id && !chat.last_msg_client_channel_id) return false;
       if (posteId && chat.poste_id !== null && chat.poste_id !== posteId) return false;
@@ -251,6 +258,15 @@ export class ConversationRestrictionService {
   }
 
   // ── Helpers privés ──────────────────────────────────────────────────────────
+
+  /**
+   * Vrai si la fenêtre WhatsApp (24h normal / 72h CTWA) du chat est expirée.
+   * Basé sur la colonne dénormalisée windowExpiresAt (= ChatSession.autoCloseAt de
+   * la session active), mise à jour par chat-session.service.ts — pas de join.
+   */
+  private isWindowExpired(chat: WhatsappChat): boolean {
+    return !!chat.windowExpiresAt && chat.windowExpiresAt < new Date();
+  }
 
   private todayDateString(): string {
     const d = new Date();

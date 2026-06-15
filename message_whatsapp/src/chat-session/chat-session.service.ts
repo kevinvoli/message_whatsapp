@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ChatSession } from './entities/chat-session.entity';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { TTL_CTWA_HOURS, TTL_NORMAL_HOURS } from './constants';
 
 export interface ReferralData {
   sourceId: string;
@@ -27,20 +28,22 @@ export class ChatSessionService {
 
   private computeWindows(
     now: Date,
-    ttlNormalHours: number,
-    isCtwa: boolean,
-    ttlCtwaHours: number,
+    ttlNormalHours: number = TTL_NORMAL_HOURS,
+    isCtwa: boolean = false,
+    ttlCtwaHours: number = TTL_CTWA_HOURS,
     existingFreeEntry: Date | null = null,
   ): {
     serviceWindowExpiresAt: Date;
     freeEntryExpiresAt: Date | null;
     autoCloseAt: Date;
   } {
-    const serviceWindowExpiresAt = new Date(now.getTime() + ttlNormalHours * 3_600_000);
+    const effectiveTtlNormal = ttlNormalHours > 0 ? ttlNormalHours : TTL_NORMAL_HOURS;
+    const effectiveTtlCtwa = ttlCtwaHours > 0 ? ttlCtwaHours : TTL_CTWA_HOURS;
+    const serviceWindowExpiresAt = new Date(now.getTime() + effectiveTtlNormal * 3_600_000);
 
     let freeEntryExpiresAt: Date | null = existingFreeEntry;
     if (isCtwa && !existingFreeEntry) {
-      freeEntryExpiresAt = new Date(now.getTime() + ttlCtwaHours * 3_600_000);
+      freeEntryExpiresAt = new Date(now.getTime() + effectiveTtlCtwa * 3_600_000);
     }
 
     const autoCloseAt =
@@ -112,6 +115,7 @@ export class ChatSessionService {
         activeSessionId: saved.id,
         isCtwa,
         last_client_message_at: now,
+        windowExpiresAt: autoCloseAt,
       });
 
       return saved;
@@ -126,6 +130,7 @@ export class ChatSessionService {
     sessionId: string,
     whatsappChatId: string,
     ttlNormalHours: number,
+    ttlCtwaHours: number = TTL_CTWA_HOURS,
     referral?: ReferralData,
   ): Promise<void> {
     const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
@@ -138,14 +143,15 @@ export class ChatSessionService {
     const becomeCtwa = !session.isCtwa && !!referral?.sourceId;
     const newIsCtwa = session.isCtwa || becomeCtwa;
 
+    const effectiveTtlNormal = ttlNormalHours > 0 ? ttlNormalHours : TTL_NORMAL_HOURS;
+    const effectiveTtlCtwa = ttlCtwaHours > 0 ? ttlCtwaHours : TTL_CTWA_HOURS;
+
     // Recalcul de serviceWindowExpiresAt, freeEntryExpiresAt inchangé sauf upgrade CTWA
-    const serviceWindowExpiresAt = new Date(now.getTime() + ttlNormalHours * 3_600_000);
+    const serviceWindowExpiresAt = new Date(now.getTime() + effectiveTtlNormal * 3_600_000);
 
     let freeEntryExpiresAt = session.freeEntryExpiresAt;
     if (becomeCtwa) {
-      // Upgrade CTWA : TTL CTWA par défaut 72h
-      const ttlCtwaHours = 72;
-      freeEntryExpiresAt = new Date(now.getTime() + ttlCtwaHours * 3_600_000);
+      freeEntryExpiresAt = new Date(now.getTime() + effectiveTtlCtwa * 3_600_000);
     }
 
     const autoCloseAt =
@@ -171,7 +177,10 @@ export class ChatSessionService {
       },
     );
 
-    const chatPatch: Partial<WhatsappChat> = { last_client_message_at: now };
+    const chatPatch: Partial<WhatsappChat> = {
+      last_client_message_at: now,
+      windowExpiresAt: autoCloseAt,
+    };
     if (becomeCtwa) {
       chatPatch.isCtwa = true;
     }
@@ -193,7 +202,10 @@ export class ChatSessionService {
   async closeSession(sessionId: string, whatsappChatId: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await manager.update(ChatSession, { id: sessionId }, { endedAt: new Date() });
-      await manager.update(WhatsappChat, { id: whatsappChatId }, { activeSessionId: null });
+      await manager.update(WhatsappChat, { id: whatsappChatId }, {
+        activeSessionId: null,
+        windowExpiresAt: null,
+      });
     });
   }
 
@@ -210,6 +222,8 @@ export class ChatSessionService {
       .where('whatsapp_chat_id = :whatsappChatId', { whatsappChatId })
       .andWhere('ended_at IS NULL')
       .execute();
+
+    await this.chatRepo.update({ id: whatsappChatId }, { windowExpiresAt: null });
   }
 
   /**
@@ -228,6 +242,13 @@ export class ChatSessionService {
       )
       .andWhere('ended_at IS NULL')
       .execute();
+
+    await this.chatRepo
+      .createQueryBuilder()
+      .update(WhatsappChat)
+      .set({ windowExpiresAt: null })
+      .where('chat_id = :whapiChatId', { whapiChatId })
+      .execute();
   }
 
   /**
@@ -245,6 +266,7 @@ export class ChatSessionService {
         activeSessionId: null,
         status: WhatsappChatStatus.FERME,
         read_only: false,
+        windowExpiresAt: null,
       });
 
       const chat = await manager.findOne(WhatsappChat, { where: { id: whatsappChatId } });

@@ -22,6 +22,13 @@ export interface ReadOnlyEnforcementPreview {
 
 @Injectable()
 export class ReadOnlyEnforcementJob implements OnModuleInit {
+  /**
+   * Compteur de cycles consécutifs où des sessions expirées ont été détectées
+   * (candidates > 0) mais où enforce() n'a fermé aucune conversation.
+   * Signal de régression silencieuse (cf. PLAN_CORRECTION_CRON_FERMETURE_FENETRE).
+   */
+  private consecutiveZeroClosures = 0;
+
   constructor(
     @InjectRepository(ChatSession)
     private readonly sessionRepo: Repository<ChatSession>,
@@ -43,17 +50,28 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
 
   /**
    * Sessions expirées : ended_at IS NULL + auto_close_at < maintenant.
-   * Le chat associé doit être non fermé et avoir cette session comme session active.
+   * Le chat associé doit être non fermé.
+   * Indépendant de whatsapp_chat.active_session_id (peut être désynchronisé) : on
+   * sélectionne la dernière session ouverte (max started_at) par chat parmi celles
+   * expirées, pour éviter tout doublon de traitement par chat.
    * Note : auto_close_at IS NULL est intentionnellement ABSENT (P2).
    */
   private async findExpiredSessions(): Promise<ChatSession[]> {
+    const now = new Date();
+
     return this.sessionRepo
       .createQueryBuilder('s')
       .innerJoinAndSelect('s.chat', 'c')
       .where('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
-      .andWhere('c.active_session_id = s.id')
       .andWhere('s.ended_at IS NULL')
-      .andWhere('s.auto_close_at < :now', { now: new Date() })
+      .andWhere('s.auto_close_at < :now', { now })
+      .andWhere(
+        `s.started_at = (
+          SELECT MAX(s2.started_at) FROM chat_session s2
+          WHERE s2.whatsapp_chat_id = s.whatsapp_chat_id
+            AND s2.ended_at IS NULL
+        )`,
+      )
       .getMany();
   }
 
@@ -102,6 +120,19 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
       await this.gateway.emitConversationClosed(chat);
       closed++;
     }
+
+    if (sessions.length > 0 && closed === 0) {
+      this.consecutiveZeroClosures++;
+      if (this.consecutiveZeroClosures >= 3) {
+        this.logger.warn(
+          `READ_ONLY_ENFORCE_STALLED candidates=${sessions.length} closed=0 cycles_consecutifs=${this.consecutiveZeroClosures} — possible régression silencieuse`,
+          ReadOnlyEnforcementJob.name,
+        );
+      }
+    } else {
+      this.consecutiveZeroClosures = 0;
+    }
+
     return `${closed} conversation(s) fermée(s) automatiquement${skipped > 0 ? ` (${skipped} ignorée(s))` : ''}`;
   }
 }

@@ -72,6 +72,7 @@ export function makeConversation(
     last_inactivity_auto_sent_at: null,
     on_assign_auto_sent: false,
     last_window_reminder_sent_at: null,
+    windowExpiresAt: null,
     campaignLinkId: null,
     isCtwa: false,
     activeSessionId: null,

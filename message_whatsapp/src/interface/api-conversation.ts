@@ -26,6 +26,9 @@ export interface ApiConversation {
   last_client_message_at?: string | null;
   last_poste_message_at?: string | null;
 
+  /** Fin de la fenêtre WhatsApp (24h normal / 72h CTWA) de la session active, ISO string. */
+  window_expires_at?: string | null;
+
   created_at: string;
   updated_at: string;
 }
