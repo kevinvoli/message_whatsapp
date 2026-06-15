@@ -154,7 +154,44 @@ export default function ConversationsView({
         }
     }, [selectedPeriod, selectedPosteId, selectedCommercialId, statusFilter]);
 
-    useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
+    useEffect(() => {
+        if (searchTerm.trim()) return;
+        void loadChats(limit, offset);
+    }, [loadChats, limit, offset, searchTerm]);
+
+    // Recherche backend globale (debounce 300ms, toutes périodes confondues).
+    // Quand searchTerm redevient vide, le useEffect ci-dessus reprend le chargement paginé normal.
+    useEffect(() => {
+        const term = searchTerm.trim();
+        if (!term) return;
+        let cancelled = false;
+        const handle = setTimeout(async () => {
+            setLoadingChats(true);
+            try {
+                const result = await getChats(
+                    200,
+                    0,
+                    'all',
+                    selectedPosteId || undefined,
+                    selectedCommercialId || undefined,
+                    statusFilter !== 'unread' ? (statusFilter ?? undefined) : undefined,
+                    statusFilter === 'unread',
+                    term,
+                );
+                if (cancelled) return;
+                setChats(result.data);
+                setTotal(result.total);
+                setTotalAll(result.totalAll);
+                setTotalActifs(result.totalActifs);
+                setTotalEnAttente(result.totalEnAttente);
+                setTotalUnread(result.totalUnread);
+                setTotalFermes(result.totalFermes);
+            } finally {
+                if (!cancelled) setLoadingChats(false);
+            }
+        }, 300);
+        return () => { cancelled = true; clearTimeout(handle); };
+    }, [searchTerm, selectedPosteId, selectedCommercialId, statusFilter]);
 
     // Reset à la page 0 quand la période, les filtres ou le statusFilter changent
     useEffect(() => { setOffset(0); }, [selectedPeriod, selectedPosteId, selectedCommercialId, statusFilter]);

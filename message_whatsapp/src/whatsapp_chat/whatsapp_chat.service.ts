@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { WhatsappChat, WhatsappChatStatus } from './entities/whatsapp_chat.entity';
 import { MessageDirection, WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -50,6 +50,25 @@ export class WhatsappChatService {
     private readonly dataSource: DataSource,
     private readonly chatSessionService: ChatSessionService,
   ) {}
+
+  /**
+   * Filtre une query de conversations par nom ou numéro. Le numéro est aussi
+   * comparé à sa forme normalisée (chiffres uniquement) pour matcher le
+   * chat_id WHAPI (ex: 33612345678@s.whatsapp.net) quel que soit le format
+   * saisi (0612345678, 06 12 34 56 78, etc.).
+   */
+  private applySearchCondition(qb: SelectQueryBuilder<WhatsappChat>, search: string): void {
+    const digits = search.replace(/\D/g, '');
+    const likeSearch = `%${search}%`;
+    if (digits) {
+      qb.andWhere(
+        '(chat.name LIKE :search OR chat.chat_id LIKE :search OR chat.chat_id LIKE :searchDigits)',
+        { search: likeSearch, searchDigits: `%${digits}%` },
+      );
+    } else {
+      qb.andWhere('(chat.name LIKE :search OR chat.chat_id LIKE :search)', { search: likeSearch });
+    }
+  }
 
   /**
    * Retourne les conversations d'un poste paginées par keyset.
@@ -102,11 +121,7 @@ export class WhatsappChatService {
     }
 
     if (search) {
-      const likeSearch = `%${search}%`;
-      qb.andWhere(
-        '(chat.name LIKE :search OR chat.chat_id LIKE :search)',
-        { search: likeSearch },
-      );
+      this.applySearchCondition(qb, search);
     }
 
     if (cursor && !unreadOnly && !search) {
@@ -314,6 +329,7 @@ export class WhatsappChatService {
     commercialId?: string,
     status?: string,
     unreadOnly = false,
+    search?: string,
   ): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalActifs: number; totalEnAttente: number; totalUnread: number; totalFermes: number }> {
     if (chat_id) {
       const data = await this.chatRepository
@@ -379,6 +395,10 @@ export class WhatsappChatService {
             AND m.deletedAt IS NULL
         )`,
       );
+    }
+
+    if (search) {
+      this.applySearchCondition(qb, search);
     }
 
     const [data, total] = await qb.take(limit).skip(offset).getManyAndCount();
