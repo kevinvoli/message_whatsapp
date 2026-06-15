@@ -61,10 +61,18 @@ export class WhatsappChatService {
     const digits = search.replace(/\D/g, '');
     const likeSearch = `%${search}%`;
     if (digits) {
-      qb.andWhere(
-        '(chat.name LIKE :search OR chat.chat_id LIKE :search OR chat.chat_id LIKE :searchDigits)',
-        { search: likeSearch, searchDigits: `%${digits}%` },
-      );
+      const conditions = ['chat.name LIKE :search', 'chat.chat_id LIKE :search', 'chat.chat_id LIKE :searchDigits'];
+      const params: Record<string, string> = { search: likeSearch, searchDigits: `%${digits}%` };
+
+      // Formats locaux (ex: 0612345678) ne correspondent pas au chat_id WHAPI
+      // (ex: 33612345678@s.whatsapp.net) qui ne contient pas le 0 initial.
+      const digitsNoLeadingZero = digits.replace(/^0+/, '');
+      if (digitsNoLeadingZero && digitsNoLeadingZero !== digits) {
+        conditions.push('chat.chat_id LIKE :searchDigitsNoZero');
+        params.searchDigitsNoZero = `%${digitsNoLeadingZero}%`;
+      }
+
+      qb.andWhere(`(${conditions.join(' OR ')})`, params);
     } else {
       qb.andWhere('(chat.name LIKE :search OR chat.chat_id LIKE :search)', { search: likeSearch });
     }
