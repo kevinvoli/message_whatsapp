@@ -159,39 +159,49 @@ export default function ConversationsView({
         void loadChats(limit, offset);
     }, [loadChats, limit, offset, searchTerm]);
 
-    // Recherche backend globale (debounce 300ms, toutes périodes confondues).
+    // Recherche backend globale (toutes périodes confondues).
+    const runSearch = useCallback(async (term: string) => {
+        setLoadingChats(true);
+        try {
+            const result = await getChats(
+                200,
+                0,
+                'all',
+                selectedPosteId || undefined,
+                selectedCommercialId || undefined,
+                statusFilter !== 'unread' ? (statusFilter ?? undefined) : undefined,
+                statusFilter === 'unread',
+                term,
+            );
+            setChats(result.data);
+            setTotal(result.total);
+            setTotalAll(result.totalAll);
+            setTotalActifs(result.totalActifs);
+            setTotalEnAttente(result.totalEnAttente);
+            setTotalUnread(result.totalUnread);
+            setTotalFermes(result.totalFermes);
+        } finally {
+            setLoadingChats(false);
+        }
+    }, [selectedPosteId, selectedCommercialId, statusFilter]);
+
+    // Debounce 300ms : recherche automatique pendant la frappe.
     // Quand searchTerm redevient vide, le useEffect ci-dessus reprend le chargement paginé normal.
     useEffect(() => {
         const term = searchTerm.trim();
         if (!term) return;
         let cancelled = false;
-        const handle = setTimeout(async () => {
-            setLoadingChats(true);
-            try {
-                const result = await getChats(
-                    200,
-                    0,
-                    'all',
-                    selectedPosteId || undefined,
-                    selectedCommercialId || undefined,
-                    statusFilter !== 'unread' ? (statusFilter ?? undefined) : undefined,
-                    statusFilter === 'unread',
-                    term,
-                );
-                if (cancelled) return;
-                setChats(result.data);
-                setTotal(result.total);
-                setTotalAll(result.totalAll);
-                setTotalActifs(result.totalActifs);
-                setTotalEnAttente(result.totalEnAttente);
-                setTotalUnread(result.totalUnread);
-                setTotalFermes(result.totalFermes);
-            } finally {
-                if (!cancelled) setLoadingChats(false);
-            }
+        const handle = setTimeout(() => {
+            if (!cancelled) void runSearch(term);
         }, 300);
         return () => { cancelled = true; clearTimeout(handle); };
-    }, [searchTerm, selectedPosteId, selectedCommercialId, statusFilter]);
+    }, [searchTerm, runSearch]);
+
+    // Entrée ou bouton loupe : lance la recherche immédiatement (sans attendre le debounce).
+    const handleSearchSubmit = () => {
+        const term = searchTerm.trim();
+        if (term) void runSearch(term);
+    };
 
     // Reset à la page 0 quand la période, les filtres ou le statusFilter changent
     useEffect(() => { setOffset(0); }, [selectedPeriod, selectedPosteId, selectedCommercialId, statusFilter]);
@@ -670,12 +680,20 @@ export default function ConversationsView({
                     )}
 
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <button
+                            type="button"
+                            onClick={handleSearchSubmit}
+                            aria-label="Rechercher"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 hover:text-slate-600"
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
                         <input
                             type="text"
                             placeholder="Nom, numéro, message..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }}
                             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 placeholder:text-slate-400"
                         />
                     </div>
