@@ -291,6 +291,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        logger.debug('Voice blob', {
+          size: blob.size,
+          type: blob.type,
+          chunks: audioChunksRef.current.length,
+          duration: recordingDurationRef.current,
+        });
         const capturedDuration = recordingDurationRef.current;
         if (blob.size > 0 && chat_id) {
           const minDuration = messageRestrictionConfig?.enabled ? (messageRestrictionConfig.minAudioDurationSeconds ?? 0) : 0;
@@ -315,7 +321,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
       setIsRecording(true);
       setRecordingDuration(0);
       recordingDurationRef.current = 0;

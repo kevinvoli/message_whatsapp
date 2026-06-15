@@ -533,7 +533,7 @@ export class CommunicationMetaService {
     }
   }
 
-  private runFfmpegStep(args: string[], tmpDir: string): Promise<void> {
+  private runFfmpegStep(args: string[], tmpDir: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const proc = spawn('ffmpeg', args);
       let stderr = '';
@@ -541,7 +541,7 @@ export class CommunicationMetaService {
       proc.on('error', (err) => { this.cleanupTmpDir(tmpDir); reject(err); });
       proc.on('close', (code) => {
         if (code === 0) {
-          resolve();
+          resolve(stderr);
         } else {
           this.logger.error(
             `ffmpeg step failed (code=${code ?? 'null'}): ${stderr.slice(0, 600)}`,
@@ -603,8 +603,13 @@ export class CommunicationMetaService {
 
     fs.writeFileSync(inputPath, input);
 
+    this.logger.log(
+      `[AUDIO_DIAG] transcodeToMp3 input: ext=${inputExt} size=${input.length}B`,
+      CommunicationMetaService.name,
+    );
+
     try {
-      await this.runFfmpegStep([
+      const ffmpegStderr = await this.runFfmpegStep([
         '-i', inputPath,
         '-ar', '44100',
         '-ac', '1',
@@ -614,11 +619,22 @@ export class CommunicationMetaService {
         '-vn', '-y', outputPath,
       ], tmpDir);
 
+      this.logger.debug(
+        `[AUDIO_DIAG] ffmpeg stderr: ${ffmpegStderr.slice(-400)}`,
+        CommunicationMetaService.name,
+      );
+
       const output = fs.readFileSync(outputPath);
       this.cleanupTmpDir(tmpDir);
       if (output.length < 512) {
         throw new Error(`mp3 output too small: ${output.length}B`);
       }
+
+      this.logger.log(
+        `[AUDIO_DIAG] transcodeToMp3 output: size=${output.length}B`,
+        CommunicationMetaService.name,
+      );
+
       return output;
     } catch (err) {
       this.cleanupTmpDir(tmpDir);
