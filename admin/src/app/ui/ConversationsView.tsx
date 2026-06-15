@@ -72,6 +72,8 @@ export default function ConversationsView({
     const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
     const mediaInputRef = useRef<HTMLInputElement>(null);
 
     // Modal "Nouveau message sortant"
@@ -164,6 +166,7 @@ export default function ConversationsView({
     useEffect(() => {
         if (selectedChat) {
             messageCountRef.current = 0;
+            setIsAtBottom(true);
             fetchMessages(selectedChat.chat_id);
             setActiveTab('conversation');
         } else {
@@ -173,12 +176,19 @@ export default function ConversationsView({
     }, [selectedChat]);
 
     useEffect(() => {
-        // Scroll to bottom when messages change
-        scrollToBottom();
-    }, [messages]);
+        if (isAtBottom) {
+            scrollToBottom();
+        }
+    }, [messages, isAtBottom]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    const handleMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollHeight, scrollTop, clientHeight } = e.currentTarget;
+        const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+        setIsAtBottom(distanceToBottom < 150);
     };
 
     const getUnreadCount = (chat: WhatsappChat) =>
@@ -313,6 +323,7 @@ export default function ConversationsView({
 
         const currentMessageText = messageInput;
         setMessageInput(''); // Clear input immediately for better UX
+        setIsAtBottom(true);
         scrollToBottom();
 
         // Optimistic update
@@ -368,6 +379,7 @@ export default function ConversationsView({
         try {
             await sendAdminMedia(selectedChat.chat_id, file);
             void loadChats(limit, offset);
+            setIsAtBottom(true);
             scrollToBottom();
         } catch (err) {
             addToast({
@@ -921,7 +933,12 @@ export default function ConversationsView({
                         )}
 
                         {activeTab === 'conversation' && (
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                        <div className="flex-1 relative overflow-hidden">
+                        <div
+                            ref={messagesContainerRef}
+                            onScroll={handleMessagesScroll}
+                            className="h-full overflow-y-auto p-4 space-y-4 bg-gray-50"
+                        >
                             {loadingMessages ? (
                                 <div className="flex justify-center items-center h-full"><Spinner /></div>
                             ) : messages.length === 0 ? (
@@ -1133,6 +1150,17 @@ export default function ConversationsView({
                                 </div>
                             )}
                             <div ref={messagesEndRef} />
+                        </div>
+                        {!isAtBottom && messages.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => { setIsAtBottom(true); scrollToBottom(); }}
+                                aria-label="Aller aux derniers messages"
+                                className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-3 py-1.5 rounded-full shadow-lg hover:bg-slate-700 transition-colors"
+                            >
+                                Nouveaux messages ↓
+                            </button>
+                        )}
                         </div>
                         )}
 
