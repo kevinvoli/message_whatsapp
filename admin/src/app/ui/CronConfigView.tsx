@@ -606,7 +606,7 @@ function ConfigPanel({
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
               />
               <p className="mt-1 text-[11px] text-gray-400">
-                Passage en lecture seule après {ttlDays}h sans message client.
+                Ferme automatiquement la conversation après {ttlDays}h sans message client (hors clients issus d&apos;une pub Meta).
               </p>
             </div>
           )}
@@ -624,7 +624,7 @@ function ConfigPanel({
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
               />
               <p className="mt-1 text-[11px] text-gray-400">
-                Fenêtre CTWA (clic pub Meta). Défaut : 72h. Le TTL standard est le champ &quot;Seuil inactivité&quot; ci-dessus.
+                Ferme automatiquement les conversations issues d&apos;une pub Meta (CTWA) après {ttlDaysCtwa}h sans message client. Remplace le &quot;Seuil inactivité&quot; ci-dessus pour ces conversations.
               </p>
             </div>
           )}
