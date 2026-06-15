@@ -495,7 +495,7 @@ export class WhapiController {
 
     const channelRecord = await this.channelService.findChannelByExternalId('instagram', igAccountId);
     this.auditLogger.log(
-      `IG[3/8] channel_lookup ig_account_id=${igAccountId} channel_found=${!!channelRecord} channel_id=${channelRecord?.channel_id} has_secret=${!!channelRecord?.meta_app_secret}`,
+      `IG[3/8] channel_lookup ig_account_id=${igAccountId} channel_found=${!!channelRecord} channel_id=${channelRecord?.channel_id} provider=${channelRecord?.provider} page_id=${channelRecord?.page_id} external_id=${channelRecord?.external_id} has_secret=${!!channelRecord?.meta_app_secret} has_token=${!!channelRecord?.token}`,
     );
 
     try {
