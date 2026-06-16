@@ -67,7 +67,25 @@ export class GalerieMediaService {
     qb.skip((page - 1) * limit).take(limit);
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, pages: Math.ceil(total / limit) };
+
+    const sizeQb = this.mediaRepo
+      .createQueryBuilder('media')
+      .innerJoin('media.message', 'msg')
+      .leftJoin('media.channel', 'channel')
+      .select('SUM(CAST(media.file_size AS UNSIGNED))', 'totalSize')
+      .where('media.local_url IS NOT NULL')
+      .andWhere('media.deletedAt IS NULL')
+      .andWhere('msg.deletedAt IS NULL');
+
+    if (dto.channelId) sizeQb.andWhere('channel.id = :channelId', { channelId: dto.channelId });
+    if (dto.posteId) sizeQb.andWhere('msg.poste_id = :posteId', { posteId: dto.posteId });
+    if (dto.direction) sizeQb.andWhere('msg.direction = :direction', { direction: dto.direction });
+    if (dto.mediaType) sizeQb.andWhere('media.media_type = :mediaType', { mediaType: dto.mediaType });
+
+    const sizeRow = await sizeQb.getRawOne<{ totalSize: string | null }>();
+    const totalSize = sizeRow?.totalSize ? parseInt(sizeRow.totalSize, 10) : 0;
+
+    return { items, total, pages: Math.ceil(total / limit), totalSize };
   }
 
   async getFilterOptions() {

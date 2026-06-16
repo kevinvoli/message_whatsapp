@@ -1067,6 +1067,7 @@ export type StoredMediaResponse = {
   items: StoredMedia[];
   total: number;
   pages: number;
+  totalSize: number;
 };
 
 export type GalerieFilterOptions = {

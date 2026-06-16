@@ -127,6 +127,7 @@ const DIRECTION_TABS: { value: MediaDirection | ''; label: string }[] = [
 export default function GalerieMediaView() {
   const [items, setItems] = useState<StoredMedia[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalSize, setTotalSize] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
   const [activeType, setActiveType] = useState('');
@@ -158,6 +159,7 @@ export default function GalerieMediaView() {
       });
       setItems(res.items);
       setTotal(res.total);
+      setTotalSize(res.totalSize ?? 0);
       setPages(res.pages);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erreur chargement';
@@ -177,6 +179,11 @@ export default function GalerieMediaView() {
         <HardDrive className="w-6 h-6 text-blue-600" />
         <h1 className="text-2xl font-bold text-gray-900">Galerie medias</h1>
         <span className="text-sm text-gray-500">({total} media{total !== 1 ? 's' : ''} stocke{total !== 1 ? 's' : ''})</span>
+        {totalSize > 0 && (
+          <span className="text-sm text-gray-400 flex items-center gap-1">
+            · <HardDrive className="w-3.5 h-3.5" /> {formatBytes(String(totalSize))}
+          </span>
+        )}
       </div>
       <div className="mb-5 space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
