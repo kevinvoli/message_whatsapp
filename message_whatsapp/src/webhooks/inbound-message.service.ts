@@ -34,6 +34,8 @@ import { ChatSessionService } from 'src/chat-session/chat-session.service';
 import { TTL_CTWA_HOURS, TTL_NORMAL_HOURS } from 'src/chat-session/constants';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { MediaDownloadService } from 'src/media-storage/media-download.service';
+import { CommunicationInstagramService } from 'src/communication_whapi/communication_instagram.service';
+import { ProfilePicStorageService } from 'src/media-storage/profile-pic-storage.service';
 
 @Injectable()
 export class InboundMessageService {
@@ -67,6 +69,8 @@ export class InboundMessageService {
     private readonly chatSessionService: ChatSessionService,
     private readonly cronConfigService: CronConfigService,
     private readonly mediaDownloadService: MediaDownloadService,
+    private readonly instagramService: CommunicationInstagramService,
+    private readonly profilePicStorage: ProfilePicStorageService,
   ) {}
 
   async handleMessages(messages: UnifiedMessage[]): Promise<void> {
@@ -121,6 +125,10 @@ export class InboundMessageService {
               `INCOMING_NO_AGENT trace=${traceId} chat_id=${message.chatId}`,
             );
             return;
+          }
+
+          if (message.provider === 'instagram' || message.provider === 'messenger') {
+            this.resolveProfilePic(message, conversation.chat_id, (conversation as any).profilePicFetchedAt ?? null);
           }
 
           // Conserver l'enregistrement du referral pour analytics
@@ -570,6 +578,42 @@ export class InboundMessageService {
       this.logger.warn(`INSTAGRAM_NAME[ERR] igsid=${igsid} error=${String(err)}`);
       return undefined;
     }
+  }
+
+  private resolveProfilePic(message: UnifiedMessage, chatId: string, profilePicFetchedAt: Date | null): void {
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const needsRefresh = !profilePicFetchedAt || (Date.now() - profilePicFetchedAt.getTime()) > THREE_DAYS_MS;
+    if (!needsRefresh || !message.from || !message.channelId) return;
+
+    setImmediate(async () => {
+      try {
+        const channel = await this.channelService.findByChannelId(message.channelId!);
+        if (!channel?.token) return;
+
+        let picUrl: string | null = null;
+        if (message.provider === 'instagram') {
+          const profile = await this.instagramService.getInstagramProfile(message.from!, channel.token);
+          picUrl = profile.profilePicUrl;
+        } else if (message.provider === 'messenger') {
+          const pageId = channel.page_id ?? channel.external_id ?? undefined;
+          const profile = await this.messengerService.getMessengerProfile(message.from!, channel.token, pageId);
+          picUrl = profile.profilePicUrl;
+        }
+
+        if (!picUrl) return;
+        const stored = await this.profilePicStorage.storeProfilePic(picUrl, message.from!, message.tenantId ?? null);
+        if (!stored) return;
+
+        await this.chatService.update(chatId, {
+          chat_pic: stored.localUrl,
+          chat_pic_full: stored.localUrl,
+          profilePicFetchedAt: new Date(),
+        });
+        this.logger.log(`PROFILE_PIC_SAVED provider=${message.provider} chatId=${chatId} localUrl=${stored.localUrl}`);
+      } catch (err) {
+        this.logger.warn(`PROFILE_PIC_ERROR provider=${message.provider} from=${message.from} error=${String(err)}`);
+      }
+    });
   }
 
 }

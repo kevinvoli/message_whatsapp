@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaStorageService } from './media-storage.service';
 import { MediaDownloadService } from './media-download.service';
+import { ProfilePicStorageService } from './profile-pic-storage.service';
 import { MediaBackfillService } from './media-backfill.service';
 import { GalerieMediaService } from './galerie-media.service';
 import { GalerieMediaController } from './galerie-media.controller';
@@ -25,11 +26,12 @@ import { LoggingModule } from 'src/logging/logging.module';
     MediaStorageService,
     MediaDownloadService,
     MediaBackfillService,
+    ProfilePicStorageService,
     CommunicationMetaService,
     CommunicationWhapiService,
     CommunicationMessengerService,
     GalerieMediaService,
   ],
-  exports: [MediaStorageService, MediaDownloadService],
+  exports: [MediaStorageService, MediaDownloadService, ProfilePicStorageService],
 })
 export class MediaStorageModule {}

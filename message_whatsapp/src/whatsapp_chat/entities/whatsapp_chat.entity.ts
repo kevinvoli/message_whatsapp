@@ -131,7 +131,7 @@ export class WhatsappChat {
   @Column({
     name: 'chat_pic',
     type: 'varchar',
-    length: 100,
+    length: 255,
     nullable: false,
     default: 'default.png',
   })
@@ -140,11 +140,14 @@ export class WhatsappChat {
   @Column({
     name: 'chat_pic_full',
     type: 'varchar',
-    length: 100,
+    length: 255,
     nullable: false,
     default: 'default.png',
   })
   chat_pic_full: string;
+
+  @Column({ name: 'profile_pic_fetched_at', type: 'timestamp', nullable: true, default: null })
+  profilePicFetchedAt: Date | null;
 
   @Column({ name: 'is_pinned', type: 'boolean', default: false })
   is_pinned: boolean;

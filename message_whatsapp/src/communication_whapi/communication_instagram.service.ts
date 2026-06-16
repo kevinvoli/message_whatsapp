@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import * as FormData from 'form-data';
 import { AppLogger } from 'src/logging/app-logger.service';
 
@@ -8,7 +8,36 @@ export class CommunicationInstagramService {
   private readonly META_API_VERSION =
     process.env.META_API_VERSION ?? 'v21.0';
 
+  private readonly profileCache = new Map<string, { name: string | null; profilePicUrl: string | null; expiresAt: number }>();
+
   constructor(private readonly logger: AppLogger) {}
+
+  async getInstagramProfile(igsid: string, accessToken: string): Promise<{ name: string | null; profilePicUrl: string | null }> {
+    const cached = this.profileCache.get(igsid);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger.debug(`IG_PROFILE_CACHE_HIT igsid=${igsid}`, CommunicationInstagramService.name);
+      return { name: cached.name, profilePicUrl: cached.profilePicUrl };
+    }
+    try {
+      const response = await axios.get<{ name?: string; username?: string; profile_pic?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${igsid}`,
+        { params: { fields: 'name,username,profile_pic', access_token: accessToken }, timeout: 5_000 },
+      );
+      const data = response.data;
+      const name = data?.name?.trim() || data?.username?.trim() || null;
+      const profilePicUrl = data?.profile_pic ?? null;
+      this.profileCache.set(igsid, { name, profilePicUrl, expiresAt: Date.now() + 2 * 60 * 60_000 });
+      this.logger.log(`IG_PROFILE_RESOLVED igsid=${igsid} name="${name ?? ''}" has_pic=${profilePicUrl !== null}`, CommunicationInstagramService.name);
+      return { name, profilePicUrl };
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number } }>;
+      const detail = axiosErr.response?.data?.error
+        ? `code=${axiosErr.response.data.error.code}: ${axiosErr.response.data.error.message}`
+        : String(err);
+      this.logger.warn(`IG_PROFILE_FAILED igsid=${igsid} — ${detail}`, CommunicationInstagramService.name);
+      return { name: null, profilePicUrl: null };
+    }
+  }
 
   async sendTextMessage(data: {
     text: string;

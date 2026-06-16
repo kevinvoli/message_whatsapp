@@ -7,11 +7,65 @@
 
 ## Contexte
 
-Le projet ingère déjà les DM Instagram (webhook `POST /webhooks/instagram` → `InstagramAdapter` → `UnifiedIngressService`). Le code de résolution du nom (`getInstagramUserName`) et même la création d'un canal `provider='instagram'` existent déjà (`ChannelService.create()` lignes 241-311). Les deux problèmes réels :
+Le projet ingère déjà les DM Instagram (webhook `POST /webhooks/instagram` → `InstagramAdapter` → `UnifiedIngressService`). Le code de résolution du nom (`getInstagramUserName`) et même la création d'un canal `provider='instagram'` existent déjà (`ChannelService.create()` lignes 241-311). Les problèmes identifiés initialement :
 
 1. **Aucun canal `instagram` n'existe en base** → les messages IG transitent par le canal `messenger` (channel_id `1124330211008757`). Le lookup de nom IG ne trouve jamais de canal IG configuré.
 2. **`resolveInstagramFromName()` n'a pas le fallback `findChannelByExternalId`** que possède `resolveMessengerFromName()`. Donc même avec un canal IG dont `channel_id` est NULL, le lookup échoue.
 3. **Aucune implémentation de photo de profil** : `chat_pic` / `chat_pic_full` restent à `'default.png'`.
+
+---
+
+## ⚠️ MISE À JOUR (2026-06-15) — Diagnostic en production : T0 OK, blocage = App Review Meta
+
+Un canal `provider='instagram'` **existe déjà en base et est correctement configuré**. Logs capturés sur un DM Instagram réel (`docker logs whatsapp-back`) :
+
+```
+IG[3/8] channel_lookup ig_account_id=17841405097000191 channel_found=true channel_id=17841405097000191
+        provider=instagram page_id=1124330211008757 external_id=17841405097000191 has_secret=true has_token=true
+INSTAGRAM_NAME[1/3] START igsid=978380681756360 channelId=17841405097000191 has_token=true
+        page_id=1124330211008757 external_id=17841405097000191 pageId_used=1124330211008757
+IG_NAME_CONV_FAILED   token_index=0 — (#298) Reading mailbox messages requires the extended permission read_mailbox
+IG_NAME_CONV_FAILED   token_index=1 — (#200) App does not have Advanced Access to instagram_manage_messages
+                      permission, and recipient user does not have role on app.
+IG_NAME_DIRECT_FAILED token_index=0 — (#100) The page is not linked to an Instagram account or the linked
+                      IG account is not a professional account
+IG_NAME_DIRECT_FAILED token_index=1 — (#200) App does not have Advanced Access to instagram_manage_messages
+                      permission, and recipient user does not have role on app.
+INSTAGRAM_NAME[3/3] FAIL igsid=978380681756360 — aucun nom retourné.
+```
+
+### Conclusions
+
+- **Tâche 0 (config canal) : ✅ FAIT** — `provider=instagram`, `external_id` = IG Business Account ID (17841405097000191), `page_id` = Facebook Page ID (1124330211008757), token présent. Le lookup direct par `channel_id` fonctionne.
+- **Tâche 1 (fallback `findChannelByExternalId`) : NON BLOQUANT** — le lookup direct par `channel_id` réussit déjà dans ce cas. À garder en backlog par cohérence/robustesse (P2), mais ne débloque pas le problème actuel.
+- **Le code de résolution (`getInstagramUserName`) fonctionne correctement** — il atteint bien l'API Graph avec les bons tokens (brut + PAT dérivé via `page_id`).
+
+### Cause racine réelle : permissions Instagram en Standard Access (App Review non soumis)
+
+Vérifié sur App Dashboard Meta → **Contrôle de l'app → Permissions** : statut **"Non soumis"** pour toutes les permissions Instagram :
+
+- `instagram_manage_messages`
+- `instagram_basic`
+- `instagram_business_basic`
+- `instagram_business_manage_messages`
+- `pages_read_engagement`
+- `pages_manage_metadata`
+- `pages_show_list`
+
+→ Ces permissions sont en **Standard Access** : l'API Graph ne répond correctement que pour des utilisateurs ayant un **rôle sur l'app** (testeur/développeur/admin). C'est pour ça que Messenger et WhatsApp fonctionnent (permissions différentes, déjà couvertes par la vérification Business/WABA) alors qu'Instagram échoue pour de vrais clients.
+
+### Plan d'action révisé (remplace l'ordre T0→T7 ci-dessous pour le court terme)
+
+| Action | Responsable | Délai |
+|---|---|---|
+| **1. Débloquer les tests immédiatement** : App Dashboard → Rôles → ajouter le compte Instagram de test comme **Testeur Instagram** | Ops/Admin Meta | Quelques minutes |
+| **2. Soumettre l'App Review** pour le cas d'usage "Instagram Messaging", permissions minimum : `instagram_basic`, `instagram_manage_messages`, `pages_read_engagement`, `pages_manage_metadata`, `pages_show_list` (description du cas d'usage + capture/vidéo du flux DM → affichage nom/photo) | Ops/Admin Meta | 2-15 jours (validation Meta) |
+| **3. Une fois Advanced Access obtenu** : revérifier les logs `IG_NAME_*` — la résolution du nom devrait fonctionner sans changement de code | Backend-dev | Immédiat après validation |
+| **4. Implémenter T2-T7** (photo de profil + tests) | Backend-dev | Après validation de T3, voir détail ci-dessous |
+
+Les tâches T1, T2-T7 ci-dessous **restent valides** pour la suite (photo de profil notamment, totalement absente), mais ne sont plus le chemin critique immédiat — celui-ci est désormais **côté Meta App Review**.
+
+---
 
 ### Documentation officielle vérifiée (Meta, API v25.0)
 

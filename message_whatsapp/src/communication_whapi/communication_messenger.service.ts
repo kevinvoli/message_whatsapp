@@ -12,6 +12,8 @@ export class CommunicationMessengerService {
   private readonly nameCache = new Map<string, { name: string; expiresAt: number }>();
   /** Cache PAT dérivés : évite de rappeler /{pageId}?fields=access_token à chaque message */
   private readonly patCache = new Map<string, { token: string; expiresAt: number }>();
+  /** Cache profil Messenger (nom + photo) : TTL 1h */
+  private readonly messengerProfileCache = new Map<string, { name: string | null; profilePicUrl: string | null; expiresAt: number }>();
 
   constructor(private readonly logger: AppLogger) {}
 
@@ -124,6 +126,35 @@ export class CommunicationMessengerService {
         CommunicationMessengerService.name,
       );
       return null;
+    }
+  }
+
+  async getMessengerProfile(psid: string, accessToken: string, pageId?: string): Promise<{ name: string | null; profilePicUrl: string | null }> {
+    const cached = this.messengerProfileCache.get(psid);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger.debug(`MESSENGER_PROFILE_CACHE_HIT psid=${psid}`, CommunicationMessengerService.name);
+      return { name: cached.name, profilePicUrl: cached.profilePicUrl };
+    }
+    const effectiveToken = pageId
+      ? (await this.derivePageAccessToken(pageId, accessToken)) ?? accessToken
+      : accessToken;
+    try {
+      const response = await axios.get<{ name?: string; first_name?: string; last_name?: string; profile_pic?: string }>(
+        `https://graph.facebook.com/${this.META_API_VERSION}/${psid}`,
+        { params: { fields: 'name,first_name,last_name,profile_pic', access_token: effectiveToken }, timeout: 5_000 },
+      );
+      const data = response.data;
+      const name = data?.name?.trim() || [data?.first_name, data?.last_name].filter(Boolean).join(' ').trim() || null;
+      const profilePicUrl = data?.profile_pic ?? null;
+      this.messengerProfileCache.set(psid, { name, profilePicUrl, expiresAt: Date.now() + 60 * 60_000 });
+      this.logger.log(`MESSENGER_PROFILE_RESOLVED psid=${psid} name="${name ?? ''}" has_pic=${profilePicUrl !== null}`, CommunicationMessengerService.name);
+      return { name, profilePicUrl };
+    } catch (err) {
+      const axiosErr = err as AxiosError<{ error?: { message?: string; code?: number; type?: string } }>;
+      const apiError = axiosErr.response?.data?.error;
+      const detail = apiError ? `code=${apiError.code} type=${apiError.type ?? '-'}: ${apiError.message}` : String(err);
+      this.logger.warn(`MESSENGER_PROFILE_FAILED psid=${psid} — ${detail}`, CommunicationMessengerService.name);
+      return { name: null, profilePicUrl: null };
     }
   }
 
