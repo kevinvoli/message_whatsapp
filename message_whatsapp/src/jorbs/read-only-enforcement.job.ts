@@ -1,12 +1,14 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import {
+  WhatsappChat,
+  WhatsappChatStatus,
+} from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { Repository } from 'typeorm';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { AppLogger } from 'src/logging/app-logger.service';
-import { ChatSession } from 'src/chat-session/entities/chat-session.entity';
 import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 export interface ReadOnlyEnforcementPreview {
@@ -22,16 +24,11 @@ export interface ReadOnlyEnforcementPreview {
 
 @Injectable()
 export class ReadOnlyEnforcementJob implements OnModuleInit {
-  /**
-   * Compteur de cycles consécutifs où des sessions expirées ont été détectées
-   * (candidates > 0) mais où enforce() n'a fermé aucune conversation.
-   * Signal de régression silencieuse (cf. PLAN_CORRECTION_CRON_FERMETURE_FENETRE).
-   */
   private consecutiveZeroClosures = 0;
 
   constructor(
-    @InjectRepository(ChatSession)
-    private readonly sessionRepo: Repository<ChatSession>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepo: Repository<WhatsappChat>,
     private readonly gateway: WhatsappMessageGateway,
     private readonly cronConfigService: CronConfigService,
     private readonly channelService: ChannelService,
@@ -49,85 +46,71 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
   }
 
   /**
-   * Sessions expirées : ended_at IS NULL + auto_close_at < maintenant.
-   * Le chat associé doit être non fermé.
-   * Indépendant de whatsapp_chat.active_session_id (peut être désynchronisé) : on
-   * sélectionne la dernière session ouverte (max started_at) par chat parmi celles
-   * expirées, pour éviter tout doublon de traitement par chat.
-   * Note : auto_close_at IS NULL est intentionnellement ABSENT (P2).
+   * Requête directe sur WhatsappChat.windowExpiresAt — couvre toutes les
+   * conversations (ACTIF et EN_ATTENTE) même sans session chat_session ouverte,
+   * ce qu'un INNER JOIN sur chat_session rate.
    */
-  private async findExpiredSessions(): Promise<ChatSession[]> {
+  private async findExpiredChats(): Promise<WhatsappChat[]> {
     const now = new Date();
-
-    return this.sessionRepo
-      .createQueryBuilder('s')
-      .innerJoinAndSelect('s.chat', 'c')
+    return this.chatRepo
+      .createQueryBuilder('c')
       .where('c.status IN (:...statuses)', {
         statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
       })
-      .andWhere('s.ended_at IS NULL')
-      .andWhere('s.auto_close_at < :now', { now })
-      .andWhere(
-        `s.started_at = (
-          SELECT MAX(s2.started_at) FROM chat_session s2
-          WHERE s2.whatsapp_chat_id = s.whatsapp_chat_id
-            AND s2.ended_at IS NULL
-        )`,
-      )
+      .andWhere('c.windowExpiresAt IS NOT NULL')
+      .andWhere('c.windowExpiresAt < :now', { now })
+      .andWhere('c.deletedAt IS NULL')
       .getMany();
   }
 
   async preview(): Promise<ReadOnlyEnforcementPreview> {
-    const sessions = await this.findExpiredSessions();
+    const chats = await this.findExpiredChats();
 
-    const eligible: ChatSession[] = [];
-    for (const session of sessions) {
-      const chat = session.chat;
+    const eligible: WhatsappChat[] = [];
+    for (const chat of chats) {
       const channelId = chat.channel_id ?? chat.last_msg_client_channel_id ?? null;
       if (channelId && await this.channelService.shouldSkipAutoClose(channelId)) continue;
-      eligible.push(session);
+      eligible.push(chat);
     }
 
     return {
       total: eligible.length,
-      conversations: eligible.map((s) => {
-        const c = s.chat;
-        return {
-          chat_id: c.chat_id,
-          name: c.name,
-          status: c.status,
-          last_activity_at: c.last_activity_at,
-          idle_hours: s.lastClientMessageAt
-            ? Math.floor((Date.now() - new Date(s.lastClientMessageAt).getTime()) / 3_600_000)
-            : -1,
-        };
-      }),
+      conversations: eligible.map((c) => ({
+        chat_id: c.chat_id,
+        name: c.name,
+        status: c.status,
+        last_activity_at: c.last_activity_at,
+        idle_hours: c.last_client_message_at
+          ? Math.floor((Date.now() - new Date(c.last_client_message_at).getTime()) / 3_600_000)
+          : -1,
+      })),
     };
   }
 
   async enforce(): Promise<string> {
-    const sessions = await this.findExpiredSessions();
-    this.logger.log(`READ_ONLY_ENFORCE candidates=${sessions.length}`, ReadOnlyEnforcementJob.name);
+    const chats = await this.findExpiredChats();
+    this.logger.log(`READ_ONLY_ENFORCE candidates=${chats.length}`, ReadOnlyEnforcementJob.name);
 
     let closed = 0;
     let skipped = 0;
-    for (const session of sessions) {
-      const chat = session.chat;
+    for (const chat of chats) {
       const channelId = chat.channel_id ?? chat.last_msg_client_channel_id ?? null;
       if (channelId && await this.channelService.shouldSkipAutoClose(channelId)) {
         skipped++;
         continue;
       }
-      await this.chatSessionService.closeExpiredSessionAndChat(session.id, chat.id);
+      await this.chatSessionService.closeExpiredChatByWindowExpiry(chat.id);
+      chat.status = WhatsappChatStatus.FERME;
+      chat.windowExpiresAt = null;
       await this.gateway.emitConversationClosed(chat);
       closed++;
     }
 
-    if (sessions.length > 0 && closed === 0) {
+    if (chats.length > 0 && closed === 0) {
       this.consecutiveZeroClosures++;
       if (this.consecutiveZeroClosures >= 3) {
         this.logger.warn(
-          `READ_ONLY_ENFORCE_STALLED candidates=${sessions.length} closed=0 cycles_consecutifs=${this.consecutiveZeroClosures} — possible régression silencieuse`,
+          `READ_ONLY_ENFORCE_STALLED candidates=${chats.length} closed=0 cycles_consecutifs=${this.consecutiveZeroClosures} — possible régression silencieuse`,
           ReadOnlyEnforcementJob.name,
         );
       }

@@ -304,6 +304,30 @@ export class ChatSessionService {
   }
 
   /**
+   * Ferme la session active d'un chat et met à jour son statut (status=fermé).
+   * Utilisé par le cron read-only-enforcement quand windowExpiresAt est expiré.
+   * Idempotent : ne ferme que les sessions avec ended_at IS NULL.
+   */
+  async closeExpiredChatByWindowExpiry(whatsappChatId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(ChatSession)
+        .set({ endedAt: new Date() })
+        .where('whatsapp_chat_id = :whatsappChatId', { whatsappChatId })
+        .andWhere('ended_at IS NULL')
+        .execute();
+
+      await manager.update(WhatsappChat, { id: whatsappChatId }, {
+        activeSessionId: null,
+        status: WhatsappChatStatus.FERME,
+        read_only: false,
+        windowExpiresAt: null,
+      });
+    });
+  }
+
+  /**
    * Retourne la session active d'un chat, ou null si aucune.
    */
   async getActiveSession(whatsappChatId: string): Promise<ChatSession | null> {
