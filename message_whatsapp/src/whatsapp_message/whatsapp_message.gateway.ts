@@ -1511,17 +1511,20 @@ export class WhatsappMessageGateway
 
   /**
    * Appelé après fermeture automatique par le cron.
-   * Envoie CONVERSATION_UPSERT avec status=fermé → le frontend retire la conversation de la liste.
+   * - Conversation assignée (poste_id défini) : CONVERSATION_UPSERT avec status=fermé.
+   * - Conversation EN_ATTENTE sans poste (queue globale) : mise à jour de la queue
+   *   pour que l'admin/front retire la conversation de la file d'attente.
    */
   public async emitConversationClosed(chat: WhatsappChat): Promise<void> {
-    if (!chat.poste_id) {
-      return;
+    if (chat.poste_id) {
+      const lastMessage = await this.messageService.findLastMessageBychat_id(chat.chat_id);
+      this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
+        type: 'CONVERSATION_UPSERT',
+        payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
+      });
+    } else {
+      await this.emitQueueUpdatePublic('conversation_auto_closed');
     }
-    const lastMessage = await this.messageService.findLastMessageBychat_id(chat.chat_id);
-    this.server.to(`poste:${chat.poste_id}`).emit('chat:event', {
-      type: 'CONVERSATION_UPSERT',
-      payload: this.mapConversation(chat, lastMessage, chat.unread_count ?? 0),
-    });
   }
 
   // ======================================================

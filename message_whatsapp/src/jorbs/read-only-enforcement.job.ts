@@ -62,7 +62,9 @@ export class ReadOnlyEnforcementJob implements OnModuleInit {
     return this.sessionRepo
       .createQueryBuilder('s')
       .innerJoinAndSelect('s.chat', 'c')
-      .where('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
+      .where('c.status IN (:...statuses)', {
+        statuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE],
+      })
       .andWhere('s.ended_at IS NULL')
       .andWhere('s.auto_close_at < :now', { now })
       .andWhere(
