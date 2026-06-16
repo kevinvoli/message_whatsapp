@@ -1086,7 +1086,7 @@ export async function bulkUpdateSystemConfig(entries: { key: string; value: stri
     return handleResponse<{ updated: number }>(response);
 }
 
-export async function patchChat(chatId: string, data: Partial<{ read_only: boolean; is_archived: boolean }>): Promise<void> {
+export async function patchChat(chatId: string, data: Partial<{ read_only: boolean; is_archived: boolean; status: string }>): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatId)}`, {
         method: 'PATCH',
         credentials: 'include',

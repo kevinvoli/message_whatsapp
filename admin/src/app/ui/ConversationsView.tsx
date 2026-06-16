@@ -482,6 +482,21 @@ export default function ConversationsView({
         }
     }, [selectedChat, addToast]);
 
+    const handleCloseChat = useCallback(async () => {
+        if (!selectedChat) return;
+        if (!window.confirm('Fermer cette conversation ? Le commercial ne pourra plus la fermer lui-même.')) return;
+        try {
+            await patchChat(selectedChat.chat_id, { status: 'fermé' });
+            setSelectedChat(prev => prev ? { ...prev, status: 'fermé' } : prev);
+            setChats(prev => prev.map(c =>
+                c.chat_id === selectedChat.chat_id ? { ...c, status: 'fermé' } : c,
+            ));
+            addToast({ type: 'success', message: 'Conversation fermée.' });
+        } catch {
+            addToast({ type: 'error', message: 'Impossible de fermer la conversation.' });
+        }
+    }, [selectedChat, addToast]);
+
     const filteredChats = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
         if (!term) return chats;
@@ -808,6 +823,16 @@ export default function ConversationsView({
                                             <LockOpen className="w-3 h-3" />
                                             Verrouiller
                                             <Lock className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                    {selectedChat.status !== 'fermé' && (
+                                        <button
+                                            onClick={() => void handleCloseChat()}
+                                            title="Fermer définitivement cette conversation"
+                                            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 hover:border-red-400 transition-colors cursor-pointer"
+                                        >
+                                            <X className="w-3 h-3" />
+                                            Fermer
                                         </button>
                                     )}
                                     {selectedChat.campaign_link_id && (

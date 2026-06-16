@@ -17,7 +17,7 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   const [showConfirmation, setShowConfirmation] = useState<ConversationStatus | null>(null);
 
   const handleStatusChange = (newStatus: ConversationStatus) => {
-    if (newStatus === 'fermé' || newStatus === 'converti') {
+    if (newStatus === 'converti') {
       setShowConfirmation(newStatus);
     } else {
       onStatusChange(conversation.id, newStatus);
@@ -83,7 +83,7 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
     }
   };
 
-  const statusOptions: ConversationStatus[] = ['actif', 'attente', 'converti', 'fermé'];
+  const statusOptions: ConversationStatus[] = ['actif', 'attente', 'converti'];
 
   return (
     <div className="relative">

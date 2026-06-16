@@ -648,15 +648,11 @@ export class WhatsappMessageGateway
       const chat = await this.chatService.findBychat_id(chatId);
       if (!chat || !this.isAllowedTenantChat(chat, tenantIds)) return;
 
-      // no_close activé → ne jamais fermer la conversation manuellement
-      if (newStatus === WhatsappChatStatus.FERME && chat.last_msg_client_channel_id) {
-        const closeBlocked = await this.channelService.isCloseBlocked(chat.last_msg_client_channel_id);
-        if (closeBlocked) {
-          this.logger.warn(
-            `CONVERSATION_STATUS_CHANGE blocked: chat=${chatId} — no_close activé sur le canal`,
-          );
-          return;
-        }
+      if (newStatus === WhatsappChatStatus.FERME) {
+        this.logger.warn(
+          `WS_STATUS_CHANGE_FORBIDDEN chat=${chatId} status=fermé — fermeture réservée à l'admin`,
+        );
+        return;
       }
 
       await this.chatService.update(chatId, { status: newStatus });
