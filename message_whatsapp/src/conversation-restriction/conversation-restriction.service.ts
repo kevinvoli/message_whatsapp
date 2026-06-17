@@ -163,7 +163,7 @@ export class ConversationRestrictionService {
         this.isWindowExpired(chat)
       ) return false;
       if (!chat.channel_id && !chat.last_msg_client_channel_id) return false;
-      if (posteId && chat.poste_id !== null && chat.poste_id !== posteId) return false;
+      if (posteId && chat.poste_id !== posteId) return false;
       return true;
     });
 

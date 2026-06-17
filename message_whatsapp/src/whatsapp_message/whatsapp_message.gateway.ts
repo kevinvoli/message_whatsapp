@@ -806,6 +806,14 @@ export class WhatsappMessageGateway
     }
   }
 
+  private async isRestrictionExemptPoste(agent: { posteId?: string }): Promise<boolean> {
+    const config = await this.restrictionService.getRestrictionConfig();
+    if (!config.enabled) return true;
+    if (!agent.posteId) return false;
+    const dedicatedIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
+    return dedicatedIds.length > 0;
+  }
+
   @SubscribeMessage('conversation:accessed')
   async handleConversationAccessed(
     @ConnectedSocket() client: Socket,
@@ -814,18 +822,14 @@ export class WhatsappMessageGateway
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    const config = await this.restrictionService.getRestrictionConfig();
-    if (!config.enabled) return;
-
-    // Postes dédiés (canal admin) : exemptés de la restriction de réponse.
-    // On émet quand même restriction:status triggered=false pour débloquer le
-    // pendingConversationId côté frontend.
-    if (agent.posteId) {
-      const dedicatedIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
-      if (dedicatedIds.length > 0) {
-        client.emit('restriction:status', { triggered: false, unrespondedCount: 0, unrespondedConversations: [], config });
-        return;
-      }
+    const isExempt = await this.isRestrictionExemptPoste(agent);
+    if (isExempt) {
+      // Postes dédiés (canal admin) ou config désactivée : exemptés de la restriction.
+      // On émet quand même restriction:status triggered=false pour débloquer le
+      // pendingConversationId côté frontend.
+      const config = await this.restrictionService.getRestrictionConfig();
+      client.emit('restriction:status', { triggered: false, unrespondedCount: 0, unrespondedConversations: [], config });
+      return;
     }
 
     const preCheck = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
@@ -835,6 +839,30 @@ export class WhatsappMessageGateway
     }
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
     const status = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
+    client.emit('restriction:status', status);
+  }
+
+  @SubscribeMessage('restriction:check')
+  async handleRestrictionCheck(@ConnectedSocket() client: Socket): Promise<void> {
+    const agent = this.connectedAgents.get(client.id);
+    if (!agent) return;
+
+    const isExempt = await this.isRestrictionExemptPoste(agent);
+    if (isExempt) {
+      const config = await this.restrictionService.getRestrictionConfig();
+      client.emit('restriction:status', {
+        triggered: false,
+        unrespondedCount: 0,
+        unrespondedConversations: [],
+        config,
+      });
+      return;
+    }
+
+    const status = await this.restrictionService.checkRestriction(
+      agent.commercialId,
+      agent.posteId,
+    );
     client.emit('restriction:status', status);
   }
 
@@ -1009,6 +1037,36 @@ export class WhatsappMessageGateway
             },
           });
           return;
+        }
+      }
+
+      // 🔒 Guard restriction « conversations non répondues » — source de vérité backend.
+      // Bloque l'envoi quand une AUTRE conversation que celle-ci est non répondue.
+      // La conversation en cours est exclue pour éviter le deadlock (le commercial ne
+      // pourrait plus répondre à la conversation bloquante).
+      if (restrictionCfg.enabled) {
+        const isExempt = await this.isRestrictionExemptPoste(agent);
+        if (!isExempt) {
+          const status = await this.restrictionService.checkRestriction(
+            agent.commercialId,
+            agent.posteId,
+          );
+          const blockingOther =
+            status.triggered &&
+            status.unrespondedConversations.some((c) => c.chat_id !== payload.chat_id);
+          if (blockingOther) {
+            client.emit('restriction:status', status);
+            client.emit('chat:event', {
+              type: 'MESSAGE_SEND_ERROR',
+              payload: {
+                chat_id: payload.chat_id,
+                tempId: payload.tempId,
+                code: 'RESTRICTION_TRIGGERED',
+                message: "Répondez aux conversations en attente avant d'en traiter une nouvelle.",
+              },
+            });
+            return;
+          }
         }
       }
 

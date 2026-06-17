@@ -43,6 +43,10 @@ const WebSocketEvents = () => {
       if (selectedChatId) {
         socket.emit('messages:get', { chat_id: selectedChatId });
       }
+
+      // Restaurer l'état de restriction au (re)connect : sans ça, restrictionTriggered
+      // repart à false après F5 / second onglet et le commercial contourne le blocage.
+      socket.emit('restriction:check');
     };
 
     const upsertConversationPatch = (
@@ -247,7 +251,8 @@ const WebSocketEvents = () => {
           if (
             errorCode === 'CHANNEL_NOT_FOUND' ||
             errorCode === 'RESPONSE_TIMEOUT_EXCEEDED' ||
-            errorCode === 'MESSAGE_TOO_SHORT'
+            errorCode === 'MESSAGE_TOO_SHORT' ||
+            errorCode === 'RESTRICTION_TRIGGERED'
           ) {
             const errorMsg = (data.payload as { message?: string }).message
               ?? 'Impossible d\'envoyer : canal introuvable pour cette conversation.';
