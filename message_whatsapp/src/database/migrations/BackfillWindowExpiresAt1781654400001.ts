@@ -16,7 +16,7 @@ export class BackfillWindowExpiresAt1781654400001 implements MigrationInterface 
       WHERE window_expires_at IS NULL
         AND last_client_message_at IS NOT NULL
         AND status IN ('actif', 'en_attente')
-        AND deleted_at IS NULL
+        AND deletedAt IS NULL
     `);
   }
 
@@ -31,7 +31,7 @@ export class BackfillWindowExpiresAt1781654400001 implements MigrationInterface 
       WHERE window_expires_at IS NOT NULL
         AND active_session_id IS NULL
         AND status IN ('actif', 'en_attente')
-        AND deleted_at IS NULL
+        AND deletedAt IS NULL
     `);
   }
 }

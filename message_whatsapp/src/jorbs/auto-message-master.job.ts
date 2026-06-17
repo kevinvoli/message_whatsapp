@@ -16,7 +16,6 @@ import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 const MASTER_KEY = 'auto-message-master';
 
-
 export interface MasterPreviewConversation {
   chat_id: string;
   name: string;
