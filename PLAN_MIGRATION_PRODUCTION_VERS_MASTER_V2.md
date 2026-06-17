@@ -1,5 +1,5 @@
 # Plan de migration : Production → Master V2
-> Révision 8 — 2026-06-17  
+> Révision 6 — 2026-05-28  
 > Statut : **Candidat exécutable** — en attente dry-run staging validé
 
 ---
@@ -150,67 +150,6 @@ Ces colonnes sont ajoutées via la migration `ConvergenceProductionToMasterV2_17
 | `poste_message_count_since_last_client` → `outbound_message_count` | `ConvergenceProductionToMasterV2_1748995200099.ts` |
 | `messages_predefinis` → FlowBot + `_legacy_*` | `20260414_remove_auto_message_legacy.ts` (déjà dans master) |
 | `business_hours_config` : données production à conserver | **Aucune transformation** — table identique, données importées via phpMyAdmin |
-
-### 3.4 Nouvelles tables créées par les migrations production (absentes de master V2)
-
-Ces tables sont créées par des migrations présentes dans la branche `production` mais **absentes de master V2**. Elles seront créées par `npm run migration:run` lors du go-live, à condition que les migrations correspondantes soient portées dans master via la branche `feature/convergence-production`.
-
-| Table | Migration créatrice | Rôle |
-|---|---|---|
-| `commercial_conversation_access` | `ConversationRestrictionAccess1748649600001` | Suivi quotidien des accès/réponses par commercial (système de restriction) |
-| `meta_ad_referral` | `AddMetaAdReferral1780272000001` | Données referral Meta (Click-to-WhatsApp) — fenêtre 72h |
-| `chat_session` | `AddChatSessionEntity1780531200000` | Source de vérité session active par conversation (CTWA/normal) |
-| `quiz_category`, `quiz_question`, `quiz_answer`, `quiz_session`, `quiz_session_question`, `quiz_attempt`, `quiz_attempt_answer` | `AddQuizSystem1749686400000` | Système QCM quotidien obligatoire pour les commerciaux |
-
-**Colonnes ajoutées par migrations production (non encore listées en 3.1) :**
-
-| Table | Colonnes ajoutées | Migration |
-|---|---|---|
-| `whapi_channels` | `read_only_after_messages` (INT) | `ReadOnlyConfig1746144000008` |
-| `whatsapp_chat` | `poste_message_count_since_last_client` (INT) | `ReadOnlyConfig1746144000008` |
-| `whatsapp_chat` | `active_session_id` (CHAR(36)) | `AddChatSessionEntity1780531200000` |
-| `whatsapp_chat` | `is_ctwa` (TINYINT) | `AddMetaAdReferral1780272000001` |
-| `whatsapp_chat` | `window_expires_at` (TIMESTAMP) | `AddWindowExpiresAtToChat1781522555000` |
-| `whatsapp_chat` | `last_window_reminder_sent_at` (DATETIME) | `AddWindowReminderSection1780531200001` |
-| `whatsapp_chat` | `profile_pic_fetched_at` (TIMESTAMP) | `AddProfilePicFetchedAt1750041600001` |
-| `whatsapp_message` | `read_by_commercial_id` (CHAR(36)), `read_by_commercial_at` (DATETIME) | `AddMessageReadTracking1748822400001` |
-| `whatsapp_message` | `is_first_reply` (TINYINT) | `AddConversationTurnTracking1748908800001` |
-| `whatsapp_commercial` | `messages_read_count`, `messages_handled_count`, `last_activity_at` | `AddMessageReadTracking1748822400001` |
-| `dispatch_settings` | `max_read_messages_per_minute`, `idle_disconnect_enabled`, `idle_disconnect_minutes` | `AddIdleDisconnectSettings1748822400002` |
-| `dispatch_settings` | `read_cooldown_seconds`, `idle_warning_seconds` | `AddCooldownAndWarningSettings1748908800002` |
-| `whatsapp_poste` | `media_panel_enabled` (TINYINT), `media_panel_types` (VARCHAR) | `AddMediaPanelToPoste1749513600001` |
-| `whatsapp_media` | `local_url`, `local_path`, `provider_url_expired` (TINYINT), `downloaded_at` | `AddLocalMediaStorage1749427200001` |
-| `messages_predefinis` | `media_asset_id` (FK → media_asset) | `AddMediaToAutoMessage1749168000001` |
-| `messages_predefinis` | trigger_type ENUM étendu avec `'window_reminder'` | `AddWindowReminderSection1780531200001` |
-| `cron_config` | `window_reminder_normal_start_min`, `window_reminder_normal_end_min`, `window_reminder_ctwa_start_min`, `window_reminder_ctwa_end_min`, `window_reminder_min_replies`, `ttl_days_ctwa` | `AddWindowReminderCronFields1780531200002` |
-| `whatsapp_message` | `message_id`, `external_id`, `provider_message_id` → VARCHAR(512) | `FixInstagramMessageIdLength1780876800001` |
-| `whatsapp_chat` | `chat_pic`, `chat_pic_full` → VARCHAR(255) (était 100) | `AddProfilePicFetchedAt1750041600001` |
-
-**Indexes de performance ajoutés :**
-
-| Index | Table | Migration |
-|---|---|---|
-| `IDX_msg_read_by_commercial` | `whatsapp_message` | `AddMessageReadTracking1748822400001` |
-| `IDX_msg_first_reply` | `whatsapp_message` | `AddConversationTurnTracking1748908800001` |
-| `IDX_msg_trafic_covering`, `IDX_msg_trafic_hour`, `IDX_msg_trafic_dow` | `whatsapp_message` | `AddTrafficGroupingIndexes1748995200001` |
-| `IDX_msg_ctwa_kpi` | `whatsapp_message` | `AddMetaAdKpiIndex1780272000002` |
-
-> **Note importante :** certaines de ces colonnes se chevauchent avec celles listées en section 3.1 (colonnes portées par `ConvergenceProductionToMasterV2_1748995200099`). Les colonnes `read_by_commercial_id`, `read_by_commercial_at`, `is_first_reply`, `messages_read_count`, `messages_handled_count`, `last_activity_at`, `read_cooldown_seconds`, `idle_warning_seconds`, `idle_disconnect_*`, `max_read_messages_per_minute` sont maintenant portées directement par leurs migrations dédiées — la migration de convergence doit vérifier avec `hasColumn()` pour ne pas dupliquer. Ceci est déjà le cas dans le code de `ConvergenceProductionToMasterV2_1748995200099` (toutes les colonnes sont conditionnelles).
-
-### 3.5 Nouvelle migration de backfill — `BackfillWindowExpiresAt1781654400001`
-
-Cette migration corrige les conversations `actif` et `en_attente` créées **avant** la mise en place du système de sessions glissantes (`Phase9SlidingWindow...`) et dont `window_expires_at` est `NULL`. Sans ce backfill, le frontend interprète `null` comme "fenêtre expirée" et bloque le champ de saisie du commercial — même pour des conversations actives (Bug #1 du RAPPORT_BUG_FENETRE_ET_ATTENTE.md).
-
-**Logique :** `window_expires_at = last_client_message_at + INTERVAL 24 HOUR`
-
-- Si le résultat est dans le **futur** → fenêtre encore active, champ de saisie débloqué.
-- Si le résultat est dans le **passé** → fenêtre effectivement expirée, blocage légitime.
-
-**Périmètre :** uniquement les conversations `status IN ('actif', 'en_attente')`, `window_expires_at IS NULL`, `last_client_message_at IS NOT NULL`, `deletedAt IS NULL`.
-
-**Exécution :** automatique via `npm run migration:run` — aucune intervention manuelle requise.
-
-**Migration présente dans :** `message_whatsapp/src/database/migrations/BackfillWindowExpiresAt1781654400001.ts`
 
 ---
 
@@ -787,8 +726,6 @@ Ce rapport est un livrable obligatoire avant l'ouverture de la fenêtre de maint
 
 Ces migrations s'exécuteront automatiquement via `npm run migration:run` sur la DB production importée.
 
-### 6.1 Migrations master V2 (fonctionnalités V2 pures)
-
 | Migration | Ce qu'elle fait | Important pour |
 |---|---|---|
 | `FixWhatsappTemplateSchema1746620000001` | Ajoute colonnes V2 à `whatsapp_template` | Prérequis `TransformTemplateData` |
@@ -802,51 +739,9 @@ Ces migrations s'exécuteront automatiquement via `npm run migration:run` sur la
 | `20260520_add_messaging_application` | Crée messaging_application | V2 |
 | `DispatchModeColumn1747267200001` | Ajoute dispatch_mode à dispatch_settings | V2 |
 | `AddCommercialPlanning*` | Planning des absences | V2 |
-| `BackfillWindowExpiresAt1781654400001` | Backfille `window_expires_at` depuis `last_client_message_at + 24h` pour les conversations `actif`/`en_attente` sans session active | Correctif critique — déblocage champ saisie |
 | *(toutes les autres migrations master)* | Fonctionnalités V2 | V2 |
 
-### 6.2 Migrations production à porter dans master (branche `feature/convergence-production`)
-
-Ces migrations existent dans la branche `production` mais **pas dans master**. Elles doivent être portées dans master pour que `npm run migration:run` les exécute lors du go-live. Sans elles, les modules backend correspondants ne fonctionneront pas (tables manquantes, colonnes manquantes).
-
-> **Ordre d'exécution** : les migrations sont exécutées par TypeORM dans l'ordre lexicographique de leur timestamp. Les migrations ci-dessous doivent donc respecter les dépendances indiquées.
-
-| Migration (fichier .ts) | Ce qu'elle fait | Dépendances |
-|---|---|---|
-| `OutboundHsm1746000000001` | Crée `whatsapp_template` (schéma V1 production) | Aucune — doit s'exécuter avant `FixWhatsappTemplateSchema` |
-| `OutboundHsmV2_1746000000002` | Ajoute `rejection_reason` à `whatsapp_template` | Après `OutboundHsm1746000000001` |
-| `ConnectionLog1746057600007` | Crée `messaging_connection_log` (IF NOT EXISTS — idempotente avec `ConvergenceProductionToMasterV2`) | Aucune |
-| `ReadOnlyConfig1746144000008` | Ajoute `read_only_after_messages` (whapi_channels), `poste_message_count_since_last_client` (whatsapp_chat), `read_only_max_messages` (dispatch_settings) | Aucune |
-| `AddTrafficGroupingIndexes1748995200001` | Ajoute colonnes virtuelles `hour_of_day`, `day_of_week_n` sur `whatsapp_message` + 3 index covering trafic | Aucune |
-| `ConversationRestrictionAccess1748649600001` | Crée `commercial_conversation_access` (suivi accès/réponses par commercial) | Aucune |
-| `AddMessageReadTracking1748822400001` | Ajoute `read_by_commercial_id`, `read_by_commercial_at` (whatsapp_message) + `messages_read_count`, `messages_handled_count`, `last_activity_at` (whatsapp_commercial) | Aucune |
-| `AddIdleDisconnectSettings1748822400002` | Ajoute `max_read_messages_per_minute`, `idle_disconnect_enabled`, `idle_disconnect_minutes` à `dispatch_settings` | Aucune |
-| `AddConversationTurnTracking1748908800001` | Ajoute `is_first_reply` (TINYINT) à `whatsapp_message` | Aucune |
-| `AddCooldownAndWarningSettings1748908800002` | Ajoute `read_cooldown_seconds`, `idle_warning_seconds` à `dispatch_settings` | Aucune |
-| `FixUnreadCountBatch1748995200002` | Recalcule `unread_count` (fermé → 0, actif → recompte depuis whatsapp_message) | Aucune — opération de données |
-| `CleanupStaleConnectionLogs1749081600001` | Supprime les logs connexion antérieurs à la date de déploiement (données corrompues) | Après `ConnectionLog1746057600007` |
-| `AddMediaToAutoMessage1749168000001` | Ajoute `media_asset_id` (FK → media_asset) à `messages_predefinis` | Après `ConvergenceProductionToMasterV2_1748995200099` (qui crée `media_asset`) |
-| `RestoreOrphanedSessions1749254400001` | Backfill `messaging_connection_log` : ferme les sessions fantômes, reconstitue les sessions des commerciaux connectés | Après `ConnectionLog1746057600007` |
-| `AddLocalMediaStorage1749427200001` | Ajoute `local_url`, `local_path`, `provider_url_expired`, `downloaded_at` à `whatsapp_media` | Aucune |
-| `AddMediaPanelToPoste1749513600001` | Ajoute `media_panel_enabled`, `media_panel_types` à `whatsapp_poste` | Aucune |
-| `AddProfilePicFetchedAt1750041600001` | Ajoute `profile_pic_fetched_at` à `whatsapp_chat` + étend `chat_pic`/`chat_pic_full` à VARCHAR(255) | Aucune |
-| `AddQuizSystem1749686400000` | Crée les 7 tables du système QCM : `quiz_category`, `quiz_question`, `quiz_answer`, `quiz_session`, `quiz_session_question`, `quiz_attempt`, `quiz_attempt_answer` | Aucune |
-| `AddMetaAdReferral1780272000001` | Crée `meta_ad_referral` + ajoute `is_ctwa` (TINYINT) et `active_session_id` (CHAR(36)) à `whatsapp_chat` | Aucune |
-| `AddMetaAdKpiIndex1780272000002` | Ajoute index `IDX_msg_ctwa_kpi` sur `whatsapp_message` (KPIs CTWA) | Après `AddMetaAdReferral1780272000001` |
-| `FixMetaAdReferralDefaults1780358400001` | Ajoute DEFAULT '' sur `source_type` et `source_id` dans `meta_ad_referral` | Après `AddMetaAdReferral1780272000001` |
-| `AddChatSessionEntity1780531200000` | Crée `chat_session` + ajoute `active_session_id` sur `whatsapp_chat` (idempotent si déjà créé par `AddMetaAdReferral`) | Après `AddMetaAdReferral1780272000001` |
-| `AddWindowReminderSection1780531200001` | Étend l'ENUM `trigger_type` avec `'window_reminder'` + ajoute `last_window_reminder_sent_at` à `whatsapp_chat` | Après `AddChatSessionEntity1780531200000` |
-| `AddWindowReminderCronFields1780531200002` | Ajoute 6 colonnes à `cron_config` : plages horaires window_reminder (normal/CTWA), min_replies, ttl_days_ctwa | Après `AddWindowReminderSection1780531200001` |
-| `FixActiveSessionIdCollation1780704000000` | Corrige la collation de `whatsapp_chat.active_session_id` (utf8mb4_unicode_ci) pour éviter ER_CANT_AGGREGATE_2COLLATIONS | Après `AddChatSessionEntity1780531200000` |
-| `FixInstagramMessageIdLength1780876800001` | Étend `message_id`, `external_id`, `provider_message_id` à VARCHAR(512) sur `whatsapp_message` (IDs Instagram trop longs) | Aucune |
-| `AddWindowExpiresAtToChat1781522555000` | Ajoute `window_expires_at` (TIMESTAMP) à `whatsapp_chat` + backfill depuis chat_session active | Après `AddChatSessionEntity1780531200000` |
-| `BackfillWindowExpiresAt1781654400001` | Backfille `window_expires_at` pour les conversations actives/en_attente sans session (last_client_message_at + 24h) | Après `AddWindowExpiresAtToChat1781522555000` |
-
 > **Note `business_hours_config` :** cette table a le **même schéma** en production et dans master. Elle est importée telle quelle via phpMyAdmin. Aucune migration n'est nécessaire. La migration FlowBot la lit en fail-open si elle est vide — si elle a 7 lignes (une par jour), les horaires de production seront respectés.
-
-> **Note `OutboundHsm1746000000001` :** cette migration crée `whatsapp_template` avec le schéma V1 production (status ENUM à 3 valeurs, pas de `body_text`, etc.). Elle doit s'exécuter **avant** `FixWhatsappTemplateSchema1746620000001` (master) qui ajoute les colonnes V2. L'ordre est garanti par les timestamps (1746000000001 < 1746620000001).
-
-> **Attention `AddWindowReminderSection1780531200001` :** cette migration modifie l'ENUM `trigger_type` de `messages_predefinis`. Si la migration `20260414_remove_auto_message_legacy` (master) a déjà renommé la table en `_legacy_messages_predefinis`, cette migration échouera. À vérifier lors du dry-run staging — si conflit, adapter le nom de table dans la migration.
 
 ---
 
@@ -927,71 +822,6 @@ FROM whatsapp_message GROUP BY direction;
 -- 10. Sessions connexion encore ouvertes (indicatif)
 SELECT 'OPEN_SESSIONS' AS check_name, COUNT(*) AS val
 FROM messaging_connection_log WHERE logout_at IS NULL;
-
--- 11. Backfill window_expires_at — conversations actives/en_attente encore sans valeur
---     Doit être 0 si BackfillWindowExpiresAt1781654400001 s'est bien exécutée
-SELECT 'WINDOW_EXPIRES_AT_NULL_ACTIVE' AS check_name, COUNT(*) AS val   -- doit être 0
-FROM whatsapp_chat
-WHERE status IN ('actif', 'en_attente')
-  AND window_expires_at IS NULL
-  AND last_client_message_at IS NOT NULL
-  AND deletedAt IS NULL;
-
--- 12. window_expires_at cohérent (ne doit pas être antérieur à last_client_message_at)
-SELECT 'WINDOW_EXPIRES_BEFORE_LAST_CLIENT' AS check_name, COUNT(*) AS val   -- doit être 0
-FROM whatsapp_chat
-WHERE window_expires_at IS NOT NULL
-  AND last_client_message_at IS NOT NULL
-  AND window_expires_at < last_client_message_at
-  AND deletedAt IS NULL;
-
--- 13. chat_session — sessions encore ouvertes pour des chats fermés
-SELECT 'SESSION_OPEN_ON_CLOSED_CHAT' AS check_name, COUNT(*) AS val   -- doit être 0
-FROM chat_session s
-JOIN whatsapp_chat c ON s.whatsapp_chat_id = c.id
-WHERE s.ended_at IS NULL
-  AND c.status = 'fermé'
-  AND c.deletedAt IS NULL;
-
--- 14. meta_ad_referral — orphelins (chat_id inexistant)
-SELECT 'ORPHAN_META_AD_REFERRAL' AS check_name, COUNT(*) AS val   -- doit être 0
-FROM meta_ad_referral r
-LEFT JOIN whatsapp_chat c ON r.chat_id = c.id
-WHERE c.id IS NULL;
-
--- 15. commercial_conversation_access — entrées sans commercial valide
-SELECT 'ORPHAN_CONV_ACCESS_NO_COMMERCIAL' AS check_name, COUNT(*) AS val   -- doit être 0
-FROM commercial_conversation_access a
-LEFT JOIN whatsapp_commercial com ON a.commercial_id = com.id
-WHERE com.id IS NULL;
-
--- 16. Quiz — sessions sans questions associées (indicatif)
-SELECT 'QUIZ_SESSION_NO_QUESTIONS' AS check_name, COUNT(*) AS val
-FROM quiz_session qs
-LEFT JOIN quiz_session_question qsq ON qsq.quiz_session_id = qs.id
-WHERE qsq.id IS NULL;
-
--- 17. messages_predefinis avec media_asset_id orphelin
-SELECT 'ORPHAN_AUTO_MSG_MEDIA' AS check_name, COUNT(*) AS val   -- doit être 0
-FROM messages_predefinis mp
-LEFT JOIN media_asset ma ON mp.media_asset_id = ma.id
-WHERE mp.media_asset_id IS NOT NULL AND ma.id IS NULL;
-
--- 18. Commerciaux avec sessions connexion encore ouvertes après migration
-SELECT 'ORPHAN_CONNECTION_SESSIONS' AS check_name, COUNT(*) AS val
-FROM messaging_connection_log
-WHERE logout_at IS NULL
-  AND login_at < DATE_SUB(NOW(), INTERVAL 24 HOUR);
--- Note : des sessions ouvertes > 24h = suspects (commerciaux déconnectés mais session non fermée)
-
--- 19. Conversations CTWA sans referral associé
-SELECT 'CTWA_WITHOUT_REFERRAL' AS check_name, COUNT(*) AS val
-FROM whatsapp_chat c
-WHERE c.is_ctwa = 1
-  AND NOT EXISTS (SELECT 1 FROM meta_ad_referral r WHERE r.chat_id = c.id)
-  AND c.deletedAt IS NULL;
--- Note : des valeurs > 0 sont attendues si is_ctwa a été backfillé sans referral complet
--- C'est une alerte, pas un bloquant.
 ```
 
 ---
@@ -1125,53 +955,6 @@ Créer la branche `feature/convergence-production` depuis `master` et y porter t
 | B1-11 | `DedicatedChannelsView` + `LectureSeuleView` (admin) | S |
 | B1-12 | Fonctions API production dans modules `admin/lib/api/` master | M |
 | B1-13 | Validation : `tsc --noEmit` + `next build` sans erreur | S |
-| B1-14 | `src/conversation-restriction/` (backend) — `ConversationRestrictionService`, `ConversationRestrictionAccess` entity | M |
-| B1-15 | `src/chat-session/` (backend) — `ChatSession` entity, `ChatSessionService` (source de vérité session CTWA/normal) | L |
-| B1-16 | `src/meta-ad-referral/` (backend) — `MetaAdReferral` entity, handler webhook referral, fenêtre 72h CTWA | M |
-| B1-17 | `src/quiz/` (backend) — module QCM complet (catégories, questions, sessions, tentatives, résultats) | L |
-| B1-18 | `src/media-storage/` (backend) — `MediaStorageService`, `MediaDownloadService`, `MediaBackfillService`, `ProfilePicService` | M |
-| B1-19 | Panneau médias poste — endpoints `GET/PUT /poste/:id/panel` + `GET /poste-panel/media` (backend + admin + front) | M |
-| B1-20 | Module Window Reminder (cron J) — job d'envoi de rappel avant expiration fenêtre 24h/72h | M |
-| B1-21 | `front/src/components/quiz/` — pages quiz commercial (accueil, question par question, résultat) | M |
-| B1-22 | `admin/src/app/dashboard/quiz/` — gestion QCM admin (catégories, questions, sessions, résultats) | L |
-
-### 10.2b Correctifs fonctionnels à porter de `production` vers `master` (sprint B1, bloquants avant go-live)
-
-Ces correctifs ont été implémentés sur la branche `production` en 2026-06-17 (RAPPORT_BUG_FENETRE_ET_ATTENTE.md + RAPPORT_BUG_RESTRICTION_COMMERCIAUX.md + PLAN_CORRECTION_BUG_RESTRICTION.md). Ils doivent être portés dans la branche `feature/convergence-production`.
-
-| # | Fichier | Changement | Nature |
-|---|---|---|---|
-| C1 | `front/src/components/chat/ChatMainArea.tsx` | Condition `windowExpired` : `windowExpiresAt != null &&` ajouté — distingue `null` (pas de session) de "fenêtre expirée" | Fix critique Bug #1 |
-| C2 | `message_whatsapp/src/dispatcher/dispatcher.service.ts` | Nouvelle méthode `reactivateWaitingConversationsForPoste(posteId)` — remet `ACTIF` toutes les conversations `EN_ATTENTE` du poste à la reconnexion | Fix Bug #5 |
-| C3 | `message_whatsapp/src/whatsapp_message/whatsapp_message.gateway.ts` | Appel de `reactivateWaitingConversationsForPoste(posteId)` dans `handleConnection()`, après `posteService.setActive()` | Fix Bug #5 |
-| C4 | `message_whatsapp/src/whatsapp_message/whatsapp_message.gateway.ts` | Fermeture immédiate via `closeExpiredChatByWindowExpiry()` dans `handleSendMessage` quand `windowExpired = true` + injection `ChatSessionService` | Fix comportement fenêtre |
-| C5 | `message_whatsapp/src/whatsapp_message/whatsapp_message.gateway.ts` | Méthode privée `isRestrictionExemptPoste(agent)` — factorise la détection "config désactivée OU poste dédié" (évite triple duplication) | Factorisation |
-| C6 | `message_whatsapp/src/whatsapp_message/whatsapp_message.gateway.ts` | Guard `RESTRICTION_TRIGGERED` dans `handleSendMessage` — vérifie `checkRestriction()` avant envoi, bloque si une autre conversation est non répondue | Fix Bug #3 (guard backend) |
-| C7 | `message_whatsapp/src/whatsapp_message/whatsapp_message.gateway.ts` | Nouveau handler `@SubscribeMessage('restriction:check')` — lecture seule du statut de restriction, sans `recordAccess()` parasite | Fix Bug #3 (reconnect) |
-| C8 | `message_whatsapp/src/conversation-restriction/conversation-restriction.service.ts` | Filtre poste : `chat.poste_id !== posteId` (suppression de `&& chat.poste_id !== null`) — exclut les conversations sans poste du quota | Fix Bug #7 |
-| C9 | `front/src/components/WebSocketEvents.tsx` | Émission `socket.emit('restriction:check')` dans `refreshAfterConnect` au (re)connect — restaure le modal de restriction après F5 | Fix Bug #3 (frontend) |
-| C10 | `front/src/components/WebSocketEvents.tsx` | Code `RESTRICTION_TRIGGERED` ajouté dans le handler `MESSAGE_SEND_ERROR` — nettoie le message optimiste et affiche l'erreur | Fix Bug #3 (feedback UI) |
-
-**Dépendances entre correctifs :**
-- C8 doit être porté avant C6 (le guard backend doit raisonner sur un comptage juste).
-- C5 doit être porté avant C6 et C7 (factorisation requise pour éviter la triple duplication).
-- C9 et C10 dépendent de C7 (le handler `restriction:check` backend doit exister).
-
-**Impact sur les tests :** après portage, vérifier `npm test -- --testPathPattern=conversation-restriction` (cas `poste_id=null` exclu du décompte) et `npm test -- --testPathPattern=gateway` (envoi refusé quand une autre conv est non répondue).
-
----
-
-### 10.2c Correctifs UX/qualité supplémentaires à porter (depuis `PLAN_CORRECTION_*.md` et `RAPPORT_BUG_*.md` 2026-06-15..17)
-
-Ces correctifs ont été identifiés et documentés dans la branche `production`. Ils ne nécessitent pas de migration SQL mais doivent être portés dans `feature/convergence-production`.
-
-| # | Fichier | Changement | Nature |
-|---|---|---|---|
-| D1 | `message_whatsapp/src/jorbs/read-only-enforcement.job.ts` + `src/chat-session/chat-session.service.ts` | Utiliser `ttlDaysCtwa` depuis `cron_config` au lieu de la valeur codée en dur `72` | Fix correctif cron fermeture CTWA (PLAN_CORRECTION_CRON_FERMETURE_FENETRE_2026-06-15) |
-| D2 | `admin/src/app/ui/ConversationsView.tsx` | Auto-scroll conditionnel (ne scroller vers le bas que si déjà en bas) — corriger le scroll forcé qui empêche de lire l'historique | Fix UX admin scroll chat (PLAN_CORRECTION_SCROLL_CHAT_ADMIN_2026-06-15) |
-| D3 | `admin/src/app/ui/ConversationsView.tsx` + backend `GET /chats?q=` | Recherche backend réelle avec debounce au lieu de filtre mémoire — le front doit déclencher une requête HTTP sur saisie (PLAN_CORRECTION_RECHERCHE_CONVERSATIONS_2026-06-15) | Fix UX recherche conversations |
-| D4 | `front/src/components/conversation/conversationOptionMenu.tsx` | Supprimer `'fermé'` du tableau des options accessibles aux commerciaux | Fix fermeture réservée admin (PLAN_FERMETURE_CONVERSATION_ADMIN_ONLY_2026-06-16) |
-| D5 | `admin/` | Ajouter bouton "Fermer la conversation" dans l'interface admin (endpoint PATCH /chats/:chat_id déjà présent) | Fix fermeture côté admin (PLAN_FERMETURE_CONVERSATION_ADMIN_ONLY_2026-06-16) |
 
 ### 10.3 Modules P1 (sprint B2, après validation B1)
 
@@ -1181,8 +964,6 @@ Ces correctifs ont été identifiés et documentés dans la branche `production`
 | B2-2 | `ActivityPanel` front + `callButton` front | S |
 | B2-3 | `ChannelStatsView` admin | S |
 | B2-4 | Vérifier `modules/templates/TemplatesView` master vs `TemplatesView` production | S |
-| B2-5 | Photo de profil Messenger/Instagram — `ProfilePicService` + stockage local (PLAN_IMPLEMENTATION_PHOTOS_PROFIL_TOUS_PROVIDERS_2026-06-16) | M |
-| B2-6 | KPIs CTWA / métriques Meta Ad Referral — endpoint admin (dépend de `meta_ad_referral` + index `IDX_msg_ctwa_kpi`) | S |
 
 ### 10.4 Checklist de non-régression finale
 
@@ -1198,17 +979,6 @@ Ces correctifs ont été identifiés et documentés dans la branche `production`
 - [ ] Templates HSM → création + soumission + statut visible
 - [ ] FlowBot V2 → créer un flow + déclencher
 - [ ] Labels, réponses prédéfinies, audit trail → fonctionnent
-- [ ] Restriction conversations — modal bloquant correctement déclenché + restauré après F5
-- [ ] Fenêtre 24h — champ saisie bloqué uniquement si window_expires_at dans le passé (pas si null)
-- [ ] Fenêtre 72h CTWA — conversation via pub Meta → session 72h correctement ouverte
-- [ ] Rappel fenêtre (Window Reminder J) — cron envoie message avant expiration
-- [ ] Chat session — `chat_session` créée à chaque nouveau message client, fermée à la clôture
-- [ ] Quiz quotidien — commercial doit répondre au quiz avant d'accéder au chat (si session active)
-- [ ] Panneau médias poste — tiroir latéral visible si activé par l'admin pour le poste
-- [ ] Stockage local médias — médias téléchargés localement, `local_url` renseignée et servie correctement
-- [ ] Fermeture conversation — commercial ne peut plus fermer, seul l'admin peut via bouton dédié
-- [ ] Messages Instagram — `message_id` VARCHAR(512) ne tronque plus les IDs longs
-- [ ] Photo de profil — `profile_pic_fetched_at` mis à jour après résolution Messenger/Instagram
 
 ---
 
@@ -1420,50 +1190,25 @@ Points à vérifier :
 ## 13. Timeline
 
 ```
-Semaine 1   Sprint B1 (core) sur branche feature/convergence-production
-             → Porter les migrations production (section 6.2) dans master
-             → Porter les modules backend P0 (B1-1 à B1-22)
-             → Porter les correctifs C1..C10 + D1..D5
-             → Objectif : compilation 0 erreur (tsc --noEmit) + next build sans erreur
+Semaine 1   Sprint B1 sur branche feature/convergence-production
+             → Objectif : compilation 0 erreur + smoke tests OK
 
-Semaine 2   Sprint B1 (UI) + dry-run préliminaire
-             → Porter les composants front/admin P0 (B1-7, B1-8, B1-21, B1-22)
+Semaine 2   Dry-run complet :
              → Import DB production sur staging via phpMyAdmin
-             → npm run migration:run sur staging (première fois — identifier les blocages)
-             → verify_integrity.sql (19 checks) → corriger les écarts
+             → npm run migration:run sur staging
+             → verify_integrity.sql → tous checks verts
+             → Sprint B2 (P1)
 
 Semaine 3   Corrections issues du dry-run
-             → Vérifier le conflit AddWindowReminderSection + remove_auto_message_legacy
-             → Sprint B2 (P1 : B2-1 à B2-6)
-             → Merge feature/convergence-production → master (après review tester + reviewer)
-             → Second dry-run sur staging propre → rapport livrable
+             → Merge feature/convergence-production → master (après review)
+             → Second dry-run sur staging propre
 
-Go-live     Fenêtre maintenance (45-60 min, prévoir 2h) + surveillance J+1
-             → Volume migrations significativement plus important (26 nouvelles migrations)
-               que la révision 7 — réévaluer la durée lors du dry-run
+Go-live     Fenêtre maintenance (45 min) + surveillance J+1
 ```
 
 ---
 
-*Révision 8 — 2026-06-17. Audit exhaustif de toutes les migrations production non encore documentées.  
-Ajouts section 3.4 : 4 nouvelles tables (commercial_conversation_access, meta_ad_referral, chat_session, quiz_*),  
-26 colonnes et 4 groupes d'index non encore listés.  
-Ajouts section 6.2 : 26 migrations production à porter dans master (OutboundHsm, ConnectionLog, ReadOnlyConfig,  
-TrafficGrouping, ConversationRestrictionAccess, MessageReadTracking, IdleDisconnect, ConversationTurnTracking,  
-CooldownAndWarning, FixUnreadCount, CleanupStaleLogs, MediaToAutoMessage, RestoreOrphanedSessions,  
-LocalMediaStorage, MediaPanelToPoste, ProfilePicFetchedAt, QuizSystem, MetaAdReferral x3, ChatSessionEntity,  
-WindowReminder x2, FixCollation, FixInstagramMessageId, WindowExpiresAt, BackfillWindowExpiresAt).  
-Ajouts section 7 : 7 nouveaux checks d'intégrité (chat_session, meta_ad_referral, commercial_conversation_access,  
-quiz, auto-message media, connexions orphelines, CTWA sans referral).  
-Ajouts section 11 : 9 nouveaux modules P0 (B1-14 à B1-22), section 10.2c (5 correctifs UX), 2 modules P1  
-supplémentaires (B2-5, B2-6), 13 entrées checklist non-régression supplémentaires.  
-Timeline étendue à 3 semaines + go-live 45-60 min.*  
-*Révision 7 — 2026-06-17. Ajouts : migration `BackfillWindowExpiresAt1781654400001`  
-(section 3.4 + section 6), 2 checks d'intégrité `window_expires_at` (section 7), tableau des 10  
-correctifs production à porter dans l'Axe B (section 10.2b) — correctifs fenêtre 24h, réactivation  
-EN_ATTENTE, guard restriction backend, handler `restriction:check`, fix filtre `poste_id`, restauration  
-état restriction au reconnect.*  
-*Révision 6 — Corrections : ALTER TABLE whatsapp_template documentés, campaign_link_click sécurisé,  
-CI/CD officiel section 12, maintenance avant push, backup Docker avec MYSQL_USER/MYSQL_PASSWORD/MYSQL_DATABASE,  
-restauration via docker exec -i, rollback conditionnel.  
+*Révision 6 — Statut candidat exécutable. Corrections : ALTER TABLE whatsapp_template documentés,  
+campaign_link_click sécurisé, CI/CD officiel section 12, maintenance avant push, backup Docker  
+avec MYSQL_USER/MYSQL_PASSWORD/MYSQL_DATABASE, restauration via docker exec -i, rollback conditionnel.  
 Analyse basée sur 156 commits production / 388 commits master depuis `c8e98a3`.*
