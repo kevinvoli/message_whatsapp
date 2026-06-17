@@ -1,5 +1,5 @@
 # Plan de migration : Production → Master V2
-> Révision 8 — 2026-06-17  
+> Révision 9 — 2026-06-17  
 > Statut : **Candidat exécutable** — en attente dry-run staging validé
 
 ---
@@ -197,7 +197,83 @@ Ces tables sont créées par des migrations présentes dans la branche `producti
 
 > **Note importante :** certaines de ces colonnes se chevauchent avec celles listées en section 3.1 (colonnes portées par `ConvergenceProductionToMasterV2_1748995200099`). Les colonnes `read_by_commercial_id`, `read_by_commercial_at`, `is_first_reply`, `messages_read_count`, `messages_handled_count`, `last_activity_at`, `read_cooldown_seconds`, `idle_warning_seconds`, `idle_disconnect_*`, `max_read_messages_per_minute` sont maintenant portées directement par leurs migrations dédiées — la migration de convergence doit vérifier avec `hasColumn()` pour ne pas dupliquer. Ceci est déjà le cas dans le code de `ConvergenceProductionToMasterV2_1748995200099` (toutes les colonnes sont conditionnelles).
 
-### 3.5 Nouvelle migration de backfill — `BackfillWindowExpiresAt1781654400001`
+### 3.5 Nouvelles divergences identifiées au 2026-06-17
+
+Ces divergences ont été identifiées par analyse des 120+ commits `production` depuis le 2026-05-28 et ne figuraient pas dans les révisions précédentes.
+
+#### 3.6.1 Module de restriction de contenu des messages (`src/message-restriction/`)
+
+Ce module est **entièrement nouveau** et absent de master. Il valide le contenu des messages commerciaux avant envoi (sans migration SQL — il repose sur `system_configs` existante).
+
+**Nouvelles clés `system_configs` insérées au démarrage :**
+
+| Clé | Valeur par défaut | Description |
+|---|---|---|
+| `MSG_RESTRICTION_ENABLED` | `"false"` | Active/désactive la restriction |
+| `MSG_RESTRICTION_MAX_WORD_LENGTH` | `"26"` | Longueur max d'un mot |
+| `MSG_RESTRICTION_MAX_REPEATED_CHARS` | `"3"` | Répétitions successives max d'une lettre |
+| `MSG_RESTRICTION_MIN_AUDIO_DURATION_SECONDS` | `"10"` | Durée minimale audio (secondes) |
+
+**Aucune migration SQL nécessaire** — les clés sont insérées via `INSERT IGNORE INTO system_configs` au démarrage du module (`onModuleInit`).
+
+#### 3.6.2 Provider Instagram (`src/communication_whapi/communication_instagram.service.ts`)
+
+Le provider Instagram DM est **implémenté à ~90%** sur `production`. Schéma SQL compatible (même table `whapi_channels`, même champ `provider = 'instagram'`). Correctifs apportés depuis le 2026-06-01 :
+
+- Caption transmise correctement dans `sendMediaMessage()`
+- Format JSON payload corrigé selon l'API Instagram Graph
+- `FixInstagramMessageIdLength1780876800001` : VARCHAR(512) pour les IDs Instagram longs (déjà documentée en 6.2)
+
+**Aucune migration SQL supplémentaire.**
+
+#### 3.6.3 Galerie des médias de conversation (`src/media-storage/galerie-media.service.ts`)
+
+Nouvelle vue admin en lecture seule listant les médias téléchargés localement (table `whatsapp_media`). Dépend de `AddLocalMediaStorage1749427200001` (déjà documentée). Aucune table ou colonne nouvelle.
+
+**Nouveau endpoint :** `GET /api/galerie-media?channel_id=&poste_id=&direction=IN|OUT&media_type=`
+
+#### 3.6.4 Onglet statistiques commerciaux enrichi
+
+La vue `admin/src/app/ui/CommerciauxView.tsx` a été enrichie avec un onglet statistiques incluant :
+- Messages lus par commercial (`messages_read_count`)
+- Conversations traitées (`messages_handled_count`)
+- Date dernier message (`last_activity_at`)
+- Nombre de sessions calculé depuis `messaging_connection_log`
+
+Ces colonnes sont portées par `AddMessageReadTracking1748822400001` (déjà documentée). **Aucune migration SQL supplémentaire.**
+
+**Nouveau endpoint :** `GET /api/metriques/commerciaux-stats`
+
+#### 3.6.5 Affichage nom de l'expéditeur sous les bulles de message
+
+Le champ `sender_name` de `whatsapp_message` est désormais affiché sous chaque bulle dans `front/src/components/chat/ChatMessage.tsx` et `admin/src/app/ui/ConversationsView.tsx`. **Aucune migration SQL** — le champ existait déjà. Correctif purement frontend.
+
+#### 3.6.6 Vue Campagnes Meta admin (`admin/src/app/ui/MetaCampaignsView.tsx`)
+
+Nouvelle vue admin affichant les conversations CTWA avec leur image d'annonce et les KPIs (clics, conversions). Dépend de `meta_ad_referral` et de `IDX_msg_ctwa_kpi` (déjà documentées). **Aucune migration SQL supplémentaire.**
+
+#### 3.6.7 Panneau médias commercial (`front/src/components/panel/MediaPanel.tsx`)
+
+Tiroir latéral sur le front commercial affichant les médias échangés sur le poste. Dépend de `AddMediaPanelToPoste1749513600001` et `AddLocalMediaStorage1749427200001` (déjà documentées). Nouveau composant frontend `MediaPanel.tsx`, nouveau modal admin `PosteMediaPanelModal.tsx`.
+
+**Nouveau endpoint :** `GET /api/poste-panel/media?poste_id=`
+
+#### 3.6.8 Système QCM — tables et services supplémentaires non documentés
+
+La migration `AddQuizSystem1749686400000` crée en réalité **9 tables**, et non 7 comme indiqué en 3.4 :
+
+- Tables supplémentaires : `quiz_pdf` (PDFs de formation), `quiz_exemption` (exemptions commerciaux)
+- Services supplémentaires : `quiz-pdf.service.ts`, `quiz-exemption.service.ts`, `quiz-attempt.service.ts`
+
+**Aucune migration SQL supplémentaire.**
+
+#### 3.6.9 Photos de profil Messenger et Instagram — état réel
+
+`ProfilePicStorageService` est **déjà implémenté** sur `production` (`src/media-storage/profile-pic-storage.service.ts`). Le service télécharge la photo de profil Messenger, la stocke dans `uploads/profile-pics/` et met à jour `whatsapp_chat.chat_pic` + `profile_pic_fetched_at`. Instagram : résolution impossible sans App Review Meta (no-op). Dépend de `AddProfilePicFetchedAt1750041600001` (déjà documentée).
+
+**Ce module est à portage uniquement (déjà implémenté) — pas de développement nouveau.**
+
+### 3.6 Nouvelle migration de backfill — `BackfillWindowExpiresAt1781654400001`
 
 Cette migration corrige les conversations `actif` et `en_attente` créées **avant** la mise en place du système de sessions glissantes (`Phase9SlidingWindow...`) et dont `window_expires_at` est `NULL`. Sans ce backfill, le frontend interprète `null` comme "fenêtre expirée" et bloque le champ de saisie du commercial — même pour des conversations actives (Bug #1 du RAPPORT_BUG_FENETRE_ET_ATTENTE.md).
 
@@ -842,6 +918,28 @@ Ces migrations existent dans la branche `production` mais **pas dans master**. E
 | `AddWindowExpiresAtToChat1781522555000` | Ajoute `window_expires_at` (TIMESTAMP) à `whatsapp_chat` + backfill depuis chat_session active | Après `AddChatSessionEntity1780531200000` |
 | `BackfillWindowExpiresAt1781654400001` | Backfille `window_expires_at` pour les conversations actives/en_attente sans session (last_client_message_at + 24h) | Après `AddWindowExpiresAtToChat1781522555000` |
 
+### 6.3 Migrations présentes sur production depuis le 2026-05-28 — nouvelles (non listées en 6.2)
+
+Ces migrations ont été créées après la Révision 8. Elles sont déjà dans `production` et doivent être portées dans `feature/convergence-production`.
+
+| Migration (fichier .ts) | Ce qu'elle fait | Criticité |
+|---|---|---|
+| `AddQuizSystem1749686400000` | Crée 9 tables QCM : `quiz_category`, `quiz_question`, `quiz_answer`, `quiz_session`, `quiz_session_question`, `quiz_attempt`, `quiz_answer_attempt`, `quiz_pdf`, `quiz_exemption` — système de formation complet avec PDFs et exemptions | **Critique** — module quiz inopérant sans |
+| `ConversationRestrictionAccess1748649600001` | Crée `commercial_conversation_access` — suivi quotidien accès/réponses par commercial | **Critique** — module restriction lecture inopérant sans |
+| `AddMetaAdReferral1780272000001` | Crée `meta_ad_referral` + colonnes `is_ctwa` et `active_session_id` sur `whatsapp_chat` | **Critique** — module CTWA inopérant sans |
+| `AddMetaAdReferral1780272000002` | Ajoute index `IDX_msg_ctwa_kpi` sur `whatsapp_message` | **Moyen** — KPIs CTWA lents sans cet index |
+| `FixMetaAdReferralDefaults1780358400001` | Ajoute `DEFAULT ''` sur `source_type` et `source_id` dans `meta_ad_referral` | **Faible** — correctif défaut colonne |
+| `AddProfilePicFetchedAt1750041600001` | Étend `chat_pic`/`chat_pic_full` à VARCHAR(255), ajoute `profile_pic_fetched_at` TIMESTAMP | **Moyen** — photos profil Messenger tronquées sans |
+| `AddWindowExpiresAtToChat1781522555000` | Ajoute `window_expires_at` TIMESTAMP à `whatsapp_chat` + backfill depuis chat_session active | **Critique** — frontend bloque le champ saisie si absente |
+| `BackfillWindowExpiresAt1781654400001` | Backfille `window_expires_at = last_client_message_at + 24h` pour conversations actives sans session | **Critique** — correctif Bug #1 champ saisie bloqué |
+| `AddChatSessionEntity1780531200000` | Crée `chat_session` + ajoute `active_session_id` sur `whatsapp_chat` | **Critique** — logique fenêtre 24h/72h inopérante sans |
+| `FixActiveSessionIdCollation1780704000000` | Corrige la collation de `whatsapp_chat.active_session_id` → `utf8mb4_unicode_ci` | **Critique** — requêtes JOIN échouent sans (ER_CANT_AGGREGATE_2COLLATIONS) |
+| `FixInstagramMessageIdLength1780876800001` | Étend `message_id`, `external_id`, `provider_message_id` à VARCHAR(512) sur `whatsapp_message` | **Critique** — IDs Instagram tronqués et doublons sans |
+| `AddWindowReminderSection1780531200001` | Étend ENUM `trigger_type` avec `'window_reminder'`, ajoute `last_window_reminder_sent_at` à `whatsapp_chat` | **Moyen** — cron Window Reminder inopérant sans |
+| `AddWindowReminderCronFields1780531200002` | Ajoute 6 colonnes de configuration à `cron_config` (plages horaires window_reminder normal/CTWA, min_replies, ttl_days_ctwa) | **Moyen** — configuration window reminder non persistée sans |
+
+> **Chevauchement avec section 6.2 :** certaines migrations ci-dessus apparaissent aussi en 6.2 (AddMetaAdReferral, AddChatSessionEntity, FixInstagramMessageIdLength, AddWindowReminder*, BackfillWindowExpiresAt). Ce tableau 6.3 liste spécifiquement celles créées depuis le 2026-05-28, pour faciliter le suivi du portage.
+
 > **Note `business_hours_config` :** cette table a le **même schéma** en production et dans master. Elle est importée telle quelle via phpMyAdmin. Aucune migration n'est nécessaire. La migration FlowBot la lit en fail-open si elle est vide — si elle a 7 lignes (une par jour), les horaires de production seront respectés.
 
 > **Note `OutboundHsm1746000000001` :** cette migration crée `whatsapp_template` avec le schéma V1 production (status ENUM à 3 valeurs, pas de `body_text`, etc.). Elle doit s'exécuter **avant** `FixWhatsappTemplateSchema1746620000001` (master) qui ajoute les colonnes V2. L'ordre est garanti par les timestamps (1746000000001 < 1746620000001).
@@ -992,6 +1090,72 @@ WHERE c.is_ctwa = 1
   AND c.deletedAt IS NULL;
 -- Note : des valeurs > 0 sont attendues si is_ctwa a été backfillé sans referral complet
 -- C'est une alerte, pas un bloquant.
+
+-- 20. Quiz — tentatives sans session parente (orphelins)
+SELECT 'ORPHAN_QUIZ_ATTEMPT_NO_SESSION' AS check_name, COUNT(*) AS val  -- doit être 0
+FROM quiz_attempt a
+LEFT JOIN quiz_session s ON a.quiz_session_id = s.id
+WHERE s.id IS NULL;
+
+-- 21. Quiz — réponses de tentative sans tentative parente (orphelins)
+SELECT 'ORPHAN_QUIZ_ANSWER_ATTEMPT' AS check_name, COUNT(*) AS val  -- doit être 0
+FROM quiz_answer_attempt aa
+LEFT JOIN quiz_attempt a ON aa.quiz_attempt_id = a.id
+WHERE a.id IS NULL;
+
+-- 22. Quiz — questions sans catégorie valide
+SELECT 'ORPHAN_QUIZ_QUESTION_NO_CATEGORY' AS check_name, COUNT(*) AS val  -- doit être 0
+FROM quiz_question q
+LEFT JOIN quiz_category c ON q.category_id = c.id
+WHERE c.id IS NULL AND q.deleted_at IS NULL;
+
+-- 23. commercial_conversation_access — responded_at antérieure à accessed_at (corruption)
+SELECT 'CONV_ACCESS_RESPONDED_BEFORE_ACCESSED' AS check_name, COUNT(*) AS val  -- doit être 0
+FROM commercial_conversation_access
+WHERE responded_at IS NOT NULL AND responded_at < accessed_at;
+
+-- 24. Médias locaux — local_path sans local_url (incohérence)
+SELECT 'MEDIA_LOCAL_PATH_WITHOUT_URL' AS check_name, COUNT(*) AS val  -- doit être 0
+FROM whatsapp_media
+WHERE local_path IS NOT NULL AND (local_url IS NULL OR local_url = '');
+
+-- 25. window_expires_at — cohérence avec chat_session active (écart max 1 minute toléré)
+SELECT 'WINDOW_EXPIRES_MISMATCH_SESSION' AS check_name, COUNT(*) AS val  -- doit être 0
+FROM whatsapp_chat c
+JOIN chat_session s ON s.id = c.active_session_id
+WHERE s.ended_at IS NULL
+  AND c.window_expires_at IS NOT NULL
+  AND ABS(TIMESTAMPDIFF(MINUTE, c.window_expires_at, s.auto_close_at)) > 1
+  AND c.deletedAt IS NULL;
+
+-- 26. Restriction messages — 4 clés system_configs présentes
+SELECT 'MSG_RESTRICTION_CONFIGS_PRESENT' AS check_name, COUNT(*) AS val  -- doit être 4
+FROM system_configs
+WHERE config_key IN (
+  'MSG_RESTRICTION_ENABLED',
+  'MSG_RESTRICTION_MAX_WORD_LENGTH',
+  'MSG_RESTRICTION_MAX_REPEATED_CHARS',
+  'MSG_RESTRICTION_MIN_AUDIO_DURATION_SECONDS'
+);
+
+-- 27. Restriction conversations — 4 clés system_configs présentes
+SELECT 'CONV_RESTRICTION_CONFIGS_PRESENT' AS check_name, COUNT(*) AS val  -- doit être >= 4
+FROM system_configs
+WHERE config_key IN (
+  'RESTRICTION_MAX_UNRESPONDED_CONVS',
+  'RESTRICTION_MIN_RESPONSE_CHARS',
+  'RESTRICTION_REQUIRE_LAST_MESSAGE_MINE',
+  'RESTRICTION_ENABLED'
+);
+
+-- 28. Photos de profil — chat_pic renseignée mais profile_pic_fetched_at absent
+--     Des valeurs > 0 indiquent que des photos ont été importées sans tracking de date
+SELECT 'PROFILE_PIC_WITHOUT_FETCHED_AT' AS check_name, COUNT(*) AS val  -- alerte si > 0
+FROM whatsapp_chat
+WHERE chat_pic NOT IN ('default.png', '')
+  AND chat_pic NOT LIKE '/uploads/profile-pics/%'
+  AND profile_pic_fetched_at IS NULL
+  AND deletedAt IS NULL;
 ```
 
 ---
@@ -1181,8 +1345,29 @@ Ces correctifs ont été identifiés et documentés dans la branche `production`
 | B2-2 | `ActivityPanel` front + `callButton` front | S |
 | B2-3 | `ChannelStatsView` admin | S |
 | B2-4 | Vérifier `modules/templates/TemplatesView` master vs `TemplatesView` production | S |
-| B2-5 | Photo de profil Messenger/Instagram — `ProfilePicService` + stockage local (PLAN_IMPLEMENTATION_PHOTOS_PROFIL_TOUS_PROVIDERS_2026-06-16) | M |
-| B2-6 | KPIs CTWA / métriques Meta Ad Referral — endpoint admin (dépend de `meta_ad_referral` + index `IDX_msg_ctwa_kpi`) | S |
+| B2-5 | Photo de profil Messenger — `ProfilePicStorageService` ✅ **DÉJÀ IMPLÉMENTÉ** sur production — portage uniquement | S |
+| B2-6 | KPIs CTWA / métriques Meta Ad Referral — endpoint admin `GET /api/metriques/meta-ad-kpi` (dépend de `meta_ad_referral` + index `IDX_msg_ctwa_kpi`) | S |
+
+### 10.3b Modules P0 supplémentaires identifiés au 2026-06-17 (sprint B1 enrichi)
+
+Ces modules sont **entièrement implémentés** sur `production` mais absents de la liste B1 initiale. Portage par cherry-pick de commits ciblés dans `feature/convergence-production`.
+
+| # | Module/Composant | Effort | Statut production |
+|---|---|---|---|
+| B1-23 | `src/message-restriction/` (backend) — restriction contenu messages commerciaux : longueur mot, répétitions, durée audio — aucune migration SQL requise | S | ✅ Livré |
+| B1-24 | `src/communication_whapi/communication_instagram.service.ts` — provider Instagram DM complet (outbound texte + médias avec caption) | S | ✅ Livré |
+| B1-25 | `src/media-storage/galerie-media.service.ts` + `GalerieMediaController` + DTO — galerie médias conversation avec filtres | S | ✅ Livré |
+| B1-26 | `src/media-storage/profile-pic-storage.service.ts` — téléchargement et stockage local photos de profil Messenger | S | ✅ Livré |
+| B1-27 | `src/quiz/quiz-pdf.service.ts` + `quiz-exemption.service.ts` + `quiz-attempt.service.ts` — services QCM complémentaires (PDFs, exemptions, calcul score) | S | ✅ Livré |
+| B1-28 | `admin/src/app/ui/MetaCampaignsView.tsx` — vue admin campagnes Meta CTWA (image annonce, KPIs, filtres) | S | ✅ Livré |
+| B1-29 | `admin/src/app/ui/GalerieMediaView.tsx` + `admin/src/app/dashboard/galerie-media/page.tsx` — galerie admin médias conversation | S | ✅ Livré |
+| B1-30 | `admin/src/app/ui/PosteMediaPanelModal.tsx` — modal admin configuration panneau médias par poste | S | ✅ Livré |
+| B1-31 | `front/src/components/panel/MediaPanel.tsx` + `front/src/types/media-panel.ts` — tiroir médias commercial | S | ✅ Livré |
+| B1-32 | `front/src/app/quiz/page.tsx` + `front/src/app/quiz/result/page.tsx` — pages quiz commercial (passage du quiz, résultat) | M | ✅ Livré |
+| B1-33 | Affichage nom expéditeur — `ChatMessage.tsx` + `ConversationsView.tsx` (champ `sender_name` déjà en DB) | S | ✅ Livré |
+| B1-34 | Statistiques commerciaux onglet admin — `CommerciauxView.tsx` + `PerformanceView.tsx` enrichis + `GET /api/metriques/commerciaux-stats` | S | ✅ Livré |
+| B1-35 | `front/src/middleware.ts` — middleware Next.js pour protection routes quiz et gestion sessions | S | ✅ Livré |
+| B1-36 | `front/src/app/global-error.tsx` — page d'erreur globale Next.js | XS | ✅ Livré |
 
 ### 10.4 Checklist de non-régression finale
 
@@ -1209,6 +1394,30 @@ Ces correctifs ont été identifiés et documentés dans la branche `production`
 - [ ] Fermeture conversation — commercial ne peut plus fermer, seul l'admin peut via bouton dédié
 - [ ] Messages Instagram — `message_id` VARCHAR(512) ne tronque plus les IDs longs
 - [ ] Photo de profil — `profile_pic_fetched_at` mis à jour après résolution Messenger/Instagram
+- [ ] Restriction contenu messages — mot > 26 chars bloqué avant envoi
+- [ ] Restriction contenu messages — répétition de lettre > 3 bloquée (ex: "aaaa")
+- [ ] Restriction contenu messages — audio < 10s bloqué
+- [ ] Restriction contenu messages — admin peut modifier les seuils depuis les paramètres système
+- [ ] Restriction contenu messages — restriction inopérante si `MSG_RESTRICTION_ENABLED=false`
+- [ ] Provider Instagram — envoi message texte commercial vers client Instagram fonctionne
+- [ ] Provider Instagram — envoi média avec caption fonctionne (image, vidéo)
+- [ ] Provider Instagram — IDs de messages longs (> 255 chars) correctement stockés
+- [ ] Galerie médias admin — filtres canal / poste / direction / type fonctionnent
+- [ ] Galerie médias admin — miniatures affichées pour les médias avec `local_url` renseignée
+- [ ] Panneau médias commercial — visible uniquement si `media_panel_enabled = true` pour le poste
+- [ ] Panneau médias commercial — filtre par types de médias configuré par l'admin respecté
+- [ ] Statistiques commerciaux admin — compteurs `messages_read_count` et `messages_handled_count` correctement incrémentés
+- [ ] Statistiques commerciaux admin — nombre de sessions calculé depuis `messaging_connection_log`
+- [ ] Nom expéditeur — affiché sous chaque bulle (prénom commercial sortant, `from_name` client entrant)
+- [ ] Campagnes Meta CTWA — vue admin liste conversations avec image d'annonce et KPIs (clics, conversions)
+- [ ] Quiz — commercial bloqué tant que le quiz du jour n'est pas complété (si session active)
+- [ ] Quiz — résultats consultables par l'admin (agrégats par commercial, par session)
+- [ ] Quiz — exemptions commerciaux respectées (commercial exempté accède au chat sans quiz)
+- [ ] Quiz — PDFs de formation téléchargeables depuis la vue admin quiz
+- [ ] Fermeture conversation — bouton "Fermer" visible uniquement dans l'interface admin
+- [ ] Fermeture conversation — menu commercial ne contient plus l'option "Fermer"
+- [ ] Recherche conversations admin — déclenche une requête backend avec debounce (pas un filtre mémoire)
+- [ ] Scroll chat admin — ne force pas le défilement vers le bas si l'admin consulte l'historique
 
 ---
 
@@ -1421,30 +1630,53 @@ Points à vérifier :
 
 ```
 Semaine 1   Sprint B1 (core) sur branche feature/convergence-production
-             → Porter les migrations production (section 6.2) dans master
-             → Porter les modules backend P0 (B1-1 à B1-22)
+             → Porter les migrations production (sections 6.2 + 6.3) dans master
+             → Porter les modules backend P0 (B1-1 à B1-36)
+               ⚠️ B1-23 à B1-36 déjà implémentés sur production — portage par cherry-pick ciblé
              → Porter les correctifs C1..C10 + D1..D5
              → Objectif : compilation 0 erreur (tsc --noEmit) + next build sans erreur
 
 Semaine 2   Sprint B1 (UI) + dry-run préliminaire
-             → Porter les composants front/admin P0 (B1-7, B1-8, B1-21, B1-22)
+             → Porter les composants front/admin P0
+               (B1-7, B1-8, B1-21, B1-22, B1-28, B1-29, B1-30, B1-31, B1-32, B1-35, B1-36)
              → Import DB production sur staging via phpMyAdmin
              → npm run migration:run sur staging (première fois — identifier les blocages)
-             → verify_integrity.sql (19 checks) → corriger les écarts
+             → verify_integrity.sql (28 checks) → corriger les écarts
+             → Point de vigilance : conflit AddWindowReminderSection + remove_auto_message_legacy
+             → Point de vigilance : vérifier que les 4 clés MSG_RESTRICTION_* sont dans system_configs
 
 Semaine 3   Corrections issues du dry-run
-             → Vérifier le conflit AddWindowReminderSection + remove_auto_message_legacy
              → Sprint B2 (P1 : B2-1 à B2-6)
              → Merge feature/convergence-production → master (après review tester + reviewer)
              → Second dry-run sur staging propre → rapport livrable
 
 Go-live     Fenêtre maintenance (45-60 min, prévoir 2h) + surveillance J+1
-             → Volume migrations significativement plus important (26 nouvelles migrations)
-               que la révision 7 — réévaluer la durée lors du dry-run
+             → Volume : ~29 migrations production à porter (sections 6.2 + 6.3 combinées)
+               dont 13 nouvelles depuis la Révision 8
+             → Checklist non-régression étendue à 38 items (26 nouveaux depuis Révision 8)
+             → Durée réelle du dry-run à mesurer (whatsapp_message index + quiz 9 tables)
+               avant de fixer définitivement la fenêtre de maintenance
 ```
+
+> **Volume total migrations production :** sections 6.2 (26 migrations) + 6.3 (13 migrations créées depuis 2026-05-28, avec chevauchements partiels). Estimé à ~29 migrations distinctes au total.
+> La durée de `AddQuizSystem1749686400000` (9 tables + FK) et des index covering sur `whatsapp_message` doit être mesurée précisément lors du dry-run.
 
 ---
 
+*Révision 9 — 2026-06-17. Analyse réelle de 120+ commits production depuis le 2026-05-28.  
+Section 3.6 ajoutée (9 sous-sections) : module message-restriction (aucune migration SQL, 4 clés system_configs),  
+provider Instagram (correctifs caption/payload/VARCHAR(512)), galerie médias conversation (nouveau endpoint),  
+statistiques commerciaux enrichies, nom expéditeur (frontend uniquement), vue Campagnes Meta admin,  
+panneau médias commercial, QCM tables quiz_pdf/quiz_exemption supplémentaires, ProfilePicStorageService.  
+Section 6.3 ajoutée : 13 migrations créées depuis 2026-05-28 avec criticité explicite  
+(AddQuizSystem, ConversationRestrictionAccess, AddMetaAdReferral x3, FixMetaAdReferralDefaults,  
+AddProfilePicFetchedAt, AddWindowExpiresAtToChat, BackfillWindowExpiresAt, AddChatSessionEntity,  
+FixActiveSessionIdCollation, FixInstagramMessageIdLength, AddWindowReminder x2).  
+Section 7 : 9 nouveaux checks SQL (checks 20..28) — quiz orphelins x3, restriction messages configs,  
+restriction conversations configs, cohérence responded_at, médias sans URL, window vs session, photos.  
+Section 11 : 14 nouveaux modules P0 B1-23..B1-36 (tous déjà implémentés, portage uniquement),  
+section 10.3b ajoutée, correction B2-5 (ProfilePicStorage déjà livré), checklist +26 items (38 total).  
+Timeline : 28 checks intégrité, ~29 migrations distinctes, fenêtre maintenance à réévaluer post dry-run.*  
 *Révision 8 — 2026-06-17. Audit exhaustif de toutes les migrations production non encore documentées.  
 Ajouts section 3.4 : 4 nouvelles tables (commercial_conversation_access, meta_ad_referral, chat_session, quiz_*),  
 26 colonnes et 4 groupes d'index non encore listés.  
