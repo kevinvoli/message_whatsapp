@@ -1051,9 +1051,20 @@ export class WhatsappMessageGateway
             agent.commercialId,
             agent.posteId,
           );
-          const blockingOther =
-            status.triggered &&
-            status.unrespondedConversations.some((c) => c.chat_id !== payload.chat_id);
+          // Bloquer uniquement si la conversation courante n'est PAS dans la liste
+          // des non-répondues ET qu'elle a encore des messages non lus.
+          // - Dans la liste → commercial en train de se débloquer → autoriser.
+          // - unread_count = 0 → déjà lue avant la restriction → autoriser.
+          // - Nouvelle conversation non lue hors liste → bloquer.
+          const isCurrentInUnrespondedList = status.unrespondedConversations.some(
+            (c) => c.chat_id === payload.chat_id,
+          );
+          let blockingOther = false;
+          if (status.triggered && !isCurrentInUnrespondedList) {
+            const currentChat = await this.chatService.findBychat_id(payload.chat_id);
+            const hasUnread = (currentChat?.unread_count ?? 0) > 0;
+            blockingOther = hasUnread;
+          }
           if (blockingOther) {
             client.emit('restriction:status', status);
             client.emit('chat:event', {
