@@ -1037,6 +1037,33 @@ export class DispatcherService {
     return { reset: stuck.length };
   }
 
+  /**
+   * Remet en ACTIF toutes les conversations EN_ATTENTE affectées à ce poste.
+   * Appelé quand le poste se reconnecte — les conversations sans nouveau message
+   * du client resteraient sinon EN_ATTENTE indéfiniment.
+   */
+  async reactivateWaitingConversationsForPoste(posteId: string): Promise<number> {
+    const waiting = await this.chatRepository.find({
+      where: { poste_id: posteId, status: WhatsappChatStatus.EN_ATTENTE },
+      select: ['id'],
+    });
+
+    if (waiting.length === 0) return 0;
+
+    const ids = waiting.map((c) => c.id);
+    await this.chatRepository
+      .createQueryBuilder()
+      .update()
+      .set({ status: WhatsappChatStatus.ACTIF, assigned_mode: 'ONLINE' })
+      .whereInIds(ids)
+      .execute();
+
+    this.logger.log(
+      `reactivateWaitingConversationsForPoste: ${waiting.length} conversation(s) EN_ATTENTE → ACTIF (poste ${posteId})`,
+    );
+    return waiting.length;
+  }
+
   async getDispatchSnapshot(): Promise<{
     queue_size: number;
     waiting_count: number;

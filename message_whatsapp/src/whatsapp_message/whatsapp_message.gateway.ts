@@ -213,6 +213,7 @@ export class WhatsappMessageGateway
         `Queue disabled for poste ${posteId}, skip enqueue on connect`,
       );
     }
+    await this.dispatcherService.reactivateWaitingConversationsForPoste(posteId);
     await this.jobRunner.startAgentSlaMonitor(posteId);
 
     await this.emitQueueUpdate('agent_connected');

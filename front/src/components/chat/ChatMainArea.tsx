@@ -38,7 +38,8 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
   const windowExpired =
     selectedConversation != null &&
     !selectedConversation.channel_dedicated &&
-    (!windowExpiresAt || new Date(windowExpiresAt).getTime() <= Date.now());
+    windowExpiresAt != null &&
+    new Date(windowExpiresAt).getTime() <= Date.now();
 
   // Conversation sans canal résolvable → l'envoi est impossible côté backend
   const noChannel =
