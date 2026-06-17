@@ -43,6 +43,7 @@ import { SystemAlertService } from 'src/system-alert/system-alert.service';
 import { MessageReadService } from './message-read.service';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import { ConversationRestrictionService } from 'src/conversation-restriction/conversation-restriction.service';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 type AuthPayload = {
   sub: string;
@@ -103,6 +104,7 @@ export class WhatsappMessageGateway
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
     private readonly restrictionService: ConversationRestrictionService,
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   afterInit(server: Server): void {
@@ -993,13 +995,22 @@ export class WhatsappMessageGateway
       }
 
       if (windowExpired) {
+        // Fermer immédiatement la conversation et sa session — ne pas attendre le cron.
+        try {
+          await this.chatSessionService.closeExpiredChatByWindowExpiry(chat.id);
+          chat.status = WhatsappChatStatus.FERME;
+          chat.windowExpiresAt = null;
+          await this.emitConversationClosed(chat);
+        } catch (err) {
+          this.logger.error(`closeExpiredChatByWindowExpiry failed for chat ${chat.id}`, err);
+        }
         client.emit('chat:event', {
           type: 'MESSAGE_SEND_ERROR',
           payload: {
             chat_id: payload.chat_id,
             tempId: payload.tempId,
             code: 'WINDOW_EXPIRED',
-            message: 'Fenêtre de 23h expirée — en attente d\'un message du client.',
+            message: 'Fenêtre de 23h expirée — la conversation a été fermée automatiquement.',
           },
         });
         return;

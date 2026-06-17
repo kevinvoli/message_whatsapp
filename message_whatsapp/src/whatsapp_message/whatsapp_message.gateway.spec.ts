@@ -29,6 +29,7 @@ describe('WhatsappMessageGateway protocol events', () => {
       {} as any, // connectionLogService
       {} as any, // channelRepository
       { getRestrictionConfig: jest.fn().mockResolvedValue({ enabled: false }), recordAccess: jest.fn(), recordResponse: jest.fn(), checkRestriction: jest.fn() } as any, // restrictionService
+      { closeExpiredChatByWindowExpiry: jest.fn().mockResolvedValue(undefined) } as any, // chatSessionService
     );
   };
 
