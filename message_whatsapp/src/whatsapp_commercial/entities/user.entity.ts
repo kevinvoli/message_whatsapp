@@ -77,6 +77,9 @@ export class WhatsappCommercial {
   @Column({ name: 'last_activity_at', type: 'datetime', nullable: true })
   lastActivityAt: Date | null;
 
+  @Column({ name: 'token_version', type: 'int', default: 1 })
+  tokenVersion: number;
+
   @Column('varchar', {
     name: 'salt',
     length: 255,

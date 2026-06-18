@@ -13,7 +13,7 @@ import {
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
-import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
+import { AdminGuard } from '../auth/admin.guard';
 import { CommercialStatsService } from './commercial-stats.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
@@ -24,7 +24,7 @@ interface DisconnectCommercialResponse {
 }
 
 @Controller('users')
-@UseGuards(AdminGuard) // Use AdminGuard
+@UseGuards(AdminGuard)
 export class WhatsappCommercialController {
   private readonly logger = new Logger(WhatsappCommercialController.name);
 
@@ -63,13 +63,11 @@ export class WhatsappCommercialController {
   async disconnectCommercial(
     @Param('id') id: string,
   ): Promise<DisconnectCommercialResponse> {
-    // Lève NotFoundException si l'ID n'existe pas
     await this.whatsappCommercialService.findOne(id);
 
     const count = await this.gateway.disconnectAgentByCommercialId(id);
+    await this.whatsappCommercialService.incrementTokenVersion(id);
 
-    // handleDisconnect couvre updateStatus + logLogout quand un socket existait.
-    // Si count === 0, aucun socket n'a été fermé : réconcilier l'état fantôme manuellement.
     if (count === 0) {
       await this.whatsappCommercialService.updateStatus(id, false);
       await this.connectionLogService.logLogout(id, 'commercial');
@@ -94,7 +92,6 @@ export class WhatsappCommercialController {
     @Body() updateWhatsappCommercialDto: UpdateWhatsappCommercialDto,
   ) {
     this.logger.debug(`Update user ${id}`);
-
     return await this.whatsappCommercialService.update(
       id,
       updateWhatsappCommercialDto,

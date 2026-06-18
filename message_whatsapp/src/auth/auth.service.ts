@@ -51,6 +51,7 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
       email: user.email,
       name: user.name,
       posteId: user.poste?.id ?? null,
+      tokenVersion: user.tokenVersion,
     };
   }
 
@@ -58,6 +59,7 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
     return {
       ...super.buildPayload(user),
       posteId: user.posteId,
+      tokenVersion: user.tokenVersion,
     };
   }
 
@@ -70,6 +72,7 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
       email: user.email,
       name: user.name,
       posteId: user.poste?.id ?? null,
+      tokenVersion: user.tokenVersion,
     };
   }
 }

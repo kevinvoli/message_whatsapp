@@ -6,6 +6,7 @@ export type BaseAuthUser = {
 
 export type AuthUser = BaseAuthUser & {
   posteId?: string | null;
+  tokenVersion: number;
 };
 
 export type AuthAdminUser = BaseAuthUser;

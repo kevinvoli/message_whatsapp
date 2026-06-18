@@ -15,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import { CommercialStatsService } from 'src/whatsapp_commercial/commercial-stats.service';
+import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { DispatchSettingsService } from 'src/dispatcher/services/dispatch-settings.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -27,6 +28,7 @@ export class AuthController {
     private readonly connectionLogService: ConnectionLogService,
     private readonly commercialStatsService: CommercialStatsService,
     private readonly dispatchSettingsService: DispatchSettingsService,
+    private readonly commercialService: WhatsappCommercialService,
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
   ) {}
@@ -112,8 +114,8 @@ export class AuthController {
     @Request() req,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Log déconnexion commercial
     void this.connectionLogService.logLogout(req.user.userId, 'commercial');
+    void this.commercialService.incrementTokenVersion(req.user.userId).catch(() => {});
 
     res.clearCookie('Authentication');
     res.clearCookie('Refresh');

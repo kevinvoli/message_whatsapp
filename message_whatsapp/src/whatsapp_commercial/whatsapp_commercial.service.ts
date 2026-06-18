@@ -426,6 +426,10 @@ export class WhatsappCommercialService {
     }
   }
 
+  async incrementTokenVersion(id: string): Promise<void> {
+    await this.whatsappCommercialRepository.increment({ id }, 'tokenVersion', 1);
+  }
+
   async updatePassword(id: string, newPassword: string): Promise<void> {
     const user = await this.whatsappCommercialRepository.findOne({
       where: { id },

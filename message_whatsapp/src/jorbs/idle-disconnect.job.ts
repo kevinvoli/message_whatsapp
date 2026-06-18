@@ -71,6 +71,7 @@ export class IdleDisconnectJob implements OnModuleInit {
         commercial.isConnected = false;
         await this.commercialRepository.save(commercial);
         await this.connectionLogService.logLogout(commercial.id, 'commercial');
+        await this.commercialRepository.increment({ id: commercial.id }, 'tokenVersion', 1);
         this.gateway.server.emit('commercial:force-disconnect', {
           commercialId: commercial.id,
         });

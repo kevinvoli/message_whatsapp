@@ -11,6 +11,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
     DispatcherModule,
     PassportModule,
     ConfigModule,
-    TypeOrmModule.forFeature([WhapiChannel]),
+    TypeOrmModule.forFeature([WhapiChannel, WhatsappCommercial]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
