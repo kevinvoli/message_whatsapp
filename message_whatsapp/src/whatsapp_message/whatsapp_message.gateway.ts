@@ -1468,6 +1468,7 @@ export class WhatsappMessageGateway
     for (const [clientId] of entries) {
       const socket = this.server.sockets.sockets.get(clientId);
       if (socket) {
+        socket.emit('commercial:force-disconnect', { commercialId });
         socket.disconnect(true);
         count++;
       }
