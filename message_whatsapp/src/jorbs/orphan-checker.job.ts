@@ -38,7 +38,7 @@ export class OrphanCheckerJob implements OnModuleInit {
     const orphans = await this.chatRepo.find({
       where: {
         poste_id: IsNull(),
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         read_only: false,
         unread_count: MoreThan(0),
       },

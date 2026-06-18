@@ -407,6 +407,11 @@ export class DispatcherService {
     chat: WhatsappChat,
     skipEmit = false,
   ): Promise<{ oldPosteId: string; newPosteId: string } | null> {
+    if (chat.status === WhatsappChatStatus.FERME) {
+      this.logger.debug(`Reinjection ignoree: conversation fermee (${chat.chat_id})`);
+      return null;
+    }
+
     if (chat.read_only) {
       this.logger.warn(
         `Reinjection ignoree: conversation read_only (${chat.chat_id})`,
@@ -520,6 +525,11 @@ export class DispatcherService {
    * Trouve le prochain poste dans la queue et emet CONVERSATION_ASSIGNED.
    */
   async dispatchOrphanConversation(chat: WhatsappChat): Promise<void> {
+    if (chat.status === WhatsappChatStatus.FERME) {
+      this.logger.debug(`Dispatch orphelin ignore: conversation fermee (${chat.chat_id})`);
+      return;
+    }
+
     if (chat.read_only) {
       this.logger.warn(`Dispatch orphelin ignore: conversation read_only (${chat.chat_id})`);
       return;
@@ -673,7 +683,7 @@ export class DispatcherService {
     const chats = await this.chatRepository.find({
       where: {
         poste_id: poste_id,
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         unread_count: MoreThan(0),
       },
     });
@@ -805,12 +815,13 @@ export class DispatcherService {
         return `File d'attente insuffisante — ${queuedPostes.length} poste(s) disponible(s)`;
       }
 
-      // 3. Nombre de convs eligibles — postes de la queue
+      // 3. Nombre de convs eligibles — postes de la queue (FERME exclues)
       const countRows = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
         .addSelect('COUNT(*)', 'cnt')
         .where('chat.poste_id IN (:...posteIds)', { posteIds })
+        .andWhere('chat.status IN (:...eligibleStatuses)', { eligibleStatuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE] })
         .andWhere(unreadEligibility)
         .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
         .andWhere(noReplyFilter)
@@ -884,10 +895,11 @@ export class DispatcherService {
         const excess = (countMap.get(srcPoste.id) ?? 0) - srcTarget;
         if (excess <= 0 || underIdx >= underloaded.length) continue;
 
-        // Convs les plus anciennes de ce poste surcharge (oldest-first)
+        // Convs les plus anciennes de ce poste surcharge (oldest-first) — FERME exclues
         const srcChats = await this.chatRepository
           .createQueryBuilder('chat')
           .where('chat.poste_id = :posteId', { posteId: srcPoste.id })
+          .andWhere('chat.status IN (:...eligibleStatuses)', { eligibleStatuses: [WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE] })
           .andWhere(unreadEligibility)
           .andWhere('(chat.last_client_message_at < :threshold OR chat.last_client_message_at IS NULL)', { threshold })
           .andWhere(noReplyFilter)

@@ -36,7 +36,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
     // Conversations non lues sur un poste hors-ligne (tous statuts)
     const activesHorsLigne = await this.chatRepo.find({
       where: {
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         unread_count: MoreThan(0),
       },
       relations: ['poste'],
@@ -47,7 +47,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
     const orphelines = await this.chatRepo.find({
       where: {
         poste_id: IsNull(),
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         read_only: false,
         unread_count: MoreThan(0),
       },
@@ -74,7 +74,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
     // take: 50 — évite le burst illimité au démarrage ou à 9h si beaucoup d'agents offline
     const actives = await this.chatRepo.find({
       where: {
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         unread_count: MoreThan(0),
       },
       relations: ['poste'],
@@ -95,7 +95,7 @@ export class OfflineReinjectionJob implements OnModuleInit {
     const orphelines = await this.chatRepo.find({
       where: {
         poste_id: IsNull(),
-        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE, WhatsappChatStatus.FERME]),
+        status: In([WhatsappChatStatus.ACTIF, WhatsappChatStatus.EN_ATTENTE]),
         read_only: false,
         unread_count: MoreThan(0),
       },
