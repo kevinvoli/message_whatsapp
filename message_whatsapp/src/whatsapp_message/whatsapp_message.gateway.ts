@@ -1469,7 +1469,7 @@ export class WhatsappMessageGateway
       const socket = this.server.sockets.sockets.get(clientId);
       if (socket) {
         socket.emit('commercial:force-disconnect', { commercialId });
-        socket.disconnect(true);
+        socket.disconnect(false);
         count++;
       }
     }
