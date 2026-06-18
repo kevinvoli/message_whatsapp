@@ -350,13 +350,19 @@ const WebSocketEvents = () => {
       chatState.updateConversation({ ...existing, unreadCount: data.unreadCount });
     };
 
-    // Déconnexion forcée par le serveur (inactivité détectée par idle-disconnect job)
+    // Déconnexion forcée par le serveur (inactivité ou action admin)
     const handleForceDisconnect = (data: { commercialId: string }) => {
       if (data.commercialId !== user.id) return;
-      logger.warn('Force disconnect received from server (idle timeout)');
-      if (typeof window !== 'undefined') {
-        window.location.replace('/login?reason=idle');
-      }
+      logger.warn('Force disconnect received from server');
+      // Effacer le cookie JWT avant de rediriger pour que /login ne redirige pas vers /whatsapp
+      void fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      }).finally(() => {
+        if (typeof window !== 'undefined') {
+          window.location.replace('/login?reason=forced');
+        }
+      });
     };
 
     socket.on('chat:event', handleChatEvent);
