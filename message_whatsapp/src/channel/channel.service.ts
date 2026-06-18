@@ -551,6 +551,19 @@ export class ChannelService implements OnModuleInit {
     return !!ch?.no_close || !!ch?.poste_id;
   }
 
+  async getChannelIdsToSkipAutoClose(channelIds: string[]): Promise<Set<string>> {
+    if (channelIds.length === 0) return new Set();
+    const channels = await this.channelRepository.find({
+      where: channelIds.map((id) => ({ channel_id: id })),
+      select: ['channel_id', 'no_close', 'poste_id'],
+    });
+    return new Set(
+      channels
+        .filter((ch) => !!ch.no_close || !!ch.poste_id)
+        .map((ch) => ch.channel_id),
+    );
+  }
+
   sanitizeChannel(
     channel: WhapiChannel,
   ): Omit<WhapiChannel, 'token' | 'meta_app_secret' | 'webhook_secret' | 'verify_token'> {

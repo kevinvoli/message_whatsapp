@@ -41,6 +41,7 @@ export function makeConversation(
     last_poste_message_at: null,
     chat_pic: 'default.png',
     chat_pic_full: 'default.png',
+    profilePicFetchedAt: null,
     is_pinned: false,
     is_muted: false,
     mute_until: null,
