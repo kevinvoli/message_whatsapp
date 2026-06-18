@@ -738,6 +738,9 @@ export class DispatcherService {
 
       // Step 0 : Reouverture des convs FERME non repondues sur postes actifs
       // Independant de la taille de la queue — tourne meme avec un seul poste.
+      // Exclut les convs dont la fenetre a expiré (fermées par read-only-enforcement) :
+      // seules les convs avec une session récemment fermée par un agent (auto_close_at encore futur)
+      // sont rouvertes. Si auto_close_at < NOW(), la fenetre est expirée — ne pas rouvrir.
       const onlinePosteIds = queuedPostes.filter(p => p.is_active).map(p => p.id);
       if (onlinePosteIds.length > 0) {
         const fermeNonRepondues = await this.chatRepository
@@ -749,6 +752,13 @@ export class DispatcherService {
           .andWhere(noReplyFilter)
           .andWhere('chat.deletedAt IS NULL')
           .andWhere(dedicatedExclusion)
+          .andWhere(`EXISTS (
+            SELECT 1 FROM chat_session s
+            WHERE s.whatsapp_chat_id = chat.id
+              AND s.ended_at IS NOT NULL
+              AND s.auto_close_at IS NOT NULL
+              AND s.auto_close_at >= NOW()
+          )`)
           .getMany();
         const reopenedChats: WhatsappChat[] = [];
         for (const chat of fermeNonRepondues) {
