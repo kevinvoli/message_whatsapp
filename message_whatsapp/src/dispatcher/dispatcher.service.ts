@@ -24,6 +24,8 @@ export class DispatcherService {
   private readonly chatDispatchLocks = new Map<string, Mutex>();
   /** S3 — mutex leger pour eviter l'overlap du cron SLA */
   private isSlaRunning = false;
+  private slaRunningStartedAt: Date | null = null;
+  private readonly SLA_STALE_TIMEOUT_MS = 30 * 60 * 1000;
   private getChatDispatchLock(chatId: string): Mutex {
     let mutex = this.chatDispatchLocks.get(chatId);
     if (!mutex) {
@@ -492,7 +494,6 @@ export class DispatcherService {
         : WhatsappChatStatus.EN_ATTENTE,
       assigned_at: new Date(),
       first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-      ...(nextPoste.is_active ? { lastOpenedAt: new Date() } : {}),
     });
 
     void this.notificationService.create(
@@ -541,7 +542,6 @@ export class DispatcherService {
               status: dedicatedPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
               assigned_at: new Date(),
               first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-              ...(dedicatedPoste.is_active ? { lastOpenedAt: new Date() } : {}),
             })
             .where('id = :id AND poste_id IS NULL', { id: chat.id })
             .execute();
@@ -571,7 +571,6 @@ export class DispatcherService {
             status: readerPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
             assigned_at: new Date(),
             first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-            ...(readerPoste.is_active ? { lastOpenedAt: new Date() } : {}),
           })
           .where('id = :id AND poste_id IS NULL', { id: chat.id })
           .execute();
@@ -599,7 +598,6 @@ export class DispatcherService {
         status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
         assigned_at: new Date(),
         first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-        ...(nextPoste.is_active ? { lastOpenedAt: new Date() } : {}),
       })
       .where('id = :id AND poste_id IS NULL', { id: chat.id })
       .execute();
@@ -645,7 +643,6 @@ export class DispatcherService {
       // 15 min au lieu de 5 min — evite que toutes les conversations non repondues
       // reviennent dans le SLA checker a chaque cycle de 5 min (boucle de charge infinie)
       first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
-      ...(nextPoste.is_active ? { lastOpenedAt: new Date() } : {}),
     });
 
     const updatedChat = await this.chatRepository.findOne({
@@ -699,10 +696,17 @@ export class DispatcherService {
    */
   async jobRunnerAllPostes(thresholdMinutes = 20, batchSize = 300): Promise<string> {
     if (this.isSlaRunning) {
-      this.logger.warn('SLA checker deja en cours — cycle ignore');
-      return 'Ignore — cycle precedent encore en cours';
+      const elapsed = this.slaRunningStartedAt
+        ? Date.now() - this.slaRunningStartedAt.getTime()
+        : 0;
+      if (elapsed < this.SLA_STALE_TIMEOUT_MS) {
+        this.logger.warn('SLA checker deja en cours — cycle ignore');
+        return 'Ignore — cycle precedent encore en cours';
+      }
+      this.logger.warn(`SLA checker — reset force (bloque depuis ${Math.round(elapsed / 60000)} min)`);
     }
     this.isSlaRunning = true;
+    this.slaRunningStartedAt = new Date();
 
     try {
       // 1. Postes dans la file d'attente (connectes OU non)
@@ -904,7 +908,6 @@ export class DispatcherService {
                 : WhatsappChatStatus.EN_ATTENTE,
               assigned_at: new Date(),
               first_response_deadline_at: new Date(Date.now() + 30 * 60 * 1000),
-              ...(destPoste.is_active ? { lastOpenedAt: new Date() } : {}),
             });
 
             countMap.set(srcPoste.id, (countMap.get(srcPoste.id) ?? 1) - 1);
@@ -926,6 +929,7 @@ export class DispatcherService {
       return summary;
     } finally {
       this.isSlaRunning = false;
+      this.slaRunningStartedAt = null;
     }
   }
 
@@ -964,7 +968,6 @@ export class DispatcherService {
           assigned_at: new Date(),
           assigned_mode: nextAgent.is_active ? 'ONLINE' : 'OFFLINE',
           first_response_deadline_at: new Date(Date.now() + 5 * 60 * 1000),
-          ...(nextAgent.is_active ? { lastOpenedAt: new Date() } : {}),
         });
 
         // Notifier l'ancien poste si la conversation lui etait deja assignee
