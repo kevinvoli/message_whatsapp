@@ -1458,6 +1458,26 @@ export class WhatsappMessageGateway
     return count;
   }
 
+  public async disconnectAgentByCommercialId(
+    commercialId: string,
+  ): Promise<number> {
+    const entries = Array.from(this.connectedAgents.entries()).filter(
+      ([, agent]) => agent.commercialId === commercialId,
+    );
+    let count = 0;
+    for (const [clientId] of entries) {
+      const socket = this.server.sockets.sockets.get(clientId);
+      if (socket) {
+        socket.disconnect(true);
+        count++;
+      }
+    }
+    this.logger.log(
+      `Admin forced disconnect commercial ${commercialId}: ${count} socket(s) closed`,
+    );
+    return count;
+  }
+
   public async emitConversationReassigned(
     chat: WhatsappChat,
     oldPosteId: string,

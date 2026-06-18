@@ -2,7 +2,7 @@
 import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, Mail, MapPin, MessageSquare, LogOut, BarChart3, CheckCheck, Activity, Wifi, WifiOff, List, UserCircle, Inbox, Reply, CheckCircle, Timer } from 'lucide-react';
 
 import { PerformanceCommercial, Poste, CommercialStatsDto, ChatLuSansReponse } from '@/app/lib/definitions';
-import { createCommercial, deleteCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats, getChatsLusSansReponse } from '@/app/lib/api';
+import { createCommercial, deleteCommercial, disconnectCommercial, getPerformanceCommerciaux, getPostes, updateCommercial, runCronNow, getCommercialStats, getChatsLusSansReponse } from '@/app/lib/api';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatRelativeDate } from '@/app/lib/dateUtils';
@@ -101,8 +101,23 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
 
   const [activeTab, setActiveTab] = useState<CommerciauxTabKey>('liste');
   const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const loading = crudLoading || dataLoading;
   const { addToast } = useToast();
+
+  const handleDisconnectCommercial = async (commercial: PerformanceCommercial) => {
+    if (!window.confirm(`Déconnecter ${commercial.name} ?`)) return;
+    setDisconnectingId(commercial.id);
+    try {
+      const res = await disconnectCommercial(commercial.id);
+      addToast({ type: res.disconnected ? 'success' : 'info', message: res.message });
+      await fetchData();
+    } catch {
+      addToast({ type: 'error', message: 'Erreur lors de la déconnexion.' });
+    } finally {
+      setDisconnectingId(null);
+    }
+  };
 
   const handleDisconnectAll = async () => {
     const connected = commerciaux.filter(c => c.isConnected).length;
@@ -670,6 +685,15 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
                               aria-label="Modifier"
                             >
                               <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => void handleDisconnectCommercial(commercial)}
+                              className="p-1 text-orange-600 hover:bg-orange-50 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                              disabled={!commercial.isConnected || disconnectingId === commercial.id}
+                              title={commercial.isConnected ? 'Déconnecter ce commercial' : 'Commercial hors ligne'}
+                              aria-label="Déconnecter"
+                            >
+                              <LogOut className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => void handleDeleteCommercial(commercial.id)}

@@ -15,6 +15,13 @@ import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dt
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
 import { CommercialStatsService } from './commercial-stats.service';
+import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
+
+interface DisconnectCommercialResponse {
+  disconnected: boolean;
+  message: string;
+}
 
 @Controller('users')
 @UseGuards(AdminGuard) // Use AdminGuard
@@ -24,6 +31,8 @@ export class WhatsappCommercialController {
   constructor(
     private readonly whatsappCommercialService: WhatsappCommercialService,
     private readonly commercialStatsService: CommercialStatsService,
+    private readonly gateway: WhatsappMessageGateway,
+    private readonly connectionLogService: ConnectionLogService,
   ) {}
 
   @Post()
@@ -48,6 +57,29 @@ export class WhatsappCommercialController {
     @Query('dateTo') dateTo?: string,
   ) {
     return this.commercialStatsService.getStats(id, periode, dateFrom, dateTo);
+  }
+
+  @Post(':id/disconnect')
+  async disconnectCommercial(
+    @Param('id') id: string,
+  ): Promise<DisconnectCommercialResponse> {
+    // Lève NotFoundException si l'ID n'existe pas
+    await this.whatsappCommercialService.findOne(id);
+
+    const count = await this.gateway.disconnectAgentByCommercialId(id);
+
+    // handleDisconnect couvre updateStatus + logLogout quand un socket existait.
+    // Si count === 0, aucun socket n'a été fermé : réconcilier l'état fantôme manuellement.
+    if (count === 0) {
+      await this.whatsappCommercialService.updateStatus(id, false);
+      await this.connectionLogService.logLogout(id, 'commercial');
+    }
+
+    this.logger.log(`Admin forced disconnect commercial ${id}: ${count} socket(s)`);
+
+    return count > 0
+      ? { disconnected: true, message: 'Commercial déconnecté.' }
+      : { disconnected: false, message: "Le commercial n'était pas connecté." };
   }
 
   @Get(':id')

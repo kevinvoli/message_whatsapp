@@ -1172,3 +1172,8 @@ export interface QuizPdf {
   availableUntil: string | null;
   uploadedAt: string;
 }
+
+export interface DisconnectCommercialResponse {
+  disconnected: boolean;
+  message: string;
+}

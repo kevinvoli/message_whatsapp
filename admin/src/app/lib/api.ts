@@ -1,6 +1,6 @@
 // admin/src/app/lib/api.ts
 
-import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse, ChatReadStatus, QuizCategory, QuizQuestion, QuizSession, QuizExemption, QuizSessionResult, QuizPdf } from './definitions';
+import { Commercial, StatsGlobales, Poste, PostePanelConfig, Channel, MessageAuto, Client, WhatsappChat, WhatsappMessage, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, WebhookMetricsSnapshot, AutoMessageScopeConfig, AutoMessageScopeType, CronConfig, UpdateCronConfigPayload, SystemConfigEntry, SystemConfigCatalogueEntry, WebhookEntry, PosteStats, CommercialStats, AutoMessageTriggerType, AutoMessageKeyword, BusinessHoursConfig, KeywordMatchType, WhatsappTemplate, CampaignLink, CampaignLinkClick, CampaignLinkStats, MediaAsset, ChannelDetailStats, CommercialStatsDto, TraficResponse, TraficConversationsResponse, RestrictionConfig, MetaAdKpiRow, StoredMediaResponse, GalerieFilterOptions, MessageRestrictionConfig, ChatLuSansReponse, ChatReadStatus, QuizCategory, QuizQuestion, QuizSession, QuizExemption, QuizSessionResult, QuizPdf, DisconnectCommercialResponse } from './definitions';
 import { logger } from './logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -124,6 +124,14 @@ export async function deleteCommercial(id: string): Promise<{ message: string }>
         credentials: 'include',
     });
     return handleResponse<{ message: string }>(response);
+}
+
+export async function disconnectCommercial(id: string): Promise<DisconnectCommercialResponse> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/disconnect`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return handleResponse<DisconnectCommercialResponse>(response);
 }
 
 export async function getChannels(): Promise<Channel[]> {
