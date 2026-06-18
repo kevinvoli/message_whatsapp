@@ -1,35 +1,18 @@
-import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeorm';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CommercialPhone1745500000001 implements MigrationInterface {
   async up(qr: QueryRunner): Promise<void> {
-    const hasPhone = await qr.hasColumn('whatsapp_commercial', 'phone');
-    if (!hasPhone) {
-      await qr.addColumn(
-        'whatsapp_commercial',
-        new TableColumn({
-          name: 'phone',
-          type: 'varchar',
-          length: '50',
-          isNullable: true,
-          default: null,
-        }),
-      );
-      await qr.createIndex(
-        'whatsapp_commercial',
-        new TableIndex({
-          name: 'IDX_commercial_phone',
-          columnNames: ['phone'],
-          isUnique: true,
-        }),
-      );
+    // whatsapp_commercial pre-dates migrations — use raw SQL to avoid TypeORM cache issues
+    if (!(await qr.hasColumn('whatsapp_commercial', 'phone'))) {
+      await qr.query('ALTER TABLE `whatsapp_commercial` ADD COLUMN `phone` VARCHAR(50) NULL DEFAULT NULL');
+      await qr.query('CREATE UNIQUE INDEX `IDX_commercial_phone` ON `whatsapp_commercial` (`phone`)');
     }
   }
 
   async down(qr: QueryRunner): Promise<void> {
-    const hasPhone = await qr.hasColumn('whatsapp_commercial', 'phone');
-    if (hasPhone) {
-      await qr.dropIndex('whatsapp_commercial', 'IDX_commercial_phone');
-      await qr.dropColumn('whatsapp_commercial', 'phone');
+    if (await qr.hasColumn('whatsapp_commercial', 'phone')) {
+      await qr.query('DROP INDEX `IDX_commercial_phone` ON `whatsapp_commercial`');
+      await qr.query('ALTER TABLE `whatsapp_commercial` DROP COLUMN `phone`');
     }
   }
 }

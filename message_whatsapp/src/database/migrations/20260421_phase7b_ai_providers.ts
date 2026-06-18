@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table, TableColumn } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 export class Phase7bAiProviders1745372800001 implements MigrationInterface {
   async up(qr: QueryRunner): Promise<void> {
@@ -21,16 +21,16 @@ export class Phase7bAiProviders1745372800001 implements MigrationInterface {
       true,
     );
 
+    // ai_module_config created via raw SQL in Phase7AiGovernance — not in TypeORM cache
     if (!(await qr.hasColumn('ai_module_config', 'provider_id'))) {
-      await qr.addColumn(
-        'ai_module_config',
-        new TableColumn({ name: 'provider_id', type: 'char', length: '36', isNullable: true }),
-      );
+      await qr.query('ALTER TABLE `ai_module_config` ADD COLUMN `provider_id` CHAR(36) NULL');
     }
   }
 
   async down(qr: QueryRunner): Promise<void> {
-    await qr.dropColumn('ai_module_config', 'provider_id');
+    if (await qr.hasColumn('ai_module_config', 'provider_id')) {
+      await qr.query('ALTER TABLE `ai_module_config` DROP COLUMN `provider_id`');
+    }
     await qr.dropTable('ai_provider');
   }
 }

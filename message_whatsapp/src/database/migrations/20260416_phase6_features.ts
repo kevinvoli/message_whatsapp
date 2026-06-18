@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableColumn } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
 
 /**
  * Phase 6 — Intelligence & Automatisation
@@ -11,25 +11,14 @@ export class Phase6Features1744761600006 implements MigrationInterface {
 
   async up(queryRunner: QueryRunner): Promise<void> {
     // ─── P6.1 — Colonnes sentiment sur whatsapp_message ───────────────────────
-    const hasSentimentScore = await queryRunner.hasColumn('whatsapp_message', 'sentiment_score');
-    if (!hasSentimentScore) {
-      await queryRunner.addColumn(
-        'whatsapp_message',
-        new TableColumn({ name: 'sentiment_score', type: 'float', isNullable: true }),
-      );
+    // queryRunner.addColumn(string) requires the table in TypeORM's internal cache,
+    // which is only populated by tables created in the current migration run.
+    // whatsapp_message pre-dates migrations (created via synchronize), so we use raw SQL.
+    if (!(await queryRunner.hasColumn('whatsapp_message', 'sentiment_score'))) {
+      await queryRunner.query('ALTER TABLE `whatsapp_message` ADD COLUMN `sentiment_score` FLOAT NULL');
     }
-
-    const hasSentimentLabel = await queryRunner.hasColumn('whatsapp_message', 'sentiment_label');
-    if (!hasSentimentLabel) {
-      await queryRunner.addColumn(
-        'whatsapp_message',
-        new TableColumn({
-          name: 'sentiment_label',
-          type: 'enum',
-          enum: ['positive', 'neutral', 'negative'],
-          isNullable: true,
-        }),
-      );
+    if (!(await queryRunner.hasColumn('whatsapp_message', 'sentiment_label'))) {
+      await queryRunner.query("ALTER TABLE `whatsapp_message` ADD COLUMN `sentiment_label` ENUM('positive','neutral','negative') NULL");
     }
 
     // ─── P6.3 — outbound_webhook ──────────────────────────────────────────────

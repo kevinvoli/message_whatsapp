@@ -1,86 +1,30 @@
-import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Phase 7 — Fondations de suivi client
- * P7.1 — Statut métier de fin de conversation sur whatsapp_chat
- *
- * Stratégie expand-contract :
- * - Toutes les colonnes sont nullable + default NULL → aucun impact sur les lignes existantes
- * - L'ancien code continue de fonctionner sans ces colonnes
- */
 export class Phase7ChatOutcome1745100000001 implements MigrationInterface {
   name = 'Phase7ChatOutcome1745100000001';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    const hasResult = await queryRunner.hasColumn('whatsapp_chat', 'conversation_result');
-    if (!hasResult) {
-      await queryRunner.addColumn(
-        'whatsapp_chat',
-        new TableColumn({
-          name: 'conversation_result',
-          type: 'enum',
-          enum: [
-            'commande_confirmee',
-            'commande_a_saisir',
-            'a_relancer',
-            'rappel_programme',
-            'pas_interesse',
-            'sans_reponse',
-            'infos_incompletes',
-            'deja_client',
-            'annule',
-          ],
-          isNullable: true,
-          default: null,
-        }),
+    // whatsapp_chat pre-dates migrations (synchronize/dump) — use raw SQL to avoid TypeORM cache issues
+    if (!(await queryRunner.hasColumn('whatsapp_chat', 'conversation_result'))) {
+      await queryRunner.query(
+        `ALTER TABLE \`whatsapp_chat\` ADD COLUMN \`conversation_result\` ENUM('commande_confirmee','commande_a_saisir','a_relancer','rappel_programme','pas_interesse','sans_reponse','infos_incompletes','deja_client','annule') NULL DEFAULT NULL`,
       );
     }
-
-    const hasResultAt = await queryRunner.hasColumn('whatsapp_chat', 'conversation_result_at');
-    if (!hasResultAt) {
-      await queryRunner.addColumn(
-        'whatsapp_chat',
-        new TableColumn({
-          name: 'conversation_result_at',
-          type: 'timestamp',
-          isNullable: true,
-          default: null,
-        }),
-      );
+    if (!(await queryRunner.hasColumn('whatsapp_chat', 'conversation_result_at'))) {
+      await queryRunner.query('ALTER TABLE `whatsapp_chat` ADD COLUMN `conversation_result_at` TIMESTAMP NULL DEFAULT NULL');
     }
-
-    const hasResultBy = await queryRunner.hasColumn('whatsapp_chat', 'conversation_result_by');
-    if (!hasResultBy) {
-      await queryRunner.addColumn(
-        'whatsapp_chat',
-        new TableColumn({
-          name: 'conversation_result_by',
-          type: 'char',
-          length: '36',
-          isNullable: true,
-          default: null,
-        }),
-      );
+    if (!(await queryRunner.hasColumn('whatsapp_chat', 'conversation_result_by'))) {
+      await queryRunner.query('ALTER TABLE `whatsapp_chat` ADD COLUMN `conversation_result_by` CHAR(36) NULL DEFAULT NULL');
     }
-
-    const hasLocked = await queryRunner.hasColumn('whatsapp_chat', 'is_locked');
-    if (!hasLocked) {
-      await queryRunner.addColumn(
-        'whatsapp_chat',
-        new TableColumn({
-          name: 'is_locked',
-          type: 'boolean',
-          default: false,
-          isNullable: false,
-        }),
-      );
+    if (!(await queryRunner.hasColumn('whatsapp_chat', 'is_locked'))) {
+      await queryRunner.query('ALTER TABLE `whatsapp_chat` ADD COLUMN `is_locked` TINYINT(1) NOT NULL DEFAULT 0');
     }
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
     for (const col of ['conversation_result', 'conversation_result_at', 'conversation_result_by', 'is_locked']) {
       if (await queryRunner.hasColumn('whatsapp_chat', col)) {
-        await queryRunner.dropColumn('whatsapp_chat', col);
+        await queryRunner.query(`ALTER TABLE \`whatsapp_chat\` DROP COLUMN \`${col}\``);
       }
     }
   }

@@ -1,41 +1,19 @@
-import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Phase9SlidingWindow1745424000001 implements MigrationInterface {
   async up(qr: QueryRunner): Promise<void> {
     // ── 1. whatsapp_chat : colonnes fenêtre glissante ───────────────────────
 
-    const hasWindowSlot = await qr.hasColumn('whatsapp_chat', 'window_slot');
-    if (!hasWindowSlot) {
-      await qr.addColumn(
-        'whatsapp_chat',
-        new TableColumn({ name: 'window_slot', type: 'int', isNullable: true, default: null }),
-      );
+    // whatsapp_chat pre-dates migrations — use raw SQL to avoid TypeORM cache issues
+    if (!(await qr.hasColumn('whatsapp_chat', 'window_slot'))) {
+      await qr.query('ALTER TABLE `whatsapp_chat` ADD COLUMN `window_slot` INT NULL DEFAULT NULL');
     }
-
-    const hasWindowStatus = await qr.hasColumn('whatsapp_chat', 'window_status');
-    if (!hasWindowStatus) {
-      await qr.addColumn(
-        'whatsapp_chat',
-        new TableColumn({
-          name: 'window_status',
-          type: 'enum',
-          enum: ['active', 'locked', 'validated', 'released'],
-          isNullable: true,
-          default: null,
-        }),
-      );
+    if (!(await qr.hasColumn('whatsapp_chat', 'window_status'))) {
+      await qr.query(`ALTER TABLE \`whatsapp_chat\` ADD COLUMN \`window_status\` ENUM('active','locked','validated','released') NULL DEFAULT NULL`);
     }
-
-    // Index pour queries fenêtre (poste_id + window_slot)
     try {
-      await qr.createIndex(
-        'whatsapp_chat',
-        new TableIndex({
-          name: 'IDX_chat_window_slot',
-          columnNames: ['poste_id', 'window_slot'],
-        }),
-      );
+      await qr.query('CREATE INDEX `IDX_chat_window_slot` ON `whatsapp_chat` (`poste_id`, `window_slot`)');
     } catch {
       // Index déjà existant — ignoré
     }
@@ -143,10 +121,11 @@ export class Phase9SlidingWindow1745424000001 implements MigrationInterface {
       // Index inexistant — ignoré
     }
 
-    const hasWindowStatus = await qr.hasColumn('whatsapp_chat', 'window_status');
-    if (hasWindowStatus) await qr.dropColumn('whatsapp_chat', 'window_status');
-
-    const hasWindowSlot = await qr.hasColumn('whatsapp_chat', 'window_slot');
-    if (hasWindowSlot) await qr.dropColumn('whatsapp_chat', 'window_slot');
+    if (await qr.hasColumn('whatsapp_chat', 'window_status')) {
+      await qr.query('ALTER TABLE `whatsapp_chat` DROP COLUMN `window_status`');
+    }
+    if (await qr.hasColumn('whatsapp_chat', 'window_slot')) {
+      await qr.query('ALTER TABLE `whatsapp_chat` DROP COLUMN `window_slot`');
+    }
   }
 }

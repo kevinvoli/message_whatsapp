@@ -1,77 +1,30 @@
-import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Phase 7 — Fondations de suivi client
- * P7.2 — Portefeuille commercial sur contact
- *
- * Stratégie expand-contract :
- * - portfolio_owner_id nullable → les contacts existants ont NULL (non attribués)
- * - client_category nullable → sera rempli par les webhooks entrants commandes
- * - client_order_summary nullable JSON
- */
 export class Phase7ContactPortfolio1745100000002 implements MigrationInterface {
   name = 'Phase7ContactPortfolio1745100000002';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    const hasOwner = await queryRunner.hasColumn('contact', 'portfolio_owner_id');
-    if (!hasOwner) {
-      await queryRunner.addColumn(
-        'contact',
-        new TableColumn({
-          name: 'portfolio_owner_id',
-          type: 'char',
-          length: '36',
-          isNullable: true,
-          default: null,
-        }),
+    // contact pre-dates migrations — use raw SQL to avoid TypeORM cache issues
+    if (!(await queryRunner.hasColumn('contact', 'portfolio_owner_id'))) {
+      await queryRunner.query('ALTER TABLE `contact` ADD COLUMN `portfolio_owner_id` CHAR(36) NULL DEFAULT NULL');
+    }
+    if (!(await queryRunner.hasColumn('contact', 'client_category'))) {
+      await queryRunner.query(
+        `ALTER TABLE \`contact\` ADD COLUMN \`client_category\` ENUM('jamais_commande','commande_sans_livraison','commande_avec_livraison','commande_annulee') NULL DEFAULT NULL`,
       );
     }
-
-    const hasCategory = await queryRunner.hasColumn('contact', 'client_category');
-    if (!hasCategory) {
-      await queryRunner.addColumn(
-        'contact',
-        new TableColumn({
-          name: 'client_category',
-          type: 'enum',
-          enum: ['jamais_commande', 'commande_sans_livraison', 'commande_avec_livraison', 'commande_annulee'],
-          isNullable: true,
-          default: null,
-        }),
-      );
+    if (!(await queryRunner.hasColumn('contact', 'client_order_summary'))) {
+      await queryRunner.query('ALTER TABLE `contact` ADD COLUMN `client_order_summary` JSON NULL');
     }
-
-    const hasOrderSummary = await queryRunner.hasColumn('contact', 'client_order_summary');
-    if (!hasOrderSummary) {
-      await queryRunner.addColumn(
-        'contact',
-        new TableColumn({
-          name: 'client_order_summary',
-          type: 'json',
-          isNullable: true,
-        }),
-      );
-    }
-
-    const hasOrderClientId = await queryRunner.hasColumn('contact', 'order_client_id');
-    if (!hasOrderClientId) {
-      await queryRunner.addColumn(
-        'contact',
-        new TableColumn({
-          name: 'order_client_id',
-          type: 'int',
-          isNullable: true,
-          default: null,
-          comment: 'ID client dans la plateforme de gestion des commandes (integer)',
-        }),
-      );
+    if (!(await queryRunner.hasColumn('contact', 'order_client_id'))) {
+      await queryRunner.query('ALTER TABLE `contact` ADD COLUMN `order_client_id` INT NULL DEFAULT NULL');
     }
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
     for (const col of ['portfolio_owner_id', 'client_category', 'client_order_summary', 'order_client_id']) {
       if (await queryRunner.hasColumn('contact', col)) {
-        await queryRunner.dropColumn('contact', col);
+        await queryRunner.query(`ALTER TABLE \`contact\` DROP COLUMN \`${col}\``);
       }
     }
   }
