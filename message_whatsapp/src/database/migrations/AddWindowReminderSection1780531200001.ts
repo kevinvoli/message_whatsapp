@@ -18,24 +18,32 @@ export class AddWindowReminderSection1780531200001 implements MigrationInterface
   }
 
   public async up(qr: QueryRunner): Promise<void> {
-    // 1. Étendre l'enum trigger_type pour ajouter 'window_reminder'
-    // MODIFY COLUMN préserve toutes les valeurs existantes
-    await qr.query(`
-      ALTER TABLE \`messages_predefinis\`
-        MODIFY COLUMN \`trigger_type\` ENUM(
-          'sequence','no_response','out_of_hours','reopened','queue_wait',
-          'keyword','client_type','inactivity','on_assign','window_reminder'
-        ) NOT NULL DEFAULT 'sequence'
-    `);
+    // RemoveAutoMessageLegacy1744000100000 (ts 1744000100000) renomme messages_predefinis
+    // en _legacy_messages_predefinis et le remplace par auto_message (V2).
+    // Si la table a déjà été renommée, on cible _legacy_messages_predefinis ; sinon messages_predefinis.
+    const hasMsgsV1 = await qr.hasTable('messages_predefinis');
+    const hasMsgsLegacy = await qr.hasTable('_legacy_messages_predefinis');
+    const msgTable = hasMsgsV1 ? 'messages_predefinis' : hasMsgsLegacy ? '_legacy_messages_predefinis' : null;
 
-    // 2. Colonne window_reminder_target sur messages_predefinis
-    if (!(await this.columnExists(qr, 'messages_predefinis', 'window_reminder_target'))) {
+    if (msgTable) {
+      // 1. Étendre l'enum trigger_type pour ajouter 'window_reminder'
       await qr.query(`
-        ALTER TABLE \`messages_predefinis\`
-          ADD COLUMN \`window_reminder_target\` ENUM('with_replies','no_replies')
-          NULL DEFAULT NULL
-          AFTER \`client_type_target\`
+        ALTER TABLE \`${msgTable}\`
+          MODIFY COLUMN \`trigger_type\` ENUM(
+            'sequence','no_response','out_of_hours','reopened','queue_wait',
+            'keyword','client_type','inactivity','on_assign','window_reminder'
+          ) NOT NULL DEFAULT 'sequence'
       `);
+
+      // 2. Colonne window_reminder_target
+      if (!(await this.columnExists(qr, msgTable, 'window_reminder_target'))) {
+        await qr.query(`
+          ALTER TABLE \`${msgTable}\`
+            ADD COLUMN \`window_reminder_target\` ENUM('with_replies','no_replies')
+            NULL DEFAULT NULL
+            AFTER \`client_type_target\`
+        `);
+      }
     }
 
     // 3. Colonne last_window_reminder_sent_at sur whatsapp_chat
