@@ -16,10 +16,11 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
 import { ChatSessionModule } from 'src/chat-session/chat-session.module';
+import { ChatSession } from 'src/chat-session/entities/chat-session.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CronConfig, WhatsappChat, WhatsappCommercial, DispatchSettings]),
+    TypeOrmModule.forFeature([CronConfig, WhatsappChat, WhatsappCommercial, DispatchSettings, ChatSession]),
     forwardRef(() => WhatsappMessageModule),
     forwardRef(() => DispatcherModule),
     LoggingModule,
