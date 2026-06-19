@@ -400,6 +400,7 @@ export type Channel = {
   max_messages_before_readonly?: number | null;
   application_id?: string | null;
   application?: MessagingApplication | null;
+  phone_number?: string | null;
 };
 
 
@@ -544,6 +545,13 @@ export type DispatchSettings = {
   read_only_check_interval_minutes: number;
   offline_reinject_cron: string;
   dispatch_mode: 'LEAST_LOADED' | 'ROUND_ROBIN';
+  readOnlyMaxMessages?: number | null;
+  idleDisconnectEnabled?: boolean | null;
+  idleDisconnectMinutes?: number | null;
+  idleWarningSeco?: number | null;
+  idleWarningSeconds?: number | null;
+  readCooldownSeconds?: number | null;
+  maxReadMessagesPerMinute?: number | null;
 };
 
 
@@ -573,6 +581,7 @@ export type MetriquesGlobales = {
 
   // Métriques Chats
   totalChats: number;
+  totalConversations: number;
   chatsActifs: number;
   chatsEnAttente: number;
   chatsFermes: number;
@@ -1734,15 +1743,9 @@ export interface DisconnectCommercialResponse {
   message: string;
 }
 
-// ============================================
-// VUES SPRINT 2 — ViewMode additions
-// ============================================
+export interface PostePanelConfig {
+  enabled: boolean;
+  types: string[];
+}
 
-export const COULEURS_STATUT = {
-  actif: 'green',
-  'en attente': 'yellow',
-  'fermé': 'gray',
-  online: 'green',
-  offline: 'gray',
-} as const;
 

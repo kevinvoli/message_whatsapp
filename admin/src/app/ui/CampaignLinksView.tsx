@@ -599,8 +599,8 @@ function CampaignLinkAnalytics({ linkId, onBack }: CampaignLinkAnalyticsProps) {
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => formatDateShort(v)} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
-                    formatter={(value: number, name: string) => [value, name === 'clicks' ? 'Clics' : 'Conversions']}
-                    labelFormatter={(label: string) => formatDateShort(String(label))}
+                    formatter={((value: number | undefined, name: string) => [value ?? 0, name === 'clicks' ? 'Clics' : 'Conversions']) as any}
+                    labelFormatter={((label: string) => formatDateShort(String(label))) as any}
                   />
                   <Legend formatter={(value: string) => (value === 'clicks' ? 'Clics' : 'Conversions')} wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="clicks" fill="#3b82f6" name="clicks" radius={[3, 3, 0, 0]} />
