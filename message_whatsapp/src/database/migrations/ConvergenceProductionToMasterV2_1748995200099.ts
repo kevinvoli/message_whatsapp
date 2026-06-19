@@ -219,11 +219,22 @@ export class ConvergenceProductionToMasterV2_1748995200099 implements MigrationI
           AND CONSTRAINT_NAME = 'FK_click_campaign_link'
       `);
       if (parseInt(fkExists[0].cnt, 10) === 0) {
-        await queryRunner.query(`
-          ALTER TABLE \`campaign_link_click\`
-            ADD CONSTRAINT \`FK_click_campaign_link\`
-              FOREIGN KEY (\`campaign_link_id\`) REFERENCES \`campaign_link\` (\`id\`) ON DELETE CASCADE
-        `);
+        try {
+          // Normalise les collations des deux tables avant d'ajouter la FK
+          // (errno 150 si campaign_link vient de production avec utf8mb4_general_ci)
+          await queryRunner.query('SET FOREIGN_KEY_CHECKS=0');
+          await queryRunner.query('ALTER TABLE `campaign_link` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+          await queryRunner.query('ALTER TABLE `campaign_link_click` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+          await queryRunner.query('SET FOREIGN_KEY_CHECKS=1');
+          await queryRunner.query(`
+            ALTER TABLE \`campaign_link_click\`
+              ADD CONSTRAINT \`FK_click_campaign_link\`
+                FOREIGN KEY (\`campaign_link_id\`) REFERENCES \`campaign_link\` (\`id\`) ON DELETE CASCADE
+          `);
+        } catch (e: any) {
+          await queryRunner.query('SET FOREIGN_KEY_CHECKS=1');
+          console.warn('[ConvergenceProductionToMasterV2] FK_click_campaign_link ignorée :', e.message);
+        }
       }
     }
 
