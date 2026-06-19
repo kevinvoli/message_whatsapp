@@ -15,6 +15,7 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
     NotificationModule,
     SystemConfigModule,
     ConnectionLogModule,
+    ChatSessionModule,
   ],
   controllers: [CronConfigController],
   providers: [
