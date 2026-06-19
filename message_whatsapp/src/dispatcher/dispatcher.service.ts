@@ -169,6 +169,32 @@ export class DispatcherService {
     }
   }
 
+  /**
+   * Réactive les conversations EN_ATTENTE assignées à un poste qui vient de se connecter.
+   * Portée depuis production — C2/C3.
+   */
+  async reactivateWaitingConversationsForPoste(posteId: string): Promise<number> {
+    const waiting = await this.chatRepository.find({
+      where: { poste_id: posteId, status: WhatsappChatStatus.EN_ATTENTE },
+      select: ['id'],
+    });
+
+    if (waiting.length === 0) return 0;
+
+    const ids = waiting.map((c) => c.id);
+    await this.chatRepository
+      .createQueryBuilder()
+      .update()
+      .set({ status: WhatsappChatStatus.ACTIF, assigned_mode: 'ONLINE' } as Partial<WhatsappChat>)
+      .whereInIds(ids)
+      .execute();
+
+    this.logger.log(
+      `reactivateWaitingConversationsForPoste: ${waiting.length} conversation(s) EN_ATTENTE → ACTIF (poste ${posteId})`,
+    );
+    return waiting.length;
+  }
+
   async getDispatchSnapshot(): Promise<{
     queue_size: number;
     /** Total EN_ATTENTE (toutes catégories) */

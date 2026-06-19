@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { WhatsappCommercialController } from './whatsapp_commercial.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -9,6 +9,9 @@ import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { CommercialStatsService } from './commercial-stats.service';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
+import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 
 @Module({
   imports: [
@@ -20,9 +23,11 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
       WhatsappChat,
       WhapiChannel,
     ]),
+    ConnectionLogModule,
+    forwardRef(() => WhatsappMessageModule),
   ],
   controllers: [WhatsappCommercialController],
-  providers: [WhatsappCommercialService, QueueService],
-  exports: [WhatsappCommercialService],
+  providers: [WhatsappCommercialService, QueueService, CommercialStatsService],
+  exports: [WhatsappCommercialService, CommercialStatsService],
 })
 export class WhatsappCommercialModule {}

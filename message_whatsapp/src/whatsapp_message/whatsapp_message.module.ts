@@ -17,9 +17,12 @@ import { CommunicationInstagramService } from 'src/communication_whapi/communica
 import { CommunicationTelegramService } from 'src/communication_whapi/communication_telegram.service';
 import { OutboundRouterService } from 'src/communication_whapi/outbound-router.service';
 import { DispatcherModule } from 'src/dispatcher/dispatcher.module';
+import { DispatchSettings } from 'src/dispatcher/entities/dispatch-settings.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
+import { MessageReadService } from './message-read.service';
+import { MessageReadRateLimiterService } from './message-read-rate-limiter.service';
 import { FirstResponseTimeoutJob } from 'src/jorbs/first-response-timeout.job';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ProviderChannel } from 'src/channel/entities/provider-channel.entity';
@@ -60,6 +63,9 @@ import { CommercialActionGateModule } from 'src/commercial-action-gate/commercia
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
+import { ConversationRestrictionModule } from 'src/conversation-restriction/conversation-restriction.module';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({
   imports: [
@@ -82,6 +88,7 @@ import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
       Contact,
       WhatsappPoste,
       WhatsappMedia,
+      DispatchSettings,
     ]),
     WhatsappChatModule,
     forwardRef(() => DispatcherModule),
@@ -100,6 +107,9 @@ import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
     CommercialActionGateModule,
     WhatsappTemplateModule,
     RedisModule,
+    ConnectionLogModule,
+    ConversationRestrictionModule,
+    ChatSessionModule,
   ],
   controllers: [WhatsappMessageController],
   providers: [
@@ -133,6 +143,8 @@ import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
     ResolveTenantUseCase,
     FlowbotOutboundListener,
     SocketListCacheService,
+    MessageReadService,
+    MessageReadRateLimiterService,
   ],
   exports: [
     WhatsappMessageGateway,

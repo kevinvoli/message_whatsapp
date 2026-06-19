@@ -3,6 +3,7 @@ import { WhatsappChatLabel } from 'src/whatsapp_chat_label/entities/whatsapp_cha
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { MetaAdReferral } from 'src/meta-ad-referral/entities/meta-ad-referral.entity';
 import {
   Column,
   CreateDateColumn,
@@ -12,6 +13,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -247,6 +249,27 @@ export class WhatsappChat {
   @Column({ name: 'outbound_message_count', type: 'int', default: 0 })
   outboundMessageCount: number;
 
+  @Column({ name: 'campaign_link_id', type: 'char', length: 36, nullable: true, default: null })
+  campaignLinkId: string | null;
+
+  /** Cache synchronisé depuis ChatSession.lastWindowReminderSentAt (source de vérité) */
+  @Column({ name: 'last_window_reminder_sent_at', type: 'timestamp', nullable: true })
+  last_window_reminder_sent_at: Date | null;
+
+  @Column({ name: 'is_ctwa', type: 'boolean', default: false })
+  isCtwa: boolean;
+
+  @Column({ name: 'active_session_id', type: 'char', length: 36, nullable: true, default: null })
+  activeSessionId: string | null;
+
+  /**
+   * Dénormalisation de ChatSession.autoCloseAt (session active).
+   * Mis à jour par chat-session.service.ts à chaque computeWindows, NULL à la fermeture.
+   * Permet d'exclure les conversations à fenêtre expirée sans join.
+   */
+  @Column({ name: 'window_expires_at', type: 'timestamp', nullable: true, default: null })
+  windowExpiresAt: Date | null;
+
   @OneToMany(() => WhatsappChatLabel, (data) => data.chat)
   chatLabel: WhatsappChatLabel[];
 
@@ -280,4 +303,7 @@ export class WhatsappChat {
     comment: 'Timestamp when the trajet was deleted',
   })
   deletedAt: Date | null;
+
+  @OneToOne(() => MetaAdReferral, (referral) => referral.chat, { nullable: true, eager: false })
+  metaAdReferral: MetaAdReferral | null;
 }

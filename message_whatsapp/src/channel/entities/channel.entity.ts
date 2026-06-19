@@ -134,6 +134,9 @@ export class WhapiChannel {
   @Column({ name: 'max_messages_before_readonly', type: 'int', nullable: true, default: null })
   maxMessagesBeforeReadonly: number | null;
 
+  @Column({ name: 'phone_number', type: 'varchar', length: 32, nullable: true, default: null })
+  phone_number: string | null;
+
   @ManyToOne(() => WhatsappPoste, (poste) => poste.channels, {
     nullable: true,
     onDelete: 'SET NULL',

@@ -108,6 +108,18 @@ export class WhatsappMedia {
   @Column({ name: 'view_once', type: 'varchar', length: 100, nullable: false })
   view_once: string;
 
+  @Column({ name: 'local_url', type: 'varchar', length: 500, nullable: true })
+  local_url?: string | null;
+
+  @Column({ name: 'local_path', type: 'varchar', length: 500, nullable: true })
+  local_path?: string | null;
+
+  @Column({ name: 'provider_url_expired', type: 'boolean', default: false })
+  provider_url_expired: boolean;
+
+  @Column({ name: 'downloaded_at', type: 'timestamp', nullable: true })
+  downloaded_at?: Date | null;
+
   // 🎵 AUDIO / 🎥 VIDEO / 🎙️ VOICE
   @Column({ name: 'duration_seconds', type: 'int', nullable: true })
   duration_seconds?: number | null;

@@ -259,6 +259,19 @@ export class WhatsappMessage {
   @JoinColumn({ name: 'quoted_message_id' })
   quotedMessage?: WhatsappMessage | null;
 
+  @Column({ name: 'read_by_commercial_id', type: 'char', length: 36, nullable: true, default: null })
+  readByCommercialId: string | null;
+
+  @Column({ name: 'read_by_commercial_at', type: 'datetime', nullable: true, default: null })
+  readByCommercialAt: Date | null;
+
+  @ManyToOne(() => WhatsappCommercial, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'read_by_commercial_id' })
+  readByCommercial?: WhatsappCommercial | null;
+
+  @Column({ name: 'is_first_reply', type: 'tinyint', nullable: true, default: null })
+  isFirstReply: boolean | null;
+
   // P6.1 — Analyse de sentiment (nullable : non encore analysé ou non textuel)
   @Column({ name: 'sentiment_score', type: 'float', nullable: true })
   sentiment_score: number | null;

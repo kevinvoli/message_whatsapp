@@ -43,6 +43,10 @@ describe('WhatsappMessageGateway protocol events', () => {
       null as any, // dossierService (optionnel)
       null as any, // closureService (optionnel)
       { emit: jest.fn() } as any, // eventEmitter
+      null as any, // connectionLogService (optionnel)
+      null as any, // messageReadService (optionnel)
+      null as any, // restrictionService (optionnel)
+      null as any, // chatSessionService (optionnel)
     );
   };
 

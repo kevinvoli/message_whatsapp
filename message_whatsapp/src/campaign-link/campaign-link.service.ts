@@ -1,0 +1,448 @@
+import { createHash, randomBytes } from 'crypto';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Between, IsNull, Not, Repository } from 'typeorm';
+import { CampaignLink } from './entities/campaign-link.entity';
+import { CampaignLinkClick } from './entities/campaign-link-click.entity';
+import { WhapiChannel } from 'src/channel/entities/channel.entity';
+import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CreateCampaignLinkDto } from './dto/create-campaign-link.dto';
+import { UpdateCampaignLinkDto } from './dto/update-campaign-link.dto';
+import { MediaAssetService } from 'src/media-asset/media-asset.service';
+import { CreateMediaAssetDto } from 'src/media-asset/dto/create-media-asset.dto';
+
+@Injectable()
+export class CampaignLinkService {
+  private readonly logger = new Logger(CampaignLinkService.name);
+
+  constructor(
+    @InjectRepository(CampaignLink)
+    private readonly linkRepository: Repository<CampaignLink>,
+    @InjectRepository(CampaignLinkClick)
+    private readonly clickRepository: Repository<CampaignLinkClick>,
+    @InjectRepository(WhapiChannel)
+    private readonly channelRepository: Repository<WhapiChannel>,
+    @InjectRepository(WhatsappChat)
+    private readonly chatRepository: Repository<WhatsappChat>,
+    private readonly mediaAssetService: MediaAssetService,
+  ) {}
+  // --- Helpers ---
+
+  private async generateShortCode(): Promise<string> {
+    const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const LENGTH = 8;
+    const MAX_ATTEMPTS = 5;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const bytes = randomBytes(LENGTH);
+      let code = '';
+      for (let i = 0; i < LENGTH; i++) {
+        code += CHARS[bytes[i] % CHARS.length];
+      }
+      const existing = await this.linkRepository.findOne({
+        where: { shortCode: code },
+      });
+      if (!existing) {
+        return code;
+      }
+    }
+    throw new Error('Impossible de generer un short code unique apres 5 tentatives');
+  }
+
+  private buildUrls(
+    phone: string,
+    message: string,
+    code: string,
+  ): { directUrl: string; trackedUrl: string } {
+    const digits = phone.replace(/\D/g, '');
+    const directUrl = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+    const domain = process.env.APP_DOMAIN || process.env.APP_URL || '';
+    const trackedUrl = `${domain}/campaign/t/${code}`;
+    return { directUrl, trackedUrl };
+  }
+
+  private async resolvePhone(channel: WhapiChannel): Promise<string | null> {
+    if (channel.phone_number) {
+      return channel.phone_number;
+    }
+    if (channel.provider === 'whapi' && channel.channel_id) {
+      return channel.channel_id.split('@')[0];
+    }
+    if (
+      channel.provider &&
+      ['meta', 'messenger', 'instagram'].includes(channel.provider) &&
+      channel.channel_id &&
+      channel.token
+    ) {
+      const phone = await this.fetchMetaPhoneNumber(channel.channel_id, channel.token);
+      if (phone) {
+        await this.channelRepository.update(channel.id, { phone_number: phone });
+        channel.phone_number = phone;
+        return phone;
+      }
+    }
+    return null;
+  }
+
+  private async fetchMetaPhoneNumber(phoneNumberId: string, token: string): Promise<string | null> {
+    try {
+      const url = `https://graph.facebook.com/v18.0/${phoneNumberId}?fields=display_phone_number&access_token=${encodeURIComponent(token)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        this.logger.warn(`Meta API error ${res.status} pour phone_number_id=${phoneNumberId}`);
+        return null;
+      }
+      const data = (await res.json()) as { display_phone_number?: string };
+      if (!data.display_phone_number) return null;
+      return data.display_phone_number.replace(/\D/g, '');
+    } catch (err: unknown) {
+      this.logger.warn(`Impossible de recuperer le numero Meta : ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+
+  private detectDevice(userAgent: string | null): string | null {
+    if (!userAgent) return null;
+    const ua = userAgent.toLowerCase();
+    if (/mobile|android|iphone|ipod/.test(ua)) return 'mobile';
+    if (/tablet|ipad/.test(ua)) return 'tablet';
+    if (/windows|macintosh|linux/.test(ua)) return 'desktop';
+    return 'other';
+  }
+
+  private normalize(s: string): string {
+    return s.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  private stripMediaUrl(message: string): string {
+    return message
+      .replace(/\n?https?:\/\/\S+\/(?:uploads\/media-assets\/\S+|media\/preview\/[\w-]+)/g, '')
+      .trim();
+  }
+  // --- CRUD ---
+
+  async create(dto: CreateCampaignLinkDto): Promise<CampaignLink> {
+    const channel = await this.channelRepository.findOne({
+      where: { id: dto.channel_id },
+    });
+    if (!channel) {
+      throw new NotFoundException(`Canal introuvable : ${dto.channel_id}`);
+    }
+    const phone = await this.resolvePhone(channel);
+    if (!phone) {
+      throw new NotFoundException(`Numero de telephone introuvable pour le canal ${dto.channel_id}. Renseignez le champ Numero de telephone dans la configuration du canal.`);
+    }
+    const shortCode = await this.generateShortCode();
+    const { directUrl, trackedUrl } = this.buildUrls(phone, dto.predefined_message, shortCode);
+    const link = this.linkRepository.create({
+      name: dto.name,
+      channelId: channel.channel_id,
+      channel,
+      predefinedMessage: dto.predefined_message,
+      shortCode,
+      directUrl,
+      trackedUrl,
+      isActive: dto.is_active ?? true,
+    });
+    return this.linkRepository.save(link);
+  }
+
+  async findAll(): Promise<CampaignLink[]> {
+    return this.linkRepository.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async findOne(id: string): Promise<CampaignLink> {
+    const link = await this.linkRepository.findOne({ where: { id } });
+    if (!link) {
+      throw new NotFoundException(`Lien campagne introuvable : ${id}`);
+    }
+    return link;
+  }
+
+  async update(id: string, dto: UpdateCampaignLinkDto): Promise<CampaignLink> {
+    const link = await this.findOne(id);
+    const messageChanged = dto.predefined_message !== undefined && dto.predefined_message !== link.predefinedMessage;
+    const channelChanged = dto.channel_id !== undefined && dto.channel_id !== link.channelId;
+    if (dto.name !== undefined) link.name = dto.name;
+    if (dto.is_active !== undefined) link.isActive = dto.is_active;
+    if (channelChanged && dto.channel_id) {
+      const channel = await this.channelRepository.findOne({ where: { id: dto.channel_id } });
+      if (!channel) {
+        throw new NotFoundException(`Canal introuvable : ${dto.channel_id}`);
+      }
+      link.channelId = channel.channel_id;
+      link.channel = channel;
+    }
+    if (messageChanged && dto.predefined_message !== undefined) {
+      link.predefinedMessage = dto.predefined_message;
+    }
+    if (messageChanged || channelChanged) {
+      const channel = link.channel ?? (await this.channelRepository.findOne({ where: { channel_id: link.channelId } }));
+      const phone = channel ? await this.resolvePhone(channel) : null;
+      if (phone) {
+        const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
+        link.directUrl = directUrl;
+        link.trackedUrl = trackedUrl;
+      }
+    }
+    return this.linkRepository.save(link);
+  }
+
+  async remove(id: string): Promise<void> {
+    const link = await this.findOne(id);
+    if (link.mediaAssetId) {
+      await this.detachAsset(id);
+    }
+    const freshLink = await this.findOne(id);
+    await this.linkRepository.remove(freshLink);
+  }
+
+  async repairTrackedUrls(): Promise<{ repaired: number }> {
+    const links = await this.linkRepository.find();
+    let repaired = 0;
+    for (const link of links) {
+      const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+      const phone = channel ? await this.resolvePhone(channel) : null;
+      if (!phone) continue;
+      const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
+      if (link.directUrl !== directUrl || link.trackedUrl !== trackedUrl) {
+        await this.linkRepository.update(link.id, { directUrl, trackedUrl });
+        repaired++;
+      }
+    }
+    return { repaired };
+  }
+  // --- Media Asset ---
+
+  async attachAsset(linkId: string, assetId: string): Promise<CampaignLink> {
+    const [link, asset] = await Promise.all([
+      this.findOne(linkId),
+      this.mediaAssetService.findOne(assetId),
+    ]);
+    if (link.mediaAssetId && link.mediaAssetId !== assetId) {
+      await this.mediaAssetService.decrementUsage(link.mediaAssetId);
+    }
+    const previewUrl = this.mediaAssetService.buildPreviewUrl(asset.id);
+    const baseMessage = this.stripMediaUrl(link.predefinedMessage);
+    const newMessage = `${baseMessage}\n${previewUrl}`.trim();
+    await this.linkRepository.update(linkId, { mediaAssetId: assetId, predefinedMessage: newMessage });
+    if (!link.mediaAssetId || link.mediaAssetId !== assetId) {
+      await this.mediaAssetService.incrementUsage(assetId);
+    }
+    const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+    const phone = channel ? await this.resolvePhone(channel) : null;
+    if (phone) {
+      const { directUrl, trackedUrl } = this.buildUrls(phone, newMessage, link.shortCode);
+      await this.linkRepository.update(linkId, { directUrl, trackedUrl });
+    }
+    return this.findOne(linkId);
+  }
+
+  async detachAsset(linkId: string): Promise<void> {
+    const link = await this.findOne(linkId);
+    if (!link.mediaAssetId) return;
+    const cleanMessage = this.stripMediaUrl(link.predefinedMessage);
+    await this.mediaAssetService.decrementUsage(link.mediaAssetId);
+    await this.linkRepository.update(linkId, { mediaAssetId: null, predefinedMessage: cleanMessage });
+    const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+    const phone = channel ? await this.resolvePhone(channel) : null;
+    if (phone) {
+      const { directUrl, trackedUrl } = this.buildUrls(phone, cleanMessage, link.shortCode);
+      await this.linkRepository.update(linkId, { directUrl, trackedUrl });
+    }
+  }
+
+  async repairMediaUrls(): Promise<{ repaired: number }> {
+    const links = await this.linkRepository.find({
+      where: { mediaAssetId: Not(IsNull()) },
+    });
+    let repaired = 0;
+    for (const link of links) {
+      if (!link.mediaAssetId) continue;
+      try {
+        const asset = await this.mediaAssetService.findOne(link.mediaAssetId);
+        const previewUrl = this.mediaAssetService.buildPreviewUrl(asset.id);
+        const baseMessage = this.stripMediaUrl(link.predefinedMessage);
+        const newMessage = `${baseMessage}\n${previewUrl}`.trim();
+        const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+        const phone = channel ? await this.resolvePhone(channel) : null;
+        const updates: Partial<CampaignLink> = { predefinedMessage: newMessage };
+        if (phone) {
+          const { directUrl, trackedUrl } = this.buildUrls(phone, newMessage, link.shortCode);
+          updates.directUrl = directUrl;
+          updates.trackedUrl = trackedUrl;
+        }
+        await this.linkRepository.update(link.id, updates);
+        repaired++;
+      } catch {
+        // skip links with broken assets
+      }
+    }
+    return { repaired };
+  }
+
+  async uploadAndAttachMedia(linkId: string, file: Express.Multer.File): Promise<CampaignLink> {
+    const dto: CreateMediaAssetDto = { name: file.originalname, category: 'campagne' };
+    const asset = await this.mediaAssetService.upload(file, dto);
+    return this.attachAsset(linkId, asset.id);
+  }
+  // --- Tracking ---
+
+  async track(shortCode: string, rawIp: string, userAgent: string | null): Promise<string> {
+    this.logger.log(`[TRACK] Clic recu — shortCode=${shortCode} ip=${rawIp}`);
+    const link = await this.linkRepository.findOne({ where: { shortCode } });
+    if (!link || !link.isActive) {
+      this.logger.warn(`[TRACK] Lien introuvable ou inactif : ${shortCode}`);
+      throw new NotFoundException(`Lien campagne introuvable ou inactif : ${shortCode}`);
+    }
+    this.logger.log(`[TRACK] Lien trouve — id=${link.id} clickCount_avant=${link.clickCount}`);
+    const ipHash = createHash('sha256').update(rawIp + (process.env.IP_SALT ?? '')).digest('hex');
+    const deviceType = this.detectDevice(userAgent);
+    void Promise.resolve()
+      .then(async () => {
+        const click = this.clickRepository.create({ campaignLinkId: link.id, ipHash, userAgent, deviceType, converted: false });
+        await this.clickRepository.save(click);
+        this.logger.log(`[TRACK] Click enregistre en base — id=${click.id}`);
+      })
+      .catch((err: Error) => {
+        this.logger.error(`[TRACK] Erreur sauvegarde click : ${err.message}`);
+      });
+    try {
+      const result = await this.linkRepository
+        .createQueryBuilder()
+        .update(CampaignLink)
+        .set({ clickCount: () => 'click_count + 1' })
+        .where('id = :id', { id: link.id })
+        .execute();
+      this.logger.log(`[TRACK] click_count incremente — affected=${result.affected}`);
+    } catch (err: unknown) {
+      this.logger.error(`[TRACK] Erreur increment click_count : ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return link.directUrl;
+  }
+
+  // --- Attribution ---
+
+  async tryAttribute(messageText: string, chatId: string): Promise<void> {
+    const normalizedText = this.normalize(messageText);
+    const links = await this.linkRepository.find({ where: { isActive: true } });
+    const matchedLink = links.find((l) => this.normalize(l.predefinedMessage) === normalizedText);
+    if (!matchedLink) return;
+    const updateResult = await this.chatRepository
+      .createQueryBuilder()
+      .update(WhatsappChat)
+      .set({ campaignLinkId: matchedLink.id })
+      .where('chat_id = :chatId AND campaign_link_id IS NULL', { chatId })
+      .execute();
+    if (!updateResult.affected || updateResult.affected === 0) return;
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentClick = await this.clickRepository.findOne({
+      where: { campaignLinkId: matchedLink.id, converted: false, clickedAt: Between(since24h, new Date()), chatId: IsNull() },
+      order: { clickedAt: 'DESC' },
+    });
+    if (recentClick) {
+      await this.clickRepository
+        .createQueryBuilder()
+        .update(CampaignLinkClick)
+        .set({ converted: true, convertedAt: () => 'NOW()', chatId })
+        .where('id = :id', { id: recentClick.id })
+        .execute();
+      await this.linkRepository
+        .createQueryBuilder()
+        .update(CampaignLink)
+        .set({ conversionCount: () => 'conversion_count + 1' })
+        .where('id = :id', { id: matchedLink.id })
+        .execute();
+    }
+  }
+
+  async tryAttributeByTiming(chatId: string, channelId: string): Promise<void> {
+    if (!channelId) return;
+    const WINDOW_MS = 5 * 60 * 1000;
+    const since = new Date(Date.now() - WINDOW_MS);
+
+    // Cherche le clic le plus récent sur ce canal dans la fenêtre temporelle
+    const recentClick = await this.clickRepository
+      .createQueryBuilder('click')
+      .innerJoin('click.campaignLink', 'link')
+      .where('link.channelId = :channelId', { channelId })
+      .andWhere('click.clickedAt >= :since', { since })
+      .andWhere('click.converted = false')
+      .andWhere('click.chatId IS NULL')
+      .orderBy('click.clickedAt', 'DESC')
+      .getOne();
+
+    if (!recentClick) return;
+
+    // Associe le lien au chat (idempotent : seulement si non déjà attribué)
+    const chatUpdate = await this.chatRepository
+      .createQueryBuilder()
+      .update(WhatsappChat)
+      .set({ campaignLinkId: recentClick.campaignLinkId })
+      .where('chat_id = :chatId AND campaign_link_id IS NULL', { chatId })
+      .execute();
+
+    if (!chatUpdate.affected || chatUpdate.affected === 0) return;
+
+    // Marque le clic comme converti (AND converted = false pour être idempotent)
+    const clickUpdate = await this.clickRepository
+      .createQueryBuilder()
+      .update(CampaignLinkClick)
+      .set({ converted: true, convertedAt: () => 'NOW()', chatId })
+      .where('id = :id AND converted = false', { id: recentClick.id })
+      .execute();
+
+    if (!clickUpdate.affected || clickUpdate.affected === 0) return;
+
+    // Incrémente conversion_count (seulement si le clic vient d'être converti)
+    await this.linkRepository
+      .createQueryBuilder()
+      .update(CampaignLink)
+      .set({ conversionCount: () => 'conversion_count + 1' })
+      .where('id = :id', { id: recentClick.campaignLinkId })
+      .execute();
+
+    this.logger.log(`[CAMPAIGN_ATTR] chat=${chatId} → link=${recentClick.campaignLinkId} (timing correlation)`);
+  }
+
+  // --- Analytics ---
+
+  async getStats(linkId: string, from: Date, to: Date): Promise<{
+    total_clicks: number; total_conversions: number; conversion_rate: number;
+    unique_clicks: number;
+    clicks_by_day: { date: string; clicks: number; conversions: number }[];
+    clicks_by_device: { device_type: string; count: number }[];
+  }> {
+    const link = await this.findOne(linkId);
+    const uniqueResult = await this.clickRepository.createQueryBuilder('click')
+      .select('COUNT(DISTINCT click.ipHash)', 'unique_clicks')
+      .where('click.campaignLinkId = :linkId', { linkId })
+      .andWhere('click.clickedAt BETWEEN :from AND :to', { from, to })
+      .getRawOne<{ unique_clicks: string }>();
+    const uniqueClicks = parseInt(uniqueResult?.unique_clicks ?? '0', 10);
+    const byDayRaw = await this.clickRepository.createQueryBuilder('click')
+      .select("DATE_FORMAT(click.clickedAt, '%Y-%m-%d')", 'date')
+      .addSelect('COUNT(*)', 'clicks')
+      .addSelect('SUM(CASE WHEN click.converted = 1 THEN 1 ELSE 0 END)', 'conversions')
+      .where('click.campaignLinkId = :linkId', { linkId })
+      .andWhere('click.clickedAt BETWEEN :from AND :to', { from, to })
+      .groupBy('date').orderBy('date', 'ASC')
+      .getRawMany<{ date: string; clicks: string; conversions: string }>();
+    const clicksByDay = byDayRaw.map((row) => ({ date: row.date, clicks: parseInt(row.clicks, 10), conversions: parseInt(row.conversions, 10) }));
+    const byDeviceRaw = await this.clickRepository.createQueryBuilder('click')
+      .select('click.deviceType', 'device_type')
+      .addSelect('COUNT(*)', 'count')
+      .where('click.campaignLinkId = :linkId', { linkId })
+      .andWhere('click.clickedAt BETWEEN :from AND :to', { from, to })
+      .groupBy('click.deviceType')
+      .getRawMany<{ device_type: string; count: string }>();
+    const clicksByDevice = byDeviceRaw.map((row) => ({ device_type: row.device_type ?? 'unknown', count: parseInt(row.count, 10) }));
+    const conversionRate = link.clickCount > 0 ? Math.round((link.conversionCount / link.clickCount) * 100 * 100) / 100 : 0;
+    return { total_clicks: link.clickCount, total_conversions: link.conversionCount, conversion_rate: conversionRate, unique_clicks: uniqueClicks, clicks_by_day: clicksByDay, clicks_by_device: clicksByDevice };
+  }
+
+  async getClickHistory(linkId: string, page: number): Promise<CampaignLinkClick[]> {
+    const pageNum = page < 1 ? 1 : page;
+    return this.clickRepository.find({ where: { campaignLinkId: linkId }, order: { clickedAt: 'DESC' }, take: 20, skip: (pageNum - 1) * 20 });
+  }
+}

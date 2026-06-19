@@ -41,6 +41,25 @@ export class DispatchSettings {
   })
   dispatch_mode: 'LEAST_LOADED' | 'ROUND_ROBIN';
 
+  /** Nombre de messages commerciaux autorisés globalement avant lecture seule (0 = désactivé, 1 = défaut) */
+  @Column({ name: 'read_only_max_messages', type: 'int', default: 1 })
+  readOnlyMaxMessages: number;
+
+  @Column({ name: 'max_read_messages_per_minute', type: 'int', default: 1 })
+  maxReadMessagesPerMinute: number;
+
+  @Column({ name: 'idle_disconnect_enabled', type: 'boolean', default: true })
+  idleDisconnectEnabled: boolean;
+
+  @Column({ name: 'idle_disconnect_minutes', type: 'int', default: 15 })
+  idleDisconnectMinutes: number;
+
+  @Column({ name: 'read_cooldown_seconds', type: 'int', default: 120 })
+  readCooldownSeconds: number;
+
+  @Column({ name: 'idle_warning_seconds', type: 'int', default: 10 })
+  idleWarningSeconds: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

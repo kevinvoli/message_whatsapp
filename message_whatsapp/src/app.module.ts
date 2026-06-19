@@ -91,6 +91,11 @@ import { ErpClientSyncModule } from './erp-client-sync/erp-client-sync.module';
 import { CommercialGroupModule } from './commercial-group/commercial-group.module';
 import { MissedCallModule } from './missed-calls/missed-call.module';
 import { ApplicationModule } from './application/application.module';
+import { QuizModule } from './quiz/quiz.module';
+import { MetaAdReferralModule } from './meta-ad-referral/meta-ad-referral.module';
+import { CampaignLinkModule } from './campaign-link/campaign-link.module';
+import { ConversationRestrictionModule } from './conversation-restriction/conversation-restriction.module';
+import { MessageRestrictionModule } from './message-restriction/message-restriction.module';
 
 @Module({
   imports: [
@@ -273,6 +278,15 @@ import { ApplicationModule } from './application/application.module';
     MissedCallModule,
     // Applications Meta (gestion credentials partagés entre canaux)
     ApplicationModule,
+    // Quiz commercial — sessions, tentatives, PDF, exemptions
+    QuizModule,
+    // Vague A5 — Référentiels publicités Meta (CTWA)
+    MetaAdReferralModule,
+    // Liens campagne trackés (short links WhatsApp avec analytics)
+    CampaignLinkModule,
+    // Vague A4 — Restriction conversations + restriction messages
+    ConversationRestrictionModule,
+    MessageRestrictionModule,
     // Bull Board UI — activé seulement si BULL_BOARD_ENABLED=true
     ...(process.env.BULL_BOARD_ENABLED === 'true' ? [BullBoardSetupModule] : []),
   ],

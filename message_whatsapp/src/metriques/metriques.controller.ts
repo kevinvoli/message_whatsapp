@@ -10,6 +10,7 @@ import {
 import { QueueMetricsDto } from './dto/create-metrique.dto';
 import { MetriquesService } from './metriques.service';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
+import { MetaAdKpiService } from './meta-ad-kpi.service';
 
 const STANDARD_PERIODS = new Set(['today', 'week', 'month', 'year']);
 
@@ -20,6 +21,7 @@ export class MetriquesController {
   constructor(
     private readonly metriquesService: MetriquesService,
     private readonly snapshotService: AnalyticsSnapshotService,
+    private readonly metaAdKpiService: MetaAdKpiService,
   ) {}
 
   @Get('globales')
@@ -211,6 +213,15 @@ export class MetriquesController {
       case 'channels':    return this.metriquesService.getStatutChannels(periode, dateFrom, dateTo);
       case 'temporelle':  return this.metriquesService.getPerformanceTemporelle(jours, dateFrom, dateTo);
     }
+  }
+
+  @Get('campagnes-meta')
+  @ApiOperation({ summary: 'KPI Meta Ads (CTWA) par campagne sur une période' })
+  async getCampagnesMeta(
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo')   dateTo:   string,
+  ) {
+    return this.metaAdKpiService.getCampagnesMeta({ dateFrom, dateTo });
   }
 
   @Post('refresh-snapshots')

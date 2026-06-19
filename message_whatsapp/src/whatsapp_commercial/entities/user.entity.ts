@@ -78,6 +78,15 @@ export class WhatsappCommercial {
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
 
+  @Column({ name: 'messages_read_count', type: 'int', default: 0 })
+  messagesReadCount: number;
+
+  @Column({ name: 'messages_handled_count', type: 'int', default: 0 })
+  messagesHandledCount: number;
+
+  @Column({ name: 'last_activity_at', type: 'datetime', nullable: true })
+  lastActivityAt: Date | null;
+
   @Column({ name: 'is_working_today', type: 'boolean', default: false })
   isWorkingToday: boolean;
 

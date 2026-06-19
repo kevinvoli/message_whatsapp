@@ -97,6 +97,32 @@ export class CronConfig {
   @Column({ name: 'active_hour_end', type: 'int', nullable: true, default: 21 })
   activeHourEnd: number | null;
 
+  // ──────────── Champs window-reminder ────────────────────────────────────
+
+  /** Minutes restantes avant autoCloseAt pour commencer J (normal — défaut 10) */
+  @Column({ name: 'window_reminder_normal_start_min', type: 'int', nullable: true })
+  windowReminderNormalStartMin: number | null;
+
+  /** Minutes restantes avant autoCloseAt pour arrêter J (normal — défaut 120 = 2h) */
+  @Column({ name: 'window_reminder_normal_end_min', type: 'int', nullable: true })
+  windowReminderNormalEndMin: number | null;
+
+  /** Minutes restantes avant autoCloseAt pour commencer J (CTWA — défaut 10) */
+  @Column({ name: 'window_reminder_ctwa_start_min', type: 'int', nullable: true })
+  windowReminderCtwaStartMin: number | null;
+
+  /** Minutes restantes avant autoCloseAt pour arrêter J (CTWA — défaut 240 = 4h) */
+  @Column({ name: 'window_reminder_ctwa_end_min', type: 'int', nullable: true })
+  windowReminderCtwaEndMin: number | null;
+
+  /** Nombre minimum de messages commerciaux pour qualifier J1 (défaut 1) */
+  @Column({ name: 'window_reminder_min_replies', type: 'int', nullable: true })
+  windowReminderMinReplies: number | null;
+
+  /** TTL fermeture CTWA en heures (défaut 72) — utilisé par ChatSessionService */
+  @Column({ name: 'ttl_days_ctwa', type: 'int', nullable: true })
+  ttlDaysCtwa: number | null;
+
   // ─────────────────────────────── Monitoring ──────────────────────────────
 
   /** Date/heure de la dernière exécution réussie */

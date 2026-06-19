@@ -57,6 +57,10 @@ import { ConversationReportService } from 'src/gicop-report/conversation-report.
 import { SystemConfigService } from 'src/system-config/system-config.service';
 import { ClientDossierService } from 'src/client-dossier/client-dossier.service';
 import { ConversationClosureService } from 'src/conversation-closure/conversation-closure.service';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
+import { MessageReadService } from './message-read.service';
+import { ConversationRestrictionService } from 'src/conversation-restriction/conversation-restriction.service';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -116,6 +120,18 @@ export class WhatsappMessageGateway
     private readonly closureService: ConversationClosureService,
 
     private readonly eventEmitter: EventEmitter2,
+
+    @Optional()
+    private readonly connectionLogService: ConnectionLogService,
+
+    @Optional()
+    private readonly messageReadService: MessageReadService,
+
+    @Optional()
+    private readonly restrictionService: ConversationRestrictionService,
+
+    @Optional()
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   afterInit(server: Server): void {
@@ -148,7 +164,31 @@ export class WhatsappMessageGateway
   // ======================================================
   async handleConnection(client: Socket) {
     const ok = await this.agentConnectionService.onConnect(client);
-    if (!ok) client.disconnect();
+    if (!ok) {
+      client.disconnect();
+      return;
+    }
+
+    const agent = this.agentConnectionService.getAgent(client.id);
+    if (!agent) return;
+
+    // C1 — log connexion
+    if (this.connectionLogService) {
+      try {
+        await this.connectionLogService.ensureOpenSession(agent.commercialId, 'commercial');
+      } catch (err) {
+        this.logger.error(`ensureOpenSession failed for commercial=${agent.commercialId}: ${String(err)}`);
+      }
+    }
+
+    // C3 — réactiver les conversations EN_ATTENTE de ce poste
+    if (agent.posteId) {
+      try {
+        await this.dispatcherService.reactivateWaitingConversationsForPoste(agent.posteId);
+      } catch (err) {
+        this.logger.error(`reactivateWaitingConversationsForPoste failed for poste=${agent.posteId}: ${String(err)}`);
+      }
+    }
   }
 
   private getTenantId(client: Socket): string | null {
@@ -176,12 +216,36 @@ export class WhatsappMessageGateway
 
   async handleDisconnect(client: Socket) {
     this.throttle.removeClient(client.id);
+
+    // C1 — log déconnexion avant onDisconnect (le agent est encore dans le store)
+    const agentBeforeDisconnect = this.agentConnectionService.getAgent(client.id);
+    if (agentBeforeDisconnect && this.connectionLogService) {
+      try {
+        await this.connectionLogService.logLogout(agentBeforeDisconnect.commercialId, 'commercial');
+      } catch (err) {
+        this.logger.error(`logLogout failed for commercial=${agentBeforeDisconnect.commercialId}: ${String(err)}`);
+      }
+    }
+
     await this.agentConnectionService.onDisconnect(client);
   }
 
   // ======================================================
   // CLIENT → SERVER
   // ======================================================
+
+  /**
+   * C5 — Vérifie si le poste est exempté des restrictions (canal dédié ou config désactivée).
+   */
+  private async isRestrictionExemptPoste(agent: { posteId?: string }): Promise<boolean> {
+    if (!this.restrictionService) return true;
+    const config = await this.restrictionService.getRestrictionConfig();
+    if (!config.enabled) return true;
+    if (!agent.posteId) return false;
+    const dedicatedIds = await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId);
+    return dedicatedIds.length > 0;
+  }
+
   private async sendContactsToClient(client: Socket) {
     const agent = this.agentConnectionService.getAgent(client.id);
     if (!agent) return;
@@ -501,6 +565,71 @@ export class WhatsappMessageGateway
     });
   }
 
+  /**
+   * C2 — Rate-limit lecture avec MessageReadService.
+   */
+  @SubscribeMessage('conversation:read')
+  async handleConversationRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chatId: string },
+  ) {
+    const agent = this.agentConnectionService.getAgent(client.id);
+    if (!agent) return;
+
+    if (!this.messageReadService) return;
+
+    try {
+      const result = await this.messageReadService.markConversationAsRead(
+        agent.commercialId,
+        payload.chatId,
+        false,
+      );
+      const chat = await this.chatService.findBychat_id(payload.chatId);
+      client.emit('conversation:read:ack', {
+        markedCount: result.markedCount,
+        chatId: payload.chatId,
+        unreadCount: chat?.unread_count ?? 0,
+      });
+      if (agent.posteId) {
+        const totalUnread = await this.chatService.getTotalUnreadForPoste(agent.posteId);
+        client.emit('chat:event', {
+          type: 'TOTAL_UNREAD_UPDATE',
+          payload: { totalUnread },
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur lors du marquage';
+      client.emit('conversation:read:ack', { markedCount: 0, chatId: payload.chatId, unreadCount: 0, error: message });
+    }
+  }
+
+  /**
+   * C7 — Lecture seule du statut restriction sans recordAccess().
+   */
+  @SubscribeMessage('restriction:check')
+  async handleRestrictionCheck(@ConnectedSocket() client: Socket): Promise<void> {
+    const agent = this.agentConnectionService.getAgent(client.id);
+    if (!agent || !this.restrictionService) return;
+
+    const isExempt = await this.isRestrictionExemptPoste(agent);
+    if (isExempt) {
+      const config = await this.restrictionService.getRestrictionConfig();
+      client.emit('restriction:status', {
+        triggered: false,
+        unrespondedCount: 0,
+        unrespondedConversations: [],
+        config,
+      });
+      return;
+    }
+
+    const status = await this.restrictionService.checkRestriction(
+      agent.commercialId,
+      agent.posteId,
+    );
+    client.emit('restriction:status', status);
+  }
+
   @SubscribeMessage(SOCKET_CLIENT_EVENTS.MESSAGES_READ)
   async handleMarkAsRead(
     @ConnectedSocket() client: Socket,
@@ -635,18 +764,39 @@ export class WhatsappMessageGateway
         return;
       }
 
-      // 🔒 Fenêtre de messagerie 23h — si le client n'a pas écrit depuis plus de 23h,
-      // WhatsApp n'autorise plus l'envoi de messages ordinaires.
-      const WINDOW_MS = 23 * 60 * 60 * 1000;
+      // 🔒 Fenêtre de messagerie — 72h pour les chats CTWA, 23h pour les autres.
+      const WINDOW_MS = (chat.isCtwa ? 72 : 23) * 60 * 60 * 1000;
       const lastClientAt = chat.last_client_message_at;
-      if (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS) {
+      let windowExpired = !lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS;
+
+      // Fallback : vérifier le dernier message client réel en base
+      if (windowExpired) {
+        const latestClientMsg = await this.messageService.findLastInboundMessageBychat_id?.(payload.chat_id) ?? null;
+        if (latestClientMsg?.timestamp && Date.now() - new Date(latestClientMsg.timestamp).getTime() <= WINDOW_MS) {
+          windowExpired = false;
+          void this.chatService.update(payload.chat_id, { last_client_message_at: new Date(latestClientMsg.timestamp) });
+        }
+      }
+
+      if (windowExpired) {
+        // C4 — Fermer immédiatement la conversation via ChatSessionService
+        if (this.chatSessionService) {
+          try {
+            await this.chatSessionService.closeExpiredChatByWindowExpiry(chat.id);
+            chat.status = WhatsappChatStatus.FERME;
+            chat.windowExpiresAt = null;
+            await this.emitConversationClosed(chat);
+          } catch (err) {
+            this.logger.error(`closeExpiredChatByWindowExpiry failed for chat ${chat.id}`, err);
+          }
+        }
         client.emit('chat:event', {
           type: 'MESSAGE_SEND_ERROR',
           payload: {
             chat_id: payload.chat_id,
             tempId: payload.tempId,
             code: 'WINDOW_EXPIRED',
-            message: 'Fenêtre de 23h expirée — en attente d\'un message du client.',
+            message: 'Fenêtre expirée — la conversation a été fermée automatiquement.',
           },
         });
         return;
@@ -667,6 +817,39 @@ export class WhatsappMessageGateway
           },
         });
         return;
+      }
+
+      // C6 — Guard restriction « conversations non répondues »
+      if (this.restrictionService) {
+        const restrictionCfg = await this.restrictionService.getRestrictionConfig();
+        if (restrictionCfg.enabled) {
+          const isExempt = await this.isRestrictionExemptPoste(agent);
+          if (!isExempt) {
+            const status = await this.restrictionService.checkRestriction(
+              agent.commercialId,
+              agent.posteId,
+            );
+            const isCurrentInUnrespondedList = status.unrespondedConversations.some(
+              (c) => c.chat_id === payload.chat_id,
+            );
+            if (status.triggered && !isCurrentInUnrespondedList) {
+              const currentChat = await this.chatService.findBychat_id(payload.chat_id);
+              if ((currentChat?.unread_count ?? 0) > 0) {
+                client.emit('restriction:status', status);
+                client.emit('chat:event', {
+                  type: 'MESSAGE_SEND_ERROR',
+                  payload: {
+                    chat_id: payload.chat_id,
+                    tempId: payload.tempId,
+                    code: 'RESTRICTION_TRIGGERED',
+                    message: "Répondez aux conversations en attente avant d'en traiter une nouvelle.",
+                  },
+                });
+                return;
+              }
+            }
+          }
+        }
       }
 
       let message: WhatsappMessage;
