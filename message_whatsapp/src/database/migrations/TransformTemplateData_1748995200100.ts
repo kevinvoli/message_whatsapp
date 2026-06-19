@@ -117,18 +117,33 @@ export class TransformTemplateData_1748995200100 implements MigrationInterface {
     }
 
     if (warnings.length > 0) {
-      throw new Error(
-        '\n[TransformTemplateData] Schéma whatsapp_template incompatible avec V2 :\n  ' +
-        warnings.join('\n  ') +
-        '\n\nCes colonnes existent déjà en production avec un type SQL différent.' +
-        '\nFixWhatsappTemplateSchema ne modifie pas les colonnes déjà présentes.' +
-        '\n\nAction requise — exécuter les ALTER TABLE ci-dessous puis relancer npm run migration:run :' +
-        '\n\n  ALTER TABLE `whatsapp_template`' +
-        "\n    MODIFY COLUMN `category` ENUM('MARKETING','UTILITY','AUTHENTICATION') NOT NULL DEFAULT 'UTILITY';" +
-        '\n\n  ALTER TABLE `whatsapp_template`' +
-        "\n    MODIFY COLUMN `status` ENUM('PENDING','APPROVED','REJECTED','PAUSED','DISABLED','IN_APPEAL','FLAGGED','DELETED') NOT NULL DEFAULT 'PENDING';" +
-        '\n\n⚠️  Vérifier d\'abord qu\'aucune valeur existante en DB ne sort de ces ENUMs.\n',
-      );
+      if (rowCount === 0) {
+        // Table vide → ALTER TABLE sans risque de corruption de données
+        if (!colMap.get('category')?.startsWith('enum')) {
+          await queryRunner.query(
+            "ALTER TABLE `whatsapp_template` MODIFY COLUMN `category` ENUM('MARKETING','UTILITY','AUTHENTICATION') NOT NULL DEFAULT 'UTILITY'",
+          );
+        }
+        const statusType = colMap.get('status') ?? '';
+        if (!statusType.includes('PAUSED') || !statusType.includes('IN_APPEAL')) {
+          await queryRunner.query(
+            "ALTER TABLE `whatsapp_template` MODIFY COLUMN `status` ENUM('PENDING','APPROVED','REJECTED','PAUSED','DISABLED','IN_APPEAL','FLAGGED','DELETED') NOT NULL DEFAULT 'PENDING'",
+          );
+        }
+      } else {
+        throw new Error(
+          '\n[TransformTemplateData] Schéma whatsapp_template incompatible avec V2 :\n  ' +
+          warnings.join('\n  ') +
+          '\n\nCes colonnes existent déjà en production avec un type SQL différent.' +
+          '\nFixWhatsappTemplateSchema ne modifie pas les colonnes déjà présentes.' +
+          '\n\nAction requise — exécuter les ALTER TABLE ci-dessous puis relancer npm run migration:run :' +
+          '\n\n  ALTER TABLE `whatsapp_template`' +
+          "\n    MODIFY COLUMN `category` ENUM('MARKETING','UTILITY','AUTHENTICATION') NOT NULL DEFAULT 'UTILITY';" +
+          '\n\n  ALTER TABLE `whatsapp_template`' +
+          "\n    MODIFY COLUMN `status` ENUM('PENDING','APPROVED','REJECTED','PAUSED','DISABLED','IN_APPEAL','FLAGGED','DELETED') NOT NULL DEFAULT 'PENDING';" +
+          '\n\n⚠️  Vérifier d\'abord qu\'aucune valeur existante en DB ne sort de ces ENUMs.\n',
+        );
+      }
     }
   }
 
