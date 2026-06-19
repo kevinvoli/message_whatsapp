@@ -68,6 +68,7 @@ import RolesView from '@/app/modules/rbac/components/RolesView';
 import WebhooksView from '@/app/modules/webhooks/components/WebhooksView';
 import BroadcastsView from '@/app/modules/broadcasts/components/BroadcastsView';
 import TemplatesView from '@/app/ui/templates/TemplatesView';
+import ChannelStatsView from '@/app/ui/ChannelStatsView';
 import { useNotifications } from '@/app/modules/notifications/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -248,6 +249,8 @@ export default function AdminDashboard() {
                 return <LoginLogsView />;
             case 'relance-config':
                 return <RelanceConfigView />;
+            case 'channel-stats':
+                return <ChannelStatsView selectedPeriod={selectedPeriod} />;
             default:
                 return null;
         }

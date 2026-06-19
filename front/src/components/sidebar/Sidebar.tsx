@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, LogOut, Wifi, WifiOff, User, Plus } from 'lucide-react';
+import { BarChart3, MessageSquare, Plus } from 'lucide-react';
 import { Commercial, Conversation, Stats, ViewMode } from '@/types/chat';
+import ActivityPanel from './ActivityPanel';
 import ConversationItem from './ConversationItem';
 import { useChatStore } from '@/store/chatStore';
 import UserHeader from './UserHeader';
@@ -64,6 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const conversationsFromStore = useChatStore((state) => state.conversations);
   const selectConversation = useChatStore((state) => state.selectConversation);
   const [showOutbound, setShowOutbound] = useState(false);
+  const [conversationsTab, setConversationsTab] = useState<'liste' | 'activite'>('liste');
 
   const handleOpenConversationById = React.useCallback((conversationId: string) => {
     const conv = conversationsFromStore.find((c) => c.id === conversationId);
@@ -95,35 +97,71 @@ const Sidebar: React.FC<SidebarProps> = ({
       {viewMode === 'conversations' ? (
         <>
           <PrioritePostePanel />
-          <div className="flex items-center border-b border-gray-100">
-            <div className="flex-1">
-              <ConversationFilters
-                conversations={allConversations ?? conversations}
-                filterStatus={filterStatus}
-                setFilterStatus={setFilterStatus}
-              />
-            </div>
+          {/* Onglets Liste / Activite */}
+          <div className="flex border-b border-gray-200 bg-white">
             <button
-              onClick={() => setShowOutbound(true)}
-              className="flex-shrink-0 mr-2 p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              title="Nouvelle conversation"
+              onClick={() => setConversationsTab('liste')}
+              aria-pressed={conversationsTab === 'liste'}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
+                conversationsTab === 'liste'
+                  ? 'text-green-700 border-b-2 border-green-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              <Plus className="w-4 h-4" />
+              <MessageSquare className="w-3.5 h-3.5" />
+              Conversations
+            </button>
+            <button
+              onClick={() => setConversationsTab('activite')}
+              aria-pressed={conversationsTab === 'activite'}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
+                conversationsTab === 'activite'
+                  ? 'text-green-700 border-b-2 border-green-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              Mon activite
             </button>
           </div>
-          {filterStatus === 'rotation_calls' ? (
-            <RotationCallsPanel
-              selectedConversation={selectedConversation}
-              onSelectConversation={onSelectConversation}
-            />
+
+          {conversationsTab === 'liste' ? (
+            <>
+              <div className="flex items-center border-b border-gray-100">
+                <div className="flex-1">
+                  <ConversationFilters
+                    conversations={allConversations ?? conversations}
+                    filterStatus={filterStatus}
+                    setFilterStatus={setFilterStatus}
+                  />
+                </div>
+                <button
+                  onClick={() => setShowOutbound(true)}
+                  className="flex-shrink-0 mr-2 p-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  title="Nouvelle conversation"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              {filterStatus === 'rotation_calls' ? (
+                <RotationCallsPanel
+                  selectedConversation={selectedConversation}
+                  onSelectConversation={onSelectConversation}
+                />
+              ) : (
+                <ConversationList
+                  filteredConversations={conversations}
+                  filterStatus={filterStatus}
+                  selectedConversation={selectedConversation}
+                  onSelectConversation={onSelectConversation}
+                  selectedConv={''}
+                />
+              )}
+            </>
           ) : (
-            <ConversationList
-              filteredConversations={conversations}
-              filterStatus={filterStatus}
-              selectedConversation={selectedConversation}
-              onSelectConversation={onSelectConversation}
-              selectedConv={''}
-            />
+            <div className="flex-1 overflow-y-auto">
+              <ActivityPanel commercialId={commercial.id} />
+            </div>
           )}
         </>
       ) : viewMode === 'contacts' ? (

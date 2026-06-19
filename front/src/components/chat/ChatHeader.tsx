@@ -4,8 +4,10 @@ import { ContactAvatar } from '../ui/ContactAvatar';
 import {
   Conversation,
   ConversationStatus,
+  CallStatus,
 } from '@/types/chat';
 import dynamic from 'next/dynamic';
+import { CallButton } from '../conversation/CallButton';
 
 const GicopReportPanel = dynamic(() => import('./GicopReportPanel'), { ssr: false });
 const CatalogModal = dynamic(() => import('./CatalogModal'), { ssr: false });
@@ -104,6 +106,19 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
         onOpenContact?.();
     }
 
+    const handleCallStatusChange = (
+      _conversationId: string,
+      callStatus: CallStatus,
+      notes?: string,
+    ) => {
+      updateConversation({
+        ...currentConv,
+        call_status: callStatus,
+        last_call_notes: notes,
+        last_call_date: new Date(),
+      });
+    };
+
     const handleConversationStatusChange = (
       _conversationId: string,
       newStatus: ConversationStatus,
@@ -194,6 +209,10 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                         <MessageCircle className="w-4 h-4" />
                         <span className="font-medium">{totalMessages} messages</span>
                     </div>
+                    <CallButton
+                        conversation={currentConv}
+                        onCallStatusChange={handleCallStatusChange}
+                    />
                     <ConversationOptionsMenu conversation={currentConv} onStatusChange={handleConversationStatusChange} />
                 </div>
             </div>

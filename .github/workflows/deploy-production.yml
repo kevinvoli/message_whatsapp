@@ -158,12 +158,29 @@ jobs:
           source:   docker-compose.yml
           target:   /var/www/whatsapp/
 
-      - name: Deploy via SSH (production)
+      - name: Backup DB before migration
         uses: appleboy/ssh-action@v1
         with:
           host:     ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USER }}
           key:      ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            set -a && source /var/www/whatsapp/message_whatsapp/.env && set +a
+            BACKUP_FILE="/var/backups/db_prod_$(date +%Y%m%d_%H%M%S).sql.gz"
+            docker exec -e MYSQL_PWD="${MYSQL_PASSWORD}" whatsapp-db \
+              mysqldump -u"${MYSQL_USER}" --single-transaction "${MYSQL_DATABASE}" \
+              | gzip > "$BACKUP_FILE"
+            echo "Backup cree : $BACKUP_FILE"
+            ls -lh "$BACKUP_FILE"
+
+      - name: Deploy via SSH (production)
+        uses: appleboy/ssh-action@v1
+        with:
+          host:            ${{ secrets.PROD_SSH_HOST }}
+          username:        ${{ secrets.PROD_SSH_USER }}
+          key:             ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
             cd /var/www/whatsapp

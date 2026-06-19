@@ -52,6 +52,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { id: 'analytics', name: 'Analytics', icon: BarChart3, badge: null },
       { id: 'performance', name: 'Performance', icon: TrendingUp, badge: null },
+      { id: 'channel-stats', name: 'Stats par canal', icon: Activity, badge: null },
       { id: 'ranking', name: 'Classement', icon: Trophy, badge: null },
       { id: 'rapports', name: 'Rapports', icon: FileText, badge: null },
     ],

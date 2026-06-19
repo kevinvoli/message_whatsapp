@@ -90,6 +90,17 @@ export type Priority = "haute" | "moyenne" | "basse";
 
 export type CallStatus = "à_appeler" | "appelé" | "rappeler" | "non_joignable";
 
+export type CommercialStatsDto = {
+  commercialId: string;
+  messagesRead: number;
+  messagesHandled: number;
+  activeConversations: number;
+  responseRate: number;
+  lastActivityAt: string | null;
+  isOnline: boolean;
+  totalConnectionMinutes?: number;
+};
+
 export type Source = {
   name: string;
   value: number;

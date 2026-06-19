@@ -5,6 +5,7 @@ import {
   UseGuards,
   Request,
   Get,
+  Query,
   UnauthorizedException,
   ForbiddenException,
   Res,
@@ -18,6 +19,7 @@ import { Throttle } from '@nestjs/throttler';
 import { CommercialSessionService } from 'src/commercial-session/commercial_session.service';
 import { GeoAccessService } from 'src/geo-access/geo_access.service';
 import { LoginLogService } from './login-log.service';
+import { CommercialStatsService } from 'src/whatsapp_commercial/commercial-stats.service';
 
 @Controller('auth')
 export class AuthController {
@@ -26,6 +28,7 @@ export class AuthController {
     private readonly sessionService: CommercialSessionService,
     private readonly geoAccessService: GeoAccessService,
     private readonly loginLogService: LoginLogService,
+    private readonly commercialStatsService: CommercialStatsService,
   ) {}
 
   // P1.4 — Brute force protection : max 10 tentatives / 15 min par IP
@@ -126,6 +129,17 @@ export class AuthController {
     void this.sessionService.openSession(user.id, user.name).catch(() => {});
 
     return { user, accessToken };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/stats')
+  async getMyStats(
+    @Request() req,
+    @Query('periode') periode = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.commercialStatsService.getStats(req.user.userId, periode, dateFrom, dateTo);
   }
 
   @UseGuards(AuthGuard('jwt'))
