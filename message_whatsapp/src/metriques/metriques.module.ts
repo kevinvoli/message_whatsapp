@@ -11,6 +11,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { QueuePosition } from 'src/dispatcher/entities/queue-position.entity';
 import { AnalyticsSnapshot } from './entities/analytics-snapshot.entity';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
+import { MetaAdKpiService } from './meta-ad-kpi.service';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { AnalyticsSnapshotService } from './analytics-snapshot.service';
     ]),
   ],
   controllers: [MetriquesController],
-  providers: [MetriquesService, AnalyticsSnapshotService],
+  providers: [MetriquesService, AnalyticsSnapshotService, MetaAdKpiService],
   exports: [MetriquesService],
 })
 export class MetriquesModule {}
