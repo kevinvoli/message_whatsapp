@@ -12,79 +12,87 @@ export class TransformTemplateData_1748995200100 implements MigrationInterface {
       );
     }
 
-    const defaultTenantId = process.env.DEFAULT_TENANT_ID ?? 'default';
+    // Si la table est vide, toutes les transformations de données sont des no-ops.
+    // On saute le check DEFAULT_TENANT_ID (inutile sans données) et les UPDATEs.
+    const countResult: Array<{ cnt: string }> = await queryRunner.query(
+      'SELECT COUNT(*) AS cnt FROM `whatsapp_template`',
+    );
+    const rowCount = parseInt(countResult[0].cnt, 10);
 
-    if (!defaultTenantId || defaultTenantId === 'default') {
-      throw new Error(
-        'DEFAULT_TENANT_ID doit être défini dans .env avec l\'ID réel du tenant principal. ' +
-        'Ne pas utiliser la valeur "default".',
-      );
-    }
+    if (rowCount > 0) {
+      const defaultTenantId = process.env.DEFAULT_TENANT_ID ?? 'default';
+      if (!defaultTenantId || defaultTenantId === 'default') {
+        throw new Error(
+          'DEFAULT_TENANT_ID doit être défini dans .env avec l\'ID réel du tenant principal. ' +
+          'Ne pas utiliser la valeur "default".',
+        );
+      }
 
-    // 1. Remplir tenant_id depuis le canal associé
-    await queryRunner.query(`
-      UPDATE \`whatsapp_template\` t
-      LEFT JOIN \`whapi_channels\` c ON c.id = t.channel_id
-      SET t.tenant_id = COALESCE(c.tenant_id, ?)
-      WHERE (t.tenant_id IS NULL OR t.tenant_id = 'default')
-    `, [defaultTenantId]);
+      // 1. Remplir tenant_id depuis le canal associé
+      await queryRunner.query(`
+        UPDATE \`whatsapp_template\` t
+        LEFT JOIN \`whapi_channels\` c ON c.id = t.channel_id
+        SET t.tenant_id = COALESCE(c.tenant_id, ?)
+        WHERE (t.tenant_id IS NULL OR t.tenant_id = 'default')
+      `, [defaultTenantId]);
 
-    // 2. Extraire body_text depuis components JSON production
-    await queryRunner.query(`
-      UPDATE \`whatsapp_template\`
-      SET \`body_text\` = COALESCE(
-        JSON_UNQUOTE(JSON_EXTRACT(\`components\`, '$.body.text')),
-        JSON_UNQUOTE(JSON_EXTRACT(\`components\`, '$.body')),
-        JSON_UNQUOTE(JSON_EXTRACT(\`components\`, '$.text')),
-        ''
-      )
-      WHERE (\`body_text\` IS NULL OR \`body_text\` = '')
-        AND \`components\` IS NOT NULL
-    `);
-
-    // 3. Extraire parameters et buttons depuis components
-    await queryRunner.query(`
-      UPDATE \`whatsapp_template\`
-      SET
-        \`parameters\` = JSON_EXTRACT(\`components\`, '$.parameters'),
-        \`buttons\`    = JSON_EXTRACT(\`components\`, '$.buttons')
-      WHERE \`parameters\` IS NULL
-        AND \`components\` IS NOT NULL
-    `);
-
-    // 4. Renommer rejection_reason → rejected_reason si les deux coexistent
-    const hasOldReason = await queryRunner.hasColumn('whatsapp_template', 'rejection_reason');
-    const hasNewReason = await queryRunner.hasColumn('whatsapp_template', 'rejected_reason');
-    if (hasOldReason && hasNewReason) {
+      // 2. Extraire body_text depuis components JSON production
       await queryRunner.query(`
         UPDATE \`whatsapp_template\`
-        SET \`rejected_reason\` = \`rejection_reason\`
-        WHERE \`rejected_reason\` IS NULL AND \`rejection_reason\` IS NOT NULL
+        SET \`body_text\` = COALESCE(
+          JSON_UNQUOTE(JSON_EXTRACT(\`components\`, '$.body.text')),
+          JSON_UNQUOTE(JSON_EXTRACT(\`components\`, '$.body')),
+          JSON_UNQUOTE(JSON_EXTRACT(\`components\`, '$.text')),
+          ''
+        )
+        WHERE (\`body_text\` IS NULL OR \`body_text\` = '')
+          AND \`components\` IS NOT NULL
       `);
-    }
 
-    // 5. Renommer external_id → meta_template_id si les deux coexistent
-    const hasOldExtId = await queryRunner.hasColumn('whatsapp_template', 'external_id');
-    const hasNewExtId = await queryRunner.hasColumn('whatsapp_template', 'meta_template_id');
-    if (hasOldExtId && hasNewExtId) {
+      // 3. Extraire parameters et buttons depuis components
       await queryRunner.query(`
         UPDATE \`whatsapp_template\`
-        SET \`meta_template_id\` = \`external_id\`
-        WHERE \`meta_template_id\` IS NULL AND \`external_id\` IS NOT NULL
+        SET
+          \`parameters\` = JSON_EXTRACT(\`components\`, '$.parameters'),
+          \`buttons\`    = JSON_EXTRACT(\`components\`, '$.buttons')
+        WHERE \`parameters\` IS NULL
+          AND \`components\` IS NOT NULL
+      `);
+
+      // 4. Renommer rejection_reason → rejected_reason si les deux coexistent
+      const hasOldReason = await queryRunner.hasColumn('whatsapp_template', 'rejection_reason');
+      const hasNewReason = await queryRunner.hasColumn('whatsapp_template', 'rejected_reason');
+      if (hasOldReason && hasNewReason) {
+        await queryRunner.query(`
+          UPDATE \`whatsapp_template\`
+          SET \`rejected_reason\` = \`rejection_reason\`
+          WHERE \`rejected_reason\` IS NULL AND \`rejection_reason\` IS NOT NULL
+        `);
+      }
+
+      // 5. Renommer external_id → meta_template_id si les deux coexistent
+      const hasOldExtId = await queryRunner.hasColumn('whatsapp_template', 'external_id');
+      const hasNewExtId = await queryRunner.hasColumn('whatsapp_template', 'meta_template_id');
+      if (hasOldExtId && hasNewExtId) {
+        await queryRunner.query(`
+          UPDATE \`whatsapp_template\`
+          SET \`meta_template_id\` = \`external_id\`
+          WHERE \`meta_template_id\` IS NULL AND \`external_id\` IS NOT NULL
+        `);
+      }
+
+      // 6. Normaliser category (varchar prod → ENUM V2)
+      await queryRunner.query(`
+        UPDATE \`whatsapp_template\`
+        SET \`category\` = CASE UPPER(TRIM(\`category\`))
+          WHEN 'MARKETING'      THEN 'MARKETING'
+          WHEN 'AUTHENTICATION' THEN 'AUTHENTICATION'
+          ELSE 'UTILITY'
+        END
+        WHERE \`category\` NOT IN ('MARKETING','UTILITY','AUTHENTICATION')
+           OR \`category\` IS NULL
       `);
     }
-
-    // 6. Normaliser category (varchar prod → ENUM V2)
-    await queryRunner.query(`
-      UPDATE \`whatsapp_template\`
-      SET \`category\` = CASE UPPER(TRIM(\`category\`))
-        WHEN 'MARKETING'      THEN 'MARKETING'
-        WHEN 'AUTHENTICATION' THEN 'AUTHENTICATION'
-        ELSE 'UTILITY'
-      END
-      WHERE \`category\` NOT IN ('MARKETING','UTILITY','AUTHENTICATION')
-         OR \`category\` IS NULL
-    `);
 
     // Vérification finale du schéma post-migration
     const columns: Array<{ COLUMN_NAME: string; DATA_TYPE: string; COLUMN_TYPE: string }> =
