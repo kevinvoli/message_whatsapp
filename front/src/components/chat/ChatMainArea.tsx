@@ -6,11 +6,18 @@ import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
 import { useSocket } from "@/contexts/SocketProvider";
 import { useChatStore } from "@/store/chatStore";
-import { Phone } from "lucide-react";
+import { Phone, PanelTop } from "lucide-react";
 
 const GicopReportPanel = dynamic(() => import("./GicopReportPanel"), { ssr: false });
 
-export default function ChatMainArea({ onOpenContact }: { onOpenContact?: () => void }) {
+interface ChatMainAreaProps {
+  onOpenContact?: () => void;
+  panelEnabled?: boolean;
+  panelOpen?: boolean;
+  onTogglePanel?: () => void;
+}
+
+export default function ChatMainArea({ onOpenContact, panelEnabled, panelOpen, onTogglePanel }: ChatMainAreaProps = {}) {
   const { isConnected: isWebSocketConnected } = useSocket();
   const {
     conversations,
@@ -32,18 +39,30 @@ export default function ChatMainArea({ onOpenContact }: { onOpenContact?: () => 
 
   const totalMessages = selectedConversation ? messages?.length : 0;
 
-  // Fenêtre de messagerie 23h : si le client n'a pas écrit depuis plus de 23h,
-  // l'envoi de messages ordinaires est interdit côté WhatsApp.
+  // Fenêtre de messagerie : le backend expose customerWindowExpiresAt (date d'expiration
+  // faisant autorité, 24h normal / 72h CTWA déjà calculés côté serveur).
   // Exception : les canaux dédiés à un poste ne sont pas soumis à cette restriction.
-  const WINDOW_MS = 23 * 60 * 60 * 1000;
-  const lastClientAt = selectedConversation?.last_client_message_at;
+  // On ne bloque la saisie que si la valeur est non-null ET réellement expirée.
+  const windowExpiresAt = selectedConversation?.customerWindowExpiresAt;
   const windowExpired =
     selectedConversation != null &&
     !selectedConversation.channel_dedicated &&
-    (!lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS);
+    windowExpiresAt != null &&
+    new Date(windowExpiresAt).getTime() <= Date.now();
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {panelEnabled && (
+        <div className="flex justify-end border-b border-gray-100 bg-white px-3 py-1.5">
+          <button
+            onClick={onTogglePanel}
+            title="Panneau médias"
+            className={`p-1.5 rounded-lg transition-colors ${panelOpen ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
+          >
+            <PanelTop className="w-5 h-5" />
+          </button>
+        </div>
+      )}
       {selectedConversation ? (
         <div className="flex flex-1 overflow-hidden">
           {/* Zone principale conversation */}

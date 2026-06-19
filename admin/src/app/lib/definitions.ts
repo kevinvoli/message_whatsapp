@@ -99,7 +99,17 @@ export type ViewMode =
   // Appels en absence (rétro-compatibilité)
   | 'missed-calls'
   // Applications Meta
-  | 'applications';
+  | 'applications'
+  // Sprint 2 — vues portées
+  | 'message-traffic'
+  | 'campaign-links'
+  | 'mediatheque'
+  | 'channel-stats'
+  | 'canaux-dedies'
+  | 'lecture-seule'
+  | 'campagnes-meta'
+  | 'galerie-media'
+  | 'quiz';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -1312,4 +1322,427 @@ export interface AbsenceSummaryItem {
   groupName: string | null;
   totalDays: number;
 }
+
+// ============================================
+// STATS COMMERCIAUX (détail activité)
+// ============================================
+
+export type CommercialStatsDto = {
+  commercialId: string;
+  messagesRead: number;
+  messagesHandled: number;
+  activeConversations: number;
+  responseRate: number;
+  lastActivityAt: string | null;
+  isOnline: boolean;
+  conversationsReceived: number;
+  conversationsReplied: number;
+  conversationsHandled: number;
+  totalConnectionMinutes?: number;
+};
+
+// ============================================
+// STATS CANAUX DÉTAILLÉES
+// ============================================
+
+export type ChannelLinkStats = {
+  id: string;
+  name: string;
+  shortCode: string;
+  isActive: boolean;
+  clickCount: number;
+  conversionCount: number;
+  conversations_count: number;
+  messages_in: number;
+  messages_out: number;
+};
+
+export type ChannelDetailStats = {
+  channel_id: string;
+  conversations_total: number;
+  conversations_actif: number;
+  conversations_attente: number;
+  conversations_ferme: number;
+  messages_total: number;
+  messages_in: number;
+  messages_out: number;
+  links_count: number;
+  links_clicks_total: number;
+  links_conversions_total: number;
+  temporal: { date: string; messages_in: number; messages_out: number; total: number }[];
+  links: ChannelLinkStats[];
+};
+
+// ============================================
+// MEDIA ASSET (Médiathèque)
+// ============================================
+
+export type MediaAssetType = 'image' | 'video' | 'audio' | 'document';
+
+export type MediaAsset = {
+  id: string;
+  name: string;
+  originalName: string;
+  publicUrl: string;
+  filePath: string;
+  mimeType: string;
+  mediaType: MediaAssetType;
+  fileSize: number;
+  category: string | null;
+  tags: string[] | null;
+  colorLabel: string | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ============================================
+// CAMPAIGN LINKS
+// ============================================
+
+export type CampaignLink = {
+  id: string;
+  name: string;
+  channelId: string;
+  channel?: { id: string; label?: string | null; channel_id: string; phone_number?: string | null } | null;
+  predefinedMessage: string;
+  shortCode: string;
+  directUrl: string;
+  trackedUrl: string;
+  clickCount: number;
+  conversionCount: number;
+  isActive: boolean;
+  media_asset_id: string | null;
+  media_asset: MediaAsset | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CampaignLinkClick = {
+  id: string;
+  campaignLinkId: string;
+  clickedAt: string;
+  ipHash: string | null;
+  userAgent: string | null;
+  deviceType: 'mobile' | 'desktop' | 'tablet' | 'other' | null;
+  converted: boolean;
+  convertedAt: string | null;
+  chatId: string | null;
+};
+
+export type CampaignLinkStats = {
+  total_clicks: number;
+  total_conversions: number;
+  conversion_rate: number;
+  unique_clicks: number;
+  clicks_by_day: { date: string; clicks: number; conversions: number }[];
+  clicks_by_device: { device_type: string; count: number }[];
+};
+
+// ============================================
+// TRAFIC MESSAGES
+// ============================================
+
+export type TraficPoint = {
+  index:         number;
+  label:         string;
+  total:         number;
+  messages_in:   number;
+  messages_out:  number;
+  avg_par_unite: number;
+};
+
+export type TraficStatistiques = {
+  total: number;
+  messages_in: number;
+  messages_out: number;
+  moy_par_minute: number;
+  moy_par_heure: number;
+  moy_par_jour: number;
+  heure_pic: number;
+  messages_pic: number;
+  heure_creux: number;
+  heure_pic_in: number;
+  ratio_in_out: number;
+  pourcentage_in: number;
+  pourcentage_out: number;
+  concentration_matin: number;
+  concentration_aprem: number;
+  concentration_soir: number;
+  concentration_nuit: number;
+  heures_actives: number;
+  nb_jours: number;
+  mode: 'journee' | 'periode';
+};
+
+export type TraficResponse = {
+  granularite:  'heure' | 'jour';
+  points:       TraficPoint[];
+  statistiques: TraficStatistiques;
+  meta: {
+    periode:    string;
+    dateStart:  string;
+    dateEnd:    string;
+    nb_unites:  number;
+    nb_jours:   number;
+  };
+};
+
+export type TraficHoraireResponse = TraficResponse;
+export type TraficHorairePoint    = TraficPoint;
+
+export type TraficConversationsPoint = {
+  index:         number;
+  label:         string;
+  total:         number;
+  fermees:       number;
+  actives:       number;
+  avg_par_unite: number;
+};
+
+export type TraficConversationsStatistiques = {
+  total:             number;
+  actives:           number;
+  fermees:           number;
+  en_attente:        number;
+  taux_cloture:      number;
+  taux_actives:      number;
+  moy_par_heure:     number;
+  moy_par_jour:      number;
+  unite_pic:         number;
+  conversations_pic: number;
+  unites_actives:    number;
+  nb_jours:          number;
+  mode:              'journee' | 'periode';
+};
+
+export type TraficConversationsResponse = {
+  granularite:  'heure' | 'jour';
+  points:       TraficConversationsPoint[];
+  statistiques: TraficConversationsStatistiques;
+  meta: {
+    periode:   string;
+    dateStart: string;
+    dateEnd:   string;
+    nb_unites: number;
+    nb_jours:  number;
+  };
+};
+
+// ============================================
+// CAMPAGNES META (CTWA)
+// ============================================
+
+export interface MetaAdKpiRow {
+  source_id:             string;
+  headline:              string | null;
+  image_url:             string | null;
+  sample_chat_id:        string;
+  total_conversations:   number;
+  conversations_closed:  number;
+  conversion_rate:       number;
+  avg_messages_per_chat: number;
+  avg_first_response_s:  number | null;
+  first_seen:            string;
+  last_seen:             string;
+}
+
+// ============================================
+// GALERIE MEDIAS SERVEUR
+// ============================================
+
+export type StoredMediaType =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'document'
+  | 'voice'
+  | 'sticker'
+  | 'gif'
+  | 'location'
+  | 'contact';
+
+export type MediaDirection = 'IN' | 'OUT';
+
+export type StoredMedia = {
+  id: string;
+  local_url: string;
+  media_type: StoredMediaType;
+  mime_type: string;
+  file_name: string | null;
+  file_size: string | null;
+  caption: string | null;
+  duration_seconds: number | null;
+  width: string | null;
+  height: string | null;
+  downloaded_at: string | null;
+  createdAt: string;
+  message: {
+    direction: MediaDirection;
+    from: string;
+    from_name: string;
+    poste_id: string | null;
+    poste: { id: string; name: string; code: string } | null;
+  } | null;
+  channel: {
+    id: string;
+    label: string | null;
+    phone_number: string | null;
+    provider: string | null;
+  } | null;
+};
+
+export type StoredMediaResponse = {
+  items: StoredMedia[];
+  total: number;
+  pages: number;
+  totalSize: number;
+};
+
+export type GalerieFilterOptions = {
+  channels: { id: string; label: string | null; phone_number: string | null }[];
+  postes: { id: string; name: string; code: string }[];
+};
+
+// ============================================
+// RESTRICTION CONTENU MESSAGES COMMERCIAUX
+// ============================================
+
+export interface MessageRestrictionConfig {
+  enabled: boolean;
+  maxWordLength: number;
+  maxRepeatedChars: number;
+  minAudioDurationSeconds: number;
+}
+
+// ============================================
+// RESTRICTION LECTURE CONVERSATIONS
+// ============================================
+
+export interface RestrictionConfig {
+  enabled: boolean;
+  maxUnrespondedConvs: number;
+  minResponseChars: number;
+  requireLastMessageMine: boolean;
+  minCharsSendEnabled: boolean;
+}
+
+// ============================================
+// CHATS LUS SANS RÉPONSE
+// ============================================
+
+export type ChatLuSansReponse = {
+  id: string;
+  chat_id: string;
+  name: string;
+  contact_client: string;
+  status: string;
+  last_activity_at: string | null;
+  last_client_message_at: string | null;
+  last_read_at: string | null;
+  last_poste_message_at: string | null;
+  last_opened_at: string | null;
+  last_closed_at: string | null;
+  last_relaunched_at: string | null;
+  session_count: number;
+};
+
+export type ChatReadStatus = {
+  lastReadAt: string | null;
+  lastReadByName: string | null;
+  hasUnrespondedRead: boolean;
+};
+
+// ============================================
+// QCM FORMATION
+// ============================================
+
+export type QuizCategory = {
+  id: string;
+  name: string;
+  color: string | null;
+  createdAt: string;
+};
+
+export type QuizAnswer = {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  position: number;
+};
+
+export type QuizQuestion = {
+  id: string;
+  categoryId: string;
+  category?: QuizCategory;
+  text: string;
+  points: number;
+  timeLimitSeconds: number | null;
+  isActive: boolean;
+  answers: QuizAnswer[];
+  createdAt: string;
+};
+
+export type QuizSession = {
+  id: string;
+  title: string;
+  sessionDate: string;
+  isActive: boolean;
+  passingScore: number | null;
+  maxAttempts: number;
+  totalTimeMinutes: number | null;
+  questionCount?: number;
+  createdAt: string;
+};
+
+export type QuizExemption = {
+  id: string;
+  scope: 'commercial' | 'poste';
+  commercialId: string | null;
+  posteId: string | null;
+  reason: string | null;
+  commercial?: { id: string; name: string };
+  poste?: { id: string; name: string };
+  createdAt: string;
+};
+
+export interface QuizSessionResult {
+  commercialId: string;
+  commercialName: string;
+  posteName: string;
+  attemptsCount: number;
+  bestScore: number | null;
+  maxScore: number | null;
+  isPassed: boolean | null;
+  completedAt: string | null;
+}
+
+export interface QuizPdf {
+  id: string;
+  sessionId: string | null;
+  originalName: string;
+  fileSize: number;
+  allowInlineView: boolean;
+  isPermanent: boolean;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  uploadedAt: string;
+}
+
+export interface DisconnectCommercialResponse {
+  disconnected: boolean;
+  message: string;
+}
+
+// ============================================
+// VUES SPRINT 2 — ViewMode additions
+// ============================================
+
+export const COULEURS_STATUT = {
+  actif: 'green',
+  'en attente': 'yellow',
+  'fermé': 'gray',
+  online: 'green',
+  offline: 'gray',
+} as const;
 

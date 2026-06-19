@@ -1,4 +1,4 @@
-import { QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit } from '../definitions';
+import { QueuePosition, DispatchSnapshot, DispatchSettings, DispatchSettingsAudit, RestrictionConfig, MessageRestrictionConfig } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 export async function getQueue(): Promise<QueuePosition[]> {
@@ -137,4 +137,42 @@ export async function getAffinityStats(): Promise<AffinityStatEntry[]> {
         credentials: 'include',
     });
     return handleResponse<AffinityStatEntry[]>(response);
+}
+
+export async function getRestrictionConfig(): Promise<RestrictionConfig> {
+    const response = await fetch(`${API_BASE_URL}/admin/system-config/restriction`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<RestrictionConfig>(response);
+}
+
+export async function updateRestrictionConfig(config: RestrictionConfig): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/admin/system-config/restriction`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(config),
+    });
+    await handleResponse<void>(response);
+}
+
+export async function getMessageRestrictionConfig(): Promise<MessageRestrictionConfig> {
+    const response = await fetch(`${API_BASE_URL}/admin/message-restrictions`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<MessageRestrictionConfig>(response);
+}
+
+export async function updateMessageRestrictionConfig(
+    config: MessageRestrictionConfig,
+): Promise<MessageRestrictionConfig> {
+    const response = await fetch(`${API_BASE_URL}/admin/message-restrictions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(config),
+    });
+    return handleResponse<MessageRestrictionConfig>(response);
 }

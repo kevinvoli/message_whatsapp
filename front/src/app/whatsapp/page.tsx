@@ -6,14 +6,24 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { ConversationSidebar } from '@/components/layout/ConversationSidebar';
 import ChatMainArea from '@/components/chat/ChatMainArea';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
+import MediaPanel from '@/components/panel/MediaPanel';
 import { ViewMode } from '@/types/chat';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { getPanelMedia } from '@/lib/mediaPanelApi';
 
 const WhatsAppPage = () => {
   const { user, initialized } = useAuth();
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('conversations');
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelEnabled, setPanelEnabled] = useState(false);
   useKeyboardShortcuts();
+
+  useEffect(() => {
+    getPanelMedia(1, 1)
+      .then(r => { setPanelEnabled(r.enabled); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (initialized && !user) {
@@ -56,7 +66,10 @@ const WhatsAppPage = () => {
         <ConversationSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
         {viewMode === 'contacts'
           ? <ContactDetailView onSwitchToConversations={() => setViewMode('conversations')} />
-          : <ChatMainArea onOpenContact={() => setViewMode('contacts')} />}
+          : <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} onOpenContact={() => setViewMode('contacts')} />}
+        {panelEnabled && panelOpen && (
+          <MediaPanel onClose={() => setPanelOpen(false)} />
+        )}
       </div>
     </div>
   );

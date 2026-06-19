@@ -226,6 +226,17 @@ export function handleChatEvent(
         const selectedChatId = chatState.selectedConversation?.chat_id;
         if (selectedChatId) chatState.setMessages(selectedChatId, next);
       }
+      const errorCode = (data.payload as { code?: string }).code;
+      if (errorCode === 'RESTRICTION_TRIGGERED') {
+        // Dispatch événement DOM pour que les composants abonnés puissent réagir
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('restriction:triggered', {
+              detail: { message: (data.payload as { message?: string }).message },
+            }),
+          );
+        }
+      }
       logger.warn('Message send error received', {
         code: data.payload?.code,
         message: data.payload?.message,

@@ -1,4 +1,4 @@
-import { StatsGlobales, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, WebhookMetricsSnapshot } from '../definitions';
+import { StatsGlobales, MetriquesGlobales, PerformanceCommercial, StatutChannel, PerformanceTemporelle, WebhookMetricsSnapshot, CommercialStatsDto, ChannelDetailStats, TraficResponse, TraficConversationsResponse, MetaAdKpiRow, ChatLuSansReponse } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 export async function getStatsGlobales(): Promise<StatsGlobales> {
@@ -118,4 +118,139 @@ export async function getOrderSyncStatus(): Promise<OrderSyncStatus> {
         credentials: 'include',
     });
     return handleResponse<OrderSyncStatus>(response);
+}
+
+export async function getStatutChannelsFiltered(
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<StatutChannel[]> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(`${API_BASE_URL}/api/metriques/channels?${params}`, {
+        credentials: 'include',
+    });
+    return handleResponse<StatutChannel[]>(response);
+}
+
+export async function getChannelDetailStats(
+    channelId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<ChannelDetailStats> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/api/metriques/channels/${encodeURIComponent(channelId)}/stats?${params}`,
+        { credentials: 'include' },
+    );
+    return handleResponse<ChannelDetailStats>(response);
+}
+
+export async function getCommercialStats(
+    commercialId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<CommercialStatsDto> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/users/${encodeURIComponent(commercialId)}/stats?${params.toString()}`,
+        { method: 'GET', credentials: 'include' },
+    );
+    return handleResponse<CommercialStatsDto>(response);
+}
+
+export async function getMetriquesDedicated(
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<MetriquesGlobales> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(`${API_BASE_URL}/api/metriques/globales-dedie?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<MetriquesGlobales>(response);
+}
+
+export async function getPerformanceCommerciauxDedie(
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<PerformanceCommercial[]> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(`${API_BASE_URL}/api/metriques/commerciaux-dedie?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<PerformanceCommercial[]>(response);
+}
+
+export async function getTraficHoraire(
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+    granularite: 'heure' | 'jour' = 'heure',
+): Promise<TraficResponse> {
+    const params = new URLSearchParams({ periode, granularite });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo)   params.set('dateTo', dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/api/metriques/trafic-horaire?${params.toString()}`,
+        { method: 'GET', credentials: 'include' },
+    );
+    return handleResponse<TraficResponse>(response);
+}
+
+export async function getTraficConversations(
+    periode      = 'today',
+    dateFrom?:   string,
+    dateTo?:     string,
+    granularite: 'heure' | 'jour' = 'heure',
+): Promise<TraficConversationsResponse> {
+    const params = new URLSearchParams({ periode, granularite });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo)   params.set('dateTo',   dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/api/metriques/trafic-conversations?${params.toString()}`,
+        { method: 'GET', credentials: 'include' },
+    );
+    return handleResponse<TraficConversationsResponse>(response);
+}
+
+export async function getCampagnesMeta(
+    dateFrom: string,
+    dateTo: string,
+): Promise<MetaAdKpiRow[]> {
+    const params = new URLSearchParams({ dateFrom, dateTo });
+    const res = await fetch(`${API_BASE_URL}/api/metriques/campagnes-meta?${params}`, {
+        credentials: 'include',
+    });
+    return handleResponse<MetaAdKpiRow[]>(res);
+}
+
+export async function getChatsLusSansReponse(
+    commercialId: string,
+    periode = 'today',
+    dateFrom?: string,
+    dateTo?: string,
+): Promise<ChatLuSansReponse[]> {
+    const params = new URLSearchParams({ periode });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const response = await fetch(
+        `${API_BASE_URL}/api/metriques/commerciaux/${commercialId}/chats-lus-sans-reponse?${params.toString()}`,
+        { method: 'GET', credentials: 'include' },
+    );
+    return handleResponse<ChatLuSansReponse[]>(response);
 }

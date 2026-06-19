@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthProvider";
 import { SocketProvider } from "@/contexts/SocketProvider";
 import WebSocketEvents from "@/components/WebSocketEvents";
+import IdleAndCooldownWrapper from "@/components/IdleAndCooldownWrapper";
 import { PwaRegister } from "@/components/PwaRegister";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { QueryProvider } from "@/components/QueryProvider";
@@ -39,6 +40,7 @@ export default function RootLayout({
               <SocketProvider>
                 <PwaRegister />
                 <WebSocketEvents />
+                <IdleAndCooldownWrapper />
                 {children}
               </SocketProvider>
             </AuthProvider>

@@ -367,6 +367,9 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Messages</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taux réponse</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Temps moy.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Msg lus</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Msg traités</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière activité</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Portefeuille</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Relances</th>
@@ -376,7 +379,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
             <tbody className="divide-y divide-gray-200">
               {dataLoading ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-12 text-center">
+                  <td colSpan={15} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                       <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -388,7 +391,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </tr>
               ) : commerciauxFiltres.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={15} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
                   </td>
                 </tr>
@@ -481,6 +484,27 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                           {formatTemps(commercial.tempsReponseMoyen)}
                         </span>
                       </div>
+                    </td>
+
+                    {/* Msg lus (A-06) */}
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-mono text-gray-700">
+                        {commercial.nbMessagesRecus ?? '—'}
+                      </span>
+                    </td>
+
+                    {/* Msg traités (A-06) */}
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-mono text-gray-700">
+                        {commercial.nbMessagesEnvoyes ?? '—'}
+                      </span>
+                    </td>
+
+                    {/* Dernière activité (A-06) */}
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-600">
+                        {commercial.lastConnectionAt ? formatRelativeDate(commercial.lastConnectionAt) : '—'}
+                      </span>
                     </td>
 
                     {/* Dernière connexion */}

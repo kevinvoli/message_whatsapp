@@ -1,4 +1,4 @@
-import { Poste } from '../definitions';
+import { Poste, PostePanelConfig } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
 export async function getPostes(): Promise<Poste[]> {
@@ -35,4 +35,27 @@ export async function deletePoste(id: string): Promise<{ message: string }> {
         credentials: 'include',
     });
     return handleResponse<{ message: string }>(response);
+}
+
+export async function getPostePanelConfig(posteId: string): Promise<PostePanelConfig> {
+    const response = await fetch(`${API_BASE_URL}/poste/${posteId}/panel`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<PostePanelConfig>(response);
+}
+
+export async function updatePostePanelConfig(
+    posteId: string,
+    payload: { enabled: boolean; types: string[] },
+): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/poste/${posteId}/panel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+    });
+    if (!response.ok) {
+        await handleResponse<void>(response);
+    }
 }

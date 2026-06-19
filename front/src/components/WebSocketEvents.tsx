@@ -43,6 +43,9 @@ const WebSocketEvents = () => {
       socket.emit('contacts:get');
       const selectedChatId = useChatStore.getState().selectedConversation?.chat_id;
       if (selectedChatId) socket.emit('messages:get', { chat_id: selectedChatId });
+      // Restaurer l'état de restriction au (re)connect : sans ça, restrictionTriggered
+      // repart à false après F5 / second onglet et le commercial contourne le blocage.
+      socket.emit('restriction:check');
     };
 
     const onChatEvent = (data: { type: string; payload: any }) =>
