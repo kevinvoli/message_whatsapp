@@ -5,6 +5,8 @@ export class AddPosteStatusIndex1782086400002 implements MigrationInterface {
   transaction = false;
 
   async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query('SET SESSION innodb_lock_wait_timeout = 15');
+
     const exists = await queryRunner.query(`
       SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.STATISTICS
       WHERE TABLE_SCHEMA = DATABASE()
@@ -13,9 +15,11 @@ export class AddPosteStatusIndex1782086400002 implements MigrationInterface {
     `);
     if (parseInt(exists[0].cnt, 10) === 0) {
       await queryRunner.query(
-        'ALTER TABLE `whatsapp_chat` ADD INDEX `IDX_chat_poste_status` (`poste_id`, `status`, `deletedAt`) ALGORITHM=INPLACE, LOCK=NONE',
+        'CREATE INDEX `IDX_chat_poste_status` ON `whatsapp_chat` (`poste_id`, `status`, `deletedAt`)',
       );
     }
+
+    await queryRunner.query('SET SESSION innodb_lock_wait_timeout = 50');
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
