@@ -8,19 +8,22 @@ import {
   Delete,
   UseGuards,
   Logger,
+  Query,
 } from '@nestjs/common';
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
 import { UpdateWhatsappCommercialDto } from './dto/update-whatsapp_commercial.dto';
-import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
+import { AdminGuard } from '../auth/admin.guard';
+import { CommercialStatsService } from './commercial-stats.service';
 
 @Controller('users')
-@UseGuards(AdminGuard) // Use AdminGuard
+@UseGuards(AdminGuard)
 export class WhatsappCommercialController {
   private readonly logger = new Logger(WhatsappCommercialController.name);
 
   constructor(
     private readonly whatsappCommercialService: WhatsappCommercialService,
+    private readonly commercialStatsService: CommercialStatsService,
   ) {}
 
   @Post()
@@ -40,6 +43,16 @@ export class WhatsappCommercialController {
   @Get('presence')
   async getPresence() {
     return this.whatsappCommercialService.getPresence();
+  }
+
+  @Get(':id/stats')
+  async getStats(
+    @Param('id') id: string,
+    @Query('periode') periode: string = 'today',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.commercialStatsService.getStats(id, periode, dateFrom, dateTo);
   }
 
   @Get(':id')

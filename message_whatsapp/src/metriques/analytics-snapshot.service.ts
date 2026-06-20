@@ -9,6 +9,9 @@ const STANDARD_PERIODS = ['today', 'week', 'month', 'year'] as const;
 @Injectable()
 export class AnalyticsSnapshotService {
   private readonly logger = new Logger(AnalyticsSnapshotService.name);
+  // In-process lock : si plusieurs admins chargent simultanément un snapshot expiré,
+  // un seul recalcul est lancé — les autres attendent le même Promise.
+  private readonly computingLocks = new Map<string, Promise<void>>();
 
   constructor(
     @InjectRepository(AnalyticsSnapshot)
@@ -83,6 +86,64 @@ export class AnalyticsSnapshotService {
     if (ageSeconds > snapshot.ttl_seconds) return null;
 
     return snapshot;
+  }
+
+  /**
+   * Retourne le snapshot valide ou déclenche un recalcul si expiré.
+   * Protège contre le thundering herd : si plusieurs requêtes arrivent
+   * simultanément sur un snapshot expiré, un seul recalcul est lancé.
+   */
+  async getLatestOrCompute(scope: string, periode: string): Promise<AnalyticsSnapshot | null> {
+    const existing = await this.getLatest(scope, periode);
+    if (existing) return existing;
+
+    await this.computeForPeriode(periode);
+
+    return this.snapshotRepository.findOne({
+      where: { scope: scope as any, scope_id: periode },
+      order: { computed_at: 'DESC' },
+    });
+  }
+
+  /**
+   * Recalcule le snapshot pour une période donnée avec lock in-process.
+   */
+  async computeForPeriode(periode: string): Promise<void> {
+    const lockKey = `global:${periode}`;
+
+    if (this.computingLocks.has(lockKey)) {
+      return this.computingLocks.get(lockKey);
+    }
+
+    const promise = this._doCompute(periode).finally(() => {
+      this.computingLocks.delete(lockKey);
+    });
+
+    this.computingLocks.set(lockKey, promise);
+    return promise;
+  }
+
+  private async _doCompute(periode: string): Promise<void> {
+    const joursMap: Record<string, number> = { today: 1, week: 7, month: 30, year: 365 };
+    const [metriques, performanceCommercial, statutChannels, performanceTemporelle] =
+      await Promise.all([
+        this.metriquesService.getMetriquesGlobales(periode),
+        this.metriquesService.getPerformanceCommerciaux(periode),
+        this.metriquesService.getStatutChannels(periode),
+        this.metriquesService.getPerformanceTemporelle(joursMap[periode] ?? 7),
+      ]);
+
+    const snapshot = this.snapshotRepository.create({
+      scope: 'global',
+      scope_id: periode,
+      date_start: null,
+      date_end: null,
+      ttl_seconds: 720,
+      data: { metriques, performanceCommercial, statutChannels, performanceTemporelle },
+    });
+
+    await this.snapshotRepository.save(snapshot);
+    this.logger.debug(`SNAPSHOT_COMPUTED scope=global period=${periode}`);
   }
 
   /**

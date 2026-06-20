@@ -110,7 +110,7 @@ export class MetriquesController {
 
     // ── Lecture snapshot pour une section précise ──────────────────────────────
     if (section && isStandard) {
-      const snap = await this.snapshotService.getLatest('global', periode);
+      const snap = await this.snapshotService.getLatestOrCompute('global', periode);
       if (snap) {
         const d = snap.data as any;
         const sectionMap: Record<string, unknown> = {

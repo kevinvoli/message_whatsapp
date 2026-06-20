@@ -56,6 +56,10 @@ export enum ConversationResult {
 @Index('IDX_chat_poste_activity',        ['poste_id', 'last_activity_at'])
 // Index pour les agrégations par résultat de conversation (objectifs/ranking)
 @Index('IDX_chat_conversation_result',   ['conversation_result', 'deletedAt'])
+// Index pour getStatutChannels — COUNT chats par canal sur période
+@Index('IDX_chat_channel_activity',      ['channel_id', 'last_activity_at', 'deletedAt'])
+// Index pour getPerformanceCommerciaux R2.4 — chats actifs par poste
+@Index('IDX_chat_poste_status',          ['poste_id', 'status', 'deletedAt'])
 export class WhatsappChat {
   @PrimaryGeneratedColumn('uuid', {
     name: 'id',

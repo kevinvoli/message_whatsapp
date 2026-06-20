@@ -538,32 +538,42 @@ export class MetriquesService {
   ): Promise<StatutChannelDto[]> {
     const { dateStart, dateEnd } = this.dateRange(periode, dateFrom, dateTo);
 
-    // Sous-requêtes scalaires : évite la multiplication de lignes que produirait
-    // un double LEFT JOIN (chats × messages) avant le GROUP BY.
+    // LEFT JOIN + GROUP BY remplace les 2N sous-requêtes scalaires précédentes.
+    // COUNT(DISTINCT) est obligatoire pour éviter la multiplication de lignes
+    // due au produit cartésien chats × messages avant le GROUP BY.
+    // Requiert : IDX_chat_channel_activity(channel_id, last_activity_at, deletedAt)
+    //            IDX_msg_channel_time(channel_id, createdAt, deletedAt)
     const channels = await this.channelRepository
       .createQueryBuilder('channel')
-      .select('channel.id',          'id')
-      .addSelect('channel.channel_id', 'channel_id')
-      .addSelect('channel.label',      'label')
-      .addSelect('channel.is_business','is_business')
-      .addSelect('channel.uptime',     'uptime')
-      .addSelect(
-        `(SELECT COUNT(*) FROM whatsapp_chat c
-           WHERE c.channel_id = channel.channel_id
-             AND c.deletedAt IS NULL
-             AND c.last_activity_at >= :dateStart
-             AND c.last_activity_at <= :dateEnd)`,
-        'nb_chats_actifs',
+      .select('channel.id',            'id')
+      .addSelect('channel.channel_id',  'channel_id')
+      .addSelect('channel.label',       'label')
+      .addSelect('channel.is_business', 'is_business')
+      .addSelect('channel.uptime',      'uptime')
+      .addSelect('COUNT(DISTINCT c.id)', 'nb_chats_actifs')
+      .addSelect('COUNT(DISTINCT m.id)', 'nb_messages')
+      .leftJoin(
+        'whatsapp_chat',
+        'c',
+        `c.channel_id = channel.channel_id
+         AND c.deletedAt IS NULL
+         AND c.last_activity_at >= :dateStart
+         AND c.last_activity_at <= :dateEnd`,
       )
-      .addSelect(
-        `(SELECT COUNT(*) FROM whatsapp_message m
-           WHERE m.channel_id = channel.channel_id
-             AND m.deletedAt IS NULL
-             AND m.createdAt >= :dateStart
-             AND m.createdAt <= :dateEnd)`,
-        'nb_messages',
+      .leftJoin(
+        'whatsapp_message',
+        'm',
+        `m.channel_id = channel.channel_id
+         AND m.deletedAt IS NULL
+         AND m.createdAt >= :dateStart
+         AND m.createdAt <= :dateEnd`,
       )
       .setParameters({ dateStart, dateEnd })
+      .groupBy('channel.id')
+      .addGroupBy('channel.channel_id')
+      .addGroupBy('channel.label')
+      .addGroupBy('channel.is_business')
+      .addGroupBy('channel.uptime')
       .orderBy('nb_messages', 'DESC')
       .getRawMany();
 
