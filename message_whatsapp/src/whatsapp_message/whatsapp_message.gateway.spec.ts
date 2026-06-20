@@ -125,7 +125,7 @@ describe('WhatsappMessageGateway protocol events', () => {
     });
   });
 
-  it('broadcasts TYPING_START via chat:event', () => {
+  it('broadcasts TYPING_START via chat:event', async () => {
     agentConnectionService.getAgent.mockReturnValue({
       commercialId: 'commercial-1',
       posteId: 'poste-9',
@@ -138,7 +138,7 @@ describe('WhatsappMessageGateway protocol events', () => {
     const to = jest.fn().mockReturnValue({ emit });
     const client = { id: 'client-1', to } as any;
 
-    gateway.handleChatEvent(client, {
+    await gateway.handleChatEvent(client, {
       type: 'TYPING_START',
       payload: { chat_id: 'chat-9' },
     });

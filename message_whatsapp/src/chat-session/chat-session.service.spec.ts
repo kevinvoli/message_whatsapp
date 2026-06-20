@@ -17,6 +17,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { ChatSessionService } from './chat-session.service';
 import { ChatSession } from './entities/chat-session.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { CronConfig } from 'src/jorbs/entities/cron-config.entity';
 import { TTL_CTWA_HOURS, TTL_NORMAL_HOURS } from './constants';
 import { mockRepository } from '../../test/helpers/mock-repository';
 import { makeConversation } from '../../test/factories/conversation.factory';
@@ -62,6 +63,7 @@ describe('ChatSessionService', () => {
         { provide: getRepositoryToken(ChatSession), useValue: sessionRepo },
         { provide: getRepositoryToken(WhatsappChat), useValue: chatRepo },
         { provide: DataSource, useValue: dataSource },
+        { provide: getRepositoryToken(CronConfig), useValue: { findOne: jest.fn().mockResolvedValue(null) } },
       ],
     }).compile();
 

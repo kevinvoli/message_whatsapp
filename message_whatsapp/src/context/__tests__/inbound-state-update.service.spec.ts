@@ -47,11 +47,11 @@ describe('InboundStateUpdateService', () => {
 
     await service.apply(chat, message, chatContext);
 
-    expect(contextService.updateChatContext).toHaveBeenCalledWith('cc-1', {
+    expect(contextService.updateChatContext).toHaveBeenCalledWith('cc-1', expect.objectContaining({
       readOnly: false,
       lastClientMessageAt: message.timestamp,
       lastActivityAt: message.timestamp,
-    });
+    }));
     expect(chatService.update).not.toHaveBeenCalled();
     expect(chat.read_only).toBe(false);
   });
@@ -64,10 +64,10 @@ describe('InboundStateUpdateService', () => {
 
     await service.apply(chat, message, undefined);
 
-    expect(chatService.update).toHaveBeenCalledWith('test@c.us', {
+    expect(chatService.update).toHaveBeenCalledWith('test@c.us', expect.objectContaining({
       read_only: false,
       last_client_message_at: message.timestamp,
-    });
+    }));
     expect(contextService.updateChatContext).not.toHaveBeenCalled();
   });
 

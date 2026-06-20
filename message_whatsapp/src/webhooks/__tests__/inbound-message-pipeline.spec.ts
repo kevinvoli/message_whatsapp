@@ -30,6 +30,7 @@ import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { BusinessHoursService } from 'src/flowbot/services/business-hours.service';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 import { UnifiedMessage } from '../normalization/unified-message';
 import {
   WhatsappChat,
@@ -140,6 +141,7 @@ describe('InboundMessageService — pipeline ingress (TICKET-10-A-BIS)', () => {
         { provide: CommunicationMessengerService, useValue: messengerServiceMock },
         { provide: DistributedLockService, useValue: distributedLockMock },
         { provide: BusinessHoursService, useValue: { isCurrentlyOpen: jest.fn().mockResolvedValue(true) } },
+        { provide: ChatSessionService, useValue: { onClientMessage: jest.fn().mockResolvedValue(undefined), openSession: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
