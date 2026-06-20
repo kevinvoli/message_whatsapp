@@ -17,4 +17,21 @@ export class CommercialStatsDto {
 
   /** Durée totale de connexion en minutes sur la période */
   totalConnectionMinutes: number;
+
+  /**
+   * Compteur cumulatif de messages lus stocké sur l'entité WhatsappCommercial
+   * (colonne messages_read_count). Mis à jour en temps réel via les triggers métier.
+   */
+  messagesReadCount: number;
+
+  /**
+   * Compteur cumulatif de messages traités stocké sur l'entité WhatsappCommercial
+   * (colonne messages_handled_count).
+   */
+  messagesHandledCount: number;
+
+  /**
+   * Nombre de sessions de connexion (messaging_connection_log) sur la période.
+   */
+  sessionCount: number;
 }

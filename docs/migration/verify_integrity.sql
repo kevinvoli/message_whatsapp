@@ -112,10 +112,10 @@ WHERE TABLE_SCHEMA = DATABASE()
 -- ── 9. Business hours (sanity) ───────────────────────────────
 
 SELECT 'BIZ_HOURS_DAYS_COUNT' AS check_name, COUNT(DISTINCT day_of_week) AS value
-FROM business_hours;
+FROM business_hours_config;
 -- Attendu : 7 (lundi→dimanche configuré)
 
--- ── 10. Config système ───────────────────────────────────────
+-- ── 10. Config système ───────────────────────────────────────  
 
 SELECT 'LOGIN_HOUR_SEEDED' AS check_name, COUNT(*) AS value
 FROM system_configs

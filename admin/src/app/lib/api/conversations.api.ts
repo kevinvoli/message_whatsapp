@@ -9,11 +9,13 @@ export async function getChats(
     posteId?: string,
     commercialId?: string,
     conversationResult?: string,
+    searchQuery?: string,
 ): Promise<{ data: WhatsappChat[]; total: number; totalAll: number; totalActifs: number; totalEnAttente: number; totalUnread: number; totalFermes: number }> {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset), periode });
     if (posteId) params.set('poste_id', posteId);
     if (commercialId) params.set('commercial_id', commercialId);
     if (conversationResult) params.set('conversation_result', conversationResult);
+    if (searchQuery) params.set('q', searchQuery);
     const response = await fetch(`${API_BASE_URL}/chats?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
@@ -114,7 +116,7 @@ export async function sendAdminMedia(
     return handleResponse<{ success: boolean; message_id: string }>(response);
 }
 
-export async function patchChat(chatId: string, data: Partial<{ read_only: boolean; is_archived: boolean }>): Promise<void> {
+export async function patchChat(chatId: string, data: Partial<{ read_only: boolean; is_archived: boolean; status: string }>): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatId)}`, {
         method: 'PATCH',
         credentials: 'include',

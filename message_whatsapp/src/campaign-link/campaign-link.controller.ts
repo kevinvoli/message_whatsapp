@@ -147,3 +147,23 @@ export class CampaignTrackingController {
     res.redirect(302, directUrl);
   }
 }
+
+@Controller('c')
+export class CampaignShortLinkController {
+  constructor(private readonly service: CampaignLinkService) {}
+
+  @Get(':shortCode')
+  async redirect(
+    @Param('shortCode') shortCode: string,
+    @Req() req: Request,
+    @Headers('user-agent') userAgent: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const rawIp =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ??
+      req.ip ??
+      '0.0.0.0';
+    const directUrl = await this.service.track(shortCode, rawIp, userAgent ?? null);
+    res.redirect(302, directUrl);
+  }
+}

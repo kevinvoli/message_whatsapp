@@ -80,6 +80,7 @@ export class CommercialStatsService {
       conversationsReplied,
       conversationsHandledRows,
       totalConnectionMinutes,
+      sessionCount,
     ] = await Promise.all([
 
       // Index 0 — messagesRead (COUNT messages individuels lus par ce commercial)
@@ -150,6 +151,14 @@ export class CommercialStatsService {
         dateStart,
         dateEnd,
       ),
+
+      // Index 5 — sessionCount (nombre de sessions sur la période)
+      this.connectionLogService.getSessionCount(
+        commercialId,
+        'commercial' as const,
+        dateStart,
+        dateEnd,
+      ),
     ]);
 
     let activeConversations = 0;
@@ -178,6 +187,11 @@ export class CommercialStatsService {
     dto.conversationsReplied  = parseInt(conversationsReplied?.cnt  ?? '0');
     dto.conversationsHandled  = parseInt(conversationsHandledRows?.[0]?.cnt ?? '0');
     dto.totalConnectionMinutes = totalConnectionMinutes;
+
+    // Champs depuis les colonnes DB de l'entité (NR-C17)
+    dto.messagesReadCount    = commercial.messagesReadCount ?? 0;
+    dto.messagesHandledCount = commercial.messagesHandledCount ?? 0;
+    dto.sessionCount         = sessionCount;
 
     return dto;
   }

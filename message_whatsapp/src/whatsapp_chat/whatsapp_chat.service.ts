@@ -17,6 +17,7 @@ import {
 } from 'src/conversations/infrastructure/conversation-read-query.service';
 import { ConversationCapacityService } from 'src/conversation-capacity/conversation-capacity.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 // Re-export des interfaces pour les consommateurs existants (rétro-compatibilité)
 export type { PosteStats, CommercialStats };
@@ -36,6 +37,8 @@ export class WhatsappChatService {
     @Optional()
     private readonly capacityService: ConversationCapacityService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional()
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   // ── Délégation aux lectures : ConversationReadQueryService ──────────────────
@@ -238,6 +241,18 @@ export class WhatsappChatService {
         newStatus: data.status,
         oldStatus: null,
       });
+    }
+    // Fermer la session active si la conversation passe au statut "fermé" (NR-09)
+    if (data.status === WhatsappChatStatus.FERME && this.chatSessionService) {
+      const chat = await this.chatRepository.findOne({ where: { chat_id } });
+      if (chat) {
+        this.chatSessionService.closeSessionByChatId(chat.id).catch((err) => {
+          this.logger.error(
+            `CLOSE_SESSION_ERROR chat_id=${chat_id}`,
+            (err as Error).stack,
+          );
+        });
+      }
     }
   }
 

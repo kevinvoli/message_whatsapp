@@ -96,6 +96,21 @@ export class ConnectionLogService {
     return parseInt(result?.total_minutes ?? '0') || 0;
   }
 
+  async getSessionCount(
+    userId: string,
+    userType: ConnectionUserType,
+    dateStart: Date,
+    dateEnd: Date,
+  ): Promise<number> {
+    return this.repo
+      .createQueryBuilder('log')
+      .where('log.userId = :userId', { userId })
+      .andWhere('log.userType = :userType', { userType })
+      .andWhere('log.loginAt >= :dateStart', { dateStart })
+      .andWhere('log.loginAt <= :dateEnd', { dateEnd })
+      .getCount();
+  }
+
   async getBulkConnectionMinutes(
     userIds: string[],
     userType: ConnectionUserType,

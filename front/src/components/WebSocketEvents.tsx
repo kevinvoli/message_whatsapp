@@ -16,13 +16,19 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
-import { Commercial } from '@/types/chat';
+import { Commercial, Message } from '@/types/chat';
 import {
   handleChatEvent,
   handleContactEvent,
   handleSocketError,
   handleQueueUpdated,
 } from '@/modules/realtime/services/socket-event-router';
+
+interface MessageSendErrorPayload {
+  tempId?: string;
+  code?: string;
+  message?: string;
+}
 
 const WebSocketEvents = () => {
   const { socket } = useSocket();
@@ -48,16 +54,35 @@ const WebSocketEvents = () => {
       socket.emit('restriction:check');
     };
 
-    const onChatEvent = (data: { type: string; payload: any }) =>
+    const onChatEvent = (data: Parameters<typeof handleChatEvent>[0]) =>
       handleChatEvent(data, socket, user.id);
-    const onContactEvent = (data: { type: string; payload: any }) =>
+    const onContactEvent = (data: Parameters<typeof handleContactEvent>[0]) =>
       handleContactEvent(data);
+
+    const onMessageSendError = (data: MessageSendErrorPayload) => {
+      const chatState = useChatStore.getState();
+      if (data.tempId) {
+        const next: Message[] = chatState.messages.map((msg) =>
+          msg.id === data.tempId ? { ...msg, status: 'error' as const } : msg,
+        );
+        const selectedChatId = chatState.selectedConversation?.chat_id;
+        if (selectedChatId) chatState.setMessages(selectedChatId, next);
+      }
+      if (data.code === 'RESTRICTION_TRIGGERED' && typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('restriction:triggered', {
+            detail: { message: data.message },
+          }),
+        );
+      }
+    };
 
     socket.on('chat:event', onChatEvent);
     socket.on('contact:event', onContactEvent);
     socket.on('error', handleSocketError);
     socket.on('connect', refreshAfterConnect);
     socket.on('queue:updated', handleQueueUpdated);
+    socket.on('MESSAGE_SEND_ERROR', onMessageSendError);
 
     if (socket.connected) refreshAfterConnect();
 
@@ -67,6 +92,7 @@ const WebSocketEvents = () => {
       socket.off('error', handleSocketError);
       socket.off('connect', refreshAfterConnect);
       socket.off('queue:updated', handleQueueUpdated);
+      socket.off('MESSAGE_SEND_ERROR', onMessageSendError);
       setSocket(null);
       setContactSocket(null);
     };

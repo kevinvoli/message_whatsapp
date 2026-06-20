@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip, Plus } from 'lucide-react';
+import { MessageSquare, Send, User, MessageCircleMore, UserRound, Briefcase, Activity, Wifi, PhoneCall, BadgeCheck, Settings, RefreshCw, Lock, LockOpen, Image, Video, Mic, FileText, MapPin, Search, Filter, X, Paperclip, Plus, XCircle } from 'lucide-react';
 import { getMessagesForChat, getMessageCount, sendMessage, sendAdminMedia, getChats, getChatStatsByCommercial, patchChat } from '@/app/lib/api/conversations.api';
 import { getChannels } from '@/app/lib/api/channels.api';
 import { getPostes } from '@/app/lib/api/postes.api';
@@ -38,6 +38,8 @@ export default function ConversationsView({
     const [limit, setLimit] = useState(50);
     const [offset, setOffset] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [selectedChat, setSelectedChat] = useState<WhatsappChat | null>(null);
     const [messages, setMessages] = useState<WhatsappMessage[]>([]);
     const messageCountRef = useRef<number>(0);
@@ -56,6 +58,8 @@ export default function ConversationsView({
     const [selectedResult, setSelectedResult] = useState<string>('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
     const mediaInputRef = useRef<HTMLInputElement>(null);
 
     // Modal outbound
@@ -93,7 +97,7 @@ export default function ConversationsView({
         return null;
     }, [selectedPoste, selectedCommercial]);
 
-    const loadChats = useCallback(async (l: number, o: number) => {
+    const loadChats = useCallback(async (l: number, o: number, q?: string) => {
         setLoadingChats(true);
         try {
             // Quand un poste ou un commercial est sélectionné, on désactive le filtre
@@ -107,6 +111,7 @@ export default function ConversationsView({
                 selectedPosteId || undefined,
                 selectedCommercialId || undefined,
                 selectedResult || undefined,
+                q || undefined,
             );
             setChats(result.data);
             setTotal(result.total);
@@ -120,14 +125,27 @@ export default function ConversationsView({
         }
     }, [selectedPeriod, selectedPosteId, selectedCommercialId, selectedResult]);
 
-    useEffect(() => { void loadChats(limit, offset); }, [loadChats, limit, offset]);
+    useEffect(() => { void loadChats(limit, offset, searchQuery); }, [loadChats, limit, offset, searchQuery]);
 
     // Reset à la page 0 quand la période ou les filtres changent
     useEffect(() => { setOffset(0); }, [selectedPeriod, selectedPosteId, selectedCommercialId]);
 
+    // Debounce searchTerm → searchQuery (300ms) + reset pagination
+    useEffect(() => {
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => {
+            setSearchQuery(searchTerm);
+            setOffset(0);
+        }, 300);
+        return () => {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        };
+    }, [searchTerm]);
+
     useEffect(() => {
         if (selectedChat) {
             messageCountRef.current = 0;
+            setIsAtBottom(true);
             fetchMessages(selectedChat.chat_id);
             setActiveTab('conversation');
         } else {
@@ -137,13 +155,22 @@ export default function ConversationsView({
     }, [selectedChat]);
 
     useEffect(() => {
-        // Scroll to bottom when messages change
-        scrollToBottom();
-    }, [messages]);
+        if (isAtBottom) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, isAtBottom]);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
+
+    const handleMessagesScroll = useCallback(() => {
+        const el = messagesContainerRef.current;
+        if (!el) return;
+        const threshold = 40;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+        setIsAtBottom(atBottom);
+    }, []);
 
     const getUnreadCount = (chat: WhatsappChat) =>
       chat.unread_count ?? chat.unreadCount ?? 0;
@@ -279,6 +306,7 @@ export default function ConversationsView({
 
         const currentMessageText = messageInput;
         setMessageInput(''); // Clear input immediately for better UX
+        setIsAtBottom(true);
         scrollToBottom();
 
         // Optimistic update
@@ -336,6 +364,7 @@ export default function ConversationsView({
         try {
             await sendAdminMedia(selectedChat.chat_id, file);
             void loadChats(limit, offset);
+            setIsAtBottom(true);
             scrollToBottom();
         } catch (err) {
             addToast({
@@ -391,20 +420,20 @@ export default function ConversationsView({
         }
     }, [selectedChat, addToast]);
 
-    const filteredChats = useMemo(() => {
-        const term = searchTerm.trim().toLowerCase();
-        if (!term) return chats;
-        return chats.filter((chat) => {
-            const name = (chat.name ?? '').toLowerCase();
-            const phone = (chat.contact_client ?? chat.client_phone ?? '').toLowerCase();
-            const lastMsg = chat.last_message
-                ? resolveAdminMessageText(chat.last_message).toLowerCase()
-                : chat.messages && chat.messages.length > 0
-                ? resolveAdminMessageText(chat.messages[chat.messages.length - 1]).toLowerCase()
-                : '';
-            return name.includes(term) || phone.includes(term) || lastMsg.includes(term);
-        });
-    }, [chats, searchTerm]);
+    const handleCloseChat = useCallback(async () => {
+        if (!selectedChat) return;
+        try {
+            await patchChat(selectedChat.chat_id, { status: 'fermé' });
+            setSelectedChat(prev => prev ? { ...prev, status: 'fermé' } : prev);
+            setChats(prev => prev.map(c =>
+                c.chat_id === selectedChat.chat_id ? { ...c, status: 'fermé' } : c,
+            ));
+            addToast({ type: 'success', message: 'Conversation fermée.' });
+        } catch {
+            addToast({ type: 'error', message: 'Impossible de fermer la conversation.' });
+        }
+    }, [selectedChat, addToast]);
+
 
     return (
         <div className="h-full flex flex-col gap-3">
@@ -555,12 +584,12 @@ export default function ConversationsView({
                 <div className="flex-1 overflow-y-auto">
                     {loadingChats ? (
                         <div className="flex justify-center items-center py-4"><Spinner /></div>
-                    ) : filteredChats.length === 0 ? (
+                    ) : chats.length === 0 ? (
                         <p className="text-center text-gray-500 py-4">
                             {searchTerm ? 'Aucune conversation trouvée.' : 'Aucune conversation.'}
                         </p>
                     ) : (
-                        filteredChats.map(chat => (
+                        chats.map(chat => (
                             <div
                                 key={chat.id}
                                 className={`flex items-center p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors ${
@@ -646,6 +675,16 @@ export default function ConversationsView({
                                             <LockOpen className="w-3 h-3" />
                                             Verrouiller
                                             <Lock className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                    {selectedChat.status !== 'fermé' && (
+                                        <button
+                                            onClick={() => void handleCloseChat()}
+                                            title="Fermer la conversation"
+                                            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:border-rose-400 transition-colors cursor-pointer"
+                                        >
+                                            <XCircle className="w-3 h-3" />
+                                            Fermer
                                         </button>
                                     )}
                                     {selectedChat.is_archived && (
@@ -791,7 +830,7 @@ export default function ConversationsView({
                         )}
 
                         {activeTab === 'conversation' && (
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto p-4 space-y-4">
                             {loadingMessages ? (
                                 <div className="flex justify-center items-center h-full"><Spinner /></div>
                             ) : messages.length === 0 ? (

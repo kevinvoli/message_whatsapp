@@ -72,6 +72,7 @@ import { TemplateStatusHandler } from 'src/webhooks/adapters/meta-event-handlers
 import { AccountUpdateHandler } from 'src/webhooks/adapters/meta-event-handlers/account-update.handler';
 import { MetaNonMessageHandler } from 'src/webhooks/adapters/meta-event-handlers/meta-non-message.handler';
 import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.
     RedisModule,
     QueueModule,
     WhatsappTemplateModule,
+    ChatSessionModule,
   ],
   controllers: [WhapiController, WebhookMetricsController],
   providers: [

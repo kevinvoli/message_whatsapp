@@ -15,6 +15,7 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { ConversationReadQueryService } from 'src/conversations/infrastructure/conversation-read-query.service';
 import { ConversationCapacityModule } from 'src/conversation-capacity/conversation-capacity.module';
+import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 /**
  * TICKET-06-B — ConversationReadQueryService enregistré ici.
@@ -33,6 +34,7 @@ import { ConversationCapacityModule } from 'src/conversation-capacity/conversati
       WhapiChannel,
     ]),
     ConversationCapacityModule,
+    ChatSessionModule,
   ],
   controllers: [WhatsappChatController],
   providers: [

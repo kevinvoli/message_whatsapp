@@ -47,6 +47,8 @@ import { ChannelService } from 'src/channel/channel.service';
 import { CommunicationMessengerService } from 'src/communication_whapi/communication_messenger.service';
 import { ChatContext } from 'src/context/entities/chat-context.entity';
 import { BusinessHoursService } from 'src/flowbot/services/business-hours.service';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
+import { TTL_NORMAL_HOURS, TTL_CTWA_HOURS } from 'src/chat-session/constants';
 
 @Injectable()
 export class InboundMessageService {
@@ -75,6 +77,8 @@ export class InboundMessageService {
     // P2.2 — Distributed locking cross-instance
     private readonly distributedLock: DistributedLockService,
     private readonly businessHours: BusinessHoursService,
+    // ── Étape 4b : gestion session chat ─────────────────────────────────────
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   // ─── Messages entrants ────────────────────────────────────────────────────
@@ -175,6 +179,18 @@ export class InboundMessageService {
 
     this.systemAlert.onInboundMessage();
 
+    // ── Étape 4b : gestion session chat (NR-08) ───────────────────────────────
+    // Ouvre une session si absente, met à jour lastClientMessageAt si active.
+    // Fire-and-forget : une erreur ne doit pas bloquer la suite du pipeline.
+    setImmediate(() => {
+      this.handleChatSession(conversation).catch((err) => {
+        this.logger.error(
+          `CHAT_SESSION_ERROR correlationId=${correlationId} chat_id=${message.chatId}`,
+          (err as Error).stack,
+        );
+      });
+    });
+
     // ── Étape 5 : persistance des médias ─────────────────────────────────────
     const medias = this.mediaExtraction.extract(message);
     await this.mediaPersistence.persistAll(medias, persistResult.message, conversation, message);
@@ -205,6 +221,28 @@ export class InboundMessageService {
 
   private buildTraceId(messageId?: string | null, chatId?: string): string {
     return messageId ?? `chat:${chatId ?? 'unknown'}:${Date.now()}`;
+  }
+
+  /**
+   * Ouvre ou prolonge la session chat pour un message client entrant.
+   * Idempotent : si une session active existe, met à jour lastClientMessageAt.
+   */
+  private async handleChatSession(conversation: WhatsappChat): Promise<void> {
+    if (conversation.activeSessionId) {
+      await this.chatSessionService.onClientMessage(
+        conversation.activeSessionId,
+        conversation.id,
+        TTL_NORMAL_HOURS,
+        TTL_CTWA_HOURS,
+      );
+    } else {
+      await this.chatSessionService.openSession(
+        conversation.id,
+        conversation.isCtwa ?? false,
+        TTL_NORMAL_HOURS,
+        TTL_CTWA_HOURS,
+      );
+    }
   }
 
   // ─── FlowBot mapping ──────────────────────────────────────────────────────
