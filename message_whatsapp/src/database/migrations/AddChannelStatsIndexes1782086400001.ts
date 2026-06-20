@@ -2,6 +2,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddChannelStatsIndexes1782086400001 implements MigrationInterface {
   name = 'AddChannelStatsIndexes1782086400001';
+  // transaction = false : évite le START TRANSACTION de TypeORM qui force un lock
+  // de table complet sur MariaDB et rend le CREATE INDEX non-bloquant (online DDL)
+  transaction = false;
 
   async up(queryRunner: QueryRunner): Promise<void> {
     const chatIdx = await queryRunner.query(`

@@ -2,6 +2,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddPosteStatusIndex1782086400002 implements MigrationInterface {
   name = 'AddPosteStatusIndex1782086400002';
+  transaction = false;
 
   async up(queryRunner: QueryRunner): Promise<void> {
     const exists = await queryRunner.query(`
