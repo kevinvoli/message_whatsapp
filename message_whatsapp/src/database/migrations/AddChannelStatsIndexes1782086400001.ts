@@ -14,8 +14,10 @@ export class AddChannelStatsIndexes1782086400001 implements MigrationInterface {
         AND INDEX_NAME   = 'IDX_chat_channel_activity'
     `);
     if (parseInt(chatIdx[0].cnt, 10) === 0) {
+      // ALTER TABLE + ALGORITHM=INPLACE LOCK=NONE : online DDL MariaDB — échoue
+      // immédiatement si un MDL lock est détenu (plutôt que d'attendre indéfiniment)
       await queryRunner.query(
-        'CREATE INDEX `IDX_chat_channel_activity` ON `whatsapp_chat` (`channel_id`, `last_activity_at`, `deletedAt`)',
+        'ALTER TABLE `whatsapp_chat` ADD INDEX `IDX_chat_channel_activity` (`channel_id`, `last_activity_at`, `deletedAt`) ALGORITHM=INPLACE, LOCK=NONE',
       );
     }
 
@@ -27,7 +29,7 @@ export class AddChannelStatsIndexes1782086400001 implements MigrationInterface {
     `);
     if (parseInt(msgIdx[0].cnt, 10) === 0) {
       await queryRunner.query(
-        'CREATE INDEX `IDX_msg_channel_time` ON `whatsapp_message` (`channel_id`, `createdAt`, `deletedAt`)',
+        'ALTER TABLE `whatsapp_message` ADD INDEX `IDX_msg_channel_time` (`channel_id`, `createdAt`, `deletedAt`) ALGORITHM=INPLACE, LOCK=NONE',
       );
     }
   }
