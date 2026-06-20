@@ -28,11 +28,7 @@ function AutoConnexionHandler() {
         { username },
         { withCredentials: true },
       )
-      .then((res) => {
-        const token = res.data?.accessToken;
-        if (token) {
-          sessionStorage.setItem('auth_token', token);
-        }
+      .then(() => {
         window.location.replace('/whatsapp');
       })
       .catch(() => {

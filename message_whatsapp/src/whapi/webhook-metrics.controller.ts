@@ -1,7 +1,9 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, UseGuards } from '@nestjs/common';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { ChannelService } from 'src/channel/channel.service';
+import { AdminGuard } from 'src/auth/admin.guard';
 
+@UseGuards(AdminGuard)
 @Controller('metrics/webhook')
 export class WebhookMetricsController {
   constructor(

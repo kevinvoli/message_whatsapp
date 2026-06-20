@@ -80,6 +80,7 @@ export class BroadcastWorker extends WorkerHost {
       let failedCount = 0;
 
       for (const recipient of recipients) {
+        if (recipient.status === RecipientStatus.SENT) continue;
         try {
           const result = await this.metaService.sendTemplateMessage({
             to: recipient.phone,

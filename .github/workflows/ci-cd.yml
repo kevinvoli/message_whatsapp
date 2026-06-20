@@ -35,11 +35,32 @@ jobs:
               - 'admin/**'
 
   # ──────────────────────────────────────────────
-  # 2a. BUILD BACKEND
+  # 2. GATE QUALITÉ
+  # ──────────────────────────────────────────────
+  quality:
+    name: Quality gate — TypeScript + tests backend
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: message_whatsapp/package-lock.json
+      - name: Install backend deps
+        run: npm ci --prefix message_whatsapp
+      - name: TypeScript check backend
+        run: cd message_whatsapp && npx tsc --noEmit
+      - name: Run backend tests
+        run: cd message_whatsapp && npm test -- --passWithNoTests
+
+  # ──────────────────────────────────────────────
+  # 3a. BUILD BACKEND
   # ──────────────────────────────────────────────
   build-backend:
     name: Build — Backend
-    needs: changes
+    needs: [changes, quality]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -75,11 +96,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/back:${{ github.sha }}
 
   # ──────────────────────────────────────────────
-  # 2b. BUILD FRONTEND
+  # 3b. BUILD FRONTEND
   # ──────────────────────────────────────────────
   build-frontend:
     name: Build — Frontend
-    needs: changes
+    needs: [changes, quality]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -116,11 +137,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/front:${{ github.sha }}
 
   # ──────────────────────────────────────────────
-  # 2c. BUILD ADMIN
+  # 3c. BUILD ADMIN
   # ──────────────────────────────────────────────
   build-admin:
     name: Build — Admin
-    needs: changes
+    needs: [changes, quality]
     if: needs.changes.outputs.admin == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -156,7 +177,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}/admin:${{ github.sha }}
 
   # ──────────────────────────────────────────────
-  # 3. DÉPLOIEMENT SUR LE SERVEUR
+  # 4. DÉPLOIEMENT SUR LE SERVEUR
   # ──────────────────────────────────────────────
   deploy:
     name: Deploy to server

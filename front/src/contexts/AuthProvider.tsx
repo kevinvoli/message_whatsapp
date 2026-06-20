@@ -57,12 +57,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      const storedToken = sessionStorage.getItem('auth_token');
-      if (storedToken) {
-        setToken(storedToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-      }
-
       try {
         const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
           withCredentials: true,
@@ -72,10 +66,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userData.poste_id) void loadAffinityChats(userData.poste_id);
       } catch {
         setUser(null);
-        if (storedToken) {
-          sessionStorage.removeItem('auth_token');
-          delete axios.defaults.headers.common['Authorization'];
-        }
       } finally {
         setInitialized(true);
       }
@@ -189,8 +179,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setUser(null);
     setToken(null);
-    sessionStorage.removeItem('auth_token');
-    delete axios.defaults.headers.common['Authorization'];
     reset();
   };
 

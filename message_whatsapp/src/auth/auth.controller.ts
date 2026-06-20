@@ -15,6 +15,19 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Response, Request as ExpressRequest } from 'express';
+
+interface JwtUser {
+  userId: string;
+  email: string;
+  posteId: string | null;
+  isWorkingToday: boolean;
+  absentToday: boolean;
+  isReplacing: boolean;
+}
+
+interface AuthenticatedRequest extends ExpressRequest {
+  user: JwtUser;
+}
 import { Throttle } from '@nestjs/throttler';
 import { CommercialSessionService } from 'src/commercial-session/commercial_session.service';
 import { GeoAccessService } from 'src/geo-access/geo_access.service';
@@ -134,7 +147,7 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @Get('me/stats')
   async getMyStats(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Query('periode') periode = 'today',
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
@@ -144,7 +157,7 @@ export class AuthController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  async getProfile(@Request() req) {
+  async getProfile(@Request() req: AuthenticatedRequest) {
     const user = await this.authService.getProfile(req.user.userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -154,7 +167,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
-  async logout(@Request() req, @Res({ passthrough: true }) res: Response) {
+  async logout(@Request() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response) {
     // 4.9 — Fermer la session de travail
     if (req.user?.userId) {
       void this.sessionService.closeSession(req.user.userId).catch(() => {});

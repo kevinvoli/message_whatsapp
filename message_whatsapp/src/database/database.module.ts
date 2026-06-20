@@ -34,7 +34,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           retryDelay: 1000,
           synchronize: isDev && forceSync,
           migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
-          migrationsRun: true,
+          migrationsRun: false,
         };
       },
     }),

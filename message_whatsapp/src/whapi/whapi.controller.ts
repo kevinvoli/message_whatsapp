@@ -1047,8 +1047,6 @@ export class WhapiController {
     provided: string,
     requireRawBody: boolean,
   ): boolean {
-    // console.log("affichage du post:1",provider);
-
     if (requireRawBody && !rawBody) {
       this.metricsService.recordSignatureInvalid(provider);
       throw new HttpException(
@@ -1067,14 +1065,10 @@ export class WhapiController {
       const candidates = [`sha256=${digest}`, digest];
       for (const candidate of candidates) {
         const expectedBuffer = Buffer.from(candidate.toLowerCase());
-        // console.log("affichage du post:4.7",candidate, receivedBuffer);
-
         if (
           expectedBuffer.length === receivedBuffer.length &&
           timingSafeEqual(expectedBuffer, receivedBuffer)
         ) {
-          // console.log("affichage du post:10");
-
           return true;
         }
       }
