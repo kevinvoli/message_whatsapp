@@ -11,12 +11,9 @@ export class AddChannelStatsIndexes1782086400001 implements MigrationInterface {
         AND INDEX_NAME   = 'IDX_chat_channel_activity'
     `);
     if (parseInt(chatIdx[0].cnt, 10) === 0) {
-      // ALGORITHM=INPLACE LOCK=NONE : Online DDL — non-bloquant, compatible MySQL 5.7+/8.0+
-      await queryRunner.query(`
-        CREATE INDEX \`IDX_chat_channel_activity\`
-          ON \`whatsapp_chat\` (\`channel_id\`, \`last_activity_at\`, \`deletedAt\`)
-          ALGORITHM=INPLACE, LOCK=NONE
-      `);
+      await queryRunner.query(
+        'CREATE INDEX `IDX_chat_channel_activity` ON `whatsapp_chat` (`channel_id`, `last_activity_at`, `deletedAt`)',
+      );
     }
 
     const msgIdx = await queryRunner.query(`
@@ -26,12 +23,9 @@ export class AddChannelStatsIndexes1782086400001 implements MigrationInterface {
         AND INDEX_NAME   = 'IDX_msg_channel_time'
     `);
     if (parseInt(msgIdx[0].cnt, 10) === 0) {
-      // ALGORITHM=INPLACE LOCK=NONE : Online DDL — non-bloquant sur 459k lignes
-      await queryRunner.query(`
-        CREATE INDEX \`IDX_msg_channel_time\`
-          ON \`whatsapp_message\` (\`channel_id\`, \`createdAt\`, \`deletedAt\`)
-          ALGORITHM=INPLACE, LOCK=NONE
-      `);
+      await queryRunner.query(
+        'CREATE INDEX `IDX_msg_channel_time` ON `whatsapp_message` (`channel_id`, `createdAt`, `deletedAt`)',
+      );
     }
   }
 
