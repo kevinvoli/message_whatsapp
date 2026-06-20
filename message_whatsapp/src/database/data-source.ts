@@ -17,4 +17,7 @@ export default new DataSource({
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
   synchronize: false,
   logging: false,
+  // 'each' : chaque migration dans sa propre transaction — permet aux migrations
+  // de déclarer transaction=false pour les CREATE INDEX non-bloquants (online DDL)
+  migrationsTransactionMode: 'each',
 });
