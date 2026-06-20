@@ -180,7 +180,7 @@ jobs:
           host:            ${{ secrets.PROD_SSH_HOST }}
           username:        ${{ secrets.PROD_SSH_USER }}
           key:             ${{ secrets.PROD_SSH_KEY }}
-          command_timeout: 30m
+          command_timeout: 90m
           script: |
             set -e
             cd /var/www/whatsapp
