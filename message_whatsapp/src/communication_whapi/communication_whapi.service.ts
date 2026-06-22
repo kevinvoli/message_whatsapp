@@ -12,6 +12,12 @@ import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { WhapiSendMessageResponse } from './dto/whapi-send-message-response.dto';
 import { WhapiMediaBase } from 'src/whapi/interface/whapi-webhook.interface';
+import {
+  WhapiGetMessageResponse,
+  WhapiHsmPayload,
+  WhapiMediaPayload,
+  WhapiTextPayload,
+} from './dto/whapi-outbound-payload.interface';
 import { AppLogger } from 'src/logging/app-logger.service';
 import {
   WhapiFailureKind,
@@ -134,7 +140,7 @@ export class CommunicationWhapiService {
     let attempt = 0;
     while (attempt <= this.maxRetries) {
       try {
-        const payload: Record<string, any> = { to, body };
+        const payload: WhapiTextPayload = { to, body };
         if (data.quotedId) {
           payload.quoted = data.quotedId;
         }
@@ -203,7 +209,7 @@ export class CommunicationWhapiService {
     const token = channel.token;
 
     const url = `https://gate.whapi.cloud/messages/${data.mediaType}`;
-    const payload: Record<string, any> = {
+    const payload: WhapiMediaPayload = {
       to,
       media: `data:${data.mimeType};base64,${data.mediaBase64}`,
     };
@@ -321,7 +327,7 @@ export class CommunicationWhapiService {
     }
 
     try {
-      const response = await axios.get(
+      const response = await axios.get<WhapiGetMessageResponse>(
         `https://gate.whapi.cloud/messages/${encodeURIComponent(messageId)}`,
         {
           headers: {
@@ -331,7 +337,7 @@ export class CommunicationWhapiService {
         },
       );
 
-      const msg = response.data as Record<string, any>;
+      const msg = response.data;
       const mediaTypes = [
         'image', 'video', 'audio', 'voice', 'document', 'gif',
       ] as const;
@@ -435,7 +441,7 @@ export class CommunicationWhapiService {
   }
   async getChannel(token: CreateChannelDto): Promise<ChanneDatalDto | null> {
     try {
-      const response: { data: any } = await axios.get<WhapiSendMessageResponse>(
+      const response = await axios.get<ChanneDatalDto>(
         'https://gate.whapi.cloud/health?wakeup=true&platform=Chrome%2CWhapi%2C1.6.0&channel_type=web',
         {
           headers: {
@@ -461,12 +467,12 @@ export class CommunicationWhapiService {
     templateName: string;
     languageCode: string;
     bodyParameters?: string[];
-  }): Promise<any> {
+  }): Promise<WhapiSendMessageResponse> {
     const channel = await this.channelRepository.findOne({ where: { channel_id: data.channelId } });
     if (!channel) throw new NotFoundException(`Canal ${data.channelId} introuvable`);
 
-    const params = (data.bodyParameters ?? []).map(text => ({ type: 'text', text }));
-    const payload: any = {
+    const params = (data.bodyParameters ?? []).map(text => ({ type: 'text' as const, text }));
+    const payload: WhapiHsmPayload = {
       to: data.to,
       template: {
         name: data.templateName,
@@ -477,9 +483,11 @@ export class CommunicationWhapiService {
       payload.template.parameters = { body: { parameters: params } };
     }
 
-    const response = await axios.post('https://gate.whapi.cloud/messages/hsm', payload, {
-      headers: { Authorization: `Bearer ${channel.token}` },
-    });
+    const response = await axios.post<WhapiSendMessageResponse>(
+      'https://gate.whapi.cloud/messages/hsm',
+      payload,
+      { headers: { Authorization: `Bearer ${channel.token}` } },
+    );
     return response.data;
   }
 }

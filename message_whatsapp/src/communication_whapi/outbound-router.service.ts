@@ -390,7 +390,7 @@ export class OutboundRouterService {
         languageCode: data.languageCode,
         bodyParameters: data.bodyParameters,
       });
-      return { providerMessageId: result?.message?.id ?? result?.id ?? 'unknown', provider: 'whapi' };
+      return { providerMessageId: result?.message?.id ?? 'unknown', provider: 'whapi' };
     }
 
     throw new BadRequestException(`Provider ${channel.provider} ne supporte pas les templates`);

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm';
 import { CommercialTarget, TargetMetric, TargetPeriodType } from './entities/commercial_target.entity';
 import { CreateTargetDto } from './dto/create-target.dto';
 import { WhatsappMessage } from '../whatsapp_message/entities/whatsapp_message.entity';
@@ -56,7 +56,7 @@ export class TargetsService {
   ) {}
 
   findAll(commercial_id?: string): Promise<CommercialTarget[]> {
-    const where: any = { deletedAt: IsNull() };
+    const where: FindOptionsWhere<CommercialTarget> = { deletedAt: IsNull() };
     if (commercial_id) where.commercial_id = commercial_id;
     return this.targetRepo.find({ where, order: { period_start: 'DESC' } });
   }

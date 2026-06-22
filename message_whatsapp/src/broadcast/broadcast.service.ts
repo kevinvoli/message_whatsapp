@@ -14,6 +14,7 @@ import {
   RecipientStatus,
 } from './entities/broadcast-recipient.entity';
 import { CreateBroadcastDto, AddRecipientsDto } from './dto/create-broadcast.dto';
+import { BroadcastJobData } from './broadcast-job.types';
 
 export const BROADCAST_QUEUE = 'broadcast-sending';
 
@@ -32,7 +33,7 @@ export class BroadcastService {
     private readonly recipientRepo: Repository<WhatsappBroadcastRecipient>,
 
     @InjectQueue(BROADCAST_QUEUE)
-    private readonly broadcastQueue: Queue,
+    private readonly broadcastQueue: Queue<BroadcastJobData>,
   ) {}
 
   async create(dto: CreateBroadcastDto): Promise<WhatsappBroadcast> {
@@ -176,7 +177,7 @@ export class BroadcastService {
   ): Promise<{ recipients: WhatsappBroadcastRecipient[]; total: number }> {
     await this.findOne(id, tenantId); // vérif tenant
 
-    const where: any = { broadcast_id: id };
+    const where: { broadcast_id: string; status?: RecipientStatus } = { broadcast_id: id };
     if (statusFilter) where.status = statusFilter;
 
     const [recipients, total] = await this.recipientRepo.findAndCount({

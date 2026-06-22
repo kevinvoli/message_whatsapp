@@ -12,6 +12,13 @@ import { MetriquesService } from './metriques.service';
 import { AnalyticsSnapshotService } from './analytics-snapshot.service';
 import { MetaAdKpiService } from './meta-ad-kpi.service';
 
+interface SnapshotData {
+  metriques: MetriquesGlobalesDto;
+  performanceCommercial: PerformanceCommercialDto[];
+  statutChannels: StatutChannelDto[];
+  performanceTemporelle: PerformanceTemporelleDto[];
+}
+
 const STANDARD_PERIODS = new Set(['today', 'week', 'month', 'year']);
 
 @ApiTags('Metriques')
@@ -112,7 +119,7 @@ export class MetriquesController {
     if (section && isStandard) {
       const snap = await this.snapshotService.getLatestOrCompute('global', periode);
       if (snap) {
-        const d = snap.data as any;
+        const d = snap.data as unknown as SnapshotData;
         const sectionMap: Record<string, unknown> = {
           globales:    d.metriques,
           commerciaux: d.performanceCommercial,
@@ -157,7 +164,7 @@ export class MetriquesController {
     if (isStandard) {
       const snap = await this.snapshotService.getLatest('global', periode);
       if (snap) {
-        const d = snap.data as any;
+        const d = snap.data as unknown as SnapshotData;
         return {
           success: true,
           timestamp: new Date().toISOString(),

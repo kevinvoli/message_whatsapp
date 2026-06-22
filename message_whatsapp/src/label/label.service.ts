@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { Label } from './entities/label.entity';
 import { ChatLabelAssignment } from './entities/chat-label-assignment.entity';
 import { CreateLabelDto } from './dto/create-label.dto';
@@ -33,7 +33,7 @@ export class LabelService {
   }
 
   async findAllLabels(tenantId: string, onlyActive = true): Promise<Label[]> {
-    const where: any = { tenant_id: tenantId };
+    const where: FindOptionsWhere<Label> = { tenant_id: tenantId };
     if (onlyActive) where.is_active = true;
     return this.labelRepo.find({ where, order: { name: 'ASC' } });
   }

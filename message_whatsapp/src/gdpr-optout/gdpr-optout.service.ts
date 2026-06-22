@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { GdprOptout, OptOutReason } from './entities/gdpr-optout.entity';
 import { RegisterOptOutDto } from './dto/register-optout.dto';
 
@@ -99,7 +99,7 @@ export class GdprOptoutService {
    * Liste tous les opt-outs actifs d'un tenant (pour l'export RGPD admin).
    */
   async findAll(tenantId: string, includeRevoked = false): Promise<GdprOptout[]> {
-    const where: any = { tenant_id: tenantId };
+    const where: FindOptionsWhere<GdprOptout> = { tenant_id: tenantId };
     if (!includeRevoked) where.revoked_at = IsNull();
     return this.repo.find({ where, order: { optedOutAt: 'DESC' } });
   }

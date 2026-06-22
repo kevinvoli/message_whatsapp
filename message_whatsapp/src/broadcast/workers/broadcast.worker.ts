@@ -16,14 +16,7 @@ import {
 import { WhatsappTemplate } from 'src/whatsapp-template/entities/whatsapp-template.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { CommunicationMetaService } from 'src/communication_whapi/communication_meta.service';
-
-interface SendBatchJobData {
-  broadcastId: string;
-  tenantId: string;
-  channelId: string;
-  templateId: string;
-  recipientIds: string[];
-}
+import { BroadcastJobData } from '../broadcast-job.types';
 
 /**
  * P4.3 — Worker d'envoi de broadcast HSM.
@@ -54,7 +47,7 @@ export class BroadcastWorker extends WorkerHost {
     super();
   }
 
-  async process(job: Job<SendBatchJobData>): Promise<void> {
+  async process(job: Job<BroadcastJobData>): Promise<void> {
     const { broadcastId, recipientIds, channelId, templateId } = job.data;
 
     try {

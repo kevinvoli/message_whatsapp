@@ -8,7 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SlaRule, SlaMetric, SlaSeverity } from './entities/sla-rule.entity';
-import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.entity';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
@@ -234,7 +234,7 @@ export class SlaService {
     if (rules.length === 0) return [];
 
     const openChats = await this.chatRepo.find({
-      where: { tenant_id: tenantId, status: 'actif' as any },
+      where: { tenant_id: tenantId, status: WhatsappChatStatus.ACTIF },
     });
 
     const allViolations: SlaEvaluationResult[] = [];

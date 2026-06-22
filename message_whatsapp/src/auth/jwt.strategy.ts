@@ -7,6 +7,11 @@ import { Repository } from 'typeorm';
 import { CommercialPlanning } from 'src/commercial-group/entities/commercial-planning.entity';
 import { GroupScheduleDay } from 'src/commercial-group/entities/group-schedule-day.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
+import { Request } from 'express';
+import {
+  CommercialAuthenticatedUser,
+  JwtCommercialPayload,
+} from './shared/base-auth-user.types';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -20,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly commercialRepo: Repository<WhatsappCommercial>,
   ) {
     super({
-      jwtFromRequest: (req: any) => {
+      jwtFromRequest: (req: Request) => {
         if (req?.cookies?.['Authentication']) {
           return req.cookies['Authentication'];
         }
@@ -35,7 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
+  async validate(payload: JwtCommercialPayload): Promise<CommercialAuthenticatedUser> {
     const today = new Intl.DateTimeFormat('fr-CA', {
       timeZone: process.env['TZ'] ?? 'Africa/Abidjan',
     }).format(new Date());
@@ -55,6 +60,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return {
         userId:         payload.sub,
         email:          payload.email,
+        name:           payload.name,
         posteId:        payload.posteId,
         isWorkingToday: false,
         absentToday:    true,
@@ -67,6 +73,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return {
         userId:         payload.sub,
         email:          payload.email,
+        name:           payload.name,
         posteId:        planning.overridePosteId ?? payload.posteId,
         isWorkingToday: true,
         absentToday:    false,
@@ -86,6 +93,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       userId:         payload.sub,
       email:          payload.email,
+      name:           payload.name,
       posteId:        payload.posteId,
       isWorkingToday,
       absentToday:    false,
