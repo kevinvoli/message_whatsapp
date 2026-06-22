@@ -36,6 +36,7 @@ export interface WindowRotationBlockedPayload {
 export class WindowRotationService {
   private readonly logger = new Logger(WindowRotationService.name);
   private readonly rotatingPostes = new Set<string>();
+  private isRotationCronRunning = false;
 
   constructor(
     @InjectRepository(WhatsappChat)
@@ -407,57 +408,68 @@ export class WindowRotationService {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async autoCheckRotations(): Promise<void> {
-    const modeEnabled = await this.capacityService.isWindowModeEnabled();
-    if (!modeEnabled) return;
-
-    // ── 1. Postes avec fenêtre déjà construite → vérifier la rotation ──────────
-    const slottedRows = await this.chatRepo
-      .createQueryBuilder('c')
-      .select('DISTINCT c.poste_id', 'posteId')
-      .where('c.poste_id IS NOT NULL')
-      .andWhere('c.window_slot IS NOT NULL')
-      .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
-      .andWhere('c.deletedAt IS NULL')
-      .getRawMany<{ posteId: string }>();
-
-    const slottedPosteIds = new Set(slottedRows.map((r) => r.posteId));
-
-    for (const row of slottedRows) {
-      if (!row.posteId) continue;
-      try {
-        await this.checkAndTriggerRotation(row.posteId);
-      } catch (err) {
-        this.logger.warn(
-          `autoCheckRotations: rotation check échoué pour poste ${row.posteId}`,
-          err instanceof Error ? err.stack : String(err),
-        );
-      }
+    if (this.isRotationCronRunning) {
+      this.logger.warn('autoCheckRotations: exécution précédente toujours en cours — skip');
+      return;
     }
+    this.isRotationCronRunning = true;
+    try {
+      const modeEnabled = await this.capacityService.isWindowModeEnabled();
+      if (!modeEnabled) return;
 
-    // ── 2. Postes sans window_slot → construire la fenêtre (rattrapage) ────────
-    // Pas de filtre sur status : si toutes les convs sont FERMÉ (cron 24h),
-    // buildWindowForPoste les slotte quand même pour permettre la rotation.
-    // On exclut les RELEASED (window_slot=null après rotation) pour éviter la boucle infinie.
-    const uninitRows = await this.chatRepo
-      .createQueryBuilder('c')
-      .select('DISTINCT c.poste_id', 'posteId')
-      .where('c.poste_id IS NOT NULL')
-      .andWhere('c.window_slot IS NULL')
-      .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
-      .andWhere('c.deletedAt IS NULL')
-      .getRawMany<{ posteId: string }>();
+      // ── 1. Postes avec fenêtre déjà construite → vérifier la rotation ──────────
+      const slottedRows = await this.chatRepo
+        .createQueryBuilder('c')
+        .select('DISTINCT c.poste_id', 'posteId')
+        .where('c.poste_id IS NOT NULL')
+        .andWhere('c.window_slot IS NOT NULL')
+        .andWhere('c.window_status != :released', { released: WindowStatus.RELEASED })
+        .andWhere('c.deletedAt IS NULL')
+        .getRawMany<{ posteId: string }>();
 
-    for (const row of uninitRows) {
-      if (!row.posteId || slottedPosteIds.has(row.posteId)) continue;
-      this.logger.log(`autoCheckRotations: fenêtre non initialisée pour poste ${row.posteId} — build automatique`);
-      try {
-        await this.buildWindowForPoste(row.posteId);
-      } catch (err) {
-        this.logger.warn(
-          `autoCheckRotations: buildWindowForPoste échoué pour poste ${row.posteId}`,
-          err instanceof Error ? err.stack : String(err),
-        );
-      }
+      const slottedPosteIds = new Set(slottedRows.map((r) => r.posteId));
+
+      await Promise.all(
+        slottedRows
+          .filter((r) => r.posteId != null)
+          .map((r) =>
+            this.checkAndTriggerRotation(r.posteId).catch((err) =>
+              this.logger.warn(
+                `autoCheckRotations: rotation check échoué pour poste ${r.posteId}`,
+                err instanceof Error ? err.stack : String(err),
+              ),
+            ),
+          ),
+      );
+
+      // ── 2. Postes sans window_slot → construire la fenêtre (rattrapage) ────────
+      // Pas de filtre sur status : si toutes les convs sont FERMÉ (cron 24h),
+      // buildWindowForPoste les slotte quand même pour permettre la rotation.
+      // On exclut les RELEASED (window_slot=null après rotation) pour éviter la boucle infinie.
+      const uninitRows = await this.chatRepo
+        .createQueryBuilder('c')
+        .select('DISTINCT c.poste_id', 'posteId')
+        .where('c.poste_id IS NOT NULL')
+        .andWhere('c.window_slot IS NULL')
+        .andWhere('(c.window_status IS NULL OR c.window_status != :released)', { released: WindowStatus.RELEASED })
+        .andWhere('c.deletedAt IS NULL')
+        .getRawMany<{ posteId: string }>();
+
+      await Promise.all(
+        uninitRows
+          .filter((r) => r.posteId != null && !slottedPosteIds.has(r.posteId))
+          .map((r) => {
+            this.logger.log(`autoCheckRotations: fenêtre non initialisée pour poste ${r.posteId} — build automatique`);
+            return this.buildWindowForPoste(r.posteId).catch((err) =>
+              this.logger.warn(
+                `autoCheckRotations: buildWindowForPoste échoué pour poste ${r.posteId}`,
+                err instanceof Error ? err.stack : String(err),
+              ),
+            );
+          }),
+      );
+    } finally {
+      this.isRotationCronRunning = false;
     }
   }
 

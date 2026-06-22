@@ -195,7 +195,7 @@ export class WhatsappChatService {
           AND m.direction = 'IN'
           AND m.status != 'READ'
       )
-      WHERE c.chat_id = $1
+      WHERE c.chat_id = ?
     `,
       [chat_id],
     );

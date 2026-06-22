@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { ConversationValidation } from '../entities/conversation-validation.entity';
@@ -269,13 +269,17 @@ export class ValidationEngineService {
 
     if (pending.length === 0) return;
 
+    // Bulk load : 1 requête pour tous les chats actifs concernés
+    const chatIds = pending.map((v) => v.chat_id);
+    const activeChats = await this.chatRepo.find({
+      where: { chat_id: In(chatIds), window_status: WindowStatus.ACTIVE },
+      select: ['id', 'chat_id'],
+    });
+    const activeChatIds = new Set(activeChats.map((c) => c.chat_id));
+
     let autoValidated = 0;
     for (const v of pending) {
-      const chat = await this.chatRepo.findOne({
-        where: { chat_id: v.chat_id, window_status: WindowStatus.ACTIVE },
-        select: ['id', 'chat_id'],
-      });
-      if (!chat) continue;
+      if (!activeChatIds.has(v.chat_id)) continue;
 
       await this.validationRepo.update(
         { id: v.id },
@@ -283,7 +287,7 @@ export class ValidationEngineService {
           is_validated: true,
           validated_at: new Date(),
           external_id: 'auto_timeout',
-          external_data: { reason: 'timeout', hours } as any,
+          external_data: { reason: 'timeout', hours } as unknown as Record<string, unknown>,
         },
       );
       autoValidated++;

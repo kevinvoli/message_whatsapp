@@ -22,7 +22,7 @@ export class DispatchQueryService {
   findChatByChatId(chatId: string): Promise<WhatsappChat | null> {
     return this.chatRepository.findOne({
       where: { chat_id: chatId },
-      relations: ['messages', 'poste', 'channel'],
+      relations: ['poste', 'channel'],
     });
   }
 

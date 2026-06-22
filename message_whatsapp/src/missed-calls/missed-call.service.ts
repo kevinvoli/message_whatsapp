@@ -56,55 +56,96 @@ export class MissedCallService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [all, todayEvents] = await Promise.all([
-      this.repo.find(),
-      this.repo.createQueryBuilder('mc')
-        .where('mc.occurred_at >= :start', { start: todayStart })
-        .getMany(),
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+
+    const [statusRows, todayCount, slaRow, avgRow, overdueRows] = await Promise.all([
+      // Comptage par statut (90 derniers jours)
+      this.repo
+        .createQueryBuilder('mc')
+        .select('mc.status', 'status')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('mc.occurredAt >= :cutoff', { cutoff })
+        .groupBy('mc.status')
+        .getRawMany<{ status: string; cnt: string }>(),
+
+      // Total aujourd'hui
+      this.repo
+        .createQueryBuilder('mc')
+        .where('mc.occurredAt >= :start', { start: todayStart })
+        .getCount(),
+
+      // SLA : called_back avec et sans breach (90j)
+      this.repo
+        .createQueryBuilder('mc')
+        .select('COUNT(*)', 'resolvedTotal')
+        .addSelect(
+          'SUM(CASE WHEN mc.slaBreachedAt IS NULL THEN 1 ELSE 0 END)',
+          'inSla',
+        )
+        .where('mc.status = :status', { status: 'called_back' })
+        .andWhere('mc.occurredAt >= :cutoff', { cutoff })
+        .getRawOne<{ resolvedTotal: string; inSla: string }>(),
+
+      // Délai moyen de traitement (90j)
+      this.repo
+        .createQueryBuilder('mc')
+        .select('AVG(mc.handlingDelaySeconds)', 'avg')
+        .where('mc.status = :status', { status: 'called_back' })
+        .andWhere('mc.handlingDelaySeconds IS NOT NULL')
+        .andWhere('mc.occurredAt >= :cutoff', { cutoff })
+        .getRawOne<{ avg: string | null }>(),
+
+      // Top 5 postes en retard : escalated ou assigned+breached (90j)
+      this.repo
+        .createQueryBuilder('mc')
+        .select('mc.posteId', 'posteId')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('mc.posteId IS NOT NULL')
+        .andWhere(
+          '(mc.status = :escalated OR (mc.status = :assigned AND mc.slaBreachedAt IS NOT NULL))',
+          { escalated: 'escalated', assigned: 'assigned' },
+        )
+        .andWhere('mc.occurredAt >= :cutoff', { cutoff })
+        .groupBy('mc.posteId')
+        .orderBy('cnt', 'DESC')
+        .limit(5)
+        .getRawMany<{ posteId: string; cnt: string }>(),
     ]);
 
-    const pending    = all.filter((m) => m.status === 'pending').length;
-    const assigned   = all.filter((m) => m.status === 'assigned').length;
-    const escalated  = all.filter((m) => m.status === 'escalated').length;
-    const calledBack = all.filter((m) => m.status === 'called_back').length;
-    const closed     = all.filter((m) => m.status === 'closed').length;
+    const countByStatus = Object.fromEntries(
+      statusRows.map((r) => [r.status, parseInt(r.cnt, 10)]),
+    ) as Record<string, number>;
 
-    const resolved = all.filter((m) => m.status === 'called_back' || m.status === 'closed');
-    const inSla    = resolved.filter((m) => m.status === 'called_back' && !m.slaBreachedAt);
-    const slaRate  = resolved.length > 0 ? Math.round((inSla.length / resolved.length) * 100) : 100;
+    const pending    = countByStatus['pending']     ?? 0;
+    const assigned   = countByStatus['assigned']    ?? 0;
+    const escalated  = countByStatus['escalated']   ?? 0;
+    const calledBack = countByStatus['called_back'] ?? 0;
+    const closed     = countByStatus['closed']      ?? 0;
 
-    const withDelay = all.filter((m) => m.handlingDelaySeconds !== null && m.status === 'called_back');
-    const avgDelay  = withDelay.length > 0
-      ? Math.round(withDelay.reduce((sum, m) => sum + (m.handlingDelaySeconds ?? 0), 0) / withDelay.length)
-      : null;
+    const resolvedTotal = parseInt(slaRow?.resolvedTotal ?? '0', 10);
+    const inSla         = parseInt(slaRow?.inSla         ?? '0', 10);
+    const slaRate       = resolvedTotal > 0 ? Math.round((inSla / resolvedTotal) * 100) : 100;
 
-    const overdue  = all.filter((m) => m.status === 'escalated' || (m.status === 'assigned' && m.slaBreachedAt));
-    const posteMap = new Map<string, number>();
-    for (const m of overdue) {
-      if (m.posteId) posteMap.set(m.posteId, (posteMap.get(m.posteId) ?? 0) + 1);
-    }
-    const topRaw = Array.from(posteMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    const avgDelay = avgRow?.avg != null ? Math.round(parseFloat(avgRow.avg)) : null;
 
-    // Résolution des noms de postes
-    const posteIds = topRaw.map(([id]) => id);
+    const posteIds     = overdueRows.map((r) => r.posteId);
     const posteNameMap = await this.resolvePosteNames(posteIds);
 
-    const topPostesOverdue = topRaw.map(([posteId, count]) => ({
-      posteId,
-      posteName: posteNameMap.get(posteId) ?? null,
-      count,
+    const topPostesOverdue = overdueRows.map((r) => ({
+      posteId:   r.posteId,
+      posteName: posteNameMap.get(r.posteId) ?? null,
+      count:     parseInt(r.cnt, 10),
     }));
 
     return {
-      totalToday:           todayEvents.length,
-      totalPending:         pending,
-      totalAssigned:        assigned,
-      totalEscalated:       escalated,
-      totalCalledBack:      calledBack,
-      totalClosed:          closed,
-      slaComplianceRate:    slaRate,
+      totalToday:              todayCount,
+      totalPending:            pending,
+      totalAssigned:           assigned,
+      totalEscalated:          escalated,
+      totalCalledBack:         calledBack,
+      totalClosed:             closed,
+      slaComplianceRate:       slaRate,
       avgHandlingDelaySeconds: avgDelay,
       topPostesOverdue,
     };

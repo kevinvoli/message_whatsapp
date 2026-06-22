@@ -156,18 +156,13 @@ export class SlaService {
   // ─── Évaluation SLA ───────────────────────────────────────────────────────
 
   /**
-   * Évalue les règles SLA pour une conversation donnée.
-   * Retourne toutes les violations (breached=true).
+   * Calcule les résultats SLA en mémoire sur des objets déjà chargés.
+   * Zéro requête BDD — utilisé par checkAllOpenChats pour éviter le N+1.
    */
-  async evaluateChat(chatId: string, tenantId: string): Promise<SlaEvaluationResult[]> {
-    const rules = await this.ruleRepo.find({
-      where: { tenant_id: tenantId, is_active: true },
-    });
-    if (rules.length === 0) return [];
-
-    const chat = await this.chatRepo.findOne({ where: { id: chatId } });
-    if (!chat) return [];
-
+  private computeSlaResults(
+    chat: WhatsappChat,
+    rules: SlaRule[],
+  ): SlaEvaluationResult[] {
     const now = Date.now();
     const results: SlaEvaluationResult[] = [];
 
@@ -176,8 +171,6 @@ export class SlaService {
 
       switch (rule.metric) {
         case SlaMetric.FIRST_RESPONSE: {
-          // Temps depuis le premier message client jusqu'à la première réponse agent
-          // ou depuis maintenant si pas encore répondu
           if (chat.last_client_message_at) {
             const refTime = chat.last_poste_message_at ?? new Date(now);
             currentValueSeconds = Math.floor(
@@ -187,14 +180,12 @@ export class SlaService {
           break;
         }
         case SlaMetric.RESOLUTION: {
-          // Temps depuis la création de la conversation
           currentValueSeconds = Math.floor(
             (now - chat.createdAt.getTime()) / 1000,
           );
           break;
         }
         case SlaMetric.REENGAGEMENT: {
-          // Temps depuis le dernier message client sans réponse
           if (chat.last_client_message_at && !chat.last_poste_message_at) {
             currentValueSeconds = Math.floor(
               (now - chat.last_client_message_at.getTime()) / 1000,
@@ -214,7 +205,7 @@ export class SlaService {
 
       results.push({
         rule,
-        chatId,
+        chatId: chat.id,
         currentValueSeconds,
         breached: currentValueSeconds > rule.threshold_seconds,
       });
@@ -224,22 +215,38 @@ export class SlaService {
   }
 
   /**
-   * Vérifie toutes les conversations ouvertes d'un tenant et retourne les violations.
-   * Utilisé par le cron SLA checker.
+   * Évalue les règles SLA pour une conversation donnée.
+   * Retourne tous les résultats (breached ou non).
+   * Appelants externes utilisent cette méthode publique.
    */
-  async checkAllOpenChats(tenantId: string): Promise<SlaEvaluationResult[]> {
-    const rules = await this.ruleRepo.find({
-      where: { tenant_id: tenantId, is_active: true },
-    });
+  async evaluateChat(chatId: string, tenantId: string): Promise<SlaEvaluationResult[]> {
+    const rules = await this.getActiveRules(tenantId);
     if (rules.length === 0) return [];
 
-    const openChats = await this.chatRepo.find({
-      where: { tenant_id: tenantId, status: WhatsappChatStatus.ACTIF },
-    });
+    const chat = await this.chatRepo.findOne({ where: { id: chatId } });
+    if (!chat) return [];
+
+    return this.computeSlaResults(chat, rules);
+  }
+
+  /**
+   * Vérifie toutes les conversations ouvertes d'un tenant et retourne les violations.
+   * Utilisé par le cron SLA checker.
+   * 2 requêtes BDD au total (chats + règles en parallèle via cache Redis), zéro N+1.
+   */
+  async checkAllOpenChats(tenantId: string): Promise<SlaEvaluationResult[]> {
+    const [openChats, rules] = await Promise.all([
+      this.chatRepo.find({
+        where: { tenant_id: tenantId, status: WhatsappChatStatus.ACTIF },
+      }),
+      this.getActiveRules(tenantId),
+    ]);
+
+    if (rules.length === 0) return [];
 
     const allViolations: SlaEvaluationResult[] = [];
     for (const chat of openChats) {
-      const results = await this.evaluateChat(chat.id, tenantId);
+      const results = this.computeSlaResults(chat, rules);
       allViolations.push(...results.filter((r) => r.breached));
     }
     return allViolations;
