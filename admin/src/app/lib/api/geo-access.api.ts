@@ -53,3 +53,21 @@ export async function deleteLocation(id: string): Promise<void> {
     credentials: 'include',
   });
 }
+
+export async function setPosteIpExempt(id: string, exempt: boolean): Promise<void> {
+  await fetch(`${API_BASE_URL}/geo-access/postes/${id}/exempt`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exempt }),
+  });
+}
+
+export async function setCommercialIpExempt(id: string, exempt: boolean): Promise<void> {
+  await fetch(`${API_BASE_URL}/geo-access/commerciaux/${id}/exempt`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exempt }),
+  });
+}

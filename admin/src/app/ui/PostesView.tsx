@@ -5,6 +5,7 @@ import { Ban, Edit, PlusCircle, ShieldCheck, Trash2, RefreshCw, MessageSquare } 
 import { formatDateShort } from '@/app/lib/dateUtils';
 import { createPoste, deletePoste, getPostes, updatePoste } from '@/app/lib/api/postes.api';
 import { blockPosteFromQueue, unblockPosteFromQueue } from '@/app/lib/api/dispatch.api';
+import { setPosteIpExempt } from '@/app/lib/api/geo-access.api';
 import { Poste } from '@/app/lib/definitions';
 import { useCrudResource } from '@/app/hooks/useCrudResource';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
@@ -59,6 +60,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
   const [formIsActive, setFormIsActive] = useState(true);
   const [formNumeroPoste, setFormNumeroPoste] = useState<string>('');
   const [queueActionLoadingId, setQueueActionLoadingId] = useState<string | null>(null);
+  const [ipExemptLoadingId, setIpExemptLoadingId] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'blocked' | 'allowed'>('all');
   const { addToast } = useToast();
 
@@ -167,6 +169,27 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
       });
     } finally {
       setQueueActionLoadingId(null);
+    }
+  };
+
+  const handleIpExemptToggle = async (poste: Poste) => {
+    setIpExemptLoadingId(poste.id);
+    try {
+      await setPosteIpExempt(poste.id, !poste.ipRestrictionExempt);
+      addToast({
+        type: 'success',
+        message: poste.ipRestrictionExempt
+          ? 'Restriction IP réactivée pour ce poste.'
+          : 'Poste exempté de la restriction IP.',
+      });
+      await fetchData();
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Action échouée.',
+      });
+    } finally {
+      setIpExemptLoadingId(null);
     }
   };
 
@@ -324,6 +347,33 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
                   </span>
                 );
               },
+            },
+            {
+              header: 'Restrict. IP',
+              render: (poste) => (
+                <button
+                  type="button"
+                  onClick={() => void handleIpExemptToggle(poste)}
+                  disabled={ipExemptLoadingId === poste.id}
+                  aria-label={
+                    poste.ipRestrictionExempt
+                      ? 'Réactiver la restriction IP pour ce poste'
+                      : 'Exempter ce poste de la restriction IP'
+                  }
+                  title={
+                    poste.ipRestrictionExempt
+                      ? 'Exempté — cliquer pour réactiver'
+                      : 'Restreint — cliquer pour exempter'
+                  }
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    poste.ipRestrictionExempt
+                      ? 'bg-violet-100 text-violet-800 hover:bg-violet-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {poste.ipRestrictionExempt ? 'Exempté' : 'Restreint'}
+                </button>
+              ),
             },
             {
               header: 'Mode dispatch',

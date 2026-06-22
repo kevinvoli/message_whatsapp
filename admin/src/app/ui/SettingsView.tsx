@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle, Link, Copy, ExternalLink } from 'lucide-react';
+import { User, Lock, Save, Settings, Eye, EyeOff, RefreshCw, CheckCircle, AlertCircle, Link, Copy, ExternalLink, Shield } from 'lucide-react';
 import { SystemConfigEntry, WebhookEntry } from '@/app/lib/definitions';
 import { bulkUpdateSystemConfig, getSystemConfigs, getWebhookUrls } from '@/app/lib/api/system-config.api';
+import { getRbacEnabled, setRbacEnabled } from '@/app/lib/api/rbac.api';
 
 interface AdminProfile {
   id: string;
@@ -18,7 +19,7 @@ interface SettingsViewProps {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
-type Tab = 'profile' | 'password' | 'system' | 'webhooks';
+type Tab = 'profile' | 'password' | 'system' | 'webhooks' | 'rbac';
 
 const CATEGORY_LABELS: Record<string, string> = {
   general: 'Général',
@@ -337,6 +338,111 @@ function SystemConfigTab() {
   );
 }
 
+// ─── RBAC Tab ─────────────────────────────────────────────────────────────────
+
+function RbacTab() {
+  const [enabled, setEnabled] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [toggling, setToggling] = useState<boolean>(false);
+  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const value = await getRbacEnabled();
+        setEnabled(value);
+      } catch {
+        setError('Impossible de charger la configuration RBAC.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleToggle = async () => {
+    setToggling(true);
+    setStatus(null);
+    const next = !enabled;
+    try {
+      await setRbacEnabled(next);
+      setEnabled(next);
+      setStatus({ ok: true, message: next ? 'Contrôle RBAC activé.' : 'Contrôle RBAC désactivé.' });
+    } catch {
+      setStatus({ ok: false, message: 'Erreur lors de la mise à jour.' });
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-32 text-gray-400">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        Chargement…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-red-50 text-red-700">
+        <AlertCircle className="w-4 h-4" />
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Shield className="w-5 h-5 text-purple-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900">Contrôle RBAC</h2>
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-800">Activer le contrôle RBAC frontend</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Quand activé, les permissions des commerciaux conditionnent l&apos;affichage des actions dans l&apos;interface agent.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label="Activer le contrôle RBAC frontend"
+            onClick={() => void handleToggle()}
+            disabled={toggling}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+              enabled ? 'bg-purple-600' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                enabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {status && (
+        <div className={`flex items-center gap-2 text-sm p-3 rounded-lg ${
+          status.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+        }`}>
+          {status.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {status.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsView({ adminProfile, onProfileUpdated }: SettingsViewProps) {
@@ -414,6 +520,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
     { id: 'password', label: 'Mot de passe', icon: <Lock className="w-4 h-4" /> },
     { id: 'webhooks', label: 'URLs Webhooks', icon: <Link className="w-4 h-4" /> },
     { id: 'system', label: 'Configuration système', icon: <Settings className="w-4 h-4" /> },
+    { id: 'rbac', label: 'Sécurité', icon: <Shield className="w-4 h-4" /> },
   ];
 
   return (
@@ -558,6 +665,9 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
 
       {/* System config tab */}
       {activeTab === 'system' && <SystemConfigTab />}
+
+      {/* RBAC tab */}
+      {activeTab === 'rbac' && <RbacTab />}
     </div>
   );
 }

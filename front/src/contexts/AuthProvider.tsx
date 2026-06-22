@@ -10,6 +10,25 @@ import React, {
 import axios from 'axios';
 import { useChatStore } from '@/store/chatStore';
 
+interface Permission {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface UserRaw {
+  id: string;
+  email: string;
+  name: string;
+  posteId?: string | null;
+  poste_id: string;
+  isWorkingToday?: boolean;
+  absentToday?: boolean;
+  isReplacing?: boolean;
+  rbacEnabled?: boolean;
+  permissions?: Permission[];
+}
+
 interface User {
   id: string;
   email: string;
@@ -19,6 +38,8 @@ interface User {
   isWorkingToday?: boolean;
   absentToday?: boolean;
   isReplacing?: boolean;
+  rbacEnabled: boolean;
+  permissions: string[];
 }
 
 interface AuthContextType {
@@ -35,10 +56,12 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const normalizeUser = (raw: User): User => ({
+const normalizeUser = (raw: UserRaw): User => ({
   ...raw,
   poste_id: raw.poste_id ?? raw.posteId ?? '',
   posteId: raw.posteId ?? raw.poste_id ?? null,
+  rbacEnabled: raw.rbacEnabled ?? false,
+  permissions: raw.permissions?.map((p) => p.name) ?? [],
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -58,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
+        const response = await axios.get<UserRaw>(`${apiBaseUrl}/auth/profile`, {
           withCredentials: true,
         });
         const userData = normalizeUser(response.data);
@@ -81,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const refreshProfile = async () => {
       try {
-        const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
+        const response = await axios.get<UserRaw>(`${apiBaseUrl}/auth/profile`, {
           withCredentials: true,
         });
         setUser((prev) => {
@@ -91,7 +114,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             prev.isWorkingToday !== fresh.isWorkingToday ||
             prev.absentToday   !== fresh.absentToday    ||
             prev.isReplacing   !== fresh.isReplacing    ||
-            prev.posteId       !== fresh.posteId;
+            prev.posteId       !== fresh.posteId        ||
+            prev.rbacEnabled   !== fresh.rbacEnabled    ||
+            prev.permissions.join(',') !== fresh.permissions.join(',');
           return changed ? fresh : prev;
         });
       } catch {
@@ -132,7 +157,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const response = await axios.post<{ user: User; accessToken: string }>(
+      const response = await axios.post<{ user: UserRaw; accessToken: string }>(
         `${apiBaseUrl}/auth/login`,
         { email, password, latitude, longitude },
         { withCredentials: true },

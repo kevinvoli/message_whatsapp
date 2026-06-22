@@ -4,6 +4,7 @@ import { Conversation, ConversationStatus } from '@/types/chat';
 import { TransferModal } from './TransferModal';
 import { LabelMenu } from './LabelMenu';
 import { MergeModal } from './MergeModal';
+import { usePermission } from '@/hooks/usePermission';
 
 interface ConversationOptionsMenuProps {
   conversation: Conversation;
@@ -22,6 +23,11 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
   const [showLabels, setShowLabels] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
   const [dossierBlocked, setDossierBlocked] = useState(false);
+
+  const canTransfer = usePermission('transfer_conversation');
+  const canMerge = usePermission('merge_conversation');
+  const canLabel = usePermission('label_conversation');
+  const canClose = usePermission('close_conversation');
 
   useEffect(() => {
     const dossierHandler = (e: Event) => {
@@ -96,7 +102,14 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
     }
   };
 
-  const statusOptions: ConversationStatus[] = ['actif', 'attente', 'converti'];
+  // Le statut "converti" correspond à la clôture — conditionné par canClose
+  const statusOptions: ConversationStatus[] = [
+    'actif',
+    'attente',
+    ...(canClose ? ['converti' as ConversationStatus] : []),
+  ];
+
+  const hasActions = canTransfer || canMerge || canLabel;
 
   return (
     <div className="relative">
@@ -153,46 +166,56 @@ export const ConversationOptionsMenu: React.FC<ConversationOptionsMenuProps> = (
             )}
 
             {/* Actions supplémentaires */}
-            <div className="px-3 py-2 border-t border-gray-100 mt-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </p>
-            </div>
+            {hasActions && (
+              <>
+                <div className="px-3 py-2 border-t border-gray-100 mt-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </p>
+                </div>
 
-            {/* Transfert */}
-            <button
-              onClick={() => { setShowTransfer(true); setIsOpen(false); }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 text-blue-600 hover:bg-blue-50 transition-colors"
-            >
-              <ArrowRight className="w-4 h-4" />
-              <span className="flex-1 text-left text-sm font-medium">Transférer</span>
-            </button>
+                {/* Transfert */}
+                {canTransfer && (
+                  <button
+                    onClick={() => { setShowTransfer(true); setIsOpen(false); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    <span className="flex-1 text-left text-sm font-medium">Transférer</span>
+                  </button>
+                )}
 
-            {/* Fusion */}
-            <button
-              onClick={() => { setShowMerge(true); setIsOpen(false); }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
-            >
-              <Merge className="w-4 h-4" />
-              <span className="flex-1 text-left text-sm font-medium">Fusionner</span>
-            </button>
+                {/* Fusion */}
+                {canMerge && (
+                  <button
+                    onClick={() => { setShowMerge(true); setIsOpen(false); }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
+                  >
+                    <Merge className="w-4 h-4" />
+                    <span className="flex-1 text-left text-sm font-medium">Fusionner</span>
+                  </button>
+                )}
 
-            {/* Labels */}
-            <div className="relative">
-              <button
-                onClick={() => setShowLabels((v) => !v)}
-                className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
-              >
-                <Tag className="w-4 h-4" />
-                <span className="flex-1 text-left text-sm font-medium">Labels</span>
-              </button>
-              {showLabels && (
-                <LabelMenu
-                  chatId={conversation.chat_id}
-                  onClose={() => setShowLabels(false)}
-                />
-              )}
-            </div>
+                {/* Labels */}
+                {canLabel && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowLabels((v) => !v)}
+                      className="w-full px-4 py-2.5 flex items-center gap-3 text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      <Tag className="w-4 h-4" />
+                      <span className="flex-1 text-left text-sm font-medium">Labels</span>
+                    </button>
+                    {showLabels && (
+                      <LabelMenu
+                        chatId={conversation.chat_id}
+                        onClose={() => setShowLabels(false)}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </>
       )}

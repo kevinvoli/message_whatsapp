@@ -6,6 +6,7 @@ import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
 import { getPostes } from '@/app/lib/api/postes.api';
 import { searchClientsAdmin } from '@/app/lib/api/clients.api';
 import { runCronNow } from '@/app/lib/api/crons.api';
+import { setCommercialIpExempt } from '@/app/lib/api/geo-access.api';
 import { formatDateShort } from '@/app/lib/dateUtils';
 import { logger } from '@/app/lib/logger';
 import { useToast } from '@/app/ui/ToastProvider';
@@ -87,6 +88,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   const [portfolioTotal, setPortfolioTotal] = useState(0);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [ipExemptLoadingId, setIpExemptLoadingId] = useState<string | null>(null);
 
   const loadPortfolioForCommercial = useCallback(async (commercialId: string) => {
     setPortfolioLoading(true);
@@ -112,6 +114,27 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
       addToast({ type: 'error', message: 'Échec de la déconnexion.' });
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  const handleIpExemptToggle = async (commercial: PerformanceCommercial) => {
+    setIpExemptLoadingId(commercial.id);
+    try {
+      await setCommercialIpExempt(commercial.id, !commercial.ipRestrictionExempt);
+      addToast({
+        type: 'success',
+        message: commercial.ipRestrictionExempt
+          ? 'Restriction IP réactivée pour ce commercial.'
+          : 'Commercial exempté de la restriction IP.',
+      });
+      void fetchData();
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Action échouée.',
+      });
+    } finally {
+      setIpExemptLoadingId(null);
     }
   };
 
@@ -373,13 +396,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière co.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Portefeuille</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Relances</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Restrict. IP</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {dataLoading ? (
                 <tr>
-                  <td colSpan={15} className="px-6 py-12 text-center">
+                  <td colSpan={16} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                       <svg className="animate-spin w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -391,7 +415,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </tr>
               ) : commerciauxFiltres.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={16} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'Aucun commercial trouvé' : 'Aucun commercial disponible'}
                   </td>
                 </tr>
@@ -540,6 +564,32 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                           <span className="text-gray-400 text-sm">—</span>
                         )}
                       </div>
+                    </td>
+
+                    {/* Restriction IP */}
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => void handleIpExemptToggle(commercial)}
+                        disabled={ipExemptLoadingId === commercial.id}
+                        aria-label={
+                          commercial.ipRestrictionExempt
+                            ? 'Réactiver la restriction IP pour ce commercial'
+                            : 'Exempter ce commercial de la restriction IP'
+                        }
+                        title={
+                          commercial.ipRestrictionExempt
+                            ? 'Exempté — cliquer pour réactiver'
+                            : 'Restreint — cliquer pour exempter'
+                        }
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                          commercial.ipRestrictionExempt
+                            ? 'bg-violet-100 text-violet-800 hover:bg-violet-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {commercial.ipRestrictionExempt ? 'Exempté' : 'Restreint'}
+                      </button>
                     </td>
 
                     {/* Actions */}

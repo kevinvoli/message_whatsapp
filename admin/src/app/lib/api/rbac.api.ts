@@ -48,3 +48,19 @@ export async function assignRole(commercialId: string, roleId: string, tenantId:
   });
   return handleResponse(r);
 }
+
+export async function getRbacEnabled(): Promise<boolean> {
+  const r = await fetch(`${API_BASE_URL}/admin/settings/rbac-enabled`, { credentials: 'include' });
+  const data = await handleResponse<{ enabled: boolean }>(r);
+  return data.enabled;
+}
+
+export async function setRbacEnabled(enabled: boolean): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/admin/settings/rbac-enabled`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ enabled }),
+  });
+  await handleResponse<{ enabled: boolean }>(r);
+}
