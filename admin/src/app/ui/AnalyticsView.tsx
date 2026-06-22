@@ -13,9 +13,10 @@ import {
     LineChart,
     Line,
 } from 'recharts';
-import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle } from 'lucide-react';
+import { RefreshCw, TrendingUp, MessageCircle, Clock, Users, ArrowDownLeft, ArrowUpRight, CalendarRange, X, AlertCircle, Activity } from 'lucide-react';
 import { getOverviewSection } from '@/app/lib/api/metrics.api';
-import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle } from '@/app/lib/definitions';
+import { getAnalyticsSummary, getAnalyticsConversations, getAnalyticsAgents, getAnalyticsChannels } from '@/app/lib/api/analytics.api';
+import { MetriquesGlobales, PerformanceCommercial, PerformanceTemporelle, AnalyticsSummary, AnalyticsConversationDay, AnalyticsAgent, AnalyticsChannel } from '@/app/lib/definitions';
 import { Spinner } from './Spinner';
 
 const PERIODS = [
@@ -65,7 +66,12 @@ function KpiCard({ label, value, sub, icon, color }: KpiCardProps) {
     );
 }
 
+type MainTab = 'overview' | 'detailed';
+
 export default function AnalyticsView() {
+    const [mainTab, setMainTab] = useState<MainTab>('overview');
+
+    // ─── Onglet Overview ─────────────────────────────────────────────────────
     const [period, setPeriod] = useState<Period>('today');
     const [loading, setLoading] = useState(false);
     const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
@@ -74,7 +80,7 @@ export default function AnalyticsView() {
     const [computedAt, setComputedAt] = useState<Date | null>(null);
     const [fromSnapshot, setFromSnapshot] = useState(false);
 
-    // Filtre plage de dates
+    // Filtre plage de dates (overview)
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [activeDateFrom, setActiveDateFrom] = useState('');
@@ -105,6 +111,44 @@ export default function AnalyticsView() {
     useEffect(() => {
         void load(period, activeDateFrom || undefined, activeDateTo || undefined);
     }, [load, period, activeDateFrom, activeDateTo]);
+
+    // ─── Onglet Analytics détaillés ──────────────────────────────────────────
+    const [detailedDateFrom, setDetailedDateFrom] = useState('');
+    const [detailedDateTo, setDetailedDateTo] = useState('');
+    const [detailedLoading, setDetailedLoading] = useState(false);
+    const [detailedSummary, setDetailedSummary] = useState<AnalyticsSummary | null>(null);
+    const [detailedConversations, setDetailedConversations] = useState<AnalyticsConversationDay[] | null>(null);
+    const [detailedAgents, setDetailedAgents] = useState<AnalyticsAgent[] | null>(null);
+    const [detailedChannels, setDetailedChannels] = useState<AnalyticsChannel[] | null>(null);
+    const [detailedError, setDetailedError] = useState<string | null>(null);
+
+    const loadDetailed = useCallback(async (from?: string, to?: string) => {
+        setDetailedLoading(true);
+        setDetailedError(null);
+        setDetailedSummary(null);
+        setDetailedConversations(null);
+        setDetailedAgents(null);
+        setDetailedChannels(null);
+        const params = { dateFrom: from, dateTo: to };
+        const [summaryRes, convsRes, agentsRes, channelsRes] = await Promise.allSettled([
+            getAnalyticsSummary(params),
+            getAnalyticsConversations(params),
+            getAnalyticsAgents(params),
+            getAnalyticsChannels(params),
+        ]);
+        if (summaryRes.status === 'fulfilled') setDetailedSummary(summaryRes.value);
+        else setDetailedError('Erreur chargement résumé analytics.');
+        if (convsRes.status === 'fulfilled') setDetailedConversations(convsRes.value);
+        if (agentsRes.status === 'fulfilled') setDetailedAgents(agentsRes.value);
+        if (channelsRes.status === 'fulfilled') setDetailedChannels(channelsRes.value);
+        setDetailedLoading(false);
+    }, []);
+
+    useEffect(() => {
+        if (mainTab === 'detailed') {
+            void loadDetailed(detailedDateFrom || undefined, detailedDateTo || undefined);
+        }
+    }, [mainTab, loadDetailed, detailedDateFrom, detailedDateTo]);
 
     const applyCustomRange = () => {
         if (!dateFrom || !dateTo) return;
@@ -150,82 +194,113 @@ export default function AnalyticsView() {
                     <TrendingUp className="w-6 h-6 text-blue-600" />
                     <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Période prédéfinie — désactivée si plage custom active */}
-                    <div className={`flex rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm ${hasCustomRange ? 'opacity-40 pointer-events-none' : ''}`}>
-                        {PERIODS.map((p) => (
-                            <button
-                                key={p.value}
-                                onClick={() => setPeriod(p.value)}
-                                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                                    period === p.value && !hasCustomRange
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:bg-gray-50'
-                                }`}
-                            >
-                                {p.label}
-                            </button>
-                        ))}
-                    </div>
+                {mainTab === 'overview' && (
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Période prédéfinie — désactivée si plage custom active */}
+                        <div className={`flex rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm ${hasCustomRange ? 'opacity-40 pointer-events-none' : ''}`}>
+                            {PERIODS.map((p) => (
+                                <button
+                                    key={p.value}
+                                    onClick={() => setPeriod(p.value)}
+                                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                                        period === p.value && !hasCustomRange
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
 
-                    {/* Filtre plage de dates */}
-                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
-                        <CalendarRange className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                        <input
-                            type="datetime-local"
-                            value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                            className="text-sm text-gray-700 border-none outline-none bg-transparent w-44"
-                        />
-                        <span className="text-gray-400 text-sm">→</span>
-                        <input
-                            type="datetime-local"
-                            value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                            className="text-sm text-gray-700 border-none outline-none bg-transparent w-44"
-                        />
+                        {/* Filtre plage de dates */}
+                        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
+                            <CalendarRange className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            <input
+                                type="datetime-local"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="text-sm text-gray-700 border-none outline-none bg-transparent w-44"
+                            />
+                            <span className="text-gray-400 text-sm">→</span>
+                            <input
+                                type="datetime-local"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="text-sm text-gray-700 border-none outline-none bg-transparent w-44"
+                            />
+                            <button
+                                onClick={applyCustomRange}
+                                disabled={!dateFrom || !dateTo}
+                                className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-md hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Appliquer
+                            </button>
+                            {hasCustomRange && (
+                                <button
+                                    onClick={clearCustomRange}
+                                    className="ml-1 p-1 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100"
+                                    title="Effacer le filtre"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+
+                        {computedAt && (() => {
+                            const ageMin = Math.round((Date.now() - computedAt.getTime()) / 60000);
+                            const isStale = ageMin > 15;
+                            return (
+                                <span className={`flex items-center gap-1 text-sm ${isStale ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                                    {isStale && <AlertCircle className="w-4 h-4" />}
+                                    {fromSnapshot
+                                        ? `Données mises à jour il y a ${ageMin} min`
+                                        : 'Données en temps réel'}
+                                    {isStale && ' — potentiellement obsolètes'}
+                                </span>
+                            );
+                        })()}
                         <button
-                            onClick={applyCustomRange}
-                            disabled={!dateFrom || !dateTo}
-                            className="ml-1 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-md hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            onClick={() => void load(period, activeDateFrom || undefined, activeDateTo || undefined)}
+                            disabled={loading}
+                            className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+                            title="Rafraîchir"
                         >
-                            Appliquer
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                         </button>
-                        {hasCustomRange && (
-                            <button
-                                onClick={clearCustomRange}
-                                className="ml-1 p-1 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100"
-                                title="Effacer le filtre"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        )}
                     </div>
-
-                    {computedAt && (() => {
-                        const ageMin = Math.round((Date.now() - computedAt.getTime()) / 60000);
-                        const isStale = ageMin > 15;
-                        return (
-                            <span className={`flex items-center gap-1 text-sm ${isStale ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                                {isStale && <AlertCircle className="w-4 h-4" />}
-                                {fromSnapshot
-                                    ? `Données mises à jour il y a ${ageMin} min`
-                                    : 'Données en temps réel'}
-                                {isStale && ' — potentiellement obsolètes'}
-                            </span>
-                        );
-                    })()}
-                    <button
-                        onClick={() => void load(period, activeDateFrom || undefined, activeDateTo || undefined)}
-                        disabled={loading}
-                        className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
-                        title="Rafraîchir"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
+                )}
             </div>
 
+            {/* Onglets principaux */}
+            <div className="flex gap-1 border-b border-gray-200">
+                <button
+                    onClick={() => setMainTab('overview')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                        mainTab === 'overview'
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    <TrendingUp className="w-4 h-4" />
+                    Vue d&apos;ensemble
+                </button>
+                <button
+                    onClick={() => setMainTab('detailed')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                        mainTab === 'detailed'
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    <Activity className="w-4 h-4" />
+                    Analytics détaillés
+                </button>
+            </div>
+
+            {/* ─── Onglet Overview ─────────────────────────────────────────── */}
+            {mainTab === 'overview' && (
+              <>
             {/* Badge plage active */}
             {hasCustomRange && (
                 <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 w-fit">
@@ -426,6 +501,194 @@ export default function AnalyticsView() {
                         </div>
                     </div>
                 </>
+            )}
+              </>
+            )}
+
+            {/* ─── Onglet Analytics détaillés ──────────────────────────────── */}
+            {mainTab === 'detailed' && (
+              <div className="space-y-6">
+                {/* Filtres date */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-wrap items-end gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="det-date-from" className="block text-xs font-medium text-gray-600">Date de début</label>
+                    <input
+                      id="det-date-from"
+                      type="date"
+                      value={detailedDateFrom}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDetailedDateFrom(e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="det-date-to" className="block text-xs font-medium text-gray-600">Date de fin</label>
+                    <input
+                      id="det-date-to"
+                      type="date"
+                      value={detailedDateTo}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDetailedDateTo(e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => void loadDetailed(detailedDateFrom || undefined, detailedDateTo || undefined)}
+                    disabled={detailedLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${detailedLoading ? 'animate-spin' : ''}`} />
+                    {detailedLoading ? 'Chargement…' : 'Actualiser'}
+                  </button>
+                  {(detailedDateFrom || detailedDateTo) && (
+                    <button
+                      onClick={() => { setDetailedDateFrom(''); setDetailedDateTo(''); }}
+                      className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                    >
+                      <X className="w-4 h-4" /> Effacer
+                    </button>
+                  )}
+                </div>
+
+                {detailedLoading && (
+                  <div className="flex justify-center py-16">
+                    <Spinner />
+                  </div>
+                )}
+
+                {detailedError && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                    {detailedError}
+                  </div>
+                )}
+
+                {/* Résumé KPIs */}
+                {detailedSummary && (
+                  <div className="space-y-4">
+                    <h2 className="text-base font-semibold text-gray-900">Résumé</h2>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <KpiCard
+                        label="Conversations totales"
+                        value={detailedSummary.totalConversations.toLocaleString('fr-FR')}
+                        sub={`${detailedSummary.openConversations} ouvertes · ${detailedSummary.closedConversations} fermées`}
+                        icon={<Users className="w-5 h-5 text-blue-600" />}
+                        color="bg-blue-100"
+                      />
+                      <KpiCard
+                        label="Messages entrants"
+                        value={detailedSummary.messagesIn.toLocaleString('fr-FR')}
+                        sub={`Total : ${detailedSummary.totalMessages.toLocaleString('fr-FR')}`}
+                        icon={<ArrowDownLeft className="w-5 h-5 text-green-600" />}
+                        color="bg-green-100"
+                      />
+                      <KpiCard
+                        label="Messages sortants"
+                        value={detailedSummary.messagesOut.toLocaleString('fr-FR')}
+                        sub="Envoyés sur la période"
+                        icon={<ArrowUpRight className="w-5 h-5 text-purple-600" />}
+                        color="bg-purple-100"
+                      />
+                      <KpiCard
+                        label="Tps. 1re réponse moy."
+                        value={formatSeconds(detailedSummary.avgFirstResponseTimeSeconds)}
+                        sub={`Résolution : ${formatSeconds(detailedSummary.avgResolutionTimeSeconds)}`}
+                        icon={<Clock className="w-5 h-5 text-orange-600" />}
+                        color="bg-orange-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Volume conversations par jour */}
+                {detailedConversations !== null && detailedConversations.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                    <h2 className="text-base font-semibold text-gray-900">Conversations par jour</h2>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={detailedConversations} barGap={2}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="opened" name="Ouvertes" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="closed" name="Fermées" fill="#94a3b8" radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Performance agents */}
+                  {detailedAgents !== null && (
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                      <h2 className="text-base font-semibold text-gray-900 mb-4">Agents</h2>
+                      {detailedAgents.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Aucune donnée agent</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-100">
+                                <th className="text-left py-2 pr-3 text-xs font-semibold text-gray-500 uppercase">Agent</th>
+                                <th className="text-right py-2 px-2 text-xs font-semibold text-gray-500 uppercase">Messages</th>
+                                <th className="text-right py-2 px-2 text-xs font-semibold text-gray-500 uppercase">Convs.</th>
+                                <th className="text-right py-2 pl-2 text-xs font-semibold text-gray-500 uppercase">Tps. rép.</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {detailedAgents.map((a) => (
+                                <tr key={a.agentId} className="hover:bg-gray-50">
+                                  <td className="py-2.5 pr-3">
+                                    <p className="font-medium text-gray-900">{a.agentName}</p>
+                                    <p className="text-xs text-gray-400">{a.posteName}</p>
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right font-semibold text-blue-600">{a.messagesOut}</td>
+                                  <td className="py-2.5 px-2 text-right text-gray-600">{a.chatsHandled}</td>
+                                  <td className="py-2.5 pl-2 text-right text-gray-600">{formatSeconds(a.avgResponseSeconds)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Canaux */}
+                  {detailedChannels !== null && (
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                      <h2 className="text-base font-semibold text-gray-900 mb-4">Canaux</h2>
+                      {detailedChannels.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Aucune donnée canal</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-100">
+                                <th className="text-left py-2 pr-3 text-xs font-semibold text-gray-500 uppercase">Canal</th>
+                                <th className="text-right py-2 px-2 text-xs font-semibold text-gray-500 uppercase">IN</th>
+                                <th className="text-right py-2 px-2 text-xs font-semibold text-gray-500 uppercase">OUT</th>
+                                <th className="text-right py-2 pl-2 text-xs font-semibold text-gray-500 uppercase">Convs.</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {detailedChannels.map((ch) => (
+                                <tr key={ch.channelId} className="hover:bg-gray-50">
+                                  <td className="py-2.5 pr-3">
+                                    <p className="font-medium text-gray-900">{ch.label ?? ch.channelId}</p>
+                                    <p className="text-xs text-gray-400">{ch.provider}</p>
+                                  </td>
+                                  <td className="py-2.5 px-2 text-right text-green-600 font-medium">{ch.messagesIn}</td>
+                                  <td className="py-2.5 px-2 text-right text-blue-600 font-medium">{ch.messagesOut}</td>
+                                  <td className="py-2.5 pl-2 text-right text-gray-600">{ch.totalConversations}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
         </div>

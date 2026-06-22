@@ -1,6 +1,7 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone, Users, LogOut } from 'lucide-react';
+import { Search, UserPlus, Eye, Edit, Trash2, TrendingUp, MessageCircle, Clock, Target, RefreshCw, ArrowLeft, Mail, MapPin, MessageSquare, Briefcase, Bell, Phone, Users, LogOut, Brain } from 'lucide-react';
 import { PerformanceCommercial, Poste, ClientSummary } from '@/app/lib/definitions';
+import { CommercialCoachingModal } from './CommercialCoachingModal';
 import { createCommercial, deleteCommercial, updateCommercial } from '@/app/lib/api/commerciaux.api';
 import { getPerformanceCommerciaux } from '@/app/lib/api/metrics.api';
 import { getPostes } from '@/app/lib/api/postes.api';
@@ -89,6 +90,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [ipExemptLoadingId, setIpExemptLoadingId] = useState<string | null>(null);
+  const [coachingCommercial, setCoachingCommercial] = useState<PerformanceCommercial | null>(null);
 
   const loadPortfolioForCommercial = useCallback(async (commercialId: string) => {
     setPortfolioLoading(true);
@@ -616,6 +618,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                           </button>
                         )}
                         <button
+                          onClick={() => setCoachingCommercial(commercial)}
+                          className="p-1 text-purple-600 hover:bg-purple-50 rounded"
+                          title="Coaching IA"
+                          aria-label={`Coaching IA pour ${commercial.name}`}
+                        >
+                          <Brain className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEditModal(commercial)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           disabled={loading}
@@ -671,10 +681,21 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
                 </div>
               </div>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-              }`}>
-              {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCoachingCommercial(selectedDetail)}
+                aria-label={`Coaching IA pour ${selectedDetail.name}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Brain className="w-3.5 h-3.5" />
+                Coaching IA
+              </button>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${selectedDetail.isConnected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                {selectedDetail.isConnected ? 'En ligne' : 'Hors ligne'}
+              </span>
+            </div>
           </div>
 
           {/* Tabs Performance / Portefeuille */}
@@ -845,6 +866,14 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', o
       )}
 
       {/* Modal d'edition */}
+      {/* Modal Coaching IA */}
+      {coachingCommercial && (
+        <CommercialCoachingModal
+          commercial={coachingCommercial}
+          onClose={() => setCoachingCommercial(null)}
+        />
+      )}
+
       <EntityFormModal
         isOpen={showAddModal}
         title="Ajouter un commercial"

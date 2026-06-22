@@ -109,7 +109,9 @@ export type ViewMode =
   | 'lecture-seule'
   | 'campagnes-meta'
   | 'galerie-media'
-  | 'quiz';
+  | 'quiz'
+  // GDPR
+  | 'gdpr-optout';
 
 // ─── Context types ────────────────────────────────────────────────────────────
 
@@ -1750,4 +1752,18 @@ export interface PostePanelConfig {
   types: string[];
 }
 
+// ============================================
+// GDPR OPT-OUT
+// ============================================
 
+export type GdprOptoutStatus = 'active' | 'revoked';
+
+export interface GdprOptout {
+  id: string;
+  phone: string;
+  optOutAt: string;
+  revokedAt: string | null;
+  status: GdprOptoutStatus;
+  createdAt: string;
+  updatedAt: string;
+}

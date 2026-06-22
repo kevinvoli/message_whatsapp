@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle, Reply } from 'lucide-react';
+import { User, CheckCheck, Clock, Check, FileText, Download, MapPin, AlertCircle, Reply, SmilePlus, Frown } from 'lucide-react';
 
 const LocationMapThumb = dynamic(() => import('./LocationMapThumb'), {
   ssr: false,
@@ -301,12 +301,18 @@ export default function ChatMessage({ msg, index }: ChatMessageProps) {
             </p>
           )}
 
-          {/* Timestamp + status */}
+          {/* Timestamp + status + sentiment */}
           <div
             className={`flex items-center gap-1 mt-1 text-xs ${
               isFromMe ? 'text-green-100 justify-end' : 'text-gray-500'
             }`}
           >
+            {msg.sentiment_label === 'positive' && (
+              <SmilePlus className="w-3 h-3 text-green-400 flex-shrink-0" aria-label="Sentiment positif" />
+            )}
+            {msg.sentiment_label === 'negative' && (
+              <Frown className="w-3 h-3 text-red-400 flex-shrink-0" aria-label="Sentiment négatif" />
+            )}
             <span>{formatTime(messageTimestamp)}</span>
             {isFromMe && renderStatusIcon(msg.status)}
           </div>

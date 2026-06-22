@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, ListChecks, RefreshCw, History, Phone } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ListChecks, RefreshCw, History, Phone } from 'lucide-react';
 import { DispatchSettingsAudit, DispatchSnapshot, Poste } from '@/app/lib/definitions';
 import {
   getDispatchSettingsAudit,
@@ -10,6 +10,7 @@ import {
   resetStuckConversations,
 } from '@/app/lib/api/dispatch.api';
 import { getPostes } from '@/app/lib/api/postes.api';
+import { forceValidateConversation } from '@/app/lib/api/window.api';
 import { useToast } from '@/app/ui/ToastProvider';
 import { formatDate } from '@/app/lib/dateUtils';
 import CallObligationsView from '@/app/modules/dispatch/components/CallObligationsView';
@@ -44,6 +45,7 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
   const [loading, setLoading] = useState(false);
   const [redispatching, setRedispatching] = useState(false);
   const [resettingStuck, setResettingStuck] = useState(false);
+  const [validatingChatId, setValidatingChatId] = useState<string | null>(null);
 
   const { addToast } = useToast();
 
@@ -141,6 +143,29 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
       });
     } finally {
       setResettingStuck(false);
+    }
+  };
+
+  // ── Forcer validation fenêtre glissante ────────────────────────────────────
+
+  const handleForceValidate = async (chatId: string) => {
+    if (!confirm(`Forcer la validation de la conversation ${chatId} ? Tous les critères seront marqués comme validés.`)) return;
+    setValidatingChatId(chatId);
+    try {
+      const result = await forceValidateConversation(chatId);
+      if (result.ok) {
+        addToast({ type: 'success', message: `Validation forcée${result.allRequiredMet ? ' — tous les critères requis sont satisfaits.' : '.'}` });
+      } else {
+        addToast({ type: 'info', message: 'Validation forcée (critères partiels).' });
+      }
+      await refresh();
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erreur lors de la validation forcée.',
+      });
+    } finally {
+      setValidatingChatId(null);
     }
   };
 
@@ -304,20 +329,36 @@ export default function DispatchView({ onRefresh }: { onRefresh?: () => void }) 
                     <th className="px-4 py-2">Chat</th>
                     <th className="px-4 py-2">Poste</th>
                     <th className="px-4 py-2">Deadline</th>
+                    <th className="px-4 py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {snapshot.waiting_items.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-mono text-xs text-gray-900">{item.chat_id}</td>
-                      <td className="px-4 py-2 text-gray-600">
-                        {item.poste?.name ?? item.poste_id ?? '-'}
-                      </td>
-                      <td className="px-4 py-2 text-gray-500">
-                        {formatDate(item.first_response_deadline_at)}
-                      </td>
-                    </tr>
-                  ))}
+                  {snapshot.waiting_items.map((item) => {
+                    const isValidating = validatingChatId === item.chat_id;
+                    return (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-mono text-xs text-gray-900">{item.chat_id}</td>
+                        <td className="px-4 py-2 text-gray-600">
+                          {item.poste?.name ?? item.poste_id ?? '-'}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">
+                          {formatDate(item.first_response_deadline_at)}
+                        </td>
+                        <td className="px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleForceValidate(item.chat_id)}
+                            disabled={validatingChatId !== null}
+                            aria-label={`Forcer la validation de la conversation ${item.chat_id}`}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 rounded-md hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <CheckCircle2 className={`w-3 h-3 ${isValidating ? 'animate-pulse' : ''}`} />
+                            {isValidating ? 'En cours…' : 'Forcer validation'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (

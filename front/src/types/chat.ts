@@ -212,6 +212,8 @@ export interface TypingStore {
   stopTyping: (chatId: string) => void;
 }
 
+export type SentimentLabel = 'positive' | 'neutral' | 'negative';
+
 export interface Message {
   id: string;
   text: string;
@@ -229,6 +231,8 @@ export interface Message {
   commercial_id?: string | null;
   poste_id?: string;
   dedicated_channel_id?: string | null;
+
+  sentiment_label?: SentimentLabel | null;
 
   // 🔊 VOCAL (optionnel)
   medias?: Array<{
@@ -605,6 +609,8 @@ interface RawMessageData {
     from_name?: string;
     from_me?: boolean;
   };
+
+  sentiment_label?: SentimentLabel | null;
 }
 
 interface RawConversationData {
@@ -797,6 +803,8 @@ export const transformToMessage = (raw: RawMessageData): Message => {
           from_me: raw.quotedMessage.from_me,
         }
       : undefined,
+
+    sentiment_label: raw.sentiment_label ?? null,
   };
 };
 

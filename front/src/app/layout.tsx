@@ -6,6 +6,7 @@ import { SocketProvider } from "@/contexts/SocketProvider";
 import WebSocketEvents from "@/components/WebSocketEvents";
 import IdleAndCooldownWrapper from "@/components/IdleAndCooldownWrapper";
 import { PwaRegister } from "@/components/PwaRegister";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { QueryProvider } from "@/components/QueryProvider";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
             <AuthProvider>
               <SocketProvider>
                 <PwaRegister />
+                <OfflineBanner />
                 <WebSocketEvents />
                 <IdleAndCooldownWrapper />
                 {children}

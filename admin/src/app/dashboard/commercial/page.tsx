@@ -61,6 +61,7 @@ import DiffusionsTabsView from '@/app/ui/DiffusionsTabsView';
 import SecuriteAccesTabsView from '@/app/ui/SecuriteAccesTabsView';
 import ComplaintsView from '@/app/modules/dispatch/components/ComplaintsView';
 import LoginLogsView from '@/app/ui/LoginLogsView';
+import GdprOptoutView from '@/app/ui/GdprOptoutView';
 import RelanceConfigView from '@/app/ui/RelanceConfigView';
 import SlaView from '@/app/modules/sla/components/SlaView';
 import AuditView from '@/app/modules/audit/components/AuditView';
@@ -247,6 +248,8 @@ export default function AdminDashboard() {
                 return <ComplaintsView />;
             case 'login-logs':
                 return <LoginLogsView />;
+            case 'gdpr-optout':
+                return <GdprOptoutView />;
             case 'relance-config':
                 return <RelanceConfigView />;
             case 'channel-stats':

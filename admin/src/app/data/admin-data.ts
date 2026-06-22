@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, Route, Activity, ShieldCheck, LayoutDashboard, Timer, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Lock, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2 } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquare, Route, Activity, ShieldCheck, LayoutDashboard, Timer, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Lock, Link2, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2, UserX } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -72,6 +72,7 @@ export const navigationGroups: NavigationGroup[] = [
       { id: 'audit-logs',    name: "Journal d'audit",  icon: ClipboardList, badge: null },
       { id: 'sla-rules',     name: 'Regles SLA',       icon: Shield,        badge: null },
       { id: 'ia-governance', name: 'Gouvernance IA',   icon: Sparkles,      badge: null },
+      { id: 'gdpr-optout',   name: 'GDPR Opt-out',     icon: UserX,         badge: null },
       { id: 'settings',      name: 'Parametres',       icon: Settings,      badge: null },
     ],
   },
