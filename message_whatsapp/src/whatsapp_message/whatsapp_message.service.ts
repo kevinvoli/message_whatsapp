@@ -24,7 +24,7 @@ import {
   WhatsappMediaType,
 } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 
-import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
+import { WhatsappTemplateService } from 'src/whatsapp-template/whatsapp-template.service';
 @Injectable()
 export class WhatsappMessageService {
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
@@ -162,7 +162,7 @@ export class WhatsappMessageService {
     let providerMessageId: string;
 
     if (data.templateId) {
-      const template = await this.templateService.findOne(data.templateId);
+      const template = await this.templateService.findById(data.templateId);
       if (!template) throw new NotFoundException(`Template ${data.templateId} introuvable`);
 
       const sent = await this.outboundRouter.sendTemplateMessage({

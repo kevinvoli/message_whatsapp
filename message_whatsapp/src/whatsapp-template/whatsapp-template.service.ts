@@ -330,6 +330,20 @@ export class WhatsappTemplateService {
     await this.repo.update(template.id, { status: TemplateStatus.DISABLED });
   }
 
+  /** Recherche un template par UUID sans contrainte de tenant — usage interne uniquement */
+  async findById(id: string): Promise<WhatsappTemplate | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
+  /** Recherche tous les templates d'un canal — usage interne uniquement, sans contrainte de tenant */
+  async findAllByChannelId(channelId: string, status?: string): Promise<WhatsappTemplate[]> {
+    const qb = this.repo.createQueryBuilder('t').where('t.channel_id = :channelId', { channelId });
+    if (status) {
+      qb.andWhere('t.status = :status', { status });
+    }
+    return qb.orderBy('t.name', 'ASC').getMany();
+  }
+
   @OnEvent(META_TEMPLATE_STATUS_EVENT)
   async onTemplateStatusEvent(payload: {
     metaTemplateId: string;

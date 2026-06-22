@@ -4,7 +4,6 @@ import {
   Param,
   UseGuards,
   Post,
-  Patch,
   Body,
   UseInterceptors,
   UploadedFile,
@@ -27,9 +26,7 @@ import { AdminGuard } from '../auth/admin.guard';
 import { CommercialActionGateGuard } from 'src/commercial-action-gate/commercial-action-gate.guard';
 import { CreateWhatsappMessageDto } from './dto/create-whatsapp_message.dto';
 import { CreateOutboundMessageDto } from './dto/create-outbound-message.dto';
-import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
-import { CreateWhatsappTemplateDto } from 'src/whatsapp_template/dto/create-whatsapp-template.dto';
-import { UpdateWhatsappTemplateDto } from 'src/whatsapp_template/dto/update-whatsapp-template.dto';
+import { WhatsappTemplateService } from 'src/whatsapp-template/whatsapp-template.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { WhatsappMedia } from 'src/whatsapp_media/entities/whatsapp_media.entity';
 import { Repository } from 'typeorm';
@@ -133,25 +130,7 @@ export class WhatsappMessageController {
       return [];
     }
     if (!channelId) return [];
-    return this.templateService.findAllByChannel(channelId, status);
-  }
-
-  @Post('templates')
-  @UseGuards(AdminGuard)
-  async createTemplate(@Body() dto: CreateWhatsappTemplateDto) {
-    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
-      throw new NotFoundException('Templates HSM désactivés');
-    }
-    return this.templateService.create(dto);
-  }
-
-  @Patch('templates/:id/resubmit')
-  @UseGuards(AdminGuard)
-  async resubmitTemplate(@Param('id') id: string, @Body() dto?: UpdateWhatsappTemplateDto) {
-    if (!WhatsappMessageController.HSM_TEMPLATES_ENABLED) {
-      throw new NotFoundException('Templates HSM désactivés');
-    }
-    return this.templateService.resubmit(id, dto);
+    return this.templateService.findAllByChannelId(channelId, status);
   }
 
   @Post('media/admin')

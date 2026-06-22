@@ -33,8 +33,7 @@ import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
 import { WebhookDegradedQueueService } from './webhook-degraded-queue.service';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { json } from 'stream/consumers';
-import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
-import { WhatsappTemplateStatus } from 'src/whatsapp_template/entities/whatsapp_template.entity';
+import { WhatsappTemplateService } from 'src/whatsapp-template/whatsapp-template.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { resolveChannelCredentials } from 'src/channel/helpers/resolve-channel-credentials.helper';
 
@@ -1259,24 +1258,21 @@ export class WhapiController {
     return `${provider}:${channelId}:${entry?.changes?.[0]?.field ?? 'unknown'}:${id}`;
   }
 
-  private async handleTemplateStatusUpdate(value: any): Promise<void> {
-    const externalId = value?.message_template_id?.toString() ?? value?.id?.toString();
-    const event = value?.event?.toLowerCase() ?? value?.status?.toLowerCase();
-    const reason = value?.reason ?? null;
-    if (!externalId || !event) return;
+  private async handleTemplateStatusUpdate(value: unknown): Promise<void> {
+    const v = value as Record<string, unknown> | null | undefined;
+    const metaTemplateId =
+      (v?.message_template_id?.toString() ?? v?.id?.toString()) ?? null;
+    const rawStatus =
+      (typeof v?.event === 'string' ? v.event : typeof v?.status === 'string' ? v.status : null);
+    const newStatus = rawStatus?.toUpperCase() ?? null;
+    const reason = typeof v?.reason === 'string' ? v.reason : null;
 
-    const statusMap: Record<string, WhatsappTemplateStatus> = {
-      approved: WhatsappTemplateStatus.APPROVED,
-      rejected: WhatsappTemplateStatus.REJECTED,
-      pending: WhatsappTemplateStatus.PENDING,
-    };
-    const status = statusMap[event];
-    if (!status) return;
+    if (!metaTemplateId || !newStatus) return;
 
-    await this.templateService.updateStatusByExternalId(externalId, status, reason);
+    await this.templateService.updateStatus(metaTemplateId, newStatus, reason);
 
     this.gateway?.server?.emit('admin:template_status_update', {
-      externalId, status, rejectionReason: reason,
+      externalId: metaTemplateId, status: newStatus, rejectionReason: reason,
     });
   }
 }

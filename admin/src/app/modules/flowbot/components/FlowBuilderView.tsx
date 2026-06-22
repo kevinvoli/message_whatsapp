@@ -463,23 +463,37 @@ export default function FlowBuilderView({ flowId, onBack }: FlowBuilderViewProps
                             <table className="w-full text-sm">
                                 <thead className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
                                     <tr>
-                                        {['Date', 'Démarrées', 'Complétées', 'Escaladées', 'Expirées', 'Moy. étapes', 'Moy. durée (s)'].map(h => (
+                                        {['Date', 'Démarrées', 'Complétées', 'Taux', 'Escaladées', 'Expirées', 'Durée moy.'].map(h => (
                                             <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {analytics.map(row => (
-                                        <tr key={row.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 font-mono">{row.periodDate}</td>
-                                            <td className="px-4 py-3">{row.sessionsStarted}</td>
-                                            <td className="px-4 py-3 text-green-700">{row.sessionsCompleted}</td>
-                                            <td className="px-4 py-3 text-orange-600">{row.sessionsEscalated}</td>
-                                            <td className="px-4 py-3 text-red-600">{row.sessionsExpired}</td>
-                                            <td className="px-4 py-3">{row.avgSteps?.toFixed(1) ?? '—'}</td>
-                                            <td className="px-4 py-3">{row.avgDurationSeconds?.toFixed(0) ?? '—'}</td>
-                                        </tr>
-                                    ))}
+                                    {analytics.map(row => {
+                                        const taux = row.sessionsStarted > 0
+                                            ? Math.round((row.sessionsCompleted / row.sessionsStarted) * 100)
+                                            : null;
+                                        const duree = row.avgDurationSeconds != null
+                                            ? `${String(Math.floor(row.avgDurationSeconds / 60)).padStart(2, '0')}:${String(Math.round(row.avgDurationSeconds % 60)).padStart(2, '0')}`
+                                            : '—';
+                                        return (
+                                            <tr key={row.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 font-mono text-gray-600">{row.periodDate}</td>
+                                                <td className="px-4 py-3 font-medium">{row.sessionsStarted}</td>
+                                                <td className="px-4 py-3 text-green-700 font-medium">{row.sessionsCompleted}</td>
+                                                <td className="px-4 py-3">
+                                                    {taux != null ? (
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${taux >= 70 ? 'bg-green-100 text-green-700' : taux >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'}`}>
+                                                            {taux}&nbsp;%
+                                                        </span>
+                                                    ) : '—'}
+                                                </td>
+                                                <td className="px-4 py-3 text-orange-600">{row.sessionsEscalated}</td>
+                                                <td className="px-4 py-3 text-red-600">{row.sessionsExpired}</td>
+                                                <td className="px-4 py-3 font-mono text-gray-600">{duree}</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

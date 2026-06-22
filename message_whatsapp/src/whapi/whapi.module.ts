@@ -71,7 +71,7 @@ import { AccountAlertsHandler } from 'src/webhooks/adapters/meta-event-handlers/
 import { TemplateStatusHandler } from 'src/webhooks/adapters/meta-event-handlers/template-status.handler';
 import { AccountUpdateHandler } from 'src/webhooks/adapters/meta-event-handlers/account-update.handler';
 import { MetaNonMessageHandler } from 'src/webhooks/adapters/meta-event-handlers/meta-non-message.handler';
-import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { WhatsappTemplateModule } from 'src/whatsapp-template/whatsapp-template.module';
 import { ChatSessionModule } from 'src/chat-session/chat-session.module';
 
 @Module({

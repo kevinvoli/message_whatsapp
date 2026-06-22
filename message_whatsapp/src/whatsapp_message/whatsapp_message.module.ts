@@ -60,7 +60,7 @@ import { SystemConfigModule } from 'src/system-config/system-config.module';
 import { ClientDossierModule } from 'src/client-dossier/client-dossier.module';
 import { ConversationClosureModule } from 'src/conversation-closure/conversation-closure.module';
 import { CommercialActionGateModule } from 'src/commercial-action-gate/commercial-action-gate.module';
-import { WhatsappTemplateModule } from 'src/whatsapp_template/whatsapp_template.module';
+import { WhatsappTemplateModule } from 'src/whatsapp-template/whatsapp-template.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
