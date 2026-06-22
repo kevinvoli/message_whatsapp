@@ -3,7 +3,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Index couvrants pour les requêtes de métriques et analytics.
  *
- * Tous les index sont créés avec ALGORITHM=INPLACE, LOCK=NONE :
+ * Tous les index sont créés avec  :
  * - pas de verrouillage table → l'application continue de fonctionner pendant la création
  * - idempotent : chaque index est vérifié avant création (IF NOT EXISTS via INFORMATION_SCHEMA)
  *
@@ -17,7 +17,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - call_log          : commercial_id, called_at, client_phone
  * - outbound_webhook_log : webhook_id, created_at, status
  *
- * transaction = false : requis pour DDL avec ALGORITHM=INPLACE
+ * transaction = false : requis pour les DDL (MariaDB crée les index en ligne par défaut)
  */
 export class AddMetricsAnalyticsIndexes1750694400001 implements MigrationInterface {
   name = 'AddMetricsAnalyticsIndexes1750694400001';
@@ -100,7 +100,7 @@ export class AddMetricsAnalyticsIndexes1750694400001 implements MigrationInterfa
   ): Promise<void> {
     if (await this.indexExists(queryRunner, table, indexName)) return;
     await queryRunner.query(
-      `ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${columns}) ALGORITHM=INPLACE, LOCK=NONE`,
+      `ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${columns}) `,
     );
   }
 
@@ -111,7 +111,7 @@ export class AddMetricsAnalyticsIndexes1750694400001 implements MigrationInterfa
   ): Promise<void> {
     if (!(await this.indexExists(queryRunner, table, indexName))) return;
     await queryRunner.query(
-      `ALTER TABLE \`${table}\` DROP INDEX \`${indexName}\` ALGORITHM=INPLACE, LOCK=NONE`,
+      `ALTER TABLE \`${table}\` DROP INDEX \`${indexName}\` `,
     );
   }
 }
