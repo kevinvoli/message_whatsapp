@@ -5,6 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { IntegrationOutboxService } from 'src/integration-outbox/integration-outbox.service';
 import { OrderDossierMirrorWriteService, DossierMirrorPayload } from 'src/order-write/services/order-dossier-mirror-write.service';
 import { ConversationReport } from './entities/conversation-report.entity';
+import { IntegrationOutbox } from 'src/integration-outbox/entities/integration-outbox.entity';
 
 /**
  * E02-T03 — Worker qui traite les entrées integration_outbox.
@@ -53,31 +54,35 @@ export class OutboxProcessorService implements OnApplicationBootstrap {
 
     this.logger.log(`DB2_SYNC_START batch=${entries.length}`);
 
-    for (const entry of entries) {
-      try {
-        const payload = JSON.parse(entry.payloadJson) as DossierMirrorPayload;
-
-        await this.mirrorService.upsertDossier(payload);
-
-        await this.outboxService.markSuccess(entry.id);
-        await this.reportRepo.update(
-          { chatId: entry.entityId },
-          { submissionStatus: 'sent', submissionError: null },
-        );
-
-        this.logger.log(`DB2_SYNC_SUCCESS chat=${entry.entityId}`);
-      } catch (err) {
-        const message = (err as Error).message;
-        await this.outboxService.markFailed(entry.id, message, entry.attemptCount);
-        await this.reportRepo.update(
-          { chatId: entry.entityId },
-          { submissionStatus: 'failed', submissionError: message.slice(0, 500) },
-        );
-
-        this.logger.warn(`DB2_SYNC_FAILED chat=${entry.entityId} attempt=${entry.attemptCount + 1}: ${message}`);
-      }
-    }
+    await Promise.allSettled(
+      entries.map((entry) => this.processOne(entry)),
+    );
 
     this.logger.log(`DB2_SYNC_END batch=${entries.length}`);
+  }
+
+  private async processOne(entry: IntegrationOutbox): Promise<void> {
+    try {
+      const payload = JSON.parse(entry.payloadJson) as DossierMirrorPayload;
+
+      await this.mirrorService.upsertDossier(payload);
+
+      await this.outboxService.markSuccess(entry.id);
+      await this.reportRepo.update(
+        { chatId: entry.entityId },
+        { submissionStatus: 'sent', submissionError: null },
+      );
+
+      this.logger.log(`DB2_SYNC_SUCCESS chat=${entry.entityId}`);
+    } catch (err) {
+      const message = (err as Error).message;
+      await this.outboxService.markFailed(entry.id, message, entry.attemptCount);
+      await this.reportRepo.update(
+        { chatId: entry.entityId },
+        { submissionStatus: 'failed', submissionError: message.slice(0, 500) },
+      );
+
+      this.logger.warn(`DB2_SYNC_FAILED chat=${entry.entityId} attempt=${entry.attemptCount + 1}: ${message}`);
+    }
   }
 }

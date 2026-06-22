@@ -1,4 +1,5 @@
-﻿import {
+import {
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -20,8 +21,12 @@ import { SystemConfigService } from 'src/system-config/system-config.service';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { SocketListCacheService } from 'src/realtime/socket-list-cache.service';
 import { DispatchSettingsService } from './dispatch-settings.service';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 
 const DEFAULT_QUOTA_ACTIVE = 10;
+const DEDICATED_POSTE_IDS_CACHE_KEY = 'queue:dedicated_poste_ids';
+const DEDICATED_POSTE_IDS_TTL = 60; // secondes
 
 @Injectable()
 export class QueueService implements OnModuleInit {
@@ -57,7 +62,81 @@ export class QueueService implements OnModuleInit {
 
     @Optional()
     private readonly dispatchSettingsService: DispatchSettingsService,
+
+    @Optional() @Inject(REDIS_CLIENT)
+    private readonly redis: Redis | null,
   ) {}
+
+  // ─── Cache Redis : IDs de postes avec canal dédié ───────────────────────────
+
+  /**
+   * Retourne l'ensemble des poste_id ayant au moins un canal dédié.
+   * Résultat mis en cache Redis TTL 60s pour éviter la requête répétée
+   * dans getNextInQueue / fillQueueWithAllPostes / syncQueueWithActivePostes.
+   */
+  private async getDedicatedPosteIds(): Promise<Set<string>> {
+    if (this.redis) {
+      const cached = await this.redis.get(DEDICATED_POSTE_IDS_CACHE_KEY);
+      if (cached) return new Set(JSON.parse(cached) as string[]);
+    }
+
+    const rows = await this.channelRepository
+      .createQueryBuilder('c')
+      .select('DISTINCT c.poste_id', 'posteId')
+      .where('c.poste_id IS NOT NULL')
+      .getRawMany<{ posteId: string }>();
+    const ids = new Set(rows.map((r) => r.posteId));
+
+    if (this.redis) {
+      await this.redis.set(
+        DEDICATED_POSTE_IDS_CACHE_KEY,
+        JSON.stringify([...ids]),
+        'EX',
+        DEDICATED_POSTE_IDS_TTL,
+      );
+    }
+
+    return ids;
+  }
+
+  /**
+   * Invalide le cache Redis des postes dédiés.
+   * À appeler lors de la création ou suppression d'un canal dédié (poste_id non null).
+   */
+  async invalidateDedicatedPosteIdsCache(): Promise<void> {
+    if (this.redis) {
+      await this.redis.del(DEDICATED_POSTE_IDS_CACHE_KEY);
+    }
+  }
+
+  // ─── Batch suppression de postes de la queue ────────────────────────────────
+
+  /**
+   * Supprime plusieurs postes de la queue en une seule requête DELETE,
+   * puis recompacte les positions en ordre croissant sans trou.
+   * Utilisé par purgeOfflinePostes() et syncQueueWithActivePostes().
+   */
+  private async batchRemoveFromQueue(posteIds: string[]): Promise<void> {
+    if (posteIds.length === 0) return;
+
+    await this.queueRepository
+      .createQueryBuilder()
+      .delete()
+      .where('poste_id IN (:...posteIds)', { posteIds })
+      .execute();
+
+    // Recompactage : renuméroter les positions restantes de 1 à N sans trou.
+    // Deux appels séparés car mysql2 n'accepte pas les multi-statements par défaut.
+    await this.dataSource.query('SET @pos := 0');
+    await this.dataSource.query(
+      'UPDATE queue_positions SET position = (@pos := @pos + 1) ORDER BY position ASC',
+    );
+
+    await this.socketListCacheService?.invalidateQueuePositions();
+    this.logQueueEvent('batch_remove', { removed_ids: posteIds });
+  }
+
+  // ─── Helpers internes ────────────────────────────────────────────────────────
 
   private async withDistributedLock<T>(resource: string, ttl: number, fn: () => Promise<T>): Promise<T> {
     if (!this.lockService) return fn();
@@ -220,12 +299,7 @@ export class QueueService implements OnModuleInit {
       });
 
       // Exclure les postes qui ont au moins un canal dédié (mode exclusif)
-      const dedicatedRows = await this.channelRepository
-        .createQueryBuilder('c')
-        .select('DISTINCT c.poste_id', 'poste_id')
-        .where('c.poste_id IS NOT NULL')
-        .getRawMany<{ poste_id: string }>();
-      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
+      const dedicatedSet = await this.getDedicatedPosteIds();
 
       const candidates = allPositions.filter((qp) => qp.poste && !dedicatedSet.has(qp.poste_id));
 
@@ -306,23 +380,23 @@ export class QueueService implements OnModuleInit {
         `Queue vide ou tous exclus — fallback BDD vers le poste le moins chargé`,
       );
 
+      const dedicatedSetFallback = await this.getDedicatedPosteIds();
       const allPostes = await this.posteRepository
         .createQueryBuilder('p')
         .innerJoin('p.commercial', 'c')
         .where('p.is_queue_enabled = :enabled', { enabled: true })
-        .andWhere(
-          `p.id NOT IN (SELECT DISTINCT poste_id FROM whapi_channels WHERE poste_id IS NOT NULL)`,
-        )
         .getMany();
 
-      if (allPostes.length === 0) {
+      const filteredPostes = allPostes.filter((p) => !dedicatedSetFallback.has(p.id));
+
+      if (filteredPostes.length === 0) {
         this.logger.warn(
           `Aucun poste configuré avec commercial — message mis en attente`,
         );
         return null;
       }
 
-      const fallbackIds = allPostes.map((p) => p.id);
+      const fallbackIds = filteredPostes.map((p) => p.id);
       const fallbackCounts = await this.chatRepository
         .createQueryBuilder('chat')
         .select('chat.poste_id', 'poste_id')
@@ -341,18 +415,18 @@ export class QueueService implements OnModuleInit {
 
       if (dispatchMode === 'ROUND_ROBIN') {
         this.logger.warn(
-          `Fallback BDD ROUND_ROBIN → poste ${allPostes[0].name} (${allPostes[0].id})`,
+          `Fallback BDD ROUND_ROBIN → poste ${filteredPostes[0].name} (${filteredPostes[0].id})`,
         );
-        return allPostes[0];
+        return filteredPostes[0];
       }
 
-      let bestFallback = allPostes[0];
+      let bestFallback = filteredPostes[0];
       let bestFallbackCount = fallbackCountMap.get(bestFallback.id) ?? 0;
 
-      for (let i = 1; i < allPostes.length; i++) {
-        const count = fallbackCountMap.get(allPostes[i].id) ?? 0;
+      for (let i = 1; i < filteredPostes.length; i++) {
+        const count = fallbackCountMap.get(filteredPostes[i].id) ?? 0;
         if (count < bestFallbackCount) {
-          bestFallback = allPostes[i];
+          bestFallback = filteredPostes[i];
           bestFallbackCount = count;
         }
       }
@@ -425,13 +499,7 @@ export class QueueService implements OnModuleInit {
   async fillQueueWithAllPostes(): Promise<void> {
     return this.withDistributedLock('dispatcher:queue', 10_000, () =>
       this.queueLock.runExclusive(async () => {
-      // Récupérer les IDs de postes dédiés (canaux exclusifs) à exclure de la queue pool
-      const dedicatedRows = await this.channelRepository
-        .createQueryBuilder('c')
-        .select('DISTINCT c.poste_id', 'poste_id')
-        .where('c.poste_id IS NOT NULL')
-        .getRawMany<{ poste_id: string }>();
-      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
+      const dedicatedSet = await this.getDedicatedPosteIds();
 
       const postes = await this.posteRepository.find({
         where: { is_queue_enabled: true },
@@ -458,6 +526,7 @@ export class QueueService implements OnModuleInit {
   /**
    * Quand un agent se connecte, retire de la queue tous les postes
    * qui ne sont pas actuellement connectes (sauf lui-meme).
+   * Utilise un batch DELETE pour éviter N transactions individuelles.
    */
   async purgeOfflinePostes(excludePosteId: string): Promise<void> {
     await this.queueLock.runExclusive(async () => {
@@ -467,15 +536,15 @@ export class QueueService implements OnModuleInit {
       });
       const offlineIds = new Set(offlinePostes.map((p) => p.id));
 
-      for (const qp of queue) {
-        if (qp.poste_id !== excludePosteId && offlineIds.has(qp.poste_id)) {
-          await this.removeFromQueueInternal(qp.poste_id);
-        }
-      }
+      const toRemove = queue
+        .filter((qp) => qp.poste_id !== excludePosteId && offlineIds.has(qp.poste_id))
+        .map((qp) => qp.poste_id);
+
+      await this.batchRemoveFromQueue(toRemove);
 
       this.logQueueEvent('purge_offline', {
         excluded: excludePosteId,
-        removed: offlinePostes.filter((p) => p.id !== excludePosteId).length,
+        removed: toRemove.length,
       });
     });
   }
@@ -485,26 +554,20 @@ export class QueueService implements OnModuleInit {
    * Un poste dédié ne doit pas faire croire que la queue pool est alimentée.
    */
   async hasActivePostes(): Promise<boolean> {
-    const count = await this.posteRepository
+    const dedicatedSet = await this.getDedicatedPosteIds();
+
+    const allActive = await this.posteRepository
       .createQueryBuilder('p')
       .where('p.is_active = :active', { active: true })
-      .andWhere(
-        `p.id NOT IN (SELECT DISTINCT poste_id FROM whapi_channels WHERE poste_id IS NOT NULL)`,
-      )
-      .getCount();
-    return count > 0;
+      .getMany();
+
+    return allActive.some((p) => !dedicatedSet.has(p.id));
   }
 
   async syncQueueWithActivePostes(): Promise<void> {
     return this.withDistributedLock('dispatcher:queue', 10_000, () =>
       this.queueLock.runExclusive(async () => {
-      // Exclure les postes dédiés de la queue pool
-      const dedicatedRows = await this.channelRepository
-        .createQueryBuilder('c')
-        .select('DISTINCT c.poste_id', 'poste_id')
-        .where('c.poste_id IS NOT NULL')
-        .getRawMany<{ poste_id: string }>();
-      const dedicatedSet = new Set(dedicatedRows.map((r) => r.poste_id));
+      const dedicatedSet = await this.getDedicatedPosteIds();
 
       const activePostes = await this.posteRepository.find({
         where: { is_active: true, is_queue_enabled: true },
@@ -516,11 +579,12 @@ export class QueueService implements OnModuleInit {
         .map((p) => p.id);
       const queue = await this.queueRepository.find();
 
-      for (const qp of queue) {
-        if (!activeIds.includes(qp.poste_id)) {
-          await this.removeFromQueueInternal(qp.poste_id);
-        }
-      }
+      // Batch DELETE des postes qui ne sont plus actifs ou sont devenus dédiés
+      const toRemove = queue
+        .filter((qp) => !activeIds.includes(qp.poste_id))
+        .map((qp) => qp.poste_id);
+
+      await this.batchRemoveFromQueue(toRemove);
 
       for (const poste of activePostes) {
         if (dedicatedSet.has(poste.id)) continue; // jamais dans la queue pool

@@ -60,6 +60,26 @@ export class FlowEngineService {
     return this.configService.get<string>('BULLMQ_FLOWBOT_DELAYED_ENABLED') === 'true';
   }
 
+  // ─── Pré-chargement du graphe ────────────────────────────────────────────
+
+  private async loadFlowGraph(flowId: string): Promise<{
+    nodeMap: Map<string, FlowNode>;
+    edgesBySource: Map<string, FlowEdge[]>;
+  }> {
+    const [nodes, edges] = await Promise.all([
+      this.nodeRepo.find({ where: { flowId } }),
+      this.edgeRepo.find({ where: { flowId }, order: { sortOrder: 'ASC' } }),
+    ]);
+    const nodeMap = new Map<string, FlowNode>(nodes.map((n) => [n.id, n]));
+    const edgesBySource = new Map<string, FlowEdge[]>();
+    for (const edge of edges) {
+      const list = edgesBySource.get(edge.sourceNodeId) ?? [];
+      list.push(edge);
+      edgesBySource.set(edge.sourceNodeId, list);
+    }
+    return { nodeMap, edgesBySource };
+  }
+
   // ─── Point d'entrée principal ─────────────────────────────────────────────
 
   /** Appelé par BotInboundListener pour chaque message entrant */
@@ -127,10 +147,11 @@ export class FlowEngineService {
 
     await this.analyticsService.recordSessionStart(match.flow.id);
 
-    // Trouver le nœud d'entrée
-    const entryNode = await this.nodeRepo.findOne({
-      where: { flowId: match.flow.id, isEntryPoint: true },
-    });
+    // Pré-charger tous les nœuds et arêtes du flow en une seule paire de requêtes
+    const { nodeMap, edgesBySource } = await this.loadFlowGraph(match.flow.id);
+
+    // Trouver le nœud d'entrée depuis la Map (0 requête supplémentaire)
+    const entryNode = Array.from(nodeMap.values()).find((n) => n.isEntryPoint) ?? null;
 
     if (!entryNode) {
       this.logger.warn(`Flow ${match.flow.id} n'a pas de nœud d'entrée — session annulée`);
@@ -139,7 +160,7 @@ export class FlowEngineService {
       return;
     }
 
-    await this.executeNode(session, entryNode, conv, execCtx);
+    await this.executeNode(session, entryNode, conv, execCtx, nodeMap, edgesBySource);
   }
 
   /** Reprend une session en attente (après délai WAIT ou timeout QUESTION) */
@@ -180,12 +201,6 @@ export class FlowEngineService {
       return;
     }
 
-    // Trouver la prochaine arête à partir du nœud courant
-    const edges = await this.edgeRepo.find({
-      where: { sourceNodeId: session.currentNodeId },
-      order: { sortOrder: 'ASC' },
-    });
-
     if (!execCtx) {
       // Reconstruire le contexte depuis les variables stockées à la création de session
       const v = session.variables ?? {};
@@ -199,12 +214,16 @@ export class FlowEngineService {
       };
     }
 
-    for (const edge of edges) {
-      const nextNode = await this.nodeRepo.findOne({
-        where: { id: edge.targetNodeId },
-      });
+    // Pré-charger tous les nœuds et arêtes du flow en une seule paire de requêtes
+    const { nodeMap, edgesBySource } = await this.loadFlowGraph(session.flowId);
+
+    // Trouver la prochaine arête à partir du nœud courant depuis la Map (0 requête)
+    const outgoingEdges = edgesBySource.get(session.currentNodeId) ?? [];
+
+    for (const edge of outgoingEdges) {
+      const nextNode = nodeMap.get(edge.targetNodeId);
       if (nextNode && execCtx) {
-        await this.executeNode(session, nextNode, session.conversation, execCtx);
+        await this.executeNode(session, nextNode, session.conversation, execCtx, nodeMap, edgesBySource);
         return;
       }
     }
@@ -220,6 +239,8 @@ export class FlowEngineService {
     node: FlowNode,
     conv: BotConversation,
     execCtx: BotExecutionContext,
+    nodeMap: Map<string, FlowNode>,
+    edgesBySource: Map<string, FlowEdge[]>,
   ): Promise<void> {
     // Anti-boucle et limite de pas
     if (session.stepsCount >= MAX_STEPS) {
@@ -260,7 +281,7 @@ export class FlowEngineService {
           return; // STOP — session passe en waiting_reply
 
         case FlowNodeType.CONDITION:
-          await this.executeCondition(session, node, conv, execCtx);
+          await this.executeCondition(session, node, conv, execCtx, nodeMap, edgesBySource);
           return; // l'arête choisie est suivie en interne
 
         case FlowNodeType.WAIT:
@@ -280,7 +301,7 @@ export class FlowEngineService {
           break;
 
         case FlowNodeType.AB_TEST:
-          await this.executeAbTest(session, node, conv, execCtx);
+          await this.executeAbTest(session, node, conv, execCtx, nodeMap, edgesBySource);
           return;
 
         // P6.2 — Nouveaux types de nœuds
@@ -305,7 +326,7 @@ export class FlowEngineService {
           break;
 
         default:
-          this.logger.warn(`Type de nœud inconnu: ${(node as any).type}`);
+          this.logger.warn(`Type de nœud inconnu: ${(node as FlowNode & { type: string }).type}`);
       }
     } catch (err) {
       this.logger.error(
@@ -324,7 +345,7 @@ export class FlowEngineService {
     }
 
     // Suivre l'arête "always" pour les nœuds non-terminaux
-    await this.followAlwaysEdge(session, node, conv, execCtx);
+    await this.followAlwaysEdge(session, node, conv, execCtx, nodeMap, edgesBySource);
   }
 
   // ─── Implémentation des nœuds ────────────────────────────────────────────
@@ -454,11 +475,11 @@ export class FlowEngineService {
     node: FlowNode,
     conv: BotConversation,
     execCtx: BotExecutionContext,
+    nodeMap: Map<string, FlowNode>,
+    edgesBySource: Map<string, FlowEdge[]>,
   ): Promise<void> {
-    const edges = await this.edgeRepo.find({
-      where: { sourceNodeId: node.id },
-      order: { sortOrder: 'ASC' },
-    });
+    // Récupérer les arêtes sortantes depuis la Map (0 requête)
+    const edges = edgesBySource.get(node.id) ?? [];
 
     const lastText = String(session.variables?.['last_message_text'] ?? '').toLowerCase();
 
@@ -466,9 +487,9 @@ export class FlowEngineService {
       const matched = this.evaluateEdgeCondition(edge, session, conv, lastText, execCtx);
       if (matched) {
         await this.writeLog(session, node, edge.id, 'condition_match', edge.conditionType);
-        const nextNode = await this.nodeRepo.findOne({ where: { id: edge.targetNodeId } });
+        const nextNode = nodeMap.get(edge.targetNodeId);
         if (nextNode) {
-          await this.executeNode(session, nextNode, conv, execCtx);
+          await this.executeNode(session, nextNode, conv, execCtx, nodeMap, edgesBySource);
         }
         return;
       }
@@ -852,11 +873,11 @@ export class FlowEngineService {
     node: FlowNode,
     conv: BotConversation,
     execCtx: BotExecutionContext,
+    nodeMap: Map<string, FlowNode>,
+    edgesBySource: Map<string, FlowEdge[]>,
   ): Promise<void> {
-    const edges = await this.edgeRepo.find({
-      where: { sourceNodeId: node.id },
-      order: { sortOrder: 'ASC' },
-    });
+    // Récupérer les arêtes sortantes depuis la Map (0 requête)
+    const edges = edgesBySource.get(node.id) ?? [];
 
     if (edges.length === 0) return;
 
@@ -874,9 +895,9 @@ export class FlowEngineService {
     }
 
     await this.writeLog(session, node, chosen.id, 'ab_test_branch', chosen.conditionValue);
-    const nextNode = await this.nodeRepo.findOne({ where: { id: chosen.targetNodeId } });
+    const nextNode = nodeMap.get(chosen.targetNodeId);
     if (nextNode) {
-      await this.executeNode(session, nextNode, conv, execCtx);
+      await this.executeNode(session, nextNode, conv, execCtx, nodeMap, edgesBySource);
     }
   }
 
@@ -887,16 +908,18 @@ export class FlowEngineService {
     node: FlowNode,
     conv: BotConversation,
     execCtx: BotExecutionContext,
+    nodeMap: Map<string, FlowNode>,
+    edgesBySource: Map<string, FlowEdge[]>,
   ): Promise<void> {
-    const edge = await this.edgeRepo.findOne({
-      where: { sourceNodeId: node.id, conditionType: 'always' },
-    });
+    // Récupérer l'arête "always" depuis la Map (0 requête)
+    const outgoingEdges = edgesBySource.get(node.id) ?? [];
+    const edge = outgoingEdges.find((e) => e.conditionType === 'always') ?? null;
 
     if (!edge) return;
 
-    const nextNode = await this.nodeRepo.findOne({ where: { id: edge.targetNodeId } });
+    const nextNode = nodeMap.get(edge.targetNodeId);
     if (nextNode) {
-      await this.executeNode(session, nextNode, conv, execCtx);
+      await this.executeNode(session, nextNode, conv, execCtx, nodeMap, edgesBySource);
     }
   }
 

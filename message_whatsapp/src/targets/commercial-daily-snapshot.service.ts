@@ -29,24 +29,26 @@ export class CommercialDailySnapshotService {
       const entries = await this.targetsService.getRanking('today');
       const now = new Date();
 
-      for (const entry of entries) {
-        await this.snapshotRepo.upsert(
-          {
-            commercialId:     entry.commercial_id,
-            commercialName:   entry.commercial_name,
-            snapshotDate:     date,
-            messagesSent:     entry.messages_sent,
-            conversations:    entry.conversations,
-            calls:            entry.calls,
-            followUpsDone:    entry.follow_ups,
-            reportsSubmitted: 0,
-            orders:           entry.orders,
-            score:            entry.score,
-            rankGlobal:       entry.rank,
-            computedAt:       now,
-          },
-          { conflictPaths: ['commercialId', 'snapshotDate'] },
-        );
+      const rows = entries.map((entry) => ({
+        commercialId:     entry.commercial_id,
+        commercialName:   entry.commercial_name,
+        snapshotDate:     date,
+        messagesSent:     entry.messages_sent,
+        conversations:    entry.conversations,
+        calls:            entry.calls,
+        followUpsDone:    entry.follow_ups,
+        reportsSubmitted: 0,
+        orders:           entry.orders,
+        score:            entry.score,
+        rankGlobal:       entry.rank,
+        computedAt:       now,
+      }));
+
+      if (rows.length > 0) {
+        await this.snapshotRepo.upsert(rows, {
+          conflictPaths: ['commercialId', 'snapshotDate'],
+          skipUpdateIfNoValuesChanged: true,
+        });
       }
       this.logger.log(`Snapshot ${date} : ${entries.length} commercial(aux) enregistré(s)`);
       await this.targetsService.invalidateRankingCache();

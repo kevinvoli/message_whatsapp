@@ -64,6 +64,7 @@ describe('QueueService', () => {
       null as any, // lockService (optional)
       null as any, // socketListCacheService (optional)
       null as any, // dispatchSettingsService (optional)
+      null as any, // redis (optional)
     );
   });
 

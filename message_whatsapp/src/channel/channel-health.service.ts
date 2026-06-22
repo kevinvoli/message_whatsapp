@@ -42,14 +42,17 @@ export class ChannelHealthService {
 
     this.logger.log(`ChannelHealth: vérification de ${channels.length} channel(s) Meta`);
 
-    for (const channel of channels) {
-      try {
-        await this.checkChannel(channel);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.error(`ChannelHealth error channel=${channel.channel_id}: ${message}`);
-      }
-    }
+    await Promise.allSettled(
+      channels.map((channel) =>
+        this.checkChannel(channel).catch((err: unknown) =>
+          this.logger.error(
+            `Health check failed for channel ${channel.channel_id}`,
+            err instanceof Error ? err.stack : String(err),
+            ChannelHealthService.name,
+          ),
+        ),
+      ),
+    );
   }
 
   async checkChannel(channel: WhapiChannel): Promise<ChannelHealth> {
@@ -69,8 +72,9 @@ export class ChannelHealthService {
       this.setCache(channel.channel_id, 'ok');
       this.logger.debug(`ChannelHealth OK: ${channel.channel_id}`);
       return 'ok';
-    } catch (err: any) {
-      const statusCode: number | undefined = err?.response?.status;
+    } catch (err: unknown) {
+      const statusCode: number | undefined =
+        (err as { response?: { status?: number } })?.response?.status;
 
       if (statusCode === 401 || statusCode === 403) {
         this.setCache(channel.channel_id, 'disconnected');

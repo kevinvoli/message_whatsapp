@@ -5,7 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { IsNull, LessThanOrEqual, In, LessThan } from 'typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { FollowUp, FollowUpStatus } from './entities/follow_up.entity';
+import { FollowUp, FollowUpStatus, FollowUpType } from './entities/follow_up.entity';
 import { FollowUpTemplateMapping } from './entities/follow-up-template-mapping.entity';
 import { PlatformSettingsService } from 'src/platform-settings/platform-settings.service';
 import { Contact } from 'src/contact/entities/contact.entity';
@@ -21,6 +21,12 @@ export interface FollowUpReminderPayload {
   scheduledAt: Date;
   type: string;
   notes?: string | null;
+}
+
+interface BulkContext {
+  mappingMap: Map<FollowUpType, FollowUpTemplateMapping>;
+  contactMap: Map<string, Contact>;
+  chatMap: Map<string, WhatsappChat>;
 }
 
 @Injectable()
@@ -75,6 +81,11 @@ export class FollowUpReminderService {
 
     const autoRelanceEnabled = await this.platformSettings.isEnabled('auto_relance_enabled');
 
+    let bulkContext: BulkContext | null = null;
+    if (autoRelanceEnabled) {
+      bulkContext = await this.loadBulkContext(dues);
+    }
+
     for (const followUp of dues) {
       if (!followUp.commercial_id) continue;
 
@@ -92,8 +103,8 @@ export class FollowUpReminderService {
       );
       this.eventEmitter.emit(FOLLOW_UP_REMINDER_EVENT, payload);
 
-      if (autoRelanceEnabled) {
-        await this.trySendTemplate(followUp, now);
+      if (autoRelanceEnabled && bulkContext) {
+        await this.trySendTemplate(followUp, now, bulkContext);
       }
     }
 
@@ -105,11 +116,36 @@ export class FollowUpReminderService {
       .execute();
   }
 
-  private async trySendTemplate(followUp: FollowUp, now: Date): Promise<void> {
+  private async loadBulkContext(dues: FollowUp[]): Promise<BulkContext> {
+    const followUpTypes = [...new Set(dues.map((f) => f.type).filter(Boolean))] as FollowUpType[];
+    const contactIds = dues.map((f) => f.contact_id).filter((id): id is string => !!id);
+    const conversationIds = dues.map((f) => f.conversation_id).filter((id): id is string => !!id);
+
+    const [mappings, contacts, chats] = await Promise.all([
+      followUpTypes.length > 0
+        ? this.mappingRepo.find({ where: { followUpType: In(followUpTypes), active: 1 } })
+        : Promise.resolve([]),
+      contactIds.length > 0
+        ? this.contactRepo.find({ where: { id: In(contactIds) }, select: ['id', 'phone'] })
+        : Promise.resolve([]),
+      conversationIds.length > 0
+        ? this.chatRepo.find({
+            where: { id: In(conversationIds) },
+            select: ['id', 'chat_id', 'channel_id', 'outboundMessageCount'],
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      mappingMap: new Map(mappings.map((m) => [m.followUpType, m])),
+      contactMap: new Map(contacts.map((c) => [c.id, c])),
+      chatMap: new Map(chats.map((c) => [c.id, c])),
+    };
+  }
+
+  private async trySendTemplate(followUp: FollowUp, now: Date, context: BulkContext): Promise<void> {
     try {
-      const mapping = await this.mappingRepo.findOne({
-        where: { followUpType: followUp.type, active: 1 },
-      });
+      const mapping = context.mappingMap.get(followUp.type);
       if (!mapping) return;
 
       const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -120,16 +156,10 @@ export class FollowUpReminderService {
       let clientPhone: string | null = null;
 
       if (followUp.contact_id) {
-        const contact = await this.contactRepo.findOne({
-          where: { id: followUp.contact_id },
-          select: ['phone'],
-        });
+        const contact = context.contactMap.get(followUp.contact_id);
         clientPhone = contact?.phone ?? null;
       } else if (followUp.conversation_id) {
-        const chat = await this.chatRepo.findOne({
-          where: { id: followUp.conversation_id },
-          select: ['chat_id'],
-        });
+        const chat = context.chatMap.get(followUp.conversation_id);
         clientPhone = chat?.chat_id ?? null;
       }
 
@@ -138,15 +168,8 @@ export class FollowUpReminderService {
         return;
       }
 
-      let channelId: string | null = null;
-
-      if (followUp.conversation_id) {
-        const chat = await this.chatRepo.findOne({
-          where: { id: followUp.conversation_id },
-          select: ['channel_id'],
-        });
-        channelId = chat?.channel_id ?? null;
-      }
+      const chat = followUp.conversation_id ? context.chatMap.get(followUp.conversation_id) : undefined;
+      const channelId = chat?.channel_id ?? null;
 
       if (!channelId) {
         this.logger.warn(`trySendTemplate: channel_id introuvable pour relance ${followUp.id}`);
@@ -168,20 +191,17 @@ export class FollowUpReminderService {
       this.logger.log(`Template ${mapping.templateName} envoyé au client pour relance ${followUp.id}`);
 
       // Incrémenter le compteur de messages sortants et vérifier la limite read_only.
-      if (followUp.conversation_id) {
+      if (followUp.conversation_id && chat) {
         await this.chatRepo.update(
           { id: followUp.conversation_id },
           { outboundMessageCount: () => 'outbound_message_count + 1' },
         );
-        const updatedChat = await this.chatRepo.findOne({
-          where: { id: followUp.conversation_id },
-          select: ['chat_id', 'outboundMessageCount', 'channel_id'],
-        });
-        if (updatedChat) {
-          const limit = await this.channelService.getEffectiveMessageLimit(updatedChat.channel_id ?? '');
-          if (limit > 0 && (updatedChat.outboundMessageCount ?? 0) >= limit) {
-            await this.chatRepo.update({ id: followUp.conversation_id }, { read_only: true });
-          }
+        const newCount = (chat.outboundMessageCount ?? 0) + 1;
+        // Mettre à jour le cache local pour les éventuelles itérations suivantes sur la même conversation
+        chat.outboundMessageCount = newCount;
+        const limit = await this.channelService.getEffectiveMessageLimit(channelId);
+        if (limit > 0 && newCount >= limit) {
+          await this.chatRepo.update({ id: followUp.conversation_id }, { read_only: true });
         }
       }
     } catch (err) {

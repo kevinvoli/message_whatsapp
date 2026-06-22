@@ -97,9 +97,10 @@ export class OrderCallSyncService {
       return { processed: 0, obligations: 0, errors: 0 };
     }
 
-    const [batchSize, lookbackMinutesRaw] = await Promise.all([
+    const [batchSize, lookbackMinutesRaw, durationThreshold] = await Promise.all([
       this.systemConfigService.getNumber('ORDER_CALL_SYNC_BATCH_SIZE', 100),
       this.systemConfigService.getNumber('ORDER_CALL_SYNC_LOOKBACK_MINUTES', 10),
+      this.systemConfigService.getNumber('ORDER_CALL_DURATION_MS_THRESHOLD_SEC', 7200),
     ]);
     const lookbackMinutes = Math.max(0, lookbackMinutesRaw);
 
@@ -193,12 +194,50 @@ export class OrderCallSyncService {
       }
     }
 
-    const workingTodayIds = new Set<string>();
-    const scheduleCache = new Map<string, string[]>();
+    // ── Pré-chargements bulk pour éliminer les N+1 dans la boucle ────────────
+
+    // Bulk 1 : call_log déjà créés pour les external_ids du batch (1 requête vs N)
+    const batchExternalIds = calls.map((c) => String(c.id));
+    const existingCallLogs = await this.callLogRepo.find({
+      where: { callEventExternalId: In(batchExternalIds) },
+      select: ['callEventExternalId'],
+    });
+    const callLogExistsSet = new Set(existingCallLogs.map((l) => l.callEventExternalId));
+
+    // Bulk 2 : contacts par remoteNumber (1 requête vs N)
+    const remotePhones = [
+      ...new Set(
+        calls
+          .filter((c) => c.remoteNumber)
+          .map((c) => normalizePhone(c.remoteNumber)),
+      ),
+    ].filter((p): p is string => Boolean(p));
+    const remoteContacts = remotePhones.length > 0
+      ? await this.contactRepo.find({
+          where: { phone: In(remotePhones) },
+          select: ['id', 'phone'],
+        })
+      : [];
+    const contactByRemotePhone = new Map(remoteContacts.map((c) => [c.phone, c]));
+
+    // Bulk 3 : syncLog existants pour les appels éligibles (1 requête vs N)
+    const eligibleExternalIds = calls
+      .filter((c) => this.isEligibleForObligation(c))
+      .map((c) => String(c.id));
+    const alreadyProcessedSet = await this.syncLog.existsAnyInBatch(
+      'call_validation',
+      eligibleExternalIds,
+    );
+
+    // ── Passe de résolution commerciaux (async, avec scheduleCache) ──────────
+    // On résout TOUS les commerciaux en premier pour constituer la liste des IDs
+    // nécessaires, puis on bulk-charge les postes en une seule requête.
+    const scheduleCache          = new Map<string, string[]>();
+    const workingTodayIds        = new Set<string>();
+    const resolvedCommercialsMap = new Map<string, { id: string | null; source: string | null }>();
 
     for (const call of calls) {
       const normalizedLocal = normalizePhone(call.localNumber);
-
       let commercialIdDb1: string | null = null;
       let attributionSource: string | null = null;
 
@@ -214,29 +253,56 @@ export class OrderCallSyncService {
           }
         }
       }
-
       if (!commercialIdDb1 && normalizedLocal) {
         commercialIdDb1 = commercialByPhone.get(normalizedLocal) ?? null;
         if (commercialIdDb1) attributionSource = 'phone';
       }
+      resolvedCommercialsMap.set(String(call.id), { id: commercialIdDb1, source: attributionSource });
+      if (commercialIdDb1) workingTodayIds.add(commercialIdDb1);
+    }
 
-      // Phase 2 — Auto-marquer is_working_today si commercial trouvé
-      if (commercialIdDb1 && !workingTodayIds.has(commercialIdDb1)) {
-        await this.commercialRepo.update(commercialIdDb1, {
-          isWorkingToday: true,
-          workingTodaySince: new Date(),
-        });
-        workingTodayIds.add(commercialIdDb1);
-      }
+    // Bulk 4 : commerciaux avec poste (FIX-H5) — 1 requête pour tout le batch
+    const commercialIdsNeeded = [...new Set(
+      [...resolvedCommercialsMap.values()]
+        .map((v) => v.id)
+        .filter((id): id is string => id !== null),
+    )];
+    const commercialsWithPoste = commercialIdsNeeded.length > 0
+      ? await this.commercialRepo.find({
+          where: { id: In(commercialIdsNeeded) },
+          relations: ['poste'],
+          select: { id: true, name: true, poste: { id: true } },
+        })
+      : [];
+    const commercialWithPosteMap = new Map(commercialsWithPoste.map((c) => [c.id, c]));
+
+    // Bulk 5 : is_working_today — 1 UPDATE pour tout le batch (remplace N updates individuels)
+    if (workingTodayIds.size > 0) {
+      await this.commercialRepo
+        .createQueryBuilder()
+        .update()
+        .set({ isWorkingToday: true, workingTodaySince: new Date() })
+        .where('id IN (:...ids)', { ids: [...workingTodayIds] })
+        .andWhere('isWorkingToday = :val', { val: false })
+        .execute();
+    }
+
+    // ── Boucle principale — requêtes SQL minimisées par itération ────────────
+    for (const call of calls) {
+      const externalId        = String(call.id);
+      const resolved          = resolvedCommercialsMap.get(externalId)!;
+      const commercialIdDb1   = resolved.id;
+      const attributionSource = resolved.source;
+      const durationSec       = this.normalizeDurationSync(call.duration, durationThreshold);
 
       // D2 - passer deviceId dans ingestFromDb2
       await this.callEventService.ingestFromDb2({
-        externalId:        String(call.id),
+        externalId,
         commercialPhone:   call.localNumber ?? '',
         commercialId:      commercialIdDb1 ?? null,
         clientPhone:       call.remoteNumber,
         callStatus:        call.callType.toLowerCase(),
-        durationSeconds:   await this.normalizeDuration(call.duration),
+        durationSeconds:   durationSec,
         eventAt:           call.callTimestamp,
         deviceId:          call.deviceId ?? null,
         attributionSource,
@@ -245,29 +311,14 @@ export class OrderCallSyncService {
       // B — Créer un call_log automatique depuis cet appel (idempotent via callEventExternalId)
       if (commercialIdDb1 !== null) {
         try {
-          const alreadyLogged = await this.callLogRepo.findOne({
-            where: { callEventExternalId: String(call.id) },
-            select: ['id'],
-          });
-          if (!alreadyLogged) {
-            // Résoudre contact_id via numéro client (peut être null si pas de contact WhatsApp)
-            const clientContact = call.remoteNumber
-              ? await this.contactRepo.findOne({
-                  where: { phone: normalizePhone(call.remoteNumber) },
-                  select: ['id'],
-                })
-              : null;
+          if (!callLogExistsSet.has(externalId)) {
+            const clientContact = contactByRemotePhone.get(
+              normalizePhone(call.remoteNumber ?? ''),
+            ) ?? null;
 
-            // FIX-H5: Charger le poste pour renseigner poste_id dans call_log
-            const commercial = await this.commercialRepo.findOne({
-              where: { id: commercialIdDb1 },
-              relations: ['poste'],
-              select: { id: true, name: true, poste: { id: true } },
-            });
+            const commercial      = commercialWithPosteMap.get(commercialIdDb1) ?? null;
             const resolvedPosteId: string | null = commercial?.poste?.id ?? null;
-            // Mapper call_status + outcome
-            const callType     = call.callType.toLowerCase();
-            const durationSec  = await this.normalizeDuration(call.duration);
+            const callType        = call.callType.toLowerCase();
             let mappedStatus: CallStatus;
             let mappedOutcome: CallOutcome | null = null;
 
@@ -309,12 +360,11 @@ export class OrderCallSyncService {
                 duration_sec:         durationSec,
                 notes:                null,
                 treated:              false,
-                poste_id:             resolvedPosteId,          // FIX-H5
-                callEventExternalId:  String(call.id),
+                poste_id:             resolvedPosteId,
+                callEventExternalId:  externalId,
               }),
             );
 
-            // Mettre à jour le statut d'appel du contact pour refléter l'issue de l'appel
             if (clientContact) {
               await this.contactRepo.update(clientContact.id, { call_status: mappedStatus });
             }
@@ -345,7 +395,7 @@ export class OrderCallSyncService {
             .insert()
             .into(CallEventUnresolved)
             .values({
-              externalId:   String(call.id),
+              externalId,
               localNumber:  call.localNumber ?? null,
               remoteNumber: call.remoteNumber ?? null,
               deviceId:     call.deviceId ?? null,
@@ -371,7 +421,7 @@ export class OrderCallSyncService {
           : null;
         this.missedCallHandlerService.handle({
           source:       'db2',
-          externalId:   String(call.id),
+          externalId,
           clientPhone:  call.remoteNumber ?? '',
           posteId:      resolvedPosteId,
           commercialId: commercialIdDb1,
@@ -386,9 +436,8 @@ export class OrderCallSyncService {
 
       let logId: string | null = null;
       try {
-        // existsAnyForEntity couvre pending+success+failed pour éviter les doublons de log
-        const alreadyProcessed = await this.syncLog.existsAnyForEntity('call_validation', call.id);
-        if (alreadyProcessed) continue;
+        // alreadyProcessedSet chargé en bulk avant la boucle
+        if (alreadyProcessedSet.has(externalId)) continue;
 
         newCalls++;
         const log = await this.processCall(call);
@@ -404,12 +453,12 @@ export class OrderCallSyncService {
               : null;
             if (resolvedPosteId) {
               isMissedCallCallback = await this.missedCallHandlerService.onOutgoingCallDetected({
-                callEventExternalId: String(call.id),
+                callEventExternalId: externalId,
                 posteId:             resolvedPosteId,
                 commercialId:        commercialIdDb1 ?? '',
                 clientPhone:         normalizePhone(call.remoteNumber ?? ''),
                 occurredAt:          call.callTimestamp,
-                durationSeconds:     await this.normalizeDuration(call.duration),
+                durationSeconds:     durationSec,
               });
             }
           } catch (err) {
@@ -423,7 +472,7 @@ export class OrderCallSyncService {
           continue;
         }
 
-        const result = await this.matchObligation(call);
+        const result = await this.matchObligation(call, durationThreshold);
         if (result?.matched) {
           obligationsMatched++;
           await this.syncLog.markSuccess(logId);
@@ -622,11 +671,21 @@ export class OrderCallSyncService {
    * FIX-C5: Normalise la duree DB2 en secondes avec seuil robuste.
    * Si raw > ORDER_CALL_DURATION_MS_THRESHOLD_SEC (defaut 7200), interprete comme ms.
    * Couvre: appels <= 2h stockes en s, et toutes durees en ms <= 2h*1000.
+   * Version async — charge le threshold depuis la config (usage isolé hors boucle).
    */
   private async normalizeDuration(raw: number): Promise<number> {
     if (!raw) return 0;
     if (raw < 0) return 0;
     const threshold = await this.systemConfigService.getNumber('ORDER_CALL_DURATION_MS_THRESHOLD_SEC', 7200);
+    return this.normalizeDurationSync(raw, threshold);
+  }
+
+  /**
+   * Version synchrone de normalizeDuration avec threshold pré-chargé.
+   * À utiliser dans les boucles pour éviter un appel config par itération.
+   */
+  private normalizeDurationSync(raw: number, threshold: number): number {
+    if (!raw || raw < 0) return 0;
     if (raw > threshold) {
       const asSec = Math.round(raw / 1000);
       this.logger.debug('normalizeDuration: ' + raw + ' -> ms -> ' + asSec + 's');
@@ -661,6 +720,7 @@ export class OrderCallSyncService {
 
   private async matchObligation(
     call: OrderCallLog,
+    durationThreshold?: number,
   ): Promise<{ matched: boolean; reason?: string } | null> {
     if (!this.obligationService) return null;
 
@@ -669,6 +729,9 @@ export class OrderCallSyncService {
     // automatiquement toutes les 5 min quand DB2 reviendra.
     if (!this.orderDb) {
       try {
+        const durationSec = durationThreshold !== undefined
+          ? this.normalizeDurationSync(call.duration, durationThreshold)
+          : await this.normalizeDuration(call.duration);
         await this.unresolvedRepo.upsert(
           {
             externalId:  String(call.id),
@@ -676,7 +739,7 @@ export class OrderCallSyncService {
             remoteNumber: call.remoteNumber ?? null,
             deviceId:    call.deviceId ?? null,
             callType:    call.callType ?? null,
-            durationSec: await this.normalizeDuration(call.duration),
+            durationSec,
             eventAt:     call.callTimestamp,
             reason:      'db2_unavailable',
             resolvedAt:  null,
@@ -686,6 +749,10 @@ export class OrderCallSyncService {
       } catch { /* non bloquant */ }
       return { matched: false, reason: 'db2_unavailable' };
     }
+
+    const durationSec = durationThreshold !== undefined
+      ? this.normalizeDurationSync(call.duration, durationThreshold)
+      : await this.normalizeDuration(call.duration);
 
     const resolvedCategory = await this.resolveClientCategory(call.remoteNumber);
 
@@ -701,12 +768,12 @@ export class OrderCallSyncService {
     }
 
     const result = await this.obligationService.tryMatchCallToTask({
-      callEventId:      call.id,
-      durationSeconds:  await this.normalizeDuration(call.duration),
+      callEventId:       call.id,
+      durationSeconds:   durationSec,
       resolvedCategory,
-      commercialPhone:  call.localNumber ?? undefined,
-      clientPhone:      call.remoteNumber,
-      posteId:          devicePosteId,
+      commercialPhone:   call.localNumber ?? undefined,
+      clientPhone:       call.remoteNumber,
+      posteId:           devicePosteId,
       skipDurationCheck: true,
     });
 
@@ -1205,6 +1272,10 @@ export class OrderCallSyncService {
     let skipped = 0;
     let errors  = 0;
 
+    // Résolution DB2 par contact (inévitable — requête par numéro de téléphone)
+    // Collecte d'abord tous les changements nécessaires, puis batch UPDATE par catégorie
+    const pendingUpdates: Array<{ id: string; category: ClientCategory }> = [];
+
     for (const contact of contacts) {
       try {
         const phone = normalizePhone(contact.phone);
@@ -1224,17 +1295,34 @@ export class OrderCallSyncService {
           continue;
         }
 
-        await this.contactRepo.update(
-          { id: contact.id },
-          { client_category: newCategory },
-        );
-        updated++;
+        pendingUpdates.push({ id: contact.id, category: newCategory });
       } catch (err) {
         errors++;
         this.logger.error(
           `syncClientCategories contact_id=${contact.id}: ${(err as Error).message}`,
         );
       }
+    }
+
+    // Batch UPDATE : 1 requête par catégorie distincte au lieu de 1 UPDATE par contact
+    if (pendingUpdates.length > 0) {
+      const byCategory = new Map<ClientCategory, string[]>();
+      for (const { id, category } of pendingUpdates) {
+        const ids = byCategory.get(category) ?? [];
+        ids.push(id);
+        byCategory.set(category, ids);
+      }
+
+      for (const [category, ids] of byCategory) {
+        await this.contactRepo
+          .createQueryBuilder()
+          .update()
+          .set({ client_category: category })
+          .where('id IN (:...ids)', { ids })
+          .execute();
+      }
+
+      updated = pendingUpdates.length;
     }
 
     this.logger.log(

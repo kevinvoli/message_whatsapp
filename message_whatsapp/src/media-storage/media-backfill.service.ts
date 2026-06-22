@@ -19,8 +19,8 @@ export class MediaBackfillService {
 
   /**
    * Rattrapage des médias non téléchargés lors de la réception webhook.
-   * Traite jusqu'à 200 médias des 30 derniers jours, avec une pause de 500 ms entre chaque
-   * appel aux APIs providers pour éviter le throttling.
+   * Traite jusqu'à 200 médias des 30 derniers jours en batches de 5 en parallèle,
+   * avec une pause de 500 ms entre chaque batch pour respecter les rate limits des providers.
    */
   @Cron('0 3 * * *')
   async backfillMediaDownloads(): Promise<void> {
@@ -42,13 +42,31 @@ export class MediaBackfillService {
       `MEDIA_BACKFILL_FOUND count=${medias.length} médias à traiter`,
     );
 
+    const BATCH_SIZE = 5;
     let successCount = 0;
-    for (const media of medias) {
-      await this.mediaDownloadService.downloadForMedia(media);
-      successCount++;
 
-      // Pause entre chaque appel pour ne pas saturer les APIs providers
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    for (let i = 0; i < medias.length; i += BATCH_SIZE) {
+      const batch = medias.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((media) =>
+          this.mediaDownloadService
+            .downloadForMedia(media)
+            .then(() => true)
+            .catch((err: unknown) => {
+              this.logger.warn(
+                `Backfill failed for media ${media.id}: ${err instanceof Error ? err.message : String(err)}`,
+                MediaBackfillService.name,
+              );
+              return false;
+            }),
+        ),
+      );
+      successCount += results.filter(Boolean).length;
+
+      // Pause entre les groupes pour respecter les rate limits des providers
+      if (i + BATCH_SIZE < medias.length) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
 
     this.logger.log(

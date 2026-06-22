@@ -93,6 +93,21 @@ export class IntegrationSyncLogService {
   }
 
   /**
+   * Version bulk de existsAnyForEntity — une seule requête SQL pour N entity_ids.
+   * Retourne le Set des entityId déjà présents dans la table (tout statut confondu).
+   */
+  async existsAnyInBatch(entityType: SyncEntityType, entityIds: string[]): Promise<Set<string>> {
+    if (entityIds.length === 0) return new Set();
+    const rows = await this.repo
+      .createQueryBuilder('l')
+      .select('l.entityId', 'entityId')
+      .where('l.entityType = :entityType', { entityType })
+      .andWhere('l.entityId IN (:...entityIds)', { entityIds })
+      .getRawMany<{ entityId: string }>();
+    return new Set(rows.map((r) => r.entityId));
+  }
+
+  /**
    * Supprime les entrées pending en doublon : garde la plus récente par entity_id,
    * supprime toutes les autres pending pour le même entity_type + entity_id.
    * Retourne le nombre de lignes supprimées.

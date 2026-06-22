@@ -166,6 +166,10 @@ export class ErpClientSyncService {
 
       this.logger.log(`syncErpClients: ${stale.length} contacts à recatégoriser (absents du batch DB2)`);
 
+      // Résolution DB2 par contact (inévitable — requête par order_client_id)
+      // Collecte d'abord tous les changements, puis batch UPDATE par catégorie
+      const pendingUpdates: Array<{ id: string; category: ClientCategory }> = [];
+
       for (const contact of stale) {
         try {
           const fresh = await this.orderCallSyncService.resolveCategoryByClientId(
@@ -174,10 +178,30 @@ export class ErpClientSyncService {
           );
           const freshCategory = fresh as unknown as ClientCategory;
           if (freshCategory !== contact.client_category) {
-            await this.contactRepo.update(contact.id, { client_category: freshCategory });
-            refreshed++;
+            pendingUpdates.push({ id: contact.id, category: freshCategory });
           }
         } catch { /* non bloquant */ }
+      }
+
+      // Batch UPDATE : 1 requête par catégorie distincte au lieu de 1 UPDATE par contact
+      if (pendingUpdates.length > 0) {
+        const byCategory = new Map<ClientCategory, string[]>();
+        for (const { id, category } of pendingUpdates) {
+          const ids = byCategory.get(category) ?? [];
+          ids.push(id);
+          byCategory.set(category, ids);
+        }
+
+        for (const [category, ids] of byCategory) {
+          await this.contactRepo
+            .createQueryBuilder()
+            .update()
+            .set({ client_category: category })
+            .where('id IN (:...ids)', { ids })
+            .execute();
+        }
+
+        refreshed = pendingUpdates.length;
       }
     } catch (err) {
       this.logger.warn(`refreshStaleCategories erreur: ${(err as Error).message}`);
