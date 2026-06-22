@@ -96,6 +96,9 @@ export class WhatsappCommercial {
   @Column({ name: 'group_id', type: 'varchar', length: 36, nullable: true, default: null })
   groupId: string | null;
 
+  @Column({ name: 'ip_restriction_exempt', type: 'boolean', default: false })
+  ipRestrictionExempt: boolean;
+
   @ManyToOne(() => CommercialGroup, (g) => g.commercials, { nullable: true })
   @JoinColumn({ name: 'group_id' })
   group?: CommercialGroup;

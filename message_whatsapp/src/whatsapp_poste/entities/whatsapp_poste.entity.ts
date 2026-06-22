@@ -63,6 +63,9 @@ export class WhatsappPoste {
   @OneToMany(() => WhapiChannel, (channel) => channel.poste)
   channels?: WhapiChannel[] | null;
 
+  @Column({ name: 'ip_restriction_exempt', type: 'boolean', default: false })
+  ipRestrictionExempt: boolean;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',

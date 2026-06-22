@@ -8,6 +8,11 @@ class UpdateAutoRelanceDto {
   enabled: boolean;
 }
 
+class UpdateRbacEnabledDto {
+  @IsBoolean()
+  enabled: boolean;
+}
+
 @Controller('admin/settings')
 @UseGuards(AdminGuard)
 export class PlatformSettingsController {
@@ -24,6 +29,20 @@ export class PlatformSettingsController {
     @Body() dto: UpdateAutoRelanceDto,
   ): Promise<{ enabled: boolean }> {
     await this.service.set('auto_relance_enabled', dto.enabled ? 'true' : 'false');
+    return { enabled: dto.enabled };
+  }
+
+  @Get('rbac-enabled')
+  async getRbacEnabled(): Promise<{ enabled: boolean }> {
+    const enabled = await this.service.isEnabled('rbac_enabled');
+    return { enabled };
+  }
+
+  @Put('rbac-enabled')
+  async updateRbacEnabled(
+    @Body() dto: UpdateRbacEnabledDto,
+  ): Promise<{ enabled: boolean }> {
+    await this.service.set('rbac_enabled', dto.enabled ? 'true' : 'false');
     return { enabled: dto.enabled };
   }
 }

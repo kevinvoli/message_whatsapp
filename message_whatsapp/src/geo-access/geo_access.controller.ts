@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { AdminGuard } from '../auth/admin.guard';
 import { GeoAccessService, CreateLocationDto } from './geo_access.service';
+import { SetExemptDto } from './dto/set-exempt.dto';
 
 @Controller('geo-access')
 @UseGuards(AdminGuard)
@@ -25,5 +26,15 @@ export class GeoAccessController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.svc.remove(id);
+  }
+
+  @Patch('postes/:id/exempt')
+  setPosteExempt(@Param('id') id: string, @Body() dto: SetExemptDto) {
+    return this.svc.setPosteExempt(id, dto.exempt);
+  }
+
+  @Patch('commerciaux/:id/exempt')
+  setCommercialExempt(@Param('id') id: string, @Body() dto: SetExemptDto) {
+    return this.svc.setCommercialExempt(id, dto.exempt);
   }
 }

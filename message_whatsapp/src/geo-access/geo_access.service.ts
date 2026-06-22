@@ -1,7 +1,9 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AllowedLocation } from './entities/allowed_location.entity';
+import { WhatsappPoste } from '../whatsapp_poste/entities/whatsapp_poste.entity';
+import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 
 export interface CreateLocationDto {
   label: string;
@@ -15,6 +17,10 @@ export class GeoAccessService {
   constructor(
     @InjectRepository(AllowedLocation)
     private readonly repo: Repository<AllowedLocation>,
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepo: Repository<WhatsappPoste>,
+    @InjectRepository(WhatsappCommercial)
+    private readonly commercialRepo: Repository<WhatsappCommercial>,
   ) {}
 
   findAll(): Promise<AllowedLocation[]> {
@@ -32,6 +38,43 @@ export class GeoAccessService {
 
   async remove(id: string): Promise<void> {
     await this.repo.softDelete(id);
+  }
+
+  async isExempt(commercialId: string | null, posteId: string | null): Promise<boolean> {
+    if (commercialId) {
+      const commercial = await this.commercialRepo.findOne({ where: { id: commercialId } });
+      if (commercial?.ipRestrictionExempt) return true;
+    }
+    if (posteId) {
+      const poste = await this.posteRepo.findOne({ where: { id: posteId } });
+      if (poste?.ipRestrictionExempt) return true;
+    }
+    return false;
+  }
+
+  async setPosteExempt(id: string, exempt: boolean): Promise<{ id: string; exempt: boolean }> {
+    const poste = await this.posteRepo.findOne({ where: { id } });
+    if (!poste) throw new NotFoundException(`Poste ${id} introuvable`);
+    await this.posteRepo.update(id, { ipRestrictionExempt: exempt });
+    return { id, exempt };
+  }
+
+  async setCommercialExempt(id: string, exempt: boolean): Promise<{ id: string; exempt: boolean }> {
+    const commercial = await this.commercialRepo.findOne({ where: { id } });
+    if (!commercial) throw new NotFoundException(`Commercial ${id} introuvable`);
+    await this.commercialRepo.update(id, { ipRestrictionExempt: exempt });
+    return { id, exempt };
+  }
+
+  /**
+   * TODO métier : aucun stockage de plages IP/CIDR n'existe dans le système.
+   * Le mécanisme de restriction actuel est géographique (lat/lng/rayon).
+   * Pour activer une vraie restriction IP, il faudra créer une entité AllowedIpRange
+   * (CIDR ou plage) et implémenter la vérification ici.
+   * En attendant cette décision métier, toutes les IPs sont autorisées.
+   */
+  async isIpAllowed(_ip: string): Promise<boolean> {
+    return true;
   }
 
   /**

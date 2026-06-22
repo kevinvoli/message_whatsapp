@@ -64,6 +64,7 @@ import { GicopPlatformModule } from './gicop-platform/gicop-platform.module';
 import { TargetsModule } from './targets/targets.module';
 import { CommercialSessionModule } from './commercial-session/commercial_session.module';
 import { GeoAccessModule } from './geo-access/geo_access.module';
+import { IpAccessGuard } from './geo-access/ip-access.guard';
 import { ConversationCapacityModule } from './conversation-capacity/conversation-capacity.module';
 import { WindowModule } from './window/window.module';
 import { SystemHealthModule } from './system-health/system-health.module';
@@ -295,6 +296,7 @@ import { MessageRestrictionModule } from './message-restriction/message-restrict
     AppService,
     // P1.4 — Activer le guard throttler globalement
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: IpAccessGuard },
   ],
 })
 export class AppModule {}

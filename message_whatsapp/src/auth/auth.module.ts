@@ -17,6 +17,8 @@ import { GroupScheduleDay } from '../commercial-group/entities/group-schedule-da
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { SystemConfigModule } from '../system-config/system-config.module';
 import { WorkingDayGuard } from './working-day.guard';
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { WorkingDayGuard } from './working-day.guard';
     PassportModule,
     ConfigModule,
     SystemConfigModule,
+    PlatformSettingsModule,
+    RbacModule,
     TypeOrmModule.forFeature([LoginLog, CommercialPlanning, GroupScheduleDay, WhatsappCommercial]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

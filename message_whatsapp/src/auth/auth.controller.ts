@@ -10,6 +10,7 @@ import {
   ForbiddenException,
   Res,
   BadRequestException,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
@@ -157,8 +158,11 @@ export class AuthController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  async getProfile(@Request() req: AuthenticatedRequest) {
-    const user = await this.authService.getProfile(req.user.userId);
+  async getProfile(
+    @Request() req: AuthenticatedRequest,
+    @Query('tenant_id', new DefaultValuePipe('default')) tenantId: string,
+  ) {
+    const user = await this.authService.getProfile(req.user.userId, tenantId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

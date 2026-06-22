@@ -4,12 +4,22 @@ import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_comme
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { AuthUser } from './shared/base-auth-user.types';
 import { BaseAuthService, UserLookupService } from './shared/base-auth.service';
+import { PlatformSettingsService } from '../platform-settings/platform-settings.service';
+import { RbacService } from '../rbac/rbac.service';
+import { Permission } from '../rbac/entities/role.entity';
+
+export interface AuthProfileResponse extends AuthUser {
+  rbacEnabled: boolean;
+  permissions: Permission[];
+}
 
 @Injectable()
 export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
   constructor(
     private readonly usersService: WhatsappCommercialService,
     jwtService: JwtService,
+    private readonly platformSettingsService: PlatformSettingsService,
+    private readonly rbacService: RbacService,
   ) {
     super(jwtService, { accessTokenExpiry: '7d', refreshTokenExpiry: '7d' });
   }
@@ -40,9 +50,16 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
     return this.toAuthUser(user);
   }
 
-  async getProfile(userId: string): Promise<AuthUser | null> {
+  async getProfile(userId: string, tenantId: string): Promise<AuthProfileResponse | null> {
     const user = await this.usersService.findOneWithPoste(userId);
     if (!user) return null;
-    return this.toAuthUser(user);
+
+    const authUser = this.toAuthUser(user);
+    const rbacEnabled = await this.platformSettingsService.isEnabled('rbac_enabled');
+    const permissions = rbacEnabled
+      ? await this.rbacService.getPermissions(userId, tenantId)
+      : [];
+
+    return { ...authUser, rbacEnabled, permissions };
   }
 }
