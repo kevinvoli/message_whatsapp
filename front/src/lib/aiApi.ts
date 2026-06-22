@@ -28,3 +28,12 @@ export async function qualifyConversation(chatId: string): Promise<AiQualifyResu
   const r = await axios.post<AiQualifyResult>(`${base}/ai/qualify/${chatId}`, {}, headers());
   return r.data;
 }
+
+export interface AiDossierResult {
+  synthesis: string;
+}
+
+export async function getAiDossier(contactId: string): Promise<AiDossierResult> {
+  const r = await axios.get<AiDossierResult>(`${base}/ai/dossier/${contactId}`, headers());
+  return r.data;
+}

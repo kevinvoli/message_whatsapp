@@ -1767,3 +1767,64 @@ export interface GdprOptout {
   createdAt: string;
   updatedAt: string;
 }
+
+// ============================================
+// ANALYTICS DÉTAILLÉS — /admin/analytics/
+// ============================================
+
+export interface AnalyticsSummary {
+  totalConversations: number;
+  openConversations: number;
+  closedConversations: number;
+  avgFirstResponseTimeSeconds: number;
+  avgResolutionTimeSeconds: number;
+  totalMessages: number;
+  messagesIn: number;
+  messagesOut: number;
+}
+
+export interface AnalyticsConversationDay {
+  date: string;
+  total: number;
+  opened: number;
+  closed: number;
+  avgResolutionSeconds: number;
+}
+
+export interface AnalyticsAgent {
+  agentId: string;
+  agentName: string;
+  posteName: string;
+  messagesOut: number;
+  chatsHandled: number;
+  avgResponseSeconds: number;
+}
+
+export interface AnalyticsChannel {
+  channelId: string;
+  label: string | null;
+  provider: string;
+  totalMessages: number;
+  messagesIn: number;
+  messagesOut: number;
+  totalConversations: number;
+}
+
+// ============================================
+// COACHING QUALITÉ IA
+// ============================================
+
+export interface QualityCoachingResult {
+  quality_score: number;
+  strengths: string[];
+  improvements: string[];
+  coaching_tips: string[];
+}
+
+export interface ConversationSummaryItem {
+  id: string;
+  chat_id: string;
+  name: string;
+  last_activity_at: string;
+  status?: string;
+}
