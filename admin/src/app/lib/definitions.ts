@@ -359,7 +359,7 @@ export type Poste = {
   is_queue_enabled?: boolean;
   /** Identifiant numérique sur la plateforme GICOP (nullable) */
   numero_poste?: number | null;
-  ipRestrictionExempt: boolean;
+  ipRestrictionExempt?: boolean;
   createdAt?: string;
   updatedAt?: string;
   chats?: WhatsappChat[] | null;
@@ -674,7 +674,7 @@ export type PerformanceCommercial = {
   portfolio_count?: number;
   follow_ups_pending?: number;
   follow_ups_overdue?: number;
-  ipRestrictionExempt: boolean;
+  ipRestrictionExempt?: boolean;
 };
 
 /**
