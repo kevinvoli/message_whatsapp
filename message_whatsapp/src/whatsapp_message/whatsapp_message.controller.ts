@@ -50,8 +50,8 @@ function detectMediaType(mimeType: string): MediaType {
 
 @Controller('messages')
 export class WhatsappMessageController {
-  /** Feature flag — templates HSM désactivés par défaut */
-  private static readonly HSM_TEMPLATES_ENABLED = false;
+  /** Feature flag — templates HSM activés */
+  private static readonly HSM_TEMPLATES_ENABLED = true;
 
   constructor(
     private readonly messageService: WhatsappMessageService,

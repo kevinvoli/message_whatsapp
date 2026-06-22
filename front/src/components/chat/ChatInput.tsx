@@ -9,6 +9,9 @@ import Picker from '@emoji-mart/react';
 import { CannedResponseMenu } from './CannedResponseMenu';
 import { useAuth } from '@/contexts/AuthProvider';
 import TemplateSelectorModal from './TemplateSelectorModal';
+import { AiSuggestionsPanel } from './AiSuggestionsPanel';
+import { rewriteText } from '@/lib/aiApi';
+import { RewriteMode } from '@/types/ai';
 
 const LocationPickerModal = dynamic(() => import('./LocationPickerModal'), { ssr: false });
 
@@ -29,7 +32,7 @@ interface ChatInputProps {
   firstResponseDeadlineAt?: Date | null;
 }
 
-const TYPING_STOP_DELAY = 2000; // 2s
+const TYPING_STOP_DELAY = 2000;
 
 function computeAvgResponseTime(messages: Message[]): string | null {
   const delays: number[] = [];
@@ -38,7 +41,6 @@ function computeAvgResponseTime(messages: Message[]): string | null {
     const msg = messages[i];
     if (msg.from_me) continue;
 
-    // Find the first outgoing message after this incoming one
     for (let j = i + 1; j < messages.length; j++) {
       if (messages[j].from_me) {
         const delay = messages[j].timestamp.getTime() - msg.timestamp.getTime();
@@ -50,7 +52,6 @@ function computeAvgResponseTime(messages: Message[]): string | null {
     }
   }
 
-  // Use last 10 exchanges max
   const recent = delays.slice(-10);
   if (recent.length === 0) return null;
 
@@ -91,7 +92,7 @@ async function uploadMedia(chatId: string, file: File | Blob, fileName: string, 
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || 'Upload failed');
+    throw new Error((err as { message?: string }).message || 'Upload failed');
   }
   return response.json();
 }
@@ -115,8 +116,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isRewriting, setIsRewriting] = useState(false);
   const [showRewriteMenu, setShowRewriteMenu] = useState(false);
-  const [suggestions, setSuggestions] = useState<{ text: string; rationale: string }[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const rewriteMenuRef = useRef<HTMLDivElement>(null);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
@@ -140,6 +139,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   const cannedPrefix = message.startsWith('/') ? message.slice(1) : null;
 
+  // Fermer le panneau de suggestions quand on change de conversation
+  useEffect(() => {
+    setShowSuggestions(false);
+  }, [chat_id]);
+
   // Raccourcis clavier globaux
   useEffect(() => {
     const onOpenCanned = () => { if (!disabled) setMessage(prev => prev.startsWith('/') ? prev : '/' + prev); };
@@ -158,38 +162,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setShowEmojiPicker(false);
   }, []);
 
-  const handleFetchSuggestions = async () => {
-    if (!chat_id) return;
-    setLoadingSuggestions(true);
-    setShowSuggestions(true);
-    try {
-      const res = await fetch(`${API_URL}/ai/suggestions/${chat_id}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json() as { text: string; rationale: string }[];
-        setSuggestions(data);
-      }
-    } catch { /* silencieux */ } finally {
-      setLoadingSuggestions(false);
-    }
+  const handleToggleSuggestions = () => {
+    setShowSuggestions((v) => !v);
   };
 
-  const handleRewrite = async (mode: 'correct' | 'improve' | 'formal' | 'short') => {
+  const handleSuggestionSelect = (text: string) => {
+    setMessage(text);
+    setShowSuggestions(false);
+  };
+
+  const handleRewrite = async (mode: RewriteMode) => {
     if (!message.trim()) return;
     setShowRewriteMenu(false);
     setIsRewriting(true);
     try {
-      const res = await fetch(`${API_URL}/ai/rewrite`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text: message, mode }),
-      });
-      if (res.ok) {
-        const data = await res.json() as { result: string };
-        if (data.result) setMessage(data.result);
-      }
+      const result = await rewriteText(message, mode);
+      if (result) setMessage(result);
     } catch {
-      // silencieux
+      // silencieux — IA désactivée ou indisponible
     } finally {
       setIsRewriting(false);
     }
@@ -206,7 +196,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showRewriteMenu]);
 
-  // Close picker on outside click
   useEffect(() => {
     if (!showEmojiPicker) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -255,7 +244,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  // --- Location sharing ---
   const handleConfirmLocation = useCallback(async (lat: number, lng: number) => {
     if (!chat_id) return;
     setIsSendingLocation(true);
@@ -269,7 +257,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [chat_id]);
 
-  // --- File upload (Paperclip) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !chat_id) return;
@@ -286,7 +273,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  // --- Voice recording (Mic) ---
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -470,43 +456,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
     )}
     <div className="bg-white border-t border-gray-200 p-3">
       <div className="max-w-4xl mx-auto">
-        {/* Suggestions IA */}
-        {showSuggestions && (
-          <div className="mb-2 p-2 bg-purple-50 border border-purple-200 rounded-xl">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-semibold text-purple-700 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" />
-                Suggestions IA
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowSuggestions(false)}
-                className="text-purple-400 hover:text-purple-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {loadingSuggestions ? (
-              <div className="flex items-center gap-2 py-1">
-                <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-purple-500">Génération en cours…</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => { setMessage(s.text); setShowSuggestions(false); }}
-                    title={s.rationale}
-                    className="text-left text-xs px-2.5 py-1.5 bg-white border border-purple-200 rounded-lg hover:bg-purple-100 text-gray-700 truncate"
-                  >
-                    {s.text}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Panneau suggestions IA */}
+        {chat_id && (
+          <AiSuggestionsPanel
+            chatId={chat_id}
+            visible={showSuggestions}
+            onSelect={handleSuggestionSelect}
+            onClose={() => setShowSuggestions(false)}
+          />
         )}
 
         {/* Bannière "En réponse à..." */}
@@ -601,16 +558,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
             {!message.trim() && (
               <button
                 type="button"
-                onClick={() => void handleFetchSuggestions()}
-                disabled={disabled || !isConnected || loadingSuggestions}
-                title="Suggestions IA"
-                className="p-3 text-gray-400 hover:text-purple-600 disabled:opacity-50"
+                onClick={handleToggleSuggestions}
+                disabled={disabled || !isConnected || !chat_id}
+                title={showSuggestions ? 'Masquer les suggestions IA' : 'Suggestions IA'}
+                aria-label="Suggestions IA"
+                className={`p-3 disabled:opacity-50 transition-colors ${
+                  showSuggestions
+                    ? 'text-purple-600 hover:text-purple-800'
+                    : 'text-gray-400 hover:text-purple-600'
+                }`}
               >
-                {loadingSuggestions ? (
-                  <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Sparkles className="w-5 h-5" />
-                )}
+                <Sparkles className="w-5 h-5" />
               </button>
             )}
             <textarea
@@ -633,6 +591,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   onClick={() => setShowRewriteMenu((v) => !v)}
                   disabled={isRewriting || disabled}
                   title="Réécrire avec l'IA"
+                  aria-label="Réécrire le message avec l'IA"
                   className="p-3 text-gray-400 hover:text-purple-600 disabled:opacity-50"
                 >
                   {isRewriting ? (
@@ -645,11 +604,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   <div className="absolute bottom-14 right-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 w-44">
                     {(
                       [
-                        { mode: 'correct', label: 'Corriger' },
-                        { mode: 'improve', label: 'Améliorer' },
-                        { mode: 'formal',  label: 'Formaliser' },
-                        { mode: 'short',   label: 'Raccourcir' },
-                      ] as const
+                        { mode: 'correct' as const, label: 'Corriger l\'orthographe' },
+                        { mode: 'formal'  as const, label: 'Formaliser' },
+                        { mode: 'improve' as const, label: 'Améliorer' },
+                        { mode: 'short'   as const, label: 'Raccourcir' },
+                      ]
                     ).map(({ mode, label }) => (
                       <button
                         key={mode}

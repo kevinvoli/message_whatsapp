@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Clock, Sparkles, X, CheckCircle, Circle, ClipboardList, Layers, Bell } from 'lucide-react';
+import { MessageCircle, Clock, Sparkles, CheckCircle, Circle, ClipboardList, Layers, Bell, Tag } from 'lucide-react';
 import { ContactAvatar } from '../ui/ContactAvatar';
 import {
   Conversation,
@@ -12,11 +12,14 @@ import { CallButton } from '../conversation/CallButton';
 const GicopReportPanel = dynamic(() => import('./GicopReportPanel'), { ssr: false });
 const CatalogModal = dynamic(() => import('./CatalogModal'), { ssr: false });
 const CreateFollowUpModal = dynamic(() => import('./CreateFollowUpModal'), { ssr: false });
+const AiSummaryModal = dynamic(() => import('./AiSummaryModal'), { ssr: false });
+const AiQualifyModal = dynamic(() => import('./AiQualifyModal'), { ssr: false });
 import { getStatusBadge } from '@/lib/utils';
 import { ConversationOptionsMenu } from '../conversation/conversationOptionMenu';
 import { useChatStore } from '@/store/chatStore';
 import { useContactStore } from '@/store/contactStore';
 import { ProviderBadge, getProviderFromChatId } from '../ui/ProviderBadge';
+import { getAiSummary, qualifyConversation, AiSummaryResult, AiQualifyResult } from '@/lib/aiApi';
 
 interface ChatHeaderProps {
     currentConv: Conversation;
@@ -63,42 +66,48 @@ function SlaCountdown({ deadline }: { deadline: Date }) {
     );
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-interface AiSummaryData {
-  summary: string;
-  sentiment: 'positive' | 'neutral' | 'negative' | 'mixed';
-  keyPoints: string[];
-  suggestedActions: string[];
-}
-
-const SENTIMENT_MAP: Record<string, { label: string; color: string }> = {
-  positive: { label: 'Positif', color: 'text-emerald-700 bg-emerald-50' },
-  neutral:  { label: 'Neutre',  color: 'text-gray-600 bg-gray-100' },
-  negative: { label: 'Négatif', color: 'text-red-700 bg-red-50' },
-  mixed:    { label: 'Mixte',   color: 'text-orange-700 bg-orange-50' },
-};
-
 export default function ChatHeader({ currentConv, totalMessages, onOpenContact, onCatalogSend, showReportPanel, onToggleReport }: ChatHeaderProps) {
     const { updateConversation, changeConversationStatus } = useChatStore();
     const { selectContactByChatId } = useContactStore();
     const provider = getProviderFromChatId(currentConv.chat_id);
-    const [showSummaryModal, setShowSummaryModal] = useState(false);
-    const [summary, setSummary] = useState<AiSummaryData | null>(null);
-    const [loadingSummary, setLoadingSummary] = useState(false);
+
     const [showCatalog, setShowCatalog] = useState(false);
     const [showFollowUp, setShowFollowUp] = useState(false);
 
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const [summaryResult, setSummaryResult] = useState<AiSummaryResult | null>(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
+
+    const [showQualifyModal, setShowQualifyModal] = useState(false);
+    const [qualifyResult, setQualifyResult] = useState<AiQualifyResult | null>(null);
+    const [loadingQualify, setLoadingQualify] = useState(false);
+
     const handleFetchSummary = async () => {
-      setShowSummaryModal(true);
-      if (summary) return;
-      setLoadingSummary(true);
-      try {
-        const res = await fetch(`${API_URL}/ai/summary/${currentConv.chat_id}`, { credentials: 'include' });
-        if (res.ok) setSummary(await res.json() as AiSummaryData);
-      } catch { /* silencieux */ } finally {
-        setLoadingSummary(false);
-      }
+        setShowSummaryModal(true);
+        if (summaryResult) return;
+        setLoadingSummary(true);
+        try {
+            const data = await getAiSummary(currentConv.chat_id);
+            setSummaryResult(data);
+        } catch {
+            setSummaryResult(null);
+        } finally {
+            setLoadingSummary(false);
+        }
+    };
+
+    const handleQualify = async () => {
+        setShowQualifyModal(true);
+        setQualifyResult(null);
+        setLoadingQualify(true);
+        try {
+            const data = await qualifyConversation(currentConv.chat_id);
+            setQualifyResult(data);
+        } catch {
+            setQualifyResult(null);
+        } finally {
+            setLoadingQualify(false);
+        }
     };
 
     function handleOpenContact() {
@@ -196,7 +205,7 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                         <Bell className="w-3.5 h-3.5" />
                         Relance
                     </button>
-                    {/* Bouton résumé IA */}
+                    {/* A2 — Bouton résumé IA */}
                     <button
                         onClick={() => void handleFetchSummary()}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
@@ -204,6 +213,15 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
                     >
                         <Sparkles className="w-3.5 h-3.5" />
                         Résumé IA
+                    </button>
+                    {/* A4 — Bouton qualification IA */}
+                    <button
+                        onClick={() => void handleQualify()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                        title="Qualifier la conversation par IA"
+                    >
+                        <Tag className="w-3.5 h-3.5" />
+                        Qualifier
                     </button>
                     <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">
                         <MessageCircle className="w-4 h-4" />
@@ -263,67 +281,22 @@ export default function ChatHeader({ currentConv, totalMessages, onOpenContact, 
             />
         )}
 
-        {/* Modal résumé IA */}
+        {/* A2 — Modal résumé IA */}
         {showSummaryModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowSummaryModal(false)}>
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-5" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-600" />
-                            Résumé IA
-                        </h3>
-                        <button onClick={() => setShowSummaryModal(false)} className="text-gray-400 hover:text-gray-600">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                    {loadingSummary ? (
-                        <div className="flex flex-col items-center py-6 gap-3">
-                            <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-sm text-gray-500">Analyse de la conversation…</p>
-                        </div>
-                    ) : summary ? (
-                        <div className="flex flex-col gap-4">
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sentiment</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${SENTIMENT_MAP[summary.sentiment]?.color ?? 'bg-gray-100 text-gray-700'}`}>
-                                        {SENTIMENT_MAP[summary.sentiment]?.label ?? summary.sentiment}
-                                    </span>
-                                </div>
-                                <p className="text-sm text-gray-700 leading-relaxed">{summary.summary}</p>
-                            </div>
-                            {summary.keyPoints.length > 0 && (
-                                <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Points clés</p>
-                                    <ul className="flex flex-col gap-1">
-                                        {summary.keyPoints.map((pt, i) => (
-                                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                                                <span className="text-purple-400 mt-0.5">•</span>
-                                                {pt}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                            {summary.suggestedActions.length > 0 && (
-                                <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Actions suggérées</p>
-                                    <ul className="flex flex-col gap-1">
-                                        {summary.suggestedActions.map((a, i) => (
-                                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                                                <span className="text-emerald-500 mt-0.5">→</span>
-                                                {a}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-gray-400 text-center py-4">Impossible de générer le résumé.</p>
-                    )}
-                </div>
-            </div>
+            <AiSummaryModal
+                loading={loadingSummary}
+                result={summaryResult}
+                onClose={() => setShowSummaryModal(false)}
+            />
+        )}
+
+        {/* A4 — Modal qualification IA */}
+        {showQualifyModal && (
+            <AiQualifyModal
+                loading={loadingQualify}
+                result={qualifyResult}
+                onClose={() => setShowQualifyModal(false)}
+            />
         )}
         </>
     );
