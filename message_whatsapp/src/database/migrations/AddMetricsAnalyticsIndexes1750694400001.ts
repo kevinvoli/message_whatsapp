@@ -160,12 +160,12 @@ export class AddMetricsAnalyticsIndexes1750694400001 implements MigrationInterfa
     table: string,
     indexName: string,
   ): Promise<boolean> {
-    const rows = await queryRunner.query<{ cnt: string }[]>(`
+    const rows = await queryRunner.query(`
       SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.STATISTICS
       WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME   = ?
         AND INDEX_NAME   = ?
-    `, [table, indexName]);
+    `, [table, indexName]) as Array<{ cnt: string }>;
     return parseInt(rows[0].cnt, 10) > 0;
   }
 
