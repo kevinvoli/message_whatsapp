@@ -281,15 +281,11 @@ export class ValidationEngineService {
     for (const v of pending) {
       if (!activeChatIds.has(v.chat_id)) continue;
 
-      await this.validationRepo.update(
-        { id: v.id },
-        {
-          is_validated: true,
-          validated_at: new Date(),
-          external_id: 'auto_timeout',
-          external_data: { reason: 'timeout', hours } as unknown as Record<string, unknown>,
-        },
-      );
+      v.is_validated = true;
+      v.validated_at = new Date();
+      v.external_id = 'auto_timeout';
+      v.external_data = { reason: 'timeout', hours };
+      await this.validationRepo.save(v);
       autoValidated++;
     }
 
