@@ -116,7 +116,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     if (currentPoste.is_queue_enabled === false && formIsActive) {
       addToast({
         type: 'error',
-        message: 'Ce poste est bloque dans la file. Debloque-le avant de l'activer.',
+        message: "Ce poste est bloqué dans la file. Débloque-le avant de l'activer.",
       });
       return;
     }
