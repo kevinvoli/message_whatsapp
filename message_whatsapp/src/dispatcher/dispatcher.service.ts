@@ -106,19 +106,24 @@ export class DispatcherService {
       await this.conversationPublisher.emitConversationRemoved(chat.chat_id, oldPoste);
       return;
     }
+    const now = new Date();
     await this.chatRepository.update(chat.id, {
       poste: nextPoste,
       poste_id: nextPoste.id,
       assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
       status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
-      assigned_at: new Date(),
-      first_response_deadline_at: new Date(Date.now() + 15 * 60 * 1000),
+      assigned_at: now,
+      first_response_deadline_at: new Date(now.getTime() + 15 * 60 * 1000),
     });
-    const updatedChat = await this.chatRepository.findOne({
-      where: { chat_id: chat.chat_id },
-      relations: ['poste'],
-    });
-    if (!updatedChat) return;
+    const updatedChat: WhatsappChat = {
+      ...chat,
+      poste: nextPoste,
+      poste_id: nextPoste.id,
+      assigned_mode: nextPoste.is_active ? 'ONLINE' : 'OFFLINE',
+      status: nextPoste.is_active ? WhatsappChatStatus.ACTIF : WhatsappChatStatus.EN_ATTENTE,
+      assigned_at: now,
+      first_response_deadline_at: new Date(now.getTime() + 15 * 60 * 1000),
+    };
     await this.conversationPublisher.emitConversationReassigned(updatedChat, oldPoste, nextPoste.id);
   }
 

@@ -837,16 +837,17 @@ export class WhatsappMessageService {
     }
   }
 
-  async findAllByChatId(chat_id: string) {
-    const messages = await this.messageRepository.find({
-      where: { chat_id: chat_id },
+  async findAllByChatId(chat_id: string, limit = 500): Promise<WhatsappMessage[]> {
+    return this.messageRepository.find({
+      where: { chat_id },
       relations: {
         medias: true,
         poste: true,
         chat: true,
       },
+      order: { createdAt: 'DESC' },
+      take: limit,
     });
-    return messages;
   }
 
   async findAll(limit = 50, offset = 0, dateStart?: Date): Promise<{ data: unknown[]; total: number }> {

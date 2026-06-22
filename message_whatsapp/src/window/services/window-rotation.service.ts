@@ -189,21 +189,31 @@ export class WindowRotationService {
   }
 
   /**
-   * Batch update de slots — updates en parallèle sans transaction explicite.
-   * Évite les problèmes de manager.transaction dans certaines configurations TypeORM.
+   * Batch update de slots — un seul UPDATE CASE WHEN au lieu de N aller-retours DB.
    */
   private async batchUpdateSlots(
     assignments: Array<{ id: string; slot: number | null; status: WindowStatus; isLocked: boolean }>,
   ): Promise<void> {
     if (assignments.length === 0) return;
 
-    await Promise.all(
-      assignments.map((a) =>
-        this.chatRepo.update(
-          { id: a.id },
-          { window_slot: a.slot, window_status: a.status, is_locked: a.isLocked },
-        ),
-      ),
+    const whenSlot     = assignments.map(() => 'WHEN id = ? THEN ?').join(' ');
+    const whenStatus   = assignments.map(() => 'WHEN id = ? THEN ?').join(' ');
+    const whenIsLocked = assignments.map(() => 'WHEN id = ? THEN ?').join(' ');
+    const placeholdersIn = assignments.map(() => '?').join(',');
+
+    const params: (string | number | boolean | null)[] = [];
+    for (const a of assignments) { params.push(a.id, a.slot); }
+    for (const a of assignments) { params.push(a.id, a.status); }
+    for (const a of assignments) { params.push(a.id, a.isLocked ? 1 : 0); }
+    for (const a of assignments) { params.push(a.id); }
+
+    await this.chatRepo.query(
+      `UPDATE whatsapp_chat
+       SET window_slot   = CASE ${whenSlot} END,
+           window_status = CASE ${whenStatus} END,
+           is_locked     = CASE ${whenIsLocked} END
+       WHERE id IN (${placeholdersIn})`,
+      params,
     );
   }
 

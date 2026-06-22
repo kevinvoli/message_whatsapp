@@ -1,6 +1,6 @@
 ﻿import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { DistributedLockService } from 'src/redis/distributed-lock.service';
 import { v4 as uuidv4 } from 'uuid';
 import { SystemConfigService } from 'src/system-config/system-config.service';
@@ -375,11 +375,17 @@ export class CallObligationService {
 
   async initAllBatches(): Promise<{ created: number; alreadyActive: number }> {
     const postes = await this.posteRepo.find({ select: ['id'] });
+
+    const activeBatches = await this.batchRepo.find({
+      where: { status: In([BatchStatus.PENDING, BatchStatus.COMPLETE]) },
+      select: ['posteId'],
+    });
+    const coveredPosteIds = new Set(activeBatches.map((b) => b.posteId));
+
     let created = 0;
     let alreadyActive = 0;
     for (const poste of postes) {
-      const active = await this.getActiveBatch(poste.id);
-      if (active) { alreadyActive++; continue; }
+      if (coveredPosteIds.has(poste.id)) { alreadyActive++; continue; }
       await this.getOrCreateActiveBatch(poste.id);
       created++;
     }
