@@ -134,7 +134,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
       addToast({
         type: 'error',
         message:
-          'Activation refusee: ce poste est bloque dans la file. Debloque-le avant de l'activer.',
+          "Activation refusée: ce poste est bloqué dans la file. Débloque-le avant de l'activer.",
       });
     }
     if (result.ok) {
