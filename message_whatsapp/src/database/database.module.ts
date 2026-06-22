@@ -2,8 +2,10 @@ import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BackgroundIndexService } from './background-index.service';
 
 @Module({
+  providers: [BackgroundIndexService],
   imports: [
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
