@@ -940,21 +940,35 @@ export class OrderCallSyncService {
     let retried = 0;
     let matched = 0;
 
+    // Pré-chargement bulk — commerciaux par ID (Résolution 1)
+    const commercialIds = [...new Set(candidates.map((e) => e.commercial_id).filter((id): id is string => Boolean(id)))];
+    const commercialsWithPoste = commercialIds.length > 0
+      ? await this.commercialRepo.find({
+          where:     { id: In(commercialIds) },
+          relations: { poste: true },
+        })
+      : [];
+    const commercialPosteMap = new Map(commercialsWithPoste.map((c) => [c.id, c]));
+
+    // Pré-chargement bulk — devices par device_id (Résolution 2 fallback)
+    const deviceIds = [...new Set(candidates.map((e) => e.device_id).filter((id): id is string => Boolean(id)))];
+    const devices = deviceIds.length > 0
+      ? await this.callDeviceRepo.findBy({ deviceId: In(deviceIds) })
+      : [];
+    const devicePosteMap = new Map(devices.map((d) => [d.deviceId, d]));
+
     for (const event of candidates) {
       let posteId: string | null = null;
 
       // Résolution 1 : commercial_id → WhatsappCommercial → poste
       if (event.commercial_id) {
-        const commercial = await this.commercialRepo.findOne({
-          where:     { id: event.commercial_id },
-          relations: { poste: true },
-        });
+        const commercial = commercialPosteMap.get(event.commercial_id) ?? null;
         posteId = commercial?.poste?.id ?? null;
       }
 
       // Résolution 2 (fallback) : device_id → call_device → poste associé
       if (!posteId && event.device_id) {
-        const device = await this.callDeviceRepo.findOne({ where: { deviceId: event.device_id } });
+        const device = devicePosteMap.get(event.device_id) ?? null;
         posteId = device?.posteId ?? null;
       }
 

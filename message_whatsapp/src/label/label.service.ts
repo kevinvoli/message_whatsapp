@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Label } from './entities/label.entity';
 import { ChatLabelAssignment } from './entities/chat-label-assignment.entity';
 import { CreateLabelDto } from './dto/create-label.dto';
@@ -89,9 +89,12 @@ export class LabelService {
     labelIds: string[],
     tenantId: string,
   ): Promise<Label[]> {
-    // Vérifier que tous les labels appartiennent au tenant
-    for (const labelId of labelIds) {
-      await this.findOneLabel(labelId, tenantId);
+    // Vérifier que tous les labels appartiennent au tenant en une seule requête
+    if (labelIds.length > 0) {
+      const found = await this.labelRepo.findBy({ id: In(labelIds), tenant_id: tenantId });
+      if (found.length !== labelIds.length) {
+        throw new NotFoundException('Un ou plusieurs labels introuvables');
+      }
     }
 
     // Supprimer les assignations existantes

@@ -203,51 +203,59 @@ export class ConversationRestrictionService {
     }
 
     // Si requireLastMessageMine : filtrer les conversations dont le dernier message est from_me = true
+    // Bulk query : dernier message par chat en une seule requête pour éviter le N+1
     let effectiveUnresponded = effectiveAccesses;
-    if (config.requireLastMessageMine) {
-      const filtered: CommercialConversationAccess[] = [];
-      for (const access of effectiveAccesses) {
-        const lastMsg = await this.messageRepository
-          .createQueryBuilder('msg')
-          .where('msg.chat_id = :chatId', { chatId: access.chatId })
-          .andWhere('msg.deletedAt IS NULL')
-          .orderBy('msg.timestamp', 'DESC')
-          .limit(1)
-          .getOne();
+    if (config.requireLastMessageMine && effectiveAccesses.length > 0) {
+      const effectiveChatIds = effectiveAccesses.map((a) => a.chatId);
+      const lastMsgRows = await this.messageRepository
+        .createQueryBuilder('msg')
+        .select('msg.chat_id', 'chatId')
+        .addSelect('msg.from_me', 'fromMe')
+        .where('msg.chat_id IN (:...effectiveChatIds)', { effectiveChatIds })
+        .andWhere('msg.deletedAt IS NULL')
+        .andWhere(
+          'msg.id = (SELECT m2.id FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.deleted_at IS NULL ORDER BY m2.timestamp DESC LIMIT 1)',
+        )
+        .getRawMany<{ chatId: string; fromMe: boolean | number }>();
 
-        // Si le dernier message est from_me, on considère la conv comme répondue → exclure
-        if (!lastMsg || !lastMsg.from_me) {
-          filtered.push(access);
-        }
-      }
-      effectiveUnresponded = filtered;
+      const lastMsgMap = new Map(lastMsgRows.map((r) => [r.chatId, r.fromMe]));
+
+      // Si le dernier message est from_me, on considère la conv comme répondue → exclure
+      effectiveUnresponded = effectiveAccesses.filter((access) => {
+        const fromMe = lastMsgMap.get(access.chatId);
+        return fromMe !== true && fromMe !== 1;
+      });
     }
 
     const unrespondedCount = effectiveUnresponded.length;
     const triggered = config.enabled && unrespondedCount > config.maxUnrespondedConvs;
 
-    // Enrichir chaque conversation non-répondue (chat déjà en cache)
-    const unrespondedConversations = await Promise.all(
-      effectiveUnresponded.map(async (access) => {
-        const chat = chatMap.get(access.chatId);
-
-        const lastClientMsg = await this.messageRepository
+    // Enrichir chaque conversation non-répondue : bulk query du dernier message client pour éviter le N+1
+    const unrespondedChatIds = effectiveUnresponded.map((a) => a.chatId);
+    const lastClientMsgMap = unrespondedChatIds.length > 0
+      ? await this.messageRepository
           .createQueryBuilder('msg')
-          .where('msg.chat_id = :chatId', { chatId: access.chatId })
+          .select('msg.chat_id', 'chatId')
+          .addSelect('msg.text', 'text')
+          .where('msg.chat_id IN (:...unrespondedChatIds)', { unrespondedChatIds })
           .andWhere('msg.from_me = :fromMe', { fromMe: false })
           .andWhere('msg.deletedAt IS NULL')
-          .orderBy('msg.timestamp', 'DESC')
-          .limit(1)
-          .getOne();
+          .andWhere(
+            'msg.id = (SELECT m2.id FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.from_me = FALSE AND m2.deleted_at IS NULL ORDER BY m2.timestamp DESC LIMIT 1)',
+          )
+          .getRawMany<{ chatId: string; text: string | null }>()
+          .then((rows) => new Map(rows.map((r) => [r.chatId, r.text])))
+      : new Map<string, string | null>();
 
-        return {
-          chat_id: access.chatId,
-          contact_name: chat?.name ?? access.chatId,
-          last_client_message: lastClientMsg?.text ?? '',
-          accessed_at: access.accessedAt.toISOString(),
-        };
-      }),
-    );
+    const unrespondedConversations = effectiveUnresponded.map((access) => {
+      const chat = chatMap.get(access.chatId);
+      return {
+        chat_id: access.chatId,
+        contact_name: chat?.name ?? access.chatId,
+        last_client_message: lastClientMsgMap.get(access.chatId) ?? '',
+        accessed_at: access.accessedAt.toISOString(),
+      };
+    });
 
     return {
       triggered,

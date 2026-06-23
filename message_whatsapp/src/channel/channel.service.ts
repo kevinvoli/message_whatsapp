@@ -75,6 +75,10 @@ export class ChannelService implements OnModuleInit {
       `channel:id:${channelId}`,
       `channel:dedicated:${channelId}`,
       `channel:is_dedicated:${channelId}`,
+      `channel:no_read_only:${channelId}`,
+      `channel:no_close:${channelId}`,
+      `channel:skip_auto_close:${channelId}`,
+      `channel:msg_limit:${channelId}`,
     );
   }
 
@@ -158,11 +162,13 @@ export class ChannelService implements OnModuleInit {
    */
   async isReadOnlyBlocked(channelId: string): Promise<boolean> {
     if (!channelId) return false;
-    const ch = await this.channelRepository.findOne({
-      where: { channel_id: channelId },
-      select: ['channel_id', 'no_read_only'],
+    return this.cachedGet<boolean>(`channel:no_read_only:${channelId}`, 60, async () => {
+      const ch = await this.channelRepository.findOne({
+        where: { channel_id: channelId },
+        select: ['channel_id', 'no_read_only'],
+      });
+      return !!ch?.no_read_only;
     });
-    return !!ch?.no_read_only;
   }
 
   /**
@@ -171,11 +177,13 @@ export class ChannelService implements OnModuleInit {
    */
   async isCloseBlocked(channelId: string): Promise<boolean> {
     if (!channelId) return false;
-    const ch = await this.channelRepository.findOne({
-      where: { channel_id: channelId },
-      select: ['channel_id', 'no_close'],
+    return this.cachedGet<boolean>(`channel:no_close:${channelId}`, 60, async () => {
+      const ch = await this.channelRepository.findOne({
+        where: { channel_id: channelId },
+        select: ['channel_id', 'no_close'],
+      });
+      return !!ch?.no_close;
     });
-    return !!ch?.no_close;
   }
 
   /**
@@ -187,11 +195,13 @@ export class ChannelService implements OnModuleInit {
    */
   async shouldSkipAutoClose(channelId: string): Promise<boolean> {
     if (!channelId) return false;
-    const ch = await this.channelRepository.findOne({
-      where: { channel_id: channelId },
-      select: ['channel_id', 'no_close', 'poste_id'],
+    return this.cachedGet<boolean>(`channel:skip_auto_close:${channelId}`, 60, async () => {
+      const ch = await this.channelRepository.findOne({
+        where: { channel_id: channelId },
+        select: ['channel_id', 'no_close', 'poste_id'],
+      });
+      return !!ch?.no_close || !!ch?.poste_id;
     });
-    return !!ch?.no_close || !!ch?.poste_id;
   }
 
   /**
@@ -203,15 +213,17 @@ export class ChannelService implements OnModuleInit {
    */
   async getEffectiveMessageLimit(channelId: string): Promise<number> {
     if (!channelId) return 0;
-    const ch = await this.channelRepository.findOne({
-      where: { channel_id: channelId },
-      select: ['channel_id', 'maxMessagesBeforeReadonly'],
+    return this.cachedGet<number>(`channel:msg_limit:${channelId}`, 60, async () => {
+      const ch = await this.channelRepository.findOne({
+        where: { channel_id: channelId },
+        select: ['channel_id', 'maxMessagesBeforeReadonly'],
+      });
+      if (ch?.maxMessagesBeforeReadonly !== null && ch?.maxMessagesBeforeReadonly !== undefined) {
+        return ch.maxMessagesBeforeReadonly;
+      }
+      const global = await this.getSystemConfigService().get('MAX_MESSAGES_BEFORE_READONLY');
+      return global ? parseInt(global, 10) || 0 : 0;
     });
-    if (ch?.maxMessagesBeforeReadonly !== null && ch?.maxMessagesBeforeReadonly !== undefined) {
-      return ch.maxMessagesBeforeReadonly;
-    }
-    const global = await this.getSystemConfigService().get('MAX_MESSAGES_BEFORE_READONLY');
-    return global ? parseInt(global, 10) || 0 : 0;
   }
 
   async findAll() {

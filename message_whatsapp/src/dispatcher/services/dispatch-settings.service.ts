@@ -1,9 +1,11 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DispatchSettings } from '../entities/dispatch-settings.entity';
 import { DispatchSettingsAudit } from '../entities/dispatch-settings-audit.entity';
 import { CronConfigService } from 'src/jorbs/cron-config.service';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
+import type Redis from 'ioredis';
 
 const DEFAULTS = {
   no_reply_reinject_interval_minutes: 5,
@@ -11,6 +13,9 @@ const DEFAULTS = {
   offline_reinject_cron: '0 9 * * *',
   dispatch_mode: 'LEAST_LOADED' as const,
 };
+
+const CACHE_KEY = 'dispatch:settings:global';
+const CACHE_TTL = 300; // 5 minutes
 
 @Injectable()
 export class DispatchSettingsService implements OnModuleInit {
@@ -22,6 +27,7 @@ export class DispatchSettingsService implements OnModuleInit {
     @InjectRepository(DispatchSettingsAudit)
     private readonly auditRepository: Repository<DispatchSettingsAudit>,
     private readonly cronConfigService: CronConfigService,
+    @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -29,14 +35,23 @@ export class DispatchSettingsService implements OnModuleInit {
   }
 
   async getSettings(): Promise<DispatchSettings> {
+    if (this.redis) {
+      const cached = await this.redis.get(CACHE_KEY).catch(() => null);
+      if (cached) return JSON.parse(cached) as DispatchSettings;
+    }
     const existing = await this.settingsRepository.findOne({
       where: {},
       order: { createdAt: 'ASC' },
     });
-    if (existing) {
-      return existing;
+    const settings = existing ?? (await this.ensureDefaults());
+    if (this.redis) {
+      await this.redis.setex(CACHE_KEY, CACHE_TTL, JSON.stringify(settings)).catch(() => null);
     }
-    return this.ensureDefaults();
+    return settings;
+  }
+
+  private async invalidateCache(): Promise<void> {
+    await this.redis?.del(CACHE_KEY).catch(() => null);
   }
 
   async updateSettings(
@@ -61,6 +76,7 @@ export class DispatchSettingsService implements OnModuleInit {
         }),
       }),
     );
+    await this.invalidateCache();
     await this.cronConfigService.syncFromDispatchSettings(patch);
     return saved;
   }
@@ -81,6 +97,7 @@ export class DispatchSettingsService implements OnModuleInit {
         }),
       }),
     );
+    await this.invalidateCache();
     await this.cronConfigService.syncFromDispatchSettings(DEFAULTS);
     return saved;
   }

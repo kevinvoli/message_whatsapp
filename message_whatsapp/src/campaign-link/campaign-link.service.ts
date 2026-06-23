@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, IsNull, Not, Repository } from 'typeorm';
+import { Between, In, IsNull, Not, Repository } from 'typeorm';
 import { CampaignLink } from './entities/campaign-link.entity';
 import { CampaignLinkClick } from './entities/campaign-link-click.entity';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
@@ -200,8 +200,15 @@ export class CampaignLinkService {
   async repairTrackedUrls(): Promise<{ repaired: number }> {
     const links = await this.linkRepository.find();
     let repaired = 0;
+
+    const channelIds = [...new Set(links.map((l) => l.channelId).filter(Boolean))];
+    const channels = channelIds.length > 0
+      ? await this.channelRepository.findBy({ channel_id: In(channelIds) })
+      : [];
+    const channelMap = new Map(channels.map((c) => [c.channel_id, c]));
+
     for (const link of links) {
-      const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+      const channel = channelMap.get(link.channelId) ?? null;
       const phone = channel ? await this.resolvePhone(channel) : null;
       if (!phone) continue;
       const { directUrl, trackedUrl } = this.buildUrls(phone, link.predefinedMessage, link.shortCode);
@@ -257,6 +264,13 @@ export class CampaignLinkService {
       where: { mediaAssetId: Not(IsNull()) },
     });
     let repaired = 0;
+
+    const channelIds = [...new Set(links.map((l) => l.channelId).filter(Boolean))];
+    const channels = channelIds.length > 0
+      ? await this.channelRepository.findBy({ channel_id: In(channelIds) })
+      : [];
+    const channelMap = new Map(channels.map((c) => [c.channel_id, c]));
+
     for (const link of links) {
       if (!link.mediaAssetId) continue;
       try {
@@ -264,7 +278,7 @@ export class CampaignLinkService {
         const previewUrl = this.mediaAssetService.buildPreviewUrl(asset.id);
         const baseMessage = this.stripMediaUrl(link.predefinedMessage);
         const newMessage = `${baseMessage}\n${previewUrl}`.trim();
-        const channel = await this.channelRepository.findOne({ where: { channel_id: link.channelId } });
+        const channel = channelMap.get(link.channelId) ?? null;
         const phone = channel ? await this.resolvePhone(channel) : null;
         const updates: Partial<CampaignLink> = { predefinedMessage: newMessage };
         if (phone) {
