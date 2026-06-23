@@ -42,8 +42,9 @@ export class BackgroundIndexService implements OnApplicationBootstrap {
   ) {}
 
   onApplicationBootstrap(): void {
-    // Lance en arrière-plan sans bloquer le démarrage de l'app
-    void this.createPendingIndexes();
+    // Délai de 5 minutes avant de démarrer pour ne pas bloquer les requêtes
+    // au démarrage (les DDL MariaDB posent un metadata lock sur la table)
+    setTimeout(() => void this.createPendingIndexes(), 5 * 60 * 1000);
   }
 
   private async createPendingIndexes(): Promise<void> {

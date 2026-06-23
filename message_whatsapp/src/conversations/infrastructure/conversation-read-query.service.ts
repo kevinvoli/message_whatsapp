@@ -241,7 +241,7 @@ export class ConversationReadQueryService {
       .addSelect("SUM(CASE WHEN chat.status = 'actif' THEN 1 ELSE 0 END)", 'totalActifs')
       .addSelect("SUM(CASE WHEN chat.status = 'en attente' THEN 1 ELSE 0 END)", 'totalEnAttente')
       .addSelect(
-        'SUM(CASE WHEN chat.unreadCount > 0 THEN 1 ELSE 0 END)',
+        'SUM(CASE WHEN chat.unread_count > 0 THEN 1 ELSE 0 END)',
         'totalUnread',
       )
       .addSelect("SUM(CASE WHEN chat.status = 'fermé' THEN 1 ELSE 0 END)", 'totalFermes')
