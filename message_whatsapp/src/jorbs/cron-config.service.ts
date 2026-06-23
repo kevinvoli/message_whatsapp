@@ -21,7 +21,7 @@ const CRON_DEFAULTS: Record<string, Partial<CronConfig>> = {
   'sla-checker': {
     label: 'Vérificateur SLA — réinjection conversations non lues',
     description:
-      'Vérifie toutes les N minutes les conversations avec des messages non lus depuis plus de N minutes et les réinjecte dans la queue. N doit être strictement supérieur à 120. Désactivé automatiquement entre 21h et 5h.',
+      'Vérifie toutes les N minutes les conversations avec des messages non lus depuis plus de N minutes et les réinjecte dans la queue. N doit être supérieur ou égal à 120. Désactivé automatiquement entre 21h et 5h.',
     enabled: true,
     scheduleType: 'interval',
     intervalMinutes: 121,
@@ -232,11 +232,11 @@ export class CronConfigService implements OnModuleInit {
       }
     }
 
-    // Validation intervalle SLA checker — minimum 121 min pour éviter la surcharge socket
+    // Validation intervalle SLA checker — minimum 120 min pour éviter la surcharge socket
     if (key === 'sla-checker' && dto.intervalMinutes !== undefined) {
-      if (dto.intervalMinutes <= 120) {
+      if (dto.intervalMinutes < 120) {
         throw new BadRequestException(
-          `L'intervalle du SLA checker doit être strictement supérieur à 120 minutes (reçu : ${dto.intervalMinutes})`,
+          `L'intervalle du SLA checker doit être supérieur ou égal à 120 minutes (reçu : ${dto.intervalMinutes})`,
         );
       }
     }

@@ -61,7 +61,7 @@ export async function searchClientsAdmin(
     if (params.category) p.set('category', params.category);
     p.set('limit', String(params.limit ?? 50));
     p.set('offset', String(params.offset ?? 0));
-    const response = await fetch(`${API_BASE_URL}/clients?${p.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}/clients/admin/search?${p.toString()}`, {
         method: 'GET',
         credentials: 'include',
     });
@@ -69,7 +69,7 @@ export async function searchClientsAdmin(
 }
 
 export async function getClientDossierAdmin(contactId: string): Promise<ClientDossier> {
-    const response = await fetch(`${API_BASE_URL}/clients/${contactId}/dossier`, {
+    const response = await fetch(`${API_BASE_URL}/clients/admin/${contactId}/dossier`, {
         method: 'GET',
         credentials: 'include',
     });
