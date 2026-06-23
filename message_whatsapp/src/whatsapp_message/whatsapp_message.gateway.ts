@@ -1065,7 +1065,9 @@ export class WhatsappMessageGateway
     if (!posteId) {
       return;
     }
-    this.server.to(`poste:${posteId}`).emit('chat:event', {
+    // .local : ne passe PAS par Redis adapter — les typing events sont éphémères
+    // et ne justifient pas un PUBLISH Redis cross-instance (Fix R5).
+    this.server.local.to(`poste:${posteId}`).emit('chat:event', {
       type: isTyping ? 'TYPING_START' : 'TYPING_STOP',
       payload: { chat_id: chatId },
     });

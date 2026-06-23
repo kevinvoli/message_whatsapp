@@ -83,50 +83,29 @@ export class AgentPresenceService implements OnModuleInit, OnModuleDestroy {
     return (await this.redis.exists(`presence:commercial:${commercialId}`)) === 1;
   }
 
-  async getPresentAgents(): Promise<AgentPresenceInfo[]> {
-    if (!this.redis || !this.enabled) {
-      return [...this.activeAgents.entries()].map(([commercialId, d]) => ({
-        commercialId,
-        posteId: d.posteId,
-        tenantId: d.tenantId,
-      }));
-    }
-
-    const keys = await this.redis.keys('presence:commercial:*');
-    if (!keys.length) return [];
-
-    const pipeline = this.redis.pipeline();
-    for (const k of keys) pipeline.get(k);
-    const results = await pipeline.exec();
-
-    const prefixPattern = new RegExp(`^${this.keyPrefix}presence:commercial:`);
-    return keys
-      .map((k, i) => {
-        const raw = results?.[i]?.[1] as string | null;
-        if (!raw) return null;
-        const commercialId = k.replace(prefixPattern, '');
-        try {
-          const parsed = JSON.parse(raw) as { posteId: string; tenantId: string };
-          return { commercialId, posteId: parsed.posteId, tenantId: parsed.tenantId };
-        } catch {
-          return null;
-        }
-      })
-      .filter((x): x is AgentPresenceInfo => x !== null);
+  getPresentAgents(): AgentPresenceInfo[] {
+    return [...this.activeAgents.entries()].map(([commercialId, d]) => ({
+      commercialId,
+      posteId: d.posteId,
+      tenantId: d.tenantId,
+    }));
   }
 
-  /** Rafraîchit le TTL de tous les agents actifs toutes les 25s */
-  @Interval(25_000)
+  /** Rafraîchit le TTL de tous les agents actifs toutes les 40s via pipeline (1 round-trip) */
+  @Interval(40_000)
   async refreshAll(): Promise<void> {
     if (!this.redis || !this.enabled || this.activeAgents.size === 0) return;
+    const ts = Date.now();
+    const pipeline = this.redis.pipeline();
     for (const [commercialId, { posteId, tenantId }] of this.activeAgents.entries()) {
-      try {
-        const value = JSON.stringify({ posteId, tenantId, ts: Date.now() });
-        await this.redis.setex(`presence:commercial:${commercialId}`, 45, value);
-        await this.redis.setex(`presence:poste:${posteId}`, 45, '1');
-      } catch (err) {
-        this.logger.warn(`refreshAll ${commercialId}: ${(err as Error).message}`);
-      }
+      const value = JSON.stringify({ posteId, tenantId, ts });
+      pipeline.setex(`presence:commercial:${commercialId}`, 45, value);
+      pipeline.setex(`presence:poste:${posteId}`, 45, '1');
+    }
+    try {
+      await pipeline.exec();
+    } catch (err) {
+      this.logger.warn(`refreshAll pipeline error: ${(err as Error).message}`);
     }
   }
 }

@@ -6,7 +6,7 @@ import { REDIS_CLIENT } from 'src/redis/redis.module';
 @Injectable()
 export class SocketListCacheService {
   private readonly logger = new Logger(SocketListCacheService.name);
-  private static readonly MAX_CONVERSATIONS_TTL = 15;
+  private static readonly MAX_CONVERSATIONS_TTL = 60;
 
   constructor(
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
@@ -19,7 +19,7 @@ export class SocketListCacheService {
   ): Promise<T> {
     if (!this.redis) return loader();
 
-    const ttl = 15;
+    const ttl = 60;
     if (ttl > SocketListCacheService.MAX_CONVERSATIONS_TTL) {
       this.logger.warn(
         `TTL conversations ${ttl} dépasse MAX_CONVERSATIONS_TTL=${SocketListCacheService.MAX_CONVERSATIONS_TTL} — forcé à MAX`,
@@ -36,7 +36,7 @@ export class SocketListCacheService {
     if (raw !== null) return JSON.parse(raw) as T;
 
     const value = await loader();
-    await this.redis.setex(key, 15, JSON.stringify(value));
+    await this.redis.setex(key, 60, JSON.stringify(value));
     return value;
   }
 
@@ -70,7 +70,7 @@ export class SocketListCacheService {
     if (raw !== null) return JSON.parse(raw) as T;
 
     const value = await loader();
-    await this.redis.setex(key, 10, JSON.stringify(value));
+    await this.redis.setex(key, 30, JSON.stringify(value));
     return value;
   }
 
@@ -87,7 +87,7 @@ export class SocketListCacheService {
     if (raw !== null) return JSON.parse(raw) as T;
 
     const value = await loader();
-    await this.redis.setex(key, 3, JSON.stringify(value));
+    await this.redis.setex(key, 30, JSON.stringify(value));
     return value;
   }
 

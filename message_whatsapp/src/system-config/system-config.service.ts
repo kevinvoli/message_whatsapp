@@ -319,10 +319,11 @@ export class SystemConfigService implements OnApplicationBootstrap {
 
   async flushCache(): Promise<void> {
     if (!this.redis) return;
-    const keys = await this.redis.keys('config:*');
-    if (keys.length > 0) {
-      await this.redis.del(...keys);
+    const pipeline = this.redis.pipeline();
+    for (const entry of CONFIG_CATALOGUE) {
+      pipeline.del('config:' + entry.key);
     }
+    await pipeline.exec();
   }
 
   getCatalogue(): ConfigEntry[] {

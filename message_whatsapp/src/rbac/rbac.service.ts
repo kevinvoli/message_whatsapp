@@ -164,10 +164,13 @@ export class RbacService {
     });
     const permissions = cr?.role?.permissions ?? [];
 
-    // 3. Mettre en cache
+    // 3. Mettre en cache + indexer dans le Set tenant
     if (this.redis) {
       try {
-        await this.redis.set(cacheKey, JSON.stringify(permissions), 'EX', CACHE_TTL);
+        const pipeline = this.redis.pipeline();
+        pipeline.set(cacheKey, JSON.stringify(permissions), 'EX', CACHE_TTL);
+        pipeline.sadd(`rbac:tenant-members:${tenantId}`, commercialId);
+        await pipeline.exec();
       } catch {
         // Redis indisponible — silencieux
       }
@@ -190,7 +193,10 @@ export class RbacService {
   private async invalidateCache(commercialId: string, tenantId: string): Promise<void> {
     if (!this.redis) return;
     try {
-      await this.redis.del(permCacheKey(commercialId, tenantId));
+      const pipeline = this.redis.pipeline();
+      pipeline.del(permCacheKey(commercialId, tenantId));
+      pipeline.srem(`rbac:tenant-members:${tenantId}`, commercialId);
+      await pipeline.exec();
     } catch {
       // silencieux
     }
@@ -199,10 +205,15 @@ export class RbacService {
   private async invalidateTenantCache(tenantId: string): Promise<void> {
     if (!this.redis) return;
     try {
-      const keys = await this.redis.keys(`rbac:perms:${tenantId}:*`);
-      if (keys.length > 0) {
-        await Promise.all(keys.map((k) => this.redis!.del(k)));
+      const memberSetKey = `rbac:tenant-members:${tenantId}`;
+      const members = await this.redis.smembers(memberSetKey);
+      if (members.length === 0) return;
+      const pipeline = this.redis.pipeline();
+      for (const cid of members) {
+        pipeline.del(permCacheKey(cid, tenantId));
       }
+      pipeline.del(memberSetKey);
+      await pipeline.exec();
     } catch {
       // silencieux
     }

@@ -74,14 +74,24 @@ export class WorkScheduleService {
         if (cached) return JSON.parse(cached) as WorkScheduleDay[];
       } catch { /* fallback DB */ }
     }
-    const result = await this.computeForCommercial(commercialId);
+    const { schedule: result, posteId } = await this.computeForCommercial(commercialId);
     if (this.redis) {
-      try { await this.redis.setex(cacheKey, 300, JSON.stringify(result)); } catch { /* ok */ }
+      try {
+        const pipeline = this.redis.pipeline();
+        pipeline.setex(cacheKey, 300, JSON.stringify(result));
+        if (posteId) {
+          pipeline.sadd(`schedule:group-idx:${posteId}`, cacheKey);
+        }
+        pipeline.sadd('schedule:all-cached', cacheKey);
+        await pipeline.exec();
+      } catch { /* ok */ }
     }
     return result;
   }
 
-  private async computeForCommercial(commercialId: string): Promise<WorkScheduleDay[]> {
+  private async computeForCommercial(
+    commercialId: string,
+  ): Promise<{ schedule: WorkScheduleDay[]; posteId: string | null }> {
     const commercial = await this.commercialRepo.findOne({
       where: { id: commercialId },
       relations: ['poste'],
@@ -96,11 +106,11 @@ export class WorkScheduleService {
     const individualByDay = new Map<DayOfWeek, WorkSchedule>(individual.map((s) => [s.dayOfWeek, s]));
     const groupByDay = new Map<DayOfWeek, WorkSchedule>(group.map((s) => [s.dayOfWeek, s]));
 
-    const result: WorkScheduleDay[] = [];
+    const schedule: WorkScheduleDay[] = [];
     for (const day of DAY_ORDER) {
       const s: WorkSchedule | undefined = individualByDay.get(day) ?? groupByDay.get(day);
       if (!s) continue;
-      result.push({
+      schedule.push({
         dayOfWeek:  s.dayOfWeek,
         startTime:  s.startTime,
         endTime:    s.endTime,
@@ -110,17 +120,28 @@ export class WorkScheduleService {
         scheduleId: s.id,
       });
     }
-    return result;
+    return { schedule, posteId };
   }
 
   private async invalidateScheduleCache(commercialId?: string | null, groupId?: string | null): Promise<void> {
     if (!this.redis) return;
     try {
       if (groupId) {
-        const keys = await this.redis.keys('schedule:commercial:*');
-        if (keys.length > 0) await this.redis.del(...keys);
+        const keys = await this.redis.smembers(`schedule:group-idx:${groupId}`);
+        if (keys.length === 0) return;
+        const pipeline = this.redis.pipeline();
+        for (const key of keys) {
+          pipeline.del(key);
+          pipeline.srem('schedule:all-cached', key);
+        }
+        pipeline.del(`schedule:group-idx:${groupId}`);
+        await pipeline.exec();
       } else if (commercialId) {
-        await this.redis.del(`schedule:commercial:${commercialId}`);
+        const cacheKey = `schedule:commercial:${commercialId}`;
+        const pipeline = this.redis.pipeline();
+        pipeline.del(cacheKey);
+        pipeline.srem('schedule:all-cached', cacheKey);
+        await pipeline.exec();
       }
     } catch { /* ok */ }
   }
