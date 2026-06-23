@@ -37,6 +37,14 @@ export class AgentPresenceService implements OnModuleInit, OnModuleDestroy {
     if (!this.redis || !this.enabled) return;
     try {
       await this.redis.config('SET', 'notify-keyspace-events', 'Ex');
+      this.logger.log('AgentPresenceService: keyspace notifications activées');
+    } catch {
+      this.logger.warn(
+        'AgentPresenceService: impossible d\'activer notify-keyspace-events via CONFIG SET ' +
+        '(Redis managé? Activer côté serveur). Fonctionnement dégradé possible.',
+      );
+    }
+    try {
       this.subscriber = this.redis.duplicate();
       await this.subscriber.subscribe('__keyevent@0__:expired');
       this.subscriber.on('message', (_channel: string, key: string) => {
@@ -50,9 +58,8 @@ export class AgentPresenceService implements OnModuleInit, OnModuleDestroy {
           this.eventEmitter?.emit('agent.presence_expired', { commercialId });
         }
       });
-      this.logger.log('AgentPresenceService: keyspace notifications activées');
     } catch (err) {
-      this.logger.warn(`Keyspace notifications setup failed: ${(err as Error).message}`);
+      this.logger.warn(`AgentPresenceService: abonnement keyspace events échoué: ${(err as Error).message}`);
     }
   }
 

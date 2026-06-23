@@ -32,7 +32,7 @@ export {
         const password = config.get<string>('REDIS_PASSWORD') || undefined;
         const prefix = config.get<string>('BULLMQ_PREFIX') || undefined;
         return {
-          connection: { host: host ?? 'localhost', port, password },
+          connection: { host: host ?? 'localhost', port, password, maxRetriesPerRequest: null },
           ...(prefix && { prefix }),
           defaultJobOptions: {
             attempts: 3,
