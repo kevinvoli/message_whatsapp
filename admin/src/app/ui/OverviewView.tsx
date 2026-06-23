@@ -32,6 +32,7 @@ interface OverviewViewProps {
 
 export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: OverviewViewProps) {
   const [metriques, setMetriques] = useState<MetriquesGlobales | null>(null);
+  const [metriqueError, setMetriqueError] = useState(false);
   const [performanceCommercial, setPerformanceCommercial] = useState<PerformanceCommercial[] | null>(null);
   const [statutChannels, setStatutChannels] = useState<StatutChannel[] | null>(null);
   const [performanceTemporelle, setPerformanceTemporelle] = useState<PerformanceTemporelle[] | null>(null);
@@ -44,6 +45,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
   const fetchData = useCallback(async () => {
     setLoading(true);
     setMetriques(null);
+    setMetriqueError(false);
     setPerformanceCommercial(null);
     setStatutChannels(null);
     setPerformanceTemporelle(null);
@@ -51,7 +53,7 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
     // Chargement progressif : chaque section s'affiche dès qu'elle arrive
     const globalesP = getOverviewSection<MetriquesGlobales>('globales', selectedPeriod)
       .then((data) => { setMetriques(data); setLoading(false); })
-      .catch(() => { setMetriques(undefined as unknown as MetriquesGlobales); setLoading(false); });
+      .catch(() => { setMetriqueError(true); setLoading(false); });
 
     const commerciauxP = getOverviewSection<PerformanceCommercial[]>('commerciaux', selectedPeriod)
       .then((data) => setPerformanceCommercial(data))
@@ -192,8 +194,23 @@ export default function OverviewView({ onRefresh, selectedPeriod = 'today' }: Ov
     </div>
   );
 
-  if (loading || !metriques) {
+  if (loading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+  }
+
+  if (metriqueError || !metriques) {
+    return (
+      <div className="flex flex-col justify-center items-center h-full gap-3 text-gray-500">
+        <p className="text-sm">Erreur de chargement des métriques.</p>
+        <button
+          type="button"
+          onClick={() => void fetchData()}
+          className="text-sm text-blue-600 underline hover:text-blue-800"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
   }
 
   return (

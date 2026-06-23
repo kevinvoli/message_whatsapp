@@ -209,8 +209,10 @@ export class WhatsappChatService {
     dateStart?: Date,
     posteId?: string,
     commercialId?: string,
+    conversationResult?: string,
+    q?: string,
   ): Promise<FindAllResult> {
-    return this.readQuery.findAll(chat_id, limit, offset, dateStart, posteId, commercialId);
+    return this.readQuery.findAll(chat_id, limit, offset, dateStart, posteId, commercialId, conversationResult, q);
   }
 
   /** @see ConversationReadQueryService.findByChatId */

@@ -145,6 +145,8 @@ export class ConversationReadQueryService {
     dateStart?: Date,
     posteId?: string,
     commercialId?: string,
+    conversationResult?: string,
+    q?: string,
   ): Promise<FindAllResult> {
     if (chat_id) {
       const data = await this.chatRepository
@@ -183,6 +185,15 @@ export class ConversationReadQueryService {
             AND m.deletedAt IS NULL
         )`,
         { commercialId },
+      );
+    }
+    if (conversationResult) {
+      qb.andWhere('chat.conversation_result = :conversationResult', { conversationResult });
+    }
+    if (q) {
+      qb.andWhere(
+        '(chat.chat_id LIKE :q OR contact.name LIKE :q OR contact.phone LIKE :q)',
+        { q: `%${q}%` },
       );
     }
 

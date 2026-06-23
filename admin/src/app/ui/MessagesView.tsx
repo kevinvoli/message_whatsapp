@@ -34,12 +34,18 @@ export default function MessagesView({ onRefresh, selectedPeriod = 'today' }: Me
         }
     }, [selectedPeriod]);
 
+    // Quand la période change (= load se reconstruit) : reset à 0 et charger directement
     useEffect(() => {
-        void load(limit, offset);
-    }, [load, limit, offset]);
+        setOffset(0);
+        void load(limit, 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [load, limit]);
 
-    // Reset à la page 0 quand la période change
-    useEffect(() => { setOffset(0); }, [selectedPeriod]);
+    // Quand offset change via la pagination (> 0) : charger la nouvelle page
+    useEffect(() => {
+        if (offset > 0) void load(limit, offset);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [offset]);
 
     const filtered = search.trim()
         ? messages.filter((m) =>
