@@ -52,42 +52,43 @@ export class QuizExemptionService {
   }
 
   async findAllExemptions(): Promise<ExemptionResult[]> {
-    const rows = await this.exemptionRepo
-      .createQueryBuilder('e')
-      .leftJoin('whatsapp_commercial', 'c', 'c.id = e.commercialId')
-      .leftJoin('whatsapp_poste', 'p', 'p.id = e.posteId')
-      .select([
-        'e.id AS id',
-        'e.scope AS scope',
-        'e.commercialId AS commercialId',
-        'c.name AS commercialName',
-        'e.posteId AS posteId',
-        'p.name AS posteName',
-        'e.reason AS reason',
-        'e.createdAt AS createdAt',
-      ])
-      .where('e.deletedAt IS NULL')
-      .orderBy('e.createdAt', 'DESC')
-      .getRawMany<{
-        id: string;
-        scope: 'commercial' | 'poste';
-        commercialId: string | null;
-        commercialName: string | null;
-        posteId: string | null;
-        posteName: string | null;
-        reason: string | null;
-        createdAt: Date;
-      }>();
+    // Requête SQL brute pour éviter que TypeORM résolve whatsapp_commercial/whatsapp_poste
+    // comme entités et injecte des filtres automatiques (soft-delete) incompatibles.
+    const rows: Array<{
+      id: string;
+      scope: 'commercial' | 'poste';
+      commercial_id: string | null;
+      commercial_name: string | null;
+      poste_id: string | null;
+      poste_name: string | null;
+      reason: string | null;
+      created_at: Date;
+    }> = await this.exemptionRepo.query(`
+      SELECT
+        e.id,
+        e.scope,
+        e.commercial_id,
+        c.name AS commercial_name,
+        e.poste_id,
+        p.name AS poste_name,
+        e.reason,
+        e.created_at
+      FROM quiz_exemption e
+      LEFT JOIN whatsapp_commercial c ON c.id = e.commercial_id
+      LEFT JOIN whatsapp_poste p ON p.id = e.poste_id
+      WHERE e.deleted_at IS NULL
+      ORDER BY e.created_at DESC
+    `);
 
     return rows.map((r) => ({
       id: r.id,
       scope: r.scope,
-      commercialId: r.commercialId,
-      commercialName: r.commercialName,
-      posteId: r.posteId,
-      posteName: r.posteName,
+      commercialId: r.commercial_id,
+      commercialName: r.commercial_name,
+      posteId: r.poste_id,
+      posteName: r.poste_name,
       reason: r.reason,
-      createdAt: r.createdAt,
+      createdAt: r.created_at,
     }));
   }
 
