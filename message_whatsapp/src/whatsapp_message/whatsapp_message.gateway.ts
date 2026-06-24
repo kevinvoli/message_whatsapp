@@ -844,13 +844,14 @@ export class WhatsappMessageGateway
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    const isExempt = await this.isRestrictionExemptPoste(agent);
+    const bypassed = await this.resolveCurrentBypass(agent.commercialId, agent.posteId);
+    const isExempt = bypassed || await this.isRestrictionExemptPoste(agent);
     if (isExempt) {
-      // Postes dédiés (canal admin) ou config désactivée : exemptés de la restriction.
-      // On émet quand même restriction:status triggered=false pour débloquer le
-      // pendingConversationId côté frontend.
       const config = await this.restrictionService.getRestrictionConfig();
-      client.emit('restriction:status', { triggered: false, unrespondedCount: 0, unrespondedConversations: [], config });
+      const effectiveConfig = bypassed
+        ? { ...config, minCharsSendEnabled: false, enabled: false }
+        : config;
+      client.emit('restriction:status', { triggered: false, unrespondedCount: 0, unrespondedConversations: [], config: effectiveConfig });
       return;
     }
 
@@ -869,14 +870,18 @@ export class WhatsappMessageGateway
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
-    const isExempt = await this.isRestrictionExemptPoste(agent);
+    const bypassed = await this.resolveCurrentBypass(agent.commercialId, agent.posteId);
+    const isExempt = bypassed || await this.isRestrictionExemptPoste(agent);
     if (isExempt) {
       const config = await this.restrictionService.getRestrictionConfig();
+      const effectiveConfig = bypassed
+        ? { ...config, minCharsSendEnabled: false, enabled: false }
+        : config;
       client.emit('restriction:status', {
         triggered: false,
         unrespondedCount: 0,
         unrespondedConversations: [],
-        config,
+        config: effectiveConfig,
       });
       return;
     }
@@ -1167,7 +1172,7 @@ export class WhatsappMessageGateway
       sendSucceeded = true;
 
       // Restriction lecture : enregistrer la réponse et réévaluer le statut
-      if (restrictionCfg.enabled) {
+      if (restrictionCfg.enabled && !isBypassed) {
         const isDedicatedPoste = agent.posteId
           ? (await this.channelService.getDedicatedChannelIdsForPoste(agent.posteId)).length > 0
           : false;
