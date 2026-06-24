@@ -819,6 +819,15 @@ export class WhatsappMessageGateway
     }
   }
 
+  private async resolveCurrentBypass(commercialId: string, posteId: string): Promise<boolean> {
+    const [commercial, posteBypass, channelBypass] = await Promise.all([
+      this.commercialRepository.findOne({ where: { id: commercialId }, select: ['id', 'bypassRestrictions'] as const }),
+      this.posteService.findOneById(posteId).then((p) => p?.bypassRestrictions ?? false).catch(() => false),
+      this.channelRepository.count({ where: { poste_id: posteId, bypassRestrictions: true } }).then((n) => n > 0),
+    ]);
+    return !!commercial?.bypassRestrictions || !!posteBypass || channelBypass;
+  }
+
   private async isRestrictionExemptPoste(agent: { posteId?: string }): Promise<boolean> {
     const config = await this.restrictionService.getRestrictionConfig();
     if (!config.enabled) return true;
@@ -940,6 +949,9 @@ export class WhatsappMessageGateway
     const agent = this.connectedAgents.get(client.id);
     if (!agent) return;
 
+    // Re-évaluer le bypass à chaque envoi pour prendre en compte les changements admin postérieurs à la connexion
+    const isBypassed = await this.resolveCurrentBypass(agent.commercialId, agent.posteId);
+
     if (payload.tempId && this.recentTempIds.has(payload.tempId)) {
       this.logger.warn(
         `Duplicate tempId ignored (${payload.chat_id}) tempId=${payload.tempId}`,
@@ -986,7 +998,7 @@ export class WhatsappMessageGateway
         return;
       }
 
-      if (!agent.bypassRestrictions) {
+      if (!isBypassed) {
         // 🔒 Fenêtre de messagerie — 72h pour les chats CTWA (Click-to-WhatsApp Ads),
         // 23h pour les autres. WhatsApp n'autorise plus l'envoi hors fenêtre.
         const WINDOW_MS = chat.isCtwa
@@ -1048,7 +1060,7 @@ export class WhatsappMessageGateway
 
       // 🔒 Restriction min caractères d'envoi — bloque si le message est trop court
       const restrictionCfg = await this.restrictionService.getRestrictionConfig();
-      if (!agent.bypassRestrictions && restrictionCfg.minCharsSendEnabled) {
+      if (!isBypassed && restrictionCfg.minCharsSendEnabled) {
         const textLen = normalizedText.length;
         if (textLen < restrictionCfg.minResponseChars) {
           client.emit('chat:event', {
@@ -1116,7 +1128,7 @@ export class WhatsappMessageGateway
           commercial_id: agent.commercialId,
           quotedMessageId: payload.quotedMessageId,
           // Postes dédiés ou bypass actif exemptés des restrictions de contenu.
-          validateContent: !agent.isDedicated && !agent.bypassRestrictions,
+          validateContent: !agent.isDedicated && !isBypassed,
         });
         this.logger.log(
           `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,
