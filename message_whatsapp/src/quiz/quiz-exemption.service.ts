@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { QuizExemption } from './entities/quiz-exemption.entity';
 import { CreateExemptionDto } from './dto/create-exemption.dto';
 
@@ -40,7 +40,15 @@ export class QuizExemptionService {
       posteId: dto.scope === 'poste' ? dto.posteId : null,
       reason: dto.reason ?? null,
     });
-    return this.exemptionRepo.save(exemption);
+    try {
+      return await this.exemptionRepo.save(exemption);
+    } catch (err: unknown) {
+      const mysqlErr = err as { errno?: number };
+      if (mysqlErr?.errno === 1062) {
+        throw new ConflictException('Cette exemption existe déjà');
+      }
+      throw err;
+    }
   }
 
   async findAllExemptions(): Promise<ExemptionResult[]> {
@@ -99,24 +107,28 @@ export class QuizExemptionService {
   }
 
   async removeExemption(id: string): Promise<void> {
-    await this.exemptionRepo.softDelete(id);
+    await this.exemptionRepo.delete(id);
   }
 
   async isExempt(commercialId: string, posteId: string | null): Promise<boolean> {
-    const qb = this.exemptionRepo
+    const count = await this.exemptionRepo
       .createQueryBuilder('e')
       .where('e.deletedAt IS NULL')
       .andWhere(
-        '(e.scope = :scopeCommercial AND e.commercialId = :commercialId)' +
-          (posteId ? ' OR (e.scope = :scopePoste AND e.posteId = :posteId)' : ''),
-        {
-          scopeCommercial: 'commercial',
-          commercialId,
-          ...(posteId ? { scopePoste: 'poste', posteId } : {}),
-        },
-      );
-
-    const count = await qb.getCount();
+        new Brackets((qb) => {
+          qb.where('e.scope = :scopeCommercial AND e.commercialId = :commercialId', {
+            scopeCommercial: 'commercial',
+            commercialId,
+          });
+          if (posteId) {
+            qb.orWhere('e.scope = :scopePoste AND e.posteId = :posteId', {
+              scopePoste: 'poste',
+              posteId,
+            });
+          }
+        }),
+      )
+      .getCount();
     return count > 0;
   }
 }
