@@ -74,8 +74,8 @@ export class QuizExemptionService {
         e.reason,
         e.created_at
       FROM quiz_exemption e
-      LEFT JOIN whatsapp_commercial c ON c.id = e.commercial_id
-      LEFT JOIN whatsapp_poste p ON p.id = e.poste_id
+      LEFT JOIN whatsapp_commercial c ON CONVERT(c.id USING utf8mb4) = CONVERT(e.commercial_id USING utf8mb4)
+      LEFT JOIN whatsapp_poste p ON CONVERT(p.id USING utf8mb4) = CONVERT(e.poste_id USING utf8mb4)
       WHERE e.deleted_at IS NULL
       ORDER BY e.created_at DESC
     `);
