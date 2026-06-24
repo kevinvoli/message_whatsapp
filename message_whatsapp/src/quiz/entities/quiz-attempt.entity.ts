@@ -11,7 +11,7 @@ export class QuizAttempt {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'commercial_id' })
+  @Column({ name: 'commercial_id', type: 'char', length: 36 })
   commercialId: string;
 
   @Column({ name: 'session_id' })
