@@ -7,6 +7,7 @@ import { DispatcherService } from 'src/dispatcher/dispatcher.service';
 import { WhatsappMessageService } from 'src/whatsapp_message/whatsapp_message.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { WhapiStatus } from './interface/whapi-webhook.interface';
+import { ChatSessionService } from 'src/chat-session/chat-session.service';
 
 @Injectable()
 export class WhapiService {
@@ -19,6 +20,7 @@ export class WhapiService {
     private readonly dispatcherService: DispatcherService,
     private readonly whatsappMessageService: WhatsappMessageService,
     private readonly messageGateway: WhatsappMessageGateway,
+    private readonly chatSessionService: ChatSessionService,
   ) {}
 
   async findChannelByExternalId(channelId: string) {
@@ -157,6 +159,10 @@ export class WhapiService {
           message,
           conversation,
         );
+        // Invalider les relances fenêtre en cours pour cette session (chemin legacy)
+        if (conversation.activeSessionId) {
+          void this.chatSessionService.markClientRespondedToReminder(conversation.activeSessionId).catch(() => {});
+        }
         const full = await this.whatsappMessageService.findOneWithMedias(
           saved.id,
         );

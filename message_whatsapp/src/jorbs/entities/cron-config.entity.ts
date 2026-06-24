@@ -119,6 +119,14 @@ export class CronConfig {
   @Column({ name: 'window_reminder_min_replies', type: 'int', nullable: true })
   windowReminderMinReplies: number | null;
 
+  /** Nombre max de tentatives de relance avant expiration (défaut 1) */
+  @Column({ name: 'window_reminder_max_attempts', type: 'int', nullable: true, default: 1 })
+  windowReminderMaxAttempts: number | null;
+
+  /** Délai minimum en minutes entre deux tentatives (défaut 30) */
+  @Column({ name: 'window_reminder_attempt_interval_min', type: 'int', nullable: true, default: 30 })
+  windowReminderAttemptIntervalMin: number | null;
+
   /** TTL fermeture CTWA en heures (défaut 72) — utilisé par ChatSessionService */
   @Column({ name: 'ttl_days_ctwa', type: 'int', nullable: true })
   ttlDaysCtwa: number | null;

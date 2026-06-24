@@ -492,18 +492,14 @@ export class AutoMessageMasterJob implements OnModuleInit {
     const config = await this.cronConfigService.findByKey('window-reminder-auto-message').catch(() => null);
     if (!config?.enabled) return;
 
-    const normalMinBeforeMin = config.windowReminderNormalStartMin ?? 10;
-    const normalMaxBeforeMin = config.windowReminderNormalEndMin   ?? 2 * 60;
-    const ctwaMinBeforeMin   = config.windowReminderCtwaStartMin   ?? 10;
-    const ctwaMaxBeforeMin   = config.windowReminderCtwaEndMin     ?? 4 * 60;
-    const minReplies         = config.windowReminderMinReplies     ?? 1;
+    const maxAttempts  = config.windowReminderMaxAttempts           ?? 1;
+    const intervalMin  = config.windowReminderAttemptIntervalMin    ?? 30;
+    const normalStartMin = config.windowReminderNormalStartMin      ?? 10;
+    const normalEndMin   = config.windowReminderNormalEndMin        ?? 2 * 60;
+    const ctwaStartMin   = config.windowReminderCtwaStartMin        ?? 10;
+    const ctwaEndMin     = config.windowReminderCtwaEndMin          ?? 4 * 60;
+    const minReplies     = config.windowReminderMinReplies          ?? 1;
     const now = Date.now();
-
-    // Bornes : auto_close_at dans [now + minBefore, now + maxBefore]
-    const normalExpiresMin = new Date(now + normalMinBeforeMin * 60_000);
-    const normalExpiresMax = new Date(now + normalMaxBeforeMin * 60_000);
-    const ctwaExpiresMin   = new Date(now + ctwaMinBeforeMin   * 60_000);
-    const ctwaExpiresMax   = new Date(now + ctwaMaxBeforeMin   * 60_000);
 
     // Fast-exit : aucun template J actif du tout
     const [hasJ1, hasJ2] = await Promise.all([
@@ -512,7 +508,16 @@ export class AutoMessageMasterJob implements OnModuleInit {
     ]);
     if (!hasJ1 && !hasJ2) return;
 
+    // Bornes de fenêtre : auto_close_at dans [now + startMin, now + endMin]
+    const normalMin = new Date(now + normalStartMin * 60_000);
+    const normalMax = new Date(now + normalEndMin   * 60_000);
+    const ctwaMin   = new Date(now + ctwaStartMin   * 60_000);
+    const ctwaMax   = new Date(now + ctwaEndMin     * 60_000);
+    // Seuil de délai inter-tentatives : la dernière tentative doit être antérieure à ce seuil
+    const intervalThreshold = new Date(now - intervalMin * 60_000);
+
     // Source de vérité : ChatSession — jointure WhatsappChat pour statut/canal
+    // Les sous-requêtes sur window_reminder_log utilisent les noms de colonnes SQL (snake_case)
     const sessions = await this.sessionRepo
       .createQueryBuilder('s')
       .innerJoinAndSelect('s.chat', 'c')
@@ -520,21 +525,42 @@ export class AutoMessageMasterJob implements OnModuleInit {
       .where('c.status != :ferme', { ferme: WhatsappChatStatus.FERME })
       .andWhere('c.activeSessionId = s.id')
       .andWhere('s.endedAt IS NULL')
+      .andWhere('s.autoCloseAt > NOW()')
       .andWhere(`(
-        (s.isCtwa = 0
-          AND s.autoCloseAt BETWEEN :normalExpiresMin AND :normalExpiresMax)
-        OR
-        (s.isCtwa = 1
-          AND s.autoCloseAt BETWEEN :ctwaExpiresMin AND :ctwaExpiresMax)
+        (s.isCtwa = 0 AND s.autoCloseAt BETWEEN :normalMin AND :normalMax)
+        OR (s.isCtwa = 1 AND s.autoCloseAt BETWEEN :ctwaMin AND :ctwaMax)
       )`)
-      .andWhere('s.lastWindowReminderSentAt IS NULL')
-      .setParameters({ normalExpiresMin, normalExpiresMax, ctwaExpiresMin, ctwaExpiresMax })
+      .andWhere(
+        `(SELECT COUNT(*) FROM window_reminder_log l WHERE l.session_id = s.id) < :maxAttempts`,
+        { maxAttempts },
+      )
+      .andWhere(
+        `NOT EXISTS (SELECT 1 FROM window_reminder_log l WHERE l.session_id = s.id AND l.client_responded_at IS NOT NULL)`,
+      )
+      .andWhere(`(
+        (SELECT MAX(l.sent_at) FROM window_reminder_log l WHERE l.session_id = s.id) IS NULL
+        OR (SELECT MAX(l.sent_at) FROM window_reminder_log l WHERE l.session_id = s.id) <= :intervalThreshold
+      )`, { intervalThreshold })
+      .setParameters({ normalMin, normalMax, ctwaMin, ctwaMax })
       .limit(100)
       .getMany();
 
     this.logger.debug(
       `TriggerJ: ${sessions.length} session(s) éligible(s)`,
       AutoMessageMasterJob.name,
+    );
+
+    // Pré-chargement du nombre de tentatives en une seule requête (évite N+1 dans la boucle)
+    const sessionIds = sessions.map((s) => s.id);
+    const attemptCountRows: { session_id: string; count: string }[] =
+      sessionIds.length > 0
+        ? await this.sessionRepo.query(
+            `SELECT session_id, COUNT(*) AS count FROM window_reminder_log WHERE session_id IN (${sessionIds.map(() => '?').join(',')}) GROUP BY session_id`,
+            sessionIds,
+          )
+        : [];
+    const attemptCountMap = new Map(
+      attemptCountRows.map((r) => [r.session_id, parseInt(r.count) || 0]),
     );
 
     for (const session of sessions) {
@@ -546,6 +572,8 @@ export class AutoMessageMasterJob implements OnModuleInit {
           chat.poste_id, chat.last_msg_client_channel_id, chat.channel?.provider ?? null,
         );
         if (!scopeOk) return;
+
+        const nextAttemptNumber = (attemptCountMap.get(session.id) ?? 0) + 1;
 
         // J1 vs J2 : le commercial a-t-il répondu au moins minReplies fois dans cette session ?
         const hasPosteReply = !!(
@@ -568,12 +596,17 @@ export class AutoMessageMasterJob implements OnModuleInit {
         );
         if (!template) return;
 
-        // Anti-concurrence : UPDATE atomique IS NULL → false si déjà fait par autre instance
-        const marked = await this.chatSessionService.markWindowReminderSent(session.id, chat.id);
+        // Anti-concurrence : mark AVANT envoi pour bloquer les instances concurrentes
+        const marked = await this.chatSessionService.markWindowReminderAttempt(
+          session.id, nextAttemptNumber, chat.id,
+        );
         if (!marked) return;
 
-        // Envoi avec template déjà résolu
-        await this.messageAutoService.sendWindowReminderWithTemplate(chat.chat_id, template);
+        // Envoi — rollback du mark si l'envoi échoue pour permettre une relance au prochain cron
+        const sent = await this.messageAutoService.sendWindowReminderWithTemplate(chat.chat_id, template);
+        if (!sent) {
+          await this.chatSessionService.deleteWindowReminderAttempt(session.id, nextAttemptNumber);
+        }
       });
     }
   }

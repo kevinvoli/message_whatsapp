@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { ChatSession } from './entities/chat-session.entity';
 import { WhatsappChat, WhatsappChatStatus } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WindowReminderLog } from './entities/window-reminder-log.entity';
 import { TTL_CTWA_HOURS, TTL_NORMAL_HOURS } from './constants';
 
 export interface ReferralData {
@@ -21,6 +23,8 @@ export class ChatSessionService {
     private readonly sessionRepo: Repository<ChatSession>,
     @InjectRepository(WhatsappChat)
     private readonly chatRepo: Repository<WhatsappChat>,
+    @InjectRepository(WindowReminderLog)
+    private readonly windowReminderLogRepo: Repository<WindowReminderLog>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -173,9 +177,14 @@ export class ChatSessionService {
               freeEntryExpiresAt,
             }
           : {}),
+        // autoCloseAt = max(serviceWindowExpiresAt, freeEntryExpiresAt)
+        // serviceWindowExpiresAt = now+24h > now+20h, donc la garantie 20h est automatiquement satisfaite
         autoCloseAt,
       },
     );
+
+    // Le client a répondu : invalider les tentatives de relance en cours pour cette session
+    await this.markClientRespondedToReminder(sessionId);
 
     const chatPatch: Partial<WhatsappChat> = {
       last_client_message_at: now,
@@ -275,32 +284,62 @@ export class ChatSessionService {
   }
 
   /**
+   * Enregistre une tentative de relance fenêtre dans window_reminder_log.
+   * Idempotent via contrainte UNIQUE (session_id, attempt_number).
+   * Retourne false si la tentative a déjà été enregistrée (autre instance concurrente).
+   */
+  async markWindowReminderAttempt(
+    sessionId: string,
+    attemptNumber: number,
+    _whatsappChatId: string,
+  ): Promise<boolean> {
+    try {
+      await this.windowReminderLogRepo.insert({
+        id: randomUUID(),
+        sessionId,
+        attemptNumber,
+        sentAt: new Date(),
+        clientRespondedAt: null,
+      });
+      return true;
+    } catch (err: unknown) {
+      const mysqlErr = err as { errno?: number };
+      // ER_DUP_ENTRY (errno 1062) : tentative déjà enregistrée par une autre instance
+      if (mysqlErr?.errno === 1062) {
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Marque les tentatives de relance sans réponse comme "client a répondu".
+   * Appelé lors de chaque message client entrant pour invalider les relances en attente.
+   */
+  async markClientRespondedToReminder(sessionId: string): Promise<void> {
+    await this.windowReminderLogRepo
+      .createQueryBuilder()
+      .update(WindowReminderLog)
+      .set({ clientRespondedAt: new Date() })
+      .where('session_id = :sessionId', { sessionId })
+      .andWhere('client_responded_at IS NULL')
+      .execute();
+  }
+
+  /**
+   * Supprime une tentative de relance — rollback si l'envoi a échoué après le mark.
+   */
+  async deleteWindowReminderAttempt(sessionId: string, attemptNumber: number): Promise<void> {
+    await this.windowReminderLogRepo.delete({ sessionId, attemptNumber });
+  }
+
+  /**
    * Marque le reminder de fenêtre comme envoyé de façon atomique (idempotent).
    * Retourne false si déjà marqué (autre instance l'a fait en premier).
+   * @deprecated Délègue à markWindowReminderAttempt(sessionId, 1, whatsappChatId).
    */
   async markWindowReminderSent(sessionId: string, whatsappChatId: string): Promise<boolean> {
-    const result = await this.sessionRepo
-      .createQueryBuilder()
-      .update(ChatSession)
-      .set({ lastWindowReminderSentAt: new Date() })
-      .where('id = :id', { id: sessionId })
-      .andWhere('last_window_reminder_sent_at IS NULL')
-      .execute();
-
-    if (!result.affected || result.affected === 0) {
-      return false;
-    }
-
-    // Synchroniser le cache sur WhatsappChat (Sprint A — colonne last_window_reminder_sent_at)
-    try {
-      await this.chatRepo.update({ id: whatsappChatId }, {
-        last_window_reminder_sent_at: new Date(),
-      } as Partial<WhatsappChat>);
-    } catch {
-      // Colonne non encore présente (Sprint A) — silencieux
-    }
-
-    return true;
+    return this.markWindowReminderAttempt(sessionId, 1, whatsappChatId);
   }
 
   /**

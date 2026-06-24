@@ -97,8 +97,10 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false, hasWin
   const [normalEndMin,   setNormalEndMin]   = useState(120);
   const [ctwaStartMin,   setCtwaStartMin]   = useState(10);
   const [ctwaEndMin,     setCtwaEndMin]     = useState(240);
-  const [minReplies,     setMinReplies]     = useState(1);
-  const [ttlDaysCtwa,    setTtlDaysCtwa]    = useState(72);
+  const [minReplies,        setMinReplies]        = useState(1);
+  const [maxAttempts,       setMaxAttempts]       = useState(1);
+  const [attemptIntervalMin, setAttemptIntervalMin] = useState(30);
+  const [ttlDaysCtwa,       setTtlDaysCtwa]       = useState(72);
 
   const load = useCallback(async () => {
     try {
@@ -121,8 +123,10 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false, hasWin
         setNormalEndMin(  found.windowReminderNormalEndMin   ?? 120);
         setCtwaStartMin(  found.windowReminderCtwaStartMin   ?? 10);
         setCtwaEndMin(    found.windowReminderCtwaEndMin     ?? 240);
-        setMinReplies(    found.windowReminderMinReplies     ?? 1);
-        setTtlDaysCtwa(   found.ttlDaysCtwa                 ?? 72);
+        setMinReplies(         found.windowReminderMinReplies        ?? 1);
+        setMaxAttempts(        found.windowReminderMaxAttempts       ?? 1);
+        setAttemptIntervalMin( found.windowReminderAttemptIntervalMin ?? 30);
+        setTtlDaysCtwa(        found.ttlDaysCtwa                     ?? 72);
       }
     } catch { /* ignore */ }
   }, [cronKey, hasThreshold]);
@@ -162,11 +166,13 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false, hasWin
       if (activeHourStart !== '') payload.activeHourStart = Number(activeHourStart);
       if (activeHourEnd !== '') payload.activeHourEnd = Number(activeHourEnd);
       if (hasWindowReminder) {
-        payload.windowReminderNormalStartMin = normalStartMin;
-        payload.windowReminderNormalEndMin   = normalEndMin;
-        payload.windowReminderCtwaStartMin   = ctwaStartMin;
-        payload.windowReminderCtwaEndMin     = ctwaEndMin;
-        payload.windowReminderMinReplies     = minReplies;
+        payload.windowReminderNormalStartMin     = normalStartMin;
+        payload.windowReminderNormalEndMin       = normalEndMin;
+        payload.windowReminderCtwaStartMin       = ctwaStartMin;
+        payload.windowReminderCtwaEndMin         = ctwaEndMin;
+        payload.windowReminderMinReplies         = minReplies;
+        payload.windowReminderMaxAttempts        = maxAttempts;
+        payload.windowReminderAttemptIntervalMin = attemptIntervalMin;
       }
       if (hasTtlCtwa) payload.ttlDaysCtwa = ttlDaysCtwa;
 
@@ -331,6 +337,28 @@ function TriggerCronConfigCard({ cronKey, hasThreshold, isMaster = false, hasWin
                   className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none" />
                 <p className="mt-0.5 text-xs text-gray-400">Si l&apos;agent a répondu → J1 &quot;agent disponible&quot;. Sinon → J2 &quot;demande en attente&quot;.</p>
               </div>
+              <div className="mt-3">
+                <label className="mb-1 block text-xs text-gray-500">Nombre de tentatives (1–5)</label>
+                <input
+                  type="number" min={1} max={5}
+                  value={maxAttempts}
+                  onChange={(e) => setMaxAttempts(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
+                  className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+                />
+                <p className="mt-0.5 text-xs text-gray-400">Si le client ne répond pas, la relance est renvoyée jusqu&apos;à N fois (si la fenêtre est encore ouverte).</p>
+              </div>
+              {maxAttempts > 1 && (
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs text-gray-500">Intervalle entre tentatives (minutes)</label>
+                  <input
+                    type="number" min={5} max={240}
+                    value={attemptIntervalMin}
+                    onChange={(e) => setAttemptIntervalMin(Math.min(240, Math.max(5, parseInt(e.target.value) || 30)))}
+                    className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none"
+                  />
+                  <p className="mt-0.5 text-xs text-gray-400">Délai minimum entre deux relances. Ex: 30 min.</p>
+                </div>
+              )}
             </div>
           )}
           {hasTtlCtwa && (

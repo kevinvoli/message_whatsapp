@@ -113,4 +113,16 @@ export class UpdateCronConfigDto {
   @IsInt()
   @Min(24)
   ttlDaysCtwa?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  windowReminderMaxAttempts?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  windowReminderAttemptIntervalMin?: number;
 }

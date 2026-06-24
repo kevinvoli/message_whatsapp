@@ -705,8 +705,10 @@ export type CronConfig = {
   windowReminderNormalEndMin:   number | null;
   windowReminderCtwaStartMin:   number | null;
   windowReminderCtwaEndMin:     number | null;
-  windowReminderMinReplies:     number | null;
-  ttlDaysCtwa:                  number | null;
+  windowReminderMinReplies:        number | null;
+  windowReminderMaxAttempts:       number | null;
+  windowReminderAttemptIntervalMin: number | null;
+  ttlDaysCtwa:                     number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -730,8 +732,10 @@ export type UpdateCronConfigPayload = {
   windowReminderNormalEndMin?:   number;
   windowReminderCtwaStartMin?:   number;
   windowReminderCtwaEndMin?:     number;
-  windowReminderMinReplies?:     number;
-  ttlDaysCtwa?:                  number;
+  windowReminderMinReplies?:        number;
+  windowReminderMaxAttempts?:       number;
+  windowReminderAttemptIntervalMin?: number;
+  ttlDaysCtwa?:                     number;
 };
 
 // ============================================

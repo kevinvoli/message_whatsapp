@@ -17,6 +17,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { ChatSessionService } from './chat-session.service';
 import { ChatSession } from './entities/chat-session.entity';
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
+import { WindowReminderLog } from './entities/window-reminder-log.entity';
 import { TTL_CTWA_HOURS, TTL_NORMAL_HOURS } from './constants';
 import { mockRepository } from '../../test/helpers/mock-repository';
 import { makeConversation } from '../../test/factories/conversation.factory';
@@ -30,6 +31,7 @@ describe('ChatSessionService', () => {
 
   const sessionRepo = mockRepository<ChatSession>();
   const chatRepo = mockRepository<WhatsappChat>();
+  const windowReminderLogRepo = mockRepository<WindowReminderLog>();
 
   // Mock minimal de l'EntityManager utilisé dans dataSource.transaction()
   const managerMock = {
@@ -56,6 +58,7 @@ describe('ChatSessionService', () => {
         ChatSessionService,
         { provide: getRepositoryToken(ChatSession), useValue: sessionRepo },
         { provide: getRepositoryToken(WhatsappChat), useValue: chatRepo },
+        { provide: getRepositoryToken(WindowReminderLog), useValue: windowReminderLogRepo },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();

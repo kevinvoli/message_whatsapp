@@ -458,9 +458,9 @@ export class MessageAutoService {
    * Le tracking est géré par ChatSessionService.markWindowReminderSent — ne pas appeler
    * updateTriggerTracking ici.
    */
-  async sendWindowReminderWithTemplate(chatId: string, template: MessageAuto): Promise<void> {
+  async sendWindowReminderWithTemplate(chatId: string, template: MessageAuto): Promise<boolean> {
     const chat = await this.chatService.findBychat_id(chatId);
-    if (!chat || !chat.last_msg_client_channel_id) return;
+    if (!chat || !chat.last_msg_client_channel_id) return false;
 
     void this.messageService.typingStart(chatId).catch(() => {});
     try {
@@ -495,12 +495,14 @@ export class MessageAutoService {
         });
         await this.gateway.notifyAutoMessage(message, chat);
       }
+      return true;
     } catch (err) {
       this.logger.error(
         `sendWindowReminderWithTemplate: échec ${chatId}: ${(err as Error).message}`,
         undefined,
         MessageAutoService.name,
       );
+      return false;
     } finally {
       void this.messageService.typingStop(chatId).catch(() => {});
     }
