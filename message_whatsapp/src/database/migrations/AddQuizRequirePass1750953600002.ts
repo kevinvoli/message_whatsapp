@@ -5,7 +5,6 @@ export class AddQuizRequirePass1750953600002 implements MigrationInterface {
     await queryRunner.query(`
       ALTER TABLE quiz_session
         ADD COLUMN require_pass TINYINT(1) NOT NULL DEFAULT 0
-          COMMENT 'Si 1 : le commercial doit atteindre le score de passage pour débloquer l'accès. Si 0 : toute soumission débloque.'
     `);
   }
 
