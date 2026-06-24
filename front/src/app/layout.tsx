@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthProvider";
 import { SocketProvider } from "@/contexts/SocketProvider";
 import WebSocketEvents from "@/components/WebSocketEvents";
 import IdleAndCooldownWrapper from "@/components/IdleAndCooldownWrapper";
+import QuizGateWrapper from "@/components/QuizGateWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,6 +35,7 @@ export default function RootLayout({
           <SocketProvider>
             <WebSocketEvents />
             <IdleAndCooldownWrapper />
+            <QuizGateWrapper />
             {children}
           </SocketProvider>
         </AuthProvider>

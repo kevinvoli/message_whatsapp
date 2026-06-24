@@ -29,6 +29,9 @@ export class QuizSession {
   @Column({ name: 'max_attempts', type: 'tinyint', default: 1 })
   maxAttempts: number;
 
+  @Column({ name: 'require_pass', type: 'tinyint', width: 1, default: 0 })
+  requirePass: boolean;
+
   @Column({ name: 'total_time_minutes', type: 'int', nullable: true })
   totalTimeMinutes: number | null;
 

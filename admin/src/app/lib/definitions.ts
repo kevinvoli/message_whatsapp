@@ -1142,6 +1142,7 @@ export type QuizSession = {
   passingScore: number | null;
   maxAttempts: number;
   totalTimeMinutes: number | null;
+  requirePass: boolean;
   questionCount?: number;
   createdAt: string;
 };

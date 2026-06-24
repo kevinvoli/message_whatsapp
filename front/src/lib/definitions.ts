@@ -4,6 +4,12 @@ export interface QuizTodayStatus {
   sessionActive: boolean;
   isExempt: boolean;
   attemptCompleted: boolean;
+  /** true dès que l'obligation du jour est remplie */
+  alreadySubmittedToday: boolean;
+  /** ID de la session du jour, null si aucune session active */
+  sessionId: string | null;
+  /** true = le commercial doit atteindre le score de passage pour débloquer l'accès */
+  requirePass: boolean;
   session: {
     id: string;
     title: string;

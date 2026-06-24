@@ -57,6 +57,7 @@ interface SessionFormState {
   isActive: boolean;
   passingScoreEnabled: boolean;
   passingScore: number;
+  requirePass: boolean;
   maxAttempts: number;
   timeLimitEnabled: boolean;
   totalTimeMinutes: number;
@@ -113,6 +114,7 @@ function emptySessionForm(date = ''): SessionFormState {
     isActive: true,
     passingScoreEnabled: false,
     passingScore: 10,
+    requirePass: false,
     maxAttempts: 1,
     timeLimitEnabled: false,
     totalTimeMinutes: 15,
@@ -711,6 +713,7 @@ function SessionsTab() {
       isActive: session.isActive,
       passingScoreEnabled: session.passingScore != null,
       passingScore: session.passingScore ?? 10,
+      requirePass: session.requirePass ?? false,
       maxAttempts: session.maxAttempts,
       timeLimitEnabled: session.totalTimeMinutes != null,
       totalTimeMinutes: session.totalTimeMinutes ?? 15,
@@ -729,6 +732,7 @@ function SessionsTab() {
       sessionDate: form.sessionDate,
       isActive: form.isActive,
       passingScore: form.passingScoreEnabled ? form.passingScore : undefined,
+      requirePass: form.requirePass,
       maxAttempts: form.maxAttempts,
       totalTimeMinutes: form.timeLimitEnabled ? form.totalTimeMinutes : undefined,
       questionIds: form.selectedQuestionIds,
@@ -948,6 +952,25 @@ function SessionsTab() {
                   />
                 </div>
               )}
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={form.requirePass}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, requirePass: e.target.checked }))}
+                  className="rounded"
+                  disabled={!form.passingScoreEnabled}
+                />
+                <span className={!form.passingScoreEnabled ? 'text-gray-400' : ''}>
+                  Réussite obligatoire
+                </span>
+              </label>
+              <p className="text-xs text-gray-400 mb-3">
+                {form.requirePass
+                  ? 'Le commercial doit atteindre le score de passage pour accéder aux conversations.'
+                  : 'Toute soumission débloque l\'accès, quel que soit le score.'}
+              </p>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Tentatives max</label>

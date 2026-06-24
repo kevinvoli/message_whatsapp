@@ -28,6 +28,10 @@ export class CreateSessionDto {
   passingScore?: number;
 
   @IsOptional()
+  @IsBoolean()
+  requirePass?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   maxAttempts?: number;

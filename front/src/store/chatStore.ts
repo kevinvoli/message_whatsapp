@@ -101,6 +101,10 @@ interface ChatState {
   cooldownRemainingMs: () => number;
   setCooldownModal: (v: boolean) => void;
 
+  /** true une fois que le commercial a soumis le QCM du jour dans cette session */
+  quizDoneToday: boolean;
+  setQuizDoneToday: (done: boolean) => void;
+
   /** Unread count de la conversation en cours de chargement (avant reset optimiste) */
   pendingConversationUnreadCount: number;
   /** Réinitialise la sélection comme si aucune conversation n'avait été cliquée */
@@ -166,6 +170,7 @@ const initialState: Omit<
   | "cooldownRemainingMs"
   | "setCooldownModal"
   | "clearSelectedConversation"
+  | "setQuizDoneToday"
   | "loadRestrictionConfig"
   | "dismissRestriction"
   | "closeRestrictionModal"
@@ -206,6 +211,7 @@ const initialState: Omit<
   pendingConversationId: null,
   sendError: null,
   messageRestrictionConfig: null,
+  quizDoneToday: false,
 };
 let typingTimeout: NodeJS.Timeout;
 let isSending = false;
@@ -515,6 +521,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setCooldownModal: (v: boolean) => set({ showCooldownModal: v }),
+  quizDoneToday: false,
+  setQuizDoneToday: (done: boolean) => set({ quizDoneToday: done }),
 
   clearSelectedConversation: () => {
     set((state) => {
@@ -1039,5 +1047,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pendingConversationId: null,
     sendError: null,
     messageRestrictionConfig: null,
+    quizDoneToday: false,
   }),
 }));

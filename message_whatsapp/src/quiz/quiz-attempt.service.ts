@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { QuizSession } from './entities/quiz-session.entity';
 import { QuizAttempt } from './entities/quiz-attempt.entity';
 import { QuizAnswerAttempt } from './entities/quiz-answer-attempt.entity';
@@ -22,6 +22,12 @@ export interface TodaySessionResponse {
   sessionActive: boolean;
   isExempt: boolean;
   attemptCompleted: boolean;
+  /** true dès que l'obligation du jour est remplie (soumission si requirePass=false, réussite si requirePass=true) */
+  alreadySubmittedToday: boolean;
+  /** ID de la session du jour (null si aucune session active) */
+  sessionId: string | null;
+  /** true = réussite obligatoire pour débloquer l'accès */
+  requirePass: boolean;
   session?: {
     id: string;
     title: string;
@@ -100,15 +106,16 @@ export class QuizAttemptService {
       .createQueryBuilder('session')
       .where('DATE(session.sessionDate) = CURDATE()')
       .andWhere('session.isActive = 1')
+      .andWhere('session.deletedAt IS NULL')
       .getOne();
 
     if (!session) {
-      return { sessionActive: false, isExempt: false, attemptCompleted: false };
+      return { sessionActive: false, isExempt: false, attemptCompleted: false, alreadySubmittedToday: false, sessionId: null, requirePass: false };
     }
 
     const isExempt = await this.exemptionService.isExempt(commercialId, posteId);
     if (isExempt) {
-      return { sessionActive: true, isExempt: true, attemptCompleted: true };
+      return { sessionActive: true, isExempt: true, attemptCompleted: true, alreadySubmittedToday: true, sessionId: session.id, requirePass: session.requirePass };
     }
 
     const attempts = await this.attemptRepo.find({
@@ -117,6 +124,11 @@ export class QuizAttemptService {
     });
 
     const attemptCompleted = this.resolveAttemptCompleted(session, attempts);
+    // requirePass=true → obligation remplie seulement si score atteint (ou tentatives épuisées)
+    // requirePass=false → toute soumission complétée suffit
+    const alreadySubmittedToday = session.requirePass
+      ? this.resolveAttemptCompleted(session, attempts)
+      : attempts.some((a) => a.completedAt !== null);
 
     const sessionQuestions = await this.loadSessionQuestionsWithRelations(session.id);
 
@@ -137,6 +149,9 @@ export class QuizAttemptService {
       sessionActive: true,
       isExempt: false,
       attemptCompleted,
+      alreadySubmittedToday,
+      sessionId: session.id,
+      requirePass: session.requirePass,
       session: {
         id: session.id,
         title: session.title,
@@ -184,6 +199,17 @@ export class QuizAttemptService {
 
     if (session.maxAttempts !== 0 && count >= session.maxAttempts) {
       throw new ForbiddenException('Nombre maximum de tentatives atteint');
+    }
+
+    // Verrou anti-double-soumission : si une tentative complétée existe déjà et maxAttempts = 1
+    if (session.maxAttempts === 1) {
+      const completedExists = await this.attemptRepo.findOne({
+        where: { commercialId, sessionId, completedAt: Not(IsNull()) },
+        select: ['id'],
+      });
+      if (completedExists) {
+        throw new ForbiddenException('QCM déjà soumis aujourd\'hui');
+      }
     }
 
     const sqRows = await this.sqRepo.findBy({ sessionId });

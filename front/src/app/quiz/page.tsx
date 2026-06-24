@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getQuizToday, startQuizAttempt, submitQuizAttempt, getQuizPdfs } from '@/lib/api';
+import { useChatStore } from '@/store/chatStore';
 import type { QuizTodayStatus, QuizStartResult, QuizPdf } from '@/lib/definitions';
 
 // ---------------------------------------------------------------------------
@@ -159,6 +160,7 @@ export default function QuizPage() {
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const setQuizDoneToday = useChatStore((s) => s.setQuizDoneToday);
 
   // --- Timers ---
   const [globalSecondsLeft, setGlobalSecondsLeft] = useState<number | null>(null);
@@ -223,6 +225,7 @@ export default function QuizPage() {
 
       try {
         await submitQuizAttempt(attemptId, answersArray, timedOutGlobal);
+        setQuizDoneToday(true);
         router.push(`/quiz/result?attemptId=${attemptId}`);
       } catch {
         submittingRef.current = false;
