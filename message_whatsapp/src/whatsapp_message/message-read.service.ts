@@ -22,6 +22,7 @@ export class MessageReadService {
     commercialId: string,
     chatId: string,
     isDedicated = false,
+    bypassRestrictions = false,
   ): Promise<{ markedCount: number }> {
     const messages = await this.messageRepository
       .createQueryBuilder('m')
@@ -35,9 +36,9 @@ export class MessageReadService {
       return { markedCount: 0 };
     }
 
-    // Skip rate limit pour postes dédiés — marquer tous les messages sans restriction
+    // Skip rate limit pour postes dédiés ou bypass actif — marquer tous les messages sans restriction
     let granted: number;
-    if (isDedicated) {
+    if (isDedicated || bypassRestrictions) {
       granted = messages.length;
     } else {
       const settings = await this.settingsRepository.findOne({

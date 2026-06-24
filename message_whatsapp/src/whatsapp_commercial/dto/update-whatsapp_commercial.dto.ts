@@ -31,4 +31,8 @@ export class UpdateWhatsappCommercialDto {
   @IsOptional()
   @IsBoolean()
   allowOutsideHours?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  bypassRestrictions?: boolean;
 }

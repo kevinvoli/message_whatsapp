@@ -64,6 +64,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
   const [formName, setFormName] = useState('');
   const [formCode, setFormCode] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formBypassRestrictions, setFormBypassRestrictions] = useState(false);
   const [queueActionLoadingId, setQueueActionLoadingId] = useState<string | null>(null);
   const [panelPoste, setPanelPoste] = useState<Poste | null>(null);
   const [queueFilter, setQueueFilter] = useState<'all' | 'blocked' | 'allowed'>('all');
@@ -82,6 +83,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     setFormName(poste.name);
     setFormCode(poste.code);
     setFormIsActive(poste.is_queue_enabled === false ? false : poste.is_active);
+    setFormBypassRestrictions(poste.bypassRestrictions ?? false);
     clearStatus();
     setShowEditModal(true);
   };
@@ -124,7 +126,7 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
     }
     const result = await update(
       currentPoste.id,
-      { name: formName, code: formCode, is_active: formIsActive },
+      { name: formName, code: formCode, is_active: formIsActive, bypassRestrictions: formBypassRestrictions },
       'Poste mis a jour.',
     );
     if (!result.ok && result.error?.toLowerCase().includes('bloque')) {
@@ -508,6 +510,26 @@ export default function PostesView({ onRefresh, onViewConversations }: PostesVie
               Debloque la queue pour activer ce poste.
             </span>
           )}
+        </div>
+        <div className="mb-4 flex items-center justify-between rounded border border-orange-200 bg-orange-50 px-3 py-3">
+          <div>
+            <p className="text-sm font-bold text-gray-700">Désactiver toutes les restrictions</p>
+            <p className="text-xs text-gray-500">Contourne le timeout de réponse, lecture seule, rate limit et restrictions de contenu</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormBypassRestrictions((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              formBypassRestrictions ? 'bg-orange-500' : 'bg-gray-300'
+            }`}
+            aria-pressed={formBypassRestrictions}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                formBypassRestrictions ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
       </EntityFormModal>
     </div>

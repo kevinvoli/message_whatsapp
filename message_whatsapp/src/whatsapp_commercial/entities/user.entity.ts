@@ -65,6 +65,9 @@ export class WhatsappCommercial {
   @Column({ type: 'boolean', default: false, name: 'allow_outside_hours' })
   allowOutsideHours: boolean;
 
+  @Column({ name: 'bypass_restrictions', type: 'boolean', default: false })
+  bypassRestrictions: boolean;
+
   @Column({ type: 'timestamp', nullable: true })
   lastConnectionAt: Date;
 

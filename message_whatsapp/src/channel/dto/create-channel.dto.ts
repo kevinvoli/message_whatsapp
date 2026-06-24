@@ -75,4 +75,9 @@ export class CreateChannelDto {
   @IsInt()
   @Min(0)
   readOnlyAfterMessages?: number | null;
+
+  /** Désactive TOUTES les restrictions de conversation/réponse pour ce canal */
+  @IsOptional()
+  @IsBoolean()
+  bypassRestrictions?: boolean;
 }

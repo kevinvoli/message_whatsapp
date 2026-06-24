@@ -226,6 +226,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
   const [formPassword, setFormPassword] = useState<string>('');
   const [formEmail, setFormEmail] = useState('');
   const [formAllowOutsideHours, setFormAllowOutsideHours] = useState(false);
+  const [formBypassRestrictions, setFormBypassRestrictions] = useState(false);
   const [currentCommercial, setCurrentCommercial] = useState<PerformanceCommercial | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<PerformanceCommercial | null>(null);
@@ -294,11 +295,12 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
       addToast({ type: 'error', message: "L'ID du commercial est manquant." });
       return;
     }
-    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null; allowOutsideHours?: boolean } = {
+    const payload: { name?: string; email?: string; password?: string; poste_id?: string | null; allowOutsideHours?: boolean; bypassRestrictions?: boolean } = {
       name: formName,
       email: formEmail,
       poste_id: formPosteId,
       allowOutsideHours: formAllowOutsideHours,
+      bypassRestrictions: formBypassRestrictions,
     };
     if (formPassword) {
       payload.password = formPassword;
@@ -336,6 +338,7 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
     setFormPosteId(commercial?.poste_id || null);
     setFormIsActive(true);
     setFormAllowOutsideHours(commercial.allowOutsideHours ?? false);
+    setFormBypassRestrictions(commercial.bypassRestrictions ?? false);
     setShowEditModal(true);
     clearStatus();
   };
@@ -1360,6 +1363,26 @@ export default function CommerciauxView({ onRefresh, selectedPeriod = 'today', d
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
                 formAllowOutsideHours ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        <div className="mb-4 flex items-center justify-between rounded border border-orange-200 bg-orange-50 px-3 py-3">
+          <div>
+            <p className="text-sm font-bold text-gray-700">Désactiver toutes les restrictions</p>
+            <p className="text-xs text-gray-500">Contourne le timeout de réponse, lecture seule, rate limit et restrictions de contenu</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormBypassRestrictions((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              formBypassRestrictions ? 'bg-orange-500' : 'bg-gray-300'
+            }`}
+            aria-pressed={formBypassRestrictions}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                formBypassRestrictions ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
           </button>

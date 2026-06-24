@@ -374,6 +374,10 @@ export class WhatsappCommercialService {
       user.allowOutsideHours = updateWhatsappCommercialDto.allowOutsideHours;
     }
 
+    if (updateWhatsappCommercialDto.bypassRestrictions !== undefined) {
+      user.bypassRestrictions = updateWhatsappCommercialDto.bypassRestrictions;
+    }
+
     const updatedUser = await this.whatsappCommercialRepository.save(user);
 
     return this.toSafeUser(updatedUser);

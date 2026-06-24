@@ -136,6 +136,14 @@ export class WhapiChannel {
   @Column({ name: 'no_close', type: 'boolean', default: false })
   no_close: boolean;
 
+  /**
+   * Désactive TOUTES les restrictions de conversation/réponse pour ce canal.
+   * true  = bypass timeout, content restrictions, rate-limit lecture, idle-disconnect.
+   * false = comportement par défaut.
+   */
+  @Column({ name: 'bypass_restrictions', type: 'boolean', default: false })
+  bypassRestrictions: boolean;
+
   @Column({ name: 'phone_number', type: 'varchar', length: 32, nullable: true, default: null })
   phone_number: string | null;
 

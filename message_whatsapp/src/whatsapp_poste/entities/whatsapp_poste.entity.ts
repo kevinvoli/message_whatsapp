@@ -38,6 +38,9 @@ export class WhatsappPoste {
   @Column({ default: true })
   is_queue_enabled: boolean;
 
+  @Column({ name: 'bypass_restrictions', type: 'boolean', default: false })
+  bypassRestrictions: boolean;
+
   @Column({ name: 'media_panel_enabled', type: 'tinyint', width: 1, default: 0 })
   media_panel_enabled: boolean;
 

@@ -472,6 +472,7 @@ describe('DispatcherService — jobRunnerAllPostes (SLA)', () => {
       messages: [],
       commercial: [],
       channels: [],
+      bypassRestrictions: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

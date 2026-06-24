@@ -26,6 +26,7 @@ import {
 import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template.service';
 import { CampaignLinkService } from 'src/campaign-link/campaign-link.service';
 import { MessageRestrictionService } from 'src/message-restriction/message-restriction.service';
+import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
 
 @Injectable()
 export class WhatsappMessageService {
@@ -49,6 +50,8 @@ export class WhatsappMessageService {
     private readonly chatRepository: Repository<WhatsappChat>,
     @InjectRepository(WhatsappMedia)
     private readonly mediaRepository: Repository<WhatsappMedia>,
+    @InjectRepository(WhatsappPoste)
+    private readonly posteRepository: Repository<WhatsappPoste>,
     private readonly templateService: WhatsappTemplateService,
     @Inject(forwardRef(() => CampaignLinkService))
     private readonly campaignLinkService: CampaignLinkService,
@@ -135,15 +138,29 @@ export class WhatsappMessageService {
       );
       chat = await this.chatService.findBychat_id(data.chat_id);
       if (!chat) throw new Error('Chat not found');
-      if (data.commercial_id) {
-        commercial = await this.commercialRepository.findOne({
-          where: { id: data.commercial_id },
-        });
-      }
+
+      const [commercialResult, channelResult, posteResult] = await Promise.all([
+        data.commercial_id
+          ? this.commercialRepository.findOne({ where: { id: data.commercial_id } })
+          : Promise.resolve(null),
+        this.channelService.findOne(data.channel_id),
+        data.poste_id
+          ? this.posteRepository.findOne({ where: { id: data.poste_id } })
+          : Promise.resolve(null),
+      ]);
+
+      commercial = commercialResult;
+      const channelEarly = channelResult;
+      if (!channelEarly) throw new NotFoundException('Channel not found');
+
+      const bypassed =
+        !!commercial?.bypassRestrictions ||
+        !!posteResult?.bypassRestrictions ||
+        !!channelEarly.bypassRestrictions;
 
       const lastInboundMessage = await this.findLastInboundMessageBychat_id(data.chat_id);
 
-      if (lastInboundMessage) {
+      if (!bypassed && lastInboundMessage) {
         const now = new Date();
         const lastMessageDate = new Date(lastInboundMessage.timestamp);
         const diff = now.getTime() - lastMessageDate.getTime();
@@ -155,7 +172,7 @@ export class WhatsappMessageService {
           );
         }
       }
-      if (data.validateContent) {
+      if (!bypassed && data.validateContent) {
         const restrictionConfig = await this.messageRestrictionService.getConfig();
         const violations = this.messageRestrictionService.validateTextContent(data.text, restrictionConfig);
         if (violations.length > 0) {
@@ -190,10 +207,7 @@ export class WhatsappMessageService {
         `OUTBOUND_PROVIDER_OK trace=${traceId} provider=${sendResponse.provider} external_id=${sendResponse.providerMessageId ?? 'unknown'}`,
       );
 
-      const channel = await this.channelService.findOne(data.channel_id);
-      if (!channel) {
-        throw new NotFoundException('Channel not found');
-      }
+      const channel = channelEarly;
 
       // Déterminer si c'est la première réponse après un tour client
       const lastAnyMessage = await this.messageRepository.findOne({
@@ -252,8 +266,8 @@ export class WhatsappMessageService {
           // Les messages auto (poste_id = null) ne doivent pas bloquer la séquence.
           ...(data.poste_id ? { last_poste_message_at: messageEntity.createdAt } : {}),
           // Le commercial vient de répondre → lecture seule paramétrée selon la limite configurée
-          // Exception : canal dédié → jamais en lecture seule
-          ...(data.poste_id && !channel.poste_id
+          // Exception : canal dédié ou bypass actif → jamais en lecture seule
+          ...(data.poste_id && !channel.poste_id && !bypassed
             ? await (async () => {
                 const limit = await this.channelService.resolveReadOnlyLimit(channel.channel_id);
                 if (limit === 0) return {};

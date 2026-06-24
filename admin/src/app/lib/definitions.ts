@@ -110,6 +110,7 @@ export type Poste = {
   is_queue_enabled?: boolean;
   media_panel_enabled?: boolean;
   media_panel_types?: string | null;
+  bypassRestrictions?: boolean;
   createdAt?: string;
   updatedAt?: string;
   chats?: WhatsappChat[] | null;
@@ -148,6 +149,7 @@ export type Channel = {
   no_read_only?: boolean;
   no_close?: boolean;
   readOnlyAfterMessages?: number | null;
+  bypassRestrictions?: boolean;
   phone_number?: string | null;
 };
 
@@ -544,6 +546,7 @@ export type PerformanceCommercial = {
   email: string;
   isConnected: boolean;
   allowOutsideHours: boolean;
+  bypassRestrictions?: boolean;
   poste_name: string;
   poste_id: string | null;
   nbChatsActifs: number;

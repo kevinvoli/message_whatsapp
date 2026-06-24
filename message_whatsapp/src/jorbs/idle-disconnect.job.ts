@@ -56,6 +56,11 @@ export class IdleDisconnectJob implements OnModuleInit {
           WHERE ch.poste_id = poste.id
         )`,
       )
+      .andWhere('c.bypassRestrictions = :bypassFalse', { bypassFalse: false })
+      .andWhere(
+        '(poste.id IS NULL OR poste.bypassRestrictions = :bypassFalse)',
+        { bypassFalse: false },
+      )
       .getMany();
 
     if (idleCommercials.length === 0) {

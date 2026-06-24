@@ -457,6 +457,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
   const [assignNoReadOnly, setAssignNoReadOnly] = useState(false);
   const [assignNoClose, setAssignNoClose] = useState(false);
   const [assignReadOnlyAfterMessages, setAssignReadOnlyAfterMessages] = useState<number | null>(null);
+  const [assignBypassRestrictions, setAssignBypassRestrictions] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
 
   const openAssignModal = async (channel: Channel) => {
@@ -465,6 +466,7 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     setAssignNoReadOnly(channel.no_read_only ?? false);
     setAssignNoClose(channel.no_close ?? false);
     setAssignReadOnlyAfterMessages(channel.readOnlyAfterMessages ?? null);
+    setAssignBypassRestrictions(channel.bypassRestrictions ?? false);
     setPostesLoading(true);
     try {
       const data = await getPostes();
@@ -482,9 +484,9 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
     try {
       const [assigned, flagsUpdated] = await Promise.all([
         assignChannelToPoste(assignModal.channel.channel_id, assigningPosteId || null),
-        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose, readOnlyAfterMessages: assignReadOnlyAfterMessages }),
+        updateChannel(assignModal.channel.id, { no_read_only: assignNoReadOnly, no_close: assignNoClose, readOnlyAfterMessages: assignReadOnlyAfterMessages, bypassRestrictions: assignBypassRestrictions }),
       ]);
-      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close, readOnlyAfterMessages: flagsUpdated.readOnlyAfterMessages ?? null };
+      const merged = { ...assigned, no_read_only: flagsUpdated.no_read_only, no_close: flagsUpdated.no_close, readOnlyAfterMessages: flagsUpdated.readOnlyAfterMessages ?? null, bypassRestrictions: flagsUpdated.bypassRestrictions ?? false };
       setItems((prev) => prev.map((c) => (c.id === merged.id ? merged : c)));
       addToast({ type: 'success', message: 'Paramètres du canal enregistrés.' });
       setAssignModal(null);
@@ -859,6 +861,18 @@ export default function ChannelsView({ onRefresh }: ChannelsViewProps) {
                 <span className="text-sm text-gray-700">
                   <span className="font-medium">Jamais fermée</span>
                   <span className="block text-xs text-gray-400 mt-0.5">La conversation ne peut pas être fermée manuellement ni par le cron d&apos;inactivité.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={assignBypassRestrictions}
+                  onChange={(e) => setAssignBypassRestrictions(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500"
+                />
+                <span className="text-sm text-gray-700">
+                  <span className="font-medium">Désactiver toutes les restrictions</span>
+                  <span className="block text-xs text-gray-400 mt-0.5">Contourne le timeout de réponse, lecture seule, rate limit et restrictions de contenu.</span>
                 </span>
               </label>
               {/* Override limite messages avant lecture seule */}

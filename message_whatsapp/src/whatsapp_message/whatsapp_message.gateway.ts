@@ -71,6 +71,7 @@ export class WhatsappMessageGateway
       tenantId: string | null;
       tenantIds: string[];
       isDedicated: boolean;
+      bypassRestrictions: boolean;
     }
   >();
   private typingChats = new Set<string>(); // 💡 Track chats en typing
@@ -168,12 +169,21 @@ export class WhatsappMessageGateway
       ? (await this.channelRepository.count({ where: { poste_id: posteId } })) > 0
       : false;
 
+    const channelBypass = posteId
+      ? (await this.channelRepository.count({ where: { poste_id: posteId, bypassRestrictions: true } })) > 0
+      : false;
+    const bypassRestrictions =
+      !!commercial.bypassRestrictions ||
+      !!commercial.poste?.bypassRestrictions ||
+      channelBypass;
+
     this.connectedAgents.set(client.id, {
       commercialId,
       posteId,
       tenantId,
       tenantIds,
       isDedicated,
+      bypassRestrictions,
     });
     for (const tid of tenantIds) {
       await client.join(`tenant:${tid}`);
@@ -788,6 +798,7 @@ export class WhatsappMessageGateway
         agent.commercialId,
         payload.chatId,
         agent.isDedicated,
+        agent.bypassRestrictions,
       );
       const chat = await this.chatService.findBychat_id(payload.chatId);
       client.emit('conversation:read:ack', {
@@ -975,45 +986,47 @@ export class WhatsappMessageGateway
         return;
       }
 
-      // 🔒 Fenêtre de messagerie — 72h pour les chats CTWA (Click-to-WhatsApp Ads),
-      // 23h pour les autres. WhatsApp n'autorise plus l'envoi hors fenêtre.
-      const WINDOW_MS = chat.isCtwa
-        ? 72 * 60 * 60 * 1000
-        : 23 * 60 * 60 * 1000;
-      const lastClientAt = chat.last_client_message_at;
-      let windowExpired = !lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS;
+      if (!agent.bypassRestrictions) {
+        // 🔒 Fenêtre de messagerie — 72h pour les chats CTWA (Click-to-WhatsApp Ads),
+        // 23h pour les autres. WhatsApp n'autorise plus l'envoi hors fenêtre.
+        const WINDOW_MS = chat.isCtwa
+          ? 72 * 60 * 60 * 1000
+          : 23 * 60 * 60 * 1000;
+        const lastClientAt = chat.last_client_message_at;
+        let windowExpired = !lastClientAt || Date.now() - new Date(lastClientAt).getTime() > WINDOW_MS;
 
-      // Fallback : last_client_message_at peut être désynchronisé (webhook manqué,
-      // canal introuvable au moment du traitement…). On vérifie le dernier message
-      // client réel en base et on répare la colonne si un message récent existe.
-      if (windowExpired) {
-        const latestClientMsg = await this.messageService.findLastInboundMessageBychat_id(payload.chat_id);
-        if (latestClientMsg?.timestamp && Date.now() - new Date(latestClientMsg.timestamp).getTime() <= WINDOW_MS) {
-          windowExpired = false;
-          void this.chatService.update(payload.chat_id, { last_client_message_at: new Date(latestClientMsg.timestamp) });
+        // Fallback : last_client_message_at peut être désynchronisé (webhook manqué,
+        // canal introuvable au moment du traitement…). On vérifie le dernier message
+        // client réel en base et on répare la colonne si un message récent existe.
+        if (windowExpired) {
+          const latestClientMsg = await this.messageService.findLastInboundMessageBychat_id(payload.chat_id);
+          if (latestClientMsg?.timestamp && Date.now() - new Date(latestClientMsg.timestamp).getTime() <= WINDOW_MS) {
+            windowExpired = false;
+            void this.chatService.update(payload.chat_id, { last_client_message_at: new Date(latestClientMsg.timestamp) });
+          }
         }
-      }
 
-      if (windowExpired) {
-        // Fermer immédiatement la conversation et sa session — ne pas attendre le cron.
-        try {
-          await this.chatSessionService.closeExpiredChatByWindowExpiry(chat.id);
-          chat.status = WhatsappChatStatus.FERME;
-          chat.windowExpiresAt = null;
-          await this.emitConversationClosed(chat);
-        } catch (err) {
-          this.logger.error(`closeExpiredChatByWindowExpiry failed for chat ${chat.id}`, err);
+        if (windowExpired) {
+          // Fermer immédiatement la conversation et sa session — ne pas attendre le cron.
+          try {
+            await this.chatSessionService.closeExpiredChatByWindowExpiry(chat.id);
+            chat.status = WhatsappChatStatus.FERME;
+            chat.windowExpiresAt = null;
+            await this.emitConversationClosed(chat);
+          } catch (err) {
+            this.logger.error(`closeExpiredChatByWindowExpiry failed for chat ${chat.id}`, err);
+          }
+          client.emit('chat:event', {
+            type: 'MESSAGE_SEND_ERROR',
+            payload: {
+              chat_id: payload.chat_id,
+              tempId: payload.tempId,
+              code: 'WINDOW_EXPIRED',
+              message: 'Fenêtre de 23h expirée — la conversation a été fermée automatiquement.',
+            },
+          });
+          return;
         }
-        client.emit('chat:event', {
-          type: 'MESSAGE_SEND_ERROR',
-          payload: {
-            chat_id: payload.chat_id,
-            tempId: payload.tempId,
-            code: 'WINDOW_EXPIRED',
-            message: 'Fenêtre de 23h expirée — la conversation a été fermée automatiquement.',
-          },
-        });
-        return;
       }
 
       const resolvedChannelId = await this.resolveChannelIdForChat(chat);
@@ -1035,7 +1048,7 @@ export class WhatsappMessageGateway
 
       // 🔒 Restriction min caractères d'envoi — bloque si le message est trop court
       const restrictionCfg = await this.restrictionService.getRestrictionConfig();
-      if (restrictionCfg.minCharsSendEnabled) {
+      if (!agent.bypassRestrictions && restrictionCfg.minCharsSendEnabled) {
         const textLen = normalizedText.length;
         if (textLen < restrictionCfg.minResponseChars) {
           client.emit('chat:event', {
@@ -1102,9 +1115,8 @@ export class WhatsappMessageGateway
           timestamp: new Date(),
           commercial_id: agent.commercialId,
           quotedMessageId: payload.quotedMessageId,
-          // Postes dédiés exemptés des restrictions de contenu (même règle que rate-limit,
-          // cooldown et idle-disconnect).
-          validateContent: !agent.isDedicated,
+          // Postes dédiés ou bypass actif exemptés des restrictions de contenu.
+          validateContent: !agent.isDedicated && !agent.bypassRestrictions,
         });
         this.logger.log(
           `OUTBOUND_SOCKET_ACK trace=${message.message_id ?? message.id} chat_id=${message.chat_id}`,

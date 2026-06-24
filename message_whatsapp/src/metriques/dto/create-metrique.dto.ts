@@ -242,6 +242,10 @@ export class PerformanceCommercialDto {
   @ApiProperty({ description: 'Messages lus sans réponse' })
   @IsNumber()
   nbMessagesLusSansReponse: number;
+
+  @ApiProperty({ description: 'Bypass de toutes les restrictions actif' })
+  @IsBoolean()
+  bypassRestrictions: boolean;
 }
 
 /**
