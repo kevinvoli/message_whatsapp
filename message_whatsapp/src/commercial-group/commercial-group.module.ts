@@ -21,7 +21,10 @@ import { BreakExclusionService } from './break-exclusion.service';
 import { CommercialBreakController } from './commercial-break.controller';
 import { BreakSessionService } from './break-session.service';
 import { BreakScheduleEngine } from './break-schedule-engine.service';
+import { BreakSupervisionService } from './break-supervision.service';
+import { DisconnectMonitorJob } from './jobs/disconnect-monitor.job';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
+import { ConnectionLog } from 'src/connection-log/entities/connection-log.entity';
 
 @Module({
   imports: [
@@ -34,6 +37,7 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
       SubGroupBreakSchedule,
       BreakExclusion,
       BreakSession,
+      ConnectionLog,
     ]),
     SystemConfigModule,
     WhatsappMessageModule,
@@ -49,6 +53,8 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
     BreakExclusionService,
     BreakSessionService,
     BreakScheduleEngine,
+    BreakSupervisionService,
+    DisconnectMonitorJob,
   ],
   exports: [
     CommercialGroupService,

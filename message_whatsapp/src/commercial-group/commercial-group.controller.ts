@@ -10,6 +10,8 @@ import { CommercialSubGroupService } from './commercial-sub-group.service';
 import { BreakScheduleService } from './break-schedule.service';
 import { BreakExclusionService } from './break-exclusion.service';
 import { CreateBreakExclusionDto, CreateSubGroupDto, UpdateSubGroupDto, UpsertBreakScheduleDto } from './dto/sub-group.dto';
+import { BreakSupervisionService } from './break-supervision.service';
+import { DisconnectMonitorJob } from './jobs/disconnect-monitor.job';
 
 @Controller('commercial-groups')
 @UseGuards(AdminGuard)
@@ -21,6 +23,8 @@ export class CommercialGroupController {
     private readonly subGroupService: CommercialSubGroupService,
     private readonly breakScheduleService: BreakScheduleService,
     private readonly breakExclusionService: BreakExclusionService,
+    private readonly supervisionService: BreakSupervisionService,
+    private readonly disconnectMonitor: DisconnectMonitorJob,
   ) {}
 
   @Post()
@@ -166,12 +170,12 @@ export class CommercialGroupController {
 
   @Get('break-supervision')
   getSupervision() {
-    return [];
+    return this.supervisionService.getSupervision();
   }
 
   @Get('disconnect-alerts')
   getDisconnectAlerts() {
-    return [];
+    return this.disconnectMonitor.getActiveAlerts();
   }
 
   @Get('presence')
