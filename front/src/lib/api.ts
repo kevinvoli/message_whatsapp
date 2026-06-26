@@ -143,3 +143,13 @@ export async function getQuizHistory(): Promise<QuizHistoryEntry[]> {
   });
   return handleResponse<QuizHistoryEntry[]>(response);
 }
+
+export async function takeBreak(breakScheduleId: string): Promise<{ ok: true }> {
+  const response = await fetch(`${API_BASE_URL}/commercial/break/take`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ breakScheduleId }),
+  });
+  return handleResponse<{ ok: true }>(response);
+}

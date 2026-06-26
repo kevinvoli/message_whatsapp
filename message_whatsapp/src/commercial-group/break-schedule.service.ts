@@ -61,6 +61,10 @@ export class BreakScheduleService {
     return rows.map((r) => this.toResponse(r));
   }
 
+  async findOne(id: string): Promise<SubGroupBreakSchedule | null> {
+    return this.scheduleRepo.findOne({ where: { id, deletedAt: IsNull() } });
+  }
+
   async softDelete(id: string): Promise<void> {
     const schedule = await this.scheduleRepo.findOne({ where: { id, deletedAt: IsNull() } });
     if (!schedule) throw new NotFoundException(`BreakSchedule ${id} introuvable`);

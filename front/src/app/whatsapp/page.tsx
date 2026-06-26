@@ -19,6 +19,8 @@ import { logger } from '@/lib/logger';
 import ConversationRestrictionModal from '@/components/ConversationRestrictionModal';
 import MediaPanel from '@/components/panel/MediaPanel';
 import { getPanelMedia } from '@/lib/api';
+import { useBreakPrompt } from '@/hooks/useBreakPrompt';
+import BreakPromptModal from '@/components/break/BreakPromptModal';
 
 const VALID_FILTER_STATUSES = ['all', 'unread', 'nouveau'];
 
@@ -55,6 +57,7 @@ const WhatsAppPageContent = () => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelEnabled, setPanelEnabled] = useState(false);
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
+  const { prompt: breakPrompt, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
 
   useEffect(() => {
     getPanelMedia(1, 1)
@@ -184,6 +187,7 @@ const WhatsAppPageContent = () => {
       )}
 
       <ConversationRestrictionModal />
+      <BreakPromptModal prompt={breakPrompt} audioRef={breakAudioRef} onTakeBreak={handleTakeBreak} />
     </div>
   );
 };

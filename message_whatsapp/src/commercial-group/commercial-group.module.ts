@@ -19,6 +19,9 @@ import { CommercialSubGroupService } from './commercial-sub-group.service';
 import { BreakScheduleService } from './break-schedule.service';
 import { BreakExclusionService } from './break-exclusion.service';
 import { CommercialBreakController } from './commercial-break.controller';
+import { BreakSessionService } from './break-session.service';
+import { BreakScheduleEngine } from './break-schedule-engine.service';
+import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 
 @Module({
   imports: [
@@ -33,6 +36,7 @@ import { CommercialBreakController } from './commercial-break.controller';
       BreakSession,
     ]),
     SystemConfigModule,
+    WhatsappMessageModule,
   ],
   controllers: [CommercialGroupController, CommercialSelfPlanningController, CommercialBreakController],
   providers: [
@@ -43,6 +47,8 @@ import { CommercialBreakController } from './commercial-break.controller';
     CommercialSubGroupService,
     BreakScheduleService,
     BreakExclusionService,
+    BreakSessionService,
+    BreakScheduleEngine,
   ],
   exports: [
     CommercialGroupService,
@@ -51,6 +57,7 @@ import { CommercialBreakController } from './commercial-break.controller';
     CommercialSubGroupService,
     BreakScheduleService,
     BreakExclusionService,
+    BreakSessionService,
   ],
 })
 export class CommercialGroupModule {}
