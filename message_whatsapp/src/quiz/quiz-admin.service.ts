@@ -155,73 +155,66 @@ export class QuizAdminService {
   }
 
   async getSessionResults(sessionId: string): Promise<SessionResultEntry[]> {
-    // Étape 1 : agréger le nombre de tentatives et le score MAX par commercial (1 requête)
-    const aggregates = await this.attemptRepo
-      .createQueryBuilder('a')
-      .select('a.commercialId', 'commercialId')
-      .addSelect('COUNT(a.id)', 'attemptsCount')
-      .addSelect('MAX(a.score)', 'bestScore')
-      .where('a.sessionId = :sessionId', { sessionId })
-      .andWhere('a.completedAt IS NOT NULL')
-      .groupBy('a.commercialId')
-      .getRawMany<{ commercialId: string; attemptsCount: string; bestScore: string | null }>();
+    const rows = await this.dataSource.query<{
+      commercialId: string;
+      commercialName: string | null;
+      posteName: string | null;
+      attemptsCount: string;
+      bestScore: string | null;
+      maxScore: string | null;
+      isPassed: number | null;
+      completedAt: Date;
+    }[]>(
+      `
+      SELECT
+        a.commercial_id        AS commercialId,
+        c.name                 AS commercialName,
+        p.name                 AS posteName,
+        COUNT(a.id)            AS attemptsCount,
+        MAX(a.score)           AS bestScore,
+        (
+          SELECT a2.max_score
+          FROM quiz_attempt a2
+          WHERE a2.commercial_id = a.commercial_id
+            AND a2.session_id    = a.session_id
+            AND a2.completed_at  IS NOT NULL
+          ORDER BY a2.score DESC
+          LIMIT 1
+        )                      AS maxScore,
+        (
+          SELECT a2.is_passed
+          FROM quiz_attempt a2
+          WHERE a2.commercial_id = a.commercial_id
+            AND a2.session_id    = a.session_id
+            AND a2.completed_at  IS NOT NULL
+          ORDER BY a2.score DESC
+          LIMIT 1
+        )                      AS isPassed,
+        (
+          SELECT a2.completed_at
+          FROM quiz_attempt a2
+          WHERE a2.commercial_id = a.commercial_id
+            AND a2.session_id    = a.session_id
+            AND a2.completed_at  IS NOT NULL
+          ORDER BY a2.score DESC
+          LIMIT 1
+        )                      AS completedAt
+      FROM quiz_attempt a
+      LEFT JOIN whatsapp_commercial c ON c.id = a.commercial_id
+      LEFT JOIN whatsapp_poste p      ON p.id = c.poste_id
+      WHERE a.session_id    = ?
+        AND a.completed_at  IS NOT NULL
+      GROUP BY a.commercial_id, c.name, p.name, a.session_id
+      ORDER BY MAX(a.score) DESC
+      `,
+      [sessionId],
+    );
 
-    if (aggregates.length === 0) return [];
-
-    // Étape 2 : pour chaque commercial, récupérer la tentative avec le score MAX
-    // Utilise IN sur les paires (commercialId, score) via une sous-requête corrélée
-    const commercialIds = aggregates.map((r) => r.commercialId);
-
-    const bestAttempts = await this.attemptRepo
-      .createQueryBuilder('attempt')
-      .leftJoin('whatsapp_commercial', 'c', 'c.id = attempt.commercialId')
-      .leftJoin('whatsapp_poste', 'p', 'p.id = c.poste_id')
-      .select([
-        'attempt.commercialId AS commercialId',
-        'c.name AS commercialName',
-        'p.name AS posteName',
-        'attempt.score AS bestScore',
-        'attempt.maxScore AS maxScore',
-        'attempt.isPassed AS isPassed',
-        'attempt.completedAt AS completedAt',
-      ])
-      .where('attempt.sessionId = :sessionId', { sessionId })
-      .andWhere('attempt.completedAt IS NOT NULL')
-      .andWhere('attempt.commercialId IN (:...commercialIds)', { commercialIds })
-      .andWhere(
-        'attempt.score = (' +
-          'SELECT MAX(a2.score) FROM quiz_attempt a2 ' +
-          'WHERE a2.commercial_id = attempt.commercial_id ' +
-          'AND a2.session_id = :sessionId ' +
-          'AND a2.completed_at IS NOT NULL' +
-          ')',
-      )
-      .orderBy('attempt.score', 'DESC')
-      .getRawMany<{
-        commercialId: string;
-        commercialName: string | null;
-        posteName: string | null;
-        bestScore: string | null;
-        maxScore: string | null;
-        isPassed: number | null;
-        completedAt: Date;
-      }>();
-
-    // Dédoublonner par commercialId (si ex-æquo, garder la première ligne)
-    const seen = new Set<string>();
-    const deduped = bestAttempts.filter((r) => {
-      if (seen.has(r.commercialId)) return false;
-      seen.add(r.commercialId);
-      return true;
-    });
-
-    const countMap = new Map(aggregates.map((r) => [r.commercialId, Number(r.attemptsCount)]));
-
-    return deduped.map((r) => ({
+    return rows.map((r) => ({
       commercialId: r.commercialId,
       commercialName: r.commercialName ?? r.commercialId,
-      posteName: r.posteName,
-      attemptsCount: countMap.get(r.commercialId) ?? 1,
+      posteName: r.posteName ?? null,
+      attemptsCount: Number(r.attemptsCount),
       bestScore: r.bestScore !== null ? Number(r.bestScore) : 0,
       maxScore: r.maxScore !== null ? Number(r.maxScore) : 0,
       isPassed: r.isPassed !== null ? Boolean(r.isPassed) : null,
