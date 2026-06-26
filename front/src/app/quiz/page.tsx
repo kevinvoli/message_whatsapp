@@ -174,6 +174,8 @@ export default function QuizPage() {
 
   // --- Ref pour eviter les appels en double dans le timer global ---
   const submittingRef = useRef(false);
+  const answersRef = useRef<Record<string, AnswerState>>({});
+  useEffect(() => { answersRef.current = answers; }, [answers]);
 
   // ---------------------------------------------------------------------------
   // Chargement initial
@@ -219,8 +221,8 @@ export default function QuizPage() {
 
       const answersArray = questionOrder.map((qId) => ({
         questionId: qId,
-        answerId: answers[qId]?.answerId ?? null,
-        timedOut: timedOutGlobal ? true : (answers[qId]?.timedOut ?? false),
+        answerId: answersRef.current[qId]?.answerId ?? null,
+        timedOut: timedOutGlobal ? true : (answersRef.current[qId]?.timedOut ?? false),
       }));
 
       try {
@@ -232,7 +234,7 @@ export default function QuizPage() {
         setSubmitting(false);
       }
     },
-    [attemptId, questionOrder, answers, router],
+    [attemptId, questionOrder, router],
   );
 
   useEffect(() => {
@@ -284,10 +286,12 @@ export default function QuizPage() {
             ...a,
             [currentQ.id]: { answerId: null, timedOut: true },
           }));
-          setCurrentIndex((i) => {
-            const orderedLen = orderedQuestions.length;
-            return i < orderedLen - 1 ? i + 1 : i;
-          });
+          const orderedLen = orderedQuestions.length;
+          if (currentIndex < orderedLen - 1) {
+            setCurrentIndex((i) => i + 1);
+          } else {
+            handleSubmit(false);
+          }
           return 0;
         }
         return prev - 1;
@@ -297,7 +301,7 @@ export default function QuizPage() {
     return () => {
       if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     };
-  }, [quizActive, quizData, questionOrder, currentIndex]);
+  }, [quizActive, quizData, questionOrder, currentIndex, handleSubmit]);
 
   // ---------------------------------------------------------------------------
   // Demarrage du quiz

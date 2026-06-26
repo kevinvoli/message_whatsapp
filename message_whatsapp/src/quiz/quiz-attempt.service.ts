@@ -252,7 +252,7 @@ export class QuizAttemptService {
       throw new ForbiddenException('Accès refusé');
     }
 
-    if (attempt.expiresAt !== null && Date.now() > attempt.expiresAt.getTime() + 60_000) {
+    if (attempt.expiresAt !== null && !dto.timedOut && Date.now() > attempt.expiresAt.getTime() + 60_000) {
       throw new ForbiddenException('Délai dépassé');
     }
 
