@@ -267,8 +267,8 @@ export class QuizAttemptService {
 
     const questionMap = new Map(questions.map((q) => [q.id, q]));
 
-    let score = 0;
-    let maxScore = 0;
+    let rawScore = 0;
+    let rawMaxScore = 0;
     const answerAttempts: QuizAnswerAttempt[] = [];
 
     for (const submitted of dto.answers) {
@@ -282,8 +282,8 @@ export class QuizAttemptService {
 
       const isCorrect = selectedAnswer?.isCorrect ?? false;
       const pointsEarned = isCorrect ? Number(question.points) : 0;
-      score += pointsEarned;
-      maxScore += Number(question.points);
+      rawScore += pointsEarned;
+      rawMaxScore += Number(question.points);
 
       answerAttempts.push(
         this.answerAttemptRepo.create({
@@ -296,6 +296,22 @@ export class QuizAttemptService {
           timedOut: submitted.timedOut,
         }),
       );
+    }
+
+    // Normalisation sur 20 points quand l'admin n'a pas défini de points personnalisés
+    const questionCount = questionIds.length;
+    const isDefaultScoring = questionCount > 0 && rawMaxScore === questionCount;
+    let score = rawScore;
+    let maxScore = rawMaxScore;
+
+    if (isDefaultScoring) {
+      const factor = 20 / questionCount;
+      maxScore = 20;
+      score = Math.round(rawScore * factor * 100) / 100;
+      const pointsPerQuestion = Math.round(factor * 100) / 100;
+      for (const aa of answerAttempts) {
+        if (aa.isCorrect) aa.pointsEarned = pointsPerQuestion;
+      }
     }
 
     await this.answerAttemptRepo.save(answerAttempts);
@@ -343,6 +359,13 @@ export class QuizAttemptService {
       (a, b) => (orderMap.get(a.questionId) ?? 0) - (orderMap.get(b.questionId) ?? 0),
     );
 
+    // Détecte si la notation a été normalisée sur 20 (toutes les questions avaient 1pt par défaut)
+    const questionCount = attempt.questionOrder.length;
+    const allDefault = questions.length > 0 && questions.every((q) => Math.abs(Number(q.points) - 1) < 0.001);
+    const questionMaxPoints = allDefault && questionCount > 0
+      ? Math.round((20 / questionCount) * 100) / 100
+      : null;
+
     return {
       score: Number(attempt.score),
       maxScore: Number(attempt.maxScore),
@@ -362,6 +385,7 @@ export class QuizAttemptService {
           questionText: question?.text ?? '',
           categoryName: question?.category?.name ?? '',
           pointsEarned: Number(aa.pointsEarned),
+          questionMaxPoints: questionMaxPoints ?? Number(question?.points ?? 1),
           isCorrect: aa.isCorrect,
           timedOut: aa.timedOut,
           selectedAnswer: selectedAnswer ? { text: selectedAnswer.text } : null,

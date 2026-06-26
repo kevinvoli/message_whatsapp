@@ -57,6 +57,7 @@ export interface QuizAttemptResult {
     questionText: string;
     categoryName: string;
     pointsEarned: number;
+    questionMaxPoints: number;
     isCorrect: boolean;
     timedOut: boolean;
     selectedAnswer: { text: string } | null;

@@ -83,7 +83,7 @@ function QuizResultContent() {
                 Tentative {result.attemptNumber}
               </p>
               <h1 className="text-xl font-semibold text-gray-800">
-                Score : {result.score} / {result.maxScore}{' '}
+                Score : {result.score} / {result.maxScore} pts{' '}
                 <span className="text-gray-500 font-normal text-base">({percent}%)</span>
               </h1>
             </div>
@@ -147,7 +147,7 @@ function QuizResultContent() {
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-xs font-medium text-gray-600">
-                      {q.pointsEarned} pt{q.pointsEarned !== 1 ? 's' : ''}
+                      {q.pointsEarned} / {q.questionMaxPoints} pt{q.questionMaxPoints !== 1 ? 's' : ''}
                     </p>
                     <p className="text-xs text-gray-400">{indicator}</p>
                   </div>

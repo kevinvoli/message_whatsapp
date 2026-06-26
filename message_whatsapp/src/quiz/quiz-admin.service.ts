@@ -191,7 +191,7 @@ export class QuizAdminService {
       .andWhere(
         'attempt.score = (' +
           'SELECT MAX(a2.score) FROM quiz_attempt a2 ' +
-          'WHERE a2.commercial_id = attempt.commercialId ' +
+          'WHERE a2.commercial_id = attempt.commercial_id ' +
           'AND a2.session_id = :sessionId ' +
           'AND a2.completed_at IS NOT NULL' +
           ')',
