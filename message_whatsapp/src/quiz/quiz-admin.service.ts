@@ -200,7 +200,7 @@ export class QuizAdminService {
           LIMIT 1
         )                      AS completedAt
       FROM quiz_attempt a
-      LEFT JOIN whatsapp_commercial c ON c.id = a.commercial_id
+      LEFT JOIN whatsapp_commercial c ON CONVERT(c.id USING utf8mb4) = CONVERT(a.commercial_id USING utf8mb4)
       LEFT JOIN whatsapp_poste p      ON p.id = c.poste_id
       WHERE a.session_id    = ?
         AND a.completed_at  IS NOT NULL
