@@ -82,21 +82,19 @@ export class SubGroupsAndBreaks1783000000002 implements MigrationInterface {
       `);
     }
 
-    // 5. Colonne sub_group_id sur whatsapp_commercial
+    // 5. Colonne sub_group_id sur whatsapp_commercial (sans FK DB pour compatibilité collation)
     if (!(await qr.hasColumn('whatsapp_commercial', 'sub_group_id'))) {
       await qr.query(`
         ALTER TABLE \`whatsapp_commercial\`
-          ADD COLUMN \`sub_group_id\` CHAR(36) NULL DEFAULT NULL,
-          ADD CONSTRAINT \`FK_commercial_sub_group\`
-            FOREIGN KEY (\`sub_group_id\`) REFERENCES \`commercial_sub_group\` (\`id\`)
-            ON DELETE SET NULL
+          ADD COLUMN \`sub_group_id\` VARCHAR(36) NULL DEFAULT NULL,
+          ADD INDEX \`IDX_commercial_sub_group_id\` (\`sub_group_id\`)
       `);
     }
   }
 
   async down(qr: QueryRunner): Promise<void> {
     if (await qr.hasColumn('whatsapp_commercial', 'sub_group_id')) {
-      await qr.query(`ALTER TABLE \`whatsapp_commercial\` DROP FOREIGN KEY \`FK_commercial_sub_group\``);
+      await qr.query(`ALTER TABLE \`whatsapp_commercial\` DROP INDEX \`IDX_commercial_sub_group_id\``);
       await qr.query(`ALTER TABLE \`whatsapp_commercial\` DROP COLUMN \`sub_group_id\``);
     }
     await qr.query(`DROP TABLE IF EXISTS \`break_session\``);

@@ -99,7 +99,7 @@ export class WhatsappCommercial {
   @JoinColumn({ name: 'group_id' })
   group?: CommercialGroup;
 
-  @Column({ name: 'sub_group_id', type: 'char', length: 36, nullable: true, default: null })
+  @Column({ name: 'sub_group_id', type: 'varchar', length: 36, nullable: true, default: null })
   subGroupId?: string | null;
 
   @ManyToOne(() => CommercialSubGroup, (s) => s.members, { nullable: true, onDelete: 'SET NULL' })
