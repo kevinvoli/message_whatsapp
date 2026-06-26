@@ -11,6 +11,7 @@ import { useChatStore } from '@/store/chatStore';
 import { useSocket } from '@/contexts/SocketProvider';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { CallStatus, Conversation, ViewMode } from '@/types/chat';
+import type { QuizPdf } from '@/lib/definitions';
 import { useStatsStore } from '@/store/stats.store';
 import ChatMainArea from '@/components/chat/ChatMainArea';
 import { ContactDetailView } from '@/components/contacts/ContactDetailView';
@@ -53,6 +54,7 @@ const WhatsAppPageContent = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelEnabled, setPanelEnabled] = useState(false);
+  const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
 
   useEffect(() => {
     getPanelMedia(1, 1)
@@ -78,6 +80,7 @@ const WhatsAppPageContent = () => {
     logger.debug('Conversation selected', {
       chat_id: conversation.chat_id,
     });
+    setViewingPdf(null);
     selectConversation(conversation.chat_id);
   }, [selectConversation]);
 
@@ -167,8 +170,15 @@ const WhatsAppPageContent = () => {
         onViewModeChange={handleViewModeChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onViewPdf={setViewingPdf}
       />
-      {viewMode === 'conversations' ? <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} /> : <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />}
+      {viewingPdf ? (
+        <PdfViewerPanel pdf={viewingPdf} onClose={() => setViewingPdf(null)} />
+      ) : viewMode === 'conversations' ? (
+        <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} />
+      ) : (
+        <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />
+      )}
       {panelEnabled && panelOpen && (
         <MediaPanel onClose={() => setPanelOpen(false)} />
       )}
@@ -185,3 +195,50 @@ const WhatsAppPage = () => (
 );
 
 export default WhatsAppPage;
+
+// ---------------------------------------------------------------------------
+// Viewer PDF dans la zone principale
+// ---------------------------------------------------------------------------
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+
+function PdfViewerPanel({ pdf, onClose }: { pdf: QuizPdf; onClose: () => void }) {
+  return (
+    <div className="flex flex-col flex-1 min-w-0 bg-white">
+      {/* Barre du haut */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+        <button
+          onClick={onClose}
+          aria-label="Fermer le document"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Retour
+        </button>
+        <span className="flex-1 truncate text-sm font-medium text-gray-800">
+          {pdf.originalName}
+        </span>
+        <a
+          href={`${API_BASE_URL}/quiz/pdfs/${pdf.id}/download`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Telecharger
+        </a>
+      </div>
+
+      {/* Iframe pleine hauteur */}
+      <iframe
+        src={`${API_BASE_URL}/quiz/pdfs/${pdf.id}/view`}
+        title={pdf.originalName}
+        className="flex-1 w-full border-none"
+      />
+    </div>
+  );
+}

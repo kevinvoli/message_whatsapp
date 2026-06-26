@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import type { QuizPdf } from '@/lib/definitions';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -13,11 +12,10 @@ export function formatFileSize(bytes: number): string {
 
 interface PdfItemProps {
   pdf: QuizPdf;
+  onView?: (pdf: QuizPdf) => void;
 }
 
-export function PdfItem({ pdf }: PdfItemProps) {
-  const [viewingOpen, setViewingOpen] = useState(false);
-
+export function PdfItem({ pdf, onView }: PdfItemProps) {
   return (
     <div className="rounded-lg border bg-gray-50 p-3">
       <div className="flex items-start justify-between gap-2">
@@ -26,9 +24,9 @@ export function PdfItem({ pdf }: PdfItemProps) {
           <p className="text-xs text-gray-500">{formatFileSize(pdf.fileSize)}</p>
         </div>
         <div className="flex gap-2 shrink-0">
-          {pdf.allowInlineView && (
+          {pdf.allowInlineView && onView && (
             <button
-              onClick={() => setViewingOpen((v) => !v)}
+              onClick={() => onView(pdf)}
               aria-label={`Voir le document ${pdf.originalName}`}
               className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
             >
@@ -44,15 +42,6 @@ export function PdfItem({ pdf }: PdfItemProps) {
           </button>
         </div>
       </div>
-      {viewingOpen && (
-        <div className="mt-3">
-          <iframe
-            src={`${API_BASE_URL}/quiz/pdfs/${pdf.id}/view`}
-            title={pdf.originalName}
-            className="h-80 w-full rounded border"
-          />
-        </div>
-      )}
     </div>
   );
 }

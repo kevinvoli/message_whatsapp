@@ -28,9 +28,10 @@ const PERIODES: { key: Periode; label: string }[] = [
 
 interface ActivityPanelProps {
   commercialId: string;
+  onViewPdf?: (pdf: QuizPdf) => void;
 }
 
-const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
+const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId, onViewPdf }) => {
   const [stats, setStats] = useState<CommercialStatsDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -264,7 +265,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
         {!loadingPdfs && pdfs.length > 0 && (
           <div className="flex flex-col gap-2">
             {pdfs.map((pdf) => (
-              <PdfItem key={pdf.id} pdf={pdf} />
+              <PdfItem key={pdf.id} pdf={pdf} onView={onViewPdf} />
             ))}
           </div>
         )}

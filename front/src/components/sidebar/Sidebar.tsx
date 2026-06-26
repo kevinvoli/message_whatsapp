@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, LogOut, Wifi, WifiOff, User, BarChart3, MessageSquare } from 'lucide-react';
 import { Commercial, Conversation, Stats, ViewMode } from '@/types/chat';
+import type { QuizPdf } from '@/lib/definitions';
 import ConversationItem from './ConversationItem';
 import { useChatStore } from '@/store/chatStore';
 import UserHeader from './UserHeader';
@@ -30,7 +31,7 @@ interface SidebarProps {
   viewMode?: ViewMode
   onViewModeChange?: (mode: ViewMode) => void
   searchQuery?: string
-
+  onViewPdf?: (pdf: QuizPdf) => void
 }
 
 type ConversationsTab = 'liste' | 'activite';
@@ -54,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   viewMode,
   onViewModeChange,
   searchQuery,
-
+  onViewPdf,
 }) => {
 
   const { logout } = useAuth();
@@ -125,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </>
           ) : (
             <div className="flex-1 overflow-y-auto">
-              <ActivityPanel commercialId={commercial.id} />
+              <ActivityPanel commercialId={commercial.id} onViewPdf={onViewPdf} />
             </div>
           )}
         </>
