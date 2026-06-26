@@ -42,6 +42,34 @@ export type ViewMode =
   | 'go_no_go'
   | 'notifications'
   | 'alert-config'
+  | 'flowbot'
+  | 'contexts'
+  | 'follow-ups'
+  | 'portfolio'
+  | 'targets'
+  | 'ip-access'
+  | 'sessions'
+  | 'capacity'
+  | 'system-health'
+  | 'integration'
+  | 'ranking'
+  | 'ia-governance'
+  | 'gicop-supervision'
+  | 'outbox-sync'
+  | 'work-schedule'
+  | 'complaints'
+  | 'login-logs'
+  | 'relance-config'
+  | 'call-devices'
+  | 'presence'
+  | 'commercial-groups'
+  | 'commercial-subgroups'
+  | 'commercial-planning'
+  | 'break-supervision'
+  | 'appels'
+  | 'missed-calls'
+  | 'applications'
+  | 'message-traffic'
   | 'campaign-links'
   | 'mediatheque'
   | 'settings'
@@ -1186,3 +1214,244 @@ export interface DisconnectCommercialResponse {
   disconnected: boolean;
   message: string;
 }
+
+
+// ============================================
+// GDPR OPT-OUT
+// ============================================
+
+export type GdprOptoutStatus = 'active' | 'revoked';
+
+export interface GdprOptout {
+  id: string;
+  phone: string;
+  optOutAt: string;
+  revokedAt: string | null;
+  status: GdprOptoutStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// ANALYTICS DÉTAILLÉS — /admin/analytics/
+// ============================================
+
+export interface AnalyticsSummary {
+  totalConversations: number;
+  openConversations: number;
+  closedConversations: number;
+  avgFirstResponseTimeSeconds: number;
+  avgResolutionTimeSeconds: number;
+  totalMessages: number;
+  messagesIn: number;
+  messagesOut: number;
+}
+
+export interface AnalyticsConversationDay {
+  date: string;
+  total: number;
+  opened: number;
+  closed: number;
+  avgResolutionSeconds: number;
+}
+
+export interface AnalyticsAgent {
+  agentId: string;
+  agentName: string;
+  posteName: string;
+  messagesOut: number;
+  chatsHandled: number;
+  avgResponseSeconds: number;
+}
+
+export interface AnalyticsChannel {
+  channelId: string;
+  label: string | null;
+  provider: string;
+  totalMessages: number;
+  messagesIn: number;
+  messagesOut: number;
+  totalConversations: number;
+}
+
+// ============================================
+// COACHING QUALITÉ IA
+// ============================================
+
+export interface QualityCoachingResult {
+  quality_score: number;
+  strengths: string[];
+  improvements: string[];
+  coaching_tips: string[];
+}
+
+export interface ConversationSummaryItem {
+  id: string;
+  chat_id: string;
+  name: string;
+  last_activity_at: string;
+  status?: string;
+}
+
+// ============================================
+// SOUS-GROUPES & PAUSES DÉCALÉES
+// ============================================
+
+export type SubGroupBreakSchedule = {
+  id: string;
+  subGroupId: string;
+  startTime: string;
+  endTime: string;
+  reminderIntervalMinutes: number;
+  popupMessageText: string | null;
+  popupAudioUrl: string | null;
+  maxDurationMinutes: number;
+};
+
+export type CommercialPresenceItem = {
+  id: string;
+  name: string;
+  isConnected: boolean;
+  isWorkingToday: boolean;
+  workingTodaySince: string | null;
+  poste: { id: string; name: string } | null;
+  group: { id: string; name: string } | null;
+  groupId?: string | null;
+  phone?: string | null;
+};
+
+export type CommercialSubGroup = {
+  id: string;
+  parentGroupId: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  breakSchedules: SubGroupBreakSchedule[];
+  memberCount: number;
+  members?: { id: string; name: string; phone?: string | null }[];
+};
+
+export type BreakExclusion = {
+  id: string;
+  subGroupId: string;
+  scope: 'poste' | 'commercial';
+  posteId: string | null;
+  commercialId: string | null;
+};
+
+export type BreakSupervisionRow = {
+  commercialId: string;
+  commercialName: string;
+  subGroupId: string | null;
+  subGroupName: string | null;
+  scheduledBreak: { startTime: string; endTime: string } | null;
+  hasTakenBreak: boolean;
+  breakTakenAt: string | null;
+  disconnectDurationMinutes: number | null;
+  status: 'en_service' | 'en_pause' | 'pause_manquee' | 'deconnecte' | 'repos' | 'absent';
+};
+
+export type DisconnectAlert = {
+  commercialId: string;
+  commercialName: string;
+  disconnectedSince: string;
+  totalDisconnectMinutes: number;
+};
+
+// ─── CommercialGroup ──────────────────────────────────────────────────────────
+
+export type TimeSlot = 'morning' | 'afternoon' | 'full_day' | 'full';
+
+export type GroupScheduleDayItem = {
+  date: string;
+  isWorkDay: boolean;
+  dayOfWeek: number;
+};
+
+export type CalendarHealthItem = {
+  groupId: string;
+  groupName: string;
+  lastGeneratedDate: string | null;
+  coverageUntil: string | null;
+  status: 'healthy' | 'warning' | 'critical';
+  message: string;
+  lastDay?: string | null;
+};
+
+export type ScheduleConfigDto = {
+  workDays?: number[];
+  workDaysCount?: number;
+  cycleOnDays?: number;
+  cycleOffDays?: number;
+  firstWorkDay: string;
+  timezone?: string;
+};
+
+export type GenerateScheduleResult = {
+  daysGenerated: number;
+};
+
+export type GenerateAllResult = {
+  groupId: string;
+  groupName: string;
+  daysGenerated: number;
+};
+
+export type CommercialPlanningEntry = {
+  id: string;
+  commercialId: string;
+  commercialName: string;
+  date: string;
+  type: 'absence' | 'exceptional';
+  reason: string | null;
+  timeSlot: TimeSlot | null;
+  replacerId: string | null;
+  replacerName: string | null;
+  commercial?: { id: string; name: string } | null;
+  linkedCommercialId: string | null;
+  linkedCommercial: { id: string; name: string } | null;
+  overridePosteId: string | null;
+  overridePoste: { id: string; name: string; code?: string } | null;
+  createdAt: string;
+};
+
+export type AbsenceSummaryItem = {
+  commercialId: string;
+  commercialName: string;
+  absenceCount: number;
+  exceptionalCount: number;
+  totalDays: number;
+  groupName?: string | null;
+};
+
+export type PlanningAuditEntry = {
+  id: string;
+  commercialId: string;
+  commercialName: string;
+  date: string;
+  type: 'absence' | 'exceptional';
+  reason: string | null;
+  createdAt: string;
+  deletedAt: string | null;
+  action: 'created' | 'deleted';
+  actorName?: string | null;
+  declaredBy?: string | null;
+  performedAt: string;
+};
+
+export type CommercialGroup = {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  cycleOnDays: number | null;
+  cycleOffDays: number | null;
+  firstWorkDay: string | null;
+  workDays: number[] | null;
+  workDaysCount?: number;
+  timezone: string | null;
+  commercials?: CommercialPresenceItem[];
+  subGroups?: CommercialSubGroup[];
+  createdAt: string;
+  updatedAt: string;
+};

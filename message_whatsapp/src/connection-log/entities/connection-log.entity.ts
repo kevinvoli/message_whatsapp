@@ -27,6 +27,9 @@ export class ConnectionLog {
   @Column({ type: 'timestamp', name: 'logout_at', nullable: true, default: null })
   logoutAt: Date | null;
 
+  @Column({ name: 'alerted_at', type: 'datetime', nullable: true, default: null })
+  alertedAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   createdAt: Date;
 

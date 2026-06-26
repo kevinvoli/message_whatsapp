@@ -1,4 +1,7 @@
 import { WhatsappPoste } from 'src/whatsapp_poste/entities/whatsapp_poste.entity';
+import { CommercialGroup } from 'src/commercial-group/entities/commercial-group.entity';
+import { CommercialSubGroup } from 'src/commercial-group/entities/commercial-sub-group.entity';
+// Note: CommercialGroup imported above used via groupId + group relation
 import {
   Entity,
   Column,
@@ -82,6 +85,26 @@ export class WhatsappCommercial {
 
   @Column({ name: 'token_version', type: 'int', default: 1 })
   tokenVersion: number;
+
+  @Column({ name: 'is_working_today', type: 'boolean', default: false })
+  isWorkingToday: boolean;
+
+  @Column({ name: 'working_today_since', type: 'datetime', nullable: true, default: null })
+  workingTodaySince: Date | null;
+
+  @Column({ name: 'group_id', type: 'char', length: 36, nullable: true, default: null })
+  groupId?: string | null;
+
+  @ManyToOne(() => CommercialGroup, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'group_id' })
+  group?: CommercialGroup;
+
+  @Column({ name: 'sub_group_id', type: 'char', length: 36, nullable: true, default: null })
+  subGroupId?: string | null;
+
+  @ManyToOne(() => CommercialSubGroup, (s) => s.members, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'sub_group_id' })
+  subGroup?: CommercialSubGroup;
 
   @Column('varchar', {
     name: 'salt',

@@ -44,6 +44,7 @@ import { ConversationRestrictionModule } from './conversation-restriction/conver
 import { MediaStorageModule } from './media-storage/media-storage.module';
 import { MessageRestrictionModule } from './message-restriction/message-restriction.module';
 import { QuizModule } from './quiz/quiz.module';
+import { CommercialGroupModule } from './commercial-group/commercial-group.module';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { QuizModule } from './quiz/quiz.module';
     MediaStorageModule,
     MessageRestrictionModule,
     QuizModule,
+    CommercialGroupModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService],

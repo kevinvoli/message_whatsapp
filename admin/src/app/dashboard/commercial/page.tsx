@@ -48,6 +48,8 @@ import DedicatedChannelsView from '@/app/ui/DedicatedChannelsView';
 import MetaCampaignsView from '@/app/ui/MetaCampaignsView';
 import GalerieMediaView from '@/app/ui/GalerieMediaView';
 import QuizView from '@/app/ui/QuizView';
+import CommercialGroupsView from '@/app/ui/CommercialGroupsView';
+import PlanningTabsView from '@/app/ui/PlanningTabsView';
 import { useNotifications } from '@/app/hooks/useNotifications';
 import { useSystemHealth } from '@/app/hooks/useSystemHealth';
 import SystemHealthBanner from '@/app/ui/SystemHealthBanner';
@@ -62,6 +64,10 @@ const VALID_VIEWS: ViewMode[] = [
     'campagnes-meta',
     'galerie-media',
     'quiz',
+    'commercial-groups',
+    'commercial-subgroups',
+    'commercial-planning',
+    'break-supervision',
 ];
 
 function AdminDashboardContent() {
@@ -204,6 +210,13 @@ function AdminDashboardContent() {
                 return <GalerieMediaView />;
             case 'quiz':
                 return <QuizView />;
+            case 'commercial-groups':
+            case 'commercial-subgroups':
+                return <CommercialGroupsView />;
+            case 'commercial-planning':
+                return <PlanningTabsView initialTab="sous-groupes" />;
+            case 'break-supervision':
+                return <PlanningTabsView initialTab="supervision" />;
             default:
                 return null;
         }
