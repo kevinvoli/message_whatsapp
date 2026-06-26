@@ -1143,6 +1143,7 @@ export type QuizSession = {
   maxAttempts: number;
   totalTimeMinutes: number | null;
   requirePass: boolean;
+  historyVisible: boolean;
   questionCount?: number;
   createdAt: string;
 };

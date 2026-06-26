@@ -32,6 +32,9 @@ export class QuizSession {
   @Column({ name: 'require_pass', type: 'tinyint', width: 1, default: 0 })
   requirePass: boolean;
 
+  @Column({ name: 'history_visible', type: 'tinyint', width: 1, default: 1 })
+  historyVisible: boolean;
+
   @Column({ name: 'total_time_minutes', type: 'int', nullable: true })
   totalTimeMinutes: number | null;
 

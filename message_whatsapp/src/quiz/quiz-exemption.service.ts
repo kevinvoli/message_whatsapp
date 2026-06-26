@@ -108,7 +108,7 @@ export class QuizExemptionService {
   }
 
   async removeExemption(id: string): Promise<void> {
-    await this.exemptionRepo.delete(id);
+    await this.exemptionRepo.softDelete(id);
   }
 
   async isExempt(commercialId: string, posteId: string | null): Promise<boolean> {

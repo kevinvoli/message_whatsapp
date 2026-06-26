@@ -32,6 +32,10 @@ export class CreateSessionDto {
   requirePass?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  historyVisible?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   maxAttempts?: number;

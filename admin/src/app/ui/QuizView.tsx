@@ -58,6 +58,7 @@ interface SessionFormState {
   passingScoreEnabled: boolean;
   passingScore: number;
   requirePass: boolean;
+  historyVisible: boolean;
   maxAttempts: number;
   timeLimitEnabled: boolean;
   totalTimeMinutes: number;
@@ -115,6 +116,7 @@ function emptySessionForm(date = ''): SessionFormState {
     passingScoreEnabled: false,
     passingScore: 10,
     requirePass: false,
+    historyVisible: true,
     maxAttempts: 1,
     timeLimitEnabled: false,
     totalTimeMinutes: 15,
@@ -714,6 +716,7 @@ function SessionsTab() {
       passingScoreEnabled: session.passingScore != null,
       passingScore: session.passingScore ?? 10,
       requirePass: session.requirePass ?? false,
+      historyVisible: session.historyVisible ?? true,
       maxAttempts: session.maxAttempts,
       timeLimitEnabled: session.totalTimeMinutes != null,
       totalTimeMinutes: session.totalTimeMinutes ?? 15,
@@ -733,6 +736,7 @@ function SessionsTab() {
       isActive: form.isActive,
       passingScore: form.passingScoreEnabled ? form.passingScore : undefined,
       requirePass: form.requirePass,
+      historyVisible: form.historyVisible,
       maxAttempts: form.maxAttempts,
       totalTimeMinutes: form.timeLimitEnabled ? form.totalTimeMinutes : undefined,
       questionIds: form.selectedQuestionIds,
@@ -970,6 +974,22 @@ function SessionsTab() {
                 {form.requirePass
                   ? 'Le commercial doit atteindre le score de passage pour accéder aux conversations.'
                   : 'Toute soumission débloque l\'accès, quel que soit le score.'}
+              </p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={form.historyVisible}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, historyVisible: e.target.checked }))}
+                  className="rounded"
+                />
+                <span>Historique visible par le commercial</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-3">
+                {form.historyVisible
+                  ? 'Le commercial peut consulter ses résultats passés dans "Mon activité".'
+                  : 'Les résultats de cette session ne sont pas visibles dans "Mon activité".'}
               </p>
             </div>
             <div>

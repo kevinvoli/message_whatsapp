@@ -12,9 +12,11 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { CommercialStatsDto } from '@/types/chat';
-import { getCommercialStats } from '@/lib/api';
-import { formatRelativeDate } from '@/lib/dateUtils';
+import { getCommercialStats, getQuizPdfs, getQuizHistory } from '@/lib/api';
+import type { QuizPdf, QuizHistoryEntry } from '@/lib/definitions';
+import { formatRelativeDate, formatDate } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger';
+import { PdfItem } from '@/components/quiz/PdfItem';
 
 type Periode = 'today' | 'week' | 'month';
 
@@ -33,6 +35,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [periode, setPeriode] = useState<Periode>('today');
+
+  const [pdfs, setPdfs] = useState<QuizPdf[]>([]);
+  const [loadingPdfs, setLoadingPdfs] = useState(true);
+  const [errorPdfs, setErrorPdfs] = useState<string | null>(null);
+
+  const [history, setHistory] = useState<QuizHistoryEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [errorHistory, setErrorHistory] = useState<string | null>(null);
 
   const fetchStats = useCallback(async (p: Periode) => {
     if (!commercialId) return;
@@ -53,6 +63,24 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
   useEffect(() => {
     void fetchStats(periode);
   }, [fetchStats, periode]);
+
+  useEffect(() => {
+    setLoadingPdfs(true);
+    setErrorPdfs(null);
+    getQuizPdfs()
+      .then((data) => setPdfs(data))
+      .catch(() => setErrorPdfs('Impossible de charger les documents.'))
+      .finally(() => setLoadingPdfs(false));
+  }, []);
+
+  useEffect(() => {
+    setLoadingHistory(true);
+    setErrorHistory(null);
+    getQuizHistory()
+      .then((data) => setHistory(data))
+      .catch(() => setErrorHistory("Impossible de charger l'historique."))
+      .finally(() => setLoadingHistory(false));
+  }, []);
 
   const formatMinutes = (min: number): string => {
     const h = Math.floor(min / 60);
@@ -77,7 +105,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
         </button>
       </div>
 
-      {/* Filtre période */}
+      {/* Filtre periode */}
       <div className="flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 gap-0.5">
         {PERIODES.map(({ key, label }) => (
           <button
@@ -94,12 +122,12 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
         ))}
       </div>
 
-      {/* Erreur */}
+      {/* Erreur stats */}
       {error && (
         <p className="text-xs text-red-500 bg-red-50 rounded px-3 py-2">{error}</p>
       )}
 
-      {/* Chargement initial */}
+      {/* Chargement initial stats */}
       {loading && !stats && (
         <div className="flex justify-center py-6">
           <div className="animate-spin w-6 h-6 rounded-full border-2 border-green-600 border-t-transparent" />
@@ -121,7 +149,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
             </span>
           </div>
 
-          {/* Grille métriques */}
+          {/* Grille metriques */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-blue-50 rounded-lg p-3 flex flex-col gap-1">
               <div className="flex items-center gap-1.5 text-blue-600">
@@ -209,6 +237,105 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ commercialId }) => {
           </div>
         </>
       )}
+
+      {/* Separateur */}
+      <div className="border-t border-gray-100" />
+
+      {/* Documents PDF */}
+      <div className="flex flex-col gap-2">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Documents PDF
+        </h4>
+
+        {errorPdfs && (
+          <p className="text-xs text-red-500 bg-red-50 rounded px-3 py-2">{errorPdfs}</p>
+        )}
+
+        {loadingPdfs && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
+        )}
+
+        {!loadingPdfs && !errorPdfs && pdfs.length === 0 && (
+          <p className="text-xs text-gray-400 px-1">Aucun document disponible.</p>
+        )}
+
+        {!loadingPdfs && pdfs.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {pdfs.map((pdf) => (
+              <PdfItem key={pdf.id} pdf={pdf} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Separateur */}
+      <div className="border-t border-gray-100" />
+
+      {/* Historique des QCM */}
+      <div className="flex flex-col gap-2">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Historique des QCM
+        </h4>
+
+        {errorHistory && (
+          <p className="text-xs text-red-500 bg-red-50 rounded px-3 py-2">{errorHistory}</p>
+        )}
+
+        {loadingHistory && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
+        )}
+
+        {!loadingHistory && !errorHistory && history.length === 0 && (
+          <p className="text-xs text-gray-400 px-1">Aucun historique disponible.</p>
+        )}
+
+        {!loadingHistory && history.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {history.map((entry) => (
+              <div
+                key={entry.attemptId}
+                className="rounded-lg border border-gray-100 bg-gray-50 p-3 flex flex-col gap-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-800">
+                      {entry.sessionTitle}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatDate(entry.sessionDate)}
+                    </p>
+                  </div>
+                  {entry.isPassed === true && (
+                    <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                      Reussi
+                    </span>
+                  )}
+                  {entry.isPassed === false && (
+                    <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      Echoue
+                    </span>
+                  )}
+                  {entry.isPassed === null && (
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      Soumis
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600">
+                  Score :{' '}
+                  <span className="font-semibold text-gray-800">
+                    {entry.score ?? '-'}/{entry.maxScore ?? '-'}
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

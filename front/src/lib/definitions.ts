@@ -74,3 +74,13 @@ export interface QuizPdf {
   availableUntil: string | null;
   uploadedAt: string;
 }
+
+export interface QuizHistoryEntry {
+  attemptId: string;
+  sessionDate: string;
+  sessionTitle: string;
+  score: number | null;
+  maxScore: number | null;
+  isPassed: boolean | null;
+  completedAt: string | null;
+}

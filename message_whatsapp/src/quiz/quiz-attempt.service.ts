@@ -385,6 +385,7 @@ export class QuizAttemptService {
         'attempt.completedAt AS completedAt',
       ])
       .where('attempt.commercialId = :commercialId', { commercialId })
+      .andWhere('session.historyVisible = 1')
       .orderBy('attempt.startedAt', 'DESC')
       .getRawMany<{
         attemptId: string;

@@ -1645,6 +1645,7 @@ export async function createQuizSession(dto: {
   passingScore?: number;
   maxAttempts?: number;
   totalTimeMinutes?: number;
+  historyVisible?: boolean;
   questionIds: string[];
 }): Promise<QuizSession> {
   const res = await fetch(`${API_BASE_URL}/quiz/admin/sessions`, {
@@ -1665,6 +1666,7 @@ export async function updateQuizSession(
     passingScore: number;
     maxAttempts: number;
     totalTimeMinutes: number;
+    historyVisible: boolean;
     questionIds: string[];
   }>,
 ): Promise<QuizSession> {

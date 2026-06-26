@@ -1,7 +1,7 @@
 // front/src/lib/api.ts
 import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
 import { PanelMediaResponse } from '@/types/media-panel';
-import type { QuizTodayStatus, QuizStartResult, QuizSubmitResult, QuizAttemptResult, QuizPdf } from '@/lib/definitions';
+import type { QuizTodayStatus, QuizStartResult, QuizSubmitResult, QuizAttemptResult, QuizPdf, QuizHistoryEntry } from '@/lib/definitions';
 
 export interface MessageRestrictionConfig {
   enabled: boolean;
@@ -134,4 +134,12 @@ export async function getQuizPdfs(): Promise<QuizPdf[]> {
     credentials: 'include',
   });
   return handleResponse<QuizPdf[]>(response);
+}
+
+export async function getQuizHistory(): Promise<QuizHistoryEntry[]> {
+  const response = await fetch(`${API_BASE_URL}/quiz/history`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  return handleResponse<QuizHistoryEntry[]>(response);
 }
