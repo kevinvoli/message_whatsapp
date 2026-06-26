@@ -335,10 +335,6 @@ export default function QuizPage() {
     }));
   }
 
-  function handlePrev() {
-    if (currentIndex > 0) setCurrentIndex((i) => i - 1);
-  }
-
   function handleNext() {
     if (quizData?.session && currentIndex < questionOrder.length - 1) {
       setCurrentIndex((i) => i + 1);
@@ -573,37 +569,26 @@ export default function QuizPage() {
             </div>
 
             {/* Navigation */}
-            <div className="flex items-center justify-between gap-3">
-              <button
-                onClick={handlePrev}
-                disabled={currentIndex === 0}
-                aria-label="Question precedente"
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Precedent
-              </button>
-
-              <div className="flex gap-3">
-                {isLastQuestion ? (
-                  <button
-                    onClick={() => handleSubmit(false)}
-                    disabled={submitting}
-                    aria-label="Soumettre le quiz"
-                    className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {submitting ? 'Envoi...' : 'Soumettre le quiz'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleNext}
-                    disabled={currentIndex >= orderedQuestions.length - 1}
-                    aria-label="Question suivante"
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Suivant
-                  </button>
-                )}
-              </div>
+            <div className="flex items-center justify-end gap-3">
+              {isLastQuestion ? (
+                <button
+                  onClick={() => handleSubmit(false)}
+                  disabled={submitting}
+                  aria-label="Soumettre le quiz"
+                  className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {submitting ? 'Envoi...' : 'Soumettre le quiz'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={currentIndex >= orderedQuestions.length - 1}
+                  aria-label="Question suivante"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Suivant
+                </button>
+              )}
             </div>
           </div>
         </div>

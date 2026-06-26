@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Request, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsUUID, ValidateNested } from 'class-validator';
 import { Response } from 'express';
 import { QuizAttemptService } from './quiz-attempt.service';
 import { QuizPdfService } from './quiz-pdf.service';
@@ -10,7 +11,12 @@ class SubmitBody {
   @IsUUID()
   attemptId: string;
 
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AnswerSubmission)
   answers: AnswerSubmission[];
+
+  @IsBoolean()
   timedOut: boolean;
 }
 
