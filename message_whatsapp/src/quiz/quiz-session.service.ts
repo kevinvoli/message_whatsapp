@@ -34,6 +34,7 @@ export class QuizSessionService {
         passingScore: dto.passingScore ?? null,
         maxAttempts: dto.maxAttempts ?? 1,
         totalTimeMinutes: dto.totalTimeMinutes ?? null,
+        requirePass: dto.requirePass ?? false,
         historyVisible: dto.historyVisible ?? true,
       });
       const savedSession = await manager.save(QuizSession, session);
@@ -152,6 +153,8 @@ export class QuizSessionService {
             passingScore: source.passingScore,
             maxAttempts: source.maxAttempts,
             totalTimeMinutes: source.totalTimeMinutes,
+            requirePass: source.requirePass,
+            historyVisible: source.historyVisible,
           });
           const saved = await manager.save(QuizSession, newSession);
 
