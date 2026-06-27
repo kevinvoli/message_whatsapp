@@ -204,8 +204,9 @@ export class CommercialGroupController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  @HttpCode(204)
+  async remove(@Param('id') id: string) {
+    await this.service.remove(id);
   }
 
   @Patch(':id/schedule-config')

@@ -59,11 +59,23 @@ export class CommercialGroupService {
     const group = await this.groupRepo.findOne({ where: { id } });
     if (!group) throw new NotFoundException(`CommercialGroup ${id} not found`);
 
-    // Retirer tous les membres avant désactivation
+    // Détacher sub_group_id des membres appartenant aux sous-groupes de ce groupe
+    await this.groupRepo.manager.query(
+      `UPDATE whatsapp_commercial SET sub_group_id = NULL
+       WHERE sub_group_id IN (SELECT id FROM commercial_sub_group WHERE parent_group_id = ?)`,
+      [id],
+    );
+
+    // Détacher group_id de tous les membres
     await this.commercialRepo.update({ groupId: id }, { groupId: null });
 
-    group.isActive = false;
-    await this.groupRepo.save(group);
+    // Supprimer le calendrier (pas de FK → nettoyage manuel)
+    await this.groupRepo.manager.query(
+      `DELETE FROM group_schedule_day WHERE group_id = ?`, [id],
+    );
+
+    // Suppression réelle — FK CASCADE supprime commercial_sub_group + break_schedules + exclusions
+    await this.groupRepo.delete(id);
   }
 
   async addMember(groupId: string, commercialId: string): Promise<WhatsappCommercial> {

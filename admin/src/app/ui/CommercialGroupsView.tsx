@@ -133,8 +133,8 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
   const [removingId, setRemovingId]   = useState<string | null>(null);
 
   // Les membres sont dérivés directement depuis allPresence (déjà chargé dans le parent)
-  const members   = allPresence.filter((p) => p.groupId === group.id);
-  const available = allPresence.filter((p) => p.groupId === null);
+  const members   = allPresence.filter((p) => p.group?.id === group.id);
+  const available = allPresence.filter((p) => p.group === null);
 
   const handleAdd = async () => {
     if (!selectedAdd) return;
@@ -235,7 +235,8 @@ export default function CommercialGroupsView() {
   const [editGroup, setEditGroup]     = useState<CommercialGroup | null>(null);
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [togglingId, setTogglingId]   = useState<string | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState<CommercialGroup | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<CommercialGroup | null>(null);
+  const [deleteError, setDeleteError]     = useState<string | null>(null);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [subGroupsFor, setSubGroupsFor] = useState<CommercialGroup | null>(null);
 
@@ -258,23 +259,16 @@ export default function CommercialGroupsView() {
   const closeModal = () => { setShowModal(false); setEditGroup(null); };
   const onSaved    = () => { closeModal(); void load(); };
 
-  const handleToggleActive = async (group: CommercialGroup) => {
-    setConfirmDeactivate(null);
-    setTogglingId(group.id);
-    try {
-      await updateGroup(group.id, { isActive: !group.isActive });
-      void load();
-    } catch { /* silencieux */ }
-    finally { setTogglingId(null); }
-  };
-
   const handleDelete = async (id: string) => {
+    setConfirmDelete(null);
     setTogglingId(id);
+    setDeleteError(null);
     try {
       await deleteGroup(id);
       void load();
-    } catch { /* silencieux */ }
-    finally { setTogglingId(null); }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Erreur lors de la suppression.');
+    } finally { setTogglingId(null); }
   };
 
   return (
@@ -362,14 +356,10 @@ export default function CommercialGroupsView() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => setConfirmDeactivate(group)}
+                      onClick={() => setConfirmDelete(group)}
                       disabled={togglingId === group.id}
-                      className={`p-1.5 rounded disabled:opacity-50 ${
-                        group.isActive
-                          ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                          : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                      }`}
-                      aria-label={group.isActive ? `Désactiver ${group.name}` : `Activer ${group.name}`}
+                      className="p-1.5 rounded disabled:opacity-50 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      aria-label={`Supprimer ${group.name}`}
                     >
                       {togglingId === group.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -422,38 +412,35 @@ export default function CommercialGroupsView() {
         />
       )}
 
-      {confirmDeactivate && (
+      {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
-              <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-gray-900 text-sm">
-                  {confirmDeactivate.isActive ? 'Désactiver ce groupe ?' : 'Activer ce groupe ?'}
+                  Supprimer «&nbsp;{confirmDelete.name}&nbsp;» ?
                 </p>
-                {confirmDeactivate.isActive && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Ce groupe sera désactivé et ses membres libérés.
-                  </p>
-                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Cette action est irréversible. Les membres seront libérés et les sous-groupes supprimés.
+                </p>
               </div>
             </div>
+            {deleteError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded mb-3">{deleteError}</p>
+            )}
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setConfirmDeactivate(null)}
+                onClick={() => { setConfirmDelete(null); setDeleteError(null); }}
                 className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
               >
                 Annuler
               </button>
               <button
-                onClick={() => void handleToggleActive(confirmDeactivate)}
-                className={`px-4 py-2 text-sm rounded-lg text-white ${
-                  confirmDeactivate.isActive
-                    ? 'bg-amber-500 hover:bg-amber-600'
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
+                onClick={() => void handleDelete(confirmDelete.id)}
+                className="px-4 py-2 text-sm rounded-lg text-white bg-red-600 hover:bg-red-700"
               >
-                Confirmer
+                Supprimer
               </button>
             </div>
           </div>

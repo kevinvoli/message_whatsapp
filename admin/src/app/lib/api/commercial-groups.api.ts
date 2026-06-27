@@ -55,10 +55,18 @@ export async function updateGroup(
 }
 
 export async function deleteGroup(id: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/commercial-groups/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/commercial-groups/${id}`, {
     method: 'DELETE',
     credentials: 'include',
   });
+  if (!response.ok) {
+    let message = response.statusText;
+    try {
+      const body = await response.json() as { message?: string };
+      message = body.message ?? message;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
 }
 
 export async function addMember(groupId: string, commercialId: string): Promise<void> {
