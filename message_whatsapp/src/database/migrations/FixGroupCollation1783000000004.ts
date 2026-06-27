@@ -13,16 +13,14 @@ export class FixGroupCollation1783000000004 implements MigrationInterface {
     // — les JOINs sur commercial_sub_group.id (unicode_ci) échouent
     await qr.query(`
       ALTER TABLE \`whatsapp_commercial\`
-        MODIFY COLUMN \`sub_group_id\` VARCHAR(36) NULL DEFAULT NULL
-          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+        MODIFY COLUMN \`sub_group_id\` VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL
     `);
   }
 
   async down(qr: QueryRunner): Promise<void> {
     await qr.query(`
       ALTER TABLE \`whatsapp_commercial\`
-        MODIFY COLUMN \`sub_group_id\` VARCHAR(36) NULL DEFAULT NULL
-          CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci
+        MODIFY COLUMN \`sub_group_id\` VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL
     `);
     await qr.query(`
       ALTER TABLE \`commercial_group\`
