@@ -33,3 +33,10 @@ export class AddMemberDto {
   @IsUUID()
   commercialId: string;
 }
+
+export class PatchDisconnectReasonDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  reason: string;
+}

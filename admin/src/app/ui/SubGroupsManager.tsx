@@ -6,31 +6,19 @@ import {
   Plus,
   Trash2,
   Clock,
-  UserPlus,
-  UserMinus,
   Loader2,
   X,
-  ChevronDown,
-  ShieldOff,
   AlertTriangle,
 } from 'lucide-react';
-import {
-  CommercialSubGroup,
-  CommercialPresenceItem,
-} from '@/app/lib/definitions';
+import { CommercialSubGroup } from '@/app/lib/definitions';
 import {
   getSubGroups,
   createSubGroup,
   updateSubGroup,
   deleteSubGroup,
-  addSubGroupMember,
-  removeSubGroupMember,
 } from '@/app/lib/api/commercial-groups.api';
-import { getPresence } from '@/app/lib/api/commerciaux.api';
-import BreakScheduleForm from './BreakScheduleForm';
-import BreakExclusionsPanel from './BreakExclusionsPanel';
 
-// ─── Props ──────────────────────────────────────────────────────────────────
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 interface SubGroupsManagerProps {
   groupId: string;
@@ -127,142 +115,25 @@ function SubGroupFormModal({ parentGroupId, onClose, onSaved }: SubGroupFormModa
   );
 }
 
-// ─── Section membres d'un sous-groupe ────────────────────────────────────────
-
-interface SubGroupMemberSectionProps {
-  subGroup: CommercialSubGroup;
-  parentMembers: CommercialPresenceItem[];
-  onRefresh: () => void;
-}
-
-function SubGroupMemberSection({ subGroup, parentMembers, onRefresh }: SubGroupMemberSectionProps) {
-  const [selectedAdd, setSelectedAdd] = useState('');
-  const [adding, setAdding]           = useState(false);
-  const [removingId, setRemovingId]   = useState<string | null>(null);
-
-  const members   = subGroup.members ?? [];
-  const memberIds = new Set(members.map((m) => m.id));
-  const available = parentMembers.filter((p) => !memberIds.has(p.id));
-
-  const handleAdd = async () => {
-    if (!selectedAdd) return;
-    setAdding(true);
-    try {
-      await addSubGroupMember(subGroup.id, selectedAdd);
-      setSelectedAdd('');
-      onRefresh();
-    } catch { /* silencieux */ }
-    finally { setAdding(false); }
-  };
-
-  const handleRemove = async (commercialId: string) => {
-    setRemovingId(commercialId);
-    try {
-      await removeSubGroupMember(subGroup.id, commercialId);
-      onRefresh();
-    } catch { /* silencieux */ }
-    finally { setRemovingId(null); }
-  };
-
-  if (!subGroup.members) {
-    return (
-      <p className="text-xs text-gray-400 mt-2">
-        {subGroup.memberCount} membre{subGroup.memberCount !== 1 ? 's' : ''} — détails disponibles via l&apos;API.
-      </p>
-    );
-  }
-
-  return (
-    <div className="mt-3 space-y-3">
-      <p className="text-xs font-semibold text-gray-600">Membres ({members.length})</p>
-
-      {members.length === 0 ? (
-        <p className="text-xs text-gray-400">Aucun membre dans ce sous-groupe.</p>
-      ) : (
-        <div className="space-y-1">
-          {members.map((m) => (
-            <div key={m.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50">
-              <div>
-                <span className="text-sm font-medium text-gray-800">{m.name}</span>
-                {m.phone && <span className="ml-2 text-xs text-gray-400">{m.phone}</span>}
-              </div>
-              <button
-                onClick={() => void handleRemove(m.id)}
-                disabled={removingId === m.id}
-                aria-label={`Retirer ${m.name} du sous-groupe`}
-                className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
-              >
-                {removingId === m.id
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <UserMinus className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <select
-            value={selectedAdd}
-            onChange={(e) => setSelectedAdd(e.target.value)}
-            aria-label="Sélectionner un commercial à ajouter"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none pr-8"
-          >
-            <option value="">-- Ajouter un membre --</option>
-            {available.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}{c.phone ? ` (${c.phone})` : ''}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-        </div>
-        <button
-          onClick={() => void handleAdd()}
-          disabled={!selectedAdd || adding}
-          aria-label="Ajouter au sous-groupe"
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-          Ajouter
-        </button>
-      </div>
-
-      {available.length === 0 && members.length > 0 && (
-        <p className="text-xs text-amber-600 flex items-center gap-1">
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Tous les membres du groupe parent sont déjà dans ce sous-groupe.
-        </p>
-      )}
-    </div>
-  );
-}
-
 // ─── Vue principale ──────────────────────────────────────────────────────────
 
 export default function SubGroupsManager({ groupId, groupName, onClose, inline = false }: SubGroupsManagerProps) {
-  const [subGroups, setSubGroups]         = useState<CommercialSubGroup[]>([]);
-  const [presence, setPresence]           = useState<CommercialPresenceItem[]>([]);
-  const [loading, setLoading]             = useState(false);
-  const [showCreate, setShowCreate]       = useState(false);
-  const [expandedId, setExpandedId]       = useState<string | null>(null);
-  const [scheduleFor, setScheduleFor]     = useState<string | null>(null);
-  const [exclusionsFor, setExclusionsFor] = useState<string | null>(null);
-  const [togglingId, setTogglingId]       = useState<string | null>(null);
+  const [subGroups, setSubGroups]             = useState<CommercialSubGroup[]>([]);
+  const [loading, setLoading]                 = useState(false);
+  const [showCreate, setShowCreate]           = useState(false);
+  const [togglingId, setTogglingId]           = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sg, p] = await Promise.all([getSubGroups(groupId), getPresence()]);
+      const sg = await getSubGroups(groupId);
       setSubGroups(sg);
-      setPresence(p);
     } catch { /* silencieux */ }
     finally { setLoading(false); }
   }, [groupId]);
 
   useEffect(() => { void load(); }, [load]);
-
-  const parentMembers = presence.filter((p) => p.groupId === groupId);
 
   const handleToggleActive = async (sg: CommercialSubGroup) => {
     setTogglingId(sg.id);
@@ -325,89 +196,59 @@ export default function SubGroupsManager({ groupId, groupName, onClose, inline =
           </div>
         ) : (
           <div className="space-y-3">
-            {subGroups.map((sg) => {
-              const isExpanded = expandedId === sg.id;
-
-              return (
-                <div key={sg.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900 text-sm">{sg.name}</span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          sg.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {sg.isActive ? 'Actif' : 'Inactif'}
+            {subGroups.map((sg) => (
+              <div key={sg.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 text-sm">{sg.name}</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        sg.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {sg.isActive ? 'Actif' : 'Inactif'}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {sg.memberCount} membre{sg.memberCount !== 1 ? 's' : ''}
+                      </span>
+                      {sg.breakSchedules.length > 0 && (
+                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">
+                          <Clock className="w-3 h-3" />
+                          {sg.breakSchedules.length} plage{sg.breakSchedules.length !== 1 ? 's' : ''}
                         </span>
-                        <span className="text-xs text-gray-400">
-                          {sg.memberCount} membre{sg.memberCount !== 1 ? 's' : ''}
-                        </span>
-                        {sg.breakSchedules.length > 0 && (
-                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">
-                            <Clock className="w-3 h-3" />
-                            {sg.breakSchedules.length} plage{sg.breakSchedules.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                      {sg.description && (
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{sg.description}</p>
                       )}
                     </div>
-
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : sg.id)}
-                        className="px-2.5 py-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 font-medium whitespace-nowrap"
-                        aria-label={isExpanded ? 'Masquer les membres' : 'Gérer les membres'}
-                      >
-                        {isExpanded ? 'Masquer' : 'Membres'}
-                      </button>
-                      <button
-                        onClick={() => setScheduleFor(sg.id)}
-                        className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded"
-                        aria-label="Configurer les plages de pause"
-                        title="Plages de pause"
-                      >
-                        <Clock className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setExclusionsFor(sg.id)}
-                        className="p-1.5 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded"
-                        aria-label="Gérer les exclusions"
-                        title="Exclusions"
-                      >
-                        <ShieldOff className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => void handleToggleActive(sg)}
-                        disabled={togglingId === sg.id}
-                        className={`p-1.5 rounded disabled:opacity-50 ${
-                          sg.isActive
-                            ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                            : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                        }`}
-                        aria-label={sg.isActive ? `Désactiver ${sg.name}` : `Activer ${sg.name}`}
-                        title={sg.isActive ? 'Désactiver' : 'Activer'}
-                      >
-                        {togglingId === sg.id
-                          ? <Loader2 className="w-4 h-4 animate-spin" />
-                          : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    </div>
+                    {sg.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{sg.description}</p>
+                    )}
                   </div>
 
-                  {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-gray-100">
-                      <SubGroupMemberSection
-                        subGroup={sg}
-                        parentMembers={parentMembers}
-                        onRefresh={load}
-                      />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => void handleToggleActive(sg)}
+                      disabled={togglingId === sg.id}
+                      className={`px-2 py-1 rounded text-xs border disabled:opacity-50 ${
+                        sg.isActive
+                          ? 'text-amber-600 border-amber-200 hover:bg-amber-50'
+                          : 'text-green-600 border-green-200 hover:bg-green-50'
+                      }`}
+                      aria-label={sg.isActive ? `Désactiver ${sg.name}` : `Activer ${sg.name}`}
+                    >
+                      {togglingId === sg.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : sg.isActive ? 'Désactiver' : 'Activer'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(sg.id)}
+                      disabled={togglingId === sg.id}
+                      className="p-1.5 rounded disabled:opacity-50 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      aria-label={`Supprimer ${sg.name}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -429,20 +270,6 @@ export default function SubGroupsManager({ groupId, groupName, onClose, inline =
           parentGroupId={groupId}
           onClose={() => setShowCreate(false)}
           onSaved={() => { setShowCreate(false); void load(); }}
-        />
-      )}
-
-      {scheduleFor && (
-        <BreakScheduleForm
-          subGroupId={scheduleFor}
-          onClose={() => setScheduleFor(null)}
-        />
-      )}
-
-      {exclusionsFor && (
-        <BreakExclusionsPanel
-          subGroupId={exclusionsFor}
-          onClose={() => setExclusionsFor(null)}
         />
       )}
 

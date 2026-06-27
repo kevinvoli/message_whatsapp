@@ -27,6 +27,10 @@ export interface SubGroupResponse {
   memberCount: number;
 }
 
+export interface SubGroupDetailResponse extends SubGroupResponse {
+  members: { id: string; name: string; phone: string | null }[];
+}
+
 type SubGroupWithCount = CommercialSubGroup & { memberCount: number };
 
 @Injectable()
@@ -64,6 +68,28 @@ export class CommercialSubGroupService {
 
     if (!sg) throw new NotFoundException(`CommercialSubGroup ${id} introuvable`);
     return this.toResponse(sg, sg.memberCount);
+  }
+
+  async findOneWithMembers(id: string): Promise<SubGroupDetailResponse> {
+    const sg = (await this.subGroupRepo
+      .createQueryBuilder('sg')
+      .leftJoinAndSelect('sg.breakSchedules', 'bs', 'bs.deletedAt IS NULL')
+      .leftJoinAndSelect('sg.members', 'm', 'm.deletedAt IS NULL')
+      .loadRelationCountAndMap('sg.memberCount', 'sg.members')
+      .where('sg.id = :id', { id })
+      .andWhere('sg.deletedAt IS NULL')
+      .getOne()) as (SubGroupWithCount & { members?: WhatsappCommercial[] }) | null;
+
+    if (!sg) throw new NotFoundException(`CommercialSubGroup ${id} introuvable`);
+
+    return {
+      ...this.toResponse(sg, sg.memberCount),
+      members: (sg.members ?? []).map((m) => ({
+        id: m.id,
+        name: m.name,
+        phone: null,
+      })),
+    };
   }
 
   async create(dto: CreateSubGroupDto): Promise<SubGroupResponse> {

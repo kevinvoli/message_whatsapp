@@ -13,6 +13,7 @@ import { BreakExclusionService } from './break-exclusion.service';
 import { BreakSessionService } from './break-session.service';
 import { SubGroupBreakSchedule } from './entities/sub-group-break-schedule.entity';
 import { getTodayLocalString } from './utils/local-date.util';
+import { MediaAsset } from 'src/media-asset/entities/media-asset.entity';
 
 type PromptKey = string; // `${commercialId}:${breakScheduleId}`
 
@@ -28,6 +29,8 @@ export class BreakScheduleEngine {
     private readonly planningRepo: Repository<CommercialPlanning>,
     @InjectRepository(GroupScheduleDay)
     private readonly scheduleDayRepo: Repository<GroupScheduleDay>,
+    @InjectRepository(MediaAsset)
+    private readonly mediaAssetRepo: Repository<MediaAsset>,
     private readonly systemConfig: SystemConfigService,
     private readonly gateway: WhatsappMessageGateway,
     private readonly exclusionService: BreakExclusionService,
@@ -86,15 +89,29 @@ export class BreakScheduleEngine {
       // Sessions prises aujourd'hui — une seule requête pour tous les pairs
       const allPairs: Array<{ commercialId: string; breakScheduleId: string }> = [];
       const allSubGroupIds: string[] = [];
+      const audioAssetIds: string[] = [];
       for (const commercial of commercials) {
         const sg = commercial.subGroup;
         if (!sg?.isActive) continue;
         for (const schedule of sg.breakSchedules ?? []) {
           allPairs.push({ commercialId: commercial.id, breakScheduleId: schedule.id });
+          if (schedule.popupAudioAssetId) audioAssetIds.push(schedule.popupAudioAssetId);
         }
         allSubGroupIds.push(sg.id);
       }
       const takenSet = await this.sessionService.bulkHasTaken(allPairs, todayStr);
+
+      // Assets audio — une seule requête pour tous les schedules avec audio
+      const audioUrlMap = new Map<string, string>();
+      const distinctAudioIds = [...new Set(audioAssetIds)];
+      if (distinctAudioIds.length > 0) {
+        const assets = await this.mediaAssetRepo
+          .createQueryBuilder('a')
+          .select(['a.id', 'a.publicUrl'])
+          .where('a.id IN (:...ids)', { ids: distinctAudioIds })
+          .getMany();
+        for (const asset of assets) audioUrlMap.set(asset.id, asset.publicUrl);
+      }
 
       // Exclusions — une seule requête pour tous les sous-groupes
       const uniqueSubGroupIds = [...new Set(allSubGroupIds)];
@@ -130,6 +147,7 @@ export class BreakScheduleEngine {
             nowHHmm,
             takenSet,
             exclusionsBySubGroup.get(commercial.subGroup.id) ?? [],
+            audioUrlMap,
           );
         }
       }
@@ -145,6 +163,7 @@ export class BreakScheduleEngine {
     nowHHmm: string,
     takenSet: Set<string>,
     exclusions: BreakExclusion[],
+    audioUrlMap: Map<string, string>,
   ): void {
     const start = schedule.startTime.slice(0, 5);
     const end = schedule.endTime.slice(0, 5);
@@ -187,7 +206,7 @@ export class BreakScheduleEngine {
       subGroupName: commercial.subGroup?.name ?? '',
       endTime: end,
       messageText: schedule.popupMessageText,
-      audioUrl: null,
+      audioUrl: schedule.popupAudioAssetId ? (audioUrlMap.get(schedule.popupAudioAssetId) ?? null) : null,
       reminderIntervalMinutes: schedule.reminderIntervalMinutes,
       expiresAt: this.buildExpiresAt(todayStr, end),
     });

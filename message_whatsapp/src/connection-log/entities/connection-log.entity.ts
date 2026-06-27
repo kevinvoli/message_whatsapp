@@ -1,4 +1,4 @@
-﻿import {
+import {
   Column,
   CreateDateColumn,
   Entity,
@@ -29,6 +29,9 @@ export class ConnectionLog {
 
   @Column({ name: 'alerted_at', type: 'datetime', nullable: true, default: null })
   alertedAt: Date | null;
+
+  @Column({ name: 'disconnect_reason', type: 'varchar', length: 255, nullable: true, default: null })
+  disconnectReason: string | null;
 
   @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   createdAt: Date;

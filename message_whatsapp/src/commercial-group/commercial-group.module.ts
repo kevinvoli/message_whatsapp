@@ -11,59 +11,25 @@ import { CommercialPlanning } from './entities/commercial-planning.entity';
 import { CommercialPlanningService } from './commercial-planning.service';
 import { CalendarRegenJob } from './jobs/calendar-regen.job';
 import { CommercialSelfPlanningController } from './commercial-self-planning.controller';
-import { CommercialSubGroup } from './entities/commercial-sub-group.entity';
-import { SubGroupBreakSchedule } from './entities/sub-group-break-schedule.entity';
-import { BreakExclusion } from './entities/break-exclusion.entity';
-import { BreakSession } from './entities/break-session.entity';
-import { CommercialSubGroupService } from './commercial-sub-group.service';
-import { BreakScheduleService } from './break-schedule.service';
-import { BreakExclusionService } from './break-exclusion.service';
-import { CommercialBreakController } from './commercial-break.controller';
-import { BreakSessionService } from './break-session.service';
-import { BreakScheduleEngine } from './break-schedule-engine.service';
-import { BreakSupervisionService } from './break-supervision.service';
+import { CommercialPresenceHistoryService } from './commercial-presence-history.service';
+import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { DisconnectMonitorJob } from './jobs/disconnect-monitor.job';
-import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
-import { ConnectionLog } from 'src/connection-log/entities/connection-log.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      CommercialGroup,
-      WhatsappCommercial,
-      GroupScheduleDay,
-      CommercialPlanning,
-      CommercialSubGroup,
-      SubGroupBreakSchedule,
-      BreakExclusion,
-      BreakSession,
-      ConnectionLog,
-    ]),
+    TypeOrmModule.forFeature([CommercialGroup, WhatsappCommercial, GroupScheduleDay, CommercialPlanning]),
     SystemConfigModule,
-    WhatsappMessageModule,
+    ConnectionLogModule,
   ],
-  controllers: [CommercialGroupController, CommercialSelfPlanningController, CommercialBreakController],
+  controllers: [CommercialGroupController, CommercialSelfPlanningController],
   providers: [
     CommercialGroupService,
     GroupScheduleService,
     CommercialPlanningService,
     CalendarRegenJob,
-    CommercialSubGroupService,
-    BreakScheduleService,
-    BreakExclusionService,
-    BreakSessionService,
-    BreakScheduleEngine,
-    BreakSupervisionService,
+    CommercialPresenceHistoryService,
     DisconnectMonitorJob,
   ],
-  exports: [
-    CommercialGroupService,
-    GroupScheduleService,
-    CommercialPlanningService,
-    CommercialSubGroupService,
-    BreakScheduleService,
-    BreakExclusionService,
-    BreakSessionService,
-  ],
+  exports: [CommercialGroupService, GroupScheduleService, CommercialPlanningService],
 })
 export class CommercialGroupModule {}

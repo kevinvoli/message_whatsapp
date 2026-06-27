@@ -1,17 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CommercialGroupService } from './commercial-group.service';
 import { AdminGuard } from 'src/auth/admin.guard';
-import { AddMemberDto, CreateCommercialGroupDto, UpdateCommercialGroupDto } from './dto/commercial-group.dto';
+import { AddMemberDto, CreateCommercialGroupDto, PatchDisconnectReasonDto, UpdateCommercialGroupDto } from './dto/commercial-group.dto';
 import { GenerateScheduleDto, ScheduleConfigDto } from './dto/schedule-config.dto';
 import { GroupScheduleService } from './group-schedule.service';
 import { CommercialPlanningService } from './commercial-planning.service';
 import { CreateAbsenceDto, CreateAbsenceRangeDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
-import { CommercialSubGroupService } from './commercial-sub-group.service';
-import { BreakScheduleService } from './break-schedule.service';
-import { BreakExclusionService } from './break-exclusion.service';
-import { CreateBreakExclusionDto, CreateSubGroupDto, UpdateSubGroupDto, UpsertBreakScheduleDto } from './dto/sub-group.dto';
-import { BreakSupervisionService } from './break-supervision.service';
-import { DisconnectMonitorJob } from './jobs/disconnect-monitor.job';
+import { CommercialPresenceHistoryService } from './commercial-presence-history.service';
 
 @Controller('commercial-groups')
 @UseGuards(AdminGuard)
@@ -20,11 +15,7 @@ export class CommercialGroupController {
     private readonly service: CommercialGroupService,
     private readonly groupScheduleService: GroupScheduleService,
     private readonly planningService: CommercialPlanningService,
-    private readonly subGroupService: CommercialSubGroupService,
-    private readonly breakScheduleService: BreakScheduleService,
-    private readonly breakExclusionService: BreakExclusionService,
-    private readonly supervisionService: BreakSupervisionService,
-    private readonly disconnectMonitor: DisconnectMonitorJob,
+    private readonly presenceHistoryService: CommercialPresenceHistoryService,
   ) {}
 
   @Post()
@@ -56,7 +47,7 @@ export class CommercialGroupController {
 
   @Post('planning')
   createPlanning(@Body() body: CreateAbsenceDto | CreateExceptionalDto) {
-    if ((body as { type?: string }).type === 'exceptional') {
+    if ((body as any).type === 'exceptional') {
       return this.planningService.createExceptional(body as CreateExceptionalDto);
     }
     return this.planningService.createAbsence(body as CreateAbsenceDto);
@@ -102,93 +93,64 @@ export class CommercialGroupController {
     return this.planningService.remove(id);
   }
 
-  // --- Routes sous-groupes & pauses (statiques — AVANT :id) ---
-
-  @Post('sub-groups')
-  createSubGroup(@Body() dto: CreateSubGroupDto) {
-    return this.subGroupService.create(dto);
-  }
-
-  @Patch('sub-groups/:subId')
-  updateSubGroup(@Param('subId') subId: string, @Body() dto: UpdateSubGroupDto) {
-    return this.subGroupService.update(subId, dto);
-  }
-
-  @Delete('sub-groups/:subId')
-  @HttpCode(204)
-  deleteSubGroup(@Param('subId') subId: string) {
-    return this.subGroupService.softDelete(subId);
-  }
-
-  @Post('sub-groups/:subId/members')
-  addSubGroupMember(@Param('subId') subId: string, @Body() body: { commercialId: string }) {
-    return this.subGroupService.addMember(subId, body.commercialId);
-  }
-
-  @Delete('sub-groups/:subId/members/:cId')
-  removeSubGroupMember(@Param('subId') subId: string, @Param('cId') cId: string) {
-    return this.subGroupService.removeMember(subId, cId);
-  }
-
-  @Put('sub-groups/:subId/break-schedule')
-  upsertBreakSchedule(@Param('subId') subId: string, @Body() dto: UpsertBreakScheduleDto) {
-    return this.breakScheduleService.upsert(subId, dto);
-  }
-
-  @Get('sub-groups/:subId/break-schedule')
-  getBreakSchedule(@Param('subId') subId: string) {
-    return this.breakScheduleService.findBySubGroup(subId);
-  }
-
-  @Get('sub-groups/:subId/exclusions')
-  getExclusions(@Param('subId') subId: string) {
-    return this.breakExclusionService.findBySubGroup(subId);
-  }
-
-  @Delete('sub-groups/:subId/exclusions/:eid')
-  @HttpCode(204)
-  deleteExclusionFromSubGroup(@Param('eid') eid: string) {
-    return this.breakExclusionService.softDelete(eid);
-  }
-
-  @Post('sub-groups/:subId/exclusions')
-  createExclusion(@Body() dto: CreateBreakExclusionDto) {
-    return this.breakExclusionService.create(dto);
-  }
-
-  @Delete('break-schedule/:id')
-  @HttpCode(204)
-  deleteBreakSchedule(@Param('id') id: string) {
-    return this.breakScheduleService.softDelete(id);
-  }
-
-  @Delete('exclusions/:id')
-  @HttpCode(204)
-  deleteExclusion(@Param('id') id: string) {
-    return this.breakExclusionService.softDelete(id);
-  }
-
-  @Get('break-supervision')
-  getSupervision() {
-    return this.supervisionService.getSupervision();
-  }
-
-  @Get('disconnect-alerts')
-  getDisconnectAlerts() {
-    return this.disconnectMonitor.getActiveAlerts();
-  }
-
-  @Get('presence')
-  getPresence() {
-    return this.service.getPresence();
-  }
-
-  @Patch('presence/:id/working-today')
-  setWorkingToday(
-    @Param('id') id: string,
-    @Body('isWorkingToday') isWorkingToday: boolean,
+  @Get('sessions')
+  getSessions(
+    @Query('date') date?: string,
+    @Query('commercialId') commercialId?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.setWorkingToday(id, isWorkingToday);
+    return this.service.getSessions({
+      date,
+      commercialId,
+      status: status as 'active' | 'closed' | 'all' | undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get('presence-history')
+  getPresenceHistory(@Query('date') date?: string) {
+    const tz = process.env['TZ'] ?? 'Africa/Abidjan';
+    const today = new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(new Date());
+    return this.presenceHistoryService.getPresenceForDate(date ?? today);
+  }
+
+  @Get('disconnect-history')
+  getDisconnectHistory(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getDisconnectHistory({
+      from,
+      to,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
+  }
+
+  @Get('disconnect-history/:commercialId')
+  getDisconnectHistoryByCommercial(
+    @Param('commercialId') commercialId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getDisconnectHistory({
+      commercialId,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
+  @Patch('disconnect-history/:logId/reason')
+  patchDisconnectReason(
+    @Param('logId') logId: string,
+    @Body() dto: PatchDisconnectReasonDto,
+  ) {
+    return this.service.patchDisconnectReason(logId, dto.reason);
   }
 
   // --- Routes paramétrées ---
@@ -204,9 +166,8 @@ export class CommercialGroupController {
   }
 
   @Delete(':id')
-  @HttpCode(204)
-  async remove(@Param('id') id: string) {
-    await this.service.remove(id);
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
   }
 
   @Patch(':id/schedule-config')
@@ -222,11 +183,6 @@ export class CommercialGroupController {
   @Get(':id/schedule')
   getSchedule(@Param('id') id: string, @Query('from') from?: string, @Query('to') to?: string) {
     return this.service.getSchedule(id, from, to);
-  }
-
-  @Get(':id/sub-groups')
-  getSubGroups(@Param('id') id: string) {
-    return this.subGroupService.findAll(id);
   }
 
   @Post(':id/members')

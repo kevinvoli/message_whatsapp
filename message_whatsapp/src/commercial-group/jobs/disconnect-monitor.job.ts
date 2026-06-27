@@ -35,13 +35,12 @@ export class DisconnectMonitorJob {
 
       const cutoff = new Date(Date.now() - thresholdMinutes * 60_000);
 
-      // Sessions encore ouvertes dont le login_at dépasse le seuil et pas encore alertées
       const staleLogs = await this.connLogRepo
         .createQueryBuilder('cl')
-        .where('cl.user_type = :t', { t: 'commercial' })
-        .andWhere('cl.logout_at IS NULL')
-        .andWhere('cl.login_at < :cutoff', { cutoff })
-        .andWhere('cl.alerted_at IS NULL')
+        .where('cl.userType = :t', { t: 'commercial' })
+        .andWhere('cl.logoutAt IS NULL')
+        .andWhere('cl.loginAt < :cutoff', { cutoff })
+        .andWhere('cl.alertedAt IS NULL')
         .getMany();
 
       if (staleLogs.length === 0) return;
@@ -55,19 +54,10 @@ export class DisconnectMonitorJob {
 
       for (const log of staleLogs) {
         const name = nameMap.get(log.userId) ?? log.userId;
-        const disconnectedSince = log.loginAt.toISOString();
         const totalDisconnectMinutes = Math.floor(
           (Date.now() - log.loginAt.getTime()) / 60_000,
         );
 
-        const alert: DisconnectAlert = {
-          commercialId: log.userId,
-          commercialName: name,
-          disconnectedSince,
-          totalDisconnectMinutes,
-        };
-
-        // Marquer pour éviter les doublons (visible via GET /commercial-groups/disconnect-alerts)
         await this.connLogRepo.update(log.id, { alertedAt: new Date() });
         this.logger.warn(
           `DisconnectAlert: commercial=${log.userId} (${name}) déconnecté depuis ${totalDisconnectMinutes} min`,
@@ -87,9 +77,9 @@ export class DisconnectMonitorJob {
 
     const staleLogs = await this.connLogRepo
       .createQueryBuilder('cl')
-      .where('cl.user_type = :t', { t: 'commercial' })
-      .andWhere('cl.logout_at IS NULL')
-      .andWhere('cl.login_at < :cutoff', { cutoff })
+      .where('cl.userType = :t', { t: 'commercial' })
+      .andWhere('cl.logoutAt IS NULL')
+      .andWhere('cl.loginAt < :cutoff', { cutoff })
       .getMany();
 
     if (staleLogs.length === 0) return [];

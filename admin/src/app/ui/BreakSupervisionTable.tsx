@@ -5,12 +5,12 @@ import { BreakSupervisionRow } from '@/app/lib/definitions';
 import { formatTime } from '@/app/lib/dateUtils';
 
 const STATUS_LABELS: Record<BreakSupervisionRow['status'], { label: string; className: string }> = {
-  en_service:   { label: 'En service',    className: 'bg-green-100 text-green-800' },
-  en_pause:     { label: 'En pause',      className: 'bg-blue-100 text-blue-800' },
-  pause_manquee:{ label: 'Pause manquée', className: 'bg-orange-100 text-orange-800' },
-  deconnecte:   { label: 'Déconnecté',    className: 'bg-red-100 text-red-800' },
-  repos:        { label: 'Repos',         className: 'bg-gray-100 text-gray-600' },
-  absent:       { label: 'Absent',        className: 'bg-yellow-100 text-yellow-800' },
+  en_service:    { label: 'En service',    className: 'bg-green-100 text-green-800' },
+  en_pause:      { label: 'En pause',      className: 'bg-blue-100 text-blue-800' },
+  pause_manquee: { label: 'Pause manquée', className: 'bg-orange-100 text-orange-800' },
+  deconnecte:    { label: 'Déconnecté',    className: 'bg-red-100 text-red-800' },
+  repos:         { label: 'Repos',         className: 'bg-gray-100 text-gray-600' },
+  absent:        { label: 'Absent',        className: 'bg-yellow-100 text-yellow-800' },
 };
 
 interface BreakSupervisionTableProps {

@@ -8,9 +8,9 @@ import CommercialPlanningView from '@/app/ui/CommercialPlanningView';
 import CalendarMonthView from '@/app/ui/groups/CalendarMonthView';
 import AbsenceSummaryTable from '@/app/ui/groups/AbsenceSummaryTable';
 import PlanningAuditView from '@/app/ui/groups/PlanningAuditView';
-import SubGroupsGroupSelector from '@/app/ui/SubGroupsGroupSelector';
 import BreakSupervisionTable from '@/app/ui/BreakSupervisionTable';
 import DisconnectAlertsBanner from '@/app/ui/DisconnectAlertsBanner';
+import DisconnectHistoryView from '@/app/ui/DisconnectHistoryView';
 import { getBreakSupervision, getDisconnectAlerts } from '@/app/lib/api/commercial-groups.api';
 import { BreakSupervisionRow, DisconnectAlert } from '@/app/lib/definitions';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -23,26 +23,27 @@ type Tab =
   | 'bilan'
   | 'historique'
   | 'sessions'
-  | 'sous-groupes'
   | 'supervision';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'planning',     label: 'Plannings de travail'      },
-  { id: 'presence',     label: 'Présence du jour'          },
-  { id: 'imprevus',     label: 'Absences & remplacements'  },
-  { id: 'calendrier',   label: 'Calendrier mensuel'        },
-  { id: 'bilan',        label: 'Bilan absences'            },
-  { id: 'historique',   label: 'Historique'                },
-  { id: 'sessions',     label: 'Heures de travail'         },
-  { id: 'sous-groupes', label: 'Sous-groupes & pauses'     },
-  { id: 'supervision',  label: 'Supervision pauses'        },
+  { id: 'planning',    label: 'Plannings de travail'     },
+  { id: 'presence',   label: 'Présence du jour'         },
+  { id: 'imprevus',   label: 'Absences & remplacements' },
+  { id: 'calendrier', label: 'Calendrier mensuel'       },
+  { id: 'bilan',      label: 'Bilan absences'           },
+  { id: 'historique', label: 'Historique'               },
+  { id: 'sessions',   label: 'Heures de travail'        },
+  { id: 'supervision',label: 'Supervision pauses'       },
 ];
 
-interface PlanningTabsViewProps {
-  initialTab?: Tab;
-}
+type SupervisionSubTab = 'deconnexions' | 'pauses';
 
-function SupervisionTab() {
+const SUPERVISION_SUB_TABS: { id: SupervisionSubTab; label: string }[] = [
+  { id: 'deconnexions', label: 'Déconnexions anormales' },
+  { id: 'pauses',       label: 'Supervision des pauses' },
+];
+
+function BreakSupervisionTab() {
   const [rows, setRows]       = useState<BreakSupervisionRow[]>([]);
   const [alerts, setAlerts]   = useState<DisconnectAlert[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,13 +85,34 @@ function SupervisionTab() {
   );
 }
 
-export default function PlanningTabsView({ initialTab = 'planning' }: PlanningTabsViewProps) {
-  const [active, setActive] = useState<Tab>(initialTab);
+function SupervisionTab() {
+  const [subTab, setSubTab] = useState<SupervisionSubTab>('deconnexions');
 
-  // Synchronise l'onglet actif quand la prop change (navigation entre vues)
-  useEffect(() => {
-    setActive(initialTab);
-  }, [initialTab]);
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 border-b border-gray-200">
+        {SUPERVISION_SUB_TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              subTab === t.id
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {subTab === 'deconnexions' && <DisconnectHistoryView />}
+      {subTab === 'pauses'       && <BreakSupervisionTab />}
+    </div>
+  );
+}
+
+export default function PlanningTabsView() {
+  const [active, setActive] = useState<Tab>('planning');
 
   return (
     <div className="space-y-4">
@@ -110,15 +132,14 @@ export default function PlanningTabsView({ initialTab = 'planning' }: PlanningTa
         ))}
       </div>
 
-      {active === 'planning'     && <GroupsCalendarView />}
-      {active === 'presence'     && <PresenceView />}
-      {active === 'imprevus'     && <CommercialPlanningView />}
-      {active === 'calendrier'   && <CalendarMonthView />}
-      {active === 'bilan'        && <AbsenceSummaryTable />}
-      {active === 'historique'   && <PlanningAuditView />}
-      {active === 'sessions'     && <SessionsView />}
-      {active === 'sous-groupes' && <SubGroupsGroupSelector />}
-      {active === 'supervision'  && <SupervisionTab />}
+      {active === 'planning'    && <GroupsCalendarView />}
+      {active === 'presence'    && <PresenceView />}
+      {active === 'imprevus'    && <CommercialPlanningView />}
+      {active === 'calendrier'  && <CalendarMonthView />}
+      {active === 'bilan'       && <AbsenceSummaryTable />}
+      {active === 'historique'  && <PlanningAuditView />}
+      {active === 'sessions'    && <SessionsView />}
+      {active === 'supervision' && <SupervisionTab />}
     </div>
   );
 }

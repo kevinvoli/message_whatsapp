@@ -12,7 +12,6 @@ import {
   Loader2,
   X,
   ChevronDown,
-  Layers,
 } from 'lucide-react';
 import {
   getGroups,
@@ -27,7 +26,6 @@ import { CommercialGroup, CommercialPresenceItem } from '../lib/definitions';
 import ScheduleConfigForm from './groups/ScheduleConfigForm';
 import GroupScheduleCalendar from './groups/GroupScheduleCalendar';
 import GroupPresenceTable from './groups/GroupPresenceTable';
-import SubGroupsManager from './SubGroupsManager';
 
 // ─── Modal création / modification ──────────────────────────────────────────
 
@@ -238,7 +236,6 @@ export default function CommercialGroupsView() {
   const [confirmDelete, setConfirmDelete] = useState<CommercialGroup | null>(null);
   const [deleteError, setDeleteError]     = useState<string | null>(null);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
-  const [subGroupsFor, setSubGroupsFor] = useState<CommercialGroup | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -334,14 +331,6 @@ export default function CommercialGroupsView() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setSubGroupsFor(group)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-violet-600 border border-violet-200 rounded-lg hover:bg-violet-50 font-medium"
-                      aria-label={`Gérer les sous-groupes de ${group.name}`}
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      Sous-groupes
-                    </button>
-                    <button
                       onClick={() => setExpandedId(isExpanded ? null : group.id)}
                       className="px-3 py-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 font-medium"
                       aria-label={isExpanded ? 'Masquer les membres' : 'Gérer les membres'}
@@ -401,14 +390,6 @@ export default function CommercialGroupsView() {
           editId={editGroup?.id ?? null}
           onClose={closeModal}
           onSaved={onSaved}
-        />
-      )}
-
-      {subGroupsFor && (
-        <SubGroupsManager
-          groupId={subGroupsFor.id}
-          groupName={subGroupsFor.name}
-          onClose={() => setSubGroupsFor(null)}
         />
       )}
 

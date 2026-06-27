@@ -14,6 +14,9 @@ import {
   BreakExclusion,
   BreakSupervisionRow,
   DisconnectAlert,
+  PresenceHistoryResponse,
+  SessionsResponse,
+  DisconnectHistoryResponse,
 } from '../definitions';
 import { API_BASE_URL, handleResponse } from './_http';
 
@@ -267,6 +270,14 @@ export async function deletePlanning(id: string): Promise<void> {
 
 // ─── Sous-groupes ────────────────────────────────────────────────────────────
 
+export async function getSubGroup(subGroupId: string): Promise<CommercialSubGroup> {
+  return handleResponse<CommercialSubGroup>(
+    await fetch(`${API_BASE_URL}/commercial-groups/sub-groups/${subGroupId}`, {
+      credentials: 'include',
+    }),
+  );
+}
+
 export async function getSubGroups(groupId: string): Promise<CommercialSubGroup[]> {
   return handleResponse<CommercialSubGroup[]>(
     await fetch(`${API_BASE_URL}/commercial-groups/${groupId}/sub-groups`, {
@@ -416,6 +427,78 @@ export async function getDisconnectAlerts(): Promise<DisconnectAlert[]> {
   return handleResponse<DisconnectAlert[]>(
     await fetch(`${API_BASE_URL}/commercial-groups/disconnect-alerts`, {
       credentials: 'include',
+    }),
+  );
+}
+
+export async function getPresenceHistory(date?: string): Promise<PresenceHistoryResponse> {
+  const params = date ? `?date=${encodeURIComponent(date)}` : '';
+  return handleResponse<PresenceHistoryResponse>(
+    await fetch(`${API_BASE_URL}/commercial-groups/presence-history${params}`, {
+      credentials: 'include',
+    }),
+  );
+}
+
+export async function getSessions(params?: {
+  date?: string;
+  commercialId?: string;
+  status?: 'active' | 'closed' | 'all';
+  page?: number;
+  limit?: number;
+}): Promise<SessionsResponse> {
+  const q = new URLSearchParams();
+  if (params?.date) q.set('date', params.date);
+  if (params?.commercialId) q.set('commercialId', params.commercialId);
+  if (params?.status) q.set('status', params.status);
+  if (params?.page !== undefined) q.set('page', String(params.page));
+  if (params?.limit !== undefined) q.set('limit', String(params.limit));
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return handleResponse<SessionsResponse>(
+    await fetch(`${API_BASE_URL}/commercial-groups/sessions${qs}`, { credentials: 'include' }),
+  );
+}
+
+export async function getDisconnectHistory(params?: {
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}): Promise<DisconnectHistoryResponse> {
+  const q = new URLSearchParams();
+  if (params?.from) q.set('from', params.from);
+  if (params?.to) q.set('to', params.to);
+  if (params?.page !== undefined) q.set('page', String(params.page));
+  if (params?.limit !== undefined) q.set('limit', String(params.limit));
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return handleResponse<DisconnectHistoryResponse>(
+    await fetch(`${API_BASE_URL}/commercial-groups/disconnect-history${qs}`, { credentials: 'include' }),
+  );
+}
+
+export async function getDisconnectHistoryByCommercial(
+  commercialId: string,
+  params?: { page?: number; limit?: number },
+): Promise<DisconnectHistoryResponse> {
+  const q = new URLSearchParams();
+  if (params?.page !== undefined) q.set('page', String(params.page));
+  if (params?.limit !== undefined) q.set('limit', String(params.limit));
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return handleResponse<DisconnectHistoryResponse>(
+    await fetch(`${API_BASE_URL}/commercial-groups/disconnect-history/${commercialId}${qs}`, { credentials: 'include' }),
+  );
+}
+
+export async function patchDisconnectReason(
+  logId: string,
+  reason: string,
+): Promise<{ success: true }> {
+  return handleResponse<{ success: true }>(
+    await fetch(`${API_BASE_URL}/commercial-groups/disconnect-history/${logId}/reason`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
     }),
   );
 }

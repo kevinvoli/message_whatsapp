@@ -22,7 +22,10 @@ export default function DisconnectAlertsBanner({ alerts = [] }: DisconnectAlerts
       </div>
       <ul className="space-y-1.5">
         {alerts.map((a) => (
-          <li key={a.commercialId} className="flex items-center justify-between text-xs text-red-700 bg-red-100 rounded-lg px-3 py-2">
+          <li
+            key={a.commercialId}
+            className="flex items-center justify-between text-xs text-red-700 bg-red-100 rounded-lg px-3 py-2"
+          >
             <span className="font-medium">{a.commercialName}</span>
             <span className="text-red-500">
               Depuis {formatTime(a.disconnectedSince)} — {a.totalDisconnectMinutes} min

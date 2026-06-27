@@ -4,7 +4,6 @@ import { Repository, DataSource, Not, IsNull, Between } from 'typeorm';
 import { CommercialGroup } from './entities/commercial-group.entity';
 import { GroupScheduleDay } from './entities/group-schedule-day.entity';
 import { SystemConfigService } from 'src/system-config/system-config.service';
-import { getTodayLocalString } from './utils/local-date.util';
 
 @Injectable()
 export class GroupScheduleService {
@@ -25,7 +24,7 @@ export class GroupScheduleService {
     }
 
     const tz = (await this.systemConfigService.get('APP_TIMEZONE')) ?? 'Africa/Abidjan';
-    const todayLocalStr = getTodayLocalString(tz);
+    const todayLocalStr = new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(new Date());
     const startDate = new Date(todayLocalStr + 'T00:00:00Z');
     const endDate = new Date(startDate);
     endDate.setUTCMonth(endDate.getUTCMonth() + months);
@@ -83,21 +82,25 @@ export class GroupScheduleService {
     return results;
   }
 
-  async getTodayWorkingGroupIds(): Promise<string[]> {
-    const tz = (await this.systemConfigService.get('APP_TIMEZONE')) ?? 'Africa/Abidjan';
-    const todayStr = getTodayLocalString(tz);
+  async getWorkingGroupIdsForDate(dateStr: string): Promise<string[]> {
     const rows = await this.scheduleDayRepo.find({
-      where: { date: todayStr, isWorkDay: true },
+      where: { date: dateStr, isWorkDay: true },
       select: ['groupId'],
     });
     return rows.map((r) => r.groupId);
+  }
+
+  async getTodayWorkingGroupIds(): Promise<string[]> {
+    const tz = (await this.systemConfigService.get('APP_TIMEZONE')) ?? 'Africa/Abidjan';
+    const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(new Date());
+    return this.getWorkingGroupIdsForDate(todayStr);
   }
 
   async getGroupsWithExpiringCalendar(
     withinDays = 7,
   ): Promise<{ groupId: string; groupName: string; lastDay: string | null }[]> {
     const tz = (await this.systemConfigService.get('APP_TIMEZONE')) ?? 'Africa/Abidjan';
-    const todayStr = getTodayLocalString(tz);
+    const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(new Date());
     const horizonDate = new Date(todayStr + 'T00:00:00Z');
     horizonDate.setUTCDate(horizonDate.getUTCDate() + withinDays);
     const horizonStr = horizonDate.toISOString().slice(0, 10);

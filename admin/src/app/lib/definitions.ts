@@ -1455,3 +1455,76 @@ export type CommercialGroup = {
   createdAt: string;
   updatedAt: string;
 };
+
+// ============================================
+// PRESENCE HISTORY
+// ============================================
+
+export type PresenceEntry = {
+  commercialId: string;
+  commercialName: string;
+  groupId: string | null;
+  groupName: string | null;
+  firstLoginAt: string | null;
+  lastLogoutAt: string | null;
+  sessionCount: number;
+  totalConnectedMinutes: number;
+  planningStatus: 'normal' | 'absent' | 'exceptional' | null;
+  groupIsWorkDay: boolean | null;
+  isWorkingToday: boolean;
+};
+
+export type PresenceHistoryResponse = {
+  date: string;
+  entries: PresenceEntry[];
+};
+
+// ============================================
+// HISTORIQUE DÉCONNEXIONS
+// ============================================
+
+export interface DisconnectHistoryEntry {
+  logId: string;
+  commercialId: string;
+  commercialName: string;
+  loginAt: string;
+  logoutAt: string | null;
+  alertedAt: string;
+  durationMinutes: number;
+  disconnectReason: string | null;
+}
+
+export interface DisconnectHistoryResponse {
+  entries: DisconnectHistoryEntry[];
+  total: number;
+  page: number;
+}
+
+// ============================================
+// SESSIONS DE CONNEXION
+// ============================================
+
+export type SessionStatus = 'active' | 'closed';
+
+export interface SessionRow {
+  id: string;
+  commercialId: string;
+  commercialName: string;
+  loginAt: string;
+  logoutAt: string | null;
+  durationMinutes: number;
+  status: SessionStatus;
+}
+
+export interface SessionsKpis {
+  activeSessions: number;
+  avgDurationMinutes: number;
+  totalConnectedMinutes: number;
+}
+
+export interface SessionsResponse {
+  sessions: SessionRow[];
+  total: number;
+  page: number;
+  kpis: SessionsKpis;
+}

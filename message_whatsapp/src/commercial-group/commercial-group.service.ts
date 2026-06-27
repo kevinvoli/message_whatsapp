@@ -4,6 +4,46 @@ import { IsNull, Repository } from 'typeorm';
 import { CommercialGroup } from './entities/commercial-group.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { GroupScheduleService } from './group-schedule.service';
+import { ConnectionLog } from 'src/connection-log/entities/connection-log.entity';
+import { ConnectionLogService } from 'src/connection-log/connection-log.service';
+
+export interface DisconnectHistoryEntry {
+  logId: string;
+  commercialId: string;
+  commercialName: string;
+  loginAt: string;
+  logoutAt: string | null;
+  alertedAt: string;
+  durationMinutes: number;
+  disconnectReason: string | null;
+}
+
+export interface DisconnectHistoryResponse {
+  entries: DisconnectHistoryEntry[];
+  total: number;
+  page: number;
+}
+
+export interface SessionRow {
+  id: string;
+  commercialId: string;
+  commercialName: string;
+  loginAt: string;
+  logoutAt: string | null;
+  durationMinutes: number;
+  status: 'active' | 'closed';
+}
+
+export interface SessionsResponse {
+  sessions: SessionRow[];
+  total: number;
+  page: number;
+  kpis: {
+    activeSessions: number;
+    avgDurationMinutes: number;
+    totalConnectedMinutes: number;
+  };
+}
 
 @Injectable()
 export class CommercialGroupService {
@@ -14,7 +54,11 @@ export class CommercialGroupService {
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
 
+    @InjectRepository(ConnectionLog)
+    private readonly connLogRepo: Repository<ConnectionLog>,
+
     private readonly groupScheduleService: GroupScheduleService,
+    private readonly connectionLogService: ConnectionLogService,
   ) {}
 
   async findAll(): Promise<CommercialGroup[]> {
@@ -59,23 +103,11 @@ export class CommercialGroupService {
     const group = await this.groupRepo.findOne({ where: { id } });
     if (!group) throw new NotFoundException(`CommercialGroup ${id} not found`);
 
-    // Détacher sub_group_id des membres appartenant aux sous-groupes de ce groupe
-    await this.groupRepo.manager.query(
-      `UPDATE whatsapp_commercial SET sub_group_id = NULL
-       WHERE sub_group_id IN (SELECT id FROM commercial_sub_group WHERE parent_group_id = ?)`,
-      [id],
-    );
-
-    // Détacher group_id de tous les membres
+    // Retirer tous les membres avant désactivation
     await this.commercialRepo.update({ groupId: id }, { groupId: null });
 
-    // Supprimer le calendrier (pas de FK → nettoyage manuel)
-    await this.groupRepo.manager.query(
-      `DELETE FROM group_schedule_day WHERE group_id = ?`, [id],
-    );
-
-    // Suppression réelle — FK CASCADE supprime commercial_sub_group + break_schedules + exclusions
-    await this.groupRepo.delete(id);
+    group.isActive = false;
+    await this.groupRepo.save(group);
   }
 
   async addMember(groupId: string, commercialId: string): Promise<WhatsappCommercial> {
@@ -132,43 +164,159 @@ export class CommercialGroupService {
     return this.groupScheduleService.getCalendarForGroup(id, from ?? defaultFrom, to ?? defaultTo);
   }
 
-  async getPresence() {
-    const commercials = await this.commercialRepo.find({
-      where: { deletedAt: IsNull() },
-      relations: ['poste', 'group'],
-      select: ['id', 'name', 'isConnected', 'isWorkingToday', 'workingTodaySince'],
-    });
-    return commercials.map((c) => ({
-      id: c.id,
-      name: c.name,
-      isConnected: c.isConnected,
-      isWorkingToday: c.isWorkingToday,
-      workingTodaySince: c.workingTodaySince?.toISOString() ?? null,
-      poste: c.poste ? { id: c.poste.id, name: c.poste.name } : null,
-      group: c.group ? { id: c.group.id, name: c.group.name } : null,
-    }));
-  }
+  async getSessions(opts: {
+    date?: string;
+    commercialId?: string;
+    status?: 'active' | 'closed' | 'all';
+    page?: number;
+    limit?: number;
+  }): Promise<SessionsResponse> {
+    const tz = process.env['TZ'] ?? 'Africa/Abidjan';
+    const dateStr = opts.date ?? new Intl.DateTimeFormat('fr-CA', { timeZone: tz }).format(new Date());
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.max(1, opts.limit ?? 50);
+    const status = opts.status ?? 'all';
 
-  async setWorkingToday(commercialId: string, isWorkingToday: boolean) {
-    const commercial = await this.commercialRepo.findOne({
-      where: { id: commercialId, deletedAt: IsNull() },
-      relations: ['poste', 'group'],
-    });
-    if (!commercial) throw new NotFoundException(`Commercial ${commercialId} introuvable`);
+    const dateStart = new Date(`${dateStr}T00:00:00.000Z`);
+    const dateEnd = new Date(`${dateStr}T23:59:59.999Z`);
 
-    await this.commercialRepo.update(commercialId, {
-      isWorkingToday,
-      workingTodaySince: isWorkingToday ? new Date() : null,
+    const qb = this.connLogRepo
+      .createQueryBuilder('log')
+      .where('log.userType = :userType', { userType: 'commercial' })
+      .andWhere('log.loginAt >= :dateStart', { dateStart })
+      .andWhere('log.loginAt <= :dateEnd', { dateEnd })
+      .orderBy('log.loginAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (opts.commercialId) {
+      qb.andWhere('log.userId = :commercialId', { commercialId: opts.commercialId });
+    }
+    if (status === 'active') {
+      qb.andWhere('log.logoutAt IS NULL');
+    } else if (status === 'closed') {
+      qb.andWhere('log.logoutAt IS NOT NULL');
+    }
+
+    const [logs, total] = await qb.getManyAndCount();
+
+    const userIds = [...new Set(logs.map((l) => l.userId))];
+
+    let nameMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const commercials = await this.commercialRepo
+        .createQueryBuilder('c')
+        .select(['c.id', 'c.name'])
+        .where('c.id IN (:...ids)', { ids: userIds })
+        .andWhere('c.deletedAt IS NULL')
+        .getMany();
+      nameMap = new Map(commercials.map((c) => [c.id, c.name]));
+    }
+
+    const now = Date.now();
+    const sessions: SessionRow[] = logs.map((log) => {
+      const durationMinutes = log.logoutAt
+        ? Math.floor((log.logoutAt.getTime() - log.loginAt.getTime()) / 60000)
+        : Math.floor((now - log.loginAt.getTime()) / 60000);
+      return {
+        id: log.id,
+        commercialId: log.userId,
+        commercialName: nameMap.get(log.userId) ?? log.userId,
+        loginAt: log.loginAt.toISOString(),
+        logoutAt: log.logoutAt?.toISOString() ?? null,
+        durationMinutes,
+        status: log.logoutAt ? 'closed' : 'active',
+      };
     });
+
+    const activeSessions = sessions.filter((s) => s.status === 'active').length;
+    const closedSessions = sessions.filter((s) => s.status === 'closed');
+    const avgDurationMinutes =
+      closedSessions.length > 0
+        ? Math.floor(
+            closedSessions.reduce((sum, s) => sum + s.durationMinutes, 0) / closedSessions.length,
+          )
+        : 0;
+
+    const minutesMap = await this.connectionLogService.getBulkConnectionMinutes(
+      userIds,
+      'commercial',
+      dateStart,
+      dateEnd,
+    );
+    const totalConnectedMinutes = [...minutesMap.values()].reduce((sum, m) => sum + m, 0);
 
     return {
-      id: commercial.id,
-      name: commercial.name,
-      isConnected: commercial.isConnected,
-      isWorkingToday,
-      workingTodaySince: isWorkingToday ? new Date().toISOString() : null,
-      poste: commercial.poste ? { id: commercial.poste.id, name: commercial.poste.name } : null,
-      group: commercial.group ? { id: commercial.group.id, name: commercial.group.name } : null,
+      sessions,
+      total,
+      page,
+      kpis: { activeSessions, avgDurationMinutes, totalConnectedMinutes },
     };
+  }
+
+  async getDisconnectHistory(opts: {
+    from?: string;
+    to?: string;
+    commercialId?: string;
+    page: number;
+    limit: number;
+  }): Promise<DisconnectHistoryResponse> {
+    const qb = this.connLogRepo
+      .createQueryBuilder('log')
+      .where('log.alertedAt IS NOT NULL')
+      .andWhere('log.userType = :userType', { userType: 'commercial' })
+      .orderBy('log.alertedAt', 'DESC')
+      .skip((opts.page - 1) * opts.limit)
+      .take(opts.limit);
+
+    if (opts.from) {
+      const dateStart = new Date(`${opts.from}T00:00:00.000Z`);
+      qb.andWhere('log.loginAt >= :dateStart', { dateStart });
+    }
+    if (opts.to) {
+      const dateEnd = new Date(`${opts.to}T23:59:59.999Z`);
+      qb.andWhere('log.loginAt <= :dateEnd', { dateEnd });
+    }
+    if (opts.commercialId) {
+      qb.andWhere('log.userId = :commercialId', { commercialId: opts.commercialId });
+    }
+
+    const [logs, total] = await qb.getManyAndCount();
+
+    const userIds = [...new Set(logs.map((l) => l.userId))];
+    let nameMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const commercials = await this.commercialRepo
+        .createQueryBuilder('c')
+        .select(['c.id', 'c.name'])
+        .where('c.id IN (:...ids)', { ids: userIds })
+        .andWhere('c.deletedAt IS NULL')
+        .getMany();
+      nameMap = new Map(commercials.map((c) => [c.id, c.name]));
+    }
+
+    const now = Date.now();
+    const entries: DisconnectHistoryEntry[] = logs.map((log) => {
+      const durationMinutes = log.logoutAt
+        ? Math.floor((log.logoutAt.getTime() - log.loginAt.getTime()) / 60000)
+        : Math.floor((now - log.loginAt.getTime()) / 60000);
+      return {
+        logId: log.id,
+        commercialId: log.userId,
+        commercialName: nameMap.get(log.userId) ?? log.userId,
+        loginAt: log.loginAt.toISOString(),
+        logoutAt: log.logoutAt?.toISOString() ?? null,
+        alertedAt: log.alertedAt!.toISOString(),
+        durationMinutes,
+        disconnectReason: log.disconnectReason,
+      };
+    });
+
+    return { entries, total, page: opts.page };
+  }
+
+  async patchDisconnectReason(logId: string, reason: string): Promise<{ success: true }> {
+    await this.connLogRepo.update({ id: logId }, { disconnectReason: reason });
+    return { success: true };
   }
 }
