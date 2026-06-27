@@ -34,6 +34,15 @@ export class BreakExclusionService {
     await this.exclusionRepo.softRemove(exclusion);
   }
 
+  async findBySubGroups(subGroupIds: string[]): Promise<BreakExclusion[]> {
+    if (subGroupIds.length === 0) return [];
+    return this.exclusionRepo
+      .createQueryBuilder('e')
+      .where('e.sub_group_id IN (:...ids)', { ids: subGroupIds })
+      .andWhere('e.deletedAt IS NULL')
+      .getMany();
+  }
+
   async isExcluded(commercialId: string, posteId: string, subGroupId: string): Promise<boolean> {
     const count = await this.exclusionRepo
       .createQueryBuilder('e')

@@ -55,8 +55,8 @@ function GroupFormModal({ initial, editId, onClose, onSaved }: GroupFormModalPro
         await createGroup({ name: name.trim(), description: description.trim() || undefined });
       }
       onSaved();
-    } catch {
-      setError('Erreur lors de la sauvegarde.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde.');
     } finally {
       setSaving(false);
     }

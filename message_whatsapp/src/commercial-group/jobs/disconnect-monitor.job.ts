@@ -4,9 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { ConnectionLog } from 'src/connection-log/entities/connection-log.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
-import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { SystemConfigService } from 'src/system-config/system-config.service';
-import { BREAK_EVENTS } from 'src/realtime/events/socket-events.constants';
 
 export type DisconnectAlert = {
   commercialId: string;
@@ -24,7 +22,6 @@ export class DisconnectMonitorJob {
     private readonly connLogRepo: Repository<ConnectionLog>,
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
-    private readonly gateway: WhatsappMessageGateway,
     private readonly systemConfig: SystemConfigService,
   ) {}
 
@@ -70,10 +67,7 @@ export class DisconnectMonitorJob {
           totalDisconnectMinutes,
         };
 
-        // Émettre vers toutes les rooms admin (tenant rooms)
-        this.gateway.server.emit(BREAK_EVENTS.BREAK_DISCONNECT_ALERT, alert);
-
-        // Marquer pour éviter les doublons
+        // Marquer pour éviter les doublons (visible via GET /commercial-groups/disconnect-alerts)
         await this.connLogRepo.update(log.id, { alertedAt: new Date() });
         this.logger.warn(
           `DisconnectAlert: commercial=${log.userId} (${name}) déconnecté depuis ${totalDisconnectMinutes} min`,

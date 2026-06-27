@@ -56,7 +56,7 @@ export class CommercialGroupController {
 
   @Post('planning')
   createPlanning(@Body() body: CreateAbsenceDto | CreateExceptionalDto) {
-    if ((body as any).type === 'exceptional') {
+    if ((body as { type?: string }).type === 'exceptional') {
       return this.planningService.createExceptional(body as CreateExceptionalDto);
     }
     return this.planningService.createAbsence(body as CreateAbsenceDto);

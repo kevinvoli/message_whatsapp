@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import GroupsCalendarView from '@/app/ui/groups/GroupsCalendarView';
 import PresenceView from '@/app/ui/PresenceView';
 import SessionsView from '@/app/ui/SessionsView';
@@ -11,6 +11,9 @@ import PlanningAuditView from '@/app/ui/groups/PlanningAuditView';
 import SubGroupsGroupSelector from '@/app/ui/SubGroupsGroupSelector';
 import BreakSupervisionTable from '@/app/ui/BreakSupervisionTable';
 import DisconnectAlertsBanner from '@/app/ui/DisconnectAlertsBanner';
+import { getBreakSupervision, getDisconnectAlerts } from '@/app/lib/api/commercial-groups.api';
+import { BreakSupervisionRow, DisconnectAlert } from '@/app/lib/definitions';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 type Tab =
   | 'planning'
@@ -39,8 +42,55 @@ interface PlanningTabsViewProps {
   initialTab?: Tab;
 }
 
+function SupervisionTab() {
+  const [rows, setRows]       = useState<BreakSupervisionRow[]>([]);
+  const [alerts, setAlerts]   = useState<DisconnectAlert[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r, a] = await Promise.all([getBreakSupervision(), getDisconnectAlerts()]);
+      setRows(r);
+      setAlerts(a);
+    } catch { /* silencieux */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          Mise à jour toutes les minutes — actualisez manuellement si besoin.
+        </p>
+        <button
+          onClick={() => void load()}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          aria-label="Actualiser la supervision"
+        >
+          {loading
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <RefreshCw className="w-3.5 h-3.5" />
+          }
+          Actualiser
+        </button>
+      </div>
+      <DisconnectAlertsBanner alerts={alerts} />
+      <BreakSupervisionTable rows={rows} />
+    </div>
+  );
+}
+
 export default function PlanningTabsView({ initialTab = 'planning' }: PlanningTabsViewProps) {
   const [active, setActive] = useState<Tab>(initialTab);
+
+  // Synchronise l'onglet actif quand la prop change (navigation entre vues)
+  useEffect(() => {
+    setActive(initialTab);
+  }, [initialTab]);
 
   return (
     <div className="space-y-4">
@@ -68,12 +118,7 @@ export default function PlanningTabsView({ initialTab = 'planning' }: PlanningTa
       {active === 'historique'   && <PlanningAuditView />}
       {active === 'sessions'     && <SessionsView />}
       {active === 'sous-groupes' && <SubGroupsGroupSelector />}
-      {active === 'supervision'  && (
-        <div className="space-y-4">
-          <DisconnectAlertsBanner />
-          <BreakSupervisionTable />
-        </div>
-      )}
+      {active === 'supervision'  && <SupervisionTab />}
     </div>
   );
 }

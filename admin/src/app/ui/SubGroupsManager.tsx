@@ -65,8 +65,8 @@ function SubGroupFormModal({ parentGroupId, onClose, onSaved }: SubGroupFormModa
         description: description.trim() || undefined,
       });
       onSaved();
-    } catch {
-      setError('Erreur lors de la création.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la création.');
     } finally {
       setSaving(false);
     }
