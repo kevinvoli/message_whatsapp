@@ -67,7 +67,6 @@ const VALID_VIEWS: ViewMode[] = [
     'commercial-groups',
     'commercial-subgroups',
     'commercial-planning',
-    'break-supervision',
 ];
 
 function AdminDashboardContent() {
@@ -214,9 +213,7 @@ function AdminDashboardContent() {
             case 'commercial-subgroups':
                 return <CommercialGroupsView />;
             case 'commercial-planning':
-                return <PlanningTabsView initialTab="sous-groupes" />;
-            case 'break-supervision':
-                return <PlanningTabsView initialTab="supervision" />;
+                return <PlanningTabsView />;
             default:
                 return null;
         }

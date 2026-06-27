@@ -1,5 +1,5 @@
 import { Commercial, StatsGlobales, PerformanceData, SourcesClients, HeuresActivite, ProduitsPopulaires, NavigationItem, NavigationGroup, GoNoGoChecklistItem } from "@/app/lib/definitions";
-import { Home, Users, TrendingUp, BarChart3, BarChart2, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Layout, Link2, Library, Lock, Megaphone, HardDrive, GraduationCap, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2, UserX, Layers, Coffee } from 'lucide-react';
+import { Home, Users, TrendingUp, BarChart3, BarChart2, MessageCircle, Briefcase, FileText, Network, Globe, MessageSquareText, MessageSquare, ListOrdered, Route, Activity, ShieldCheck, LayoutDashboard, Server, Timer, Bell, Layout, Link2, Library, Lock, Megaphone, HardDrive, GraduationCap, Bot, Database, Send, Shield, ClipboardList, Webhook, PhoneCall, Target, Trophy, Sparkles, Stethoscope, CalendarDays, AlertCircle, Settings, Users2, UserX, Layers } from 'lucide-react';
 
 export const navigationGroups: NavigationGroup[] = [
   {
@@ -44,8 +44,7 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Layers,
     items: [
       { id: 'commercial-groups',   name: 'Groupes commerciaux',     icon: Users2,       badge: null },
-      { id: 'commercial-planning', name: 'Planning & Sous-groupes', icon: CalendarDays, badge: null },
-      { id: 'break-supervision',   name: 'Supervision pauses',      icon: Coffee,       badge: null },
+      { id: 'commercial-planning', name: 'Planning & Pauses',       icon: CalendarDays, badge: null },
     ],
   },
   {
