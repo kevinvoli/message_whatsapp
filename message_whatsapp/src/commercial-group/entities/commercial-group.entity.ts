@@ -1,6 +1,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   OneToMany,
@@ -36,6 +37,9 @@ export class CommercialGroup {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt?: Date | null;
 
   @OneToMany(() => WhatsappCommercial, (c) => c.group)
   commercials?: WhatsappCommercial[];

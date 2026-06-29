@@ -12,6 +12,7 @@ import {
   Loader2,
   X,
   ChevronDown,
+  Power,
 } from 'lucide-react';
 import {
   getGroups,
@@ -20,9 +21,12 @@ import {
   deleteGroup,
   addMember,
   removeMember,
+  getSubGroups,
+  createSubGroup,
+  deleteSubGroup,
 } from '../lib/api/commercial-groups.api';
 import { getPresence } from '../lib/api/commerciaux.api';
-import { CommercialGroup, CommercialPresenceItem } from '../lib/definitions';
+import { CommercialGroup, CommercialPresenceItem, CommercialSubGroup } from '../lib/definitions';
 import ScheduleConfigForm from './groups/ScheduleConfigForm';
 import GroupScheduleCalendar from './groups/GroupScheduleCalendar';
 import GroupPresenceTable from './groups/GroupPresenceTable';
@@ -223,6 +227,127 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
   );
 }
 
+// ─── Liste des sous-groupes ──────────────────────────────────────────────────
+
+interface SubGroupsListProps {
+  groupId: string;
+}
+
+function SubGroupsList({ groupId }: SubGroupsListProps) {
+  const [subGroups, setSubGroups]   = useState<CommercialSubGroup[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [newName, setNewName]       = useState('');
+  const [adding, setAdding]         = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const loadSubGroups = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getSubGroups(groupId);
+      setSubGroups(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des sous-groupes.');
+    } finally {
+      setLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => { void loadSubGroups(); }, [loadSubGroups]);
+
+  const handleAdd = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setAdding(true);
+    setError(null);
+    try {
+      await createSubGroup({ parentGroupId: groupId, name });
+      setNewName('');
+      await loadSubGroups();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la création.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = async (subId: string) => {
+    setDeletingId(subId);
+    setError(null);
+    try {
+      await deleteSubGroup(subId);
+      await loadSubGroups();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la suppression.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-100 pt-4 space-y-3">
+      <p className="text-sm font-semibold text-gray-700">Sous-groupes</p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Chargement…
+        </div>
+      ) : subGroups.length === 0 ? (
+        <p className="text-xs text-gray-400">Aucun sous-groupe pour l'instant.</p>
+      ) : (
+        <div className="space-y-1">
+          {subGroups.map((sub) => (
+            <div key={sub.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50">
+              <div>
+                <span className="text-sm font-medium text-gray-800">{sub.name}</span>
+                <span className="ml-2 text-xs text-gray-400">
+                  {sub.memberCount} membre{sub.memberCount > 1 ? 's' : ''}
+                </span>
+              </div>
+              <button
+                onClick={() => void handleDelete(sub.id)}
+                disabled={deletingId === sub.id}
+                aria-label={`Supprimer le sous-groupe ${sub.name}`}
+                className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+              >
+                {deletingId === sub.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}
+
+      <div className="flex items-center gap-2">
+        <input
+          value={newName}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
+          placeholder="Nom du sous-groupe"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter') void handleAdd();
+          }}
+        />
+        <button
+          onClick={() => void handleAdd()}
+          disabled={!newName.trim() || adding}
+          aria-label="Ajouter un sous-groupe"
+          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          Ajouter
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Vue principale ──────────────────────────────────────────────────────────
 
 export default function CommercialGroupsView() {
@@ -233,6 +358,7 @@ export default function CommercialGroupsView() {
   const [editGroup, setEditGroup]     = useState<CommercialGroup | null>(null);
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [togglingId, setTogglingId]   = useState<string | null>(null);
+  const [toggleActiveId, setToggleActiveId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CommercialGroup | null>(null);
   const [deleteError, setDeleteError]     = useState<string | null>(null);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
@@ -257,15 +383,24 @@ export default function CommercialGroupsView() {
   const onSaved    = () => { closeModal(); void load(); };
 
   const handleDelete = async (id: string) => {
-    setConfirmDelete(null);
     setTogglingId(id);
     setDeleteError(null);
     try {
       await deleteGroup(id);
+      setConfirmDelete(null);
       void load();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Erreur lors de la suppression.');
     } finally { setTogglingId(null); }
+  };
+
+  const handleToggleActive = async (group: CommercialGroup) => {
+    setToggleActiveId(group.id);
+    try {
+      await updateGroup(group.id, { isActive: !group.isActive });
+      void load();
+    } catch { /* silencieux */ }
+    finally { setToggleActiveId(null); }
   };
 
   return (
@@ -345,6 +480,23 @@ export default function CommercialGroupsView() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => void handleToggleActive(group)}
+                      disabled={toggleActiveId === group.id}
+                      className={`p-1.5 rounded disabled:opacity-50 ${
+                        group.isActive
+                          ? 'text-green-600 hover:text-amber-600 hover:bg-amber-50'
+                          : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                      }`}
+                      aria-label={group.isActive ? `Désactiver ${group.name}` : `Activer ${group.name}`}
+                      title={group.isActive ? 'Désactiver' : 'Activer'}
+                    >
+                      {toggleActiveId === group.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Power className="w-4 h-4" />
+                      )}
+                    </button>
+                    <button
                       onClick={() => setConfirmDelete(group)}
                       disabled={togglingId === group.id}
                       className="p-1.5 rounded disabled:opacity-50 text-gray-400 hover:text-red-600 hover:bg-red-50"
@@ -366,6 +518,7 @@ export default function CommercialGroupsView() {
                       allPresence={presence}
                       onRefresh={load}
                     />
+                    <SubGroupsList groupId={group.id} />
                     <ScheduleConfigForm
                       groupId={group.id}
                       initialWorkDaysCount={group.workDaysCount}
@@ -419,8 +572,10 @@ export default function CommercialGroupsView() {
               </button>
               <button
                 onClick={() => void handleDelete(confirmDelete.id)}
-                className="px-4 py-2 text-sm rounded-lg text-white bg-red-600 hover:bg-red-700"
+                disabled={togglingId === confirmDelete.id}
+                className="px-4 py-2 text-sm rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
               >
+                {togglingId === confirmDelete.id && <Loader2 className="w-4 h-4 animate-spin" />}
                 Supprimer
               </button>
             </div>

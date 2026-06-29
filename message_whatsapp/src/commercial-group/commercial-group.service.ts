@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { CommercialGroup } from './entities/commercial-group.entity';
+import { CommercialSubGroup } from './entities/commercial-sub-group.entity';
 import { WhatsappCommercial } from 'src/whatsapp_commercial/entities/user.entity';
 import { GroupScheduleService } from './group-schedule.service';
 import { ConnectionLog } from 'src/connection-log/entities/connection-log.entity';
@@ -70,6 +71,9 @@ export class CommercialGroupService {
     @InjectRepository(CommercialGroup)
     private readonly groupRepo: Repository<CommercialGroup>,
 
+    @InjectRepository(CommercialSubGroup)
+    private readonly subGroupRepo: Repository<CommercialSubGroup>,
+
     @InjectRepository(WhatsappCommercial)
     private readonly commercialRepo: Repository<WhatsappCommercial>,
 
@@ -122,11 +126,14 @@ export class CommercialGroupService {
     const group = await this.groupRepo.findOne({ where: { id } });
     if (!group) throw new NotFoundException(`CommercialGroup ${id} not found`);
 
-    // Retirer tous les membres avant désactivation
-    await this.commercialRepo.update({ groupId: id }, { groupId: null });
+    // Libérer les membres du groupe
+    await this.commercialRepo.update({ groupId: id }, { groupId: null, subGroupId: null });
 
-    group.isActive = false;
-    await this.groupRepo.save(group);
+    // Soft-delete de tous les sous-groupes du groupe en une seule requête
+    await this.subGroupRepo.softDelete({ parentGroupId: id });
+
+    // Vrai soft-delete du groupe
+    await this.groupRepo.softRemove(group);
   }
 
   async addMember(groupId: string, commercialId: string): Promise<WhatsappCommercial> {
