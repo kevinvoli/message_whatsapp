@@ -31,6 +31,18 @@ export interface DisconnectHistoryResponse {
   page: number;
 }
 
+export interface CommercialPresenceItem {
+  id: string;
+  name: string;
+  isConnected: boolean;
+  isWorkingToday: boolean;
+  workingTodaySince: string | null;
+  poste: { id: string; name: string } | null;
+  group: { id: string; name: string } | null;
+  groupId: string | null;
+  phone: string | null;
+}
+
 export interface SessionRow {
   id: string;
   commercialId: string;
@@ -325,6 +337,65 @@ export class CommercialGroupService {
   async patchDisconnectReason(logId: string, reason: string): Promise<{ success: true }> {
     await this.connLogRepo.update({ id: logId }, { disconnectReason: reason });
     return { success: true };
+  }
+
+  async getAllPresence(): Promise<CommercialPresenceItem[]> {
+    const commercials = await this.commercialRepo.find({
+      where: { deletedAt: IsNull() },
+      relations: ['poste', 'group'],
+    });
+
+    if (commercials.length === 0) return [];
+
+    const ids = commercials.map((c) => c.id);
+    const activeLogs = await this.connLogRepo
+      .createQueryBuilder('log')
+      .where('log.userType = :userType', { userType: 'commercial' })
+      .andWhere('log.userId IN (:...ids)', { ids })
+      .andWhere('log.logoutAt IS NULL')
+      .getMany();
+
+    const connectedIds = new Set(activeLogs.map((l) => l.userId));
+    return commercials.map((c) => this.toPresenceItem(c, connectedIds));
+  }
+
+  async setWorkingToday(commercialId: string, isWorkingToday: boolean): Promise<CommercialPresenceItem> {
+    const commercial = await this.commercialRepo.findOne({
+      where: { id: commercialId, deletedAt: IsNull() },
+      relations: ['poste', 'group'],
+    });
+    if (!commercial) throw new NotFoundException(`Commercial ${commercialId} not found`);
+
+    commercial.isWorkingToday = isWorkingToday;
+    commercial.workingTodaySince = isWorkingToday ? new Date() : null;
+    await this.commercialRepo.save(commercial);
+
+    const activeLog = await this.connLogRepo
+      .createQueryBuilder('log')
+      .where('log.userId = :commercialId', { commercialId })
+      .andWhere('log.userType = :userType', { userType: 'commercial' })
+      .andWhere('log.logoutAt IS NULL')
+      .getOne();
+
+    const connectedIds = new Set<string>(activeLog ? [commercialId] : []);
+    return this.toPresenceItem(commercial, connectedIds);
+  }
+
+  private toPresenceItem(
+    commercial: WhatsappCommercial,
+    connectedIds: Set<string>,
+  ): CommercialPresenceItem {
+    return {
+      id: commercial.id,
+      name: commercial.name,
+      isConnected: connectedIds.has(commercial.id),
+      isWorkingToday: commercial.isWorkingToday,
+      workingTodaySince: commercial.workingTodaySince?.toISOString() ?? null,
+      poste: commercial.poste ? { id: commercial.poste.id, name: commercial.poste.name } : null,
+      group: commercial.group ? { id: commercial.group.id, name: commercial.group.name } : null,
+      groupId: commercial.groupId ?? null,
+      phone: null,
+    };
   }
 
   async getActiveAlerts(): Promise<DisconnectAlertItem[]> {

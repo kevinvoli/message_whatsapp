@@ -40,3 +40,8 @@ export class PatchDisconnectReasonDto {
   @MaxLength(255)
   reason: string;
 }
+
+export class SetWorkingTodayDto {
+  @IsBoolean()
+  isWorkingToday: boolean;
+}

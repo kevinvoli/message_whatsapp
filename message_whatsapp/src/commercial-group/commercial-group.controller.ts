@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CommercialGroupService } from './commercial-group.service';
 import { AdminGuard } from 'src/auth/admin.guard';
-import { AddMemberDto, CreateCommercialGroupDto, PatchDisconnectReasonDto, UpdateCommercialGroupDto } from './dto/commercial-group.dto';
+import { AddMemberDto, CreateCommercialGroupDto, PatchDisconnectReasonDto, SetWorkingTodayDto, UpdateCommercialGroupDto } from './dto/commercial-group.dto';
 import { GenerateScheduleDto, ScheduleConfigDto } from './dto/schedule-config.dto';
 import { GroupScheduleService } from './group-schedule.service';
 import { CommercialPlanningService } from './commercial-planning.service';
@@ -163,6 +163,19 @@ export class CommercialGroupController {
     @Body() dto: PatchDisconnectReasonDto,
   ) {
     return this.service.patchDisconnectReason(logId, dto.reason);
+  }
+
+  @Get('presence')
+  getAllPresence() {
+    return this.service.getAllPresence();
+  }
+
+  @Patch('presence/:commercialId/working-today')
+  setWorkingToday(
+    @Param('commercialId') commercialId: string,
+    @Body() dto: SetWorkingTodayDto,
+  ) {
+    return this.service.setWorkingToday(commercialId, dto.isWorkingToday);
   }
 
   // --- Routes paramétrées ---
