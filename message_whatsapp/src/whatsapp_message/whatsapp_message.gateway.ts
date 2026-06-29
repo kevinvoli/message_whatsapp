@@ -863,13 +863,28 @@ export class WhatsappMessageGateway
       return;
     }
 
-    await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
-    const status = await this.restrictionService.checkRestriction(
+    // preCheck AVANT recordAccess : accessAllowed doit refléter si la conv était
+    // DÉJÀ dans la liste des non-répondues, pas si elle vient d'y être ajoutée.
+    const preStatus = await this.restrictionService.checkRestriction(
       agent.commercialId,
       agent.posteId,
       payload.chat_id,
     );
-    client.emit('restriction:status', status);
+
+    if (preStatus.triggered && !preStatus.accessAllowed) {
+      // Accès refusé : ne pas tracer cet accès (conv bloquée non enregistrée)
+      client.emit('restriction:status', preStatus);
+      return;
+    }
+
+    // Accès autorisé : tracer puis réémettre l'état à jour
+    await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
+    const finalStatus = await this.restrictionService.checkRestriction(
+      agent.commercialId,
+      agent.posteId,
+      payload.chat_id,
+    );
+    client.emit('restriction:status', finalStatus);
   }
 
   @SubscribeMessage('restriction:check')

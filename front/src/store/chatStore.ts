@@ -239,6 +239,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Gestionnaire de l'événement restriction:status
       socket.on('restriction:status', (status: RestrictionStatus) => {
+        console.log('[Restriction] restriction:status reçu', {
+          triggered: status.triggered,
+          accessAllowed: status.accessAllowed,
+          requestedChatId: status.requestedChatId,
+          unrespondedCount: status.unrespondedCount,
+          unresponded: status.unrespondedConversations.map((c) => c.chat_id),
+        });
+
         set({
           restrictionConfig: status.config,
           restrictionTriggered: status.triggered,
@@ -247,6 +255,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         const pending = get().pendingConversationId;
         if (pending && status.requestedChatId === pending && status.accessAllowed) {
+          console.log('[Restriction] reprise pending', pending);
           set({ pendingConversationId: null });
           get()._doSelectConversation(pending);
         }
@@ -395,6 +404,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.conversationsUnread.find((c) => c.chat_id === chat_id) ??
       state.conversationsNouveau.find((c) => c.chat_id === chat_id) ??
       (state.selectedConversation?.chat_id === chat_id ? state.selectedConversation : undefined);
+
+    console.log('[Restriction] clic conversation', {
+      chat_id,
+      contact: conversation?.name ?? '?',
+      unreadCount: conversation?.unreadCount ?? 0,
+      restrictionEnabled: state.restrictionConfig?.enabled ?? false,
+      restrictionTriggered: state.restrictionTriggered,
+      pendingConversationId: state.pendingConversationId,
+      unrespondedCount: state.restrictionUnresponded.length,
+      unresponded: state.restrictionUnresponded.map((c) => c.chat_id),
+    });
 
     // Bypass restriction si :
     // – restriction désactivée ou config non encore chargée
