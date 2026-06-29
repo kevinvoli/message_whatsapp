@@ -7,6 +7,13 @@ import { GroupScheduleService } from './group-schedule.service';
 import { ConnectionLog } from 'src/connection-log/entities/connection-log.entity';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 
+export interface DisconnectAlertItem {
+  commercialId: string;
+  commercialName: string;
+  disconnectedSince: string;
+  totalDisconnectMinutes: number;
+}
+
 export interface DisconnectHistoryEntry {
   logId: string;
   commercialId: string;
@@ -318,5 +325,34 @@ export class CommercialGroupService {
   async patchDisconnectReason(logId: string, reason: string): Promise<{ success: true }> {
     await this.connLogRepo.update({ id: logId }, { disconnectReason: reason });
     return { success: true };
+  }
+
+  async getActiveAlerts(): Promise<DisconnectAlertItem[]> {
+    const logs = await this.connLogRepo
+      .createQueryBuilder('log')
+      .where('log.alertedAt IS NOT NULL')
+      .andWhere('log.logoutAt IS NULL')
+      .andWhere('log.userType = :userType', { userType: 'commercial' })
+      .orderBy('log.alertedAt', 'ASC')
+      .getMany();
+
+    if (logs.length === 0) return [];
+
+    const userIds = [...new Set(logs.map((l) => l.userId))];
+    const commercials = await this.commercialRepo
+      .createQueryBuilder('c')
+      .select(['c.id', 'c.name'])
+      .where('c.id IN (:...ids)', { ids: userIds })
+      .andWhere('c.deletedAt IS NULL')
+      .getMany();
+    const nameMap = new Map(commercials.map((c) => [c.id, c.name]));
+
+    const now = Date.now();
+    return logs.map((log) => ({
+      commercialId: log.userId,
+      commercialName: nameMap.get(log.userId) ?? log.userId,
+      disconnectedSince: log.loginAt.toISOString(),
+      totalDisconnectMinutes: Math.floor((now - log.loginAt.getTime()) / 60_000),
+    }));
   }
 }

@@ -72,6 +72,7 @@ export class UpsertBreakScheduleDto {
 
 export class CreateBreakExclusionDto {
   @IsUUID()
+  @IsOptional()
   subGroupId: string;
 
   @IsIn(['poste', 'commercial'])

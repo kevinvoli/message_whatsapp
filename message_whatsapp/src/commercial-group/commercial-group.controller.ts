@@ -7,6 +7,7 @@ import { GroupScheduleService } from './group-schedule.service';
 import { CommercialPlanningService } from './commercial-planning.service';
 import { CreateAbsenceDto, CreateAbsenceRangeDto, CreateExceptionalDto, CreateReplacementDto } from './dto/create-planning.dto';
 import { CommercialPresenceHistoryService } from './commercial-presence-history.service';
+import { BreakSupervisionService } from './break-supervision.service';
 
 @Controller('commercial-groups')
 @UseGuards(AdminGuard)
@@ -16,6 +17,7 @@ export class CommercialGroupController {
     private readonly groupScheduleService: GroupScheduleService,
     private readonly planningService: CommercialPlanningService,
     private readonly presenceHistoryService: CommercialPresenceHistoryService,
+    private readonly breakSupervisionService: BreakSupervisionService,
   ) {}
 
   @Post()
@@ -29,6 +31,16 @@ export class CommercialGroupController {
   }
 
   // --- Routes statiques AVANT les routes paramétrées (:id) ---
+
+  @Get('break-supervision')
+  getBreakSupervision() {
+    return this.breakSupervisionService.getSupervision();
+  }
+
+  @Get('disconnect-alerts')
+  getDisconnectAlerts() {
+    return this.service.getActiveAlerts();
+  }
 
   @Post('schedule/generate-all')
   generateAll() {

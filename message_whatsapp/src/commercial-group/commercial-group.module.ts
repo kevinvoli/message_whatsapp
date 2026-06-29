@@ -24,6 +24,8 @@ import { BreakSessionService } from './break-session.service';
 import { BreakScheduleService } from './break-schedule.service';
 import { BreakExclusionService } from './break-exclusion.service';
 import { CommercialBreakController } from './commercial-break.controller';
+import { CommercialSubGroupController } from './commercial-sub-group.controller';
+import { BreakSupervisionService } from './break-supervision.service';
 import { MediaAsset } from 'src/media-asset/entities/media-asset.entity';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
 
@@ -44,7 +46,7 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
     ConnectionLogModule,
     WhatsappMessageModule,
   ],
-  controllers: [CommercialGroupController, CommercialSelfPlanningController, CommercialBreakController],
+  controllers: [CommercialGroupController, CommercialSelfPlanningController, CommercialBreakController, CommercialSubGroupController],
   providers: [
     CommercialGroupService,
     GroupScheduleService,
@@ -53,6 +55,7 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
     CommercialPresenceHistoryService,
     DisconnectMonitorJob,
     CommercialSubGroupService,
+    BreakSupervisionService,
     BreakScheduleEngine,
     BreakSessionService,
     BreakScheduleService,
