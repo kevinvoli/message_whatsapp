@@ -108,15 +108,13 @@ describe('ConversationRestrictionService', () => {
         windowExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // +1h
       });
       chatRepo.findOne.mockResolvedValue(validChat);
-      accessRepo.findOne.mockResolvedValue(null);
-      accessRepo.create.mockImplementation((data: unknown) => data as CommercialConversationAccess);
-      accessRepo.save.mockResolvedValue(makeAccess());
 
       // act
       await service.recordAccess('commercial-uuid-001', '33600000011@c.us');
 
-      // assert — accès créé normalement
-      expect(accessRepo.save).toHaveBeenCalledTimes(1);
+      // assert — upsert atomique via createQueryBuilder (pas de save)
+      expect(accessRepo.createQueryBuilder).toHaveBeenCalled();
+      expect(accessRepo.save).not.toHaveBeenCalled();
     });
 
     it('trace normalement un chat actif avec windowExpiresAt = null', async () => {
@@ -129,15 +127,13 @@ describe('ConversationRestrictionService', () => {
         windowExpiresAt: null,
       });
       chatRepo.findOne.mockResolvedValue(validChat);
-      accessRepo.findOne.mockResolvedValue(null);
-      accessRepo.create.mockImplementation((data: unknown) => data as CommercialConversationAccess);
-      accessRepo.save.mockResolvedValue(makeAccess());
 
       // act
       await service.recordAccess('commercial-uuid-001', '33600000012@c.us');
 
-      // assert
-      expect(accessRepo.save).toHaveBeenCalledTimes(1);
+      // assert — upsert atomique via createQueryBuilder (pas de save)
+      expect(accessRepo.createQueryBuilder).toHaveBeenCalled();
+      expect(accessRepo.save).not.toHaveBeenCalled();
     });
   });
 

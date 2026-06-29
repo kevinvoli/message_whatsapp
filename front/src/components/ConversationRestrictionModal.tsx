@@ -11,13 +11,18 @@ const ConversationRestrictionModal: React.FC = () => {
   const restrictionConfig = useChatStore((s) => s.restrictionConfig);
   const dismissRestriction = useChatStore((s) => s.dismissRestriction);
   const closeRestrictionModal = useChatStore((s) => s.closeRestrictionModal);
+  const currentChatId = useChatStore((s) => s.selectedConversation?.chat_id);
 
   // Fermeture automatique quand la restriction est levée
   useEffect(() => {
     // Pas d'action nécessaire : le modal disparaît via restrictionTriggered = false
   }, [restrictionTriggered]);
 
-  if (!restrictionTriggered) return null;
+  const filteredUnresponded = restrictionUnresponded.filter(
+    (conv) => conv.chat_id !== currentChatId,
+  );
+
+  if (!restrictionTriggered || filteredUnresponded.length === 0) return null;
 
   const minChars = restrictionConfig?.minResponseChars ?? 0;
 
@@ -53,7 +58,7 @@ const ConversationRestrictionModal: React.FC = () => {
         </p>
 
         <div className="space-y-3 mb-6 max-h-64 overflow-y-auto pr-1">
-          {restrictionUnresponded.map((conv) => (
+          {filteredUnresponded.map((conv) => (
             <div
               key={conv.chat_id}
               className="flex items-start justify-between gap-3 p-3 bg-red-50 border border-red-200 rounded-lg"

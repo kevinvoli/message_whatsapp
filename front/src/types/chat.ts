@@ -1056,6 +1056,8 @@ export interface RestrictionStatus {
   unrespondedCount: number;
   unrespondedConversations: RestrictionUnrespondedConv[];
   config: RestrictionConfig;
+  requestedChatId?: string;
+  accessAllowed?: boolean;
 }
 
 

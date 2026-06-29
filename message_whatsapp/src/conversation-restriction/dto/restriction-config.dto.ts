@@ -29,4 +29,6 @@ export class RestrictionStatusDto {
     accessed_at: string;
   }>;
   config: RestrictionConfigDto;
+  requestedChatId?: string;
+  accessAllowed?: boolean;
 }

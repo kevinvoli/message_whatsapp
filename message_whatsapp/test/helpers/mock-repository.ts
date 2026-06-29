@@ -35,6 +35,11 @@ export interface MockQueryBuilder {
   set: jest.Mock;
   addSelect: jest.Mock;
   groupBy: jest.Mock;
+  insert: jest.Mock;
+  into: jest.Mock;
+  values: jest.Mock;
+  orUpdate: jest.Mock;
+  whereInIds: jest.Mock;
 }
 
 export interface MockRepository<T = Record<string, unknown>> {
@@ -80,6 +85,11 @@ function buildQueryBuilder(): MockQueryBuilder {
     set: jest.fn(),
     addSelect: jest.fn(),
     groupBy: jest.fn(),
+    insert: jest.fn(),
+    into: jest.fn(),
+    values: jest.fn(),
+    orUpdate: jest.fn(),
+    whereInIds: jest.fn(),
   };
 
   // Toutes les méthodes de construction retournent `this` pour permettre le chaînage
@@ -88,6 +98,7 @@ function buildQueryBuilder(): MockQueryBuilder {
     'leftJoin', 'leftJoinAndSelect', 'innerJoin', 'innerJoinAndSelect',
     'orderBy', 'addOrderBy', 'limit', 'offset', 'skip', 'take',
     'setParameter', 'setParameters', 'update', 'set', 'addSelect', 'groupBy',
+    'insert', 'into', 'values', 'orUpdate', 'whereInIds',
   ];
 
   for (const method of chainingMethods) {

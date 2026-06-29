@@ -852,17 +852,23 @@ export class WhatsappMessageGateway
       const effectiveConfig = bypassed
         ? { ...config, minCharsSendEnabled: false, enabled: false }
         : config;
-      client.emit('restriction:status', { triggered: false, unrespondedCount: 0, unrespondedConversations: [], config: effectiveConfig });
+      client.emit('restriction:status', {
+        triggered: false,
+        unrespondedCount: 0,
+        unrespondedConversations: [],
+        config: effectiveConfig,
+        requestedChatId: payload.chat_id,
+        accessAllowed: true,
+      });
       return;
     }
 
-    const preCheck = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
-    if (preCheck.triggered) {
-      client.emit('restriction:status', preCheck);
-      return;
-    }
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
-    const status = await this.restrictionService.checkRestriction(agent.commercialId, agent.posteId);
+    const status = await this.restrictionService.checkRestriction(
+      agent.commercialId,
+      agent.posteId,
+      payload.chat_id,
+    );
     client.emit('restriction:status', status);
   }
 
@@ -1092,33 +1098,24 @@ export class WhatsappMessageGateway
           const status = await this.restrictionService.checkRestriction(
             agent.commercialId,
             agent.posteId,
+            payload.chat_id,
           );
-          // Bloquer uniquement si la conversation courante n'est PAS dans la liste
-          // des non-répondues ET qu'elle a encore des messages non lus.
-          // - Dans la liste → commercial en train de se débloquer → autoriser.
-          // - unread_count = 0 → déjà lue avant la restriction → autoriser.
-          // - Nouvelle conversation non lue hors liste → bloquer.
-          const isCurrentInUnrespondedList = status.unrespondedConversations.some(
-            (c) => c.chat_id === payload.chat_id,
-          );
-          let blockingOther = false;
-          if (status.triggered && !isCurrentInUnrespondedList) {
+          if (status.triggered && !status.accessAllowed) {
             const currentChat = await this.chatService.findBychat_id(payload.chat_id);
             const hasUnread = (currentChat?.unread_count ?? 0) > 0;
-            blockingOther = hasUnread;
-          }
-          if (blockingOther) {
-            client.emit('restriction:status', status);
-            client.emit('chat:event', {
-              type: 'MESSAGE_SEND_ERROR',
-              payload: {
-                chat_id: payload.chat_id,
-                tempId: payload.tempId,
-                code: 'RESTRICTION_TRIGGERED',
-                message: "Répondez aux conversations en attente avant d'en traiter une nouvelle.",
-              },
-            });
-            return;
+            if (hasUnread) {
+              client.emit('restriction:status', status);
+              client.emit('chat:event', {
+                type: 'MESSAGE_SEND_ERROR',
+                payload: {
+                  chat_id: payload.chat_id,
+                  tempId: payload.tempId,
+                  code: 'RESTRICTION_TRIGGERED',
+                  message: "Répondez aux conversations en attente avant d'en traiter une nouvelle.",
+                },
+              });
+              return;
+            }
           }
         }
       }
@@ -1187,6 +1184,7 @@ export class WhatsappMessageGateway
           const restrictionStatus = await this.restrictionService.checkRestriction(
             agent.commercialId,
             agent.posteId,
+            payload.chat_id,
           );
           client.emit('restriction:status', restrictionStatus);
         }

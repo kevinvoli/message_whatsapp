@@ -63,6 +63,7 @@ export class ConversationRestrictionAdminController {
         value: String(dto.minCharsSendEnabled),
       },
     ]);
+    this.restrictionService.invalidateConfigCache();
     return this.restrictionService.getRestrictionConfig();
   }
 }

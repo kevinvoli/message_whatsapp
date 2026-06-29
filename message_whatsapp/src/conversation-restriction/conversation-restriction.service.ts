@@ -12,6 +12,8 @@ import { WhatsappMessage } from 'src/whatsapp_message/entities/whatsapp_message.
 
 @Injectable()
 export class ConversationRestrictionService {
+  private configCache: { value: RestrictionConfigDto; expiresAt: number } | null = null;
+
   constructor(
     @InjectRepository(CommercialConversationAccess)
     private readonly accessRepository: Repository<CommercialConversationAccess>,
@@ -23,6 +25,10 @@ export class ConversationRestrictionService {
   ) {}
 
   async getRestrictionConfig(): Promise<RestrictionConfigDto> {
+    if (this.configCache && Date.now() < this.configCache.expiresAt) {
+      return this.configCache.value;
+    }
+
     const [enabled, maxStr, minCharsStr, requireLastStr, minCharsSendStr] = await Promise.all([
       this.systemConfigService.get('RESTRICTION_ENABLED'),
       this.systemConfigService.get('RESTRICTION_MAX_UNRESPONDED_CONVS'),
@@ -31,7 +37,7 @@ export class ConversationRestrictionService {
       this.systemConfigService.get('RESTRICTION_MIN_CHARS_SEND_ENABLED'),
     ]);
 
-    return {
+    const value: RestrictionConfigDto = {
       enabled: enabled !== null ? enabled === 'true' : true,
       maxUnrespondedConvs: maxStr !== null ? parseInt(maxStr, 10) : 1,
       minResponseChars: minCharsStr !== null ? parseInt(minCharsStr, 10) : 50,
@@ -39,16 +45,20 @@ export class ConversationRestrictionService {
         requireLastStr !== null ? requireLastStr === 'true' : false,
       minCharsSendEnabled: minCharsSendStr !== null ? minCharsSendStr === 'true' : false,
     };
+
+    this.configCache = { value, expiresAt: Date.now() + 30_000 };
+    return value;
+  }
+
+  invalidateConfigCache(): void {
+    this.configCache = null;
   }
 
   /**
    * Enregistre ou met à jour l'accès d'un commercial à une conversation pour la date du jour.
-   * Si un accès existe déjà avec une réponse valide (respondedAt IS NOT NULL), on ne réinitialise pas.
+   * Upsert atomique : ne réinitialise jamais responded_at ni response_length.
    */
   async recordAccess(commercialId: string, chatId: string): Promise<void> {
-    // Ne pas tracer les conversations en lecture seule, fermées, ou dont la fenêtre
-    // WhatsApp (24h/72h) est expirée : le commercial ne peut pas y répondre,
-    // elles ne doivent pas compter dans la restriction.
     const chat = await this.chatRepository.findOne({ where: { chat_id: chatId } });
     if (
       !chat ||
@@ -59,39 +69,26 @@ export class ConversationRestrictionService {
       return;
     }
 
-    // Ne pas tracer les conversations sans canal résolvable :
-    // le commercial ne peut physiquement pas envoyer de message → ne doit pas déclencher la restriction.
     if (!chat.channel_id && !chat.last_msg_client_channel_id) {
       return;
     }
 
     const today = this.todayDateString();
 
-    const existing = await this.accessRepository.findOne({
-      where: { commercialId, chatId, accessDate: today },
-    });
-
-    if (existing) {
-      // Ne pas réinitialiser si déjà répondu
-      if (existing.respondedAt !== null) {
-        return;
-      }
-      await this.accessRepository.update(existing.id, {
+    await this.accessRepository
+      .createQueryBuilder()
+      .insert()
+      .into(CommercialConversationAccess)
+      .values({
+        commercialId,
+        chatId,
+        accessDate: today,
         accessedAt: new Date(),
-      });
-      return;
-    }
-
-    const access = this.accessRepository.create({
-      id: this.generateUuid(),
-      commercialId,
-      chatId,
-      accessDate: today,
-      accessedAt: new Date(),
-      respondedAt: null,
-      responseLength: 0,
-    });
-    await this.accessRepository.save(access);
+        respondedAt: null,
+        responseLength: 0,
+      })
+      .orUpdate(['accessed_at'], ['commercial_id', 'chat_id', 'access_date'])
+      .execute();
   }
 
   /**
@@ -125,11 +122,27 @@ export class ConversationRestrictionService {
   /**
    * Calcule si la restriction doit être déclenchée pour ce commercial.
    */
-  async checkRestriction(commercialId: string, posteId?: string): Promise<RestrictionStatusDto> {
+  async checkRestriction(
+    commercialId: string,
+    posteId?: string,
+    requestedChatId?: string,
+  ): Promise<RestrictionStatusDto> {
     const config = await this.getRestrictionConfig();
+
+    // T5 — court-circuit si restriction désactivée
+    if (!config.enabled) {
+      return {
+        triggered: false,
+        unrespondedCount: 0,
+        unrespondedConversations: [],
+        config,
+        requestedChatId,
+        accessAllowed: true,
+      };
+    }
+
     const today = this.todayDateString();
 
-    // Récupérer tous les accès du jour sans réponse enregistrée
     const rawAccesses = await this.accessRepository
       .createQueryBuilder('cca')
       .where('cca.commercialId = :commercialId', { commercialId })
@@ -138,21 +151,19 @@ export class ConversationRestrictionService {
       .orderBy('cca.accessedAt', 'DESC')
       .getMany();
 
-    // Précharger les chats en une seule requête
     const chatIds = rawAccesses.map((a) => a.chatId);
     const chats = chatIds.length > 0
       ? await this.chatRepository
           .createQueryBuilder('chat')
           .where('chat.chat_id IN (:...chatIds)', { chatIds })
+          .andWhere('chat.deletedAt IS NULL')
           .getMany()
       : [];
     const chatMap = new Map(chats.map((c) => [c.chat_id, c]));
 
-    // Début du jour pour la vérification bootstrap
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // Filtrer d'abord les accès selon les règles métier (chat valide, poste, canal)
     const candidateAccesses = rawAccesses.filter((access) => {
       const chat = chatMap.get(access.chatId);
       if (!chat) return false;
@@ -167,7 +178,6 @@ export class ConversationRestrictionService {
       return true;
     });
 
-    // Bootstrap en une seule requête groupée
     const effectiveAccesses: CommercialConversationAccess[] = [];
     if (candidateAccesses.length > 0) {
       const candidateChatIds = candidateAccesses.map((a) => a.chatId);
@@ -178,7 +188,7 @@ export class ConversationRestrictionService {
         .andWhere('msg.commercial_id = :commercialId', { commercialId })
         .andWhere('msg.from_me = :fromMe', { fromMe: true })
         .andWhere('msg.timestamp >= :todayStart', { todayStart })
-        .andWhere(`CHAR_LENGTH(COALESCE(msg.text, '')) >= :minChars`, { minChars: config.minResponseChars })
+        .andWhere(`CHAR_LENGTH(TRIM(COALESCE(msg.text, ''))) >= :minChars`, { minChars: config.minResponseChars })
         .andWhere('msg.deletedAt IS NULL')
         .groupBy('msg.chat_id')
         .getRawMany<{ chatId: string }>();
@@ -202,68 +212,73 @@ export class ConversationRestrictionService {
       }
     }
 
-    // Si requireLastMessageMine : filtrer les conversations dont le dernier message est from_me = true
+    // T3 — requireLastMessageMine : une seule requête groupée (dernier message par chat)
     let effectiveUnresponded = effectiveAccesses;
-    if (config.requireLastMessageMine) {
-      const filtered: CommercialConversationAccess[] = [];
-      for (const access of effectiveAccesses) {
-        const lastMsg = await this.messageRepository
-          .createQueryBuilder('msg')
-          .where('msg.chat_id = :chatId', { chatId: access.chatId })
-          .andWhere('msg.deletedAt IS NULL')
-          .orderBy('msg.timestamp', 'DESC')
-          .limit(1)
-          .getOne();
-
-        // Si le dernier message est from_me, on considère la conv comme répondue → exclure
-        if (!lastMsg || !lastMsg.from_me) {
-          filtered.push(access);
-        }
-      }
-      effectiveUnresponded = filtered;
+    if (config.requireLastMessageMine && effectiveAccesses.length > 0) {
+      const candidateIds = effectiveAccesses.map((a) => a.chatId);
+      const lastMsgRows = await this.messageRepository
+        .createQueryBuilder('msg')
+        .select('msg.chat_id', 'chatId')
+        .addSelect('msg.from_me', 'fromMe')
+        .where('msg.chat_id IN (:...candidateIds)', { candidateIds })
+        .andWhere('msg.deletedAt IS NULL')
+        .andWhere(
+          `msg.timestamp = (SELECT MAX(m2.timestamp) FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.deleted_at IS NULL)`,
+        )
+        .getRawMany<{ chatId: string; fromMe: boolean | number }>();
+      const lastMsgMap = new Map(lastMsgRows.map((r) => [r.chatId, Boolean(r.fromMe)]));
+      // Exclure les conversations dont le dernier message est from_me=true
+      effectiveUnresponded = effectiveAccesses.filter((a) => !lastMsgMap.get(a.chatId));
     }
 
     const unrespondedCount = effectiveUnresponded.length;
-    const triggered = config.enabled && unrespondedCount > config.maxUnrespondedConvs;
+    const triggered = unrespondedCount > config.maxUnrespondedConvs;
 
-    // Enrichir chaque conversation non-répondue (chat déjà en cache)
-    const unrespondedConversations = await Promise.all(
-      effectiveUnresponded.map(async (access) => {
-        const chat = chatMap.get(access.chatId);
+    // T2 — accessAllowed : vrai si non déclenché ou si la conv demandée est déjà listée
+    const accessAllowed =
+      !triggered ||
+      (requestedChatId !== undefined &&
+        effectiveUnresponded.some((a) => a.chatId === requestedChatId));
 
-        const lastClientMsg = await this.messageRepository
+    // T3 — enrichissement : une seule requête groupée (dernier message client par chat)
+    const unrespondedChatIds = effectiveUnresponded.map((a) => a.chatId);
+    const lastClientMsgRows = unrespondedChatIds.length > 0
+      ? await this.messageRepository
           .createQueryBuilder('msg')
-          .where('msg.chat_id = :chatId', { chatId: access.chatId })
+          .select('msg.chat_id', 'chatId')
+          .addSelect('msg.text', 'text')
+          .where('msg.chat_id IN (:...unrespondedChatIds)', { unrespondedChatIds })
           .andWhere('msg.from_me = :fromMe', { fromMe: false })
           .andWhere('msg.deletedAt IS NULL')
-          .orderBy('msg.timestamp', 'DESC')
-          .limit(1)
-          .getOne();
+          .andWhere(
+            `msg.timestamp = (SELECT MAX(m2.timestamp) FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.from_me = 0 AND m2.deleted_at IS NULL)`,
+          )
+          .getRawMany<{ chatId: string; text: string | null }>()
+      : [];
+    const lastClientMsgMap = new Map(lastClientMsgRows.map((r) => [r.chatId, r.text ?? '']));
 
-        return {
-          chat_id: access.chatId,
-          contact_name: chat?.name ?? access.chatId,
-          last_client_message: lastClientMsg?.text ?? '',
-          accessed_at: access.accessedAt.toISOString(),
-        };
-      }),
-    );
+    const unrespondedConversations = effectiveUnresponded.map((access) => {
+      const chat = chatMap.get(access.chatId);
+      return {
+        chat_id: access.chatId,
+        contact_name: chat?.name ?? access.chatId,
+        last_client_message: lastClientMsgMap.get(access.chatId) ?? '',
+        accessed_at: access.accessedAt.toISOString(),
+      };
+    });
 
     return {
       triggered,
       unrespondedCount,
       unrespondedConversations,
       config,
+      requestedChatId,
+      accessAllowed,
     };
   }
 
   // ── Helpers privés ──────────────────────────────────────────────────────────
 
-  /**
-   * Vrai si la fenêtre WhatsApp (24h normal / 72h CTWA) du chat est expirée.
-   * Basé sur la colonne dénormalisée windowExpiresAt (= ChatSession.autoCloseAt de
-   * la session active), mise à jour par chat-session.service.ts — pas de join.
-   */
   private isWindowExpired(chat: WhatsappChat): boolean {
     return !!chat.windowExpiresAt && chat.windowExpiresAt < new Date();
   }
@@ -274,13 +289,5 @@ export class ConversationRestrictionService {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  }
-
-  private generateUuid(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
   }
 }
