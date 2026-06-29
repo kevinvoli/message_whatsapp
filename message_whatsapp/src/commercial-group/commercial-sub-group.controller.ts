@@ -56,7 +56,7 @@ export class CommercialSubGroupController {
 
   @Get('sub-groups/:subId')
   findOne(@Param('subId') subId: string) {
-    return this.subGroupService.findOne(subId);
+    return this.subGroupService.findOneWithMembers(subId);
   }
 
   @Patch('sub-groups/:subId')
