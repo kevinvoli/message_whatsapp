@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Put,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AdminGuard } from 'src/auth/admin.guard';
@@ -38,9 +37,9 @@ export class CommercialSubGroupController {
     return this.subGroupService.create(dto);
   }
 
-  @Get('sub-groups')
-  findAll(@Query('parentGroupId') parentGroupId: string) {
-    return this.subGroupService.findAll(parentGroupId);
+  @Get(':groupId/sub-groups')
+  findAll(@Param('groupId') groupId: string) {
+    return this.subGroupService.findAll(groupId);
   }
 
   @Delete('break-schedule/:scheduleId')
