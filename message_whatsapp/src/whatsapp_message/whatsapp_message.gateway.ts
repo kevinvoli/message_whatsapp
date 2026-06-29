@@ -865,11 +865,19 @@ export class WhatsappMessageGateway
 
     // preCheck AVANT recordAccess : accessAllowed doit refléter si la conv était
     // DÉJÀ dans la liste des non-répondues, pas si elle vient d'y être ajoutée.
-    const preStatus = await this.restrictionService.checkRestriction(
-      agent.commercialId,
-      agent.posteId,
-      payload.chat_id,
-    );
+    let preStatus: Awaited<ReturnType<typeof this.restrictionService.checkRestriction>>;
+    try {
+      preStatus = await this.restrictionService.checkRestriction(
+        agent.commercialId,
+        agent.posteId,
+        payload.chat_id,
+      );
+    } catch (err) {
+      this.logger.error('checkRestriction (preCheck) failed', err);
+      // En cas d'erreur, laisser passer sans bloquer
+      await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
+      return;
+    }
 
     if (preStatus.triggered && !preStatus.accessAllowed) {
       // Accès refusé : ne pas tracer cet accès (conv bloquée non enregistrée)
@@ -879,12 +887,16 @@ export class WhatsappMessageGateway
 
     // Accès autorisé : tracer puis réémettre l'état à jour
     await this.restrictionService.recordAccess(agent.commercialId, payload.chat_id);
-    const finalStatus = await this.restrictionService.checkRestriction(
-      agent.commercialId,
-      agent.posteId,
-      payload.chat_id,
-    );
-    client.emit('restriction:status', finalStatus);
+    try {
+      const finalStatus = await this.restrictionService.checkRestriction(
+        agent.commercialId,
+        agent.posteId,
+        payload.chat_id,
+      );
+      client.emit('restriction:status', finalStatus);
+    } catch (err) {
+      this.logger.error('checkRestriction (finalCheck) failed', err);
+    }
   }
 
   @SubscribeMessage('restriction:check')
@@ -908,11 +920,15 @@ export class WhatsappMessageGateway
       return;
     }
 
-    const status = await this.restrictionService.checkRestriction(
-      agent.commercialId,
-      agent.posteId,
-    );
-    client.emit('restriction:status', status);
+    try {
+      const status = await this.restrictionService.checkRestriction(
+        agent.commercialId,
+        agent.posteId,
+      );
+      client.emit('restriction:status', status);
+    } catch (err) {
+      this.logger.error('checkRestriction (restriction:check) failed', err);
+    }
   }
 
   @SubscribeMessage('presence:ping')

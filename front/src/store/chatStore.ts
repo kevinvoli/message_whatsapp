@@ -407,7 +407,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     console.log('[Restriction] clic conversation', {
       chat_id,
-      contact: conversation?.name ?? '?',
+      contact: conversation?.clientName ?? '?',
       unreadCount: conversation?.unreadCount ?? 0,
       restrictionEnabled: state.restrictionConfig?.enabled ?? false,
       restrictionTriggered: state.restrictionTriggered,

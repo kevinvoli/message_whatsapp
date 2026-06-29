@@ -223,7 +223,7 @@ export class ConversationRestrictionService {
         .where('msg.chat_id IN (:...candidateIds)', { candidateIds })
         .andWhere('msg.deletedAt IS NULL')
         .andWhere(
-          `msg.timestamp = (SELECT MAX(m2.timestamp) FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.deleted_at IS NULL)`,
+          `msg.timestamp = (SELECT MAX(m2.timestamp) FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.\`deletedAt\` IS NULL)`,
         )
         .getRawMany<{ chatId: string; fromMe: boolean | number }>();
       const lastMsgMap = new Map(lastMsgRows.map((r) => [r.chatId, Boolean(r.fromMe)]));
@@ -251,7 +251,7 @@ export class ConversationRestrictionService {
           .andWhere('msg.from_me = :fromMe', { fromMe: false })
           .andWhere('msg.deletedAt IS NULL')
           .andWhere(
-            `msg.timestamp = (SELECT MAX(m2.timestamp) FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.from_me = 0 AND m2.deleted_at IS NULL)`,
+            `msg.timestamp = (SELECT MAX(m2.timestamp) FROM whatsapp_message m2 WHERE m2.chat_id = msg.chat_id AND m2.from_me = 0 AND m2.\`deletedAt\` IS NULL)`,
           )
           .getRawMany<{ chatId: string; text: string | null }>()
       : [];
