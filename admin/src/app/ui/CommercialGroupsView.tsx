@@ -41,10 +41,10 @@ interface GroupFormModalProps {
 }
 
 function GroupFormModal({ initial, editId, onClose, onSaved }: GroupFormModalProps) {
-  const [name, setName]           = useState(initial?.name ?? '');
-  const [description, setDesc]    = useState(initial?.description ?? '');
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [name, setName]        = useState(initial?.name ?? '');
+  const [description, setDesc] = useState(initial?.description ?? '');
+  const [saving, setSaving]    = useState(false);
+  const [error, setError]      = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!name.trim()) { setError('Le nom est requis.'); return; }
@@ -121,7 +121,7 @@ function GroupFormModal({ initial, editId, onClose, onSaved }: GroupFormModalPro
   );
 }
 
-// ─── Panneau détail d'un groupe ──────────────────────────────────────────────
+// ─── Onglet membres ──────────────────────────────────────────────────────────
 
 interface GroupDetailPanelProps {
   group: CommercialGroup;
@@ -134,7 +134,6 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
   const [adding, setAdding]           = useState(false);
   const [removingId, setRemovingId]   = useState<string | null>(null);
 
-  // Les membres sont dérivés directement depuis allPresence (déjà chargé dans le parent)
   const members   = allPresence.filter((p) => p.group?.id === group.id);
   const available = allPresence.filter((p) => p.group === null);
 
@@ -159,9 +158,7 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
   };
 
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4 space-y-4">
-      <p className="text-sm font-semibold text-gray-700">Membres du groupe</p>
-
+    <div className="space-y-4">
       {members.length === 0 ? (
         <p className="text-xs text-gray-400">Aucun membre pour l'instant.</p>
       ) : (
@@ -178,11 +175,9 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
                 aria-label={`Retirer ${m.name} du groupe`}
                 className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
               >
-                {removingId === m.id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <UserMinus className="w-3.5 h-3.5" />
-                )}
+                {removingId === m.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <UserMinus className="w-3.5 h-3.5" />}
               </button>
             </div>
           ))}
@@ -227,7 +222,7 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
   );
 }
 
-// ─── Liste des sous-groupes ──────────────────────────────────────────────────
+// ─── Onglet sous-groupes ─────────────────────────────────────────────────────
 
 interface SubGroupsListProps {
   groupId: string;
@@ -286,9 +281,7 @@ function SubGroupsList({ groupId }: SubGroupsListProps) {
   };
 
   return (
-    <div className="border-t border-gray-100 pt-4 space-y-3">
-      <p className="text-sm font-semibold text-gray-700">Sous-groupes</p>
-
+    <div className="space-y-3">
       {loading ? (
         <div className="flex items-center gap-2 text-xs text-gray-400">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Chargement…
@@ -311,11 +304,9 @@ function SubGroupsList({ groupId }: SubGroupsListProps) {
                 aria-label={`Supprimer le sous-groupe ${sub.name}`}
                 className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
               >
-                {deletingId === sub.id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="w-3.5 h-3.5" />
-                )}
+                {deletingId === sub.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Trash2 className="w-3.5 h-3.5" />}
               </button>
             </div>
           ))}
@@ -348,20 +339,110 @@ function SubGroupsList({ groupId }: SubGroupsListProps) {
   );
 }
 
+// ─── Modale de gestion d'un groupe (onglets) ─────────────────────────────────
+
+type ManageTab = 'membres' | 'sous-groupes' | 'planning';
+
+interface GroupManageModalProps {
+  group: CommercialGroup;
+  allPresence: CommercialPresenceItem[];
+  onClose: () => void;
+  onRefresh: () => void;
+}
+
+function GroupManageModal({ group, allPresence, onClose, onRefresh }: GroupManageModalProps) {
+  const [activeTab, setActiveTab]                   = useState<ManageTab>('membres');
+  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
+
+  const tabs: { key: ManageTab; label: string }[] = [
+    { key: 'membres',      label: 'Membres' },
+    { key: 'sous-groupes', label: 'Sous-groupes' },
+    { key: 'planning',     label: 'Planning' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col"
+        style={{ maxHeight: '80vh' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-semibold text-gray-900">{group.name}</h3>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              group.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {group.isActive ? 'Actif' : 'Inactif'}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-gray-100"
+            aria-label="Fermer"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Onglets */}
+        <div className="flex border-b border-gray-100 px-6 flex-shrink-0">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === tab.key
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Corps scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {activeTab === 'membres' && (
+            <GroupDetailPanel group={group} allPresence={allPresence} onRefresh={onRefresh} />
+          )}
+          {activeTab === 'sous-groupes' && (
+            <SubGroupsList groupId={group.id} />
+          )}
+          {activeTab === 'planning' && (
+            <>
+              <ScheduleConfigForm
+                groupId={group.id}
+                initialWorkDaysCount={group.workDaysCount}
+                initialFirstWorkDay={group.firstWorkDay}
+                onScheduleGenerated={() => setScheduleRefreshKey((k) => k + 1)}
+              />
+              <GroupScheduleCalendar
+                groupId={group.id}
+                refreshKey={scheduleRefreshKey}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Vue principale ──────────────────────────────────────────────────────────
 
 export default function CommercialGroupsView() {
-  const [groups, setGroups]           = useState<CommercialGroup[]>([]);
-  const [presence, setPresence]       = useState<CommercialPresenceItem[]>([]);
-  const [loading, setLoading]         = useState(false);
-  const [showModal, setShowModal]     = useState(false);
-  const [editGroup, setEditGroup]     = useState<CommercialGroup | null>(null);
-  const [expandedId, setExpandedId]   = useState<string | null>(null);
-  const [togglingId, setTogglingId]   = useState<string | null>(null);
+  const [groups, setGroups]               = useState<CommercialGroup[]>([]);
+  const [presence, setPresence]           = useState<CommercialPresenceItem[]>([]);
+  const [loading, setLoading]             = useState(false);
+  const [showModal, setShowModal]         = useState(false);
+  const [editGroup, setEditGroup]         = useState<CommercialGroup | null>(null);
+  const [managingGroup, setManagingGroup] = useState<CommercialGroup | null>(null);
+  const [togglingId, setTogglingId]       = useState<string | null>(null);
   const [toggleActiveId, setToggleActiveId] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<CommercialGroup | null>(null);
-  const [deleteError, setDeleteError]     = useState<string | null>(null);
-  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
+  const [confirmDelete, setConfirmDelete]   = useState<CommercialGroup | null>(null);
+  const [deleteError, setDeleteError]       = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -439,7 +520,6 @@ export default function CommercialGroupsView() {
           <GroupPresenceTable groups={groups} />
           {groups.map((group) => {
             const memberCount = presence.filter((p) => p.groupId === group.id).length;
-            const isExpanded  = expandedId === group.id;
 
             return (
               <div
@@ -466,11 +546,11 @@ export default function CommercialGroupsView() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setExpandedId(isExpanded ? null : group.id)}
+                      onClick={() => setManagingGroup(group)}
                       className="px-3 py-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 font-medium"
-                      aria-label={isExpanded ? 'Masquer les membres' : 'Gérer les membres'}
+                      aria-label={`Gérer les membres de ${group.name}`}
                     >
-                      {isExpanded ? 'Masquer' : 'Gérer les membres'}
+                      Gérer les membres
                     </button>
                     <button
                       onClick={() => openEdit(group)}
@@ -490,11 +570,9 @@ export default function CommercialGroupsView() {
                       aria-label={group.isActive ? `Désactiver ${group.name}` : `Activer ${group.name}`}
                       title={group.isActive ? 'Désactiver' : 'Activer'}
                     >
-                      {toggleActiveId === group.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Power className="w-4 h-4" />
-                      )}
+                      {toggleActiveId === group.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Power className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() => setConfirmDelete(group)}
@@ -502,39 +580,25 @@ export default function CommercialGroupsView() {
                       className="p-1.5 rounded disabled:opacity-50 text-gray-400 hover:text-red-600 hover:bg-red-50"
                       aria-label={`Supprimer ${group.name}`}
                     >
-                      {togglingId === group.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
+                      {togglingId === group.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Trash2 className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-
-                {isExpanded && (
-                  <div className="px-5 pb-5">
-                    <GroupDetailPanel
-                      group={group}
-                      allPresence={presence}
-                      onRefresh={load}
-                    />
-                    <SubGroupsList groupId={group.id} />
-                    <ScheduleConfigForm
-                      groupId={group.id}
-                      initialWorkDaysCount={group.workDaysCount}
-                      initialFirstWorkDay={group.firstWorkDay}
-                      onScheduleGenerated={() => setScheduleRefreshKey((k) => k + 1)}
-                    />
-                    <GroupScheduleCalendar
-                      groupId={group.id}
-                      refreshKey={scheduleRefreshKey}
-                    />
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {managingGroup && (
+        <GroupManageModal
+          group={managingGroup}
+          allPresence={presence}
+          onClose={() => setManagingGroup(null)}
+          onRefresh={load}
+        />
       )}
 
       {showModal && (
