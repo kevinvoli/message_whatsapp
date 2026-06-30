@@ -370,10 +370,18 @@ export async function upsertBreakSchedule(
 }
 
 export async function deleteBreakSchedule(id: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/commercial-groups/break-schedule/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/commercial-groups/break-schedule/${id}`, {
     method: 'DELETE',
     credentials: 'include',
   });
+  if (!response.ok) {
+    let message = response.statusText;
+    try {
+      const body = await response.json() as { message?: string };
+      message = body.message ?? message;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
 }
 
 // ─── Exclusions ───────────────────────────────────────────────────────────────
