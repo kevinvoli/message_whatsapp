@@ -82,8 +82,8 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
     setError(null);
     try {
       const saved = await upsertBreakSchedule(subGroupId, {
-        startTime: form.startTime,
-        endTime: form.endTime,
+        startTime: form.startTime.slice(0, 5),
+        endTime: form.endTime.slice(0, 5),
         maxDurationMinutes: form.maxDurationMinutes,
         reminderIntervalMinutes: form.reminderIntervalMinutes,
         popupMessageText: form.popupMessageText.trim() || null,
