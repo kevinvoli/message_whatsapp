@@ -57,7 +57,11 @@ const WhatsAppPageContent = () => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelEnabled, setPanelEnabled] = useState(false);
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
-  const { prompt: breakPrompt, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+  const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+  const testBreak = searchParams.get('testBreak') === '1';
+  const breakPrompt = testBreak
+    ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: "C'est l'heure de ta pause !", audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() }
+    : breakPromptReal;
 
   useEffect(() => {
     getPanelMedia(1, 1)
