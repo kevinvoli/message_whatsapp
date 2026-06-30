@@ -1267,12 +1267,12 @@ export default function ConversationsView({
                                 value={messageInput}
                                 onChange={(e) => setMessageInput(e.target.value)}
                                 placeholder="Écrire un message..."
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary"
                                 disabled={loadingMessages || activeTab !== 'conversation'}
                             />
                             <button
                                 type="submit"
-                                className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                className="p-2 bg-primary text-white rounded-full hover:bg-primary-hover transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                                 disabled={loadingMessages || !messageInput.trim() || activeTab !== 'conversation'}
                             >
                                 {loadingMessages ? <Spinner  /> : <Send className="w-5 h-5" />}

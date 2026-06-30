@@ -10,11 +10,13 @@ import {
   UserMinus,
   AlertTriangle,
   Loader2,
-  X,
   ChevronDown,
   Power,
   ChevronRight,
 } from 'lucide-react';
+import { Modal } from '@/app/ui/shared/Modal';
+import { Tabs } from '@/app/ui/shared/Tabs';
+import type { TabItem } from '@/app/ui/shared/Tabs';
 import {
   getGroups,
   createGroup,
@@ -81,53 +83,43 @@ function GroupFormModal({ initial, editId, onClose, onSaved }: GroupFormModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-semibold text-gray-900">
-            {editId ? 'Modifier le groupe' : 'Nouveau groupe'}
-          </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Fermer">
-            <X className="w-5 h-5 text-gray-500" />
+    <Modal title={editId ? 'Modifier le groupe' : 'Nouveau groupe'} onClose={onClose} size="md">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Nom du groupe *</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="ex: Equipe A"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={2}
+            placeholder="Description optionnelle"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none resize-none"
+          />
+        </div>
+        {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}
+        <div className="flex justify-end gap-3 pt-1">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+            className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {editId ? 'Enregistrer' : 'Créer'}
           </button>
         </div>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Nom du groupe *</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="ex: Equipe A"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={2}
-              placeholder="Description optionnelle"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-            />
-          </div>
-          {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}
-          <div className="flex justify-end gap-3 pt-1">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
-              Annuler
-            </button>
-            <button
-              onClick={() => void handleSubmit()}
-              disabled={saving}
-              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editId ? 'Enregistrer' : 'Créer'}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -234,6 +226,11 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
 
 type SubGroupInnerTab = 'membres' | 'pause';
 
+const INNER_TABS: TabItem<SubGroupInnerTab>[] = [
+  { id: 'membres', label: 'Membres' },
+  { id: 'pause',   label: 'Pause'   },
+];
+
 interface SubGroupCardProps {
   sub: CommercialSubGroup;
   groupMembers: CommercialPresenceItem[];
@@ -323,20 +320,13 @@ function SubGroupCard({ sub, groupMembers, onDeleted }: SubGroupCardProps) {
       {expanded && (
         <div className="border-t border-gray-100 bg-gray-50">
           {/* Onglets internes */}
-          <div className="flex border-b border-gray-200 px-4">
-            {(['membres', 'pause'] as SubGroupInnerTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setInnerTab(tab)}
-                className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
-                  innerTab === tab
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab === 'membres' ? 'Membres' : 'Pause'}
-              </button>
-            ))}
+          <div className="px-4 pt-1">
+            <Tabs<SubGroupInnerTab>
+              tabs={INNER_TABS}
+              active={innerTab}
+              onChange={setInnerTab}
+              size="sm"
+            />
           </div>
 
           <div className="px-4 pb-4 pt-3 space-y-3">
@@ -586,7 +576,7 @@ export default function CommercialGroupsView() {
                 title={disabled ? 'Sélectionnez d\'abord un groupe' : undefined}
                 className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'border-indigo-600 text-indigo-600'
+                    ? 'border-primary text-primary'
                     : disabled
                       ? 'border-transparent text-gray-300 cursor-not-allowed'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -594,7 +584,7 @@ export default function CommercialGroupsView() {
               >
                 {tab.label}
                 {tab.requiresGroup && selectedGroup && activeTab === tab.id && (
-                  <span className="ml-1.5 text-xs text-indigo-400 font-normal">
+                  <span className="ml-1.5 text-xs text-primary/60 font-normal">
                     — {selectedGroup.name}
                   </span>
                 )}
@@ -782,40 +772,37 @@ export default function CommercialGroupsView() {
       )}
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
-            <div className="flex items-start gap-3 mb-4">
-              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">
-                  Supprimer «&nbsp;{confirmDelete.name}&nbsp;» ?
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Cette action est irréversible. Les membres seront libérés et les sous-groupes supprimés.
-                </p>
-              </div>
-            </div>
-            {deleteError && (
-              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded mb-3">{deleteError}</p>
-            )}
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => { setConfirmDelete(null); setDeleteError(null); }}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => void handleDelete(confirmDelete.id)}
-                disabled={togglingId === confirmDelete.id}
-                className="px-4 py-2 text-sm rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {togglingId === confirmDelete.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                Supprimer
-              </button>
-            </div>
+        <Modal
+          title={`Supprimer « ${confirmDelete.name} » ?`}
+          onClose={() => { setConfirmDelete(null); setDeleteError(null); }}
+          size="sm"
+        >
+          <div className="flex items-start gap-3 mb-4">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-gray-500">
+              Cette action est irréversible. Les membres seront libérés et les sous-groupes supprimés.
+            </p>
           </div>
-        </div>
+          {deleteError && (
+            <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded mb-3">{deleteError}</p>
+          )}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => { setConfirmDelete(null); setDeleteError(null); }}
+              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => void handleDelete(confirmDelete.id)}
+              disabled={togglingId === confirmDelete.id}
+              className="px-4 py-2 text-sm rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {togglingId === confirmDelete.id && <Loader2 className="w-4 h-4 animate-spin" />}
+              Supprimer
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

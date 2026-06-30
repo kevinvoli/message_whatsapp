@@ -254,7 +254,7 @@ function SystemConfigTab() {
             onClick={() => setActiveCategory(cat)}
             className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors ${
               activeCategory === cat
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -290,7 +290,7 @@ function SystemConfigTab() {
                     placeholder={cfg.isSecret ? 'Laisser vide pour conserver la valeur actuelle' : ''}
                     value={edits[cfg.configKey] ?? ''}
                     onChange={(e) => setEdits((prev) => ({ ...prev, [cfg.configKey]: e.target.value }))}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
                       cfg.isReadonly
                         ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
                         : 'border-gray-300'
@@ -325,7 +325,7 @@ function SystemConfigTab() {
       <button
         onClick={() => void handleSave()}
         disabled={saving}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
       >
         <Save className="w-4 h-4" />
         {saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
@@ -453,7 +453,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -464,7 +464,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -478,7 +478,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
             <button
               type="submit"
               disabled={profileLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {profileLoading ? 'Enregistrement...' : 'Enregistrer'}
@@ -505,7 +505,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -516,7 +516,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -527,7 +527,7 @@ export default function SettingsView({ adminProfile, onProfileUpdated }: Setting
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
