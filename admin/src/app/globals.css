@@ -14,13 +14,29 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --color-primary:        #4f46e5;
+  --color-primary-hover:  #4338ca;
+  --color-primary-light:  #eef2ff;
+  --color-danger:         #dc2626;
+  --color-danger-light:   #fef2f2;
+  --color-warning:        #f59e0b;
+  --color-success:        #16a34a;
+  --color-border:         #e5e7eb;
+  --color-surface-alt:    #f9fafb;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background:    var(--background);
+  --color-foreground:    var(--foreground);
+  --font-sans:           var(--font-geist-sans);
+  --font-mono:           var(--font-geist-mono);
+  --color-primary:       var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-light: var(--color-primary-light);
+  --color-danger:        var(--color-danger);
+  --color-danger-light:  var(--color-danger-light);
+  --color-warning:       var(--color-warning);
+  --color-success:       var(--color-success);
 }
 
 @media (prefers-color-scheme: dark) {

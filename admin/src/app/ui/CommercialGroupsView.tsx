@@ -536,6 +536,11 @@ export default function CommercialGroupsView() {
     setActiveTab('membres');
   };
 
+  const handleManageSubGroups = (group: CommercialGroup) => {
+    setSelectedGroup(group);
+    setActiveTab('sous-groupes');
+  };
+
   const handleBackToGroups = () => {
     setActiveTab('groupes');
   };
@@ -578,6 +583,7 @@ export default function CommercialGroupsView() {
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
                 disabled={disabled}
+                title={disabled ? 'Sélectionnez d\'abord un groupe' : undefined}
                 className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-indigo-600 text-indigo-600'
@@ -664,6 +670,13 @@ export default function CommercialGroupsView() {
                             aria-label={`Gérer ${group.name}`}
                           >
                             Gérer <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleManageSubGroups(group)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 font-medium"
+                            aria-label={`Sous-groupes de ${group.name}`}
+                          >
+                            Sous-groupes
                           </button>
                           <button
                             onClick={() => openEdit(group)}

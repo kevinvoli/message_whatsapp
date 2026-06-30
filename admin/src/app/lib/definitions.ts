@@ -69,7 +69,6 @@ export type ViewMode =
   | 'appels'
   | 'missed-calls'
   | 'applications'
-  | 'message-traffic'
   | 'campaign-links'
   | 'mediatheque'
   | 'settings'
