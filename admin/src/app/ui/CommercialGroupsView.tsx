@@ -13,10 +13,9 @@ import {
   ChevronDown,
   Power,
   ChevronRight,
+  Clock,
 } from 'lucide-react';
 import { Modal } from '@/app/ui/shared/Modal';
-import { Tabs } from '@/app/ui/shared/Tabs';
-import type { TabItem } from '@/app/ui/shared/Tabs';
 import {
   getGroups,
   createGroup,
@@ -132,6 +131,7 @@ interface GroupDetailPanelProps {
 }
 
 function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelProps) {
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [selectedAdd, setSelectedAdd] = useState('');
   const [adding, setAdding]           = useState(false);
   const [removingId, setRemovingId]   = useState<string | null>(null);
@@ -145,6 +145,7 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
     try {
       await addMember(group.id, selectedAdd);
       setSelectedAdd('');
+      setShowAddMemberModal(false);
       onRefresh();
     } catch { /* silencieux */ }
     finally { setAdding(false); }
@@ -161,6 +162,18 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">Membres du groupe</h3>
+        <button
+          onClick={() => setShowAddMemberModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover"
+          aria-label="Ajouter un membre au groupe"
+        >
+          <UserPlus className="w-4 h-4" />
+          Ajouter un membre
+        </button>
+      </div>
+
       {members.length === 0 ? (
         <p className="text-xs text-gray-400">Aucun membre pour l'instant.</p>
       ) : (
@@ -185,51 +198,67 @@ function GroupDetailPanel({ group, allPresence, onRefresh }: GroupDetailPanelPro
           ))}
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <select
-            value={selectedAdd}
-            onChange={(e) => setSelectedAdd(e.target.value)}
-            aria-label="Sélectionner un commercial à ajouter"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none pr-8"
-          >
-            <option value="">-- Ajouter un commercial --</option>
-            {available.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}{c.phone ? ` (${c.phone})` : ''}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-        </div>
-        <button
-          onClick={() => void handleAdd()}
-          disabled={!selectedAdd || adding}
-          aria-label="Ajouter au groupe"
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+
+      {showAddMemberModal && (
+        <Modal
+          title="Ajouter un membre"
+          onClose={() => { setShowAddMemberModal(false); setSelectedAdd(''); }}
+          size="sm"
         >
-          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-          Ajouter
-        </button>
-      </div>
-      {available.length === 0 && (
-        <p className="text-xs text-amber-600 flex items-center gap-1">
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Tous les commerciaux sans groupe sont déjà membres.
-        </p>
+          <div className="space-y-4">
+            {available.length === 0 ? (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Tous les commerciaux sans groupe sont déjà membres.
+              </p>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Sélectionner un commercial
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedAdd}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedAdd(e.target.value)}
+                    aria-label="Sélectionner un commercial à ajouter"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none appearance-none pr-8"
+                  >
+                    <option value="">-- Choisir un commercial --</option>
+                    {available.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.phone ? ` (${c.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                onClick={() => { setShowAddMemberModal(false); setSelectedAdd(''); }}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => void handleAdd()}
+                disabled={!selectedAdd || adding}
+                aria-label="Ajouter au groupe"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover disabled:opacity-50"
+              >
+                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Ajouter
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
 }
 
 // ─── Onglet sous-groupes ─────────────────────────────────────────────────────
-
-type SubGroupInnerTab = 'membres' | 'pause';
-
-const INNER_TABS: TabItem<SubGroupInnerTab>[] = [
-  { id: 'membres', label: 'Membres' },
-  { id: 'pause',   label: 'Pause'   },
-];
 
 interface SubGroupCardProps {
   sub: CommercialSubGroup;
@@ -239,7 +268,7 @@ interface SubGroupCardProps {
 
 function SubGroupCard({ sub, groupMembers, onDeleted }: SubGroupCardProps) {
   const [expanded, setExpanded]       = useState(false);
-  const [innerTab, setInnerTab]       = useState<SubGroupInnerTab>('membres');
+  const [pauseOpen, setPauseOpen]     = useState(false);
   const [members, setMembers]         = useState<{ id: string; name: string; phone?: string | null }[]>(sub.members ?? []);
   const [loadingMembers, setLoadingM] = useState(false);
   const [selectedAdd, setSelectedAdd] = useState('');
@@ -295,7 +324,7 @@ function SubGroupCard({ sub, groupMembers, onDeleted }: SubGroupCardProps) {
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
+      <div className="flex items-center gap-2 px-4 py-3 bg-white hover:bg-gray-50">
         <button
           onClick={() => void handleExpand()}
           className="flex items-center gap-2 flex-1 text-left"
@@ -307,6 +336,23 @@ function SubGroupCard({ sub, groupMembers, onDeleted }: SubGroupCardProps) {
             {members.length} membre{members.length > 1 ? 's' : ''}
           </span>
         </button>
+
+        {sub.breakSchedules[0] ? (
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded font-mono">
+            {sub.breakSchedules[0].startTime} – {sub.breakSchedules[0].endTime}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400 italic">Pas de pause</span>
+        )}
+
+        <button
+          onClick={(e) => { e.stopPropagation(); setPauseOpen(true); }}
+          aria-label={`Configurer la pause de ${sub.name}`}
+          className="p-1.5 text-gray-400 hover:text-orange-600 rounded hover:bg-orange-50"
+        >
+          <Clock className="w-3.5 h-3.5" />
+        </button>
+
         <button
           onClick={() => void handleDelete()}
           disabled={deleting}
@@ -318,80 +364,66 @@ function SubGroupCard({ sub, groupMembers, onDeleted }: SubGroupCardProps) {
       </div>
 
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50">
-          {/* Onglets internes */}
-          <div className="px-4 pt-1">
-            <Tabs<SubGroupInnerTab>
-              tabs={INNER_TABS}
-              active={innerTab}
-              onChange={setInnerTab}
-              size="sm"
-            />
-          </div>
-
-          <div className="px-4 pb-4 pt-3 space-y-3">
-            {innerTab === 'membres' && (
-              <>
-                {loadingMembers ? (
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Chargement…
-                  </div>
-                ) : members.length === 0 ? (
-                  <p className="text-xs text-gray-400">Aucun membre dans ce sous-groupe.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {members.map((m) => (
-                      <div key={m.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-white">
-                        <span className="text-sm text-gray-700">{m.name}</span>
-                        <button
-                          onClick={() => void handleRemoveMember(m.id)}
-                          disabled={removingId === m.id}
-                          aria-label={`Retirer ${m.name}`}
-                          className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
-                        >
-                          {removingId === m.id
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <UserMinus className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {available.length > 0 && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <div className="relative flex-1">
-                      <select
-                        value={selectedAdd}
-                        onChange={(e) => setSelectedAdd(e.target.value)}
-                        aria-label="Ajouter un membre du groupe"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none pr-7"
-                      >
-                        <option value="">-- Ajouter un membre du groupe --</option>
-                        {available.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                    </div>
-                    <button
-                      onClick={() => void handleAddMember()}
-                      disabled={!selectedAdd || adding}
-                      aria-label="Ajouter au sous-groupe"
-                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
-                      Ajouter
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {innerTab === 'pause' && (
-              <BreakSchedulePanel subGroupId={sub.id} />
-            )}
-          </div>
+        <div className="border-t border-gray-100 bg-gray-50 px-4 pb-4 pt-3 space-y-3">
+          {loadingMembers ? (
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <Loader2 className="w-3 h-3 animate-spin" /> Chargement…
+            </div>
+          ) : members.length === 0 ? (
+            <p className="text-xs text-gray-400">Aucun membre dans ce sous-groupe.</p>
+          ) : (
+            <div className="space-y-1">
+              {members.map((m) => (
+                <div key={m.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-white">
+                  <span className="text-sm text-gray-700">{m.name}</span>
+                  <button
+                    onClick={() => void handleRemoveMember(m.id)}
+                    disabled={removingId === m.id}
+                    aria-label={`Retirer ${m.name}`}
+                    className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
+                  >
+                    {removingId === m.id
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <UserMinus className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {available.length > 0 && (
+            <div className="flex items-center gap-2 pt-1">
+              <div className="relative flex-1">
+                <select
+                  value={selectedAdd}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedAdd(e.target.value)}
+                  aria-label="Ajouter un membre du groupe"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary focus:outline-none appearance-none pr-7"
+                >
+                  <option value="">-- Ajouter un membre du groupe --</option>
+                  {available.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              </div>
+              <button
+                onClick={() => void handleAddMember()}
+                disabled={!selectedAdd || adding}
+                aria-label="Ajouter au sous-groupe"
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-xs hover:bg-primary-hover disabled:opacity-50"
+              >
+                {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                Ajouter
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {pauseOpen && (
+        <Modal title={`Pause — ${sub.name}`} onClose={() => setPauseOpen(false)} size="md">
+          <BreakSchedulePanel subGroupId={sub.id} />
+        </Modal>
       )}
     </div>
   );
@@ -403,11 +435,12 @@ interface SubGroupsListProps {
 }
 
 function SubGroupsList({ groupId, groupMembers }: SubGroupsListProps) {
-  const [subGroups, setSubGroups] = useState<CommercialSubGroup[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [newName, setNewName]     = useState('');
-  const [adding, setAdding]       = useState(false);
+  const [subGroups, setSubGroups]           = useState<CommercialSubGroup[]>([]);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newName, setNewName]               = useState('');
+  const [adding, setAdding]                 = useState(false);
 
   const loadSubGroups = useCallback(async () => {
     setLoading(true);
@@ -431,6 +464,7 @@ function SubGroupsList({ groupId, groupMembers }: SubGroupsListProps) {
     try {
       await createSubGroup({ parentGroupId: groupId, name });
       setNewName('');
+      setShowCreateModal(false);
       await loadSubGroups();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création.');
@@ -449,6 +483,18 @@ function SubGroupsList({ groupId, groupMembers }: SubGroupsListProps) {
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-700">Sous-groupes</h3>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover"
+          aria-label="Créer un nouveau sous-groupe"
+        >
+          <Plus className="w-4 h-4" />
+          Nouveau sous-groupe
+        </button>
+      </div>
+
       {subGroups.length === 0 ? (
         <p className="text-xs text-gray-400">Aucun sous-groupe pour l'instant.</p>
       ) : (
@@ -463,25 +509,49 @@ function SubGroupsList({ groupId, groupMembers }: SubGroupsListProps) {
           ))}
         </div>
       )}
+
       {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}
-      <div className="flex items-center gap-2 pt-1">
-        <input
-          value={newName}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
-          placeholder="Nom du nouveau sous-groupe"
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') void handleAdd(); }}
-        />
-        <button
-          onClick={() => void handleAdd()}
-          disabled={!newName.trim() || adding}
-          aria-label="Créer un sous-groupe"
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+
+      {showCreateModal && (
+        <Modal
+          title="Nouveau sous-groupe"
+          onClose={() => { setShowCreateModal(false); setNewName(''); }}
+          size="sm"
         >
-          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          Créer
-        </button>
-      </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Nom du sous-groupe *
+              </label>
+              <input
+                value={newName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
+                placeholder="Nom du nouveau sous-groupe"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') void handleAdd(); }}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                onClick={() => { setShowCreateModal(false); setNewName(''); }}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => void handleAdd()}
+                disabled={!newName.trim() || adding}
+                aria-label="Créer le sous-groupe"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover disabled:opacity-50"
+              >
+                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Créer
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

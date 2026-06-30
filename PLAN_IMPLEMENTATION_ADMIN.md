@@ -290,7 +290,36 @@ Si le nombre de vues dépasse 50, reconsidérer avec `React.lazy()` + `Suspense`
 
 | Sprint | Contenu | Statut |
 |--------|---------|--------|
-| Sprint 1 | Corrections UX critiques | À faire |
-| Sprint 2 | Fondations design system | À faire |
-| Sprint 3 | Migration vues existantes | À faire |
-| Sprint 4 | Nettoyage definitions.ts | À faire |
+| Sprint 1 | Corrections UX critiques | ✅ Livré 2026-06-30 |
+| Sprint 2 | Fondations design system | ✅ Livré 2026-06-30 |
+| Sprint 3 | Migration vues existantes | ✅ Livré 2026-06-30 |
+| Sprint 4 | Nettoyage definitions.ts | ✅ Livré 2026-06-30 |
+
+---
+
+## Résultats livrés
+
+### Sprint 1
+- Bouton "Sous-groupes" direct sur chaque carte groupe (`CommercialGroupsView.tsx`)
+- Tooltip `"Sélectionnez d'abord un groupe"` sur les onglets désactivés
+- Doublon `'message-traffic'` supprimé de `ViewMode`
+
+### Sprint 2
+- `globals.css` — 9 variables CSS couleur + exposition Tailwind v4 via `@theme inline`
+- `admin/src/app/ui/shared/Tabs.tsx` — générique `<T extends string>`, disabled/badge/2 tailles
+- `admin/src/app/ui/shared/Modal.tsx` — overlay, Escape, stopPropagation, aria
+- `admin/src/app/hooks/useAsync.ts` — deps, cleanup `cancelled`, reload via `reloadKey`
+
+### Sprint 3
+- `SettingsView` : `blue-*` → `primary` sur inputs et boutons de sauvegarde
+- `CommercialGroupsView` : 2 modales inline → `<Modal>`, tabs SubGroupCard → `<Tabs>`, couleurs → tokens
+- `OverviewView` : rien à migrer (badges décoratifs sémantiques)
+- `ConversationsView` : focus input + bouton envoi → `primary`
+
+### Sprint 4
+- `definitions.ts` (1529 lignes) → barrel 4 lignes
+- `lib/types/entities.ts` (807 lignes) — entités métier
+- `lib/types/api.ts` (627 lignes) — DTOs et réponses API
+- `lib/types/ui.ts` (111 lignes) — ViewMode, navigation, états UI
+- `lib/types/constants.ts` (21 lignes) — SEUILS_ALERTES, COULEURS_STATUT
+- 24 valeurs `ViewMode` orphelines auditées → documentées dans `VIEWMODE_ORPHELINS.md` (5 avec backend prêt, 17 sans backend)

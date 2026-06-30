@@ -71,3 +71,12 @@ select:disabled {
   20% { opacity: 1; }
   100% { opacity: .2; }
 }
+
+@keyframes slow-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.82; }
+}
+
+.animate-slow-pulse {
+  animation: slow-pulse 2.4s ease-in-out infinite;
+}

@@ -136,7 +136,7 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
             type="time"
             value={form.startTime}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('startTime', e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
           />
         </div>
         <div>
@@ -147,7 +147,7 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
             type="time"
             value={form.endTime}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('endTime', e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
           />
         </div>
       </div>
@@ -164,7 +164,7 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setField('maxDurationMinutes', Math.max(1, parseInt(e.target.value, 10) || 1))
             }
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
           />
         </div>
         <div>
@@ -178,14 +178,14 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setField('reminderIntervalMinutes', Math.max(1, parseInt(e.target.value, 10) || 1))
             }
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
           />
         </div>
       </div>
 
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">
-          Message popup{' '}
+          Message banner{' '}
           <span className="font-normal text-gray-400">(optionnel, max 1000 caractères)</span>
         </label>
         <textarea
@@ -194,7 +194,7 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
           maxLength={1000}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setField('popupMessageText', e.target.value)}
           placeholder="Message affiché aux commerciaux lors de la pause…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none resize-none"
         />
         <p className="text-xs text-gray-400 text-right mt-0.5">
           {form.popupMessageText.length}/1000
@@ -209,7 +209,7 @@ export default function BreakSchedulePanel({ subGroupId }: BreakSchedulePanelPro
         <button
           onClick={() => void handleSave()}
           disabled={saving || deleting}
-          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Enregistrer

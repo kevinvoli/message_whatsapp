@@ -26,35 +26,33 @@ export default function BreakPromptModal({ prompt, audioRef, onTakeBreak }: Brea
   if (!prompt) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div
-        className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-gray-900 mb-1">
-          C&apos;est l&apos;heure de ta pause&nbsp;!
-        </h2>
-        <p className="text-sm text-gray-500 mb-4">{prompt.subGroupName}</p>
-
-        {prompt.messageText && (
-          <p className="text-gray-700 mb-4">{prompt.messageText}</p>
-        )}
-
-        <p className="text-sm text-gray-500 mb-6">
-          Fin dans <span className="font-semibold text-gray-800">{remainingMinutes} min</span>
-        </p>
-
-        <audio ref={audioRef} className="hidden" />
-
-        <div className="flex justify-center">
-          <button
-            onClick={onTakeBreak}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Prendre ma pause
-          </button>
+    <>
+      <audio ref={audioRef} className="hidden" />
+      <div className="fixed bottom-0 left-0 right-0 z-50 animate-slow-pulse">
+        <div className="bg-orange-500 text-white px-6 py-4 shadow-2xl">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-base leading-tight">
+                C&apos;est l&apos;heure de ta pause — {prompt.subGroupName}
+              </p>
+              {prompt.messageText && (
+                <p className="text-sm text-orange-100 mt-0.5 leading-snug">
+                  {prompt.messageText}
+                </p>
+              )}
+              <p className="text-xs text-orange-200 mt-1">
+                Fin dans <span className="font-bold text-white">{remainingMinutes} min</span>
+              </p>
+            </div>
+            <button
+              onClick={onTakeBreak}
+              className="shrink-0 px-5 py-2 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors text-sm"
+            >
+              Prendre ma pause
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
