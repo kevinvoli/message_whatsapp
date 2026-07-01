@@ -48,7 +48,7 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
   }, [sendError, setSendError]);
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 min-h-0 flex flex-col">
       {panelEnabled && (
         <div className="flex justify-end border-b border-gray-100 bg-white px-3 py-1.5">
           <button

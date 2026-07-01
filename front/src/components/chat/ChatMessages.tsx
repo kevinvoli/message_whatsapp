@@ -61,7 +61,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
   // Si aucun message
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
+      <div className="flex-1 min-h-0 flex items-center justify-center bg-gray-50">
         <div className="text-center text-gray-400">
           <p className="text-lg">Aucun message</p>
           <p className="text-sm mt-2">Envoyez le premier message pour démarrer la conversation</p>
@@ -71,7 +71,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentConv }) =>
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-gray-50">
       <div className="max-w-4xl mx-auto space-y-3">
         {/* Sentinel pour le scroll infini (chargement des anciens messages) */}
         {!currentConv.channel_dedicated && hasMoreMessages && (
